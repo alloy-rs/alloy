@@ -781,39 +781,6 @@ impl BlockHeader for Header {
     }
 }
 
-#[cfg(all(test, feature = "serde"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_header_serde_json_roundtrip() {
-        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
-        let header = Header {
-            base_fee_per_gas: Some(1),
-            withdrawals_root: Some(EMPTY_ROOT_HASH),
-            ..Default::default()
-        };
-
-        let encoded = serde_json::to_string(&header).unwrap();
-        assert_eq!(encoded, raw);
-
-        let decoded: Header = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded, header);
-
-        // Create a vector to store the encoded RLP
-        let mut encoded_rlp = Vec::new();
-
-        // Encode the header data
-        decoded.encode(&mut encoded_rlp);
-
-        // Decode the RLP data
-        let decoded_rlp = Header::decode(&mut encoded_rlp.as_slice()).unwrap();
-
-        // Check that the decoded RLP data matches the original header data
-        assert_eq!(decoded_rlp, decoded);
-    }
-}
-
 /// Bincode-compatibl [`Header`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
@@ -970,5 +937,38 @@ pub(super) mod serde_bincode_compat {
             let decoded: Data = bincode::deserialize(&encoded).unwrap();
             assert_eq!(decoded, data);
         }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_header_serde_json_roundtrip() {
+        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
+        let header = Header {
+            base_fee_per_gas: Some(1),
+            withdrawals_root: Some(EMPTY_ROOT_HASH),
+            ..Default::default()
+        };
+
+        let encoded = serde_json::to_string(&header).unwrap();
+        assert_eq!(encoded, raw);
+
+        let decoded: Header = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, header);
+
+        // Create a vector to store the encoded RLP
+        let mut encoded_rlp = Vec::new();
+
+        // Encode the header data
+        decoded.encode(&mut encoded_rlp);
+
+        // Decode the RLP data
+        let decoded_rlp = Header::decode(&mut encoded_rlp.as_slice()).unwrap();
+
+        // Check that the decoded RLP data matches the original header data
+        assert_eq!(decoded_rlp, decoded);
     }
 }
