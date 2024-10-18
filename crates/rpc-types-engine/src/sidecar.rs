@@ -1,6 +1,7 @@
 //! Contains helpers for dealing with additional parameters of `newPayload` requests.
 
 use crate::{CancunPayloadFields, MaybeCancunPayloadFields};
+use alloc::vec::Vec;
 use alloy_eips::eip7685::Requests;
 use alloy_primitives::B256;
 
