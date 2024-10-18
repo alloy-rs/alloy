@@ -138,13 +138,11 @@ pub trait Decodable2718: Sized {
         *buf = h_decode;
 
         let remaining_len = buf.len();
-
         if remaining_len == 0 || remaining_len < h.payload_length {
             return Err(alloy_rlp::Error::InputTooShort.into());
         }
 
-        let ty = buf[0];
-        buf.advance(1);
+        let ty = buf.get_u8();
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();

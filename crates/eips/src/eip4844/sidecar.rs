@@ -1,5 +1,7 @@
 //! EIP-4844 sidecar type
 
+use core::fmt;
+
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
@@ -19,7 +21,7 @@ pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "BlobTxSidecar")]
@@ -34,6 +36,16 @@ pub struct BlobTransactionSidecar {
     pub commitments: Vec<Bytes48>,
     /// The blob proofs.
     pub proofs: Vec<Bytes48>,
+}
+
+impl fmt::Debug for BlobTransactionSidecar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlobTransactionSidecar")
+            .field("blob_count", &self.blobs.len())
+            .field("commitments", &self.commitments)
+            .field("proofs", &self.proofs)
+            .finish()
+    }
 }
 
 impl IntoIterator for BlobTransactionSidecar {
