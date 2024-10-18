@@ -1,7 +1,10 @@
 //! Payload types.
 
 use crate::PayloadError;
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip4844::BlobTransactionSidecar, eip4895::Withdrawal, BlockNumHash};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
@@ -837,7 +840,6 @@ impl serde::Serialize for PayloadStatus {
 
 impl From<PayloadError> for PayloadStatusEnum {
     fn from(error: PayloadError) -> Self {
-        use alloc::string::ToString;
         Self::Invalid { validation_error: error.to_string() }
     }
 }
