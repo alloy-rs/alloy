@@ -1,3 +1,4 @@
+use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
@@ -6,20 +7,12 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{
-    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
+    keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
 use core::mem;
-
-/// Ommer root of empty list.
-pub const EMPTY_OMMER_ROOT_HASH: B256 =
-    b256!("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
-
-/// Root hash of an empty trie.
-pub const EMPTY_ROOT_HASH: B256 =
-    b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -122,12 +115,12 @@ pub struct Header {
     /// The beacon roots contract handles root storage, enhancing Ethereum's functionalities.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
-    /// The Keccak 256-bit hash of the root node of the trie structure populated with each
+    /// The Keccak 256-bit hash of the an RLP encoded list with each
     /// [EIP-7685] request in the block body.
     ///
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub requests_root: Option<B256>,
+    pub requests_hash: Option<B256>,
     /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
     /// fewer; formally Hx.
     pub extra_data: Bytes,
@@ -162,7 +155,7 @@ impl Default for Header {
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root: None,
-            requests_root: None,
+            requests_hash: None,
         }
     }
 }
@@ -317,7 +310,7 @@ impl Header {
             length += parent_beacon_block_root.length();
         }
 
-        // Encode requests root length.
+        // Encode requests hash length.
         //
         // If new fields are added, the above pattern will
         // need to be repeated and placeholder length added. Otherwise, it's impossible to
@@ -326,8 +319,8 @@ impl Header {
         //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
         //    post-London, so this is technically not valid. However, a tool like proptest would
         //    generate a block like this.
-        if let Some(requests_root) = self.requests_root {
-            length += requests_root.length();
+        if let Some(requests_hash) = self.requests_hash {
+            length += requests_hash.length();
         }
 
         length
@@ -443,7 +436,7 @@ impl Encodable for Header {
             parent_beacon_block_root.encode(out);
         }
 
-        // Encode requests root.
+        // Encode requests hash.
         //
         // If new fields are added, the above pattern will need to
         // be repeated and placeholders added. Otherwise, it's impossible to tell _which_
@@ -452,8 +445,8 @@ impl Encodable for Header {
         //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
         //    post-London, so this is technically not valid. However, a tool like proptest would
         //    generate a block like this.
-        if let Some(ref requests_root) = self.requests_root {
-            requests_root.encode(out);
+        if let Some(ref requests_hash) = self.requests_hash {
+            requests_hash.encode(out);
         }
     }
 
@@ -493,7 +486,7 @@ impl Decodable for Header {
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root: None,
-            requests_root: None,
+            requests_hash: None,
         };
 
         if started_len - buf.len() < rlp_head.payload_length {
@@ -592,7 +585,7 @@ pub(crate) const fn generate_valid_header(
     }
 
     // Placeholder for future EIP adjustments
-    header.requests_root = None;
+    header.requests_hash = None;
 
     header
 }
@@ -622,7 +615,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             blob_gas_used: u.arbitrary()?,
             excess_blob_gas: u.arbitrary()?,
             parent_beacon_block_root: u.arbitrary()?,
-            requests_root: u.arbitrary()?,
+            requests_hash: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
         };
 
@@ -695,8 +688,8 @@ pub trait BlockHeader {
     /// Retrieves the parent beacon block root of the block, if available
     fn parent_beacon_block_root(&self) -> Option<B256>;
 
-    /// Retrieves the requests root of the block, if available
-    fn requests_root(&self) -> Option<B256>;
+    /// Retrieves the requests hash of the block, if available
+    fn requests_hash(&self) -> Option<B256>;
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
@@ -779,8 +772,8 @@ impl BlockHeader for Header {
         self.parent_beacon_block_root
     }
 
-    fn requests_root(&self) -> Option<B256> {
-        self.requests_root
+    fn requests_hash(&self) -> Option<B256> {
+        self.requests_hash
     }
 
     fn extra_data(&self) -> &Bytes {
@@ -871,7 +864,7 @@ pub(super) mod serde_bincode_compat {
         #[serde(default)]
         parent_beacon_block_root: Option<B256>,
         #[serde(default)]
-        requests_root: Option<B256>,
+        requests_hash: Option<B256>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -897,7 +890,7 @@ pub(super) mod serde_bincode_compat {
                 blob_gas_used: value.blob_gas_used,
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
-                requests_root: value.requests_root,
+                requests_hash: value.requests_hash,
                 extra_data: Cow::Borrowed(&value.extra_data),
             }
         }
@@ -925,7 +918,7 @@ pub(super) mod serde_bincode_compat {
                 blob_gas_used: value.blob_gas_used,
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
-                requests_root: value.requests_root,
+                requests_hash: value.requests_hash,
                 extra_data: value.extra_data.into_owned(),
             }
         }
