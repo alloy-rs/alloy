@@ -16,6 +16,16 @@ use alloc::vec::Vec;
 #[cfg(feature = "kzg")]
 pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
+/// A Blob hash
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct IndexedBlobHash {
+    /// The index of the blob
+    pub index: u64,
+    /// The hash of the blob
+    pub hash: B256,
+}
+
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
@@ -105,9 +115,12 @@ impl BlobTransactionSidecarItem {
         result.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
 
-    /// Verify the blob sidecar against its [crate::NumHash].
-    pub fn verify_blob(&self, hash: &crate::NumHash) -> Result<(), BlobTransactionValidationError> {
-        if self.index != hash.number {
+    /// Verify the blob sidecar against its [IndexedBlobHash].
+    pub fn verify_blob(
+        &self,
+        hash: &IndexedBlobHash,
+    ) -> Result<(), BlobTransactionValidationError> {
+        if self.index != hash.index {
             let blob_hash_part = B256::from_slice(&self.blob[0..32]);
             return Err(BlobTransactionValidationError::WrongVersionedHash {
                 have: blob_hash_part,
