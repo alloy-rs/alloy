@@ -981,5 +981,9 @@ mod tests {
         let header = serde_json::from_str::<Header>(raw).unwrap();
         let hash = header.hash_slow();
         assert_eq!(hash, b256!("661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26"));
+        let mut v = Vec::new();
+        header.encode(&mut v);
+        let decoded = Header::decode(&mut v.as_slice()).unwrap();
+        assert_eq!(decoded, header);
     }
 }
