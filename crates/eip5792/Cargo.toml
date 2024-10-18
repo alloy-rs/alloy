@@ -1,5 +1,5 @@
 [package]
-name = "alloy-wallet-rpc-types"
+name = "alloy-eip5792"
 description = "Types for the 'wallet' Ethereum JSON-RPC namespace"
 
 version.workspace = true
@@ -12,18 +12,12 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["map"] }
+alloy-primitives = { workspace = true, features = ["serde", "map"] }
 alloy-serde = { workspace = true, optional = true }
-serde = { workspace = true, features = ["derive"], optional = true }
-serde_json = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 
 [features]
-default = ["serde", "std"]
-std = ["alloy-primitives/map"]
-serde = [
-    "dep:serde",
-    "dep:alloy-serde"
-]
 
 [lints]
 workspace = true
