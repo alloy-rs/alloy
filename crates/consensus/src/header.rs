@@ -456,7 +456,7 @@ impl Decodable for Header {
             this.parent_beacon_block_root = Some(B256::decode(buf)?);
         }
 
-        // Decode requests root.
+        // Decode requests hash.
         if started_len - buf.len() < rlp_head.payload_length {
             this.requests_hash = Some(B256::decode(buf)?);
         }
