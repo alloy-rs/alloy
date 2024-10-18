@@ -292,7 +292,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
         let tx: Signed<TxEip4844> = tx.try_into()?;
-        let (inner, signature, _) = tx.into_parts();
+        let (inner, signature) = tx.into_parts();
         let tx: TxEip4844Variant = inner.into();
 
         Ok(tx.into_signed(signature))
@@ -329,11 +329,11 @@ impl TryFrom<Transaction> for TxEnvelope {
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
         match tx.transaction_type.unwrap_or_default().try_into()? {
-            TxType::Legacy => Ok(Self::Legacy(tx.try_into()?)),
-            TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
-            TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
-            TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
-            TxType::Eip7702 => Ok(Self::Eip7702(tx.try_into()?)),
+            TxType::Legacy => Ok(Signed::<TxLegacy>::try_from(tx)?.into()),
+            TxType::Eip1559 => Ok(Signed::<TxEip1559>::try_from(tx)?.into()),
+            TxType::Eip2930 => Ok(Signed::<TxEip2930>::try_from(tx)?.into()),
+            TxType::Eip4844 => Ok(Signed::<TxEip4844>::try_from(tx)?.into()),
+            TxType::Eip7702 => Ok(Signed::<TxEip7702>::try_from(tx)?.into()),
         }
     }
 }

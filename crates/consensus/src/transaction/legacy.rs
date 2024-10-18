@@ -1,8 +1,7 @@
 use core::mem;
 
-use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
@@ -296,10 +295,8 @@ impl SignableTransaction<Signature> for TxLegacy {
         } else {
             signature
         };
-        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature));
-        self.encode_with_signature_fields(&signature, &mut buf);
-        let hash = keccak256(&buf);
-        Signed::new_unchecked(self, signature, hash)
+
+        Signed::new_unchecked(self, signature)
     }
 }
 
@@ -372,9 +369,9 @@ mod tests {
         )
         .unwrap();
 
-        let signed_tx = tx.into_signed(sig);
+        let signed_tx: crate::TxEnvelope = tx.into_signed(sig).into();
 
-        assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
+        assert_eq!(*signed_tx.tx_hash(), hash, "Expected same hash");
         assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
     }
 
