@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Wallet namespace types ([#1448](https://github.com/alloy-rs/alloy/issues/1448))
 
+### Miscellaneous Tasks
+
+- Release 0.5.0
+
 [`alloy`]: https://crates.io/crates/alloy
 [alloy]: https://crates.io/crates/alloy
 [`alloy-core`]: https://crates.io/crates/alloy-core

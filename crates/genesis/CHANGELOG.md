@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
 
+### Miscellaneous Tasks
+
+- Release 0.5.0
+
 ### Other
 
 - GenesisAccount : implement `deserialize_private_key` ([#1447](https://github.com/alloy-rs/alloy/issues/1447))

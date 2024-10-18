@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Enable serde types dependencies in rpc-types ([#1456](https://github.com/alloy-rs/alloy/issues/1456))
 
+### Miscellaneous Tasks
+
+- Release 0.5.0
+
 ### Other
 
 - Replace assert_eq! with similar_asserts::assert_eq! ([#1429](https://github.com/alloy-rs/alloy/issues/1429))

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.0
 - Flatten eip-7685 requests into a single opaque list ([#1383](https://github.com/alloy-rs/alloy/issues/1383))
 - Refactor some match with same arms ([#1463](https://github.com/alloy-rs/alloy/issues/1463))
 - More simplifications ([#1469](https://github.com/alloy-rs/alloy/issues/1469))

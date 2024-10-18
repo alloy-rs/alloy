@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.0
 - Unify use Option ref ([#1477](https://github.com/alloy-rs/alloy/issues/1477))
 - More simplifications ([#1469](https://github.com/alloy-rs/alloy/issues/1469))
 - Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))

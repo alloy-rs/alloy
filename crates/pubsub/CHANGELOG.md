@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.0
 - Refactor some match with same arms ([#1463](https://github.com/alloy-rs/alloy/issues/1463))
 - Rm needless pass by ref mut ([#1465](https://github.com/alloy-rs/alloy/issues/1465))
 

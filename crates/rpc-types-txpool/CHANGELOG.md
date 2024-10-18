@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.0
 - Refactor some match with same arms ([#1463](https://github.com/alloy-rs/alloy/issues/1463))
 - Some lifetime simplifications ([#1467](https://github.com/alloy-rs/alloy/issues/1467))
 

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [wasm] Support ws ([#1481](https://github.com/alloy-rs/alloy/issues/1481))
 - [provider] Use wasmtimer for wasm32 target ([#1426](https://github.com/alloy-rs/alloy/issues/1426))
 
+### Miscellaneous Tasks
+
+- Release 0.5.0
+
 ## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
 
 ### Miscellaneous Tasks
