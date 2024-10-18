@@ -34,7 +34,7 @@ impl ExecutionPayloadSidecar {
     }
 
     /// Returns a reference to the [`CancunPayloadFields`].
-    pub fn cancun(&self) -> Option<&CancunPayloadFields> {
+    pub const fn cancun(&self) -> Option<&CancunPayloadFields> {
         self.cancun.as_ref()
     }
 
@@ -49,7 +49,7 @@ impl ExecutionPayloadSidecar {
     }
 
     /// Returns the EIP-7685 requests
-    pub fn requests(&self) -> Option<&Requests> {
+    pub const fn requests(&self) -> Option<&Requests> {
         self.prague.as_ref()
     }
 }
