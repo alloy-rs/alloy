@@ -2,7 +2,7 @@
 
 use crate::Header;
 use alloc::vec::Vec;
-use alloy_eips::eip4895::Withdrawal;
+use alloy_eips::eip4895::Withdrawals;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -31,7 +31,7 @@ pub struct BlockBody<T> {
     /// Ommers/uncles header.
     pub ommers: Vec<Header>,
     /// Block withdrawals.
-    pub withdrawals: Option<Vec<Withdrawal>>,
+    pub withdrawals: Option<Withdrawals>,
 }
 
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
@@ -45,7 +45,7 @@ mod block_rlp {
         header: Header,
         transactions: Vec<T>,
         ommers: Vec<Header>,
-        withdrawals: Option<Vec<Withdrawal>>,
+        withdrawals: Option<Withdrawals>,
     }
 
     #[derive(RlpEncodable)]
@@ -54,7 +54,7 @@ mod block_rlp {
         header: &'a Header,
         transactions: &'a Vec<T>,
         ommers: &'a Vec<Header>,
-        withdrawals: Option<&'a Vec<Withdrawal>>,
+        withdrawals: Option<&'a Withdrawals>,
     }
 
     impl<'a, T> From<&'a Block<T>> for HelperRef<'a, T> {
