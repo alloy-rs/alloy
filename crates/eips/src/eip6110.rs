@@ -1,8 +1,6 @@
-//! Contains Deposit types, first introduced in the [Prague hardfork](https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md).
+//! Contains Deposit request constants, first introduced in the [Prague hardfork](https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md).
 //!
 //! See also [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110): Supply validator deposits on chain
-//!
-//! Provides validator deposits as a list of deposit operations added to the Execution Layer block.
 
 use alloy_primitives::{address, Address};
 
