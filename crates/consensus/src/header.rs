@@ -528,7 +528,7 @@ impl Decodable for Header {
             this.parent_beacon_block_root = Some(B256::decode(buf)?);
         }
 
-        // Decode requests root.
+        // Decode requests hash.
         //
         // If new fields are added, the above pattern will need to
         // be repeated and placeholders decoded. Otherwise, it's impossible to tell _which_
