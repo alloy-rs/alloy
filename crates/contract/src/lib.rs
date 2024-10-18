@@ -30,6 +30,9 @@ pub use instance::*;
 mod call;
 pub use call::*;
 
+mod multicall;
+pub use multicall::*;
+
 // Not public API.
 // NOTE: please avoid changing the API of this module due to its use in the `sol!` macro.
 #[doc(hidden)]

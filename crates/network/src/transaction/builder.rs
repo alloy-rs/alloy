@@ -93,6 +93,9 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Get the input data for the transaction.
     fn input(&self) -> Option<&Bytes>;
 
+    /// Take the input data for the transaction.
+    fn into_input(self) -> Option<Bytes>;
+
     /// Set the input data for the transaction.
     fn set_input<T: Into<Bytes>>(&mut self, input: T);
 
