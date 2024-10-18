@@ -208,7 +208,7 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     /// This is a convenience method for encoding into a vec, and returning the
     /// vec.
     fn encoded_2718(&self) -> Vec<u8> {
-        let mut out = vec![];
+        let mut out = Vec::with_capacity(self.encode_2718_len());
         self.encode_2718(&mut out);
         out
     }
