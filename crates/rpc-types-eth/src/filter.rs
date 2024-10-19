@@ -1594,6 +1594,90 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_range_block() {
+        let json = json!(
+                    {
+          "fromBlock": null,
+          "toBlock": null,
+          "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::AtBlockHash(
+                "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
+                    .parse()
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash() {
+        let json = json!(
+                    {
+          "fromBlock": "0x1",
+          "toBlock": "0x2",
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: Some(2u64.into()) }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash_and_null_from_block() {
+        let json = json!(
+                    {
+          "fromBlock": null,
+          "toBlock": "0x2",
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash_and_null_to_block() {
+        let json = json!(
+                    {
+          "fromBlock": "0x1",
+          "toBlock": null,
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None }
+        );
+    }
+
+    #[test]
     fn test_is_pending_block_filter() {
         let filter = Filter {
             block_option: FilterBlockOption::Range {
