@@ -185,10 +185,6 @@ mod tests {
     use alloy_primitives::U256;
     use std::{future::Future, time::Duration};
 
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
-
     async fn timeout<T: Future>(future: T) -> T::Output {
         try_timeout(future).await.expect("Timeout")
     }
@@ -207,8 +203,6 @@ mod tests {
         yield_block(true).await;
     }
     async fn yield_block(ws: bool) {
-        init_tracing();
-
         let anvil = Anvil::new().spawn();
 
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
@@ -239,8 +233,6 @@ mod tests {
     async fn yield_many_blocks(ws: bool) {
         // Make sure that we can process more blocks than fits in the cache.
         const BLOCKS_TO_MINE: usize = BLOCK_CACHE_SIZE.get() + 1;
-
-        init_tracing();
 
         let anvil = Anvil::new().spawn();
 
