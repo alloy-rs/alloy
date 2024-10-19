@@ -5,6 +5,17 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B25
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
+/// Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
+macro_rules! legacy_sig {
+    ($signature:expr) => {
+        if let Parity::Parity(parity) = $signature.v() {
+            &$signature.with_parity(Parity::NonEip155(parity))
+        } else {
+            $signature
+        }
+    };
+}
+
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -122,6 +133,21 @@ impl RlpEcdsaTx for TxLegacy {
         self.to.encode(out);
         self.value.encode(out);
         self.input.0.encode(out);
+    }
+
+    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
+        // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
+        let signature = legacy_sig!(signature);
+        let header = self.rlp_header_signed(&signature);
+        header.length() + header.payload_length
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
+        let signature = legacy_sig!(signature);
+        self.rlp_header_signed(signature).encode(out);
+        self.rlp_encode_fields(out);
+        signature.write_rlp_vrs(out);
     }
 
     fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
