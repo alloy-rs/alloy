@@ -1085,7 +1085,6 @@ mod tests {
         let len = expected_envelope.length();
         let mut buf = Vec::with_capacity(len);
         expected_envelope.encode(&mut buf);
-        dbg!(alloy_primitives::hex::encode(&buf[0..16]));
         assert_eq!(buf.len(), len);
 
         // ensure it's also the same size that `actual` claims to be, since we just changed the
