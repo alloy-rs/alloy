@@ -1,4 +1,4 @@
-use crate::{Response, ResponsePayload};
+use crate::{check_and_set_field, Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde::{
     de::{MapAccess, Visitor},
@@ -87,30 +87,10 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 // Drain the map into the appropriate fields.
                 while let Ok(Some(key)) = map.next_key() {
                     match key {
-                        "id" => {
-                            if id.is_some() {
-                                return Err(serde::de::Error::duplicate_field("id"));
-                            }
-                            id = Some(map.next_value()?);
-                        }
-                        "result" => {
-                            if result.is_some() {
-                                return Err(serde::de::Error::duplicate_field("result"));
-                            }
-                            result = Some(map.next_value()?);
-                        }
-                        "params" => {
-                            if params.is_some() {
-                                return Err(serde::de::Error::duplicate_field("params"));
-                            }
-                            params = Some(map.next_value()?);
-                        }
-                        "error" => {
-                            if error.is_some() {
-                                return Err(serde::de::Error::duplicate_field("error"));
-                            }
-                            error = Some(map.next_value()?);
-                        }
+                        "id" => check_and_set_field!(map, id),
+                        "result" => check_and_set_field!(map, result),
+                        "params" => check_and_set_field!(map, params),
+                        "error" => check_and_set_field!(map, error),
                         // Discard unknown fields.
                         _ => {
                             let _ = map.next_value::<serde_json::Value>()?;

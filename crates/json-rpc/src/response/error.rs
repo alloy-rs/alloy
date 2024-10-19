@@ -1,3 +1,4 @@
+use crate::check_and_set_field;
 use alloy_primitives::Bytes;
 use alloy_sol_types::SolInterface;
 use serde::{
@@ -262,27 +263,12 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        Field::Code => {
-                            if code.is_some() {
-                                return Err(serde::de::Error::duplicate_field("code"));
-                            }
-                            code = Some(map.next_value()?);
-                        }
-                        Field::Message => {
-                            if message.is_some() {
-                                return Err(serde::de::Error::duplicate_field("message"));
-                            }
-                            message = Some(map.next_value()?);
-                        }
-                        Field::Data => {
-                            if data.is_some() {
-                                return Err(serde::de::Error::duplicate_field("data"));
-                            }
-                            data = Some(map.next_value()?);
-                        }
+                        Field::Code => check_and_set_field!(map, code),
+                        Field::Message => check_and_set_field!(map, message),
+                        Field::Data => check_and_set_field!(map, data),
                         Field::Unknown => {
+                            // Discard unknown fields.
                             let _: serde::de::IgnoredAny = map.next_value()?;
-                            // ignore
                         }
                     }
                 }

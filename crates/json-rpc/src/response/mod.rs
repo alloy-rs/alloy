@@ -1,4 +1,4 @@
-use crate::{common::Id, RpcObject};
+use crate::{check_and_set_field, common::Id, RpcObject};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     ser::SerializeMap,
@@ -255,24 +255,9 @@ where
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        Field::Result => {
-                            if result.is_some() {
-                                return Err(serde::de::Error::duplicate_field("result"));
-                            }
-                            result = Some(map.next_value()?);
-                        }
-                        Field::Error => {
-                            if error.is_some() {
-                                return Err(serde::de::Error::duplicate_field("error"));
-                            }
-                            error = Some(map.next_value()?);
-                        }
-                        Field::Id => {
-                            if id.is_some() {
-                                return Err(serde::de::Error::duplicate_field("id"));
-                            }
-                            id = Some(map.next_value()?);
-                        }
+                        Field::Result => check_and_set_field!(map, result),
+                        Field::Error => check_and_set_field!(map, error),
+                        Field::Id => check_and_set_field!(map, id),
                         Field::Unknown => {
                             let _: serde::de::IgnoredAny = map.next_value()?; // ignore
                         }
