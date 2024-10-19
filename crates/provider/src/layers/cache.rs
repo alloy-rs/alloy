@@ -58,12 +58,13 @@ where
     }
 }
 
-/// The [`CacheProvider`] holds the underlying in-memory LRU cache and overrides methods from the
-/// [`Provider`] trait that should attempt to fetch from cache and fallback to the RPC in case of a
-/// cache miss.
+/// The [`CacheProvider`] holds the underlying in-memory LRU cache and overrides methods
+/// from the [`Provider`] trait. It attempts to fetch from the cache and fallbacks to
+/// the RPC in case of a cache miss.
 ///
-/// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods to the
-/// provider interface to lets users save cache to the disk and load from it on demand.
+/// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods
+/// to the provider interface, allowing users to save the cache to disk and load it
+/// from there on demand.
 #[derive(Debug, Clone)]
 pub struct CacheProvider<P, T, N> {
     /// Inner provider.
