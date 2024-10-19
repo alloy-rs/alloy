@@ -138,7 +138,7 @@ impl RlpEcdsaTx for TxLegacy {
     fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
         // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
         let signature = legacy_sig!(signature);
-        let header = self.rlp_header_signed(&signature);
+        let header = self.rlp_header_signed(signature);
         header.length() + header.payload_length
     }
 
