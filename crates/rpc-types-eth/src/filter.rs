@@ -619,32 +619,17 @@ impl<'de> serde::Deserialize<'de> for Filter {
                             if from_block.is_some() {
                                 return Err(serde::de::Error::duplicate_field("fromBlock"));
                             }
-                            if block_hash.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "fromBlock not allowed with blockHash",
-                                ));
-                            }
                             from_block = Some(map.next_value()?)
                         }
                         "toBlock" => {
                             if to_block.is_some() {
                                 return Err(serde::de::Error::duplicate_field("toBlock"));
                             }
-                            if block_hash.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "toBlock not allowed with blockHash",
-                                ));
-                            }
                             to_block = Some(map.next_value()?)
                         }
                         "blockHash" => {
                             if block_hash.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockHash"));
-                            }
-                            if from_block.is_some() || to_block.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "fromBlock,toBlock not allowed with blockHash",
-                                ));
                             }
                             block_hash = Some(map.next_value()?)
                         }
@@ -670,9 +655,20 @@ impl<'de> serde::Deserialize<'de> for Filter {
                     }
                 }
 
-                let from_block = from_block.unwrap_or_default();
-                let to_block = to_block.unwrap_or_default();
-                let block_hash = block_hash.unwrap_or_default();
+                // conflict check between block_hash and from_block/to_block
+                let (block_hash, from_block, to_block) = if let Some(Some(hash)) = block_hash {
+                    if from_block.is_some_and(|inner| inner.is_some())
+                        || to_block.is_some_and(|inner| inner.is_some())
+                    {
+                        return Err(serde::de::Error::custom(
+                            "cannot specify both blockHash and fromBlock/toBlock, choose one or the other",
+                        ));
+                    }
+                    (Some(hash), None, None)
+                } else {
+                    (None, from_block.unwrap_or_default(), to_block.unwrap_or_default())
+                };
+
                 let address = address.flatten().map(|a| a.into()).unwrap_or_default();
                 let topics_vec = topics.flatten().unwrap_or_default();
 
@@ -1590,6 +1586,90 @@ mod tests {
                 address: Default::default(),
                 topics: Default::default(),
             }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_range_block() {
+        let json = json!(
+                    {
+          "fromBlock": null,
+          "toBlock": null,
+          "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::AtBlockHash(
+                "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
+                    .parse()
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash() {
+        let json = json!(
+                    {
+          "fromBlock": "0x1",
+          "toBlock": "0x2",
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: Some(2u64.into()) }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash_and_null_from_block() {
+        let json = json!(
+                    {
+          "fromBlock": null,
+          "toBlock": "0x2",
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash_and_null_to_block() {
+        let json = json!(
+                    {
+          "fromBlock": "0x1",
+          "toBlock": null,
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None }
         );
     }
 
