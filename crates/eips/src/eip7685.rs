@@ -47,20 +47,67 @@ impl Requests {
     /// sha256(sha256(requests_0) ++ sha256(requests_1) ++ ...)
     /// ```
     #[cfg(feature = "sha2")]
-    pub fn requests_hash(&self) -> alloy_primitives::B256 {
+    pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
-        let mut hash = sha2::Sha256::new();
+        let mut hash = Sha256::new();
         for (ty, req) in self.0.iter().enumerate() {
             let mut req_hash = Sha256::new();
             req_hash.update([ty as u8]);
             req_hash.update(req);
             hash.update(req_hash.finalize());
         }
-        alloy_primitives::B256::from(hash.finalize().as_ref())
+        B256::from(hash.finalize().as_ref())
     }
 
     /// Extend this container with requests from another container.
     pub fn extend(&mut self, other: Self) {
         self.0.extend(other.take());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extend() {
+        // Test extending a Requests container with another Requests container
+        let mut reqs1 = Requests::new(vec![Bytes::from(vec![0x01, 0x02])]);
+        let reqs2 =
+            Requests::new(vec![Bytes::from(vec![0x03, 0x04]), Bytes::from(vec![0x05, 0x06])]);
+
+        // Extend reqs1 with reqs2
+        reqs1.extend(reqs2);
+
+        // Ensure the requests are correctly combined
+        assert_eq!(reqs1.0.len(), 3);
+        assert_eq!(
+            reqs1.0,
+            vec![
+                Bytes::from(vec![0x01, 0x02]),
+                Bytes::from(vec![0x03, 0x04]),
+                Bytes::from(vec![0x05, 0x06])
+            ]
+        );
+    }
+
+    #[test]
+    fn test_consistent_requests_hash() {
+        // We test that the empty requests hash is consistent with the EIP-7685 definition.
+        assert_eq!(
+            Requests(vec![Bytes::from(vec![]), Bytes::from(vec![]), Bytes::from(vec![])])
+                .requests_hash(),
+            EMPTY_REQUESTS_HASH,
+        );
+
+        // Test to hash a non-empty vector of requests.
+        assert_eq!(
+            Requests(vec![
+                Bytes::from(vec![0x0a, 0x0b, 0x0c]),
+                Bytes::from(vec![0x0d, 0x0e, 0x0f])
+            ])
+            .requests_hash(),
+            b256!("be3a57667b9bb9e0275019c0faf0f415fdc8385a408fd03e13a5c50615e3530c"),
+        );
     }
 }
