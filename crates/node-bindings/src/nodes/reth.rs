@@ -517,7 +517,7 @@ impl Reth {
             instance: self.instance,
             http_port,
             ws_port,
-            p2p_port: if p2p_port != 0 { Some(p2p_port) } else { None },
+            p2p_port: (p2p_port != 0).then_some(p2p_port),
             ipc: self.ipc_path,
             data_dir: self.data_dir,
             auth_port: Some(auth_port),
