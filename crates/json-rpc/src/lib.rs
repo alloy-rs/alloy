@@ -78,7 +78,6 @@ extern crate tracing;
 
 #[macro_use]
 mod macros;
-pub(crate) use check_and_set_field;
 
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;

@@ -1,4 +1,4 @@
-use crate::{check_and_set_field, common::Id, RpcObject, RpcParam};
+use crate::{common::Id, RpcObject, RpcParam};
 use alloy_primitives::{keccak256, B256};
 use serde::{
     de::{DeserializeOwned, MapAccess},

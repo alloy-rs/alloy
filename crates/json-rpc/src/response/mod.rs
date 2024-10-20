@@ -1,4 +1,4 @@
-use crate::{check_and_set_field, common::Id, RpcObject};
+use crate::{common::Id, RpcObject};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     ser::SerializeMap,

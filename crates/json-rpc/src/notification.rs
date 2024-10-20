@@ -1,4 +1,4 @@
-use crate::{check_and_set_field, Response, ResponsePayload};
+use crate::{Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde::{
     de::{MapAccess, Visitor},

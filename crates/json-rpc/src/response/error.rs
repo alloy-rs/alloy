@@ -1,4 +1,3 @@
-use crate::check_and_set_field;
 use alloy_primitives::Bytes;
 use alloy_sol_types::SolInterface;
 use serde::{
