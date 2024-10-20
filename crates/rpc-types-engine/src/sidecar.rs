@@ -8,6 +8,7 @@ use alloy_primitives::B256;
 /// Container type for all available additional `newPayload` request parameters that are not present
 /// in the `ExecutionPayload` object itself.
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExecutionPayloadSidecar {
     /// Cancun request params introduced in `engine_newPayloadV3` that are not present in the
     /// `ExecutionPayload`.
