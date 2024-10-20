@@ -76,6 +76,10 @@
 #[macro_use]
 extern crate tracing;
 
+#[macro_use]
+mod macros;
+pub(crate) use check_and_set_field;
+
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
@@ -135,14 +139,3 @@ impl<T> RpcReturn for T where T: DeserializeOwned + Debug + Send + Sync + Unpin 
 pub trait RpcObject: RpcParam + RpcReturn {}
 
 impl<T> RpcObject for T where T: RpcParam + RpcReturn {}
-
-/// A macro to check if a field is present in a map and set it if it is.
-#[macro_export]
-macro_rules! check_and_set_field {
-    ($map:expr, $field:expr) => {{
-        if $field.is_some() {
-            return Err(serde::de::Error::duplicate_field(stringify!($field)));
-        }
-        $field = Some($map.next_value()?);
-    }};
-}
