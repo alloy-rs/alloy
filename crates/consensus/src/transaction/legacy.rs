@@ -347,9 +347,9 @@ impl Decodable for TxLegacy {
 pub(crate) mod signed_legacy_serde {
     use super::TxLegacy;
     use crate::Signed;
+    use alloc::borrow::Cow;
     use alloy_primitives::{Signature, B256, U256, U64};
     use serde::{Deserialize, Serialize};
-    use std::borrow::Cow;
 
     struct LegacySignature {
         r: U256,
