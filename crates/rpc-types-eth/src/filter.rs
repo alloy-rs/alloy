@@ -585,6 +585,15 @@ impl serde::Serialize for Filter {
     }
 }
 
+macro_rules! check_and_set_field {
+    ($map:expr, $field:expr, $field_name:expr) => {{
+        if $field.is_some() {
+            return Err(serde::de::Error::duplicate_field($field_name));
+        }
+        $field = Some($map.next_value()?);
+    }};
+}
+
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for Filter {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -615,37 +624,11 @@ impl<'de> serde::Deserialize<'de> for Filter {
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
-                        "fromBlock" => {
-                            if from_block.is_some() {
-                                return Err(serde::de::Error::duplicate_field("fromBlock"));
-                            }
-                            from_block = Some(map.next_value()?)
-                        }
-                        "toBlock" => {
-                            if to_block.is_some() {
-                                return Err(serde::de::Error::duplicate_field("toBlock"));
-                            }
-                            to_block = Some(map.next_value()?)
-                        }
-                        "blockHash" => {
-                            if block_hash.is_some() {
-                                return Err(serde::de::Error::duplicate_field("blockHash"));
-                            }
-                            block_hash = Some(map.next_value()?)
-                        }
-                        "address" => {
-                            if address.is_some() {
-                                return Err(serde::de::Error::duplicate_field("address"));
-                            }
-                            address = Some(map.next_value()?)
-                        }
-                        "topics" => {
-                            if topics.is_some() {
-                                return Err(serde::de::Error::duplicate_field("topics"));
-                            }
-                            topics = Some(map.next_value()?)
-                        }
-
+                        "fromBlock" => check_and_set_field!(map, from_block, "fromBlock"),
+                        "toBlock" => check_and_set_field!(map, to_block, "toBlock"),
+                        "blockHash" => check_and_set_field!(map, block_hash, "blockHash"),
+                        "address" => check_and_set_field!(map, address, "address"),
+                        "topics" => check_and_set_field!(map, topics, "topics"),
                         key => {
                             return Err(serde::de::Error::unknown_field(
                                 key,
