@@ -18,9 +18,6 @@ pub use block::{Block, BlockBody};
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
-mod encodable_signature;
-pub use encodable_signature::EncodableSignature;
-
 mod header;
 pub use header::{BlockHeader, Header};
 

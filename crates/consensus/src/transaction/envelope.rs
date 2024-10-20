@@ -279,19 +279,33 @@ impl TxEnvelope {
     /// Return the length of the inner txn, including type byte length
     pub fn rlp_payload_length(&self) -> usize {
         let payload_length = match self {
-            Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip2930(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip1559(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Legacy(t) => {
+                t.tx().fields_len()
+                    + t.signature().rlp_rs_len()
+                    + t.tx().signature_parity(t.signature()).length()
+            }
+            Self::Eip2930(t) => {
+                t.tx().fields_len() + t.signature().rlp_rs_len() + t.signature().v().length()
+            }
+            Self::Eip1559(t) => {
+                t.tx().fields_len() + t.signature().rlp_rs_len() + t.signature().v().length()
+            }
             Self::Eip4844(t) => match t.tx() {
-                TxEip4844Variant::TxEip4844(tx) => tx.fields_len() + t.signature().rlp_vrs_len(),
+                TxEip4844Variant::TxEip4844(tx) => {
+                    tx.fields_len() + t.signature().rlp_rs_len() + t.signature().v().length()
+                }
                 TxEip4844Variant::TxEip4844WithSidecar(tx) => {
-                    let inner_payload_length = tx.tx().fields_len() + t.signature().rlp_vrs_len();
+                    let inner_payload_length = tx.tx().fields_len()
+                        + t.signature().rlp_rs_len()
+                        + t.signature().v().length();
                     let inner_header = Header { list: true, payload_length: inner_payload_length };
 
                     inner_header.length() + inner_payload_length + tx.sidecar.fields_len()
                 }
             },
-            Self::Eip7702(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Eip7702(t) => {
+                t.tx().fields_len() + t.signature().rlp_rs_len() + t.signature().v().length()
+            }
         };
         Header { list: true, payload_length }.length() + payload_length + !self.is_legacy() as usize
     }
@@ -527,19 +541,23 @@ mod serde_from {
     //!
     //! We serialize via [`TaggedTxEnvelope`] and deserialize via
     //! [`MaybeTaggedTxEnvelope`].
-    use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy};
+    use crate::{
+        transaction::legacy::signed_legacy_serde, Signed, TxEip1559, TxEip2930, TxEip4844Variant,
+        TxEip7702, TxEnvelope, TxLegacy,
+    };
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(untagged)]
     pub(crate) enum MaybeTaggedTxEnvelope {
         Tagged(TaggedTxEnvelope),
+        #[serde(with = "signed_legacy_serde")]
         Untagged(Signed<TxLegacy>),
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     #[serde(tag = "type")]
     pub(crate) enum TaggedTxEnvelope {
-        #[serde(rename = "0x0", alias = "0x00")]
+        #[serde(rename = "0x0", alias = "0x00", with = "signed_legacy_serde")]
         Legacy(Signed<TxLegacy>),
         #[serde(rename = "0x1", alias = "0x01")]
         Eip2930(Signed<TxEip2930>),
@@ -594,7 +612,7 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    use alloy_primitives::{hex, Address, Parity, Signature, U256};
+    use alloy_primitives::{hex, Address, Signature, U256};
     #[allow(unused_imports)]
     use alloy_primitives::{Bytes, TxKind};
     use std::{fs, path::PathBuf, str::FromStr, vec};
@@ -716,10 +734,7 @@ mod tests {
             value: U256::from(7_u64),
             ..Default::default()
         };
-        test_encode_decode_roundtrip(
-            tx,
-            Some(Signature::test_signature().with_parity(Parity::NonEip155(true))),
-        );
+        test_encode_decode_roundtrip(tx, Some(Signature::test_signature().with_parity(true)));
     }
 
     #[test]
@@ -751,7 +766,7 @@ mod tests {
             input: vec![8].into(),
             access_list: Default::default(),
         };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -767,7 +782,7 @@ mod tests {
             input: vec![7].into(),
             access_list: Default::default(),
         };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -789,7 +804,7 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -817,7 +832,7 @@ mod tests {
             proofs: vec![[4; 48].into()],
         };
         let tx = TxEip4844WithSidecar { tx, sidecar };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -840,7 +855,7 @@ mod tests {
             max_fee_per_blob_gas: 0,
         };
         let tx = TxEip4844Variant::TxEip4844(tx);
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
