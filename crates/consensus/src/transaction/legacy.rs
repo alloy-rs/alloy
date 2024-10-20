@@ -128,11 +128,7 @@ impl TxLegacy {
 
     /// Returns parity byte value for the signature, respecting EIP-155.
     pub const fn signature_parity(&self, signature: &Signature) -> u64 {
-        if let Some(id) = self.chain_id {
-            35 + id * 2 + signature.v() as u64
-        } else {
-            27 + signature.v() as u64
-        }
+        to_eip155_value(signature.v(), self.chain_id)
     }
 
     /// Encodes EIP-155 arguments into the desired buffer. Only encodes values
@@ -178,14 +174,12 @@ impl TxLegacy {
         let original_len = buf.len();
 
         let mut tx = Self::decode_fields(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf, |buf| match u64::decode(buf)? {
-            27 => Ok(false),
-            28 => Ok(true),
-            v @ 35.. => {
-                tx.chain_id = Some((v - 35) / 2);
-                Ok(((v - 35) % 2) != 0)
-            }
-            _ => Err(alloy_rlp::Error::Custom("invalid parity value")),
+        let signature = Signature::decode_rlp_vrs(buf, |buf| {
+            let value = u64::decode(buf)?;
+            let (parity, chain_id) =
+                from_eip155_value(value).ok_or(alloy_rlp::Error::Custom("invalid parity value"))?;
+            tx.chain_id = chain_id;
+            Ok(parity)
         })?;
 
         let signed = tx.into_signed(signature);
@@ -343,10 +337,33 @@ impl Decodable for TxLegacy {
     }
 }
 
+/// Helper for encoding `y_parity` boolean and optional `chain_id` into EIP-155 `v` value.
+const fn to_eip155_value(y_parity: bool, chain_id: Option<ChainId>) -> u64 {
+    match chain_id {
+        Some(id) => 35 + id * 2 + y_parity as u64,
+        None => 27 + y_parity as u64,
+    }
+}
+
+/// Helper for decoding EIP-155 `v` value into `y_parity` boolean and optional `chain_id`.
+const fn from_eip155_value(value: u64) -> Option<(bool, Option<ChainId>)> {
+    match value {
+        27 => Some((false, None)),
+        28 => Some((true, None)),
+        v @ 35.. => Some((((v - 35) % 2) != 0, Some((v - 35) / 2))),
+        _ => None,
+    }
+}
+
 #[cfg(feature = "serde")]
 pub(crate) mod signed_legacy_serde {
-    use super::TxLegacy;
-    use crate::Signed;
+    //! Helper module for encoding signatures of transactions wrapped into [`Signed`] in legacy
+    //! format.
+    //!
+    //! By default, signatures are encoded as a single boolean under `yParity` key. However, for
+    //! legacy transactions parity byte is encoded as `v` key respecting EIP-155 format.
+    use super::{from_eip155_value, to_eip155_value};
+    use crate::{Signed, Transaction};
     use alloc::borrow::Cow;
     use alloy_primitives::{Signature, B256, U256, U64};
     use serde::{Deserialize, Serialize};
@@ -403,25 +420,26 @@ pub(crate) mod signed_legacy_serde {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct SignedLegacy<'a> {
+    struct SignedLegacy<'a, T: Clone> {
         #[serde(flatten)]
-        tx: Cow<'a, TxLegacy>,
+        tx: Cow<'a, T>,
         #[serde(flatten)]
         signature: LegacySignature,
         hash: B256,
     }
 
-    pub(crate) fn serialize<S>(
-        signed: &crate::Signed<TxLegacy>,
+    pub(crate) fn serialize<T, S>(
+        signed: &crate::Signed<T>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
+        T: Transaction + Clone + Serialize,
         S: serde::Serializer,
     {
         SignedLegacy {
             tx: Cow::Borrowed(signed.tx()),
             signature: LegacySignature {
-                v: U64::from(signed.tx().signature_parity(signed.signature())),
+                v: U64::from(to_eip155_value(signed.signature().v(), signed.tx().chain_id())),
                 r: signed.signature().r(),
                 s: signed.signature().s(),
             },
@@ -430,18 +448,15 @@ pub(crate) mod signed_legacy_serde {
         .serialize(serializer)
     }
 
-    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<crate::Signed<TxLegacy>, D::Error>
+    pub(crate) fn deserialize<'de, T, D>(deserializer: D) -> Result<crate::Signed<T>, D::Error>
     where
+        T: Transaction + Clone + Deserialize<'de>,
         D: serde::Deserializer<'de>,
     {
-        let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
-        let (parity, chain_id) = match signature.v.to::<u64>() {
-            0 | 27 => (false, None),
-            1 | 28 => (true, None),
-            v @ 35.. => (((v - 35) % 2) != 0, Some((v - 35) / 2)),
-            _ => return Err(serde::de::Error::custom("invalid `v` value")),
-        };
-        if chain_id != tx.chain_id {
+        let SignedLegacy::<T> { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
+        let (parity, chain_id) = from_eip155_value(signature.v.to::<u64>())
+            .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
+        if chain_id != tx.chain_id() {
             return Err(serde::de::Error::custom("chain id mismatch"));
         }
         Ok(Signed::new_unchecked(
