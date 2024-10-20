@@ -18,9 +18,6 @@ pub use block::{AnyHeader, Block, BlockBody, BlockHeader, Header};
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
-mod encodable_signature;
-pub use encodable_signature::EncodableSignature;
-
 mod receipt;
 pub use receipt::{
     AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,

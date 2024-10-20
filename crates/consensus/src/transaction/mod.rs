@@ -155,11 +155,6 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
 /// unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]
 pub trait SignableTransaction<Signature>: Transaction {
-    /// True if the transaction uses EIP-155 signatures.
-    fn use_eip155(&self) -> bool {
-        false
-    }
-
     /// Sets `chain_id`.
     ///
     /// Prefer [`set_chain_id_checked`](Self::set_chain_id_checked).

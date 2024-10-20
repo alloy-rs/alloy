@@ -1,8 +1,8 @@
 use crate::{SignableTransaction, Signed};
 use alloc::vec::Vec;
 use alloy_eips::eip2718::{Eip2718Error, Eip2718Result};
-use alloy_primitives::{keccak256, Parity, Signature, TxHash};
-use alloy_rlp::{Buf, BufMut, Header};
+use alloy_primitives::{keccak256, PrimitiveSignature as Signature, TxHash};
+use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
 /// Helper trait for managing RLP encoding of transactions inside 2718
 /// envelopes.
@@ -37,7 +37,8 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
     /// Create an rlp list header for the signed transaction.
     fn rlp_header_signed(&self, signature: &Signature) -> Header {
-        let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
+        let payload_length =
+            self.rlp_encoded_fields_length() + signature.rlp_rs_len() + signature.v().length();
         Header { list: true, payload_length }
     }
 
@@ -51,7 +52,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.rlp_header_signed(signature).encode(out);
         self.rlp_encode_fields(out);
-        signature.write_rlp_vrs(out);
+        signature.write_rlp_vrs(out, signature.v());
     }
 
     /// Get the length of the transaction when EIP-2718 encoded. This is the
@@ -127,13 +128,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
         let remaining = buf.len();
         let tx = Self::rlp_decode_fields(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        if !matches!(signature.v(), Parity::Parity(_)) {
-            return Err(alloy_rlp::Error::Custom(
-                "invalid parity for non-legacy typed transaction",
-            ));
-        }
+        let signature = Signature::decode_rlp_vrs(buf, bool::decode)?;
 
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::ListLengthMismatch {

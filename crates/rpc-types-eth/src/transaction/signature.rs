@@ -74,27 +74,21 @@ where
     }
 }
 
-impl TryFrom<Signature> for alloy_primitives::Signature {
+impl TryFrom<Signature> for alloy_primitives::PrimitiveSignature {
     type Error = alloy_primitives::SignatureError;
 
     fn try_from(value: Signature) -> Result<Self, Self::Error> {
         let parity = if let Some(y_parity) = value.y_parity {
-            alloy_primitives::Parity::Parity(y_parity.0)
+            y_parity.0
         } else {
-            value.v.to::<u64>().try_into()?
+            match value.v.to::<u64>() {
+                0 | 27 => false,
+                1 | 28 => true,
+                v @ 35.. => ((v - 35) % 2) != 0,
+                v => return Err(alloy_primitives::SignatureError::InvalidParity(v)),
+            }
         };
-        Self::from_rs_and_parity(value.r, value.s, parity)
-    }
-}
-
-impl From<alloy_primitives::Signature> for Signature {
-    fn from(signature: alloy_primitives::Signature) -> Self {
-        Self {
-            v: U256::from(signature.v().to_u64()),
-            r: signature.r(),
-            s: signature.s(),
-            y_parity: Some(Parity::from(signature.v().y_parity())),
-        }
+        Ok(Self::new(value.r, value.s, parity))
     }
 }
 

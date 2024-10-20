@@ -1,6 +1,6 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -198,10 +198,6 @@ impl SignableTransaction<Signature> for TxEip2930 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct
-        // at the time of combination for an EIP-2930 transaction. V should
-        // indicate the y-parity of the signature.
-        let signature = signature.with_parity_bool();
         let tx_hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, tx_hash)
     }
@@ -227,7 +223,7 @@ impl Decodable for TxEip2930 {
 mod tests {
     use super::TxEip2930;
     use crate::{transaction::RlpEcdsaTx, SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address, Signature, TxKind, U256};
+    use alloy_primitives::{Address, PrimitiveSignature as Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
