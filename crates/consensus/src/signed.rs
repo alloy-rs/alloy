@@ -17,6 +17,11 @@ pub struct Signed<T, Sig = Signature> {
 }
 
 impl<T, Sig> Signed<T, Sig> {
+    /// Instantiate from a transaction and signature. Does not verify the signature.
+    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
+        Self { tx, signature, hash }
+    }
+
     /// Returns a reference to the transaction.
     #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
@@ -46,11 +51,6 @@ impl<T, Sig> Signed<T, Sig> {
 }
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
-    /// Instantiate from a transaction and signature. Does not verify the signature.
-    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
-    }
-
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256 {
         self.tx.signature_hash()
