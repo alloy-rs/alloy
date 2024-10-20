@@ -397,7 +397,7 @@ impl From<HashOrNumber> for BlockId {
     fn from(block: HashOrNumber) -> Self {
         match block {
             HashOrNumber::Hash(hash) => {
-                Self::Hash(RpcBlockHash { block_hash: hash, require_canonical: None })
+                RpcBlockHash { block_hash: hash, require_canonical: None }.into()
             }
             HashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
         }
@@ -406,13 +406,19 @@ impl From<HashOrNumber> for BlockId {
 
 impl From<B256> for BlockId {
     fn from(block_hash: B256) -> Self {
-        Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
+        RpcBlockHash { block_hash, require_canonical: None }.into()
     }
 }
 
 impl From<(B256, Option<bool>)> for BlockId {
     fn from(hash_can: (B256, Option<bool>)) -> Self {
-        Self::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
+        RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 }.into()
+    }
+}
+
+impl From<RpcBlockHash> for BlockId {
+    fn from(value: RpcBlockHash) -> Self {
+        Self::Hash(value)
     }
 }
 
