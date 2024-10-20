@@ -158,7 +158,7 @@ impl TxEip2930 {
         out: &mut dyn BufMut,
         with_header: bool,
     ) {
-        let payload_length = self.fields_len() + signature.rlp_rs_len();
+        let payload_length = self.fields_len() + signature.rlp_rs_len() + signature.v().length();
         if with_header {
             Header {
                 list: false,
