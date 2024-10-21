@@ -395,10 +395,8 @@ impl From<BlockNumberOrTag> for BlockId {
 impl From<HashOrNumber> for BlockId {
     fn from(block: HashOrNumber) -> Self {
         match block {
-            HashOrNumber::Hash(hash) => {
-                RpcBlockHash { block_hash: hash, require_canonical: None }.into()
-            }
-            HashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
+            HashOrNumber::Hash(hash) => hash.into(),
+            HashOrNumber::Number(num) => num.into(),
         }
     }
 }
