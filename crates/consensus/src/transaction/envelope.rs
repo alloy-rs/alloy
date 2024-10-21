@@ -288,7 +288,9 @@ impl TxEnvelope {
                     let inner_payload_length = tx.tx().fields_len() + t.signature().rlp_vrs_len();
                     let inner_header = Header { list: true, payload_length: inner_payload_length };
 
-                    inner_header.length() + inner_payload_length + tx.sidecar.fields_len()
+                    inner_header.length()
+                        + inner_payload_length
+                        + tx.sidecar.rlp_encoded_fields_length()
                 }
             },
             Self::Eip7702(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
