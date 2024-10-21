@@ -1186,7 +1186,7 @@ mod tests {
         let block_id: BlockId = block_number_or_tag.into();
 
         match block_id {
-            BlockId::Number(BlockNumberOrTag::Pending) => assert!(true),
+            BlockId::Number(BlockNumberOrTag::Pending) => {}
             _ => panic!("Expected BlockId::Number with Pending"),
         }
     }
@@ -1307,5 +1307,67 @@ mod tests {
 
         // Assert that the decoded value matches the original
         assert_eq!(decoded, hash_or_number);
+    }
+
+    #[test]
+    fn test_numhash() {
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash = NumHash::new(number, hash);
+
+        // Validate the initial values
+        assert_eq!(num_hash.number, number);
+        assert_eq!(num_hash.hash, hash);
+
+        // Test into_components
+        assert_eq!(num_hash.into_components(), (number, hash));
+    }
+
+    #[test]
+    fn test_numhash_matches_block_or_num() {
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash = NumHash::new(number, hash);
+
+        // Test matching by hash
+        let block_hash = HashOrNumber::Hash(hash);
+        assert!(num_hash.matches_block_or_num(&block_hash));
+
+        // Test matching by number
+        let block_number = HashOrNumber::Number(number);
+        assert!(num_hash.matches_block_or_num(&block_number));
+
+        // Test non-matching by different hash
+        let different_hash = B256::random();
+        let non_matching_hash = HashOrNumber::Hash(different_hash);
+        assert!(!num_hash.matches_block_or_num(&non_matching_hash));
+
+        // Test non-matching by different number
+        let different_number: u64 = 43;
+        let non_matching_number = HashOrNumber::Number(different_number);
+        assert!(!num_hash.matches_block_or_num(&non_matching_number));
+    }
+
+    #[test]
+    fn test_numhash_conversions() {
+        // From a tuple (u64, B256)
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash_from_tuple: NumHash = (number, hash).into();
+
+        assert_eq!(num_hash_from_tuple.number, number);
+        assert_eq!(num_hash_from_tuple.hash, hash);
+
+        // From a reversed tuple (B256, u64)
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash_from_reversed_tuple: NumHash = (hash, number).into();
+
+        assert_eq!(num_hash_from_reversed_tuple.number, number);
+        assert_eq!(num_hash_from_reversed_tuple.hash, hash);
     }
 }
