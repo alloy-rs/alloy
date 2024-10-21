@@ -1,5 +1,4 @@
 //! RPC types for transactions
-
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
     TxEnvelope, TxLegacy, TxType,
@@ -32,13 +31,14 @@ pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
 mod signature;
+use serde::ser::SerializeStruct;
 pub use signature::{Parity, Signature};
 
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Tx")]
@@ -196,6 +196,84 @@ impl Transaction {
         }
     }
 }
+
+impl serde::Serialize for Transaction
+{
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+        let mut state = ser.serialize_struct("Transaction", std::mem::size_of::<Transaction>())?;
+        
+        let tx_type = self.transaction_type.as_ref().unwrap_or(&0);
+        let hash = &self.hash;
+        let nonce = self.nonce;
+        let block_hash = &self.block_hash.unwrap_or_default();
+        let block_number = self.block_number.unwrap_or_default();
+        let tx_id = &self.transaction_index.unwrap_or_default();
+        let chain_id = &self.chain_id.unwrap_or_default();
+        let gas = &self.gas;
+        let to = &self.to.unwrap_or_default();
+        let from = &self.from;
+        let value = &self.value;
+        let input = &self.input;
+        let sig = self.signature.as_ref();
+        let access_list = &self.access_list;
+        let max_fee_per_gas = &self.max_fee_per_gas.unwrap_or_default();
+        let max_priority_fee_per_gas = &self.max_priority_fee_per_gas.unwrap_or_default();
+        let max_fee_per_blob_gas = &self.max_fee_per_blob_gas.unwrap_or_default();
+        let blob_version_hashes = &self.blob_versioned_hashes.as_ref();
+        let auth_list = &self.authorization_list.as_ref();
+
+        state.serialize_field("hash", hash)?;
+        state.serialize_field("nonce", &format!("{nonce:#x}"))?;
+        state.serialize_field("blockHash", block_hash)?;
+        state.serialize_field("blockNumber", &format!("{block_number:#x}"))?;
+        state.serialize_field("transactionIndex", &format!("{tx_id:#x}"))?;
+        state.serialize_field("from", from)?;
+        state.serialize_field("to", to)?;
+        state.serialize_field("value", value)?;
+        if *tx_type < 2 {
+            if self.gas_price.is_some() {
+                let price = &self.gas_price.unwrap();
+                state.serialize_field("gasPrice", &format!("{price:#x}"))?;
+            }            
+        }
+        state.serialize_field("gasLimit", &format!("{gas:#x}"))?;
+        if *tx_type >= 2 {
+            state.serialize_field("maxFeePerGas", &format!("{max_fee_per_gas:#x}"))?;
+            state.serialize_field("maxPriorityFeePerGas", &format!("{max_priority_fee_per_gas:#x}"))?;
+        }
+        if *tx_type == 3 {
+            state.serialize_field("blobVersionedHashes", blob_version_hashes.unwrap())?;
+            state.serialize_field("maxFeePerBlobGas", &format!("{max_fee_per_blob_gas:#x}"))?;
+        }
+        state.serialize_field("input", input)?;
+
+        if sig.is_some() {
+            let Signature {r, s, v, y_parity} = sig.unwrap();
+            if *tx_type == 0 {
+                state.serialize_field("v", &v)?;                
+            } else {
+                state.serialize_field("yParity", &y_parity.unwrap_or_default())?;
+            }
+            state.serialize_field("r", &r)?;
+            state.serialize_field("s", &s)?;
+        }
+
+        state.serialize_field("chainId", &format!("{chain_id:#x}"))?;
+        
+        if *tx_type >= 1 && access_list.is_some() {
+            state.serialize_field("accessList", &access_list)?;
+        }
+        state.serialize_field("transactionType", tx_id)?;
+        if *tx_type == 4 && auth_list.is_some() {
+            state.serialize_field("authorizationList", &auth_list.unwrap())?;
+        }
+
+        state.end()
+        
+    }
+
+    
+} 
 
 impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
@@ -429,7 +507,7 @@ impl TransactionResponse for Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::Signature as AlloySignature;
+    use alloy_primitives::{Signature as AlloySignature, b256, B256, address};
     use arbitrary::Arbitrary;
     use core::str::FromStr;
     use rand::Rng;
@@ -445,6 +523,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+<<<<<<< HEAD
     fn serde_transaction() {
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
@@ -554,6 +633,8 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+=======
+>>>>>>> 02e43ed (serialize impl for tx)
     fn into_request_legacy() {
         // cast rpc eth_getTransactionByHash
         // 0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e --rpc-url mainnet
