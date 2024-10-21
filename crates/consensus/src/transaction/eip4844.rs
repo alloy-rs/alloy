@@ -873,7 +873,7 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         self.tx.rlp_encode(out);
         // BUG: this relies on a faulty implementation of `BlobTransactionSidecar::encode`. See
         // issue #1499
-        self.sidecar.encode(out);
+        self.sidecar.rlp_encode_fields(out);
     }
 
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
@@ -881,14 +881,14 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         self.tx.rlp_encode_signed(signature, out);
         // BUG: this relies on a faulty implementation of `BlobTransactionSidecar::encode`. See
         // issue #1499
-        self.sidecar.encode(out);
+        self.sidecar.rlp_encode_fields(out);
     }
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let tx = TxEip4844::rlp_decode(buf)?;
         // BUG: this relies on a faulty implementation of `BlobTransactionSidecar::decode`. See
         // issue #1499
-        let sidecar = BlobTransactionSidecar::decode(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
         Ok(Self { tx, sidecar })
     }
 
@@ -905,7 +905,7 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
         // BUG: this relies on a faulty implementation of `BlobTransactionSidecar::decode`. See
         // issue #1499
-        let sidecar = BlobTransactionSidecar::decode(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
         Ok((Self { tx, sidecar }, signature))
     }
 
