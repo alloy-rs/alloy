@@ -226,8 +226,8 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         Sealed::new_unchecked(self, hash)
     }
 
-    /// The length of the 2718 encoded envelope in network format. This is the length of the header
-    /// + the length of the type flag and inner encoding.
+    /// The length of the 2718 encoded envelope in network format. This is the
+    /// length of the header + the length of the type flag and inner encoding.
     fn network_len(&self) -> usize {
         let mut payload_length = self.encode_2718_len();
         if !self.is_legacy() {

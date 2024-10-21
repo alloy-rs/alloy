@@ -138,7 +138,7 @@ impl TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => {
                 let payload_length = tx.tx().fields_len() + signature.rlp_vrs_len();
                 let inner_header = Header { list: true, payload_length };
-                inner_header.length() + payload_length + tx.sidecar().fields_len()
+                inner_header.length() + payload_length + tx.sidecar().rlp_encoded_fields_length()
             }
         };
 
@@ -875,7 +875,7 @@ impl TxEip4844WithSidecar {
         let inner_header = Header { list: true, payload_length: inner_payload_length };
 
         let outer_payload_length =
-            inner_header.length() + inner_payload_length + self.sidecar.fields_len();
+            inner_header.length() + inner_payload_length + self.sidecar.rlp_encoded_fields_length();
         let outer_header = Header { list: true, payload_length: outer_payload_length };
 
         // write the two headers
@@ -885,7 +885,7 @@ impl TxEip4844WithSidecar {
         // now write the fields
         self.tx.encode_fields(out);
         signature.write_rlp_vrs(out);
-        self.sidecar.encode(out);
+        self.sidecar.rlp_encode_fields(out);
     }
 
     /// Decodes the transaction from RLP bytes, including the signature.
@@ -910,7 +910,7 @@ impl TxEip4844WithSidecar {
         let inner_tx = TxEip4844::decode_signed_fields(buf)?;
 
         // decode the sidecar
-        let sidecar = BlobTransactionSidecar::decode(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
 
         if buf.len() + header.payload_length != original_len {
             return Err(alloy_rlp::Error::ListLengthMismatch {
