@@ -2,6 +2,7 @@
 
 use crate::{ConversionError, Transaction, Withdrawal};
 use alloc::collections::BTreeMap;
+use alloy_consensus::Sealed;
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
@@ -172,6 +173,62 @@ impl Header {
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
+    }
+}
+
+impl From<Sealed<alloy_consensus::Header>> for Header {
+    fn from(value: Sealed<alloy_consensus::Header>) -> Self {
+        let (header, hash) = value.into_parts();
+
+        let alloy_consensus::Header {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            extra_data,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+        } = header;
+
+        Self {
+            hash,
+            parent_hash,
+            uncles_hash: ommers_hash,
+            miner: beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            withdrawals_root,
+            number,
+            gas_used,
+            gas_limit,
+            extra_data,
+            logs_bloom,
+            timestamp,
+            difficulty,
+            mix_hash: Some(mix_hash),
+            nonce: Some(nonce),
+            base_fee_per_gas,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            total_difficulty: None,
+            requests_hash,
+        }
     }
 }
 
@@ -769,5 +826,48 @@ mod tests {
         let header: alloy_consensus::Header = block2.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
         assert_eq!(recomputed_hash, block2.header.hash);
+    }
+
+    #[test]
+    fn header_roundtrip_conversion() {
+        // Setup a RPC header
+        let rpc_header = Header {
+            hash: B256::with_last_byte(1),
+            parent_hash: B256::with_last_byte(2),
+            uncles_hash: B256::with_last_byte(3),
+            miner: Address::with_last_byte(4),
+            state_root: B256::with_last_byte(5),
+            transactions_root: B256::with_last_byte(6),
+            receipts_root: B256::with_last_byte(7),
+            withdrawals_root: None,
+            number: 9,
+            gas_used: 10,
+            gas_limit: 11,
+            extra_data: vec![1, 2, 3].into(),
+            logs_bloom: Bloom::default(),
+            timestamp: 12,
+            difficulty: U256::from(13),
+            total_difficulty: None,
+            mix_hash: Some(B256::with_last_byte(14)),
+            nonce: Some(B64::with_last_byte(15)),
+            base_fee_per_gas: Some(20),
+            blob_gas_used: None,
+            excess_blob_gas: None,
+            parent_beacon_block_root: None,
+            requests_hash: None,
+        };
+
+        // Convert the RPC header to a primitive header
+        let primitive_header: alloy_consensus::Header = rpc_header.clone().try_into().unwrap();
+
+        // Seal the primitive header
+        let sealed_header: Sealed<alloy_consensus::Header> =
+            primitive_header.seal(B256::with_last_byte(1));
+
+        // Convert the sealed header back to a RPC header
+        let roundtrip_rpc_header: Header = sealed_header.into();
+
+        // Ensure the roundtrip conversion is correct
+        assert_eq!(rpc_header, roundtrip_rpc_header);
     }
 }
