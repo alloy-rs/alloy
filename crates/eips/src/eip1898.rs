@@ -1369,7 +1369,7 @@ mod tests {
         let hex_id = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
         assert_eq!(
             BlockId::from_str(hex_id).unwrap(),
-            BlockId::Hash(RpcBlockHash::from_hash(B256::from_str(hex_id).unwrap(), None).into())
+            BlockId::Hash(RpcBlockHash::from_hash(B256::from_str(hex_id).unwrap(), None))
         );
 
         // Valid tag strings
