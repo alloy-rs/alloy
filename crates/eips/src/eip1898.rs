@@ -175,8 +175,7 @@ impl FromStr for BlockNumberOrTag {
             "pending" => Self::Pending,
             _number => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
-                    let number = u64::from_str_radix(hex_val, 16);
-                    Self::Number(number?)
+                    u64::from_str_radix(hex_val, 16)?.into()
                 } else {
                     return Err(HexStringMissingPrefixError::default().into());
                 }
@@ -461,7 +460,7 @@ impl<'de> serde::Deserialize<'de> for BlockId {
                 // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefor deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
                 // However, since the hex string should be a QUANTITY, we can safely assume that if the len is 66 bytes, it is in fact a hash, ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/rpc/types.go#L184-L184>
                 if v.len() == 66 {
-                    Ok(BlockId::Hash(v.parse::<B256>().map_err(serde::de::Error::custom)?.into()))
+                    Ok(v.parse::<B256>().map_err(serde::de::Error::custom)?.into())
                 } else {
                     // quantity hex string or tag
                     Ok(BlockId::Number(v.parse().map_err(serde::de::Error::custom)?))
@@ -513,9 +512,9 @@ impl<'de> serde::Deserialize<'de> for BlockId {
 
                 #[allow(clippy::option_if_let_else)]
                 if let Some(number) = number {
-                    Ok(BlockId::Number(number))
+                    Ok(number.into())
                 } else if let Some(block_hash) = block_hash {
-                    Ok(BlockId::Hash(RpcBlockHash { block_hash, require_canonical }))
+                    Ok((block_hash, require_canonical).into())
                 } else {
                     Err(serde::de::Error::custom(
                         "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
@@ -590,23 +589,17 @@ impl FromStr for BlockId {
     type Err = ParseBlockIdError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("0x") {
-            return if s.len() == 66 {
-                B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError)
-            } else {
-                U64::from_str(s).map(Into::into).map_err(ParseBlockIdError::ParseError)
+            return match s.len() {
+                66 => B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError),
+                _ => U64::from_str(s).map(Into::into).map_err(ParseBlockIdError::ParseError),
             };
         }
 
         match s {
-            "latest" => Ok(BlockNumberOrTag::Latest.into()),
-            "finalized" => Ok(BlockNumberOrTag::Finalized.into()),
-            "safe" => Ok(BlockNumberOrTag::Safe.into()),
-            "earliest" => Ok(BlockNumberOrTag::Earliest.into()),
-            "pending" => Ok(BlockNumberOrTag::Pending.into()),
-            _ => s
-                .parse::<u64>()
-                .map_err(ParseBlockIdError::ParseIntError)
-                .map(|n| Self::Number(n.into())),
+            "latest" | "finalized" | "safe" | "earliest" | "pending" => {
+                Ok(BlockNumberOrTag::from_str(s).unwrap().into())
+            }
+            _ => s.parse::<u64>().map_err(ParseBlockIdError::ParseIntError).map(Into::into),
         }
     }
 }
@@ -1369,5 +1362,38 @@ mod tests {
 
         assert_eq!(num_hash_from_reversed_tuple.number, number);
         assert_eq!(num_hash_from_reversed_tuple.hash, hash);
+    }
+
+    #[test]
+    fn test_block_id_from_str() {
+        // Valid hexadecimal block ID (with 0x prefix)
+        let hex_id = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        assert_eq!(
+            BlockId::from_str(hex_id).unwrap(),
+            BlockId::Hash(RpcBlockHash::from_hash(B256::from_str(hex_id).unwrap(), None).into())
+        );
+
+        // Valid tag strings
+        assert_eq!(BlockId::from_str("latest").unwrap(), BlockNumberOrTag::Latest.into());
+        assert_eq!(BlockId::from_str("finalized").unwrap(), BlockNumberOrTag::Finalized.into());
+        assert_eq!(BlockId::from_str("safe").unwrap(), BlockNumberOrTag::Safe.into());
+        assert_eq!(BlockId::from_str("earliest").unwrap(), BlockNumberOrTag::Earliest.into());
+        assert_eq!(BlockId::from_str("pending").unwrap(), BlockNumberOrTag::Pending.into());
+
+        // Valid numeric string without prefix
+        let numeric_string = "12345";
+        let parsed_numeric_string = BlockId::from_str(numeric_string);
+        assert!(parsed_numeric_string.is_ok());
+
+        // Hex interpretation of numeric string
+        assert_eq!(
+            BlockId::from_str("0x12345").unwrap(),
+            BlockId::Number(BlockNumberOrTag::Number(74565))
+        );
+
+        // Invalid non-numeric string
+        let invalid_string = "invalid_block_id";
+        let parsed_invalid_string = BlockId::from_str(invalid_string);
+        assert!(parsed_invalid_string.is_err());
     }
 }
