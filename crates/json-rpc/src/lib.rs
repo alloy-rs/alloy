@@ -76,6 +76,9 @@
 #[macro_use]
 extern crate tracing;
 
+#[macro_use]
+mod macros;
+
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
