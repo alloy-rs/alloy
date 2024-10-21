@@ -167,7 +167,7 @@ impl FromStr for BlockNumberOrTag {
     type Err = ParseBlockNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let block = match s {
+        Ok(match s {
             "latest" => Self::Latest,
             "finalized" => Self::Finalized,
             "safe" => Self::Safe,
@@ -180,8 +180,7 @@ impl FromStr for BlockNumberOrTag {
                     return Err(HexStringMissingPrefixError::default().into());
                 }
             }
-        };
-        Ok(block)
+        })
     }
 }
 
