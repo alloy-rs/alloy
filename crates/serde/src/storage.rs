@@ -132,4 +132,11 @@ mod tests {
         let key = JsonStorageKey::default();
         assert_eq!(String::from(key), String::from("0x0"));
     }
+
+    #[test]
+    fn storage_key_32_roundtrip() {
+        let key = "\"0x0000000000000000000000000000000000000000000000000000000000000000\"";
+        let key = serde_json::from_str::<JsonStorageKey>(key).unwrap();
+        dbg!(serde_json::to_string(&key).unwrap());
+    }
 }
