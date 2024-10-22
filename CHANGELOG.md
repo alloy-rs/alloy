@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
+
+### Bug Fixes
+
+- Correct implementations of Encodable and Decodable for sidecars ([#1528](https://github.com/alloy-rs/alloy/issues/1528))
+- [filter] Treat null fields as null ([#1529](https://github.com/alloy-rs/alloy/issues/1529))
+- Maybetagged serde for typed transaction ([#1495](https://github.com/alloy-rs/alloy/issues/1495))
+
+### Dependencies
+
+- Bump alloy-eip7702 ([#1547](https://github.com/alloy-rs/alloy/issues/1547))
+
+### Documentation
+
+- [prestate] Comment prestate more clear ([#1527](https://github.com/alloy-rs/alloy/issues/1527))
+
+### Features
+
+- [rpc-types-trace/prestate] Support disable_{code,storage} ([#1538](https://github.com/alloy-rs/alloy/issues/1538))
+- Derive serde for `ExecutionPayloadSidecar` ([#1535](https://github.com/alloy-rs/alloy/issues/1535))
+
+### Miscellaneous Tasks
+
+- Remove self from codeowners ([#1498](https://github.com/alloy-rs/alloy/issues/1498))
+
+### Other
+
+- Add `Debug` trait bound for `Transaction` trait ([#1543](https://github.com/alloy-rs/alloy/issues/1543))
+- Impl `From<RpcBlockHash>` for `BlockId` ([#1539](https://github.com/alloy-rs/alloy/issues/1539))
+- Small refactor with `then_some` ([#1533](https://github.com/alloy-rs/alloy/issues/1533))
+- Add unit tests and reduce paths ([#1531](https://github.com/alloy-rs/alloy/issues/1531))
+- Use `Withdrawals` wrapper in `BlockBody` ([#1525](https://github.com/alloy-rs/alloy/issues/1525))
+
+### Testing
+
+- Fix more ci only ([#1402](https://github.com/alloy-rs/alloy/issues/1402))
+
 ## [0.5.2](https://github.com/alloy-rs/alloy/releases/tag/v0.5.2) - 2024-10-18
 
 ### Bug Fixes
@@ -14,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.2
 - Make Header encoding good ([#1524](https://github.com/alloy-rs/alloy/issues/1524))
 - Reorder bincode modules ([#1520](https://github.com/alloy-rs/alloy/issues/1520))
 
