@@ -268,14 +268,18 @@ pub enum GethDebugBuiltInTracerType {
     /// to the nested format of `callTracer`.
     #[serde(rename = "flatCallTracer")]
     FlatCallTracer,
-    /// The prestate tracer has two modes: prestate and diff. The prestate mode returns the
-    /// accounts necessary to execute a given transaction. diff mode returns the differences
-    /// between the transaction's pre and post-state (i.e. what changed because the transaction
-    /// happened). The prestateTracer defaults to prestate mode. It reexecutes the given
-    /// transaction and tracks every part of state that is touched. This is similar to the concept
-    /// of a stateless witness, the difference being this tracer doesn't return any cryptographic
-    /// proof, rather only the trie leaves. The result is an object. The keys are addresses of
-    /// accounts.
+    /// The prestate tracer operates in two distinct modes: prestate and diff.
+    /// - In prestate mode, it retrieves the accounts required for executing a specified
+    ///   transaction.
+    /// - In diff mode, it identifies the changes between the transaction's initial and final
+    ///   states, detailing the modifications caused by the transaction.
+    ///
+    /// By default, the prestateTracer is set to prestate mode. It reexecutes the given transaction
+    /// and tracks every part of state that is accessed.
+    ///
+    /// This functionality is akin to a stateless witness, with the key distinction that this
+    /// tracer does not provide any cryptographic proofs; it only returns the trie leaves.
+    /// The output is an object where the keys correspond to account addresses.
     #[serde(rename = "prestateTracer")]
     PreStateTracer,
     /// This tracer is noop. It returns an empty object and is only meant for testing the setup.
