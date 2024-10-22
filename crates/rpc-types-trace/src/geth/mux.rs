@@ -60,7 +60,7 @@ mod tests {
             Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::MuxTracer));
 
         let call_config = CallConfig { only_top_call: Some(true), with_log: Some(true) };
-        let prestate_config = PreStateConfig { diff_mode: Some(true) };
+        let prestate_config = PreStateConfig { diff_mode: Some(true), ..Default::default() };
 
         opts.tracing_options.tracer_config = MuxConfig(HashMap::from_iter([
             (GethDebugBuiltInTracerType::FourByteTracer, None),
