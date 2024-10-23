@@ -346,8 +346,8 @@ impl BlobTransactionSidecar {
     /// Decodes the [BlobTransactionSidecar] from RLP bytes.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(buf)?;
-        if header.list {
-            return Err(alloy_rlp::Error::UnexpectedList);
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
         }
         if buf.len() < header.payload_length {
             return Err(alloy_rlp::Error::InputTooShort);

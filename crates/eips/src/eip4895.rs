@@ -113,6 +113,7 @@ impl<'a> IntoIterator for &'a mut Withdrawals {
 #[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
+    use core::str::FromStr;
 
     // <https://github.com/paradigmxyz/reth/issues/1614>
     #[test]
@@ -128,5 +129,14 @@ mod tests {
         let withdrawals: Withdrawals = serde_json::from_str(input).unwrap();
         let s = serde_json::to_string(&withdrawals).unwrap();
         assert_eq!(input, s);
+    }
+
+    #[test]
+    fn test_withdrawal_amount_wei() {
+        let withdrawal =
+            Withdrawal { index: 1, validator_index: 2, address: Address::random(), amount: 454456 };
+
+        // Assert that the amount_wei method returns the correct value
+        assert_eq!(withdrawal.amount_wei(), U256::from_str("0x19d5348723000").unwrap());
     }
 }
