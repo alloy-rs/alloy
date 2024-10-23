@@ -26,8 +26,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
     /// Get the length of the transaction when RLP encoded.
     fn rlp_encoded_length(&self) -> usize {
-        let payload_length = self.rlp_encoded_fields_length();
-        self.rlp_header().length() + payload_length
+        self.rlp_header().length_with_payload()
     }
 
     /// RLP encodes the transaction.
@@ -45,8 +44,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     /// Get the length of the transaction when RLP encoded with the given
     /// signature.
     fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        let header = self.rlp_header_signed(signature);
-        header.length() + header.payload_length
+        self.rlp_header_signed(signature).length_with_payload()
     }
 
     /// RLP encodes the transaction with the given signature.
@@ -83,8 +81,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     /// Get the length of the transaction when network encoded. This is the
     /// EIP-2718 encoded length with an outer RLP header.
     fn network_encoded_length(&self, signature: &Signature) -> usize {
-        let header = self.network_header(signature);
-        header.length() + header.payload_length
+        self.network_header(signature).length_with_payload()
     }
 
     /// Network encode the transaction with the given signature.
