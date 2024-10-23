@@ -356,24 +356,6 @@ impl BlobTransactionSidecar {
     }
 }
 
-impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
-    fn encode(&self, out: &mut dyn BufMut) {
-        self.rlp_encode(out);
-    }
-
-    fn length(&self) -> usize {
-        self.rlp_encoded_length()
-    }
-}
-
-impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::rlp_decode(buf)
-    }
-}
-
 // Helper function to deserialize boxed blobs
 #[cfg(all(debug_assertions, feature = "serde"))]
 fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
