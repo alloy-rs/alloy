@@ -58,7 +58,7 @@ impl<T> Block<T> {
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
     /// using the provided [`alloy_consensus::Header`].
     pub fn uncle_block_from_header(header: alloy_consensus::Header) -> Self {
-        Block {
+        Self {
             uncles: vec![],
             header: header.clone().seal(header.hash_slow()).into(),
             transactions: BlockTransactions::Uncle,
