@@ -212,9 +212,8 @@ pub enum ParseBlockNumberError {
 }
 
 /// Error variants when parsing a [BlockNumberOrTag]
-#[cfg(feature = "std")]
-impl std::error::Error for ParseBlockNumberError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for ParseBlockNumberError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::ParseIntErr(err) => std::error::Error::source(err),
             Self::ParseErr(err) => std::error::Error::source(err),
@@ -262,8 +261,7 @@ impl Display for HexStringMissingPrefixError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for HexStringMissingPrefixError {}
+impl core::error::Error for HexStringMissingPrefixError {}
 
 /// A Block Identifier.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
@@ -566,9 +564,8 @@ impl Display for ParseBlockIdError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ParseBlockIdError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for ParseBlockIdError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::ParseIntError(err) => std::error::Error::source(err),
             Self::FromHexError(err) => std::error::Error::source(err),
@@ -784,8 +781,7 @@ impl fmt::Display for ParseBlockHashOrNumberError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ParseBlockHashOrNumberError {}
+impl core::error::Error for ParseBlockHashOrNumberError {}
 
 impl FromStr for HashOrNumber {
     type Err = ParseBlockHashOrNumberError;

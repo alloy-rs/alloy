@@ -283,9 +283,8 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for BlockError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for BlockError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::RlpDecodeRawBlock(err) => Some(err),
             _ => None,

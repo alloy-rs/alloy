@@ -74,9 +74,8 @@ pub enum ConversionError {
     Custom(String),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ConversionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for ConversionError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::Eip2718Error(err) => Some(err),
             Self::SignatureError(err) => Some(err),
