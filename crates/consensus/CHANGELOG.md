@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct implementations of Encodable and Decodable for sidecars ([#1528](https://github.com/alloy-rs/alloy/issues/1528))
 - Maybetagged serde for typed transaction ([#1495](https://github.com/alloy-rs/alloy/issues/1495))
 
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
 ### Other
 
 - Add `Debug` trait bound for `Transaction` trait ([#1543](https://github.com/alloy-rs/alloy/issues/1543))

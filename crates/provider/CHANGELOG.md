@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [prestate] Comment prestate more clear ([#1527](https://github.com/alloy-rs/alloy/issues/1527))
 
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
 ### Testing
 
 - Fix more ci only ([#1402](https://github.com/alloy-rs/alloy/issues/1402))

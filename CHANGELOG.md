@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
+
+### Bug Fixes
+
+- Sidecar rlp decoding ([#1549](https://github.com/alloy-rs/alloy/issues/1549))
+
+### Dependencies
+
+- Bump alloy-eip7702 ([#1550](https://github.com/alloy-rs/alloy/issues/1550))
+
+### Features
+
+- Add osaka time to genesis ([#1548](https://github.com/alloy-rs/alloy/issues/1548))
+
+### Other
+
+- Add unit test for `amount_wei` `Withdrawal` ([#1551](https://github.com/alloy-rs/alloy/issues/1551))
+
 ## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
 
 ### Bug Fixes
@@ -28,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.3
 - Remove self from codeowners ([#1498](https://github.com/alloy-rs/alloy/issues/1498))
 
 ### Other
