@@ -52,8 +52,9 @@ impl From<Eip2718Error> for alloy_rlp::Error {
     }
 }
 
-impl core::error::Error for Eip2718Error {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+#[cfg(feature = "std")]
+impl std::error::Error for Eip2718Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::RlpError(err) => Some(err),
             Self::UnexpectedType(_) => None,

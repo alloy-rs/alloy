@@ -215,9 +215,9 @@ pub enum ParseBlockNumberError {
 impl core::error::Error for ParseBlockNumberError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            Self::ParseIntErr(err) => std::error::Error::source(err),
-            Self::ParseErr(err) => std::error::Error::source(err),
-            Self::MissingPrefix(err) => std::error::Error::source(err),
+            Self::ParseIntErr(err) => core::error::Error::source(err),
+            Self::ParseErr(err) => core::error::Error::source(err),
+            Self::MissingPrefix(err) => core::error::Error::source(err),
         }
     }
 }
@@ -567,9 +567,9 @@ impl Display for ParseBlockIdError {
 impl core::error::Error for ParseBlockIdError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            Self::ParseIntError(err) => std::error::Error::source(err),
-            Self::FromHexError(err) => std::error::Error::source(err),
-            Self::ParseError(err) => std::error::Error::source(err),
+            Self::ParseIntError(err) => core::error::Error::source(err),
+            Self::FromHexError(err) => core::error::Error::source(err),
+            Self::ParseError(err) => core::error::Error::source(err),
         }
     }
 }
