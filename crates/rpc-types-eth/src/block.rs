@@ -2,11 +2,12 @@
 
 use crate::{ConversionError, Transaction, Withdrawal};
 use alloc::collections::BTreeMap;
-use alloy_consensus::Sealed;
+use alloy_consensus::{Sealed, TxEnvelope};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
+use alloy_rlp::Encodable;
 
 use alloc::vec::Vec;
 
@@ -48,6 +49,32 @@ impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
+    }
+}
+
+impl<T> Block<T> {
+    /// Constructs an "uncle block" from the provided header.
+    ///
+    /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
+    /// using the provided [`alloy_consensus::Header`].
+    pub fn uncle_block_from_header(header: alloy_consensus::Header) -> Self {
+        Block {
+            uncles: vec![],
+            header: header.clone().seal(header.hash_slow()).into(),
+            transactions: BlockTransactions::Uncle,
+            withdrawals: Some(vec![]),
+            size: Some(U256::from(
+                alloy_consensus::Block {
+                    header,
+                    body: alloy_consensus::BlockBody::<TxEnvelope> {
+                        transactions: vec![],
+                        ommers: vec![],
+                        withdrawals: None,
+                    },
+                }
+                .length(),
+            )),
+        }
     }
 }
 
@@ -447,7 +474,7 @@ impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::keccak256;
+    use alloy_primitives::{hex, keccak256};
     use arbitrary::Arbitrary;
     use rand::Rng;
     use similar_asserts::assert_eq;
@@ -869,5 +896,58 @@ mod tests {
 
         // Ensure the roundtrip conversion is correct
         assert_eq!(rpc_header, roundtrip_rpc_header);
+    }
+
+    #[test]
+    fn test_consensus_header_to_rpc_block() {
+        // Setup a RPC header
+        let header = Header {
+            hash: B256::with_last_byte(1),
+            parent_hash: B256::with_last_byte(2),
+            uncles_hash: B256::with_last_byte(3),
+            miner: Address::with_last_byte(4),
+            state_root: B256::with_last_byte(5),
+            transactions_root: B256::with_last_byte(6),
+            receipts_root: B256::with_last_byte(7),
+            withdrawals_root: None,
+            number: 9,
+            gas_used: 10,
+            gas_limit: 11,
+            extra_data: vec![1, 2, 3].into(),
+            logs_bloom: Bloom::default(),
+            timestamp: 12,
+            difficulty: U256::from(13),
+            total_difficulty: None,
+            mix_hash: Some(B256::with_last_byte(14)),
+            nonce: Some(B64::with_last_byte(15)),
+            base_fee_per_gas: Some(20),
+            blob_gas_used: None,
+            excess_blob_gas: None,
+            parent_beacon_block_root: None,
+            requests_hash: None,
+        };
+
+        // Convert the RPC header to a primitive header
+        let primitive_header: alloy_consensus::Header = header.clone().try_into().unwrap();
+
+        // Convert the primitive header to a RPC uncle block
+        let block: Block<Transaction> = Block::uncle_block_from_header(primitive_header);
+
+        // Ensure the block is correct
+        assert_eq!(
+            block,
+            Block {
+                header: Header {
+                    hash: B256::from(hex!(
+                        "379bd1414cf69a9b86fb4e0e6b05a2e4b14cb3d5af057e13ccdc2192cb9780b2"
+                    )),
+                    ..header
+                },
+                uncles: vec![],
+                transactions: BlockTransactions::Uncle,
+                size: Some(U256::from(505)),
+                withdrawals: Some(vec![]),
+            }
+        );
     }
 }
