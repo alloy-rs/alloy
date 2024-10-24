@@ -193,8 +193,11 @@ impl RlpEcdsaTx for TxLegacy {
         let mut tx = Self::rlp_decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
-        let chain_id = signature.v().chain_id();
-        tx.chain_id = chain_id;
+        if !matches!(signature.v(), Parity::Eip155(_) | Parity::NonEip155(_)) {
+            return Err(alloy_rlp::Error::Custom("invalid parity for legacy transaction"));
+        }
+
+        tx.chain_id = signature.v().chain_id();
 
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::ListLengthMismatch {
