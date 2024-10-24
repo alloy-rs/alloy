@@ -10,6 +10,16 @@ use alloy_rlp::{Decodable, Encodable, Header};
 
 use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
+/// Expected number of transactions where we can expect a speed-up by recovering the senders in
+/// parallel.
+#[cfg(feature = "k256")]
+pub(crate) static PARALLEL_SENDER_RECOVERY_THRESHOLD: std::sync::LazyLock<usize> =
+    std::sync::LazyLock::new(|| match rayon::current_num_threads() {
+        0..=1 => usize::MAX,
+        2..=8 => 10,
+        _ => 5,
+    });
+
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].
 ///
@@ -238,6 +248,29 @@ impl TxEnvelope {
             Self::Eip1559(tx) => tx.recover_signer(),
             Self::Eip4844(tx) => tx.recover_signer(),
             Self::Eip7702(tx) => tx.recover_signer(),
+        }
+    }
+
+    /// Recovers a list of signers from a transaction list iterator.
+    ///
+    /// Returns `None` if some transaction's signature is invalid;
+    /// See also [`Self::recover_signer`].
+    #[cfg(feature = "k256")]
+    pub fn recover_signers<'a, T>(
+        txes: T,
+        num_txes: usize,
+    ) -> Result<alloc::vec::Vec<alloy_primitives::Address>, alloy_primitives::SignatureError>
+    where
+        T: rayon::prelude::IntoParallelIterator<Item = &'a Self>
+            + IntoIterator<Item = &'a Self>
+            + Send,
+    {
+        use rayon::iter::ParallelIterator;
+
+        if num_txes < *PARALLEL_SENDER_RECOVERY_THRESHOLD {
+            txes.into_iter().map(|tx| tx.recover_signer()).collect()
+        } else {
+            txes.into_par_iter().map(|tx| tx.recover_signer()).collect()
         }
     }
 

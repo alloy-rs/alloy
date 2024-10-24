@@ -1,8 +1,9 @@
 //! Block Type
 
-use crate::Header;
+use crate::{Header, TxEnvelope};
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
+use alloy_primitives::Address;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -32,6 +33,14 @@ pub struct BlockBody<T> {
     pub ommers: Vec<Header>,
     /// Block withdrawals.
     pub withdrawals: Option<Withdrawals>,
+}
+
+impl BlockBody<TxEnvelope> {
+    /// Recover signer addresses for all transactions in the block body.
+    #[cfg(feature = "k256")]
+    pub fn recover_signers(&self) -> Result<Vec<Address>, alloy_primitives::SignatureError> {
+        TxEnvelope::recover_signers(&self.transactions, self.transactions.len())
+    }
 }
 
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
