@@ -62,7 +62,7 @@ impl<T> Block<T> {
             uncles: vec![],
             header: header.clone().seal(header.hash_slow()).into(),
             transactions: BlockTransactions::Uncle,
-            withdrawals: Some(vec![]),
+            withdrawals: None,
             size: Some(U256::from(
                 alloy_consensus::Block {
                     header,
@@ -946,7 +946,7 @@ mod tests {
                 uncles: vec![],
                 transactions: BlockTransactions::Uncle,
                 size: Some(U256::from(505)),
-                withdrawals: Some(vec![]),
+                withdrawals: None,
             }
         );
     }
