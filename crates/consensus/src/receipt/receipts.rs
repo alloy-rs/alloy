@@ -126,6 +126,12 @@ impl<T> Receipts<T> {
     pub fn push(&mut self, receipts: Vec<T>) {
         self.receipt_vec.push(receipts);
     }
+
+    /// Retrieves all recorded receipts from index and calculates the root using the given closure.
+    pub fn root_slow(&self, index: usize, f: impl FnOnce(&[&T]) -> B256) -> Option<B256> {
+        let receipts = self.receipt_vec.get(index)?.iter().collect::<Vec<_>>();
+        Some(f(receipts.as_slice()))
+    }
 }
 
 impl<T> From<Vec<T>> for Receipts<T> {
