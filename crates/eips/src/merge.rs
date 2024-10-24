@@ -26,16 +26,6 @@ pub const EPOCH_DURATION: Duration = Duration::from_secs(EPOCH_DURATION_SECS);
 /// The default block nonce in the beacon consensus
 pub const BEACON_NONCE: u64 = 0u64;
 
-/// The number of blocks to unwind during a reorg that already became a part of canonical chain.
-///
-/// In reality, the node can end up in this particular situation very rarely. It would happen only
-/// if the node process is abruptly terminated during ongoing reorg and doesn't boot back up for
-/// long period of time.
-///
-/// Unwind depth of `3` blocks significantly reduces the chance that the reorged block is kept in
-/// the database.
-pub const BEACON_CONSENSUS_REORG_UNWIND_DEPTH: u64 = 3;
-
 /// Max seconds from current time allowed for blocks, before they're considered future blocks.
 ///
 /// This is only used when checking whether or not the timestamp for pre-merge blocks is in the
