@@ -19,7 +19,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     /// a RLP header.
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut);
 
-    /// Create an rlp header for the unsigned transaction.
+    /// Create an list rlp header for the unsigned transaction.
     fn rlp_header(&self) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length() }
     }
@@ -35,7 +35,7 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         self.rlp_encode_fields(out);
     }
 
-    /// Create a header for the signed transaction.
+    /// Create an rlp list header for the signed transaction.
     fn rlp_header_signed(&self, signature: &Signature) -> Header {
         let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
         Header { list: true, payload_length }
@@ -72,7 +72,9 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         self.eip2718_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
     }
 
-    /// Create a header for the network encoded transaction.
+    /// Create an rlp header for the network encoded transaction. This will
+    /// usually be a string header, however, legacy transactions' network
+    /// encoding is a list.
     fn network_header(&self, signature: &Signature) -> Header {
         let payload_length = self.eip2718_encoded_length(signature);
         Header { list: false, payload_length }
