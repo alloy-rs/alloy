@@ -1,12 +1,13 @@
 //! RPC types for transactions
+use core::str::FromStr;
+
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
     TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
-use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
-
+use alloy_primitives::{address, b256, Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256, Parity as yParity, Signature as ySignature};
 use alloc::vec::Vec;
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -31,31 +32,25 @@ pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
 mod signature;
-use serde::ser::SerializeStruct;
 pub use signature::{Parity, Signature};
+use serde::{de::{MapAccess, Visitor}, ser::SerializeStruct, Deserialize, Deserializer};
 
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Tx")]
 pub struct Transaction {
     /// Hash
     pub hash: TxHash,
     /// Nonce
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
     /// Block hash
-    #[cfg_attr(feature = "serde", serde(default))]
     pub block_hash: Option<BlockHash>,
     /// Block number
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
     /// Transaction Index
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
@@ -64,92 +59,38 @@ pub struct Transaction {
     /// Transferred value
     pub value: U256,
     /// Gas Price
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
     pub gas_price: Option<u128>,
     /// Gas amount
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas: u64,
     /// Max BaseFeePerGas the user is willing to pay.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
     pub max_fee_per_gas: Option<u128>,
     /// The miner's tip.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
     pub max_priority_fee_per_gas: Option<u128>,
     /// Configured max fee per blob gas for eip-4844 transactions
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
     ///
     /// Note: this is an option so special transaction types without a signature (e.g. <https://github.com/ethereum-optimism/optimism/blob/0bf643c4147b43cd6f25a759d331ef3a2a61a2a3/specs/deposits.md#the-deposited-transaction-type>) can be supported.
-    #[cfg_attr(feature = "serde", serde(flatten, skip_serializing_if = "Option::is_none"))]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
     pub chain_id: Option<ChainId>,
     /// Contains the blob hashes for eip-4844 transactions.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// EIP2930
     ///
     /// Pre-pay to warm storage access.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub access_list: Option<AccessList>,
     /// EIP2718
     ///
     /// Transaction type,
     /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559
     /// transaction, Some(1) for AccessList transaction, None or Some(0) for Legacy
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            rename = "type",
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
     #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// The signed authorization list is a list of tuples that store the address to code which the
     /// signer desires to execute in the context of their EOA and their signature.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
@@ -263,7 +204,7 @@ impl serde::Serialize for Transaction
         if *tx_type >= 1 && access_list.is_some() {
             state.serialize_field("accessList", &access_list)?;
         }
-        state.serialize_field("transactionType", tx_id)?;
+        state.serialize_field("transactionType", &format!("{tx_type:#x}"))?;
         if *tx_type == 4 && auth_list.is_some() {
             state.serialize_field("authorizationList", &auth_list.unwrap())?;
         }
@@ -274,6 +215,220 @@ impl serde::Serialize for Transaction
 
     
 } 
+
+impl<'de> Deserialize<'de> for Transaction {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct TxVisitor;
+        
+        const FIELDS: &'static [&'static str] = &["hash", "nonce", "block_hash", "block_number", "transaction_index", "from", "to", "value", "gas_price", "gas", "max_fee_per_gas", "max_priority_fee_per_gas", "max_fee_per_blob_gas", "input", "r", "s", "v", "yParity", "chain_id", "blob_versioned_hashes", "access_list", "transaction_type", "authorization_list"];
+
+        impl<'de> Visitor<'de> for TxVisitor {
+            type Value = Transaction;            
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct Transaction")
+            }
+
+            fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<Transaction, V::Error> {
+                let mut hash = b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
+                let mut nonce = u64::MIN;
+                let mut block_hash: Option<BlockHash> = Option::None;
+                let mut block_number: Option<u64> = Option::None;
+                let mut transaction_index: Option<u64> = Option::None;
+                let mut from: Address = address!("d8da6bf26964af9d7eed9e03e53415d37aa96045");
+                let mut to: Option<Address> = Option::None;
+                let mut value: U256 = U256::ZERO;
+                let mut gas_price: Option<u128> = Option::None;
+                let mut gas: u64 = u64::MIN;
+                let mut max_fee_per_gas: Option<u128> = Option::None;
+                let mut max_priority_fee_per_gas: Option<u128> = Option::None;
+                let mut max_fee_per_blob_gas: Option<u128> = Option::None;
+                let mut input: Bytes = Bytes::new();
+                let mut r: U256 = U256::MIN;
+                let mut s: U256 = U256::MIN;
+                let mut v: U256 = U256::MIN;
+                let mut y_parity: Option<Parity> = Option::None;
+                let mut chain_id: Option<ChainId> = Option::None;
+                let mut blob_versioned_hashes: Option<Vec<B256>> = Option::None;
+                let mut access_list: Option<AccessList> = Option::None;
+                let mut transaction_type: Option<u8> = Option::None;
+                let mut authorization_list: Option<Vec<SignedAuthorization>> = Option::None; 
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "hash" => {
+                            let hash_str = map.next_value::<&str>()?;
+                            hash = TxHash::from_str(hash_str).unwrap_or_default();
+                        },
+                        "nonce" => {
+                            let n = map.next_value::<&str>()?; 
+                            nonce = n.parse::<u64>().unwrap_or_default();
+                        },
+                        "blockHash" => {
+                            let b = map.next_value::<&str>()?;
+                            block_hash = Option::Some(BlockHash::from_str(b).unwrap_or_default());
+                        },
+                        "blockNumber" => {
+                            let b = map.next_value::<&str>()?;
+                            block_number = Option::Some(b.parse::<u64>().unwrap_or_default());
+                        },
+                        "transactionIndex" => {
+                            let idx = map.next_value::<&str>()?;
+                            transaction_index = Option::Some(idx.parse::<u64>().unwrap_or_default());
+                        },
+                        "from" => {
+                            let f = map.next_value::<&str>()?;
+                            from = Address::from_str(f).unwrap_or_default();
+                        },
+                        "to" => {
+                            let t = map.next_value::<&str>()?;
+                            to = Option::Some(Address::from_str(t).unwrap_or_default());
+                        },
+                        "value" => {
+                            let v = map.next_value::<&str>()?;
+                            value = U256::from_str(v).unwrap_or_default();
+                        },
+                        "gasPrice" => {
+                            let g = map.next_value::<&str>()?;
+                            gas_price = Option::Some(g.parse::<u128>().unwrap_or_default());
+                        },
+                        "gas" => {
+                            let g = map.next_value::<&str>()?;
+                            gas = g.parse::<u64>().unwrap_or_default();
+                        },
+                        "maxFeePerGas" => {
+                            let m = map.next_value::<&str>()?;
+                            max_fee_per_gas = Option::Some(m.parse::<u128>().unwrap_or_default());
+                        },
+                        "maxPriorityFeePerGas" => {
+                            let m = map.next_value::<&str>()?;
+                            max_priority_fee_per_gas = m.parse::<u128>().ok();
+                        },
+                        "maxFeePerBlobGas" => {
+                            let m = map.next_value::<&str>()?;
+                            max_fee_per_blob_gas = Option::Some(m.parse::<u128>().unwrap_or_default());
+                        },
+                        "input" => {
+                            let i = map.next_value::<&str>()?;
+                            input = Bytes::from_str(i).unwrap_or_default();
+                        },
+                        "r" => {
+                            let st = map.next_value::<&str>()?;
+                            r = U256::from_str(st).unwrap_or_default();
+                        },
+                        "s" => {
+                            let st = map.next_value::<&str>()?;
+                            s = U256::from_str(st).unwrap_or_default();
+                        },
+                        "v" => {
+                            let st = map.next_value::<&str>()?;
+                            v = U256::from_str(st).unwrap_or_default();
+                        },
+                        "y_parity" => {
+                            let st = map.next_value::<&str>()?;
+                            y_parity = Option::Some(Parity(st.parse::<bool>().unwrap_or(false)));
+                        }
+                        "chainId" => {
+                            let st = map.next_value::<&str>()?;
+                            chain_id = Option::Some(ChainId::from_str(st).unwrap_or(1));
+                        },
+                        "blobVersionedHashes" => {
+                            let mut hashes_str = map.next_value::<String>()?;                            
+                            if hashes_str.len() > 0 {
+                                hashes_str.remove(0);
+                                hashes_str.remove(hashes_str.len() - 1);
+                                let hashes = hashes_str.split(",").map(|s| B256::from_str(s).unwrap()).collect();
+                                blob_versioned_hashes = Option::Some(hashes);
+                                continue;
+                            }
+                            blob_versioned_hashes = Option::None
+                        },
+                        "accessList" => {
+                            let mut list = map.next_value::<String>()?;
+                            list.remove(0);
+                            list.remove(list.len() - 1);
+                                
+                            if list.len() > 0 {
+                                let access_list_items = list.split(",").map(|s| {
+                                    let mut obj: String = s.into();
+                                    obj.remove(0);
+                                    obj.remove(list.len() - 1);
+                                    let idx = obj.find(",").unwrap();
+                                    let addr = &obj[0..(idx-1)];
+                                    let addr_idx = addr.find(":").unwrap() + 1;
+                                    let keys = String::from(&obj[(idx+1)..(obj.len() - 1)]);
+                                    let keys_idx = keys.find(":").unwrap();
+                                    let keys_list = String::from(&keys[(keys_idx + 2)..keys.len() - 2]);
+                                    let storage_keys = keys_list.split(",").map(|s| B256::from_str(s).unwrap()).collect();
+                                    let list_item = AccessListItem {
+                                        address: Address::from_str(&addr[addr_idx..addr.len() - 1]).unwrap(),
+                                        storage_keys
+                                    };
+                                    list_item
+                                    
+                                }).collect();
+                                access_list = Option::Some(AccessList(access_list_items));
+                                continue;
+                            }                            
+                            access_list = Option::None
+                        },
+                        "transactionType" => {
+                            let t = map.next_value::<&str>()?;
+                            transaction_type = Option::Some(t.parse::<u8>().unwrap_or_default());
+                        },
+                        "authorizationList" => {
+                            let mut auth_list_str = String::from(map.next_value::<&str>()?);
+                            auth_list_str.remove(0);
+                            auth_list_str.remove(auth_list_str.len() - 1);
+                            if auth_list_str.len() > 0 {
+                                authorization_list = Option::Some(auth_list_str.split(",").map(|s| {
+                                    let mut obj = String::from(s);
+                                    obj.remove(0);
+                                    obj.remove(obj.len() - 1);
+                                    let kv: Vec<&str> = obj.split(",").collect();
+                                    let chain = kv[0];
+                                    let address = kv[1];
+                                    let nonce = kv[2];
+                                    let authorization = Authorization {
+                                        chain_id: U256::from_str(&chain[(chain.find(":").unwrap() + 1)..chain.len() - 1]).unwrap(),
+                                        address: Address::from_str(&address[(address.find(":").unwrap() + 1)..address.len() - 1]).unwrap(),
+                                        nonce: nonce[(nonce.find(":").unwrap() + 1)..nonce.len() - 1].parse::<u64>().unwrap()
+                                    };
+                                    let mut r = kv[3];
+                                    r = &r[(r.find(":").unwrap() + 1)..r.len() - 1];
+                                    let mut s = kv[4];
+                                    s = &s[(s.find(":").unwrap() + 1)..s.len() - 1];
+                                    let mut v = kv[5];
+                                    v = &v[(v.find(":").unwrap() + 1)..v.len() - 1];
+                                    
+                                    let v_param = v.parse::<u64>().unwrap_or_default();
+                                    let parity = if v_param == 27 || v_param == 28 {
+                                        yParity::NonEip155(true)
+                                    } else if v_param % 2 != 0 {
+                                        yParity::Parity(false)
+                                    } else {
+                                        yParity::Eip155(v_param)
+                                    };
+                                    let signature = ySignature::new(U256::from_str(r).unwrap_or_default(), U256::from_str(s).unwrap_or_default(), parity);
+                                    authorization.into_signed(signature)
+                                }).collect());
+                            }                            
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+                Ok(Transaction {hash, nonce, block_hash, block_number, transaction_index, from, to, value, gas_price, gas, max_fee_per_gas, max_priority_fee_per_gas, max_fee_per_blob_gas, input, signature: Option::Some(Signature {
+                    r, s, v, y_parity
+                }), chain_id: chain_id, blob_versioned_hashes, access_list, transaction_type, authorization_list})
+                
+            }
+        }
+        deserializer.deserialize_struct("Transaction", FIELDS, TxVisitor)
+    
+    }
+}
 
 impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
