@@ -63,18 +63,8 @@ impl<T> Block<T> {
             header: header.clone().seal_slow().into(),
             transactions: BlockTransactions::Uncle,
             withdrawals: None,
-            size: Some(U256::from(
-                alloy_consensus::Block {
-                    header,
-                    body: alloy_consensus::BlockBody::<TxEnvelope> {
-                        transactions: vec![],
-                        ommers: vec![],
-                        withdrawals: None,
-                    },
-                }
-                .length(),
-            )),
-        }
+            size: Some(U256::from(alloy_consensus::Block::<TxEnvelope>::uncle(header).length())),
+        };
     }
 }
 

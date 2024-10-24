@@ -20,12 +20,12 @@ pub struct Block<T> {
     pub body: BlockBody<T>,
 }
 
-// impl<T> Block<T> {
-//     /// Creates a new empty uncle block.
-//     pub fn uncle(header: Header) -> Self {
-//         Self { header, body: Default::default() }
-//     }
-// }
+impl<T> Block<T> {
+    /// Creates a new empty uncle block.
+    pub fn uncle(header: Header) -> Self {
+        Self { header, body: Default::default() }
+    }
+}
 
 /// A response to `GetBlockBodies`, containing bodies if any bodies were found.
 ///
