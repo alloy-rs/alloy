@@ -85,8 +85,7 @@ pub enum ForkchoiceUpdateError {
     UnknownFinalBlock,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ForkchoiceUpdateError {}
+impl core::error::Error for ForkchoiceUpdateError {}
 
 #[cfg(feature = "jsonrpsee-types")]
 impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static> {

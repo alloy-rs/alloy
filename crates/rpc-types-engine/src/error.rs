@@ -120,5 +120,4 @@ pub enum PayloadValidationError {
     },
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for PayloadValidationError {}
+impl core::error::Error for PayloadValidationError {}
