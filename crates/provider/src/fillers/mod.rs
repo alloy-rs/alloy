@@ -312,17 +312,17 @@ where
 /// A trait which may be used to configure default fillers for [Network] implementations.
 pub trait RecommendedFillers: Network {
     /// Recommended fillers for this network.
-    type RecomendedFillers: TxFiller<Self>;
+    type RecommendedFillers: TxFiller<Self>;
 
     /// Returns the recommended filler for this provider.
-    fn recommended_fillers() -> Self::RecomendedFillers;
+    fn recommended_fillers() -> Self::RecommendedFillers;
 }
 
 impl RecommendedFillers for Ethereum {
-    type RecomendedFillers =
+    type RecommendedFillers =
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
-    fn recommended_fillers() -> Self::RecomendedFillers {
+    fn recommended_fillers() -> Self::RecommendedFillers {
         JoinFill::new(
             GasFiller,
             JoinFill::new(
@@ -334,10 +334,10 @@ impl RecommendedFillers for Ethereum {
 }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecomendedFillers =
+    type RecommendedFillers =
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
-    fn recommended_fillers() -> Self::RecomendedFillers {
+    fn recommended_fillers() -> Self::RecommendedFillers {
         JoinFill::new(
             GasFiller,
             JoinFill::new(
