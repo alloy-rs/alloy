@@ -57,7 +57,7 @@ impl<T> Block<T> {
     ///
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
     /// using the provided [`alloy_consensus::Header`].
-    pub fn uncle_block_from_header(header: alloy_consensus::Header) -> Self {
+    pub fn uncle_from_header(header: alloy_consensus::Header) -> Self {
         Self {
             uncles: vec![],
             header: header.clone().seal_slow().into(),
@@ -921,7 +921,7 @@ mod tests {
         let primitive_header: alloy_consensus::Header = header.clone().try_into().unwrap();
 
         // Convert the primitive header to a RPC uncle block
-        let block: Block<Transaction> = Block::uncle_block_from_header(primitive_header);
+        let block: Block<Transaction> = Block::uncle_from_header(primitive_header);
 
         // Ensure the block is correct
         assert_eq!(
