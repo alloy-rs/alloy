@@ -7,7 +7,7 @@ use alloy_eips::{
     eip7702::SignedAuthorization,
 };
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[doc(inline)]
@@ -896,8 +896,16 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let chunk = &mut &buf[..remaining_len];
+        let (tx, signature) = TxEip4844::rlp_decode_with_signature(chunk)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(chunk)?;
+
+        // Decoding did not consume the entire payload specified by the header
+        if !chunk.is_empty() {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+        buf.advance(header.payload_length);
+
         Ok((Self { tx, sidecar }, signature))
     }
 
