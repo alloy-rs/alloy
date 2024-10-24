@@ -321,14 +321,13 @@ impl RlpEcdsaTx for TxEip4844Variant {
         // First we decode the outer header
         Header::decode(needle)?;
 
-        // If the next bytes are a header, one of 2 things is true:
-        // - This is a sidecar tx and the header is the header byte of the internal tx
-        // - This is a regular tx, with a first byte that is also a valid header
-        //
-        // To check these, we first try to decode the header, then the sidecar
-        // tx.  If it fails, we know that the first byte was a header only by
-        // coincidence, and we fall back to non-sidecar decoding
-        if Header::decode(needle).is_ok() {
+        // If the next bytes are a header, one of 3 things is true:
+        // - If the header is a list, this is a WithSidecar tx
+        // - If there is no header, this is a non-sidecar tx with a single-byte chain ID.
+        // - If there is a string header, this is a non-sidecar tx with a multi-byte chain ID.
+        // To check these, we first try to decode the header. If it fails or is
+        // not a list, we lmow that it is a non-sidecar transaction.
+        if Header::decode(needle).map_or(false, |h| h.list) {
             if let Ok((tx, signature)) = TxEip4844WithSidecar::rlp_decode_with_signature(trial) {
                 // If succesful, we need to consume the trial buffer up to
                 // the same point.
