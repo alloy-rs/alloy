@@ -1,11 +1,7 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 
 use alloc::vec::Vec;
-use alloy_eips::{
-    eip2930::AccessList,
-    eip4844::{BYTES_PER_BLOB, DATA_GAS_PER_BLOB},
-    eip7702::SignedAuthorization,
-};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 use core::mem;
@@ -295,21 +291,23 @@ impl RlpEcdsaTx for TxEip4844Variant {
     }
 
     fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
+        let needle = &mut &**buf;
+        let header = Header::decode(needle)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining_len = buf.len();
-
+        let remaining_len = needle.len();
         if header.payload_length > remaining_len {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        if header.payload_length > BYTES_PER_BLOB {
-            TxEip4844WithSidecar::rlp_decode(buf).map(Into::into)
-        } else {
-            TxEip4844::rlp_decode(buf).map(Into::into)
+        let chunk = &mut &buf[..header.length_with_payload()];
+        let res = Self::rlp_decode_fields(chunk)?;
+        if !chunk.is_empty() {
+            return Err(alloy_rlp::Error::UnexpectedLength);
         }
+        buf.advance(header.length_with_payload());
+        Ok(res)
     }
 
     fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
@@ -758,12 +756,6 @@ impl TxEip4844WithSidecar {
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
-    }
-
-    /// Get the network-encoded fields length of the transaction.
-    pub fn network_encoded_fields_length(&self, signature: &Signature) -> usize {
-        self.tx.rlp_encoded_length_with_signature(signature)
-            + self.sidecar.rlp_encoded_fields_length()
     }
 }
 
