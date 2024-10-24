@@ -64,7 +64,7 @@ impl<T> Block<T> {
             transactions: BlockTransactions::Uncle,
             withdrawals: None,
             size: Some(U256::from(alloy_consensus::Block::<TxEnvelope>::uncle(header).length())),
-        };
+        }
     }
 }
 
