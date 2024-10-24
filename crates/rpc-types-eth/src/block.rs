@@ -6,7 +6,7 @@ use alloy_consensus::{Sealed, TxEnvelope};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
-use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
 use alloy_rlp::Encodable;
 
 use alloc::vec::Vec;
@@ -60,7 +60,7 @@ impl<T> Block<T> {
     pub fn uncle_block_from_header(header: alloy_consensus::Header) -> Self {
         Self {
             uncles: vec![],
-            header: header.clone().seal(header.hash_slow()).into(),
+            header: header.clone().seal_slow().into(),
             transactions: BlockTransactions::Uncle,
             withdrawals: None,
             size: Some(U256::from(
