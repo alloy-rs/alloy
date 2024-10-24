@@ -23,7 +23,7 @@ pub struct Block<T> {
 /// A response to `GetBlockBodies`, containing bodies if any bodies were found.
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
-#[derive(Debug, Clone, PartialEq, Eq, Default, RlpEncodable, RlpDecodable)]
+#[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[rlp(trailing)]
 pub struct BlockBody<T> {
     /// Transactions in this block.
@@ -32,6 +32,12 @@ pub struct BlockBody<T> {
     pub ommers: Vec<Header>,
     /// Block withdrawals.
     pub withdrawals: Option<Withdrawals>,
+}
+
+impl<T> Default for BlockBody<T> {
+    fn default() -> Self {
+        Self { transactions: Vec::new(), ommers: Vec::new(), withdrawals: None }
+    }
 }
 
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
