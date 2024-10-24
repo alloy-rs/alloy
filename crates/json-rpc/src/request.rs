@@ -220,24 +220,9 @@ where
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "id" => {
-                            if id.is_some() {
-                                return Err(serde::de::Error::duplicate_field("id"));
-                            }
-                            id = Some(map.next_value()?);
-                        }
-                        "params" => {
-                            if params.is_some() {
-                                return Err(serde::de::Error::duplicate_field("params"));
-                            }
-                            params = Some(map.next_value()?);
-                        }
-                        "method" => {
-                            if method.is_some() {
-                                return Err(serde::de::Error::duplicate_field("method"));
-                            }
-                            method = Some(map.next_value()?);
-                        }
+                        "id" => check_and_set_field!(map, id),
+                        "params" => check_and_set_field!(map, params),
+                        "method" => check_and_set_field!(map, method),
                         "jsonrpc" => {
                             let version: String = map.next_value()?;
                             if version != "2.0" {
