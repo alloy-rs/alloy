@@ -9,16 +9,13 @@ use core::{
 };
 
 #[cfg(feature = "serde")]
-use serde::{
-    de::{MapAccess, Visitor},
-    ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::ser::SerializeStruct;
 
-/// A block hash which may have a boolean requireCanonical field.
+/// A block hash which may have a boolean `requireCanonical` field.
 ///
-/// If false, an RPC call should raise if a block matching the hash is not found.
-/// If true, an RPC call should additionally raise if the block is not in the canonical chain.
+/// - If false, a RPC call should raise if a block matching the hash is not found.
+/// - If true, a RPC call should additionally raise if the block is not in the canonical chain.
+///
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -31,7 +28,7 @@ pub struct RpcBlockHash {
 }
 
 impl RpcBlockHash {
-    /// Returns an [RpcBlockHash] from a [B256].
+    /// Returns a [`RpcBlockHash`] from a [`B256`].
     #[doc(alias = "from_block_hash")]
     pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
         Self { block_hash, require_canonical }
@@ -67,6 +64,8 @@ impl Display for RpcBlockHash {
 }
 
 /// A block Number (or tag - "latest", "earliest", "pending")
+///
+/// This enum allows users to specify a block in a flexible manner.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlockNumberOrTag {
     /// Latest block
@@ -80,7 +79,7 @@ pub enum BlockNumberOrTag {
     Earliest,
     /// Pending block (not yet part of the blockchain)
     Pending,
-    /// Block by number from canon chain
+    /// Block by number from canonical chain
     Number(u64),
 }
 
@@ -137,10 +136,10 @@ impl From<U64> for BlockNumberOrTag {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for BlockNumberOrTag {
+impl serde::Serialize for BlockNumberOrTag {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match *self {
             Self::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
@@ -154,10 +153,10 @@ impl Serialize for BlockNumberOrTag {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for BlockNumberOrTag {
+impl<'de> serde::Deserialize<'de> for BlockNumberOrTag {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         let s = alloc::string::String::deserialize(deserializer)?.to_lowercase();
         s.parse().map_err(serde::de::Error::custom)
@@ -168,7 +167,7 @@ impl FromStr for BlockNumberOrTag {
     type Err = ParseBlockNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let block = match s {
+        Ok(match s {
             "latest" => Self::Latest,
             "finalized" => Self::Finalized,
             "safe" => Self::Safe,
@@ -176,14 +175,12 @@ impl FromStr for BlockNumberOrTag {
             "pending" => Self::Pending,
             _number => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
-                    let number = u64::from_str_radix(hex_val, 16);
-                    Self::Number(number?)
+                    u64::from_str_radix(hex_val, 16)?.into()
                 } else {
                     return Err(HexStringMissingPrefixError::default().into());
                 }
             }
-        };
-        Ok(block)
+        })
     }
 }
 
@@ -370,7 +367,7 @@ impl BlockId {
 
 impl Default for BlockId {
     fn default() -> Self {
-        Self::Number(BlockNumberOrTag::Latest)
+        BlockNumberOrTag::Latest.into()
     }
 }
 
@@ -382,7 +379,7 @@ impl From<u64> for BlockId {
 
 impl From<U64> for BlockId {
     fn from(value: U64) -> Self {
-        BlockNumberOrTag::Number(value.to()).into()
+        value.to::<u64>().into()
     }
 }
 
@@ -395,10 +392,8 @@ impl From<BlockNumberOrTag> for BlockId {
 impl From<HashOrNumber> for BlockId {
     fn from(block: HashOrNumber) -> Self {
         match block {
-            HashOrNumber::Hash(hash) => {
-                RpcBlockHash { block_hash: hash, require_canonical: None }.into()
-            }
-            HashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
+            HashOrNumber::Hash(hash) => hash.into(),
+            HashOrNumber::Number(num) => num.into(),
         }
     }
 }
@@ -422,10 +417,10 @@ impl From<RpcBlockHash> for BlockId {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for BlockId {
+impl serde::Serialize for BlockId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::Hash(RpcBlockHash { block_hash, require_canonical }) => {
@@ -442,14 +437,14 @@ impl Serialize for BlockId {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for BlockId {
+impl<'de> serde::Deserialize<'de> for BlockId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         struct BlockIdVisitor;
 
-        impl<'de> Visitor<'de> for BlockIdVisitor {
+        impl<'de> serde::de::Visitor<'de> for BlockIdVisitor {
             type Value = BlockId;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -463,7 +458,7 @@ impl<'de> Deserialize<'de> for BlockId {
                 // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefor deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
                 // However, since the hex string should be a QUANTITY, we can safely assume that if the len is 66 bytes, it is in fact a hash, ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/rpc/types.go#L184-L184>
                 if v.len() == 66 {
-                    Ok(BlockId::Hash(v.parse::<B256>().map_err(serde::de::Error::custom)?.into()))
+                    Ok(v.parse::<B256>().map_err(serde::de::Error::custom)?.into())
                 } else {
                     // quantity hex string or tag
                     Ok(BlockId::Number(v.parse().map_err(serde::de::Error::custom)?))
@@ -472,7 +467,7 @@ impl<'de> Deserialize<'de> for BlockId {
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
-                A: MapAccess<'de>,
+                A: serde::de::MapAccess<'de>,
             {
                 let mut number = None;
                 let mut block_hash = None;
@@ -515,9 +510,9 @@ impl<'de> Deserialize<'de> for BlockId {
 
                 #[allow(clippy::option_if_let_else)]
                 if let Some(number) = number {
-                    Ok(BlockId::Number(number))
+                    Ok(number.into())
                 } else if let Some(block_hash) = block_hash {
-                    Ok(BlockId::Hash(RpcBlockHash { block_hash, require_canonical }))
+                    Ok((block_hash, require_canonical).into())
                 } else {
                     Err(serde::de::Error::custom(
                         "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
@@ -592,23 +587,17 @@ impl FromStr for BlockId {
     type Err = ParseBlockIdError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("0x") {
-            return if s.len() == 66 {
-                B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError)
-            } else {
-                U64::from_str(s).map(Into::into).map_err(ParseBlockIdError::ParseError)
+            return match s.len() {
+                66 => B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError),
+                _ => U64::from_str(s).map(Into::into).map_err(ParseBlockIdError::ParseError),
             };
         }
 
         match s {
-            "latest" => Ok(BlockNumberOrTag::Latest.into()),
-            "finalized" => Ok(BlockNumberOrTag::Finalized.into()),
-            "safe" => Ok(BlockNumberOrTag::Safe.into()),
-            "earliest" => Ok(BlockNumberOrTag::Earliest.into()),
-            "pending" => Ok(BlockNumberOrTag::Pending.into()),
-            _ => s
-                .parse::<u64>()
-                .map_err(ParseBlockIdError::ParseIntError)
-                .map(|n| Self::Number(n.into())),
+            "latest" | "finalized" | "safe" | "earliest" | "pending" => {
+                Ok(BlockNumberOrTag::from_str(s).unwrap().into())
+            }
+            _ => s.parse::<u64>().map_err(ParseBlockIdError::ParseIntError).map(Into::into),
         }
     }
 }
@@ -686,6 +675,15 @@ impl HashOrNumber {
             Self::Number(num) => Some(num),
         }
     }
+
+    /// Returns the block hash if it is a [`HashOrNumber::Hash`].
+    #[inline]
+    pub const fn as_hash(self) -> Option<B256> {
+        match self {
+            Self::Hash(hash) => Some(hash),
+            Self::Number(_) => None,
+        }
+    }
 }
 
 impl From<B256> for HashOrNumber {
@@ -696,7 +694,7 @@ impl From<B256> for HashOrNumber {
 
 impl From<&B256> for HashOrNumber {
     fn from(value: &B256) -> Self {
-        Self::Hash(*value)
+        (*value).into()
     }
 }
 
@@ -744,14 +742,13 @@ impl Decodable for HashOrNumber {
             // strip the first byte, parsing the rest of the string.
             // If the rest of the string fails to decode into 32 bytes, we'll bubble up the
             // decoding error.
-            let hash = B256::decode(buf)?;
-            Ok(Self::Hash(hash))
+            Ok(B256::decode(buf)?.into())
         } else {
             // a block number when encoded as bytes ranges from 0 to any number of bytes - we're
             // going to accept numbers which fit in less than 64 bytes.
             // Any data larger than this which is not caught by the Hash decoding should error and
             // is considered an invalid block number.
-            Ok(Self::Number(u64::decode(buf)?))
+            Ok(u64::decode(buf)?.into())
         }
     }
 }
@@ -808,9 +805,8 @@ impl FromStr for HashOrNumber {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::b256;
-
     use super::*;
+    use alloy_primitives::b256;
 
     const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
 
@@ -980,5 +976,421 @@ mod tests {
         let id = BlockId::pending();
 
         assert_eq!(id.to_string(), "pending");
+    }
+
+    #[test]
+    fn test_block_number_or_tag() {
+        // Test Latest variant
+        let latest = BlockNumberOrTag::Latest;
+        assert_eq!(latest.as_number(), None);
+        assert!(latest.is_latest());
+        assert!(!latest.is_number());
+        assert!(!latest.is_finalized());
+        assert!(!latest.is_safe());
+        assert!(!latest.is_pending());
+        assert!(!latest.is_earliest());
+
+        // Test Finalized variant
+        let finalized = BlockNumberOrTag::Finalized;
+        assert_eq!(finalized.as_number(), None);
+        assert!(finalized.is_finalized());
+        assert!(!finalized.is_latest());
+        assert!(!finalized.is_number());
+        assert!(!finalized.is_safe());
+        assert!(!finalized.is_pending());
+        assert!(!finalized.is_earliest());
+
+        // Test Safe variant
+        let safe = BlockNumberOrTag::Safe;
+        assert_eq!(safe.as_number(), None);
+        assert!(safe.is_safe());
+        assert!(!safe.is_latest());
+        assert!(!safe.is_number());
+        assert!(!safe.is_finalized());
+        assert!(!safe.is_pending());
+        assert!(!safe.is_earliest());
+
+        // Test Earliest variant
+        let earliest = BlockNumberOrTag::Earliest;
+        assert_eq!(earliest.as_number(), None);
+        assert!(earliest.is_earliest());
+        assert!(!earliest.is_latest());
+        assert!(!earliest.is_number());
+        assert!(!earliest.is_finalized());
+        assert!(!earliest.is_safe());
+        assert!(!earliest.is_pending());
+
+        // Test Pending variant
+        let pending = BlockNumberOrTag::Pending;
+        assert_eq!(pending.as_number(), None);
+        assert!(pending.is_pending());
+        assert!(!pending.is_latest());
+        assert!(!pending.is_number());
+        assert!(!pending.is_finalized());
+        assert!(!pending.is_safe());
+        assert!(!pending.is_earliest());
+
+        // Test Number variant
+        let number = BlockNumberOrTag::Number(42);
+        assert_eq!(number.as_number(), Some(42));
+        assert!(number.is_number());
+        assert!(!number.is_latest());
+        assert!(!number.is_finalized());
+        assert!(!number.is_safe());
+        assert!(!number.is_pending());
+        assert!(!number.is_earliest());
+    }
+
+    #[test]
+    fn test_block_number_or_tag_from() {
+        // Test conversion from u64
+        let num = 100u64;
+        let block: BlockNumberOrTag = num.into();
+        assert_eq!(block, BlockNumberOrTag::Number(100));
+
+        // Test conversion from U64
+        let num = U64::from(200);
+        let block: BlockNumberOrTag = num.into();
+        assert_eq!(block, BlockNumberOrTag::Number(200));
+    }
+
+    #[test]
+    fn test_block_id() {
+        let hash = BlockHash::random();
+
+        // Block hash
+        let block_id_hash = BlockId::hash(hash);
+        assert_eq!(block_id_hash.as_block_hash(), Some(hash));
+        assert!(block_id_hash.is_hash());
+        assert!(!block_id_hash.is_number());
+        assert!(!block_id_hash.is_latest());
+        assert!(!block_id_hash.is_pending());
+        assert!(!block_id_hash.is_safe());
+        assert!(!block_id_hash.is_finalized());
+        assert!(!block_id_hash.is_earliest());
+
+        // Block number
+        let block_id_number = BlockId::number(123);
+        assert_eq!(block_id_number.as_u64(), Some(123));
+        assert!(block_id_number.is_number());
+        assert!(!block_id_number.is_hash());
+        assert!(!block_id_number.is_latest());
+        assert!(!block_id_number.is_pending());
+        assert!(!block_id_number.is_safe());
+        assert!(!block_id_number.is_finalized());
+        assert!(!block_id_number.is_earliest());
+
+        // Latest block
+        let block_latest = BlockId::latest();
+        assert!(block_latest.is_latest());
+        assert!(!block_latest.is_number());
+        assert!(!block_latest.is_hash());
+        assert!(!block_latest.is_pending());
+        assert!(!block_latest.is_safe());
+        assert!(!block_latest.is_finalized());
+        assert!(!block_latest.is_earliest());
+
+        // Pending block
+        let block_pending = BlockId::pending();
+        assert!(block_pending.is_pending());
+        assert!(!block_pending.is_latest());
+        assert!(!block_pending.is_number());
+        assert!(!block_pending.is_hash());
+        assert!(!block_pending.is_safe());
+        assert!(!block_pending.is_finalized());
+        assert!(!block_pending.is_earliest());
+
+        // Safe block
+        let block_safe = BlockId::safe();
+        assert!(block_safe.is_safe());
+        assert!(!block_safe.is_latest());
+        assert!(!block_safe.is_number());
+        assert!(!block_safe.is_hash());
+        assert!(!block_safe.is_pending());
+        assert!(!block_safe.is_finalized());
+        assert!(!block_safe.is_earliest());
+
+        // Finalized block
+        let block_finalized = BlockId::finalized();
+        assert!(block_finalized.is_finalized());
+        assert!(!block_finalized.is_latest());
+        assert!(!block_finalized.is_number());
+        assert!(!block_finalized.is_hash());
+        assert!(!block_finalized.is_pending());
+        assert!(!block_finalized.is_safe());
+        assert!(!block_finalized.is_earliest());
+
+        // Earliest block
+        let block_earliest = BlockId::earliest();
+        assert!(block_earliest.is_earliest());
+        assert!(!block_earliest.is_latest());
+        assert!(!block_earliest.is_number());
+        assert!(!block_earliest.is_hash());
+        assert!(!block_earliest.is_pending());
+        assert!(!block_earliest.is_safe());
+        assert!(!block_earliest.is_finalized());
+
+        // Default block
+        assert!(BlockId::default().is_latest());
+        assert!(!BlockId::default().is_number());
+        assert!(!BlockId::default().is_hash());
+        assert!(!BlockId::default().is_pending());
+        assert!(!BlockId::default().is_safe());
+        assert!(!BlockId::default().is_finalized());
+        assert!(!BlockId::default().is_earliest());
+    }
+
+    #[test]
+    fn test_u64_to_block_id() {
+        // Simple u64
+        let num: u64 = 123;
+        let block_id: BlockId = num.into();
+
+        match block_id {
+            BlockId::Number(BlockNumberOrTag::Number(n)) => assert_eq!(n, 123),
+            _ => panic!("Expected BlockId::Number with 123"),
+        }
+
+        // Big integer U64
+        let num: U64 = U64::from(456);
+        let block_id: BlockId = num.into();
+
+        match block_id {
+            BlockId::Number(BlockNumberOrTag::Number(n)) => assert_eq!(n, 456),
+            _ => panic!("Expected BlockId::Number with 456"),
+        }
+
+        // u64 as HashOrNumber
+        let num: u64 = 789;
+        let block_id: BlockId = HashOrNumber::Number(num).into();
+
+        match block_id {
+            BlockId::Number(BlockNumberOrTag::Number(n)) => assert_eq!(n, 789),
+            _ => panic!("Expected BlockId::Number with 789"),
+        }
+    }
+
+    #[test]
+    fn test_block_number_or_tag_to_block_id() {
+        let block_number_or_tag = BlockNumberOrTag::Pending;
+        let block_id: BlockId = block_number_or_tag.into();
+
+        match block_id {
+            BlockId::Number(BlockNumberOrTag::Pending) => {}
+            _ => panic!("Expected BlockId::Number with Pending"),
+        }
+    }
+
+    #[test]
+    fn test_hash_or_number_to_block_id_hash() {
+        // B256 wrapped in HashOrNumber
+        let hash: B256 = B256::random();
+        let block_id: BlockId = HashOrNumber::Hash(hash).into();
+
+        match block_id {
+            BlockId::Hash(rpc_block_hash) => assert_eq!(rpc_block_hash.block_hash, hash),
+            _ => panic!("Expected BlockId::Hash"),
+        }
+
+        // Simple B256
+        let hash: B256 = B256::random();
+        let block_id: BlockId = hash.into();
+
+        match block_id {
+            BlockId::Hash(rpc_block_hash) => assert_eq!(rpc_block_hash.block_hash, hash),
+            _ => panic!("Expected BlockId::Hash"),
+        }
+
+        // Tuple with B256 and canonical flag
+        let hash: B256 = B256::random();
+        let block_id: BlockId = (hash, Some(true)).into();
+
+        match block_id {
+            BlockId::Hash(rpc_block_hash) => {
+                assert_eq!(rpc_block_hash.block_hash, hash);
+                assert_eq!(rpc_block_hash.require_canonical, Some(true));
+            }
+            _ => panic!("Expected BlockId::Hash with canonical flag"),
+        }
+    }
+
+    #[test]
+    fn test_hash_or_number_as_number() {
+        // Test with a number
+        let hash_or_number = HashOrNumber::Number(123);
+        assert_eq!(hash_or_number.as_number(), Some(123));
+
+        // Test with a hash
+        let hash = B256::random();
+        let hash_or_number = HashOrNumber::Hash(hash);
+        assert_eq!(hash_or_number.as_number(), None);
+    }
+
+    #[test]
+    fn test_hash_or_number_as_hash() {
+        // Test with a hash
+        let hash = B256::random();
+        let hash_or_number = HashOrNumber::Hash(hash);
+        assert_eq!(hash_or_number.as_hash(), Some(hash));
+
+        // Test with a number
+        let hash_or_number = HashOrNumber::Number(456);
+        assert_eq!(hash_or_number.as_hash(), None);
+    }
+
+    #[test]
+    fn test_hash_or_number_conversions() {
+        // Test conversion from B256
+        let hash = B256::random();
+        let hash_or_number: HashOrNumber = hash.into();
+        assert_eq!(hash_or_number, HashOrNumber::Hash(hash));
+
+        // Test conversion from &B256
+        let hash_ref: HashOrNumber = (&hash).into();
+        assert_eq!(hash_ref, HashOrNumber::Hash(hash));
+
+        // Test conversion from u64
+        let number: u64 = 123;
+        let hash_or_number: HashOrNumber = number.into();
+        assert_eq!(hash_or_number, HashOrNumber::Number(number));
+
+        // Test conversion from U64
+        let u64_value = U64::from(456);
+        let hash_or_number: HashOrNumber = u64_value.into();
+        assert_eq!(hash_or_number, HashOrNumber::Number(u64_value.to::<u64>()));
+
+        // Test conversion from RpcBlockHash (assuming RpcBlockHash is convertible to B256)
+        let rpc_block_hash = RpcBlockHash { block_hash: hash, require_canonical: Some(true) };
+        let hash_or_number: HashOrNumber = rpc_block_hash.into();
+        assert_eq!(hash_or_number, HashOrNumber::Hash(hash));
+    }
+
+    #[test]
+    fn test_hash_or_number_rlp_roundtrip_hash() {
+        // Test case: encoding and decoding a B256 hash
+        let original_hash = B256::random();
+        let hash_or_number: HashOrNumber = HashOrNumber::Hash(original_hash);
+
+        // Encode the HashOrNumber
+        let mut buf = Vec::new();
+        hash_or_number.encode(&mut buf);
+
+        // Decode the encoded bytes
+        let decoded: HashOrNumber = HashOrNumber::decode(&mut &buf[..]).expect("Decoding failed");
+
+        // Assert that the decoded value matches the original
+        assert_eq!(decoded, hash_or_number);
+    }
+
+    #[test]
+    fn test_hash_or_number_rlp_roundtrip_u64() {
+        // Test case: encoding and decoding a u64 number
+        let original_number: u64 = 12345;
+        let hash_or_number: HashOrNumber = HashOrNumber::Number(original_number);
+
+        // Encode the HashOrNumber
+        let mut buf = Vec::new();
+        hash_or_number.encode(&mut buf);
+
+        // Decode the encoded bytes
+        let decoded: HashOrNumber = HashOrNumber::decode(&mut &buf[..]).expect("Decoding failed");
+
+        // Assert that the decoded value matches the original
+        assert_eq!(decoded, hash_or_number);
+    }
+
+    #[test]
+    fn test_numhash() {
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash = NumHash::new(number, hash);
+
+        // Validate the initial values
+        assert_eq!(num_hash.number, number);
+        assert_eq!(num_hash.hash, hash);
+
+        // Test into_components
+        assert_eq!(num_hash.into_components(), (number, hash));
+    }
+
+    #[test]
+    fn test_numhash_matches_block_or_num() {
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash = NumHash::new(number, hash);
+
+        // Test matching by hash
+        let block_hash = HashOrNumber::Hash(hash);
+        assert!(num_hash.matches_block_or_num(&block_hash));
+
+        // Test matching by number
+        let block_number = HashOrNumber::Number(number);
+        assert!(num_hash.matches_block_or_num(&block_number));
+
+        // Test non-matching by different hash
+        let different_hash = B256::random();
+        let non_matching_hash = HashOrNumber::Hash(different_hash);
+        assert!(!num_hash.matches_block_or_num(&non_matching_hash));
+
+        // Test non-matching by different number
+        let different_number: u64 = 43;
+        let non_matching_number = HashOrNumber::Number(different_number);
+        assert!(!num_hash.matches_block_or_num(&non_matching_number));
+    }
+
+    #[test]
+    fn test_numhash_conversions() {
+        // From a tuple (u64, B256)
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash_from_tuple: NumHash = (number, hash).into();
+
+        assert_eq!(num_hash_from_tuple.number, number);
+        assert_eq!(num_hash_from_tuple.hash, hash);
+
+        // From a reversed tuple (B256, u64)
+        let number: u64 = 42;
+        let hash = B256::random();
+
+        let num_hash_from_reversed_tuple: NumHash = (hash, number).into();
+
+        assert_eq!(num_hash_from_reversed_tuple.number, number);
+        assert_eq!(num_hash_from_reversed_tuple.hash, hash);
+    }
+
+    #[test]
+    fn test_block_id_from_str() {
+        // Valid hexadecimal block ID (with 0x prefix)
+        let hex_id = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        assert_eq!(
+            BlockId::from_str(hex_id).unwrap(),
+            BlockId::Hash(RpcBlockHash::from_hash(B256::from_str(hex_id).unwrap(), None))
+        );
+
+        // Valid tag strings
+        assert_eq!(BlockId::from_str("latest").unwrap(), BlockNumberOrTag::Latest.into());
+        assert_eq!(BlockId::from_str("finalized").unwrap(), BlockNumberOrTag::Finalized.into());
+        assert_eq!(BlockId::from_str("safe").unwrap(), BlockNumberOrTag::Safe.into());
+        assert_eq!(BlockId::from_str("earliest").unwrap(), BlockNumberOrTag::Earliest.into());
+        assert_eq!(BlockId::from_str("pending").unwrap(), BlockNumberOrTag::Pending.into());
+
+        // Valid numeric string without prefix
+        let numeric_string = "12345";
+        let parsed_numeric_string = BlockId::from_str(numeric_string);
+        assert!(parsed_numeric_string.is_ok());
+
+        // Hex interpretation of numeric string
+        assert_eq!(
+            BlockId::from_str("0x12345").unwrap(),
+            BlockId::Number(BlockNumberOrTag::Number(74565))
+        );
+
+        // Invalid non-numeric string
+        let invalid_string = "invalid_block_id";
+        let parsed_invalid_string = BlockId::from_str(invalid_string);
+        assert!(parsed_invalid_string.is_err());
     }
 }
