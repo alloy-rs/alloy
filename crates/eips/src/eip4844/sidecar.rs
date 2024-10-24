@@ -3,14 +3,12 @@
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
-
-use alloc::vec::Vec;
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]

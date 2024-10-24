@@ -32,6 +32,10 @@ pub use envelope::{TxEnvelope, TxType};
 mod legacy;
 pub use legacy::TxLegacy;
 
+mod rlp;
+#[doc(hidden)]
+pub use rlp::RlpEcdsaTx;
+
 mod typed;
 pub use typed::TypedTransaction;
 
