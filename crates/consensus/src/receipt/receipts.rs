@@ -1,6 +1,6 @@
 use crate::receipt::{Eip658Value, TxReceipt};
 use alloc::{vec, vec::Vec};
-use alloy_primitives::{Bloom, Log};
+use alloy_primitives::{Bloom, Log, B256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::{borrow::Borrow, fmt};
 use derive_more::{DerefMut, From, IntoIterator};
