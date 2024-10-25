@@ -154,7 +154,7 @@ where
         self.client().request("debug_getRawReceipts", (block,)).await
     }
 
-    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<BadBlock>> {
         self.client().request_noparams("debug_getBadBlocks").await
     }
 
