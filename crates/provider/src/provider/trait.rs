@@ -128,7 +128,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// This function returns [`EthCall`] which can be used to execute the
     /// call, or to add [`StateOverride`] or a [`BlockId`]. If no overrides
-    /// or block ID is provided, the call will be executed on the latest block
+    /// or block ID is provided, the call will be executed on the pending block
     /// with the current state.
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
@@ -185,10 +185,13 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_createAccessList", request).into()
     }
 
-    /// This function returns an [`EthCall`] which can be used to get a gas estimate,
-    /// or to add [`StateOverride`] or a [`BlockId`]. If no overrides
-    /// or block ID is provided, the gas estimate will be computed for the latest block
-    /// with the current state.
+    /// Create an [`EthCall`] future to estimate the gas required for a
+    /// transaction.
+    ///
+    /// The future can be used to specify a [`StateOverride`] or [`BlockId`]
+    /// before dispatching the call. If no overrides or block ID is provided,
+    /// the gas estimate will be computed for the pending block with the
+    /// current state.
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
