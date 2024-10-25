@@ -355,7 +355,7 @@ mod test {
             Receipt { status: Eip658Value::Eip658(false), cumulative_gas_used: 2000, logs: vec![] };
 
         // Create a `Receipts` instance with a single set of receipts
-        let receipts = Receipts { receipt_vec: vec![vec![receipt1.clone(), receipt2.clone()]] };
+        let receipts = Receipts { receipt_vec: vec![vec![receipt1, receipt2]] };
 
         // Calculate the root hash of the receipts at index 0
         //
@@ -387,7 +387,7 @@ mod test {
             Receipt { status: Eip658Value::Eip658(true), cumulative_gas_used: 1000, logs: vec![] };
 
         // Initialize `Receipts` with a single set of receipts
-        let receipts = Receipts { receipt_vec: vec![vec![receipt.clone()]] };
+        let receipts = Receipts { receipt_vec: vec![vec![receipt]] };
 
         // Calculate the root hash of the receipts at index 1 (invalid index)
         let root = receipts.root_slow(1, |receipts| B256::with_last_byte(receipts.len() as u8));
@@ -407,9 +407,7 @@ mod test {
             Receipt { status: Eip658Value::Eip658(true), cumulative_gas_used: 3000, logs: vec![] };
 
         // Initialize `Receipts` with two sets of receipts, each containing a different count
-        let receipts = Receipts {
-            receipt_vec: vec![vec![receipt1.clone()], vec![receipt2.clone(), receipt3.clone()]],
-        };
+        let receipts = Receipts { receipt_vec: vec![vec![receipt1], vec![receipt2, receipt3]] };
 
         // Calculate root for the first set (index 0) using `calculate_root`
         let root_set_0 =
