@@ -1,20 +1,17 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::{Sealed, TxEnvelope};
+pub use alloy_eips::{
+    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
+    BlockNumberOrTag, ForkBlock, RpcBlockHash,
+};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
 use alloy_rlp::Encodable;
-
-use alloc::vec::Vec;
-
-pub use alloy_eips::{
-    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
-    BlockNumberOrTag, ForkBlock, RpcBlockHash,
-};
 
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -460,6 +457,19 @@ impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         &mut self.transactions
     }
+}
+
+/// Bad block representation.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct BadBlock {
+    /// Underyling block object.
+    block: Block,
+    /// Hash of the block.
+    hash: BlockHash,
+    /// RLP encoded block header.
+    rlp: Bytes,
 }
 
 #[cfg(test)]
@@ -939,5 +949,54 @@ mod tests {
                 withdrawals: None,
             }
         );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_bad_block() {
+        let block = Block {
+            header: Header {
+                hash: B256::with_last_byte(1),
+                parent_hash: B256::with_last_byte(2),
+                uncles_hash: B256::with_last_byte(3),
+                miner: Address::with_last_byte(4),
+                state_root: B256::with_last_byte(5),
+                transactions_root: B256::with_last_byte(6),
+                receipts_root: B256::with_last_byte(7),
+                withdrawals_root: Some(B256::with_last_byte(8)),
+                number: 9,
+                gas_used: 10,
+                gas_limit: 11,
+                extra_data: vec![1, 2, 3].into(),
+                logs_bloom: Default::default(),
+                timestamp: 12,
+                difficulty: U256::from(13),
+                total_difficulty: Some(U256::from(100000)),
+                mix_hash: Some(B256::with_last_byte(14)),
+                nonce: Some(B64::with_last_byte(15)),
+                base_fee_per_gas: Some(20),
+                blob_gas_used: None,
+                excess_blob_gas: None,
+                parent_beacon_block_root: None,
+                requests_hash: None,
+            },
+            uncles: vec![B256::with_last_byte(17)],
+            transactions: vec![B256::with_last_byte(18)].into(),
+            size: Some(U256::from(19)),
+            withdrawals: Some(vec![]),
+        };
+        let hash = block.header.hash;
+        let rlp = Bytes::from("header");
+
+        let bad_block = BadBlock { block, hash, rlp };
+
+        let serialized = serde_json::to_string(&bad_block).unwrap();
+        assert_eq!(
+            serialized,
+            r#"{"block":{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","totalDifficulty":"0x186a0","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"size":"0x13","withdrawals":[]},"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","rlp":"0x686561646572"}"#
+        );
+
+        let deserialized: BadBlock = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(bad_block, deserialized);
     }
 }
