@@ -153,7 +153,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
-        EthCall::new(self.weak_client(), tx)
+        EthCall::new(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.
@@ -196,7 +196,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
     fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, U64, u64> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(utils::convert_u64)
+        EthCall::gas_estimate(self.weak_client(), tx)
+            .block(BlockNumberOrTag::Pending.into())
+            .map_resp(utils::convert_u64)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
