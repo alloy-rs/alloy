@@ -1,18 +1,17 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::{Sealed, TxEnvelope};
-use alloy_network_primitives::{
-    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
-};
-use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
-use alloy_rlp::{Encodable, RlpDecodable, RlpEncodable};
-
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_rlp::Encodable;
 
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -68,10 +67,9 @@ impl<T> Block<T> {
 
 /// Block header representation.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpDecodable, RlpEncodable)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[rlp(trailing)]
 pub struct Header {
     /// Hash of the block
     pub hash: BlockHash,
@@ -104,11 +102,11 @@ pub struct Header {
     /// Timestamp
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub timestamp: u64,
-    /// Extra data
-    pub extra_data: Bytes,
     /// Total difficulty
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub total_difficulty: Option<U256>,
+    /// Extra data
+    pub extra_data: Bytes,
     /// Mix Hash
     ///
     /// Before the merge this proves, combined with the nonce, that a sufficient amount of
