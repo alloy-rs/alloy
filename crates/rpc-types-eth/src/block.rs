@@ -7,7 +7,7 @@ use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
-use alloy_rlp::Encodable;
+use alloy_rlp::{Bytes, Encodable};
 
 use alloc::vec::Vec;
 
@@ -460,6 +460,19 @@ impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         &mut self.transactions
     }
+}
+
+/// BadBlock representation.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct BadBlock {
+    /// Block is the underyling block object.
+    block: Block,
+    /// Hash is the block hash.
+    hash: BlockHash,
+    /// RLP is the rlp encoding of the block.
+    rlp: Bytes,
 }
 
 #[cfg(test)]

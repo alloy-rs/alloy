@@ -27,6 +27,7 @@ pub trait DebugApi<N, T>: Send + Sync {
     async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>>;
 
     /// Returns an array of recent bad blocks that the client has seen on the network.
+    /// TODO: edwardJES swap out return type.
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
 
     /// Returns the structured logs created during the execution of EVM between two blocks
