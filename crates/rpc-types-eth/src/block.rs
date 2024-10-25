@@ -988,7 +988,7 @@ mod tests {
         let hash = block.header.hash.clone();
         let rlp = Bytes::from("header");
 
-        let bad_block = BadBlock { block, hash, rlp: rlp.into() };
+        let bad_block = BadBlock { block, hash, rlp };
 
         let serialized = serde_json::to_string(&bad_block).unwrap();
         assert_eq!(
