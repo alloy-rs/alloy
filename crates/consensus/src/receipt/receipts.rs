@@ -129,8 +129,7 @@ impl<T> Receipts<T> {
 
     /// Retrieves all recorded receipts from index and calculates the root using the given closure.
     pub fn root_slow(&self, index: usize, f: impl FnOnce(&[&T]) -> B256) -> Option<B256> {
-        let receipts = self.receipt_vec.get(index)?.iter().collect::<Vec<_>>();
-        Some(f(receipts.as_slice()))
+        self.receipt_vec.get(index).map(|receipts| f(&receipts.iter().collect::<Vec<_>>()))
     }
 }
 
@@ -301,6 +300,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     #[cfg(feature = "serde")]
     #[test]
     fn root_vs_status() {
@@ -341,5 +342,87 @@ mod test {
                 "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
             ))
         );
+    }
+
+    #[test]
+    fn test_root_slow_valid_index() {
+        // Create a first dummy receipt
+        let receipt1: Receipt<Log> =
+            Receipt { status: Eip658Value::Eip658(true), cumulative_gas_used: 1000, logs: vec![] };
+
+        // Create a second dummy receipt
+        let receipt2 =
+            Receipt { status: Eip658Value::Eip658(false), cumulative_gas_used: 2000, logs: vec![] };
+
+        // Create a `Receipts` instance with a single set of receipts
+        let receipts = Receipts { receipt_vec: vec![vec![receipt1.clone(), receipt2.clone()]] };
+
+        // Calculate the root hash of the receipts at index 0
+        //
+        // We are using a dummy closure that generates a root hash based on the number of receipts.
+        let root = receipts.root_slow(0, |receipts| B256::with_last_byte(receipts.len() as u8));
+
+        // Verify that the calculated root matches the expected result (encoded with 2 receipts)
+        assert_eq!(root, Some(B256::with_last_byte(2)));
+    }
+
+    #[test]
+    fn test_root_slow_empty_receipts() {
+        // Initialize `Receipts` with an empty receipt set
+        let receipts = Receipts::<Receipt> { receipt_vec: vec![vec![]] };
+
+        // Call `root_slow` with index 0 and provide the `calculate_root` closure.
+        //
+        // Since there are no receipts, it should calculate a root based on 0 receipts.
+        let root = receipts.root_slow(0, |receipts| B256::with_last_byte(receipts.len() as u8));
+
+        // Assert that the root is calculated correctly (0 receipts)
+        assert_eq!(root, Some(B256::with_last_byte(0)));
+    }
+
+    #[test]
+    fn test_root_slow_invalid_index() {
+        // Create a sample receipt for testing
+        let receipt: Receipt<Log> =
+            Receipt { status: Eip658Value::Eip658(true), cumulative_gas_used: 1000, logs: vec![] };
+
+        // Initialize `Receipts` with a single set of receipts
+        let receipts = Receipts { receipt_vec: vec![vec![receipt.clone()]] };
+
+        // Calculate the root hash of the receipts at index 1 (invalid index)
+        let root = receipts.root_slow(1, |receipts| B256::with_last_byte(receipts.len() as u8));
+
+        // Assert that `root` is `None` for an invalid index
+        assert!(root.is_none());
+    }
+
+    #[test]
+    fn test_root_slow_multiple_receipt_sets() {
+        // Create multiple dummy receipts
+        let receipt1: Receipt<Log> =
+            Receipt { status: Eip658Value::Eip658(true), cumulative_gas_used: 1000, logs: vec![] };
+        let receipt2 =
+            Receipt { status: Eip658Value::Eip658(false), cumulative_gas_used: 2000, logs: vec![] };
+        let receipt3 =
+            Receipt { status: Eip658Value::Eip658(true), cumulative_gas_used: 3000, logs: vec![] };
+
+        // Initialize `Receipts` with two sets of receipts, each containing a different count
+        let receipts = Receipts {
+            receipt_vec: vec![vec![receipt1.clone()], vec![receipt2.clone(), receipt3.clone()]],
+        };
+
+        // Calculate root for the first set (index 0) using `calculate_root`
+        let root_set_0 =
+            receipts.root_slow(0, |receipts| B256::with_last_byte(receipts.len() as u8));
+
+        // Confirm that the root for the first set matches the count of 1 receipt
+        assert_eq!(root_set_0, Some(B256::with_last_byte(1)));
+
+        // Calculate root for the second set (index 1), which has 2 receipts
+        let root_set_1 =
+            receipts.root_slow(1, |receipts| B256::with_last_byte(receipts.len() as u8));
+
+        // Verify the root for the second set matches the count of 2 receipts
+        assert_eq!(root_set_1, Some(B256::with_last_byte(2)));
     }
 }
