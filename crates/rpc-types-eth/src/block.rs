@@ -1,7 +1,7 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::collections::BTreeMap;
 use alloy_consensus::{Sealed, TxEnvelope};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
