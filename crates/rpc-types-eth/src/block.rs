@@ -985,7 +985,7 @@ mod tests {
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
         };
-        let hash = block.header.hash.clone();
+        let hash = block.header.hash;
         let rlp = Bytes::from("header");
 
         let bad_block = BadBlock { block, hash, rlp };

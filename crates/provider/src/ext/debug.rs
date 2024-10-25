@@ -3,7 +3,7 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{
-    BadBlock, Block, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
+    BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
 };
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
