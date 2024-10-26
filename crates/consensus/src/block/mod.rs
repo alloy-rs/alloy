@@ -1,6 +1,13 @@
-//! Block Type
+//! Block-related consensus types.
 
-use crate::Header;
+mod header;
+pub use header::{BlockHeader, Header};
+mod any;
+pub use any::AnyHeader;
+
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(crate) use header::serde_bincode_compat;
+
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
@@ -13,16 +20,16 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 ///
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Block<T> {
+pub struct Block<T, H = Header> {
     /// Block header.
-    pub header: Header,
+    pub header: H,
     /// Block body.
     pub body: BlockBody<T>,
 }
 
-impl<T> Block<T> {
+impl<T, H> Block<T, H> {
     /// Creates a new empty uncle block.
-    pub fn uncle(header: Header) -> Self {
+    pub fn uncle(header: H) -> Self {
         Self { header, body: Default::default() }
     }
 }
@@ -54,8 +61,8 @@ mod block_rlp {
 
     #[derive(RlpDecodable)]
     #[rlp(trailing)]
-    struct Helper<T> {
-        header: Header,
+    struct Helper<T, H> {
+        header: H,
         transactions: Vec<T>,
         ommers: Vec<Header>,
         withdrawals: Option<Withdrawals>,
@@ -63,33 +70,33 @@ mod block_rlp {
 
     #[derive(RlpEncodable)]
     #[rlp(trailing)]
-    struct HelperRef<'a, T> {
-        header: &'a Header,
+    struct HelperRef<'a, T, H> {
+        header: &'a H,
         transactions: &'a Vec<T>,
         ommers: &'a Vec<Header>,
         withdrawals: Option<&'a Withdrawals>,
     }
 
-    impl<'a, T> From<&'a Block<T>> for HelperRef<'a, T> {
-        fn from(block: &'a Block<T>) -> Self {
+    impl<'a, T, H> From<&'a Block<T, H>> for HelperRef<'a, T, H> {
+        fn from(block: &'a Block<T, H>) -> Self {
             let Block { header, body: BlockBody { transactions, ommers, withdrawals } } = block;
             Self { header, transactions, ommers, withdrawals: withdrawals.as_ref() }
         }
     }
 
-    impl<T: Encodable> Encodable for Block<T> {
+    impl<T: Encodable, H: Encodable> Encodable for Block<T, H> {
         fn encode(&self, out: &mut dyn alloy_rlp::bytes::BufMut) {
-            let helper: HelperRef<'_, T> = self.into();
+            let helper: HelperRef<'_, T, H> = self.into();
             helper.encode(out)
         }
 
         fn length(&self) -> usize {
-            let helper: HelperRef<'_, T> = self.into();
+            let helper: HelperRef<'_, T, H> = self.into();
             helper.length()
         }
     }
 
-    impl<T: Decodable> Decodable for Block<T> {
+    impl<T: Decodable, H: Decodable> Decodable for Block<T, H> {
         fn decode(b: &mut &[u8]) -> alloy_rlp::Result<Self> {
             let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })

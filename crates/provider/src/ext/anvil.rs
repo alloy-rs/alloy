@@ -625,7 +625,7 @@ mod tests {
 
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
-        assert_eq!(block.header.miner, coinbase);
+        assert_eq!(block.header.beneficiary, coinbase);
     }
 
     #[tokio::test]

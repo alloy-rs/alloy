@@ -8,12 +8,11 @@ use crate::{
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
+use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network};
-use alloy_network_primitives::{
-    BlockResponse, BlockTransactionsKind, HeaderResponse, ReceiptResponse,
-};
+use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -230,6 +229,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
                     .await?
                     .ok_or(RpcError::NullResp)?
                     .header()
+                    .as_ref()
                     .base_fee_per_gas()
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
                     .into()

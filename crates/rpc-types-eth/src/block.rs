@@ -1,17 +1,17 @@
 //! Block RPC types.
 
-use crate::{ConversionError, Transaction};
+use core::ops::{Deref, DerefMut};
+
+use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_consensus::{Sealed, TxEnvelope};
+use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
 use alloy_eips::eip4895::Withdrawals;
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_network_primitives::{
-    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
-};
-use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_network_primitives::{BlockResponse, BlockTransactions, TransactionResponse};
+use alloy_primitives::{Address, BlockHash, Bytes, Sealable, B256, U256};
 use alloy_rlp::Encodable;
 
 /// Block representation
@@ -53,10 +53,11 @@ impl<T> Block<T> {
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
     /// using the provided [`alloy_consensus::Header`].
     pub fn uncle_from_header(header: alloy_consensus::Header) -> Self {
-        let size = U256::from(alloy_consensus::Block::<TxEnvelope>::uncle(header.clone()).length());
+        let block = alloy_consensus::Block::<TxEnvelope>::uncle(header);
+        let size = U256::from(block.length());
         Self {
             uncles: vec![],
-            header: Header::from_consensus(header.seal_slow(), None, Some(size)),
+            header: Header::from_consensus(block.header.seal_slow(), None, Some(size)),
             transactions: BlockTransactions::Uncle,
             withdrawals: None,
         }
@@ -82,100 +83,17 @@ impl<T> Block<T> {
     }
 }
 
-/// Block header representation.
+/// RPC representation of block header, wrapping a consensus header.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct Header {
+pub struct Header<H = alloy_consensus::Header> {
     /// Hash of the block
     pub hash: BlockHash,
-    /// Hash of the parent
-    pub parent_hash: B256,
-    /// Hash of the uncles
-    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
-    pub uncles_hash: B256,
-    /// Alias of `author`
-    pub miner: Address,
-    /// State root hash
-    pub state_root: B256,
-    /// Transactions root hash
-    pub transactions_root: B256,
-    /// Transactions receipts root hash
-    pub receipts_root: B256,
-    /// Logs bloom
-    pub logs_bloom: Bloom,
-    /// Difficulty
-    pub difficulty: U256,
-    /// Block number
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub number: u64,
-    /// Gas Limit
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
-    pub gas_limit: u64,
-    /// Gas Used
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
-    pub gas_used: u64,
-    /// Timestamp
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
-    pub timestamp: u64,
-    /// Extra data
-    pub extra_data: Bytes,
-    /// Mix Hash
-    ///
-    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
-    /// computation has been carried out on this block: the Proof-of-Work (PoF).
-    ///
-    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
-    ///
-    /// This is an Option because it is not always set by non-ethereum networks.
-    ///
-    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
-    /// And <https://github.com/ethereum/execution-apis/issues/328>
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub mix_hash: Option<B256>,
-    /// Nonce
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub nonce: Option<B64>,
-    /// Base fee per unit of gas (if past London)
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub base_fee_per_gas: Option<u64>,
-    /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub withdrawals_root: Option<B256>,
-    /// Blob gas used
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub blob_gas_used: Option<u64>,
-    /// Excess blob gas
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub excess_blob_gas: Option<u64>,
-    /// EIP-4788 parent beacon block root
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub parent_beacon_block_root: Option<B256>,
-    /// EIP-7685 requests hash.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub requests_hash: Option<B256>,
+    /// Inner consensus header.
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub inner: H,
     /// Total difficulty
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub total_difficulty: Option<U256>,
@@ -184,12 +102,32 @@ pub struct Header {
     pub size: Option<U256>,
 }
 
-impl Header {
+impl<H> Deref for Header<H> {
+    type Target = H;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for Header<H> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<H> AsRef<H> for Header<H> {
+    fn as_ref(&self) -> &H {
+        &self.inner
+    }
+}
+
+impl<H: BlockHeader> Header<H> {
     /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None
     pub fn blob_fee(&self) -> Option<u128> {
-        self.excess_blob_gas.map(calc_blob_gasprice)
+        self.inner.excess_blob_gas().map(calc_blob_gasprice)
     }
 
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
@@ -198,7 +136,7 @@ impl Header {
     ///
     /// See also [Self::next_block_excess_blob_gas]
     pub fn next_block_blob_fee(&self) -> Option<u128> {
-        self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+        self.inner.next_block_blob_fee()
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
@@ -206,165 +144,17 @@ impl Header {
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
-        Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
+        self.inner.next_block_excess_blob_gas()
     }
 
     /// Create a new [`Header`] from a sealed [`alloy_consensus::Header`] and additional fields.
     pub fn from_consensus(
-        header: Sealed<alloy_consensus::Header>,
+        header: Sealed<H>,
         total_difficulty: Option<U256>,
         size: Option<U256>,
     ) -> Self {
-        let (header, hash) = header.into_parts();
-
-        let alloy_consensus::Header {
-            parent_hash,
-            ommers_hash,
-            beneficiary,
-            state_root,
-            transactions_root,
-            receipts_root,
-            logs_bloom,
-            difficulty,
-            number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            mix_hash,
-            nonce,
-            base_fee_per_gas,
-            extra_data,
-            withdrawals_root,
-            blob_gas_used,
-            excess_blob_gas,
-            parent_beacon_block_root,
-            requests_hash,
-        } = header;
-
-        Self {
-            hash,
-            parent_hash,
-            uncles_hash: ommers_hash,
-            miner: beneficiary,
-            state_root,
-            transactions_root,
-            receipts_root,
-            withdrawals_root,
-            number,
-            gas_used,
-            gas_limit,
-            extra_data,
-            logs_bloom,
-            timestamp,
-            difficulty,
-            mix_hash: Some(mix_hash),
-            nonce: Some(nonce),
-            base_fee_per_gas,
-            blob_gas_used,
-            excess_blob_gas,
-            parent_beacon_block_root,
-            total_difficulty,
-            requests_hash,
-            size,
-        }
-    }
-}
-
-impl TryFrom<Header> for alloy_consensus::Header {
-    type Error = ConversionError;
-    fn try_from(value: Header) -> Result<Self, Self::Error> {
-        let Header {
-            parent_hash,
-            uncles_hash,
-            miner,
-            state_root,
-            transactions_root,
-            receipts_root,
-            logs_bloom,
-            difficulty,
-            number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            extra_data,
-            mix_hash,
-            nonce,
-            base_fee_per_gas,
-            withdrawals_root,
-            blob_gas_used,
-            excess_blob_gas,
-            parent_beacon_block_root,
-            requests_hash,
-            // not included in the consensus header
-            hash: _hash,
-            total_difficulty: _total_difficulty,
-            size: _size,
-        } = value;
-        Ok(Self {
-            parent_hash,
-            ommers_hash: uncles_hash,
-            beneficiary: miner,
-            state_root,
-            transactions_root,
-            receipts_root,
-            withdrawals_root,
-            logs_bloom,
-            difficulty,
-            number,
-            gas_limit,
-            gas_used,
-            timestamp,
-            mix_hash: mix_hash.ok_or(ConversionError::Custom("missing block mix_hash".into()))?,
-            nonce: nonce.ok_or(ConversionError::Custom("missing block nonce".into()))?,
-            base_fee_per_gas,
-            blob_gas_used,
-            excess_blob_gas,
-            parent_beacon_block_root,
-            requests_hash,
-            extra_data,
-        })
-    }
-}
-
-impl HeaderResponse for Header {
-    fn hash(&self) -> BlockHash {
-        self.hash
-    }
-
-    fn number(&self) -> u64 {
-        self.number
-    }
-
-    fn timestamp(&self) -> u64 {
-        self.timestamp
-    }
-
-    fn extra_data(&self) -> &Bytes {
-        &self.extra_data
-    }
-
-    fn base_fee_per_gas(&self) -> Option<u64> {
-        self.base_fee_per_gas
-    }
-
-    fn next_block_blob_fee(&self) -> Option<u128> {
-        self.next_block_blob_fee()
-    }
-
-    fn coinbase(&self) -> Address {
-        self.miner
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.gas_limit
-    }
-
-    fn mix_hash(&self) -> Option<B256> {
-        self.mix_hash
-    }
-
-    fn difficulty(&self) -> U256 {
-        self.difficulty
+        let (inner, hash) = header.into_parts();
+        Self { hash, inner, total_difficulty, size }
     }
 }
 
@@ -467,7 +257,7 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
+impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
     type Header = H;
     type Transaction = T;
 
@@ -499,7 +289,7 @@ pub struct BadBlock {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::{hex, keccak256};
+    use alloy_primitives::{hex, keccak256, Bloom, B64};
     use arbitrary::Arbitrary;
     use rand::Rng;
     use similar_asserts::assert_eq;
@@ -527,31 +317,35 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_block() {
+        use alloy_primitives::B64;
+
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                parent_hash: B256::with_last_byte(2),
-                uncles_hash: B256::with_last_byte(3),
-                miner: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: Some(B256::with_last_byte(8)),
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Default::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
+                inner: alloy_consensus::Header {
+                    parent_hash: B256::with_last_byte(2),
+                    ommers_hash: B256::with_last_byte(3),
+                    beneficiary: Address::with_last_byte(4),
+                    state_root: B256::with_last_byte(5),
+                    transactions_root: B256::with_last_byte(6),
+                    receipts_root: B256::with_last_byte(7),
+                    withdrawals_root: Some(B256::with_last_byte(8)),
+                    number: 9,
+                    gas_used: 10,
+                    gas_limit: 11,
+                    extra_data: vec![1, 2, 3].into(),
+                    logs_bloom: Default::default(),
+                    timestamp: 12,
+                    difficulty: U256::from(13),
+                    mix_hash: B256::with_last_byte(14),
+                    nonce: B64::with_last_byte(15),
+                    base_fee_per_gas: Some(20),
+                    blob_gas_used: None,
+                    excess_blob_gas: None,
+                    parent_beacon_block_root: None,
+                    requests_hash: None,
+                },
                 total_difficulty: Some(U256::from(100000)),
-                mix_hash: Some(B256::with_last_byte(14)),
-                nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
                 size: None,
             },
             uncles: vec![B256::with_last_byte(17)],
@@ -570,32 +364,36 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_uncle_block() {
+        use alloy_primitives::B64;
+
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                parent_hash: B256::with_last_byte(2),
-                uncles_hash: B256::with_last_byte(3),
-                miner: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: Some(B256::with_last_byte(8)),
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Default::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
-                total_difficulty: Some(U256::from(100000)),
-                mix_hash: Some(B256::with_last_byte(14)),
-                nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
+                inner: alloy_consensus::Header {
+                    parent_hash: B256::with_last_byte(2),
+                    ommers_hash: B256::with_last_byte(3),
+                    beneficiary: Address::with_last_byte(4),
+                    state_root: B256::with_last_byte(5),
+                    transactions_root: B256::with_last_byte(6),
+                    receipts_root: B256::with_last_byte(7),
+                    withdrawals_root: Some(B256::with_last_byte(8)),
+                    number: 9,
+                    gas_used: 10,
+                    gas_limit: 11,
+                    extra_data: vec![1, 2, 3].into(),
+                    logs_bloom: Default::default(),
+                    timestamp: 12,
+                    difficulty: U256::from(13),
+                    mix_hash: B256::with_last_byte(14),
+                    nonce: B64::with_last_byte(15),
+                    base_fee_per_gas: Some(20),
+                    blob_gas_used: None,
+                    excess_blob_gas: None,
+                    parent_beacon_block_root: None,
+                    requests_hash: None,
+                },
                 size: None,
+                total_difficulty: Some(U256::from(100000)),
             },
             uncles: vec![],
             transactions: BlockTransactions::Uncle,
@@ -616,28 +414,30 @@ mod tests {
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                parent_hash: B256::with_last_byte(2),
-                uncles_hash: B256::with_last_byte(3),
-                miner: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: None,
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Bloom::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
+                inner: alloy_consensus::Header {
+                    parent_hash: B256::with_last_byte(2),
+                    ommers_hash: B256::with_last_byte(3),
+                    beneficiary: Address::with_last_byte(4),
+                    state_root: B256::with_last_byte(5),
+                    transactions_root: B256::with_last_byte(6),
+                    receipts_root: B256::with_last_byte(7),
+                    withdrawals_root: None,
+                    number: 9,
+                    gas_used: 10,
+                    gas_limit: 11,
+                    extra_data: vec![1, 2, 3].into(),
+                    logs_bloom: Bloom::default(),
+                    timestamp: 12,
+                    difficulty: U256::from(13),
+                    mix_hash: B256::with_last_byte(14),
+                    nonce: B64::with_last_byte(15),
+                    base_fee_per_gas: Some(20),
+                    blob_gas_used: None,
+                    excess_blob_gas: None,
+                    parent_beacon_block_root: None,
+                    requests_hash: None,
+                },
                 total_difficulty: Some(U256::from(100000)),
-                mix_hash: Some(B256::with_last_byte(14)),
-                nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
                 size: None,
             },
             uncles: vec![B256::with_last_byte(17)],
@@ -838,7 +638,7 @@ mod tests {
     "size": "0xaeb6"
 }"#;
         let block = serde_json::from_str::<Block>(s).unwrap();
-        let header: alloy_consensus::Header = block.clone().header.try_into().unwrap();
+        let header = block.clone().header.inner;
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
         assert_eq!(recomputed_hash, block.header.hash);
 
@@ -875,7 +675,7 @@ mod tests {
             "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
          }"#;
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
-        let header: alloy_consensus::Header = block2.clone().header.try_into().unwrap();
+        let header = block2.clone().header.inner;
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
         assert_eq!(recomputed_hash, block2.header.hash);
     }
@@ -885,33 +685,35 @@ mod tests {
         // Setup a RPC header
         let rpc_header = Header {
             hash: B256::with_last_byte(1),
-            parent_hash: B256::with_last_byte(2),
-            uncles_hash: B256::with_last_byte(3),
-            miner: Address::with_last_byte(4),
-            state_root: B256::with_last_byte(5),
-            transactions_root: B256::with_last_byte(6),
-            receipts_root: B256::with_last_byte(7),
-            withdrawals_root: None,
-            number: 9,
-            gas_used: 10,
-            gas_limit: 11,
-            extra_data: vec![1, 2, 3].into(),
-            logs_bloom: Bloom::default(),
-            timestamp: 12,
-            difficulty: U256::from(13),
-            total_difficulty: None,
-            mix_hash: Some(B256::with_last_byte(14)),
-            nonce: Some(B64::with_last_byte(15)),
-            base_fee_per_gas: Some(20),
-            blob_gas_used: None,
-            excess_blob_gas: None,
-            parent_beacon_block_root: None,
-            requests_hash: None,
+            inner: alloy_consensus::Header {
+                parent_hash: B256::with_last_byte(2),
+                ommers_hash: B256::with_last_byte(3),
+                beneficiary: Address::with_last_byte(4),
+                state_root: B256::with_last_byte(5),
+                transactions_root: B256::with_last_byte(6),
+                receipts_root: B256::with_last_byte(7),
+                withdrawals_root: None,
+                number: 9,
+                gas_used: 10,
+                gas_limit: 11,
+                extra_data: vec![1, 2, 3].into(),
+                logs_bloom: Bloom::default(),
+                timestamp: 12,
+                difficulty: U256::from(13),
+                mix_hash: B256::with_last_byte(14),
+                nonce: B64::with_last_byte(15),
+                base_fee_per_gas: Some(20),
+                blob_gas_used: None,
+                excess_blob_gas: None,
+                parent_beacon_block_root: None,
+                requests_hash: None,
+            },
             size: None,
+            total_difficulty: None,
         };
 
         // Convert the RPC header to a primitive header
-        let primitive_header: alloy_consensus::Header = rpc_header.clone().try_into().unwrap();
+        let primitive_header = rpc_header.clone().inner;
 
         // Seal the primitive header
         let sealed_header: Sealed<alloy_consensus::Header> =
@@ -929,33 +731,35 @@ mod tests {
         // Setup a RPC header
         let header = Header {
             hash: B256::with_last_byte(1),
-            parent_hash: B256::with_last_byte(2),
-            uncles_hash: B256::with_last_byte(3),
-            miner: Address::with_last_byte(4),
-            state_root: B256::with_last_byte(5),
-            transactions_root: B256::with_last_byte(6),
-            receipts_root: B256::with_last_byte(7),
-            withdrawals_root: None,
-            number: 9,
-            gas_used: 10,
-            gas_limit: 11,
-            extra_data: vec![1, 2, 3].into(),
-            logs_bloom: Bloom::default(),
-            timestamp: 12,
-            difficulty: U256::from(13),
+            inner: alloy_consensus::Header {
+                parent_hash: B256::with_last_byte(2),
+                ommers_hash: B256::with_last_byte(3),
+                beneficiary: Address::with_last_byte(4),
+                state_root: B256::with_last_byte(5),
+                transactions_root: B256::with_last_byte(6),
+                receipts_root: B256::with_last_byte(7),
+                withdrawals_root: None,
+                number: 9,
+                gas_used: 10,
+                gas_limit: 11,
+                extra_data: vec![1, 2, 3].into(),
+                logs_bloom: Bloom::default(),
+                timestamp: 12,
+                difficulty: U256::from(13),
+                mix_hash: B256::with_last_byte(14),
+                nonce: B64::with_last_byte(15),
+                base_fee_per_gas: Some(20),
+                blob_gas_used: None,
+                excess_blob_gas: None,
+                parent_beacon_block_root: None,
+                requests_hash: None,
+            },
             total_difficulty: None,
-            mix_hash: Some(B256::with_last_byte(14)),
-            nonce: Some(B64::with_last_byte(15)),
-            base_fee_per_gas: Some(20),
-            blob_gas_used: None,
-            excess_blob_gas: None,
-            parent_beacon_block_root: None,
-            requests_hash: None,
             size: Some(U256::from(505)),
         };
 
         // Convert the RPC header to a primitive header
-        let primitive_header: alloy_consensus::Header = header.clone().try_into().unwrap();
+        let primitive_header = header.clone().inner;
 
         // Convert the primitive header to a RPC uncle block
         let block: Block<Transaction> = Block::uncle_from_header(primitive_header);
@@ -980,31 +784,35 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn serde_bad_block() {
+        use alloy_primitives::B64;
+
         let block = Block {
             header: Header {
                 hash: B256::with_last_byte(1),
-                parent_hash: B256::with_last_byte(2),
-                uncles_hash: B256::with_last_byte(3),
-                miner: Address::with_last_byte(4),
-                state_root: B256::with_last_byte(5),
-                transactions_root: B256::with_last_byte(6),
-                receipts_root: B256::with_last_byte(7),
-                withdrawals_root: Some(B256::with_last_byte(8)),
-                number: 9,
-                gas_used: 10,
-                gas_limit: 11,
-                extra_data: vec![1, 2, 3].into(),
-                logs_bloom: Default::default(),
-                timestamp: 12,
-                difficulty: U256::from(13),
+                inner: alloy_consensus::Header {
+                    parent_hash: B256::with_last_byte(2),
+                    ommers_hash: B256::with_last_byte(3),
+                    beneficiary: Address::with_last_byte(4),
+                    state_root: B256::with_last_byte(5),
+                    transactions_root: B256::with_last_byte(6),
+                    receipts_root: B256::with_last_byte(7),
+                    withdrawals_root: Some(B256::with_last_byte(8)),
+                    number: 9,
+                    gas_used: 10,
+                    gas_limit: 11,
+                    extra_data: vec![1, 2, 3].into(),
+                    logs_bloom: Default::default(),
+                    timestamp: 12,
+                    difficulty: U256::from(13),
+                    mix_hash: B256::with_last_byte(14),
+                    nonce: B64::with_last_byte(15),
+                    base_fee_per_gas: Some(20),
+                    blob_gas_used: None,
+                    excess_blob_gas: None,
+                    parent_beacon_block_root: None,
+                    requests_hash: None,
+                },
                 total_difficulty: Some(U256::from(100000)),
-                mix_hash: Some(B256::with_last_byte(14)),
-                nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(20),
-                blob_gas_used: None,
-                excess_blob_gas: None,
-                parent_beacon_block_root: None,
-                requests_hash: None,
                 size: Some(U256::from(19)),
             },
             uncles: vec![B256::with_last_byte(17)],

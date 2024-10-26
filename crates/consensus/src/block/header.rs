@@ -592,11 +592,11 @@ pub trait BlockHeader {
     /// Retrieves the timestamp of the block
     fn timestamp(&self) -> u64;
 
-    /// Retrieves the mix hash of the block
-    fn mix_hash(&self) -> B256;
+    /// Retrieves the mix hash of the block, if available
+    fn mix_hash(&self) -> Option<B256>;
 
-    /// Retrieves the nonce of the block
-    fn nonce(&self) -> B64;
+    /// Retrieves the nonce of the block, if avaialble
+    fn nonce(&self) -> Option<B64>;
 
     /// Retrieves the base fee per gas of the block, if available
     fn base_fee_per_gas(&self) -> Option<u64>;
@@ -615,6 +615,23 @@ pub trait BlockHeader {
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    fn next_block_excess_blob_gas(&self) -> Option<u64> {
+        Some(calc_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// See also [Self::next_block_excess_blob_gas]
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+    }
 }
 
 impl BlockHeader for Header {
@@ -670,12 +687,12 @@ impl BlockHeader for Header {
         self.timestamp
     }
 
-    fn mix_hash(&self) -> B256 {
-        self.mix_hash
+    fn mix_hash(&self) -> Option<B256> {
+        Some(self.mix_hash)
     }
 
-    fn nonce(&self) -> B64 {
-        self.nonce
+    fn nonce(&self) -> Option<B64> {
+        Some(self.nonce)
     }
 
     fn base_fee_per_gas(&self) -> Option<u64> {
@@ -705,7 +722,7 @@ impl BlockHeader for Header {
 
 /// Bincode-compatibl [`Header`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub(super) mod serde_bincode_compat {
+pub(crate) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
