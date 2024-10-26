@@ -15,7 +15,7 @@ pub struct AnyHeader {
     #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
     pub ommers_hash: B256,
     /// Alias of `author`
-    #[serde(rename = "miner")]
+    #[cfg_attr(feature = "serde", serde(rename = "miner"))]
     pub beneficiary: Address,
     /// State root hash
     pub state_root: B256,
