@@ -773,5 +773,4 @@ mod tests {
         assert!(request.gas_price.is_none());
         assert!(request.max_fee_per_gas.is_some());
     }
-
 }
