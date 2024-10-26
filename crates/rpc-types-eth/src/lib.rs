@@ -11,7 +11,7 @@
 #[allow(unused_imports)]
 extern crate alloc;
 
-pub use alloy_eips::eip4895::Withdrawal;
+pub use alloy_eips::eip4895::{Withdrawal, Withdrawals};
 
 mod account;
 pub use account::*;

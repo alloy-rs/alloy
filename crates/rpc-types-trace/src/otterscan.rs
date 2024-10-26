@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawal};
+use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawals};
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -130,12 +130,9 @@ pub struct OtsSlimBlock {
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
-    /// Integer the size of this block in bytes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub size: Option<U256>,
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub withdrawals: Option<Vec<Withdrawal>>,
+    pub withdrawals: Option<Withdrawals>,
     /// The number of transactions in the block.
     #[doc(alias = "tx_count")]
     pub transaction_count: usize,
@@ -146,7 +143,6 @@ impl<T> From<Block<T>> for OtsSlimBlock {
         Self {
             header: block.header,
             uncles: block.uncles,
-            size: block.size,
             withdrawals: block.withdrawals,
             transaction_count: block.transactions.len(),
         }
