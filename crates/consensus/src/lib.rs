@@ -22,7 +22,7 @@ mod encodable_signature;
 pub use encodable_signature::EncodableSignature;
 
 mod header;
-pub use header::{BlockHeader, Header};
+pub use header::{BlockHeader, ConsensusError, Header};
 
 mod receipt;
 pub use receipt::{

@@ -12,6 +12,35 @@ use alloy_primitives::{
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::mem;
 
+/// Consensus Errors
+#[derive(Debug, PartialEq, Eq, Clone, derive_more::Display, derive_more::Error)]
+pub enum ConsensusError {
+    /// Error when blob gas used is missing.
+    #[display("missing blob gas used")]
+    BlobGasUsedMissing,
+
+    /// Error when excess blob gas is missing.
+    #[display("missing excess blob gas")]
+    ExcessBlobGasMissing,
+
+    /// Error when there is an invalid excess blob gas.
+    #[display(
+        "invalid excess blob gas, got: {got}, expected: {expected}; \
+            parent excess blob gas: {parent_excess_blob_gas}, \
+            parent blob gas used: {parent_blob_gas_used}"
+    )]
+    ExcessBlobGasDiff {
+        /// Expected excess blob gas.
+        expected: u64,
+        /// Actual excess blob gas.
+        got: u64,
+        /// The parent excess blob gas.
+        parent_excess_blob_gas: u64,
+        /// The parent blob gas used.
+        parent_blob_gas_used: u64,
+    },
+}
+
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -345,6 +374,50 @@ impl Header {
     #[inline]
     pub const fn seal(self, hash: B256) -> Sealed<Self> {
         Sealed::new_unchecked(self, hash)
+    }
+
+    /// Validates that the EIP-4844 fields in the current block header are correct compared to the
+    /// parent block header.
+    ///
+    /// Specifically, this function checks two things:
+    /// 1. The current block header contains the `blob_gas_used` and `excess_blob_gas` fields.
+    /// 2. The `excess_blob_gas` field matches the expected value calculated from the parent header
+    ///    fields.
+    pub fn validate_against_parent_4844(&self, parent: &Self) -> Result<(), ConsensusError> {
+        // From [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension):
+        //
+        // > For the first post-fork block, both parent.blob_gas_used and parent.excess_blob_gas
+        // > are evaluated as 0.
+        //
+        // This means in the first post-fork block, calc_excess_blob_gas will return 0.
+        let parent_blob_gas_used = parent.blob_gas_used.unwrap_or(0);
+        let parent_excess_blob_gas = parent.excess_blob_gas.unwrap_or(0);
+
+        // Ensure `blob_gas_used` exists in the current block header.
+        // Return an error if it is missing.
+        if self.blob_gas_used.is_none() {
+            return Err(ConsensusError::BlobGasUsedMissing);
+        }
+
+        // Retrieve the `excess_blob_gas` field from the current block header.
+        let excess_blob_gas = self.excess_blob_gas.ok_or(ConsensusError::ExcessBlobGasMissing)?;
+
+        // Calculate the expected `excess_blob_gas` for the current block.
+        let expected_excess_blob_gas =
+            calc_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used);
+
+        // Check if the calculated `excess_blob_gas` matches the actual value in the header.
+        // If they are different, return an error with both values for comparison.
+        if expected_excess_blob_gas != excess_blob_gas {
+            return Err(ConsensusError::ExcessBlobGasDiff {
+                got: excess_blob_gas,
+                expected: expected_excess_blob_gas,
+                parent_excess_blob_gas,
+                parent_blob_gas_used,
+            });
+        }
+
+        Ok(())
     }
 }
 
