@@ -76,7 +76,29 @@ impl Requests {
         self.0.extend(other.take());
     }
 }
+/// A list of requests or a precomputed requests hash.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum PragueRequests {
+    /// Stores a list of requests for dynamic requests hash calculation.
+    Requests(Requests),
+    /// Stores a precomputed requests hash.
+    Hash(B256),
+}
 
+impl PragueRequests {
+    /// Returns the requests hash for the enum instance.
+    ///
+    /// - If the instance contains a list of requests, this function calculates the hash using
+    ///   `requests_hash` of the `Requests` struct.
+    /// - If it contains a precomputed hash, it returns that hash directly.
+    #[cfg(feature = "sha2")]
+    pub fn requests_hash(&self) -> B256 {
+        match self {
+            Self::Requests(requests) => requests.requests_hash(),
+            Self::Hash(precomputed_hash) => *precomputed_hash,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
