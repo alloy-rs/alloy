@@ -3,7 +3,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo};
+use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
 use alloy_rpc_types_eth::Block;
 use alloy_transport::{Transport, TransportResult};
 
@@ -137,6 +137,9 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
 
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
+
+    /// Reorg the chain
+    async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()>;
 
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
@@ -300,6 +303,10 @@ where
 
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()> {
         self.client().request("anvil_setRpcUrl", (url,)).await
+    }
+
+    async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()> {
+        self.client().request("anvil_reorg", options).await
     }
 
     async fn eth_send_unsigned_transaction(
@@ -916,6 +923,22 @@ mod tests {
 
         let url = "https://example.com".to_string();
         provider.anvil_set_rpc_url(url.clone()).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_reorg() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        // Mine two blocks
+        provider.anvil_mine(Some(U256::from(2)), None).await.unwrap();
+
+        let reorged_block = provider.get_block_by_number(2.into(), false).await.unwrap().unwrap();
+        provider.anvil_reorg(ReorgOptions { depth: 1, tx_block_pairs: Vec::new() }).await.unwrap();
+
+        let new_block = provider.get_block_by_number(2.into(), false).await.unwrap().unwrap();
+
+        assert_eq!(reorged_block.header.number, new_block.header.number);
+        assert_ne!(reorged_block.header.hash, new_block.header.hash);
     }
 
     #[tokio::test]
