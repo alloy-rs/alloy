@@ -5,7 +5,7 @@
 use alloc::vec::Vec;
 use alloy_primitives::{b256, Bytes, B256};
 use derive_more::{Deref, DerefMut, From, IntoIterator};
-use serde::{Deserialize, Serialize};
+
 
 /// The empty requests hash.
 ///
@@ -80,7 +80,7 @@ impl Requests {
 
 /// A list of requests or a precomputed requests hash.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PragueRequests {
     /// Stores a list of requests for dynamic requests hash calculation.
     Requests(Requests),
