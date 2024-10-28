@@ -370,6 +370,16 @@ impl Encodable2718 for TxEnvelope {
             }
         }
     }
+
+    fn trie_hash(&self) -> B256 {
+        match self {
+            Self::Legacy(tx) => *tx.hash(),
+            Self::Eip2930(tx) => *tx.hash(),
+            Self::Eip1559(tx) => *tx.hash(),
+            Self::Eip4844(tx) => *tx.hash(),
+            Self::Eip7702(tx) => *tx.hash(),
+        }
+    }
 }
 
 impl Transaction for TxEnvelope {
