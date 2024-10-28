@@ -79,7 +79,8 @@ impl Requests {
 }
 
 /// A list of requests or a precomputed requests hash.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PragueRequests {
     /// Stores a list of requests for dynamic requests hash calculation.
     Requests(Requests),
