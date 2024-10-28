@@ -7,7 +7,7 @@ use alloc::{
 };
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip4844::BlobTransactionSidecar, eip4895::Withdrawal, BlockNumHash};
-use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256, U64};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -760,6 +760,22 @@ pub struct PayloadAttributes {
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3>
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
+    /// Target blob count as defined in EIP-7742. Enabled with V4.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#payloadattributesv4>
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")
+    )]
+    pub target_block_count: Option<u64>,
+    /// Maximum blob count as defined in EIP-7742. Enabled with V4.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#payloadattributesv4>
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")
+    )]
+    pub maximum_blob_count: Option<u64>,
 }
 
 /// This structure contains the result of processing a payload or fork choice update.
