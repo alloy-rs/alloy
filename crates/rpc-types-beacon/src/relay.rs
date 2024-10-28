@@ -5,7 +5,7 @@
 use crate::{BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
-    BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    BlobsBundleV1, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -157,18 +157,6 @@ pub struct SignedBidSubmissionV4 {
     pub signature: BlsSignature,
 }
 
-/// SubmitBlockRequest is the request from the builder to submit a block.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SubmitBlockRequest {
-    /// The BidTrace message associated with the block submission.
-    pub message: BidTrace,
-    /// The execution payload for the block submission.
-    #[serde(with = "crate::payload::beacon_payload")]
-    pub execution_payload: ExecutionPayload,
-    /// The signature associated with the block submission.
-    pub signature: BlsSignature,
-}
-
 /// Query for the `/relay/v1/builder/blocks` endpoint
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -192,7 +180,7 @@ impl SubmitBlockRequestQuery {
 pub struct BuilderBlockValidationRequest {
     /// The [SubmitBlockRequest] data to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV1,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
@@ -204,12 +192,10 @@ pub struct BuilderBlockValidationRequest {
 pub struct BuilderBlockValidationRequestV2 {
     /// The [SubmitBlockRequest] data to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV2,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
-    /// The withdrawals root for the validation request.
-    pub withdrawals_root: B256,
 }
 
 /// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
@@ -218,7 +204,7 @@ pub struct BuilderBlockValidationRequestV2 {
 pub struct BuilderBlockValidationRequestV3 {
     /// The [SubmitBlockRequest] data to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV3,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
