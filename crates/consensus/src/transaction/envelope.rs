@@ -190,6 +190,22 @@ impl TxEnvelope {
         matches!(self, Self::Eip7702(_))
     }
 
+    /// Returns true if the signature of the transaction is protected.
+    #[inline]
+    pub const fn is_protected(&self) -> bool {
+        match self {
+            Self::Legacy(tx) => {
+                let v = tx.signature().v().to_u64();
+                if 64 - v.leading_zeros() <= 8 {
+                    return v != 27 && v != 28 && v != 1 && v != 0;
+                }
+                // anything not 27 or 28 is considered protected
+                true
+            }
+            _ => true,
+        }
+    }
+
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
     pub const fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
         match self {
@@ -588,9 +604,9 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    use alloy_primitives::{hex, Address, Parity, Signature, U256};
     #[allow(unused_imports)]
-    use alloy_primitives::{Bytes, TxKind};
+    use alloy_primitives::{b256, Bytes, TxKind};
+    use alloy_primitives::{hex, Address, Parity, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[cfg(not(feature = "std"))]
@@ -615,6 +631,51 @@ mod tests {
         assert_eq!(tx.tx().to, TxKind::Call(address!("D9e1459A7A482635700cBc20BBAF52D495Ab9C96")));
         let from = tx.recover_signer().unwrap();
         assert_eq!(from, address!("001e2b7dE757bA469a57bF6b23d982458a07eFcE"));
+    }
+
+    #[test]
+    fn test_is_protected_v() {
+        let sig = Signature::test_signature();
+        assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_protected());
+        let r = b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565");
+        let s = b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1");
+        let v = 27;
+        let valid_sig = Signature::from_scalars_and_parity(r, s, v).unwrap();
+        assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            valid_sig,
+            Default::default(),
+        ))
+        .is_protected());
+        assert!(&TxEnvelope::Eip2930(Signed::new_unchecked(
+            TxEip2930::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_protected());
+        assert!(&TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_protected());
+        assert!(&TxEnvelope::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            sig,
+            Default::default(),
+        ))
+        .is_protected());
+        assert!(&TxEnvelope::Eip7702(Signed::new_unchecked(
+            TxEip7702::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_protected());
     }
 
     #[test]
