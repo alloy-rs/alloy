@@ -90,7 +90,7 @@ impl PragueRequests {
     /// Returns the requests hash for the enum instance.
     ///
     /// - If the instance contains a list of requests, this function calculates the hash using
-    ///   `requests_hash` of the `Requests` struct.
+    ///   `requests_hash` of the [`Requests`] struct.
     /// - If it contains a precomputed hash, it returns that hash directly.
     #[cfg(feature = "sha2")]
     pub fn requests_hash(&self) -> B256 {
