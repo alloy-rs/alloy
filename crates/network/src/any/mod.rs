@@ -122,6 +122,17 @@ impl Encodable2718 for AnyTxEnvelope {
             }
         }
     }
+
+    fn trie_hash(&self) -> B256 {
+        match self {
+            AnyTxEnvelope::Ethereum(tx) => tx.trie_hash(),
+            AnyTxEnvelope::Other { fields, .. } => fields
+                .get("hash")
+                .and_then(|v| v.as_str())
+                .and_then(|v| v.parse().ok())
+                .unwrap_or_else(B256::default),
+        }
+    }
 }
 
 impl Decodable2718 for AnyTxEnvelope {
