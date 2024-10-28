@@ -6,7 +6,8 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{BlockHash, ChainId, TxHash, B256, U256};
+use alloy_primitives::{BlockHash, Bytes, ChainId, TxHash, B256, U256};
+use alloy_rpc_types_eth::TransactionRequest;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
@@ -162,6 +163,25 @@ impl Default for MineOptions {
     fn default() -> Self {
         Self::Options { timestamp: None, blocks: None }
     }
+}
+
+/// Represents the options used in `anvil_reorg`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReorgOptions {
+    /// The depth of the reorg
+    pub depth: u64,
+    /// List of transaction requests and blocks pairs to be mined into the new chain
+    pub tx_block_pairs: Vec<(TransactionData, u64)>,
+}
+
+/// Type representing txs in `ReorgOptions`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TransactionData {
+    /// Transaction request
+    JSON(TransactionRequest),
+    /// Raw transaction bytes
+    Raw(Bytes),
 }
 
 #[cfg(test)]
