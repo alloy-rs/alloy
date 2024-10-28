@@ -6,10 +6,11 @@ use crate::{
     utils::Eip1559Estimation,
     Provider,
 };
+use alloy_consensus::BlockHeader;
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
-use alloy_network_primitives::{BlockResponse, HeaderResponse};
+use alloy_network_primitives::BlockResponse;
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
@@ -230,6 +231,7 @@ where
             .await?
             .ok_or(RpcError::NullResp)?
             .header()
+            .as_ref()
             .next_block_blob_fee()
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
