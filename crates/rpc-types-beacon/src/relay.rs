@@ -96,7 +96,7 @@ pub struct SignedBidTrace {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Bellatrix).
-/// 
+///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -112,7 +112,7 @@ pub struct SignedBidSubmissionV1 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Capella).
-/// 
+///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/capella/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -128,7 +128,7 @@ pub struct SignedBidSubmissionV2 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Deneb).
-/// 
+///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -180,13 +180,13 @@ impl SubmitBlockRequestQuery {
     }
 }
 
-/// A Request to validate a [`SignedBidSubmissionV1`] 
-/// 
+/// A Request to validate a [`SignedBidSubmissionV1`]
+///
 /// <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L132-L136>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequest {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
     pub request: SignedBidSubmissionV1,
     /// The registered gas limit for the validation request.
@@ -194,13 +194,13 @@ pub struct BuilderBlockValidationRequest {
     pub registered_gas_limit: u64,
 }
 
-/// A Request to validate a [`SignedBidSubmissionV2`] 
-/// 
+/// A Request to validate a [`SignedBidSubmissionV2`]
+///
 /// <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L204-L208>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequestV2 {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
     pub request: SignedBidSubmissionV2,
     /// The registered gas limit for the validation request.
@@ -208,13 +208,13 @@ pub struct BuilderBlockValidationRequestV2 {
     pub registered_gas_limit: u64,
 }
 
-/// A Request to validate a [`SignedBidSubmissionV3`] 
-/// 
+/// A Request to validate a [`SignedBidSubmissionV3`]
+///
 /// <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequestV3 {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
     pub request: SignedBidSubmissionV3,
     /// The registered gas limit for the validation request.
