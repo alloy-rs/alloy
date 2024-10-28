@@ -6,7 +6,6 @@ use alloc::vec::Vec;
 use alloy_primitives::{b256, Bytes, B256};
 use derive_more::{Deref, DerefMut, From, IntoIterator};
 
-
 /// The empty requests hash.
 ///
 /// This is equivalent to `sha256(sha256(0) ++ sha256(1) ++ sha256(2))`
