@@ -224,8 +224,19 @@ pub struct BuilderBlockValidationRequestV3 {
     pub parent_beacon_block_root: B256,
 }
 
-/// A Request to validate a [`SignedBidSubmissionV3`] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
-pub type BuilderBlockValidationRequestV4 = BuilderBlockValidationRequestV3;
+/// A Request to validate a [`SignedBidSubmissionV4`]
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV4 {
+    /// The request to be validated.
+    #[serde(flatten)]
+    pub request: SignedBidSubmissionV4,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
+}
 
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///
