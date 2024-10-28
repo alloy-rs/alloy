@@ -125,8 +125,8 @@ impl Encodable2718 for AnyTxEnvelope {
 
     fn trie_hash(&self) -> B256 {
         match self {
-            AnyTxEnvelope::Ethereum(tx) => tx.trie_hash(),
-            AnyTxEnvelope::Other { fields, .. } => fields
+            Self::Ethereum(tx) => tx.trie_hash(),
+            Self::Other { fields, .. } => fields
                 .get("hash")
                 .and_then(|v| v.as_str())
                 .and_then(|v| v.parse().ok())
