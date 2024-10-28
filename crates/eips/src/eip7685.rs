@@ -76,6 +76,7 @@ impl Requests {
         self.0.extend(other.take());
     }
 }
+
 /// A list of requests or a precomputed requests hash.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PragueRequests {
