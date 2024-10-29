@@ -57,8 +57,6 @@ pub struct Transaction<T = TxEnvelope> {
 
     /// Sender
     pub from: Address,
-    // /// Transaction hash
-    // pub hash: B256,
 }
 
 impl<T> AsRef<T> for Transaction<T> {
