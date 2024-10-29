@@ -632,14 +632,14 @@ mod tests {
     }
 
     #[test]
-    fn test_is_protected_v() {
+    fn test_is_replay_protected_v() {
         let sig = Signature::test_signature();
         assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
             TxLegacy::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         let r = b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565");
         let s = b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1");
         let v = 27;
@@ -649,31 +649,31 @@ mod tests {
             valid_sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip2930(Signed::new_unchecked(
             TxEip2930::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip1559(Signed::new_unchecked(
             TxEip1559::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip4844(Signed::new_unchecked(
             TxEip4844Variant::TxEip4844(TxEip4844::default()),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip7702(Signed::new_unchecked(
             TxEip7702::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
     }
 
     #[test]
