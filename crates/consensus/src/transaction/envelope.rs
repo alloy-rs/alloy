@@ -190,7 +190,7 @@ impl TxEnvelope {
         matches!(self, Self::Eip7702(_))
     }
 
-    /// Returns true if the signature of the transaction is replay protected.
+    /// Returns true if the transaction is replay protected.
     ///
     /// All non-legacy transactions are replay protected, as the chain id is
     /// included in the transaction body. Legacy transactions are considered
