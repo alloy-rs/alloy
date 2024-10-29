@@ -190,20 +190,18 @@ impl TxEnvelope {
         matches!(self, Self::Eip7702(_))
     }
 
-    /// Returns true if the signature of the transaction is protected.
+    /// Returns true if the signature of the transaction is replay protected.
+    ///
+    /// All non-legacy transactions are replay protected, as the chain id is
+    /// included in the transaction body. Legacy transactions are considered
+    /// replay protected if the `v` value is not 27 or 28, according to the
+    /// rules of [EIP-155].
+    ///
+    /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
     #[inline]
-    pub const fn is_protected(&self) -> bool {
-        match self {
-            Self::Legacy(tx) => {
-                let v = tx.signature().v().to_u64();
-                if 64 - v.leading_zeros() <= 8 {
-                    return v != 27 && v != 28 && v != 1 && v != 0;
-                }
-                // anything not 27 or 28 is considered protected
-                true
-            }
-            _ => true,
-        }
+    pub const fn is_replay_protected(&self) -> bool {
+        let Self::Legacy(ref tx) = self else { return true };
+        tx.signature().v().chain_id().is_some()
     }
 
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
