@@ -1517,7 +1517,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         let hash = block.header.hash;
         let block =
             provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
@@ -1529,7 +1530,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         let hash = block.header.hash;
         let block: Block = provider
             .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
@@ -1543,7 +1545,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1552,7 +1555,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1776,7 +1780,11 @@ mod tests {
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let block = provider.get_block_by_number(0.into(), BlockTransactionsKind::Hashes).await.unwrap().unwrap();
+        let block = provider
+            .get_block_by_number(0.into(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(block.transactions.is_hashes());
     }
 }
