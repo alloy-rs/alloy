@@ -114,11 +114,15 @@ impl Encodable2718 for AnyTxEnvelope {
         }
     }
 
+    #[track_caller]
     fn encode_2718(&self, out: &mut dyn alloy_primitives::bytes::BufMut) {
         match self {
             Self::Ethereum(t) => t.encode_2718(out),
             Self::Other { ty, .. } => {
-                out.put_u8(ty.into());
+                panic!(
+                    "Attempted to encode unknown transaction type: {}. This is not a bug in alloy. To encode or decode unknown transaction types, use a custom Transaction type and a custom Network implementation. See https://docs.rs/alloy-network/latest/alloy_network/ for network documentation.",
+                    ty
+                )
             }
         }
     }
