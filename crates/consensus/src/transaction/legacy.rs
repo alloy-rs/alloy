@@ -451,10 +451,7 @@ pub mod signed_legacy_serde {
     }
 
     /// Serializes signed transaction with `v` key for signature parity.
-    pub fn serialize<T, S>(
-        signed: &crate::Signed<T>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<T, S>(signed: &crate::Signed<T>, serializer: S) -> Result<S::Ok, S::Error>
     where
         T: Transaction + Clone + Serialize,
         S: serde::Serializer,
@@ -470,7 +467,7 @@ pub mod signed_legacy_serde {
         }
         .serialize(serializer)
     }
-    
+
     /// Deserializes signed transaction expecting `v` key for signature parity.
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<crate::Signed<T>, D::Error>
     where
