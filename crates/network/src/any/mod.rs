@@ -99,6 +99,25 @@ pub enum AnyTxEnvelope {
     },
 }
 
+impl AnyTxEnvelope {
+    /// Select a field by key and attempt to deserialize it.
+    ///
+    /// This method will return `None` if the key is not present in the fields,
+    /// or if the transaction is already fully deserialized (i.e. it is an
+    /// Ethereum [`TxEnvelope`]). Otherwise, it will attempt to deserialize the
+    /// field and return the result wrapped in a `Some`.
+    pub fn deser_by_key<T: serde::de::DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Option<serde_json::Result<T>> {
+        let Self::Other { fields, .. } = self else {
+            return None;
+        };
+
+        fields.get(key).cloned().map(serde_json::from_value)
+    }
+}
+
 impl Encodable2718 for AnyTxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
@@ -244,22 +263,17 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
-            Self::Other { fields, .. } => fields
-                .get("value")
-                .and_then(|v| v.as_str())
-                .map(|v| v.parse().expect("invalid value"))
-                .expect("missing value in tx response"),
+            Self::Other { .. } => {
+                self.deser_by_key("value").and_then(Result::ok).unwrap_or_default()
+            }
         }
     }
 
     fn input(&self) -> &Bytes {
         match self {
             Self::Ethereum(inner) => inner.input(),
-            Self::Other { fields, memo, .. } => memo.input.get_or_init(|| {
-                fields
-                    .get("input")
-                    .and_then(|value| serde_json::from_value(value.clone()).ok())
-                    .unwrap_or_default()
+            Self::Other { memo, .. } => memo.input.get_or_init(|| {
+                self.deser_by_key("input").and_then(Result::ok).unwrap_or_default()
             }),
         }
     }
@@ -277,10 +291,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
             Self::Other { fields, memo, .. } => {
                 if fields.contains_key("accessList") {
                     Some(memo.access_list.get_or_init(|| {
-                        fields
-                            .get("accessList")
-                            .and_then(|value| serde_json::from_value(value.clone()).ok())
-                            .unwrap_or_default()
+                        self.deser_by_key("accessList").and_then(Result::ok).unwrap_or_default()
                     }))
                 } else {
                     None
@@ -295,9 +306,8 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
             Self::Other { fields, memo, .. } => {
                 if fields.contains_key("blobVersionedHashes") {
                     Some(memo.blob_versioned_hashes.get_or_init(|| {
-                        fields
-                            .get("blobVersionedHashes")
-                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                        self.deser_by_key("blobVersionedHashes")
+                            .and_then(Result::ok)
                             .unwrap_or_default()
                     }))
                 } else {
@@ -313,9 +323,8 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
             Self::Other { fields, memo, .. } => {
                 if fields.contains_key("authorizationList") {
                     Some(memo.authorization_list.get_or_init(|| {
-                        fields
-                            .get("authorizationList")
-                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                        self.deser_by_key("authorizationList")
+                            .and_then(Result::ok)
                             .unwrap_or_default()
                     }))
                 } else {
@@ -345,6 +354,25 @@ pub enum AnyTypedTransaction {
         #[serde(skip, default)]
         memo: DeserMemo,
     },
+}
+
+impl AnyTypedTransaction {
+    /// Select a field by key and attempt to deserialize it.
+    ///
+    /// This method will return `None` if the key is not present in the fields,
+    /// or if the transaction is already fully deserialized (i.e. it is an
+    /// Ethereum [`TxEnvelope`]). Otherwise, it will attempt to deserialize the
+    /// field and return the result wrapped in a `Some`.
+    pub fn deser_by_key<T: serde::de::DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Option<serde_json::Result<T>> {
+        let Self::Other { fields, .. } = self else {
+            return None;
+        };
+
+        fields.get(key).cloned().map(serde_json::from_value)
+    }
 }
 
 impl From<TypedTransaction> for AnyTypedTransaction {
@@ -475,22 +503,17 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
-            Self::Other { fields, .. } => fields
-                .get("value")
-                .and_then(|v| v.as_str())
-                .map(|v| v.parse().expect("invalid value"))
-                .expect("missing value in tx response"),
+            Self::Other { .. } => {
+                self.deser_by_key("value").and_then(Result::ok).unwrap_or_default()
+            }
         }
     }
 
     fn input(&self) -> &Bytes {
         match self {
             Self::Ethereum(inner) => inner.input(),
-            Self::Other { fields, memo, .. } => memo.input.get_or_init(|| {
-                fields
-                    .get("input")
-                    .and_then(|value| serde_json::from_value(value.clone()).ok())
-                    .unwrap_or_default()
+            Self::Other { memo, .. } => memo.input.get_or_init(|| {
+                self.deser_by_key("input").and_then(Result::ok).unwrap_or_default()
             }),
         }
     }
@@ -508,10 +531,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
             Self::Other { fields, memo, .. } => {
                 if fields.contains_key("accessList") {
                     Some(memo.access_list.get_or_init(|| {
-                        fields
-                            .get("accessList")
-                            .and_then(|value| serde_json::from_value(value.clone()).ok())
-                            .unwrap_or_default()
+                        self.deser_by_key("accessList").and_then(Result::ok).unwrap_or_default()
                     }))
                 } else {
                     None
@@ -526,9 +546,8 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
             Self::Other { fields, memo, .. } => {
                 if fields.contains_key("blobVersionedHashes") {
                     Some(memo.blob_versioned_hashes.get_or_init(|| {
-                        fields
-                            .get("blobVersionedHashes")
-                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                        self.deser_by_key("blobVersionedHashes")
+                            .and_then(Result::ok)
                             .unwrap_or_default()
                     }))
                 } else {
@@ -544,9 +563,8 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
             Self::Other { fields, memo, .. } => {
                 if fields.contains_key("authorizationList") {
                     Some(memo.authorization_list.get_or_init(|| {
-                        fields
-                            .get("authorizationList")
-                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                        self.deser_by_key("authorizationList")
+                            .and_then(Result::ok)
                             .unwrap_or_default()
                     }))
                 } else {
