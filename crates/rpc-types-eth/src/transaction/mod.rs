@@ -157,9 +157,9 @@ impl serde::Serialize for Transaction {
 
         let tx_type = self.transaction_type.as_ref().unwrap_or(&0);
         let hash = &self.hash;
-        let nonce = self.nonce;
+        let nonce = &self.nonce;
         let block_hash = &self.block_hash.unwrap_or_default();
-        let block_number = self.block_number.unwrap_or_default();
+        let block_number = &self.block_number.unwrap_or_default();
         let tx_id = &self.transaction_index.unwrap_or_default();
         let chain_id = &self.chain_id.unwrap_or(1);
         let gas = &self.gas;
@@ -167,13 +167,13 @@ impl serde::Serialize for Transaction {
         let from = &self.from;
         let value = &self.value;
         let input = &self.input;
-        let sig = self.signature.as_ref();
-        let access_list = self.access_list.as_ref();
+        let sig = &self.signature.as_ref();
+        let access_list = &self.access_list.as_ref();
         let max_fee_per_gas = &self.max_fee_per_gas.unwrap_or_default();
         let max_priority_fee_per_gas = &self.max_priority_fee_per_gas.unwrap_or_default();
         let max_fee_per_blob_gas = &self.max_fee_per_blob_gas.unwrap_or_default();
-        let blob_version_hashes = self.blob_versioned_hashes.as_ref();
-        let auth_list = self.authorization_list.as_ref();
+        let blob_version_hashes = &self.blob_versioned_hashes.as_ref();
+        let auth_list = &self.authorization_list.as_ref();
 
         state.serialize_field("hash", hash)?;
         state.serialize_field("nonce", &format!("{nonce:#x}"))?;
