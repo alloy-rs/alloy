@@ -1,14 +1,20 @@
 //! RPC types for transactions
-use core::{str::{self, FromStr}, u128};
+use core::{
+    str::{self, FromStr},
+    u128,
+};
 
+use alloc::vec::Vec;
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
     TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
-use alloy_primitives::{address, b256, Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256, Parity as yParity, Signature as ySignature};
-use alloc::vec::Vec;
+use alloy_primitives::{
+    address, b256, Address, BlockHash, Bytes, ChainId, Parity as yParity, Signature as ySignature,
+    TxHash, TxKind, B256, U256,
+};
 
 pub use alloy_consensus::BlobTransactionSidecar;
 pub use alloy_eips::{
@@ -32,8 +38,12 @@ pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
 mod signature;
+use serde::{
+    de::{MapAccess, Visitor},
+    ser::SerializeStruct,
+    Deserialize, Deserializer,
+};
 pub use signature::{Parity, Signature};
-use serde::{de::{MapAccess, Visitor}, ser::SerializeStruct, Deserialize, Deserializer};
 
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
@@ -138,11 +148,13 @@ impl Transaction {
     }
 }
 
-impl serde::Serialize for Transaction
-{
-    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+impl serde::Serialize for Transaction {
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         let mut state = ser.serialize_struct("Transaction", std::mem::size_of::<Transaction>())?;
-        
+
         let tx_type = self.transaction_type.as_ref().unwrap_or(&0);
         let hash = &self.hash;
         let nonce = self.nonce;
@@ -175,12 +187,15 @@ impl serde::Serialize for Transaction
             if self.gas_price.is_some() {
                 let price = &self.gas_price.unwrap();
                 state.serialize_field("gasPrice", &format!("{price:#x}"))?;
-            }            
+            }
         }
         state.serialize_field("gasLimit", &format!("{gas:#x}"))?;
         if *tx_type >= 2 {
             state.serialize_field("maxFeePerGas", &format!("{max_fee_per_gas:#x}"))?;
-            state.serialize_field("maxPriorityFeePerGas", &format!("{max_priority_fee_per_gas:#x}"))?;
+            state.serialize_field(
+                "maxPriorityFeePerGas",
+                &format!("{max_priority_fee_per_gas:#x}"),
+            )?;
         }
         if *tx_type == 3 {
             state.serialize_field("blobVersionedHashes", blob_version_hashes.unwrap())?;
@@ -189,7 +204,7 @@ impl serde::Serialize for Transaction
         state.serialize_field("input", input)?;
 
         if sig.is_some() {
-            let Signature {r, s, v, y_parity} = sig.unwrap();
+            let Signature { r, s, v, y_parity } = sig.unwrap();
             state.serialize_field("r", &r)?;
             state.serialize_field("s", &s)?;
             state.serialize_field("v", &v)?;
@@ -199,7 +214,7 @@ impl serde::Serialize for Transaction
         }
 
         state.serialize_field("chainId", &format!("{chain_id:#x}"))?;
-        
+
         if *tx_type >= 1 && access_list.is_some() {
             state.serialize_field("accessList", &access_list)?;
         }
@@ -209,27 +224,49 @@ impl serde::Serialize for Transaction
         }
 
         state.end()
-        
     }
-
-    
-} 
+}
 
 impl<'de> Deserialize<'de> for Transaction {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct TxVisitor;
-        
-        const FIELDS: &'static [&'static str] = &["hash", "nonce", "block_hash", "block_number", "transaction_index", "from", "to", "value", "gas_price", "gas", "max_fee_per_gas", "max_priority_fee_per_gas", "max_fee_per_blob_gas", "input", "r", "s", "v", "yParity", "chain_id", "blob_versioned_hashes", "access_list", "transaction_type", "authorization_list"];
+
+        const FIELDS: &'static [&'static str] = &[
+            "hash",
+            "nonce",
+            "block_hash",
+            "block_number",
+            "transaction_index",
+            "from",
+            "to",
+            "value",
+            "gas_price",
+            "gas",
+            "max_fee_per_gas",
+            "max_priority_fee_per_gas",
+            "max_fee_per_blob_gas",
+            "input",
+            "r",
+            "s",
+            "v",
+            "yParity",
+            "chain_id",
+            "blob_versioned_hashes",
+            "access_list",
+            "transaction_type",
+            "authorization_list",
+        ];
 
         impl<'de> Visitor<'de> for TxVisitor {
-            type Value = Transaction;            
+            type Value = Transaction;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("struct Transaction")
             }
 
             fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<Transaction, V::Error> {
-                let mut hash = b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
+                let mut hash =
+                    b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
                 let mut nonce = u64::MIN;
                 let mut block_hash: Option<BlockHash> = Option::None;
                 let mut block_number: Option<u64> = Option::None;
@@ -251,114 +288,134 @@ impl<'de> Deserialize<'de> for Transaction {
                 let mut blob_versioned_hashes: Option<Vec<B256>> = Option::None;
                 let mut access_list: Option<AccessList> = Option::None;
                 let mut transaction_type: Option<u8> = Option::None;
-                let mut authorization_list: Option<Vec<SignedAuthorization>> = Option::None; 
+                let mut authorization_list: Option<Vec<SignedAuthorization>> = Option::None;
 
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
                         "hash" => {
                             let hash_str = map.next_value::<&str>()?;
                             hash = TxHash::from_str(hash_str).unwrap_or_default();
-                        },
+                        }
                         "nonce" => {
                             let n = map.next_value::<&str>()?;
                             nonce = u64::from_str_radix(&n[2..], 16).unwrap_or_default();
-                        },
+                        }
                         "blockHash" => {
                             let b = map.next_value::<&str>()?;
                             block_hash = Option::Some(BlockHash::from_str(b).unwrap_or_default());
-                        },
+                        }
                         "blockNumber" => {
                             let b = map.next_value::<&str>()?;
-                            block_number = Option::Some(u64::from_str_radix(&b[2..], 16).unwrap_or_default());
-                        },
+                            block_number =
+                                Option::Some(u64::from_str_radix(&b[2..], 16).unwrap_or_default());
+                        }
                         "transactionIndex" => {
                             let idx = map.next_value::<&str>()?;
-                            transaction_index = Option::Some(u64::from_str_radix(&idx[2..], 16).unwrap_or_default());
-                        },
+                            transaction_index = Option::Some(
+                                u64::from_str_radix(&idx[2..], 16).unwrap_or_default(),
+                            );
+                        }
                         "from" => {
                             let f = map.next_value::<&str>()?;
                             from = Address::from_str(f).unwrap_or_default();
-                        },
+                        }
                         "to" => {
                             let t = map.next_value::<&str>()?;
                             to = Option::Some(Address::from_str(t).unwrap_or_default());
-                        },
+                        }
                         "value" => {
                             let v = map.next_value::<&str>()?;
                             value = U256::from_str(v).unwrap_or_default();
-                        },
+                        }
                         "gasPrice" => {
                             let g = map.next_value::<&str>()?;
                             gas_price = u128::from_str_radix(&g[2..], 16).ok();
-                        },
+                        }
                         "gasLimit" => {
                             let g = map.next_value::<&str>()?;
                             gas = u64::from_str_radix(&g[2..], 16).unwrap();
-                        },
+                        }
                         "maxFeePerGas" => {
                             let m = map.next_value::<&str>()?;
                             max_fee_per_gas = u128::from_str_radix(&m[2..], 16).ok();
-                        },
+                        }
                         "maxPriorityFeePerGas" => {
                             let m = map.next_value::<&str>()?;
                             max_priority_fee_per_gas = u128::from_str_radix(&m[2..], 16).ok();
-                        },
+                        }
                         "maxFeePerBlobGas" => {
                             let m = map.next_value::<&str>()?;
                             max_fee_per_blob_gas = u128::from_str_radix(&m[2..], 16).ok();
-                        },
+                        }
                         "input" => {
                             let i = map.next_value::<&str>()?;
                             input = Bytes::from_str(i).unwrap_or(Bytes::new());
-                        },
+                        }
                         "r" => {
                             let st = map.next_value::<&str>()?;
                             r = U256::from_str_radix(&st[2..], 16).unwrap_or_default();
-                        },
+                        }
                         "s" => {
                             let st = map.next_value::<&str>()?;
                             s = U256::from_str_radix(&st[2..], 16).unwrap_or_default();
-                        },
+                        }
                         "v" => {
                             let st = map.next_value::<&str>()?;
                             v = U256::from_str_radix(&st[2..], 16).unwrap_or_default();
-                        },
+                        }
                         "yParity" => {
                             let st = map.next_value::<&str>()?;
                             let num = u8::from_str_radix(&st[2..], 16).unwrap();
                             let b = num != 0;
-                            y_parity = Option::Some(Parity(b));                            
+                            y_parity = Option::Some(Parity(b));
                         }
                         "chainId" => {
                             let st = String::from(map.next_value::<&str>()?);
                             chain_id = ChainId::from_str_radix(&st[2..], 16).ok();
-                        },
+                        }
                         "blobVersionedHashes" => {
                             blob_versioned_hashes = Option::Some(map.next_value()?);
-                        },
+                        }
                         "accessList" => {
                             access_list = Option::Some(map.next_value()?);
-                        },
+                        }
                         "transactionType" => {
                             let t = map.next_value::<&str>()?;
                             transaction_type = u8::from_str_radix(&t[2..], 16).ok();
-                        },
+                        }
                         "authorizationList" => {
                             authorization_list = Option::Some(map.next_value()?);
-                        },
+                        }
                         _ => {
                             continue;
                         }
                     }
                 }
-                Ok(Transaction {hash, nonce, block_hash, block_number, transaction_index, from, to, value, gas_price, gas, max_fee_per_gas, max_priority_fee_per_gas, max_fee_per_blob_gas, input, signature: Option::Some(Signature {
-                    r, s, v, y_parity
-                }), chain_id: chain_id, blob_versioned_hashes, access_list, transaction_type, authorization_list})
-                
+                Ok(Transaction {
+                    hash,
+                    nonce,
+                    block_hash,
+                    block_number,
+                    transaction_index,
+                    from,
+                    to,
+                    value,
+                    gas_price,
+                    gas,
+                    max_fee_per_gas,
+                    max_priority_fee_per_gas,
+                    max_fee_per_blob_gas,
+                    input,
+                    signature: Option::Some(Signature { r, s, v, y_parity }),
+                    chain_id,
+                    blob_versioned_hashes,
+                    access_list,
+                    transaction_type,
+                    authorization_list,
+                })
             }
         }
         deserializer.deserialize_struct("Transaction", FIELDS, TxVisitor)
-    
     }
 }
 
@@ -594,7 +651,7 @@ impl TransactionResponse for Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Signature as AlloySignature, b256, B256, address};
+    use alloy_primitives::{address, b256, Signature as AlloySignature, B256};
     use arbitrary::Arbitrary;
     use core::str::FromStr;
     use rand::Rng;
@@ -667,22 +724,22 @@ mod tests {
 
         tx.transaction_type = Option::Some(1);
         let serialized = serde_json::to_string(&tx).unwrap();
-        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasPrice":"0x9","gasLimit":"0xa","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x1"}"#;
+        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasPrice":"0x9","gasLimit":"0xa","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x1"}"#;
         assert_eq!(serialized, expected);
-        
+
         tx.transaction_type = Option::Some(2);
         let serialized = serde_json::to_string(&tx).unwrap();
-        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x2"}"#;
+        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x2"}"#;
         assert_eq!(serialized, expected);
-        
+
         tx.transaction_type = Option::Some(3);
         let serialized = serde_json::to_string(&tx).unwrap();
-        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","blobVersionedHashes":["0xbcd76a82d8a6c5f7a9ffde451c3e916f5d90eab90b8ab8f7e6fdd4e48f4c7cb9","0xd5a9c3f147b4b81d263f4c4f93e56e9c13b08434f9f4b5a3e8dc2e3b7d2f8a29","0xa3e9fb72f7e51b5fa9c4e35f9de9cddc9a0db82c9e4d47a4f8db3ea47f8b6c12"],"maxFeePerBlobGas":"0x0","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x3"}"#;
+        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","blobVersionedHashes":["0xbcd76a82d8a6c5f7a9ffde451c3e916f5d90eab90b8ab8f7e6fdd4e48f4c7cb9","0xd5a9c3f147b4b81d263f4c4f93e56e9c13b08434f9f4b5a3e8dc2e3b7d2f8a29","0xa3e9fb72f7e51b5fa9c4e35f9de9cddc9a0db82c9e4d47a4f8db3ea47f8b6c12"],"maxFeePerBlobGas":"0x0","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x3"}"#;
         assert_eq!(serialized, expected);
-    
+
         tx.transaction_type = Option::Some(4);
         let serialized = serde_json::to_string(&tx).unwrap();
-        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x4","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":"0x1b"}]}"#;
+        let expected = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x4","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","yParity":"0x0","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"}]}"#;
         assert_eq!(serialized, expected);
     }
 
@@ -692,48 +749,208 @@ mod tests {
         let blob_1 = b256!("bcd76a82d8a6c5f7a9ffde451c3e916f5d90eab90b8ab8f7e6fdd4e48f4c7cb9");
         let blob_2 = b256!("d5a9c3f147b4b81d263f4c4f93e56e9c13b08434f9f4b5a3e8dc2e3b7d2f8a29");
         let blob_3 = b256!("a3e9fb72f7e51b5fa9c4e35f9de9cddc9a0db82c9e4d47a4f8db3ea47f8b6c12");
-        
+
         let mut serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasPrice":"0x9","gasLimit":"0xa","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x2","transactionType":"0x0"}"#;
         let mut deserialized = serde_json::from_str::<Transaction>(serialized).unwrap();
-        let mut expected = Transaction { hash: B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(), nonce: 2, block_hash: Option::Some(B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap()), block_number: Option::Some(4), transaction_index: Option::Some(5), from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(), to: Option::Some(Address::from_str("0x0000000000000000000000000000000000000007").unwrap()), value: U256::from(59612), gas_price: Option::Some(9), gas: 10, max_fee_per_gas: Option::None, max_priority_fee_per_gas: Option::None, max_fee_per_blob_gas: Option::None, input: vec![11, 12, 13].into(), signature: Option::Some(Signature {
-            v: U256::from(14),
-            r: U256::from(14),
-            s: U256::from(14),
-            y_parity: Option::None,
-        }), chain_id: Option::Some(2), blob_versioned_hashes: Option::None, access_list: Option::None, transaction_type: Option::Some(0), authorization_list: Option::None };
+        let mut expected = Transaction {
+            hash: B256::from_str(
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap(),
+            nonce: 2,
+            block_hash: Option::Some(
+                B256::from_str(
+                    "0x0000000000000000000000000000000000000000000000000000000000000003",
+                )
+                .unwrap(),
+            ),
+            block_number: Option::Some(4),
+            transaction_index: Option::Some(5),
+            from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(),
+            to: Option::Some(
+                Address::from_str("0x0000000000000000000000000000000000000007").unwrap(),
+            ),
+            value: U256::from(59612),
+            gas_price: Option::Some(9),
+            gas: 10,
+            max_fee_per_gas: Option::None,
+            max_priority_fee_per_gas: Option::None,
+            max_fee_per_blob_gas: Option::None,
+            input: vec![11, 12, 13].into(),
+            signature: Option::Some(Signature {
+                v: U256::from(14),
+                r: U256::from(14),
+                s: U256::from(14),
+                y_parity: Option::None,
+            }),
+            chain_id: Option::Some(2),
+            blob_versioned_hashes: Option::None,
+            access_list: Option::None,
+            transaction_type: Option::Some(0),
+            authorization_list: Option::None,
+        };
         assert_eq!(deserialized, expected);
 
-        serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasPrice":"0x9","gasLimit":"0xa","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x1","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x1"}"#; 
+        serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasPrice":"0x9","gasLimit":"0xa","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x1","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x1"}"#;
         deserialized = serde_json::from_str::<Transaction>(serialized).unwrap();
-        expected = Transaction { hash: TxHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(), nonce: 2, block_hash: Option::Some(BlockHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap()), block_number: Option::Some(4), transaction_index: Option::Some(5), from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(), to: Option::Some(Address::from_str("0x0000000000000000000000000000000000000007").unwrap()), value: U256::from(59612), gas_price: Option::Some(9), gas: 10, max_fee_per_gas: Option::None, max_priority_fee_per_gas: Option::None, max_fee_per_blob_gas: Option::None, input: vec![11, 12, 13].into(), signature: Some(Signature {
-            v: U256::from(14),
-            r: U256::from(14),
-            s: U256::from(14),
-            y_parity: Option::Some(Parity(true)),
-        }), chain_id: Option::Some(1), blob_versioned_hashes: None, access_list: Some(AccessList(Vec::from([AccessListItem { address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(), storage_keys: Vec::from([B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap(), B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000007").unwrap()]) }]))), transaction_type: Option::Some(1), authorization_list: Option::None };
+        expected = Transaction {
+            hash: TxHash::from_str(
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap(),
+            nonce: 2,
+            block_hash: Option::Some(
+                BlockHash::from_str(
+                    "0x0000000000000000000000000000000000000000000000000000000000000003",
+                )
+                .unwrap(),
+            ),
+            block_number: Option::Some(4),
+            transaction_index: Option::Some(5),
+            from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(),
+            to: Option::Some(
+                Address::from_str("0x0000000000000000000000000000000000000007").unwrap(),
+            ),
+            value: U256::from(59612),
+            gas_price: Option::Some(9),
+            gas: 10,
+            max_fee_per_gas: Option::None,
+            max_priority_fee_per_gas: Option::None,
+            max_fee_per_blob_gas: Option::None,
+            input: vec![11, 12, 13].into(),
+            signature: Some(Signature {
+                v: U256::from(14),
+                r: U256::from(14),
+                s: U256::from(14),
+                y_parity: Option::Some(Parity(true)),
+            }),
+            chain_id: Option::Some(1),
+            blob_versioned_hashes: None,
+            access_list: Some(AccessList(Vec::from([AccessListItem {
+                address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(),
+                storage_keys: Vec::from([
+                    B256::from_str(
+                        "0x0000000000000000000000000000000000000000000000000000000000000003",
+                    )
+                    .unwrap(),
+                    B256::from_str(
+                        "0x0000000000000000000000000000000000000000000000000000000000000007",
+                    )
+                    .unwrap(),
+                ]),
+            }]))),
+            transaction_type: Option::Some(1),
+            authorization_list: Option::None,
+        };
         assert_eq!(deserialized, expected);
 
         serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x2"}"#;
         deserialized = serde_json::from_str::<Transaction>(serialized).unwrap();
-        expected = Transaction { hash: TxHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(), nonce: 2, block_hash: Option::Some(BlockHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap()), block_number: Option::Some(4), transaction_index: Option::Some(5), from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(), to: Option::Some(Address::from_str("0x0000000000000000000000000000000000000007").unwrap()), value: U256::from(59612), gas_price: Option::None, gas: 10, max_fee_per_gas: Option::Some(21), max_priority_fee_per_gas: Option::Some(22), max_fee_per_blob_gas: Option::None, input: vec![11, 12, 13].into(), signature: Some(Signature {
-            v: U256::from(14),
-            r: U256::from(14),
-            s: U256::from(14),
-            y_parity: Option::Some(Parity(true)),
-        }), chain_id: Option::Some(8), blob_versioned_hashes: None, access_list: Some(AccessList(Vec::from([AccessListItem { address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(), storage_keys: Vec::from([B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap(), B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000007").unwrap()]) }]))), transaction_type: Option::Some(2), authorization_list: Option::None };
+        expected = Transaction {
+            hash: TxHash::from_str(
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap(),
+            nonce: 2,
+            block_hash: Option::Some(
+                BlockHash::from_str(
+                    "0x0000000000000000000000000000000000000000000000000000000000000003",
+                )
+                .unwrap(),
+            ),
+            block_number: Option::Some(4),
+            transaction_index: Option::Some(5),
+            from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(),
+            to: Option::Some(
+                Address::from_str("0x0000000000000000000000000000000000000007").unwrap(),
+            ),
+            value: U256::from(59612),
+            gas_price: Option::None,
+            gas: 10,
+            max_fee_per_gas: Option::Some(21),
+            max_priority_fee_per_gas: Option::Some(22),
+            max_fee_per_blob_gas: Option::None,
+            input: vec![11, 12, 13].into(),
+            signature: Some(Signature {
+                v: U256::from(14),
+                r: U256::from(14),
+                s: U256::from(14),
+                y_parity: Option::Some(Parity(true)),
+            }),
+            chain_id: Option::Some(8),
+            blob_versioned_hashes: None,
+            access_list: Some(AccessList(Vec::from([AccessListItem {
+                address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(),
+                storage_keys: Vec::from([
+                    B256::from_str(
+                        "0x0000000000000000000000000000000000000000000000000000000000000003",
+                    )
+                    .unwrap(),
+                    B256::from_str(
+                        "0x0000000000000000000000000000000000000000000000000000000000000007",
+                    )
+                    .unwrap(),
+                ]),
+            }]))),
+            transaction_type: Option::Some(2),
+            authorization_list: Option::None,
+        };
         assert_eq!(deserialized, expected);
 
         serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","blobVersionedHashes":["0xbcd76a82d8a6c5f7a9ffde451c3e916f5d90eab90b8ab8f7e6fdd4e48f4c7cb9","0xd5a9c3f147b4b81d263f4c4f93e56e9c13b08434f9f4b5a3e8dc2e3b7d2f8a29","0xa3e9fb72f7e51b5fa9c4e35f9de9cddc9a0db82c9e4d47a4f8db3ea47f8b6c12"],"maxFeePerBlobGas":"0x37","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x3"}"#;
         deserialized = serde_json::from_str::<Transaction>(serialized).unwrap();
-        expected = Transaction { hash: TxHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(), nonce: 2, block_hash: Option::Some(BlockHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap()), block_number: Option::Some(4), transaction_index: Option::Some(5), from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(), to: Option::Some(Address::from_str("0x0000000000000000000000000000000000000007").unwrap()), value: U256::from(59612), gas_price: Option::None, gas: 10, max_fee_per_gas: Option::Some(21), max_priority_fee_per_gas: Option::Some(22), max_fee_per_blob_gas: Option::Some(55), input: vec![11, 12, 13].into(), signature: Some(Signature {
-            v: U256::from(14),
-            r: U256::from(14),
-            s: U256::from(14),
-            y_parity: Option::Some(Parity(true)),
-        }), chain_id: Option::Some(8), blob_versioned_hashes: Option::Some(vec![blob_1, blob_2, blob_3]), access_list: Some(AccessList(Vec::from([AccessListItem { address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(), storage_keys: Vec::from([B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap(), B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000007").unwrap()]) }]))), transaction_type: Option::Some(3), authorization_list: Option::None };
+        expected = Transaction {
+            hash: TxHash::from_str(
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap(),
+            nonce: 2,
+            block_hash: Option::Some(
+                BlockHash::from_str(
+                    "0x0000000000000000000000000000000000000000000000000000000000000003",
+                )
+                .unwrap(),
+            ),
+            block_number: Option::Some(4),
+            transaction_index: Option::Some(5),
+            from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(),
+            to: Option::Some(
+                Address::from_str("0x0000000000000000000000000000000000000007").unwrap(),
+            ),
+            value: U256::from(59612),
+            gas_price: Option::None,
+            gas: 10,
+            max_fee_per_gas: Option::Some(21),
+            max_priority_fee_per_gas: Option::Some(22),
+            max_fee_per_blob_gas: Option::Some(55),
+            input: vec![11, 12, 13].into(),
+            signature: Some(Signature {
+                v: U256::from(14),
+                r: U256::from(14),
+                s: U256::from(14),
+                y_parity: Option::Some(Parity(true)),
+            }),
+            chain_id: Option::Some(8),
+            blob_versioned_hashes: Option::Some(vec![blob_1, blob_2, blob_3]),
+            access_list: Some(AccessList(Vec::from([AccessListItem {
+                address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(),
+                storage_keys: Vec::from([
+                    B256::from_str(
+                        "0x0000000000000000000000000000000000000000000000000000000000000003",
+                    )
+                    .unwrap(),
+                    B256::from_str(
+                        "0x0000000000000000000000000000000000000000000000000000000000000007",
+                    )
+                    .unwrap(),
+                ]),
+            }]))),
+            transaction_type: Option::Some(3),
+            authorization_list: Option::None,
+        };
         assert_eq!(deserialized, expected);
 
-        serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x4","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":"0x1b"}]}"#;
+        serialized = r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0xe8dc","gasLimit":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x8","accessList":[{"address":"0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000003","0x0000000000000000000000000000000000000000000000000000000000000007"]}],"transactionType":"0x4","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","yParity":"0x0","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"}]}"#;
         deserialized = serde_json::from_str::<Transaction>(serialized).unwrap();
         expected = Transaction { hash: TxHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(), nonce: 2, block_hash: Option::Some(BlockHash::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap()), block_number: Option::Some(4), transaction_index: Option::Some(5), from: Address::from_str("0x0000000000000000000000000000000000000006").unwrap(), to: Option::Some(Address::from_str("0x0000000000000000000000000000000000000007").unwrap()), value: U256::from(59612), gas_price: Option::None, gas: 10, max_fee_per_gas: Option::Some(21), max_priority_fee_per_gas: Option::Some(22), max_fee_per_blob_gas: Option::None, input: vec![11, 12, 13].into(), signature: Some(Signature {
             v: U256::from(14),
@@ -741,7 +958,7 @@ mod tests {
             s: U256::from(14),
             y_parity: Option::Some(Parity(true)),
         }), chain_id: Option::Some(8), blob_versioned_hashes: Option::None, access_list: Some(AccessList(Vec::from([AccessListItem { address: Address::from_str("0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae").unwrap(), storage_keys: Vec::from([B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000003").unwrap(), B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000007").unwrap()]) }]))), transaction_type: Option::Some(4), authorization_list: Option::Some(vec![(Authorization {
-            chain_id: U256::from(1u64),
+            chain_id: 1u64,
             address: Address::left_padding_from(&[6]),
             nonce: 1u64,
         }).into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())])};
