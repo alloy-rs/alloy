@@ -378,6 +378,119 @@ const fn from_eip155_value(value: u64) -> Option<(bool, Option<ChainId>)> {
     }
 }
 
+#[cfg(feature = "serde")]
+pub mod signed_legacy_serde {
+    //! Helper module for encoding signatures of transactions wrapped into [`Signed`] in legacy
+    //! format.
+    //!
+    //! By default, signatures are encoded as a single boolean under `yParity` key. However, for
+    //! legacy transactions parity byte is encoded as `v` key respecting EIP-155 format.
+    use super::*;
+    use alloc::borrow::Cow;
+    use alloy_primitives::U64;
+    use serde::{Deserialize, Serialize};
+
+    struct LegacySignature {
+        r: U256,
+        s: U256,
+        v: U64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct HumanReadableRepr {
+        r: U256,
+        s: U256,
+        v: U64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    struct NonHumanReadableRepr((U256, U256, U64));
+
+    impl Serialize for LegacySignature {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            if serializer.is_human_readable() {
+                HumanReadableRepr { r: self.r, s: self.s, v: self.v }.serialize(serializer)
+            } else {
+                NonHumanReadableRepr((self.r, self.s, self.v)).serialize(serializer)
+            }
+        }
+    }
+
+    impl<'de> Deserialize<'de> for LegacySignature {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            if deserializer.is_human_readable() {
+                HumanReadableRepr::deserialize(deserializer).map(|repr| Self {
+                    r: repr.r,
+                    s: repr.s,
+                    v: repr.v,
+                })
+            } else {
+                NonHumanReadableRepr::deserialize(deserializer).map(|repr| Self {
+                    r: repr.0 .0,
+                    s: repr.0 .1,
+                    v: repr.0 .2,
+                })
+            }
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct SignedLegacy<'a, T: Clone> {
+        #[serde(flatten)]
+        tx: Cow<'a, T>,
+        #[serde(flatten)]
+        signature: LegacySignature,
+        hash: B256,
+    }
+
+    /// Serializes signed transaction with `v` key for signature parity.
+    pub fn serialize<T, S>(
+        signed: &crate::Signed<T>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        T: Transaction + Clone + Serialize,
+        S: serde::Serializer,
+    {
+        SignedLegacy {
+            tx: Cow::Borrowed(signed.tx()),
+            signature: LegacySignature {
+                v: U64::from(to_eip155_value(signed.signature().v(), signed.tx().chain_id())),
+                r: signed.signature().r(),
+                s: signed.signature().s(),
+            },
+            hash: *signed.hash(),
+        }
+        .serialize(serializer)
+    }
+    
+    /// Deserializes signed transaction expecting `v` key for signature parity.
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<crate::Signed<T>, D::Error>
+    where
+        T: Transaction + Clone + Deserialize<'de>,
+        D: serde::Deserializer<'de>,
+    {
+        let SignedLegacy::<T> { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
+        let (parity, chain_id) = from_eip155_value(signature.v.to::<u64>())
+            .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
+        if chain_id != tx.chain_id() {
+            return Err(serde::de::Error::custom("chain id mismatch"));
+        }
+        Ok(Signed::new_unchecked(
+            tx.into_owned(),
+            Signature::new(signature.r, signature.s, parity),
+            hash,
+        ))
+    }
+}
+
 /// Bincode-compatible [`TxLegacy`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {

@@ -549,7 +549,7 @@ mod serde_from {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     #[serde(tag = "type")]
     pub(crate) enum TaggedTxEnvelope {
-        #[serde(rename = "0x0", alias = "0x00")]
+        #[serde(rename = "0x0", alias = "0x00", with = "crate::transaction::signed_legacy_serde")]
         Legacy(Signed<TxLegacy>),
         #[serde(rename = "0x1", alias = "0x01")]
         Eip2930(Signed<TxEip2930>),

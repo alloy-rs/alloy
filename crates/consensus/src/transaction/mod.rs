@@ -39,6 +39,9 @@ pub use rlp::RlpEcdsaTx;
 mod typed;
 pub use typed::TypedTransaction;
 
+#[cfg(feature = "serde")]
+pub use legacy::signed_legacy_serde;
+
 /// Bincode-compatible serde implementations for transaction types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub mod serde_bincode_compat {
