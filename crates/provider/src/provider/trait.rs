@@ -225,7 +225,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
-                self.get_block_by_number(BlockNumberOrTag::Latest, false)
+                self.get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
                     .await?
                     .ok_or(RpcError::NullResp)?
                     .header()
@@ -285,10 +285,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<Option<N::BlockResponse>> {
         match block {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
-            BlockId::Number(number) => {
-                let full = matches!(kind, BlockTransactionsKind::Full);
-                self.get_block_by_number(number, full).await
-            }
+            BlockId::Number(number) => self.get_block_by_number(number, kind).await,
         }
     }
 
@@ -324,14 +321,19 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        hydrate: bool,
+        kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
+
         let block = self
             .client()
-            .request::<_, Option<N::BlockResponse>>("eth_getBlockByNumber", (number, hydrate))
+            .request::<_, Option<N::BlockResponse>>("eth_getBlockByNumber", (number, full))
             .await?
             .map(|mut block| {
-                if !hydrate {
+                if !full {
                     // this ensures an empty response for `Hashes` has the expected form
                     // this is required because deserializing [] is ambiguous
                     block.transactions_mut().convert_to_hashes();
@@ -1515,7 +1517,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         let hash = block.header.hash;
         let block =
             provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
@@ -1527,7 +1529,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         let hash = block.header.hash;
         let block: Block = provider
             .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
@@ -1541,7 +1543,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1550,7 +1552,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1774,7 +1776,7 @@ mod tests {
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let block = provider.get_block_by_number(0.into(), false).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(0.into(), BlockTransactionsKind::Hashes).await.unwrap().unwrap();
         assert!(block.transactions.is_hashes());
     }
 }
