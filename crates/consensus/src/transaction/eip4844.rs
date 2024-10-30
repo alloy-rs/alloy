@@ -859,6 +859,12 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         self.sidecar.rlp_encode_fields(out);
     }
 
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        let payload_length = self.tx.rlp_encoded_length_with_signature(signature)
+            + self.sidecar.rlp_encoded_fields_length();
+        Header { list: true, payload_length }
+    }
+
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.rlp_header_signed(signature).encode(out);
         self.tx.rlp_encode_signed(signature, out);
