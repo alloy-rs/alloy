@@ -1,7 +1,7 @@
 use crate::{SignableTransaction, Signed};
 use alloc::vec::Vec;
 use alloy_eips::eip2718::{Eip2718Error, Eip2718Result};
-use alloy_primitives::{keccak256, PrimitiveSignature as Signature, TxHash};
+use alloy_primitives::{keccak256, Signature, TxHash};
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
 /// Helper trait for managing RLP encoding of transactions inside 2718

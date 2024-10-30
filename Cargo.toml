@@ -162,4 +162,9 @@ tempfile = "3.10"
 tower-http = "0.6.1"
 
 [patch.crates-io]
-alloy-eip7702 = { git = "https://github.com/alloy-rs/eips", rev = "c3ab112" }
+alloy-eip7702 = { git = "https://github.com/alloy-rs/eips", rev = "9e6fcee" }
+alloy-core = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }

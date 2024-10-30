@@ -1,9 +1,7 @@
 use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{
-    keccak256, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
-};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
@@ -605,9 +603,7 @@ pub(super) mod serde_bincode_compat {
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use crate::{SignableTransaction, TxLegacy};
-    use alloy_primitives::{
-        address, b256, hex, Address, PrimitiveSignature as Signature, TxKind, B256, U256,
-    };
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
 
     #[test]
     fn recover_signer_legacy() {

@@ -429,7 +429,7 @@ impl TransactionResponse for Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::PrimitiveSignature as AlloySignature;
+    use alloy_primitives::Signature as AlloySignature;
     use arbitrary::Arbitrary;
     use core::str::FromStr;
     use rand::Rng;
