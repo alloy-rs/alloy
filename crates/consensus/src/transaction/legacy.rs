@@ -359,7 +359,7 @@ impl Decodable for TxLegacy {
 }
 
 /// Helper for encoding `y_parity` boolean and optional `chain_id` into EIP-155 `v` value.
-const fn to_eip155_value(y_parity: bool, chain_id: Option<ChainId>) -> u64 {
+pub const fn to_eip155_value(y_parity: bool, chain_id: Option<ChainId>) -> u64 {
     match chain_id {
         Some(id) => 35 + id * 2 + y_parity as u64,
         None => 27 + y_parity as u64,
@@ -367,7 +367,7 @@ const fn to_eip155_value(y_parity: bool, chain_id: Option<ChainId>) -> u64 {
 }
 
 /// Helper for decoding EIP-155 `v` value into `y_parity` boolean and optional `chain_id`.
-const fn from_eip155_value(value: u64) -> Option<(bool, Option<ChainId>)> {
+pub const fn from_eip155_value(value: u64) -> Option<(bool, Option<ChainId>)> {
     match value {
         27 => Some((false, None)),
         28 => Some((true, None)),
