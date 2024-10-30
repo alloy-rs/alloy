@@ -1,6 +1,6 @@
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
 
-use super::BlockHeader;
+use super::{BlockHeader, Header};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differencies in network implementations.
@@ -181,5 +181,57 @@ impl BlockHeader for AnyHeader {
 
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
+    }
+}
+
+impl From<super::Header> for AnyHeader {
+    fn from(value: super::Header) -> Self {
+        let Header {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+        } = value;
+
+        Self {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash: Some(mix_hash),
+            nonce: Some(nonce),
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+        }
     }
 }
