@@ -363,7 +363,14 @@ impl BlobTransactionSidecar {
         if buf.len() < header.payload_length {
             return Err(alloy_rlp::Error::InputTooShort);
         }
-        Self::rlp_decode_fields(buf)
+        let remaining = buf.len();
+        let this = Self::rlp_decode_fields(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
     }
 }
 
