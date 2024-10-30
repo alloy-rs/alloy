@@ -22,9 +22,12 @@ pub use block::*;
 #[cfg(feature = "serde")]
 use alloy_serde::WithOtherFields;
 
+/// A catch-all header type for handling headers on multiple networks.
+pub type AnyNetworkHeader = Header<alloy_consensus::AnyHeader>;
+
 /// A catch-all block type for handling blocks on multiple networks.
 #[cfg(feature = "serde")]
-pub type AnyNetworkBlock = WithOtherFields<Block<WithOtherFields<Transaction>>>;
+pub type AnyNetworkBlock = WithOtherFields<Block<WithOtherFields<Transaction>, AnyNetworkHeader>>;
 
 pub use alloy_network_primitives::{
     BlockTransactionHashes, BlockTransactions, BlockTransactionsKind,

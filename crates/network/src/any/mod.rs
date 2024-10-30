@@ -1,7 +1,7 @@
 use crate::Network;
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
-use alloy_rpc_types_eth::{AnyTransactionReceipt, Block, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{AnyTransactionReceipt, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use core::fmt;
 
@@ -73,7 +73,7 @@ impl Network for AnyNetwork {
 
     type ReceiptResponse = AnyTransactionReceipt;
 
-    type HeaderResponse = alloy_rpc_types_eth::Header<Self::Header>;
+    type HeaderResponse = alloy_rpc_types_eth::AnyNetworkHeader;
 
-    type BlockResponse = WithOtherFields<Block<Self::TransactionResponse, Self::HeaderResponse>>;
+    type BlockResponse = alloy_rpc_types_eth::AnyNetworkBlock;
 }
