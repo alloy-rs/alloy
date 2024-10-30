@@ -164,60 +164,66 @@ pub mod u128_vec_vec_opt {
     }
 }
 
-/// Serde functions for encoding a hashmap of primitive numbers using the Ethereum "quantity"
+/// Serde functions for encoding a `HashMap` of primitive numbers using the Ethereum "quantity"
 /// format.
 ///
 /// See [`quantity`](self) for more information.
 pub mod hashmap {
     use super::private::ConvertRuint;
     use core::{fmt, marker::PhantomData};
-    use serde::{de::MapAccess, ser::SerializeMap, Deserializer, Serializer};
-    use std::collections::HashMap;
+    use serde::{
+        de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
+    };
+    use std::{collections::HashMap, hash::BuildHasher};
 
-    /// Serializes a hashmap of primitive numbers as a "quantity" hex string.
-    pub fn serialize<K, V, S>(map: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
+    /// Serializes a `HashMap` of primitive numbers as a "quantity" hex string.
+    pub fn serialize<K, V, S, H>(map: &HashMap<K, V, H>, serializer: S) -> Result<S::Ok, S::Error>
     where
         K: ConvertRuint,
-        V: ConvertRuint,
+        V: Serialize,
         S: Serializer,
+        H: BuildHasher,
     {
         let mut map_ser = serializer.serialize_map(Some(map.len()))?;
         for (key, value) in map {
-            map_ser.serialize_entry(&key.into_ruint(), &value.into_ruint())?;
+            map_ser.serialize_entry(&key.into_ruint(), value)?;
         }
         map_ser.end()
     }
 
-    /// Deserializes a hashmap of primitive numbers from a "quantity" hex string.
-    pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
+    /// Deserializes a `HashMap` of primitive numbers from a "quantity" hex string.
+    pub fn deserialize<'de, K, V, D, H>(deserializer: D) -> Result<HashMap<K, V, H>, D::Error>
     where
         K: ConvertRuint + Eq + std::hash::Hash,
-        V: ConvertRuint,
+        V: Deserialize<'de>,
         D: Deserializer<'de>,
+        H: BuildHasher + Default,
     {
-        struct HashMapVisitor<K, V> {
-            marker: PhantomData<(K, V)>,
+        struct HashMapVisitor<K, V, H> {
+            marker: PhantomData<(K, V, H)>,
         }
 
-        impl<'de, K, V> serde::de::Visitor<'de> for HashMapVisitor<K, V>
+        impl<'de, K, V, H> serde::de::Visitor<'de> for HashMapVisitor<K, V, H>
         where
             K: ConvertRuint + Eq + std::hash::Hash,
-            V: ConvertRuint,
+            V: Deserialize<'de>,
+            H: BuildHasher + Default,
         {
-            type Value = HashMap<K, V>;
+            type Value = HashMap<K, V, H>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a map with quantity hex-encoded keys and values")
+                formatter.write_str("a map with quantity hex-encoded keys")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: MapAccess<'de>,
             {
-                let mut values = HashMap::new();
+                let mut values =
+                    HashMap::with_capacity_and_hasher(map.size_hint().unwrap_or(0), H::default());
 
-                while let Some((key, value)) = map.next_entry::<K::Ruint, V::Ruint>()? {
-                    values.insert(K::from_ruint(key), V::from_ruint(value));
+                while let Some((key, value)) = map.next_entry::<K::Ruint, V>()? {
+                    values.insert(K::from_ruint(key), value);
                 }
                 Ok(values)
             }
@@ -228,24 +234,26 @@ pub mod hashmap {
     }
 }
 
-/// Serde functions for encoding a BTreeMap of primitive numbers using the Ethereum "quantity"
+/// Serde functions for encoding a `BTreeMap` of primitive numbers using the Ethereum "quantity"
 /// format.
 pub mod btreemap {
     use super::private::ConvertRuint;
     use alloc::collections::BTreeMap;
     use core::{fmt, marker::PhantomData};
-    use serde::{de::MapAccess, ser::SerializeMap, Deserializer, Serializer};
+    use serde::{
+        de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
+    };
 
     /// Serializes a `BTreeMap` of primitive numbers as a "quantity" hex string.
     pub fn serialize<K, V, S>(value: &BTreeMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         K: ConvertRuint + Ord,
-        V: ConvertRuint,
+        V: Serialize,
         S: Serializer,
     {
         let mut map = serializer.serialize_map(Some(value.len()))?;
         for (key, val) in value {
-            map.serialize_entry(&key.into_ruint(), &val.into_ruint())?;
+            map.serialize_entry(&key.into_ruint(), val)?;
         }
         map.end()
     }
@@ -254,7 +262,7 @@ pub mod btreemap {
     pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<BTreeMap<K, V>, D::Error>
     where
         K: ConvertRuint + Ord,
-        V: ConvertRuint,
+        V: Deserialize<'de>,
         D: Deserializer<'de>,
     {
         struct BTreeMapVisitor<K, V> {
@@ -265,12 +273,12 @@ pub mod btreemap {
         impl<'de, K, V> serde::de::Visitor<'de> for BTreeMapVisitor<K, V>
         where
             K: ConvertRuint + Ord,
-            V: ConvertRuint,
+            V: Deserialize<'de>,
         {
             type Value = BTreeMap<K, V>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a map of quantities")
+                formatter.write_str("a map with quantity hex-encoded keys")
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
@@ -279,8 +287,8 @@ pub mod btreemap {
             {
                 let mut values = BTreeMap::new();
 
-                while let Some((key, value)) = map.next_entry::<K::Ruint, V::Ruint>()? {
-                    values.insert(K::from_ruint(key), V::from_ruint(value));
+                while let Some((key, value)) = map.next_entry::<K::Ruint, V>()? {
+                    values.insert(K::from_ruint(key), value);
                 }
                 Ok(values)
             }
@@ -465,7 +473,7 @@ mod tests {
 
         // Deserialize and verify that the original `val` and deserialized version match
         let deserialized: Value = serde_json::from_str(&s).unwrap();
-        assert_eq!(val, deserialized);
+        assert_eq!(val.inner, deserialized.inner);
     }
 
     #[test]
@@ -484,7 +492,7 @@ mod tests {
 
         let val = Value { inner: inner_map };
         let s = serde_json::to_string(&val).unwrap();
-        assert_eq!(s, "{\"inner\":{\"0x3e8\":\"0x7d0\",\"0xbb8\":\"0xfa0\"}}");
+        assert_eq!(s, "{\"inner\":{\"0x3e8\":2000,\"0xbb8\":4000}}");
 
         let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
