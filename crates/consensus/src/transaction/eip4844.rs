@@ -3,7 +3,7 @@ use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[doc(inline)]
@@ -290,22 +290,17 @@ impl RlpEcdsaTx for TxEip4844Variant {
     }
 
     fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let needle = &mut &**buf;
-        let header = Header::decode(needle)?;
+        let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining_len = needle.len();
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
+        let remaining = buf.len();
 
-        let chunk = &mut &buf[..header.length_with_payload()];
-        let res = Self::rlp_decode_fields(chunk)?;
-        if !chunk.is_empty() {
+        let res = Self::rlp_decode_fields(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
-        buf.advance(header.length_with_payload());
         Ok(res)
     }
 
@@ -881,20 +876,14 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining_len = buf.len();
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
+        let remaining = buf.len();
 
-        let chunk = &mut &buf[..remaining_len];
-        let (tx, signature) = TxEip4844::rlp_decode_with_signature(chunk)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(chunk)?;
+        let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
 
-        // Decoding did not consume the entire payload specified by the header
-        if !chunk.is_empty() {
+        if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
-        buf.advance(header.payload_length);
 
         Ok((Self { tx, sidecar }, signature))
     }
