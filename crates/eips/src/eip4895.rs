@@ -39,7 +39,7 @@ impl Withdrawal {
     }
 }
 
-/// Represents a collection of Withdrawals.
+/// Represents a collection of withdrawals.
 #[derive(
     Debug,
     Clone,
@@ -57,32 +57,32 @@ impl Withdrawal {
 )]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Withdrawals(Vec<Withdrawal>);
+pub struct Withdrawals(pub Vec<Withdrawal>);
 
 impl Withdrawals {
-    /// Create a new Withdrawals instance.
+    /// Create a new [`Withdrawals`] instance.
     pub const fn new(withdrawals: Vec<Withdrawal>) -> Self {
         Self(withdrawals)
     }
 
-    /// Calculate the total size, including capacity, of the Withdrawals.
+    /// Calculate the total size, including capacity, of the [`Withdrawals`].
     #[inline]
     pub fn total_size(&self) -> usize {
         self.0.capacity() * core::mem::size_of::<Withdrawal>()
     }
 
-    /// Calculate a heuristic for the in-memory size of the [Withdrawals].
+    /// Calculate a heuristic for the in-memory size of the [`Withdrawals`].
     #[inline]
     pub fn size(&self) -> usize {
         self.0.len() * core::mem::size_of::<Withdrawal>()
     }
 
-    /// Get an iterator over the Withdrawals.
+    /// Get an iterator over the [`Withdrawals`].
     pub fn iter(&self) -> core::slice::Iter<'_, Withdrawal> {
         self.0.iter()
     }
 
-    /// Get a mutable iterator over the Withdrawals.
+    /// Get a mutable iterator over the [`Withdrawals`].
     pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, Withdrawal> {
         self.0.iter_mut()
     }
