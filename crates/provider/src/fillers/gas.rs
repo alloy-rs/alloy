@@ -254,7 +254,7 @@ where
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_consensus::{SidecarBuilder, SimpleCoder};
+    use alloy_consensus::{SidecarBuilder, SimpleCoder, Transaction};
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
@@ -317,7 +317,7 @@ mod tests {
 
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
 
-        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
@@ -345,7 +345,7 @@ mod tests {
 
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
 
-        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),

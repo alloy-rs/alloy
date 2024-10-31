@@ -138,7 +138,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
             )
             .into_unbuilt(self));
         }
-        Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
+        Ok(self.inner.build_typed_tx().expect("checked by missing_keys").into())
     }
 
     async fn build<W: NetworkWallet<AnyNetwork>>(
