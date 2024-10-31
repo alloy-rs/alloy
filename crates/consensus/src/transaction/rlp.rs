@@ -110,13 +110,19 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining_len = buf.len();
+        let remaining = buf.len();
 
-        if header.payload_length > remaining_len {
+        if header.payload_length > remaining {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        Self::rlp_decode_fields(buf)
+        let this = Self::rlp_decode_fields(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
     }
 
     /// Decodes the transaction from RLP bytes, including the signature.
@@ -180,7 +186,15 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         if header.list {
             return Err(alloy_rlp::Error::UnexpectedList.into());
         }
-        Self::eip2718_decode_with_type(buf, ty)
+
+        let remaining = buf.len();
+        let res = Self::eip2718_decode_with_type(buf, ty)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength.into());
+        }
+
+        Ok(res)
     }
 
     /// Decodes the transaction from network bytes, expecting the default type
