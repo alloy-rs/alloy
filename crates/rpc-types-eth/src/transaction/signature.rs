@@ -74,7 +74,7 @@ where
     }
 }
 
-impl TryFrom<Signature> for alloy_primitives::Signature {
+impl TryFrom<Signature> for alloy_primitives::PrimitiveSignature {
     type Error = alloy_primitives::SignatureError;
 
     fn try_from(value: Signature) -> Result<Self, Self::Error> {

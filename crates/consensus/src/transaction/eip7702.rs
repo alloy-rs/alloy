@@ -4,7 +4,9 @@ use alloy_eips::{
     eip2930::AccessList,
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
 };
-use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{
+    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
+};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -393,7 +395,7 @@ mod tests {
     use super::*;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, U256};
+    use alloy_primitives::{address, b256, hex, Address, PrimitiveSignature as Signature, U256};
 
     #[test]
     fn encode_decode_eip7702() {

@@ -1,5 +1,7 @@
 use crate::Result;
-use alloy_primitives::{eip191_hash_message, Address, ChainId, Signature, B256};
+use alloy_primitives::{
+    eip191_hash_message, Address, ChainId, PrimitiveSignature as Signature, B256,
+};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 

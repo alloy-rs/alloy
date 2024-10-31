@@ -82,7 +82,7 @@ alloy-chains = { version = "0.1.18", default-features = false }
 
 # eips
 alloy-eip2930 = { version = "0.1.0", default-features = false }
-alloy-eip7702 = { version = "0.3.2", default-features = false }
+alloy-eip7702 = { version = "0.4", default-features = false }
 
 # ethereum
 ethereum_ssz_derive = "0.8"
@@ -160,11 +160,3 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
 tower-http = "0.6.1"
-
-[patch.crates-io]
-alloy-eip7702 = { git = "https://github.com/alloy-rs/eips", rev = "9e6fcee" }
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "237cfc4" }
