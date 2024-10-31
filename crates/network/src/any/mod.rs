@@ -90,6 +90,7 @@ pub struct UnknownTxEnvelope {
     pub hash: B256,
 
     /// Additional fields.
+    #[serde(flatten)]
     pub fields: std::collections::BTreeMap<String, serde_json::Value>,
 
     /// Memoization for deserialization.
@@ -349,6 +350,7 @@ pub struct UnknownTypedTransaction {
     pub ty: AnyTxType,
 
     /// Additional fields.
+    #[serde(flatten)]
     pub fields: std::collections::BTreeMap<String, serde_json::Value>,
 
     /// Memoization for deserialization.
