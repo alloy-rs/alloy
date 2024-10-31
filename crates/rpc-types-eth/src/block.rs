@@ -41,7 +41,7 @@ pub struct Block<T = Transaction<TxEnvelope>, H = Header> {
 }
 
 // cannot derive, as the derive impl would constrain `where T: Default`
-impl Default for Block<Transaction, Header> {
+impl<T, H: Default> Default for Block<T, H> {
     fn default() -> Self {
         Self {
             header: Default::default(),

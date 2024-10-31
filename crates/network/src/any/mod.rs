@@ -90,6 +90,10 @@ pub enum AnyTxEnvelope {
         /// Transaction type.
         #[serde(rename = "type")]
         ty: AnyTxType,
+
+        /// Transaction hash.
+        hash: B256,
+
         /// Additional fields.
         fields: std::collections::BTreeMap<String, serde_json::Value>,
 
@@ -149,11 +153,7 @@ impl Encodable2718 for AnyTxEnvelope {
     fn trie_hash(&self) -> B256 {
         match self {
             Self::Ethereum(tx) => tx.trie_hash(),
-            Self::Other { fields, .. } => fields
-                .get("hash")
-                .and_then(|v| v.as_str())
-                .and_then(|v| v.parse().ok())
-                .unwrap_or_else(B256::default),
+            Self::Other { hash, .. } => *hash,
         }
     }
 }
@@ -385,7 +385,7 @@ impl From<AnyTxEnvelope> for AnyTypedTransaction {
     fn from(value: AnyTxEnvelope) -> Self {
         match value {
             AnyTxEnvelope::Ethereum(tx) => Self::Ethereum(tx.into()),
-            AnyTxEnvelope::Other { ty, fields, memo } => Self::Other { ty, fields, memo },
+            AnyTxEnvelope::Other { ty, fields, memo, .. } => Self::Other { ty, fields, memo },
         }
     }
 }
