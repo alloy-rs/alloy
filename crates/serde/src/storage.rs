@@ -47,6 +47,16 @@ impl Default for StorageKeyKind {
 #[serde(into = "String")]
 pub struct JsonStorageKey(pub StorageKeyKind);
 
+impl JsonStorageKey {
+    /// Returns the key as a [B256] value.
+    pub fn as_b256(&self) -> B256 {
+        match self.0 {
+            StorageKeyKind::Hash(hash) => hash,
+            StorageKeyKind::Number(num) => B256::from(num),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for JsonStorageKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -210,7 +220,6 @@ mod tests {
 
         for input in test_cases {
             let key: JsonStorageKey = serde_json::from_str(&json!(input).to_string()).unwrap();
-            println!("{:?}", key);
             let output = String::from(key);
 
             assert_eq!(
@@ -219,5 +228,21 @@ mod tests {
                 input
             );
         }
+    }
+
+    #[test]
+    fn test_as_b256() {
+        let cases = [
+            "0x0abc",                                                             // Number
+            "0x0000000000000000000000000000000000000000000000000000000000000abc", // Hash
+        ];
+
+        let num_key: JsonStorageKey = serde_json::from_str(&json!(cases[0]).to_string()).unwrap();
+        let hash_key: JsonStorageKey = serde_json::from_str(&json!(cases[1]).to_string()).unwrap();
+
+        matches!(num_key.0, StorageKeyKind::Number(_));
+        matches!(hash_key.0, StorageKeyKind::Hash(_));
+
+        assert_eq!(num_key.as_b256(), hash_key.as_b256());
     }
 }
