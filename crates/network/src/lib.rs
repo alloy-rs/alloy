@@ -25,7 +25,7 @@ pub use any::{AnyNetwork, AnyTxType};
 
 pub use alloy_eips::eip2718;
 pub use alloy_network_primitives::{
-    self as primitives, BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse,
+    self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
 };
 
 /// Captures type info for network-specific RPC requests/responses.
@@ -87,7 +87,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptResponse: RpcObject + ReceiptResponse;
 
     /// The JSON body of a header response.
-    type HeaderResponse: RpcObject + HeaderResponse;
+    type HeaderResponse: RpcObject + AsRef<Self::Header>;
 
     /// The JSON body of a block response.
     type BlockResponse: RpcObject

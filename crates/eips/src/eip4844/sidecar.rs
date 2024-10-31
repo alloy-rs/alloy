@@ -3,23 +3,31 @@
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
-use alloy_rlp::{Decodable, Encodable};
+use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
-
-use alloc::vec::Vec;
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
 pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
+/// A Blob hash
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct IndexedBlobHash {
+    /// The index of the blob
+    pub index: u64,
+    /// The hash of the blob
+    pub hash: B256,
+}
+
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "BlobTxSidecar")]
@@ -34,6 +42,16 @@ pub struct BlobTransactionSidecar {
     pub commitments: Vec<Bytes48>,
     /// The blob proofs.
     pub proofs: Vec<Bytes48>,
+}
+
+impl core::fmt::Debug for BlobTransactionSidecar {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BlobTransactionSidecar")
+            .field("blobs", &self.blobs.len())
+            .field("commitments", &self.commitments)
+            .field("proofs", &self.proofs)
+            .finish()
+    }
 }
 
 impl IntoIterator for BlobTransactionSidecar {
@@ -105,9 +123,12 @@ impl BlobTransactionSidecarItem {
         result.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
 
-    /// Verify the blob sidecar against its [crate::NumHash].
-    pub fn verify_blob(&self, hash: &crate::NumHash) -> Result<(), BlobTransactionValidationError> {
-        if self.index != hash.number {
+    /// Verify the blob sidecar against its [IndexedBlobHash].
+    pub fn verify_blob(
+        &self,
+        hash: &IndexedBlobHash,
+    ) -> Result<(), BlobTransactionValidationError> {
+        if self.index != hash.index {
             let blob_hash_part = B256::from_slice(&self.blob[0..32]);
             return Err(BlobTransactionValidationError::WrongVersionedHash {
                 have: blob_hash_part,
@@ -248,25 +269,6 @@ impl BlobTransactionSidecar {
         self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, __without__ a RLP header.
-    ///
-    /// This encodes the fields in the following order:
-    /// - `blobs`
-    /// - `commitments`
-    /// - `proofs`
-    #[inline]
-    pub(crate) fn encode_inner(&self, out: &mut dyn BufMut) {
-        // Encode the blobs, commitments, and proofs
-        self.blobs.encode(out);
-        self.commitments.encode(out);
-        self.proofs.encode(out);
-    }
-
-    /// Outputs the RLP length of the [BlobTransactionSidecar] fields, without a RLP header.
-    pub fn fields_len(&self) -> usize {
-        self.blobs.length() + self.commitments.length() + self.proofs.length()
-    }
-
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
     pub fn size(&self) -> usize {
@@ -302,27 +304,91 @@ impl BlobTransactionSidecar {
 
         Ok(Self::from_kzg(blobs, commitments, proofs))
     }
+
+    /// Outputs the RLP length of the [BlobTransactionSidecar] fields, without
+    /// a RLP header.
+    #[doc(hidden)]
+    pub fn rlp_encoded_fields_length(&self) -> usize {
+        self.blobs.length() + self.commitments.length() + self.proofs.length()
+    }
+
+    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, __without__ a RLP header.
+    ///
+    /// This encodes the fields in the following order:
+    /// - `blobs`
+    /// - `commitments`
+    /// - `proofs`
+    #[inline]
+    #[doc(hidden)]
+    pub fn rlp_encode_fields(&self, out: &mut dyn BufMut) {
+        // Encode the blobs, commitments, and proofs
+        self.blobs.encode(out);
+        self.commitments.encode(out);
+        self.proofs.encode(out);
+    }
+
+    /// Creates an RLP header for the [BlobTransactionSidecar].
+    fn rlp_header(&self) -> Header {
+        Header { list: true, payload_length: self.rlp_encoded_fields_length() }
+    }
+
+    /// Calculates the length of the [BlobTransactionSidecar] when encoded as
+    /// RLP.
+    pub fn rlp_encoded_length(&self) -> usize {
+        self.rlp_header().length() + self.rlp_encoded_fields_length()
+    }
+
+    /// Encodes the [BlobTransactionSidecar] as RLP bytes.
+    pub fn rlp_encode(&self, out: &mut dyn BufMut) {
+        self.rlp_header().encode(out);
+        self.rlp_encode_fields(out);
+    }
+
+    /// RLP decode the fields of a [BlobTransactionSidecar].
+    #[doc(hidden)]
+    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            blobs: Decodable::decode(buf)?,
+            commitments: Decodable::decode(buf)?,
+            proofs: Decodable::decode(buf)?,
+        })
+    }
+
+    /// Decodes the [BlobTransactionSidecar] from RLP bytes.
+    pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        if buf.len() < header.payload_length {
+            return Err(alloy_rlp::Error::InputTooShort);
+        }
+        let remaining = buf.len();
+        let this = Self::rlp_decode_fields(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
+    }
 }
 
 impl Encodable for BlobTransactionSidecar {
     /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
-    fn encode(&self, s: &mut dyn BufMut) {
-        self.encode_inner(s);
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.rlp_encode(out);
     }
 
     fn length(&self) -> usize {
-        self.fields_len()
+        self.rlp_encoded_length()
     }
 }
 
 impl Decodable for BlobTransactionSidecar {
     /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            proofs: Decodable::decode(buf)?,
-        })
+        Self::rlp_decode(buf)
     }
 }
 

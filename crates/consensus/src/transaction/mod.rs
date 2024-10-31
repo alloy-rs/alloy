@@ -4,7 +4,7 @@ use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
-use core::any;
+use core::{any, fmt};
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -32,6 +32,10 @@ pub use envelope::{TxEnvelope, TxType};
 mod legacy;
 pub use legacy::TxLegacy;
 
+mod rlp;
+#[doc(hidden)]
+pub use rlp::RlpEcdsaTx;
+
 mod typed;
 pub use typed::TypedTransaction;
 
@@ -46,7 +50,7 @@ pub mod serde_bincode_compat {
 
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
-pub trait Transaction: any::Any + Send + Sync + 'static {
+pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 

@@ -1,14 +1,17 @@
-use core::fmt;
-
-use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
+use crate::{
+    transaction::{
+        eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+        RlpEcdsaTx,
+    },
+    Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
+};
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
 use alloy_primitives::{Bytes, TxKind, B256};
-use alloy_rlp::{Decodable, Encodable, Header};
-
-use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
+use alloy_rlp::{Decodable, Encodable};
+use core::fmt;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].
@@ -187,6 +190,20 @@ impl TxEnvelope {
         matches!(self, Self::Eip7702(_))
     }
 
+    /// Returns true if the transaction is replay protected.
+    ///
+    /// All non-legacy transactions are replay protected, as the chain id is
+    /// included in the transaction body. Legacy transactions are considered
+    /// replay protected if the `v` value is not 27 or 28, according to the
+    /// rules of [EIP-155].
+    ///
+    /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
+    #[inline]
+    pub const fn is_replay_protected(&self) -> bool {
+        let Self::Legacy(ref tx) = self else { return true };
+        tx.signature().v().chain_id().is_some()
+    }
+
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
     pub const fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
         match self {
@@ -277,23 +294,14 @@ impl TxEnvelope {
     }
 
     /// Return the length of the inner txn, including type byte length
-    pub fn rlp_payload_length(&self) -> usize {
-        let payload_length = match self {
-            Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip2930(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip1559(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip4844(t) => match t.tx() {
-                TxEip4844Variant::TxEip4844(tx) => tx.fields_len() + t.signature().rlp_vrs_len(),
-                TxEip4844Variant::TxEip4844WithSidecar(tx) => {
-                    let inner_payload_length = tx.tx().fields_len() + t.signature().rlp_vrs_len();
-                    let inner_header = Header { list: true, payload_length: inner_payload_length };
-
-                    inner_header.length() + inner_payload_length + tx.sidecar.fields_len()
-                }
-            },
-            Self::Eip7702(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-        };
-        Header { list: true, payload_length }.length() + payload_length + !self.is_legacy() as usize
+    pub fn eip2718_encoded_length(&self) -> usize {
+        match self {
+            Self::Legacy(t) => t.eip2718_encoded_length(),
+            Self::Eip2930(t) => t.eip2718_encoded_length(),
+            Self::Eip1559(t) => t.eip2718_encoded_length(),
+            Self::Eip4844(t) => t.eip2718_encoded_length(),
+            Self::Eip7702(t) => t.eip2718_encoded_length(),
+        }
     }
 }
 
@@ -316,16 +324,16 @@ impl Decodable for TxEnvelope {
 impl Decodable2718 for TxEnvelope {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
-            TxType::Eip2930 => Ok(TxEip2930::decode_signed_fields(buf)?.into()),
-            TxType::Eip1559 => Ok(TxEip1559::decode_signed_fields(buf)?.into()),
-            TxType::Eip4844 => Ok(TxEip4844Variant::decode_signed_fields(buf)?.into()),
-            TxType::Eip7702 => Ok(TxEip7702::decode_signed_fields(buf)?.into()),
+            TxType::Eip2930 => Ok(TxEip2930::rlp_decode_signed(buf)?.into()),
+            TxType::Eip1559 => Ok(TxEip1559::rlp_decode_signed(buf)?.into()),
+            TxType::Eip4844 => Ok(TxEip4844Variant::rlp_decode_signed(buf)?.into()),
+            TxType::Eip7702 => Ok(TxEip7702::rlp_decode_signed(buf)?.into()),
             TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
         }
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        Ok(TxLegacy::decode_signed_fields(buf)?.into())
+        TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
     }
 }
 
@@ -341,24 +349,24 @@ impl Encodable2718 for TxEnvelope {
     }
 
     fn encode_2718_len(&self) -> usize {
-        self.rlp_payload_length()
+        self.eip2718_encoded_length()
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
             // Legacy transactions have no difference between network and 2718
-            Self::Legacy(tx) => tx.tx().encode_with_signature_fields(tx.signature(), out),
+            Self::Legacy(tx) => tx.eip2718_encode(out),
             Self::Eip2930(tx) => {
-                tx.tx().encode_with_signature(tx.signature(), out, false);
+                tx.eip2718_encode(out);
             }
             Self::Eip1559(tx) => {
-                tx.tx().encode_with_signature(tx.signature(), out, false);
+                tx.eip2718_encode(out);
             }
             Self::Eip4844(tx) => {
-                tx.tx().encode_with_signature(tx.signature(), out, false);
+                tx.eip2718_encode(out);
             }
             Self::Eip7702(tx) => {
-                tx.tx().encode_with_signature(tx.signature(), out, false);
+                tx.eip2718_encode(out);
             }
         }
     }
@@ -594,9 +602,9 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    use alloy_primitives::{hex, Address, Parity, Signature, U256};
     #[allow(unused_imports)]
-    use alloy_primitives::{Bytes, TxKind};
+    use alloy_primitives::{b256, Bytes, TxKind};
+    use alloy_primitives::{hex, Address, Parity, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[cfg(not(feature = "std"))]
@@ -624,19 +632,66 @@ mod tests {
     }
 
     #[test]
+    fn test_is_replay_protected_v() {
+        let sig = Signature::test_signature();
+        assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_replay_protected());
+        let r = b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565");
+        let s = b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1");
+        let v = 27;
+        let valid_sig = Signature::from_scalars_and_parity(r, s, v).unwrap();
+        assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            valid_sig,
+            Default::default(),
+        ))
+        .is_replay_protected());
+        assert!(&TxEnvelope::Eip2930(Signed::new_unchecked(
+            TxEip2930::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_replay_protected());
+        assert!(&TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_replay_protected());
+        assert!(&TxEnvelope::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            sig,
+            Default::default(),
+        ))
+        .is_replay_protected());
+        assert!(&TxEnvelope::Eip7702(Signed::new_unchecked(
+            TxEip7702::default(),
+            sig,
+            Default::default(),
+        ))
+        .is_replay_protected());
+    }
+
+    #[test]
     #[cfg(feature = "k256")]
     // Test vector from https://etherscan.io/tx/0x280cde7cdefe4b188750e76c888f13bd05ce9a4d7767730feefe8a0e50ca6fc4
     fn test_decode_live_legacy_tx() {
         use alloy_primitives::address;
 
-        let raw_tx = alloy_primitives::hex::decode("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8").unwrap();
-        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+        let raw_tx = alloy_primitives::bytes!("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8");
+        let res = TxEnvelope::decode_2718(&mut raw_tx.as_ref()).unwrap();
         assert_eq!(res.tx_type(), TxType::Legacy);
 
         let tx = match res {
             TxEnvelope::Legacy(tx) => tx,
             _ => unreachable!(),
         };
+
+        assert_eq!(tx.tx().chain_id(), Some(1));
 
         assert_eq!(tx.tx().to, TxKind::Call(address!("7a250d5630B4cF539739dF2C5dAcb4c659F2488D")));
         assert_eq!(
@@ -657,7 +712,8 @@ mod tests {
 
         // https://sepolia.etherscan.io/getRawTx?tx=0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
         let raw_tx = alloy_primitives::hex::decode("0x03f9011d83aa36a7820fa28477359400852e90edd0008252089411e9ca82a3a762b4b5bd264d4173a242e7a770648080c08504a817c800f8a5a0012ec3d6f66766bedb002a190126b3549fce0047de0d4c25cffce0dc1c57921aa00152d8e24762ff22b1cfd9f8c0683786a7ca63ba49973818b3d1e9512cd2cec4a0013b98c6c83e066d5b14af2b85199e3d4fc7d1e778dd53130d180f5077e2d1c7a001148b495d6e859114e670ca54fb6e2657f0cbae5b08063605093a4b3dc9f8f1a0011ac212f13c5dff2b2c6b600a79635103d6f580a4221079951181b25c7e654901a0c8de4cced43169f9aa3d36506363b2d2c44f6c49fc1fd91ea114c86f3757077ea01e11fdd0d1934eda0492606ee0bb80a7bf8f35cc5f86ec60fe5031ba48bfd544").unwrap();
-        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+
+        let res = TxEnvelope::decode_2718(&mut raw_tx.as_slice()).unwrap();
         assert_eq!(res.tx_type(), TxType::Eip4844);
 
         let tx = match res {
@@ -752,6 +808,7 @@ mod tests {
             access_list: Default::default(),
         };
         let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -818,7 +875,17 @@ mod tests {
         };
         let tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
-        test_encode_decode_roundtrip(tx, Some(signature));
+
+        let tx_signed = tx.into_signed(signature);
+        let tx_envelope: TxEnvelope = tx_signed.into();
+
+        let mut out = Vec::new();
+        tx_envelope.network_encode(&mut out);
+        let mut slice = out.as_slice();
+        let decoded = TxEnvelope::network_decode(&mut slice).unwrap();
+        assert_eq!(slice.len(), 0);
+        assert_eq!(out.len(), tx_envelope.network_len());
+        assert_eq!(decoded, tx_envelope);
     }
 
     #[test]

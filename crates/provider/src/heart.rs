@@ -1,8 +1,9 @@
 //! Block heartbeat and pending transaction watcher.
 
 use crate::{Provider, RootProvider};
+use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
-use alloy_network::{BlockResponse, HeaderResponse, Network};
+use alloy_network::{BlockResponse, Network};
 use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, B256,
@@ -576,7 +577,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         latest: &watch::Sender<Option<N::BlockResponse>>,
     ) {
         // Blocks without numbers are ignored, as they're not part of the chain.
-        let block_height = block.header().number();
+        let block_height = block.header().as_ref().number();
 
         // Add the block the lookbehind.
         // The value is chosen arbitrarily to not have a huge memory footprint but still
