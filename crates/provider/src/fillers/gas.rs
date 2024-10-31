@@ -226,13 +226,19 @@ where
             }
         }
 
-        provider
+        let latest_block = provider
             .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await?
-            .ok_or(RpcError::NullResp)?
-            .header()
-            .as_ref()
-            .next_block_blob_fee()
+            .ok_or(RpcError::NullResp)?;
+
+        let latest_header = latest_block.header().as_ref();
+
+        latest_header
+            // We assume next block blob count to be the same as the latest block
+            //
+            // Blob target increases are expected to be rare, thus this should be correct most of
+            // the time
+            .next_block_blob_fee(latest_header.target_blob_count())
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
     }

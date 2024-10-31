@@ -149,8 +149,8 @@ impl<H: BlockHeader> Header<H> {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [Self::next_block_excess_blob_gas]
-    pub fn next_block_blob_fee(&self) -> Option<u128> {
-        self.inner.next_block_blob_fee()
+    pub fn next_block_blob_fee(&self, next_block_target_blob_count: Option<u64>) -> Option<u128> {
+        self.inner.next_block_blob_fee(next_block_target_blob_count)
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
@@ -255,6 +255,10 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
 
     fn requests_hash(&self) -> Option<B256> {
         self.inner.requests_hash()
+    }
+
+    fn target_blob_count(&self) -> Option<u64> {
+        self.inner.target_blob_count()
     }
 }
 
@@ -450,6 +454,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blob_count: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -497,6 +502,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blob_count: None,
                 },
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
@@ -542,6 +548,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blob_count: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -813,6 +820,7 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                target_blob_count: None,
             },
             size: None,
             total_difficulty: None,
@@ -859,6 +867,7 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                target_blob_count: None,
             },
             total_difficulty: None,
             size: Some(U256::from(505)),
@@ -917,6 +926,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blob_count: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),
