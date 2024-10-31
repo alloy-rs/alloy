@@ -190,20 +190,18 @@ impl TxEnvelope {
         matches!(self, Self::Eip7702(_))
     }
 
-    /// Returns true if the signature of the transaction is protected.
+    /// Returns true if the transaction is replay protected.
+    ///
+    /// All non-legacy transactions are replay protected, as the chain id is
+    /// included in the transaction body. Legacy transactions are considered
+    /// replay protected if the `v` value is not 27 or 28, according to the
+    /// rules of [EIP-155].
+    ///
+    /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
     #[inline]
-    pub const fn is_protected(&self) -> bool {
-        match self {
-            Self::Legacy(tx) => {
-                let v = tx.signature().v().to_u64();
-                if 64 - v.leading_zeros() <= 8 {
-                    return v != 27 && v != 28 && v != 1 && v != 0;
-                }
-                // anything not 27 or 28 is considered protected
-                true
-            }
-            _ => true,
-        }
+    pub const fn is_replay_protected(&self) -> bool {
+        let Self::Legacy(ref tx) = self else { return true };
+        tx.signature().v().chain_id().is_some()
     }
 
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
@@ -634,14 +632,14 @@ mod tests {
     }
 
     #[test]
-    fn test_is_protected_v() {
+    fn test_is_replay_protected_v() {
         let sig = Signature::test_signature();
         assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
             TxLegacy::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         let r = b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565");
         let s = b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1");
         let v = 27;
@@ -651,31 +649,31 @@ mod tests {
             valid_sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip2930(Signed::new_unchecked(
             TxEip2930::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip1559(Signed::new_unchecked(
             TxEip1559::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip4844(Signed::new_unchecked(
             TxEip4844Variant::TxEip4844(TxEip4844::default()),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
         assert!(&TxEnvelope::Eip7702(Signed::new_unchecked(
             TxEip7702::default(),
             sig,
             Default::default(),
         ))
-        .is_protected());
+        .is_replay_protected());
     }
 
     #[test]
