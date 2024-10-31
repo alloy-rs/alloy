@@ -48,7 +48,7 @@ jsonwebtoken = { workspace = true, optional = true }
 default = ["jwt", "std", "serde"]
 std = ["alloy-consensus/std", "derive_more/std", "strum/std"]
 serde = ["dep:serde", "dep:alloy-serde"]
-jwt = ["dep:jsonwebtoken", "dep:rand"]
+jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]

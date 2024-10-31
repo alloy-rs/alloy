@@ -156,11 +156,16 @@ where
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        hydrate: bool,
+        kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
-        let req = RequestType::new("eth_getBlockByNumber", (number, hydrate));
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
 
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, hydrate)).await
+        let req = RequestType::new("eth_getBlockByNumber", (number, full));
+
+        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
     }
 
     async fn get_block_by_hash(

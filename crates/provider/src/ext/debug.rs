@@ -3,7 +3,7 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{
-    Block, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
+    BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
 };
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
@@ -27,7 +27,7 @@ pub trait DebugApi<N, T>: Send + Sync {
     async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>>;
 
     /// Returns an array of recent bad blocks that the client has seen on the network.
-    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<BadBlock>>;
 
     /// Returns the structured logs created during the execution of EVM between two blocks
     /// (excluding start) as a JSON object.
@@ -154,7 +154,7 @@ where
         self.client().request("debug_getRawReceipts", (block,)).await
     }
 
-    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<BadBlock>> {
         self.client().request_noparams("debug_getBadBlocks").await
     }
 
