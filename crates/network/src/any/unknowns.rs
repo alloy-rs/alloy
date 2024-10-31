@@ -51,9 +51,13 @@ impl From<TxType> for AnyTxType {
     }
 }
 
-/// Memoization for deserialization of [`AnyTxEnvelope`] and
-/// [`AnyTypedTransaction`]. Setting these manually is discouraged, however the
-/// fields are left public for power users :)
+/// Memoization for deserialization of [`UnknownTxEnvelope`],
+/// [`UnknownTypedTransaction`] [`AnyTxEnvelope`], [`AnyTypedTransaction`].
+/// Setting these manually is discouraged, however the fields are left public
+/// for power users :)
+///
+/// [`AnyTxEnvelope`]: crate::AnyTxEnvelope
+/// [`AnyTypedTransaction`]: crate::AnyTypedTransaction
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[allow(unnameable_types)]
 pub struct DeserMemo {
@@ -87,6 +91,8 @@ impl UnknownTypedTransaction {
     /// or if the transaction is already fully deserialized (i.e. it is an
     /// Ethereum [`TxEnvelope`]). Otherwise, it will attempt to deserialize the
     /// field and return the result wrapped in a `Some`.
+    ///
+    /// [`TxEnvelope`]: alloy_consensus::TxEnvelope
     pub fn deser_by_key<T: serde::de::DeserializeOwned>(
         &self,
         key: &str,

@@ -43,6 +43,10 @@ pub type AnyRpcBlock =
 ///   build any unknown type.
 /// - The [`Network::TransactionResponse`] may deserialize unknown metadata fields into the inner
 ///   [`AnyTxEnvelope`], rather than into the outer [`WithOtherFields`].
+///
+/// [`Decodable2718`]: alloy_eips::eip2718::Decodable2718
+/// [`Encodable2718`]: alloy_eips::eip2718::Encodable2718
+/// [`TxEnvelope`]: alloy_consensus::TxEnvelope
 #[derive(Clone, Copy, Debug)]
 pub struct AnyNetwork {
     _private: (),
