@@ -97,31 +97,31 @@ impl UnknownTypedTransaction {
 
 impl alloy_consensus::Transaction for UnknownTypedTransaction {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
-        self.deser_by_key("chainId").map(Result::ok).flatten()
+        self.deser_by_key("chainId").and_then(Result::ok)
     }
 
     fn nonce(&self) -> u64 {
-        self.deser_by_key("nonce").map(Result::ok).flatten().unwrap_or_default()
+        self.deser_by_key("nonce").and_then(Result::ok).unwrap_or_default()
     }
 
     fn gas_limit(&self) -> u64 {
-        self.deser_by_key("gasLimit").map(Result::ok).flatten().unwrap_or_default()
+        self.deser_by_key("gasLimit").and_then(Result::ok).unwrap_or_default()
     }
 
     fn gas_price(&self) -> Option<u128> {
-        self.deser_by_key("gasPrice").map(Result::ok).flatten()
+        self.deser_by_key("gasPrice").and_then(Result::ok)
     }
 
     fn max_fee_per_gas(&self) -> u128 {
-        self.deser_by_key("maxFeePerGas").map(Result::ok).flatten().unwrap_or_default()
+        self.deser_by_key("maxFeePerGas").and_then(Result::ok).unwrap_or_default()
     }
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.deser_by_key("maxPriorityFeePerGas").map(Result::ok).flatten()
+        self.deser_by_key("maxPriorityFeePerGas").and_then(Result::ok)
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.deser_by_key("maxFeePerBlobGas").map(Result::ok).flatten()
+        self.deser_by_key("maxFeePerBlobGas").and_then(Result::ok)
     }
 
     fn priority_fee_or_price(&self) -> u128 {
@@ -143,7 +143,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     }
 
     fn value(&self) -> alloy_primitives::U256 {
-        self.deser_by_key("value").map(Result::ok).flatten().unwrap_or_default()
+        self.deser_by_key("value").and_then(Result::ok).unwrap_or_default()
     }
 
     fn input(&self) -> &Bytes {
