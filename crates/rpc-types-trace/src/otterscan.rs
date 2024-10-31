@@ -105,17 +105,17 @@ pub struct InternalIssuance {
 /// Custom `Block` struct that includes transaction count for Otterscan responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OtsBlock<T = Transaction> {
+pub struct OtsBlock<T = Transaction, H = Header> {
     /// The block information.
     #[serde(flatten)]
-    pub block: Block<T>,
+    pub block: Block<T, H>,
     /// The number of transactions in the block.
     #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
-impl<T> From<Block<T>> for OtsBlock<T> {
-    fn from(block: Block<T>) -> Self {
+impl<T, H> From<Block<T, H>> for OtsBlock<T, H> {
+    fn from(block: Block<T, H>) -> Self {
         Self { transaction_count: block.transactions.len(), block }
     }
 }
@@ -215,9 +215,9 @@ pub struct OtsReceipt {
 
 /// Custom struct for otterscan `getBlockTransactions` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OtsBlockTransactions<T = Transaction> {
+pub struct OtsBlockTransactions<T = Transaction, H = Header> {
     /// The full block information with transaction count.
-    pub fullblock: OtsBlock<T>,
+    pub fullblock: OtsBlock<T, H>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
 }
