@@ -78,6 +78,25 @@ pub struct DeserMemo {
     authorization_list: OnceLock<Vec<SignedAuthorization>>,
 }
 
+/// A transaction envelope from an unknown network.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[doc(alias = "UnknownTransactionEnvelope")]
+pub struct UnknownTxEnvelope {
+    /// Transaction type.
+    #[serde(rename = "type")]
+    pub ty: AnyTxType,
+
+    /// Transaction hash.
+    pub hash: B256,
+
+    /// Additional fields.
+    pub fields: std::collections::BTreeMap<String, serde_json::Value>,
+
+    /// Memoization for deserialization.
+    #[serde(skip, default)]
+    pub memo: DeserMemo,
+}
+
 /// Transaction envelope for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -86,21 +105,7 @@ pub enum AnyTxEnvelope {
     /// An Ethereum transaction.
     Ethereum(TxEnvelope),
     /// A transaction with unknown type.
-    Other {
-        /// Transaction type.
-        #[serde(rename = "type")]
-        ty: AnyTxType,
-
-        /// Transaction hash.
-        hash: B256,
-
-        /// Additional fields.
-        fields: std::collections::BTreeMap<String, serde_json::Value>,
-
-        /// Memoization for deserialization.
-        #[serde(skip, default)]
-        memo: DeserMemo,
-    },
+    Unknown(UnknownTxEnvelope),
 }
 
 impl AnyTxEnvelope {
@@ -114,7 +119,7 @@ impl AnyTxEnvelope {
         &self,
         key: &str,
     ) -> Option<serde_json::Result<T>> {
-        let Self::Other { fields, .. } = self else {
+        let Self::Unknown(UnknownTxEnvelope { fields, .. }) = self else {
             return None;
         };
 
@@ -126,14 +131,14 @@ impl Encodable2718 for AnyTxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
             Self::Ethereum(t) => t.type_flag(),
-            Self::Other { ty, .. } => Some(ty.into()),
+            Self::Unknown(UnknownTxEnvelope { ty, .. }) => Some(ty.into()),
         }
     }
 
     fn encode_2718_len(&self) -> usize {
         match self {
             Self::Ethereum(t) => t.encode_2718_len(),
-            Self::Other { .. } => 1,
+            Self::Unknown(_) => 1,
         }
     }
 
@@ -141,7 +146,7 @@ impl Encodable2718 for AnyTxEnvelope {
     fn encode_2718(&self, out: &mut dyn alloy_primitives::bytes::BufMut) {
         match self {
             Self::Ethereum(t) => t.encode_2718(out),
-            Self::Other { ty, .. } => {
+            Self::Unknown(UnknownTxEnvelope { ty, .. }) => {
                 panic!(
                     "Attempted to encode unknown transaction type: {}. This is not a bug in alloy. To encode or decode unknown transaction types, use a custom Transaction type and a custom Network implementation. See https://docs.rs/alloy-network/latest/alloy_network/ for network documentation.",
                     ty
@@ -153,7 +158,7 @@ impl Encodable2718 for AnyTxEnvelope {
     fn trie_hash(&self) -> B256 {
         match self {
             Self::Ethereum(tx) => tx.trie_hash(),
-            Self::Other { hash, .. } => *hash,
+            Self::Unknown(UnknownTxEnvelope { hash, .. }) => *hash,
         }
     }
 }
@@ -172,14 +177,16 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
         match self {
             Self::Ethereum(inner) => inner.chain_id(),
-            Self::Other { fields, .. } => fields.get("chainId").and_then(|v| v.as_u64()),
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => {
+                fields.get("chainId").and_then(|v| v.as_u64())
+            }
         }
     }
 
     fn nonce(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.nonce(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => {
                 fields.get("nonce").and_then(|v| v.as_u64()).expect("missing nonce in tx response")
             }
         }
@@ -188,7 +195,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.gas_limit(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => {
                 fields.get("gas").and_then(|v| v.as_u64()).expect("missing gas in tx response")
             }
         }
@@ -197,7 +204,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.gas_price(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => {
                 fields.get("gasPrice").and_then(|v| v.as_u64()).map(|v| v as u128)
             }
         }
@@ -206,7 +213,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_gas(),
-            Self::Other { fields, .. } => fields
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => fields
                 .get("maxFeePerGas")
                 .and_then(|v| v.as_u64())
                 .expect("missing maxFeePerGas in tx response")
@@ -217,7 +224,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => {
                 fields.get("maxPriorityFeePerGas").and_then(|v| v.as_u64()).map(|v| v as u128)
             }
         }
@@ -226,7 +233,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_blob_gas(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => {
                 fields.get("maxFeePerBlobGas").and_then(|v| v.as_u64()).map(|v| v as u128)
             }
         }
@@ -241,7 +248,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn kind(&self) -> alloy_primitives::TxKind {
         match self {
             Self::Ethereum(inner) => inner.kind(),
-            Self::Other { fields, .. } => fields
+            Self::Unknown(UnknownTxEnvelope { fields, .. }) => fields
                 .get("to")
                 .or(Some(&serde_json::Value::Null))
                 .map(|v| {
@@ -263,16 +270,14 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
-            Self::Other { .. } => {
-                self.deser_by_key("value").and_then(Result::ok).unwrap_or_default()
-            }
+            Self::Unknown(_) => self.deser_by_key("value").and_then(Result::ok).unwrap_or_default(),
         }
     }
 
     fn input(&self) -> &Bytes {
         match self {
             Self::Ethereum(inner) => inner.input(),
-            Self::Other { memo, .. } => memo.input.get_or_init(|| {
+            Self::Unknown(UnknownTxEnvelope { memo, .. }) => memo.input.get_or_init(|| {
                 self.deser_by_key("input").and_then(Result::ok).unwrap_or_default()
             }),
         }
@@ -281,14 +286,14 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn ty(&self) -> u8 {
         match self {
             Self::Ethereum(inner) => inner.ty(),
-            Self::Other { ty, .. } => ty.0,
+            Self::Unknown(UnknownTxEnvelope { ty, .. }) => ty.0,
         }
     }
 
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
-            Self::Other { fields, memo, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, memo, .. }) => {
                 if fields.contains_key("accessList") {
                     Some(memo.access_list.get_or_init(|| {
                         self.deser_by_key("accessList").and_then(Result::ok).unwrap_or_default()
@@ -303,7 +308,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Ethereum(inner) => inner.blob_versioned_hashes(),
-            Self::Other { fields, memo, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, memo, .. }) => {
                 if fields.contains_key("blobVersionedHashes") {
                     Some(memo.blob_versioned_hashes.get_or_init(|| {
                         self.deser_by_key("blobVersionedHashes")
@@ -320,7 +325,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
-            Self::Other { fields, memo, .. } => {
+            Self::Unknown(UnknownTxEnvelope { fields, memo, .. }) => {
                 if fields.contains_key("authorizationList") {
                     Some(memo.authorization_list.get_or_init(|| {
                         self.deser_by_key("authorizationList")
@@ -335,6 +340,22 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     }
 }
 
+/// A typed transaction of an unknown Network
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[doc(alias = "UnknownTypedTx")]
+pub struct UnknownTypedTransaction {
+    #[serde(rename = "type")]
+    /// Transaction type.
+    pub ty: AnyTxType,
+
+    /// Additional fields.
+    pub fields: std::collections::BTreeMap<String, serde_json::Value>,
+
+    /// Memoization for deserialization.
+    #[serde(skip, default)]
+    pub memo: DeserMemo,
+}
+
 /// Unsigned transaction type for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -343,17 +364,7 @@ pub enum AnyTypedTransaction {
     /// An Ethereum transaction.
     Ethereum(TypedTransaction),
     /// A transaction with unknown type.
-    Other {
-        #[serde(rename = "type")]
-        /// Transaction type.
-        ty: AnyTxType,
-        /// Additional fields.
-        fields: std::collections::BTreeMap<String, serde_json::Value>,
-
-        /// Memoization for deserialization.
-        #[serde(skip, default)]
-        memo: DeserMemo,
-    },
+    Unknown(UnknownTypedTransaction),
 }
 
 impl AnyTypedTransaction {
@@ -367,7 +378,7 @@ impl AnyTypedTransaction {
         &self,
         key: &str,
     ) -> Option<serde_json::Result<T>> {
-        let Self::Other { fields, .. } = self else {
+        let Self::Unknown(UnknownTypedTransaction { fields, .. }) = self else {
             return None;
         };
 
@@ -385,7 +396,9 @@ impl From<AnyTxEnvelope> for AnyTypedTransaction {
     fn from(value: AnyTxEnvelope) -> Self {
         match value {
             AnyTxEnvelope::Ethereum(tx) => Self::Ethereum(tx.into()),
-            AnyTxEnvelope::Other { ty, fields, memo, .. } => Self::Other { ty, fields, memo },
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { ty, fields, memo, .. }) => {
+                Self::Unknown(UnknownTypedTransaction { ty, fields, memo })
+            }
         }
     }
 }
@@ -394,7 +407,7 @@ impl From<AnyTypedTransaction> for WithOtherFields<TransactionRequest> {
     fn from(value: AnyTypedTransaction) -> Self {
         match value {
             AnyTypedTransaction::Ethereum(tx) => Self::new(tx.into()),
-            AnyTypedTransaction::Other { ty, mut fields, .. } => {
+            AnyTypedTransaction::Unknown(UnknownTypedTransaction { ty, mut fields, .. }) => {
                 fields.insert("type".to_string(), serde_json::Value::Number(ty.0.into()));
                 Self { inner: Default::default(), other: OtherFields::new(fields) }
             }
@@ -412,14 +425,16 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
         match self {
             Self::Ethereum(inner) => inner.chain_id(),
-            Self::Other { fields, .. } => fields.get("chainId").and_then(|v| v.as_u64()),
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => {
+                fields.get("chainId").and_then(|v| v.as_u64())
+            }
         }
     }
 
     fn nonce(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.nonce(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => {
                 fields.get("nonce").and_then(|v| v.as_u64()).expect("missing nonce in tx response")
             }
         }
@@ -428,7 +443,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.gas_limit(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => {
                 fields.get("gas").and_then(|v| v.as_u64()).expect("missing gas in tx response")
             }
         }
@@ -437,7 +452,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.gas_price(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => {
                 fields.get("gasPrice").and_then(|v| v.as_u64()).map(|v| v as u128)
             }
         }
@@ -446,7 +461,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_gas(),
-            Self::Other { fields, .. } => fields
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => fields
                 .get("maxFeePerGas")
                 .and_then(|v| v.as_u64())
                 .expect("missing maxFeePerGas in tx response")
@@ -457,7 +472,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => {
                 fields.get("maxPriorityFeePerGas").and_then(|v| v.as_u64()).map(|v| v as u128)
             }
         }
@@ -466,7 +481,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_blob_gas(),
-            Self::Other { fields, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => {
                 fields.get("maxFeePerBlobGas").and_then(|v| v.as_u64()).map(|v| v as u128)
             }
         }
@@ -481,7 +496,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn kind(&self) -> alloy_primitives::TxKind {
         match self {
             Self::Ethereum(inner) => inner.kind(),
-            Self::Other { fields, .. } => fields
+            Self::Unknown(UnknownTypedTransaction { fields, .. }) => fields
                 .get("to")
                 .or(Some(&serde_json::Value::Null))
                 .map(|v| {
@@ -503,16 +518,14 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
-            Self::Other { .. } => {
-                self.deser_by_key("value").and_then(Result::ok).unwrap_or_default()
-            }
+            Self::Unknown(_) => self.deser_by_key("value").and_then(Result::ok).unwrap_or_default(),
         }
     }
 
     fn input(&self) -> &Bytes {
         match self {
             Self::Ethereum(inner) => inner.input(),
-            Self::Other { memo, .. } => memo.input.get_or_init(|| {
+            Self::Unknown(UnknownTypedTransaction { memo, .. }) => memo.input.get_or_init(|| {
                 self.deser_by_key("input").and_then(Result::ok).unwrap_or_default()
             }),
         }
@@ -521,14 +534,14 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn ty(&self) -> u8 {
         match self {
             Self::Ethereum(inner) => inner.ty(),
-            Self::Other { ty, .. } => ty.0,
+            Self::Unknown(UnknownTypedTransaction { ty, .. }) => ty.0,
         }
     }
 
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
-            Self::Other { fields, memo, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, memo, .. }) => {
                 if fields.contains_key("accessList") {
                     Some(memo.access_list.get_or_init(|| {
                         self.deser_by_key("accessList").and_then(Result::ok).unwrap_or_default()
@@ -543,7 +556,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Ethereum(inner) => inner.blob_versioned_hashes(),
-            Self::Other { fields, memo, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, memo, .. }) => {
                 if fields.contains_key("blobVersionedHashes") {
                     Some(memo.blob_versioned_hashes.get_or_init(|| {
                         self.deser_by_key("blobVersionedHashes")
@@ -560,7 +573,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
-            Self::Other { fields, memo, .. } => {
+            Self::Unknown(UnknownTypedTransaction { fields, memo, .. }) => {
                 if fields.contains_key("authorizationList") {
                     Some(memo.authorization_list.get_or_init(|| {
                         self.deser_by_key("authorizationList")
