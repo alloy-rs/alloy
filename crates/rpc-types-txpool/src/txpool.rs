@@ -235,7 +235,7 @@ mod tests {
         "value": "0x0",
         "type": "0x0",
         "chainId": "0x1",
-        "yParity": "0x0",
+        "v": "0x25",
         "r": "0xaf46b2c0f067f7d1d63ac19daa349c0e1eb83f019ee00542ffa7095e05352e92",
         "s": "0x21d6d24d58ec361379ffffe4cc17bec8ce2b9f5f9759a91afc9a54dfdfa519c2"
       }

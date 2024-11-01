@@ -553,6 +553,7 @@ mod serde_from {
     #[serde(untagged)]
     pub(crate) enum MaybeTaggedTxEnvelope {
         Tagged(TaggedTxEnvelope),
+        #[serde(with = "crate::transaction::signed_legacy_serde")]
         Untagged(Signed<TxLegacy>),
     }
 
