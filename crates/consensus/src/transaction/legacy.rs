@@ -442,18 +442,17 @@ pub mod signed_legacy_serde {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct SignedLegacy<'a, T: Clone> {
+    struct SignedLegacy<'a> {
         #[serde(flatten)]
-        tx: Cow<'a, T>,
+        tx: Cow<'a, TxLegacy>,
         #[serde(flatten)]
         signature: LegacySignature,
         hash: B256,
     }
 
     /// Serializes signed transaction with `v` key for signature parity.
-    pub fn serialize<T, S>(signed: &crate::Signed<T>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(signed: &crate::Signed<TxLegacy>, serializer: S) -> Result<S::Ok, S::Error>
     where
-        T: Transaction + Clone + Serialize,
         S: serde::Serializer,
     {
         SignedLegacy {
@@ -469,25 +468,22 @@ pub mod signed_legacy_serde {
     }
 
     /// Deserializes signed transaction expecting `v` key for signature parity.
-    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<crate::Signed<T>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<crate::Signed<TxLegacy>, D::Error>
     where
-        T: Transaction + Clone + Deserialize<'de>,
         D: serde::Deserializer<'de>,
     {
-        let SignedLegacy::<T> { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
+        let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
         let (parity, chain_id) = from_eip155_value(signature.v.to::<u64>())
             .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
         if let Some(tx_chain_id) = tx.chain_id() {
-            // Some nodes respond with 0 chain ID for legacy transactions when it is missing. 
+            // Some nodes respond with 0 chain ID for legacy transactions when it is missing.
             if tx_chain_id > 0 && chain_id != Some(tx_chain_id) {
                 return Err(serde::de::Error::custom("chain id mismatch"));
             }
         }
-        Ok(Signed::new_unchecked(
-            tx.into_owned(),
-            Signature::new(signature.r, signature.s, parity),
-            hash,
-        ))
+        let mut tx = tx.into_owned();
+        tx.chain_id = chain_id;
+        Ok(Signed::new_unchecked(tx, Signature::new(signature.r, signature.s, parity), hash))
     }
 }
 
