@@ -16,9 +16,6 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-#[cfg(feature = "eip712")]
-use alloy_signer::Error;
-
 /// A Ledger Ethereum signer.
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
@@ -55,13 +52,13 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
                 let domain_sep = data
                     .get(..32)
                     .ok_or_else(|| {
-                        Error::other("eip712 encoded data did not have a domain separator")
+                        alloy_signer::Error::other("eip712 encoded data did not have a domain separator")
                     })
                     .map(B256::from_slice)?;
 
                 let hash = data[32..]
                     .get(..32)
-                    .ok_or_else(|| Error::other("eip712 encoded data did not have hash struct"))
+                    .ok_or_else(|| alloy_signer::Error::other("eip712 encoded data did not have hash struct"))
                     .map(B256::from_slice)?;
 
                 sign_transaction_with_chain_id!(
