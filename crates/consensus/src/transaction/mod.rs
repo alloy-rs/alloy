@@ -3,8 +3,8 @@
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
-use core::any;
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
+use core::{any, fmt};
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -32,6 +32,10 @@ pub use envelope::{TxEnvelope, TxType};
 mod legacy;
 pub use legacy::TxLegacy;
 
+mod rlp;
+#[doc(hidden)]
+pub use rlp::RlpEcdsaTx;
+
 mod typed;
 pub use typed::TypedTransaction;
 
@@ -46,7 +50,7 @@ pub mod serde_bincode_compat {
 
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
-pub trait Transaction: any::Any + Send + Sync + 'static {
+pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -109,14 +113,22 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }
 
-    /// Get `to`.
-    fn to(&self) -> TxKind;
+    /// Returns the transaction kind.
+    fn kind(&self) -> TxKind;
+
+    /// Get the transaction's address of the contract that will be called, or the address that will
+    /// receive the transfer.
+    ///
+    /// Returns `None` if this is a `CREATE` transaction.
+    fn to(&self) -> Option<Address> {
+        self.kind().to().copied()
+    }
 
     /// Get `value`.
     fn value(&self) -> U256;
 
     /// Get `data`.
-    fn input(&self) -> &[u8];
+    fn input(&self) -> &Bytes;
 
     /// Returns the transaction type
     fn ty(&self) -> u8;
@@ -243,15 +255,15 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
         self.inner.priority_fee_or_price()
     }
 
-    fn to(&self) -> TxKind {
-        self.inner.to()
+    fn kind(&self) -> TxKind {
+        self.inner.kind()
     }
 
     fn value(&self) -> U256 {
         self.inner.value()
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         self.inner.input()
     }
 

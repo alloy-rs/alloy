@@ -2,9 +2,7 @@
 //!
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
-#[cfg(not(feature = "std"))]
-use crate::alloc::{vec, vec::Vec};
-
+use crate::alloc::vec::Vec;
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use core::{
@@ -140,13 +138,11 @@ pub trait Decodable2718: Sized {
         *buf = h_decode;
 
         let remaining_len = buf.len();
-
         if remaining_len == 0 || remaining_len < h.payload_length {
             return Err(alloy_rlp::Error::InputTooShort.into());
         }
 
-        let ty = buf[0];
-        buf.advance(1);
+        let ty = buf.get_u8();
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
@@ -208,7 +204,7 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     /// This is a convenience method for encoding into a vec, and returning the
     /// vec.
     fn encoded_2718(&self) -> Vec<u8> {
-        let mut out = vec![];
+        let mut out = Vec::with_capacity(self.encode_2718_len());
         self.encode_2718(&mut out);
         out
     }
@@ -228,8 +224,8 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         Sealed::new_unchecked(self, hash)
     }
 
-    /// The length of the 2718 encoded envelope in network format. This is the length of the header
-    /// + the length of the type flag and inner encoding.
+    /// The length of the 2718 encoded envelope in network format. This is the
+    /// length of the header + the length of the type flag and inner encoding.
     fn network_len(&self) -> usize {
         let mut payload_length = self.encode_2718_len();
         if !self.is_legacy() {

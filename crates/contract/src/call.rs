@@ -495,7 +495,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// Returns a builder for configuring the pending transaction watcher.
     /// See [`Provider::send_transaction`] for more information.
-    pub async fn send(&self) -> Result<PendingTransactionBuilder<'_, T, N>> {
+    pub async fn send(&self) -> Result<PendingTransactionBuilder<T, N>> {
         Ok(self.provider.send_transaction(self.request.clone()).await?)
     }
 
@@ -567,6 +567,7 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_consensus::Transaction;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{
         layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
@@ -781,13 +782,13 @@ mod tests {
             .expect("failed to fetch tx")
             .expect("tx not included");
         assert_eq!(
-            transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
+            transaction.max_fee_per_gas(),
             max_fee_per_gas.to(),
             "max_fee_per_gas of the transaction should be set to the right value"
         );
         assert_eq!(
             transaction
-                .max_priority_fee_per_gas
+                .max_priority_fee_per_gas()
                 .expect("max_priority_fee_per_gas of the transaction should be set"),
             max_priority_fee_per_gas.to(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"

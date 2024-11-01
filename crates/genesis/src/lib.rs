@@ -420,6 +420,13 @@ pub struct ChainConfig {
     )]
     pub prague_time: Option<u64>,
 
+    /// Osaka switch time (None = no fork, 0 = already on osaka).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub osaka_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -567,6 +574,7 @@ impl Default for ChainConfig {
             shanghai_time: None,
             cancun_time: None,
             prague_time: None,
+            osaka_time: None,
             terminal_total_difficulty: None,
             terminal_total_difficulty_passed: false,
             ethash: None,
@@ -1026,6 +1034,7 @@ mod tests {
         "shanghaiTime": 0,
         "cancunTime": 0,
         "pragueTime": 1,
+        "osakaTime": 2,
         "terminalTotalDifficulty": 0,
         "depositContractAddress": "0x0000000000000000000000000000000000000000",
         "terminalTotalDifficultyPassed": true
@@ -1062,6 +1071,7 @@ mod tests {
                 shanghai_time: Some(0),
                 cancun_time: Some(0),
                 prague_time: Some(1),
+                osaka_time: Some(2),
                 terminal_total_difficulty: Some(U256::ZERO),
                 terminal_total_difficulty_passed: true,
                 deposit_contract_address: Some(Address::ZERO),

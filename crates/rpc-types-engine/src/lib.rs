@@ -13,6 +13,8 @@ extern crate alloc;
 
 mod cancun;
 pub use cancun::*;
+mod sidecar;
+pub use sidecar::*;
 
 mod forkchoice;
 pub use forkchoice::*;
@@ -28,14 +30,11 @@ pub use jwt::*;
 pub mod payload;
 pub use payload::*;
 
+mod error;
+pub use error::*;
+
 mod transition;
 pub use transition::*;
-
-#[doc(inline)]
-pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;
-
-#[doc(inline)]
-pub use alloy_eips::eip7002::WithdrawalRequest as WithdrawalRequestV1;
 
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobAndProofV1;
@@ -59,6 +58,4 @@ pub const CAPABILITIES: &[&str] = &[
     "engine_newPayloadV4",
     "engine_getPayloadBodiesByHashV1",
     "engine_getPayloadBodiesByRangeV1",
-    "engine_getPayloadBodiesByHashV2",
-    "engine_getPayloadBodiesByRangeV2",
 ];

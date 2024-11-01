@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
+
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
+## [0.5.2](https://github.com/alloy-rs/alloy/releases/tag/v0.5.2) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.2
+
+## [0.5.1](https://github.com/alloy-rs/alloy/releases/tag/v0.5.1) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.1
+
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Bug Fixes
+
+- Types inside mev_calls.rs ([#1435](https://github.com/alloy-rs/alloy/issues/1435))
+
+### Features
+
+- [rpc-types-mev] Add mev-share sse types ([#1419](https://github.com/alloy-rs/alloy/issues/1419))
+- [rpc-types-mev] Add support for `Bundle` inside `BundleItem` ([#1418](https://github.com/alloy-rs/alloy/issues/1418))
+
+### Miscellaneous Tasks
+
+- Release 0.5.0
+
+### Other
+
+- Replace assert_eq! with similar_asserts::assert_eq! ([#1429](https://github.com/alloy-rs/alloy/issues/1429))
+
+## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
+
 ## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
 
 ### Miscellaneous Tasks

@@ -14,7 +14,7 @@ use alloy_pubsub::ConnectionInterface;
 #[cfg(not(target_arch = "wasm32"))]
 mod native;
 #[cfg(not(target_arch = "wasm32"))]
-pub use native::WsConnect;
+pub use native::{WebSocketConfig, WsConnect};
 
 #[cfg(not(target_arch = "wasm32"))]
 use rustls as _;

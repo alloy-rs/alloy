@@ -89,9 +89,9 @@ impl std::error::Error for JwtError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::JwtSecretHexDecodeError(err) => Some(err),
-            Self::CreateDir { source, .. } => Some(source),
-            Self::Read { source, .. } => Some(source),
-            Self::Write { source, .. } => Some(source),
+            Self::CreateDir { source, .. }
+            | Self::Read { source, .. }
+            | Self::Write { source, .. } => Some(source),
             _ => None,
         }
     }

@@ -1,3 +1,4 @@
+use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
@@ -6,20 +7,10 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{
-    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
+    keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
-use alloy_rlp::{
-    length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
-};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::mem;
-
-/// Ommer root of empty list.
-pub const EMPTY_OMMER_ROOT_HASH: B256 =
-    b256!("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
-
-/// Root hash of an empty trie.
-pub const EMPTY_ROOT_HASH: B256 =
-    b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -30,9 +21,11 @@ pub struct Header {
     /// block’s header, in its entirety; formally Hp.
     pub parent_hash: B256,
     /// The Keccak 256-bit hash of the ommers list portion of this block; formally Ho.
+    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
     pub ommers_hash: B256,
     /// The 160-bit address to which all fees collected from the successful mining of this block
     /// be transferred; formally Hc.
+    #[cfg_attr(feature = "serde", serde(rename = "miner"))]
     pub beneficiary: Address,
     /// The Keccak 256-bit hash of the root node of the state trie, after all transactions are
     /// executed and finalisations applied; formally Hr.
@@ -43,10 +36,6 @@ pub struct Header {
     /// The Keccak 256-bit hash of the root node of the trie structure populated with the receipts
     /// of each transaction in the transactions list portion of the block; formally He.
     pub receipts_root: B256,
-    /// The Keccak 256-bit hash of the withdrawals list portion of this block.
-    /// <https://eips.ethereum.org/EIPS/eip-4895>
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub withdrawals_root: Option<B256>,
     /// The Bloom filter composed from indexable information (logger address and log topics)
     /// contained in each log entry from the receipt of each transaction in the transactions list;
     /// formally Hb.
@@ -68,6 +57,9 @@ pub struct Header {
     /// formally Hs.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub timestamp: u64,
+    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
+    /// fewer; formally Hx.
+    pub extra_data: Bytes,
     /// A 256-bit hash which, combined with the
     /// nonce, proves that a sufficient amount of computation has been carried out on this block;
     /// formally Hm.
@@ -90,6 +82,10 @@ pub struct Header {
         )
     )]
     pub base_fee_per_gas: Option<u64>,
+    /// The Keccak 256-bit hash of the withdrawals list portion of this block.
+    /// <https://eips.ethereum.org/EIPS/eip-4895>
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub withdrawals_root: Option<B256>,
     /// The total amount of blob gas consumed by the transactions within the block, added in
     /// EIP-4844.
     #[cfg_attr(
@@ -122,15 +118,12 @@ pub struct Header {
     /// The beacon roots contract handles root storage, enhancing Ethereum's functionalities.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
-    /// The Keccak 256-bit hash of the root node of the trie structure populated with each
+    /// The Keccak 256-bit hash of the an RLP encoded list with each
     /// [EIP-7685] request in the block body.
     ///
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub requests_root: Option<B256>,
-    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
-    /// fewer; formally Hx.
-    pub extra_data: Bytes,
+    pub requests_hash: Option<B256>,
 }
 
 impl AsRef<Self> for Header {
@@ -162,7 +155,7 @@ impl Default for Header {
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root: None,
-            requests_root: None,
+            requests_hash: None,
         }
     }
 }
@@ -282,52 +275,31 @@ impl Header {
         length += self.nonce.length();
 
         if let Some(base_fee) = self.base_fee_per_gas {
+            // Adding base fee length if it exists.
             length += U256::from(base_fee).length();
-        } else if self.withdrawals_root.is_some()
-            || self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            length += 1; // EMPTY LIST CODE
         }
 
         if let Some(root) = self.withdrawals_root {
+            // Adding withdrawals_root length if it exists.
             length += root.length();
-        } else if self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            length += 1; // EMPTY STRING CODE
         }
 
         if let Some(blob_gas_used) = self.blob_gas_used {
+            // Adding blob_gas_used length if it exists.
             length += U256::from(blob_gas_used).length();
-        } else if self.excess_blob_gas.is_some() || self.parent_beacon_block_root.is_some() {
-            length += 1; // EMPTY LIST CODE
         }
 
         if let Some(excess_blob_gas) = self.excess_blob_gas {
+            // Adding excess_blob_gas length if it exists.
             length += U256::from(excess_blob_gas).length();
-        } else if self.parent_beacon_block_root.is_some() {
-            length += 1; // EMPTY LIST CODE
         }
 
-        // Encode parent beacon block root length.
         if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
             length += parent_beacon_block_root.length();
         }
 
-        // Encode requests root length.
-        //
-        // If new fields are added, the above pattern will
-        // need to be repeated and placeholder length added. Otherwise, it's impossible to
-        // tell _which_ fields are missing. This is mainly relevant for contrived cases
-        // where a header is created at random, for example:
-        //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
-        //    post-London, so this is technically not valid. However, a tool like proptest would
-        //    generate a block like this.
-        if let Some(requests_root) = self.requests_root {
-            length += requests_root.length();
+        if let Some(requests_hash) = self.requests_hash {
+            length += requests_hash.length();
         }
 
         length
@@ -399,61 +371,29 @@ impl Encodable for Header {
         self.mix_hash.encode(out);
         self.nonce.encode(out);
 
-        // Encode base fee. Put empty list if base fee is missing,
-        // but withdrawals root is present.
+        // Encode all the fork specific fields
         if let Some(ref base_fee) = self.base_fee_per_gas {
             U256::from(*base_fee).encode(out);
-        } else if self.withdrawals_root.is_some()
-            || self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode withdrawals root. Put empty string if withdrawals root is missing,
-        // but blob gas used is present.
         if let Some(ref root) = self.withdrawals_root {
             root.encode(out);
-        } else if self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            out.put_u8(EMPTY_STRING_CODE);
         }
 
-        // Encode blob gas used. Put empty list if blob gas used is missing,
-        // but excess blob gas is present.
         if let Some(ref blob_gas_used) = self.blob_gas_used {
             U256::from(*blob_gas_used).encode(out);
-        } else if self.excess_blob_gas.is_some() || self.parent_beacon_block_root.is_some() {
-            out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode excess blob gas. Put empty list if excess blob gas is missing,
-        // but parent beacon block root is present.
         if let Some(ref excess_blob_gas) = self.excess_blob_gas {
             U256::from(*excess_blob_gas).encode(out);
-        } else if self.parent_beacon_block_root.is_some() {
-            out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode parent beacon block root.
         if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
             parent_beacon_block_root.encode(out);
         }
 
-        // Encode requests root.
-        //
-        // If new fields are added, the above pattern will need to
-        // be repeated and placeholders added. Otherwise, it's impossible to tell _which_
-        // fields are missing. This is mainly relevant for contrived cases where a header is
-        // created at random, for example:
-        //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
-        //    post-London, so this is technically not valid. However, a tool like proptest would
-        //    generate a block like this.
-        if let Some(ref requests_root) = self.requests_root {
-            requests_root.encode(out);
+        if let Some(ref requests_hash) = self.requests_hash {
+            requests_hash.encode(out);
         }
     }
 
@@ -493,41 +433,24 @@ impl Decodable for Header {
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root: None,
-            requests_root: None,
+            requests_hash: None,
         };
-
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
-                buf.advance(1)
-            } else {
-                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u64>());
-            }
+            this.base_fee_per_gas = Some(u64::decode(buf)?);
         }
 
         // Withdrawals root for post-shanghai headers
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_STRING_CODE) {
-                buf.advance(1)
-            } else {
-                this.withdrawals_root = Some(Decodable::decode(buf)?);
-            }
+            this.withdrawals_root = Some(Decodable::decode(buf)?);
         }
 
         // Blob gas used and excess blob gas for post-cancun headers
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
-                buf.advance(1)
-            } else {
-                this.blob_gas_used = Some(U256::decode(buf)?.to::<u64>());
-            }
+            this.blob_gas_used = Some(u64::decode(buf)?);
         }
 
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
-                buf.advance(1)
-            } else {
-                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u64>());
-            }
+            this.excess_blob_gas = Some(u64::decode(buf)?);
         }
 
         // Decode parent beacon block root.
@@ -535,17 +458,9 @@ impl Decodable for Header {
             this.parent_beacon_block_root = Some(B256::decode(buf)?);
         }
 
-        // Decode requests root.
-        //
-        // If new fields are added, the above pattern will need to
-        // be repeated and placeholders decoded. Otherwise, it's impossible to tell _which_
-        // fields are missing. This is mainly relevant for contrived cases where a header is
-        // created at random, for example:
-        //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
-        //    post-London, so this is technically not valid. However, a tool like proptest would
-        //    generate a block like this.
+        // Decode requests hash.
         if started_len - buf.len() < rlp_head.payload_length {
-            this.parent_beacon_block_root = Some(B256::decode(buf)?);
+            this.requests_hash = Some(B256::decode(buf)?);
         }
 
         let consumed = started_len - buf.len();
@@ -592,7 +507,7 @@ pub(crate) const fn generate_valid_header(
     }
 
     // Placeholder for future EIP adjustments
-    header.requests_root = None;
+    header.requests_hash = None;
 
     header
 }
@@ -622,7 +537,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             blob_gas_used: u.arbitrary()?,
             excess_blob_gas: u.arbitrary()?,
             parent_beacon_block_root: u.arbitrary()?,
-            requests_root: u.arbitrary()?,
+            requests_hash: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
         };
 
@@ -677,11 +592,11 @@ pub trait BlockHeader {
     /// Retrieves the timestamp of the block
     fn timestamp(&self) -> u64;
 
-    /// Retrieves the mix hash of the block
-    fn mix_hash(&self) -> B256;
+    /// Retrieves the mix hash of the block, if available
+    fn mix_hash(&self) -> Option<B256>;
 
-    /// Retrieves the nonce of the block
-    fn nonce(&self) -> B64;
+    /// Retrieves the nonce of the block, if avaialble
+    fn nonce(&self) -> Option<B64>;
 
     /// Retrieves the base fee per gas of the block, if available
     fn base_fee_per_gas(&self) -> Option<u64>;
@@ -695,11 +610,28 @@ pub trait BlockHeader {
     /// Retrieves the parent beacon block root of the block, if available
     fn parent_beacon_block_root(&self) -> Option<B256>;
 
-    /// Retrieves the requests root of the block, if available
-    fn requests_root(&self) -> Option<B256>;
+    /// Retrieves the requests hash of the block, if available
+    fn requests_hash(&self) -> Option<B256>;
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    fn next_block_excess_blob_gas(&self) -> Option<u64> {
+        Some(calc_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// See also [Self::next_block_excess_blob_gas]
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+    }
 }
 
 impl BlockHeader for Header {
@@ -755,12 +687,12 @@ impl BlockHeader for Header {
         self.timestamp
     }
 
-    fn mix_hash(&self) -> B256 {
-        self.mix_hash
+    fn mix_hash(&self) -> Option<B256> {
+        Some(self.mix_hash)
     }
 
-    fn nonce(&self) -> B64 {
-        self.nonce
+    fn nonce(&self) -> Option<B64> {
+        Some(self.nonce)
     }
 
     fn base_fee_per_gas(&self) -> Option<u64> {
@@ -779,8 +711,8 @@ impl BlockHeader for Header {
         self.parent_beacon_block_root
     }
 
-    fn requests_root(&self) -> Option<B256> {
-        self.requests_root
+    fn requests_hash(&self) -> Option<B256> {
+        self.requests_hash
     }
 
     fn extra_data(&self) -> &Bytes {
@@ -788,42 +720,9 @@ impl BlockHeader for Header {
     }
 }
 
-#[cfg(all(test, feature = "serde"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_header_serde_json_roundtrip() {
-        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
-        let header = Header {
-            base_fee_per_gas: Some(1),
-            withdrawals_root: Some(EMPTY_ROOT_HASH),
-            ..Default::default()
-        };
-
-        let encoded = serde_json::to_string(&header).unwrap();
-        assert_eq!(encoded, raw);
-
-        let decoded: Header = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded, header);
-
-        // Create a vector to store the encoded RLP
-        let mut encoded_rlp = Vec::new();
-
-        // Encode the header data
-        decoded.encode(&mut encoded_rlp);
-
-        // Decode the RLP data
-        let decoded_rlp = Header::decode(&mut encoded_rlp.as_slice()).unwrap();
-
-        // Check that the decoded RLP data matches the original header data
-        assert_eq!(decoded_rlp, decoded);
-    }
-}
-
 /// Bincode-compatibl [`Header`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub(super) mod serde_bincode_compat {
+pub(crate) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -871,7 +770,7 @@ pub(super) mod serde_bincode_compat {
         #[serde(default)]
         parent_beacon_block_root: Option<B256>,
         #[serde(default)]
-        requests_root: Option<B256>,
+        requests_hash: Option<B256>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -897,7 +796,7 @@ pub(super) mod serde_bincode_compat {
                 blob_gas_used: value.blob_gas_used,
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
-                requests_root: value.requests_root,
+                requests_hash: value.requests_hash,
                 extra_data: Cow::Borrowed(&value.extra_data),
             }
         }
@@ -925,7 +824,7 @@ pub(super) mod serde_bincode_compat {
                 blob_gas_used: value.blob_gas_used,
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
-                requests_root: value.requests_root,
+                requests_hash: value.requests_hash,
                 extra_data: value.extra_data.into_owned(),
             }
         }
@@ -977,5 +876,53 @@ pub(super) mod serde_bincode_compat {
             let decoded: Data = bincode::deserialize(&encoded).unwrap();
             assert_eq!(decoded, data);
         }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+    use alloy_primitives::b256;
+
+    #[test]
+    fn test_header_serde_json_roundtrip() {
+        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","miner":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","extraData":"0x","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"}"#;
+        let header = Header {
+            base_fee_per_gas: Some(1),
+            withdrawals_root: Some(EMPTY_ROOT_HASH),
+            ..Default::default()
+        };
+
+        let encoded = serde_json::to_string(&header).unwrap();
+        assert_eq!(encoded, raw);
+
+        let decoded: Header = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, header);
+
+        // Create a vector to store the encoded RLP
+        let mut encoded_rlp = Vec::new();
+
+        // Encode the header data
+        decoded.encode(&mut encoded_rlp);
+
+        // Decode the RLP data
+        let decoded_rlp = Header::decode(&mut encoded_rlp.as_slice()).unwrap();
+
+        // Check that the decoded RLP data matches the original header data
+        assert_eq!(decoded_rlp, decoded);
+    }
+
+    #[test]
+    fn serde_rlp_prague() {
+        // Note: Some fields are renamed from eth_getHeaderByHash
+        let raw = r#"{"baseFeePerGas":"0x7","blobGasUsed":"0x20000","difficulty":"0x0","excessBlobGas":"0x40000","extraData":"0xd883010e0c846765746888676f312e32332e32856c696e7578","gasLimit":"0x1c9c380","gasUsed":"0x5208","hash":"0x661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0xf97e180c050e5ab072211ad2c213eb5aee4df134","mixHash":"0xe6d9c084dd36560520d5776a5387a82fb44793c9cd1b69afb61d53af29ee64b0","nonce":"0x0000000000000000","number":"0x315","parentBeaconBlockRoot":"0xd0bdb48ab45028568e66c8ddd600ac4c2a52522714bbfbf00ea6d20ba40f3ae2","parentHash":"0x60f1563d2c572116091a4b91421d8d972118e39604d23455d841f9431cea4b6a","receiptsRoot":"0xeaa8c40899a61ae59615cf9985f5e2194f8fd2b57d273be63bde6733e89b12ab","requestsHash":"0x6036c41849da9c076ed79654d434017387a88fb833c2856b32e18218b3341c5f","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","stateRoot":"0x8101d88f2761eb9849634740f92fe09735551ad5a4d5e9da9bcae1ef4726a475","timestamp":"0x6712ba6e","transactionsRoot":"0xf543eb3d405d2d6320344d348b06703ff1abeef71288181a24061e53f89bb5ef","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"}
+"#;
+        let header = serde_json::from_str::<Header>(raw).unwrap();
+        let hash = header.hash_slow();
+        assert_eq!(hash, b256!("661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26"));
+        let mut v = Vec::new();
+        header.encode(&mut v);
+        let decoded = Header::decode(&mut v.as_slice()).unwrap();
+        assert_eq!(decoded, header);
     }
 }

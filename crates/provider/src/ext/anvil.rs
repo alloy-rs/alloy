@@ -3,7 +3,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo};
+use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
 use alloy_rpc_types_eth::Block;
 use alloy_transport::{Transport, TransportResult};
 
@@ -137,6 +137,9 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
 
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
+
+    /// Reorg the chain
+    async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()>;
 
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
@@ -302,6 +305,10 @@ where
         self.client().request("anvil_setRpcUrl", (url,)).await
     }
 
+    async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()> {
+        self.client().request("anvil_reorg", options).await
+    }
+
     async fn eth_send_unsigned_transaction(
         &self,
         request: N::TransactionRequest,
@@ -316,6 +323,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
+    use alloy_network_primitives::BlockTransactionsKind;
     use alloy_primitives::B256;
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -608,8 +616,11 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u64>()));
     }
@@ -623,9 +634,12 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
-        assert_eq!(block.header.miner, coinbase);
+        let block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(block.header.beneficiary, coinbase);
     }
 
     #[tokio::test]
@@ -645,8 +659,11 @@ mod tests {
     async fn test_anvil_node_info() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let latest_block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let latest_block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
 
         provider.evm_mine(None).await.unwrap();
 
@@ -738,7 +755,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await
             .unwrap()
             .unwrap()
@@ -755,7 +772,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await
             .unwrap()
             .unwrap()
@@ -766,8 +783,11 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let latest_block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let latest_block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(latest_block.header.timestamp, timestamp + 1337);
     }
 
@@ -791,8 +811,11 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let latest_block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let latest_block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(block_gas_limit.to::<u64>(), latest_block.header.gas_limit);
     }
 
@@ -803,7 +826,7 @@ mod tests {
         provider.anvil_set_block_timestamp_interval(1).await.unwrap();
 
         let start_timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await
             .unwrap()
             .unwrap()
@@ -814,8 +837,11 @@ mod tests {
 
         provider.evm_mine(None).await.unwrap();
 
-        let latest_block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let latest_block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(latest_block.header.timestamp, start_timestamp + 1);
 
@@ -824,7 +850,7 @@ mod tests {
         provider.evm_mine(None).await.unwrap();
 
         let start_timestamp = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await
             .unwrap()
             .unwrap()
@@ -833,8 +859,11 @@ mod tests {
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        let latest_block =
-            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        let latest_block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(latest_block.header.timestamp, start_timestamp);
     }
@@ -916,6 +945,30 @@ mod tests {
 
         let url = "https://example.com".to_string();
         provider.anvil_set_rpc_url(url.clone()).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_reorg() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        // Mine two blocks
+        provider.anvil_mine(Some(U256::from(2)), None).await.unwrap();
+
+        let reorged_block = provider
+            .get_block_by_number(2.into(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
+        provider.anvil_reorg(ReorgOptions { depth: 1, tx_block_pairs: Vec::new() }).await.unwrap();
+
+        let new_block = provider
+            .get_block_by_number(2.into(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(reorged_block.header.number, new_block.header.number);
+        assert_ne!(reorged_block.header.hash, new_block.header.hash);
     }
 
     #[tokio::test]

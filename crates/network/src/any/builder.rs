@@ -1,9 +1,7 @@
 use crate::{
     any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+    TransactionBuilderError,
 };
-use alloy_consensus::BlobTransactionSidecar;
-use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
@@ -138,7 +136,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
             )
             .into_unbuilt(self));
         }
-        Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
+        Ok(self.inner.build_typed_tx().expect("checked by missing_keys").into())
     }
 
     async fn build<W: NetworkWallet<AnyNetwork>>(
@@ -146,33 +144,5 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         wallet: &W,
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
         Ok(wallet.sign_request(self).await?)
-    }
-}
-
-impl TransactionBuilder4844 for WithOtherFields<TransactionRequest> {
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.deref().max_fee_per_blob_gas()
-    }
-
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
-        self.deref_mut().set_max_fee_per_blob_gas(max_fee_per_blob_gas)
-    }
-
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.deref().blob_sidecar()
-    }
-
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.deref_mut().set_blob_sidecar(sidecar)
-    }
-}
-
-impl TransactionBuilder7702 for WithOtherFields<TransactionRequest> {
-    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
-        self.deref().authorization_list()
-    }
-
-    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
-        self.deref_mut().set_authorization_list(authorization_list)
     }
 }
