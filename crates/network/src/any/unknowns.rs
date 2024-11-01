@@ -5,6 +5,7 @@ use alloy_consensus::TxType;
 use alloy_eips::{eip2718::Eip2718Error, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, TxKind, B256};
 use alloy_rpc_types_eth::AccessList;
+use alloy_serde::OtherFields;
 
 /// Transaction type for a catch-all network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -77,57 +78,40 @@ pub struct UnknownTypedTransaction {
 
     /// Additional fields.
     #[serde(flatten)]
-    pub fields: std::collections::BTreeMap<String, serde_json::Value>,
+    pub fields: OtherFields,
 
     /// Memoization for deserialization.
     #[serde(skip, default)]
     pub memo: DeserMemo,
 }
 
-impl UnknownTypedTransaction {
-    /// Select a field by key and attempt to deserialize it.
-    ///
-    /// This method will return `None` if the key is not present in the fields,
-    /// or if the transaction is already fully deserialized (i.e. it is an
-    /// Ethereum [`TxEnvelope`]). Otherwise, it will attempt to deserialize the
-    /// field and return the result wrapped in a `Some`.
-    ///
-    /// [`TxEnvelope`]: alloy_consensus::TxEnvelope
-    pub fn deser_by_key<T: serde::de::DeserializeOwned>(
-        &self,
-        key: &str,
-    ) -> Option<serde_json::Result<T>> {
-        self.fields.get(key).cloned().map(serde_json::from_value)
-    }
-}
-
 impl alloy_consensus::Transaction for UnknownTypedTransaction {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
-        self.deser_by_key("chainId").and_then(Result::ok)
+        self.fields.get_deserialized("chainId").and_then(Result::ok)
     }
 
     fn nonce(&self) -> u64 {
-        self.deser_by_key("nonce").and_then(Result::ok).unwrap_or_default()
+        self.fields.get_deserialized("nonce").and_then(Result::ok).unwrap_or_default()
     }
 
     fn gas_limit(&self) -> u64 {
-        self.deser_by_key("gasLimit").and_then(Result::ok).unwrap_or_default()
+        self.fields.get_deserialized("gasLimit").and_then(Result::ok).unwrap_or_default()
     }
 
     fn gas_price(&self) -> Option<u128> {
-        self.deser_by_key("gasPrice").and_then(Result::ok)
+        self.fields.get_deserialized("gasPrice").and_then(Result::ok)
     }
 
     fn max_fee_per_gas(&self) -> u128 {
-        self.deser_by_key("maxFeePerGas").and_then(Result::ok).unwrap_or_default()
+        self.fields.get_deserialized("maxFeePerGas").and_then(Result::ok).unwrap_or_default()
     }
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.deser_by_key("maxPriorityFeePerGas").and_then(Result::ok)
+        self.fields.get_deserialized("maxPriorityFeePerGas").and_then(Result::ok)
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.deser_by_key("maxFeePerBlobGas").and_then(Result::ok)
+        self.fields.get_deserialized("maxFeePerBlobGas").and_then(Result::ok)
     }
 
     fn priority_fee_or_price(&self) -> u128 {
@@ -149,13 +133,13 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     }
 
     fn value(&self) -> alloy_primitives::U256 {
-        self.deser_by_key("value").and_then(Result::ok).unwrap_or_default()
+        self.fields.get_deserialized("value").and_then(Result::ok).unwrap_or_default()
     }
 
     fn input(&self) -> &Bytes {
-        self.memo
-            .input
-            .get_or_init(|| self.deser_by_key("input").and_then(Result::ok).unwrap_or_default())
+        self.memo.input.get_or_init(|| {
+            self.fields.get_deserialized("input").and_then(Result::ok).unwrap_or_default()
+        })
     }
 
     fn ty(&self) -> u8 {
@@ -165,7 +149,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     fn access_list(&self) -> Option<&AccessList> {
         if self.fields.contains_key("accessList") {
             Some(self.memo.access_list.get_or_init(|| {
-                self.deser_by_key("accessList").and_then(Result::ok).unwrap_or_default()
+                self.fields.get_deserialized("accessList").and_then(Result::ok).unwrap_or_default()
             }))
         } else {
             None
@@ -175,7 +159,10 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         if self.fields.contains_key("blobVersionedHashes") {
             Some(self.memo.blob_versioned_hashes.get_or_init(|| {
-                self.deser_by_key("blobVersionedHashes").and_then(Result::ok).unwrap_or_default()
+                self.fields
+                    .get_deserialized("blobVersionedHashes")
+                    .and_then(Result::ok)
+                    .unwrap_or_default()
             }))
         } else {
             None
@@ -185,7 +172,10 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         if self.fields.contains_key("authorizationList") {
             Some(self.memo.authorization_list.get_or_init(|| {
-                self.deser_by_key("authorizationList").and_then(Result::ok).unwrap_or_default()
+                self.fields
+                    .get_deserialized("authorizationList")
+                    .and_then(Result::ok)
+                    .unwrap_or_default()
             }))
         } else {
             None
