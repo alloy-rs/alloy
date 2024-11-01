@@ -687,7 +687,6 @@ impl TransactionBuilder7702 for TransactionRequest {
     }
 }
 
-
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.
 ///
 /// This is done for compatibility reasons where older implementations used `data` instead of the
