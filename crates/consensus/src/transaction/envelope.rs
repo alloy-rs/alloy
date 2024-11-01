@@ -94,6 +94,7 @@ impl TryFrom<u8> for TxType {
     feature = "serde",
     serde(into = "serde_from::TaggedTxEnvelope", from = "serde_from::MaybeTaggedTxEnvelope")
 )]
+#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[doc(alias = "TransactionEnvelope")]
 #[non_exhaustive]
 pub enum TxEnvelope {
@@ -618,6 +619,7 @@ mod tests {
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
+    use arbitrary::Arbitrary;
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[cfg(not(feature = "std"))]
@@ -1149,5 +1151,14 @@ mod tests {
                 "018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f"
             )
         );
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn test_arbitrary_envelope() {
+        let mut unstructured = arbitrary::Unstructured::new(b"arbitrary tx envelope");
+        let tx = TxEnvelope::arbitrary(&mut unstructured).unwrap();
+
+        assert!(tx.recover_signer().is_ok());
     }
 }

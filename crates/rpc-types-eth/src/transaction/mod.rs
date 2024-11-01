@@ -3,7 +3,7 @@
 use alloy_consensus::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
 };
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
@@ -35,7 +35,7 @@ pub use alloy_consensus::{
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Tx")]
 pub struct Transaction<T = TxEnvelope> {
@@ -237,10 +237,9 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
     }
 }
 
-impl<T: TransactionTrait> TransactionResponse for Transaction<T> {
+impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T> {
     fn tx_hash(&self) -> B256 {
-        Default::default()
-        // self.hash
+        self.inner.trie_hash()
     }
 
     fn block_hash(&self) -> Option<BlockHash> {

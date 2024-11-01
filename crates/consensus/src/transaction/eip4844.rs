@@ -248,17 +248,10 @@ impl RlpEcdsaTx for TxEip4844Variant {
         }
     }
 
-    fn rlp_encoded_length(&self) -> usize {
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
         match self {
-            Self::TxEip4844(inner) => inner.rlp_encoded_length(),
-            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length(),
-        }
-    }
-
-    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        match self {
-            Self::TxEip4844(inner) => inner.rlp_encoded_length_with_signature(signature),
-            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length_with_signature(signature),
+            Self::TxEip4844(inner) => inner.rlp_header_signed(signature),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_header_signed(signature),
         }
     }
 
@@ -291,21 +284,6 @@ impl RlpEcdsaTx for TxEip4844Variant {
         TxEip4844::rlp_decode_fields(buf).map(Into::into)
     }
 
-    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let remaining = buf.len();
-
-        let res = Self::rlp_decode_fields(buf)?;
-
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-        Ok(res)
-    }
-
     fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
         // We need to determine if this has a sidecar tx or not. The needle ref
         // is consumed to look for headers.
@@ -336,8 +314,10 @@ impl RlpEcdsaTx for TxEip4844Variant {
     }
 
     fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
-        // eip4844 tx_hash is always based on the non-sidecar encoding
-        self.tx().tx_hash_with_type(signature, ty)
+        match self {
+            Self::TxEip4844(inner) => inner.tx_hash_with_type(signature, ty),
+            Self::TxEip4844WithSidecar(inner) => inner.tx_hash_with_type(signature, ty),
+        }
     }
 }
 
@@ -767,7 +747,7 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
 
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
         // important: must hash the tx WITHOUT the sidecar
-        let hash = self.tx.tx_hash(&signature);
+        let hash = self.tx_hash(&signature);
 
         Signed::new_unchecked(self, signature, hash)
     }
@@ -883,6 +863,7 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
     }
 
     fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
+        // eip4844 tx_hash is always based on the non-sidecar encoding
         self.tx.tx_hash_with_type(signature, ty)
     }
 }
