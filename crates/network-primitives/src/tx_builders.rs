@@ -1,5 +1,6 @@
 use core::ops::{Deref, DerefMut};
 
+use alloc::vec::Vec;
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_serde::WithOtherFields;
