@@ -137,3 +137,28 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
         self.signature.recover_address_from_prehash(&sighash)
     }
 }
+
+#[cfg(all(any(test, feature = "arbitrary"), feature = "k256"))]
+impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a>
+    for Signed<T, Signature>
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use k256::{
+            ecdsa::{signature::hazmat::PrehashSigner, SigningKey},
+            NonZeroScalar,
+        };
+        use rand::{rngs::StdRng, SeedableRng};
+
+        let rng_seed = u.arbitrary::<[u8; 32]>()?;
+        let mut rand_gen = StdRng::from_seed(rng_seed);
+        let signing_key: SigningKey = NonZeroScalar::random(&mut rand_gen).into();
+
+        let tx = T::arbitrary(u)?;
+
+        let (recoverable_sig, recovery_id) =
+            signing_key.sign_prehash(tx.signature_hash().as_ref()).unwrap();
+        let signature: Signature = (recoverable_sig, recovery_id).into();
+
+        Ok(tx.into_signed(signature))
+    }
+}
