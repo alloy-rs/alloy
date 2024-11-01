@@ -14,3 +14,6 @@ pub use traits::{BlockResponse, ReceiptResponse, TransactionResponse};
 
 mod block;
 pub use block::{BlockTransactionHashes, BlockTransactions, BlockTransactionsKind};
+
+mod tx_builders;
+pub use tx_builders::{TransactionBuilder4844, TransactionBuilder7702};
