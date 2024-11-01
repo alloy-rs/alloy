@@ -160,3 +160,10 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
 tower-http = "0.6.1"
+
+[patch.crates-io]
+alloy-core = { git = "https://github.com/alloy-rs/core", rev = "e127567" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "e127567" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "e127567" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "e127567" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "e127567" }

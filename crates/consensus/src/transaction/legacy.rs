@@ -477,7 +477,8 @@ pub mod signed_legacy_serde {
         let SignedLegacy::<T> { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
         let (parity, chain_id) = from_eip155_value(signature.v.to::<u64>())
             .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
-        if chain_id != tx.chain_id() {
+        // Some nodes respond with 0 chain ID for legacy transactions when it is missing.
+        if chain_id != tx.chain_id().filter(|c| *c > 0) {
             return Err(serde::de::Error::custom("chain id mismatch"));
         }
         Ok(Signed::new_unchecked(
