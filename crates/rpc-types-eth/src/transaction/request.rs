@@ -6,6 +6,7 @@ use alloy_consensus::{
     TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use core::hash::Hash;
 
@@ -656,6 +657,36 @@ impl TransactionRequest {
         BuildTransactionErr { tx: self, error: message.to_string() }
     }
 }
+
+impl TransactionBuilder4844 for TransactionRequest {
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.max_fee_per_blob_gas
+    }
+
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
+        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
+    }
+
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.sidecar.as_ref()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+        self.sidecar = Some(sidecar);
+        self.populate_blob_hashes();
+    }
+}
+
+impl TransactionBuilder7702 for TransactionRequest {
+    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
+        self.authorization_list.as_ref()
+    }
+
+    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
+        self.authorization_list = Some(authorization_list);
+    }
+}
+
 
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.
 ///
