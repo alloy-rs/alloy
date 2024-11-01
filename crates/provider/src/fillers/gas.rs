@@ -6,10 +6,11 @@ use crate::{
     utils::Eip1559Estimation,
     Provider,
 };
+use alloy_consensus::BlockHeader;
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
-use alloy_network_primitives::{BlockResponse, HeaderResponse};
+use alloy_network_primitives::{BlockResponse, BlockTransactionsKind};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
@@ -226,10 +227,11 @@ where
         }
 
         provider
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await?
             .ok_or(RpcError::NullResp)?
             .header()
+            .as_ref()
             .next_block_blob_fee()
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
@@ -252,19 +254,13 @@ where
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_consensus::{SidecarBuilder, SimpleCoder};
+    use alloy_consensus::{SidecarBuilder, SimpleCoder, Transaction};
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
-
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
@@ -285,8 +281,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let gas_price = provider.get_gas_price().await.unwrap();
@@ -306,8 +300,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_max_fee_per_blob_gas() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
@@ -325,7 +317,7 @@ mod tests {
 
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
 
-        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
@@ -335,8 +327,6 @@ mod tests {
 
     #[tokio::test]
     async fn zero_max_fee_per_blob_gas() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
@@ -355,7 +345,7 @@ mod tests {
 
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
 
-        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),

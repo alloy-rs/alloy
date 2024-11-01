@@ -99,16 +99,13 @@ impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static
                     None::<()>,
                 )
             }
-            ForkchoiceUpdateError::InvalidState => jsonrpsee_types::error::ErrorObject::owned(
-                INVALID_FORK_CHOICE_STATE_ERROR,
-                INVALID_FORK_CHOICE_STATE_ERROR_MSG,
-                None::<()>,
-            ),
-            ForkchoiceUpdateError::UnknownFinalBlock => jsonrpsee_types::error::ErrorObject::owned(
-                INVALID_FORK_CHOICE_STATE_ERROR,
-                INVALID_FORK_CHOICE_STATE_ERROR_MSG,
-                None::<()>,
-            ),
+            ForkchoiceUpdateError::InvalidState | ForkchoiceUpdateError::UnknownFinalBlock => {
+                jsonrpsee_types::error::ErrorObject::owned(
+                    INVALID_FORK_CHOICE_STATE_ERROR,
+                    INVALID_FORK_CHOICE_STATE_ERROR_MSG,
+                    None::<()>,
+                )
+            }
         }
     }
 }

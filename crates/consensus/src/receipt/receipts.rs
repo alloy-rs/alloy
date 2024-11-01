@@ -295,6 +295,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     #[cfg(feature = "serde")]
     #[test]
     fn root_vs_status() {
@@ -317,6 +319,23 @@ mod test {
         assert_eq!(
             json,
             r#"{"root":"0x0000000000000000000000000000000000000000000000000000000000000000","cumulativeGasUsed":"0x0","logs":[]}"#
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deser_pre658() {
+        use alloy_primitives::b256;
+
+        let json = r#"{"root":"0x284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10","cumulativeGasUsed":"0x0","logs":[]}"#;
+
+        let receipt: super::Receipt<()> = serde_json::from_str(json).unwrap();
+
+        assert_eq!(
+            receipt.status,
+            super::Eip658Value::PostState(b256!(
+                "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
+            ))
         );
     }
 }

@@ -71,12 +71,13 @@ where
     }
 }
 
-/// The [`CacheProvider`] holds the underlying in-memory LRU cache and overrides methods from the
-/// [`Provider`] trait that should attempt to fetch from cache and fallback to the RPC in case of a
-/// cache miss.
+/// The [`CacheProvider`] holds the underlying in-memory LRU cache and overrides methods
+/// from the [`Provider`] trait. It attempts to fetch from the cache and fallbacks to
+/// the RPC in case of a cache miss.
 ///
-/// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods to the
-/// provider interface to lets users save cache to the disk and load from it on demand.
+/// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods
+/// to the provider interface, allowing users to save the cache to disk and load it
+/// from there on demand.
 #[derive(Debug, Clone)]
 pub struct CacheProvider<P, T, N> {
     /// Inner provider.
@@ -168,11 +169,16 @@ where
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        hydrate: bool,
+        kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
-        let req = RequestType::new("eth_getBlockByNumber", (number, hydrate));
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
 
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, hydrate)).await
+        let req = RequestType::new("eth_getBlockByNumber", (number, full));
+
+        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
     }
 
     async fn get_block_by_hash(
@@ -428,8 +434,7 @@ impl<Params: RpcParam> RequestType<Params> {
     const fn has_block_tag(&self) -> bool {
         if let Some(block_id) = self.block_id {
             match block_id {
-                BlockId::Hash(_) => return false,
-                BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
+                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
                 _ => return true,
             }
         }

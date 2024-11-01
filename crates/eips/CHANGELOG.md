@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
+
+### Bug Fixes
+
+- Sidecar rlp decoding ([#1549](https://github.com/alloy-rs/alloy/issues/1549))
+
+### Other
+
+- Add unit test for `amount_wei` `Withdrawal` ([#1551](https://github.com/alloy-rs/alloy/issues/1551))
+
+## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
+
+### Bug Fixes
+
+- Correct implementations of Encodable and Decodable for sidecars ([#1528](https://github.com/alloy-rs/alloy/issues/1528))
+
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
+### Other
+
+- Impl `From<RpcBlockHash>` for `BlockId` ([#1539](https://github.com/alloy-rs/alloy/issues/1539))
+- Add unit tests and reduce paths ([#1531](https://github.com/alloy-rs/alloy/issues/1531))
+
+## [0.5.2](https://github.com/alloy-rs/alloy/releases/tag/v0.5.2) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.2
+
+## [0.5.1](https://github.com/alloy-rs/alloy/releases/tag/v0.5.1) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.1
+- Add empty requests constant ([#1519](https://github.com/alloy-rs/alloy/issues/1519))
+- Remove 7685 request variants ([#1515](https://github.com/alloy-rs/alloy/issues/1515))
+- Remove redundant cfgs ([#1516](https://github.com/alloy-rs/alloy/issues/1516))
+
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Bug Fixes
+
+- [eips] Blob Sidecar Item Serde ([#1441](https://github.com/alloy-rs/alloy/issues/1441))
+
+### Features
+
+- [eip4895] Implement `Withdrawals` ([#1462](https://github.com/alloy-rs/alloy/issues/1462))
+- Port generate_blob_sidecar ([#1511](https://github.com/alloy-rs/alloy/issues/1511))
+- [eips] Arbitrary BaseFeeParams ([#1432](https://github.com/alloy-rs/alloy/issues/1432))
+- `Encodable2718::network_len` ([#1431](https://github.com/alloy-rs/alloy/issues/1431))
+- Add helper from impl ([#1407](https://github.com/alloy-rs/alloy/issues/1407))
+
+### Miscellaneous Tasks
+
+- Release 0.5.0
+- Update pectra system contracts bytecodes & addresses ([#1512](https://github.com/alloy-rs/alloy/issues/1512))
+- Refactor some match with same arms ([#1463](https://github.com/alloy-rs/alloy/issues/1463))
+- Update eip-7251 bytecode and address ([#1380](https://github.com/alloy-rs/alloy/issues/1380))
+- Remove redundant else ([#1468](https://github.com/alloy-rs/alloy/issues/1468))
+- Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))
+
+### Other
+
+- Update fn encoded_2718 ([#1475](https://github.com/alloy-rs/alloy/issues/1475))
+- Add unit tests for `ConsolidationRequest` ([#1497](https://github.com/alloy-rs/alloy/issues/1497))
+- Add unit tests for `WithdrawalRequest` ([#1472](https://github.com/alloy-rs/alloy/issues/1472))
+- Add more unit tests ([#1464](https://github.com/alloy-rs/alloy/issues/1464))
+- Revert test: update test cases with addresses ([#1358](https://github.com/alloy-rs/alloy/issues/1358)) ([#1444](https://github.com/alloy-rs/alloy/issues/1444))
+
+## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
+
 ## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
 
 ### Bug Fixes

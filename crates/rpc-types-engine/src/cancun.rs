@@ -22,6 +22,7 @@ pub struct CancunPayloadFields {
 
 /// A container type for [CancunPayloadFields] that may or may not be present.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MaybeCancunPayloadFields {
     fields: Option<CancunPayloadFields>,
 }

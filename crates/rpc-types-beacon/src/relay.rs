@@ -3,10 +3,9 @@
 //! See also <https://flashbots.github.io/relay-specs/>
 
 use crate::{BlsPublicKey, BlsSignature};
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
-    BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
-    ExecutionPayloadV4,
+    BlobsBundleV1, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -97,6 +96,8 @@ pub struct SignedBidTrace {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Bellatrix).
+///
+/// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -111,6 +112,8 @@ pub struct SignedBidSubmissionV1 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Capella).
+///
+/// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/capella/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -125,6 +128,8 @@ pub struct SignedBidSubmissionV2 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Deneb).
+///
+/// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -148,23 +153,13 @@ pub struct SignedBidSubmissionV4 {
     /// The [`BidTrace`] message associated with the submission.
     pub message: BidTrace,
     /// The execution payload for the submission.
-    #[serde(with = "crate::payload::beacon_payload_v4")]
-    pub execution_payload: ExecutionPayloadV4,
+    #[serde(with = "crate::payload::beacon_payload_v3")]
+    pub execution_payload: ExecutionPayloadV3,
     /// The Electra block bundle for this bid.
     pub blobs_bundle: BlobsBundleV1,
+    /// The Pectra execution requests for this bid.
+    pub execution_requests: Vec<Bytes>,
     /// The signature associated with the submission.
-    pub signature: BlsSignature,
-}
-
-/// SubmitBlockRequest is the request from the builder to submit a block.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SubmitBlockRequest {
-    /// The BidTrace message associated with the block submission.
-    pub message: BidTrace,
-    /// The execution payload for the block submission.
-    #[serde(with = "crate::payload::beacon_payload")]
-    pub execution_payload: ExecutionPayload,
-    /// The signature associated with the block submission.
     pub signature: BlsSignature,
 }
 
@@ -185,39 +180,43 @@ impl SubmitBlockRequestQuery {
     }
 }
 
-/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L132-L136>
+/// A Request to validate a [`SignedBidSubmissionV1`]
+///
+/// <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L132-L136>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequest {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV1,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
 }
 
-/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L204-L204>
+/// A Request to validate a [`SignedBidSubmissionV2`]
+///
+/// <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L204-L208>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequestV2 {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV2,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
-    /// The withdrawals root for the validation request.
-    pub withdrawals_root: B256,
 }
 
-/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
+/// A Request to validate a [`SignedBidSubmissionV3`]
+///
+/// <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequestV3 {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV3,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
@@ -225,8 +224,19 @@ pub struct BuilderBlockValidationRequestV3 {
     pub parent_beacon_block_root: B256,
 }
 
-/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
-pub type BuilderBlockValidationRequestV4 = BuilderBlockValidationRequestV3;
+/// A Request to validate a [`SignedBidSubmissionV4`]
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV4 {
+    /// The request to be validated.
+    #[serde(flatten)]
+    pub request: SignedBidSubmissionV4,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
+}
 
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///

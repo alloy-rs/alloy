@@ -37,6 +37,7 @@ thiserror.workspace = true
 alloy-pubsub = { workspace = true, optional = true }
 
 [dev-dependencies]
+alloy-consensus.workspace = true
 alloy-rpc-client = { workspace = true, features = ["pubsub", "ws"] }
 alloy-transport-http.workspace = true
 alloy-node-bindings.workspace = true
