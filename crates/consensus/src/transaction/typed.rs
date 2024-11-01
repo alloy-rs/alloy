@@ -22,6 +22,7 @@ use crate::{
         into = "serde_from::TaggedTypedTransaction"
     )
 )]
+#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[doc(alias = "TypedTx", alias = "TxTyped", alias = "TransactionTyped")]
 pub enum TypedTransaction {
     /// Legacy transaction

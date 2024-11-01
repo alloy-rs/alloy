@@ -24,11 +24,15 @@ alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-serde = { workspace = true, optional = true }
 
+# k256
+k256 = { workspace = true, features = ["ecdsa"], optional = true }
+
 # kzg
 c-kzg = { workspace = true, features = ["serde"], optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
+rand = { workspace = true, optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -58,9 +62,9 @@ tokio = { workspace = true, features = ["macros"] }
 [features]
 default = ["std"]
 std = ["alloy-eips/std", "c-kzg?/std"]
-k256 = ["alloy-primitives/k256", "alloy-eips/k256"]
+k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
-arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
+arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = [
     "dep:serde",
     "alloy-primitives/serde",
