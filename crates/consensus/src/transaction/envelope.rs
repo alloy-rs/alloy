@@ -1154,6 +1154,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "k256")]
     fn test_arbitrary_envelope() {
         let mut unstructured = arbitrary::Unstructured::new(b"arbitrary tx envelope");
         let tx = TxEnvelope::arbitrary(&mut unstructured).unwrap();
