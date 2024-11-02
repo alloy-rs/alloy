@@ -15,10 +15,10 @@ use alloy_primitives::{Address, BlockHash, Bytes, Sealable, B256, U256};
 use alloy_rlp::Encodable;
 
 /// Block representation
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct Block<T = Transaction, H = Header> {
+pub struct Block<T = Transaction<TxEnvelope>, H = Header> {
     /// Header of the block.
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub header: H,
@@ -38,6 +38,18 @@ pub struct Block<T = Transaction, H = Header> {
     /// Withdrawals in the block.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals: Option<Withdrawals>,
+}
+
+// cannot derive, as the derive impl would constrain `where T: Default`
+impl<T, H: Default> Default for Block<T, H> {
+    fn default() -> Self {
+        Self {
+            header: Default::default(),
+            uncles: Default::default(),
+            transactions: Default::default(),
+            withdrawals: Default::default(),
+        }
+    }
 }
 
 impl<T: TransactionResponse, H> Block<T, H> {

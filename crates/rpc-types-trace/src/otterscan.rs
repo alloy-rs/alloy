@@ -105,17 +105,17 @@ pub struct InternalIssuance {
 /// Custom `Block` struct that includes transaction count for Otterscan responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OtsBlock<T = Transaction> {
+pub struct OtsBlock<T = Transaction, H = Header> {
     /// The block information.
     #[serde(flatten)]
-    pub block: Block<T>,
+    pub block: Block<T, H>,
     /// The number of transactions in the block.
     #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
-impl<T> From<Block<T>> for OtsBlock<T> {
-    fn from(block: Block<T>) -> Self {
+impl<T, H> From<Block<T, H>> for OtsBlock<T, H> {
+    fn from(block: Block<T, H>) -> Self {
         Self { transaction_count: block.transactions.len(), block }
     }
 }
@@ -123,10 +123,10 @@ impl<T> From<Block<T>> for OtsBlock<T> {
 /// Custom `Block` struct that without transactions for Otterscan responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OtsSlimBlock {
+pub struct OtsSlimBlock<H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
@@ -138,8 +138,8 @@ pub struct OtsSlimBlock {
     pub transaction_count: usize,
 }
 
-impl<T> From<Block<T>> for OtsSlimBlock {
-    fn from(block: Block<T>) -> Self {
+impl<T, H> From<Block<T, H>> for OtsSlimBlock<H> {
+    fn from(block: Block<T, H>) -> Self {
         Self {
             header: block.header,
             uncles: block.uncles,
@@ -152,24 +152,24 @@ impl<T> From<Block<T>> for OtsSlimBlock {
 /// Custom struct for otterscan `getBlockDetails` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BlockDetails {
+pub struct BlockDetails<H = Header> {
     /// The block information with transaction count.
-    pub block: OtsSlimBlock,
+    pub block: OtsSlimBlock<H>,
     /// The issuance information for the block.
     pub issuance: InternalIssuance,
     /// The total fees for the block.
     pub total_fees: U256,
 }
 
-impl<T> From<Block<T>> for BlockDetails {
-    fn from(block: Block<T>) -> Self {
+impl<T, H> From<Block<T, H>> for BlockDetails<H> {
+    fn from(block: Block<T, H>) -> Self {
         Self { block: block.into(), issuance: Default::default(), total_fees: U256::default() }
     }
 }
 
-impl BlockDetails {
+impl<H> BlockDetails<H> {
     /// Create a new `BlockDetails` struct.
-    pub fn new<T>(block: Block<T>, issuance: InternalIssuance, total_fees: U256) -> Self {
+    pub fn new<T>(block: Block<T, H>, issuance: InternalIssuance, total_fees: U256) -> Self {
         Self { block: block.into(), issuance, total_fees }
     }
 }
@@ -215,9 +215,9 @@ pub struct OtsReceipt {
 
 /// Custom struct for otterscan `getBlockTransactions` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OtsBlockTransactions<T = Transaction> {
+pub struct OtsBlockTransactions<T = Transaction, H = Header> {
     /// The full block information with transaction count.
-    pub fullblock: OtsBlock<T>,
+    pub fullblock: OtsBlock<T, H>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
 }

@@ -3,7 +3,7 @@ use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[doc(inline)]
@@ -246,17 +246,10 @@ impl RlpEcdsaTx for TxEip4844Variant {
         }
     }
 
-    fn rlp_encoded_length(&self) -> usize {
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
         match self {
-            Self::TxEip4844(inner) => inner.rlp_encoded_length(),
-            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length(),
-        }
-    }
-
-    fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        match self {
-            Self::TxEip4844(inner) => inner.rlp_encoded_length_with_signature(signature),
-            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length_with_signature(signature),
+            Self::TxEip4844(inner) => inner.rlp_header_signed(signature),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_header_signed(signature),
         }
     }
 
@@ -289,26 +282,6 @@ impl RlpEcdsaTx for TxEip4844Variant {
         TxEip4844::rlp_decode_fields(buf).map(Into::into)
     }
 
-    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let needle = &mut &**buf;
-        let header = Header::decode(needle)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let remaining_len = needle.len();
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-
-        let chunk = &mut &buf[..header.length_with_payload()];
-        let res = Self::rlp_decode_fields(chunk)?;
-        if !chunk.is_empty() {
-            return Err(alloy_rlp::Error::UnexpectedLength);
-        }
-        buf.advance(header.length_with_payload());
-        Ok(res)
-    }
-
     fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
         // We need to determine if this has a sidecar tx or not. The needle ref
         // is consumed to look for headers.
@@ -339,8 +312,10 @@ impl RlpEcdsaTx for TxEip4844Variant {
     }
 
     fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
-        // eip4844 tx_hash is always based on the non-sidecar encoding
-        self.tx().tx_hash_with_type(signature, ty)
+        match self {
+            Self::TxEip4844(inner) => inner.tx_hash_with_type(signature, ty),
+            Self::TxEip4844WithSidecar(inner) => inner.tx_hash_with_type(signature, ty),
+        }
     }
 }
 
@@ -784,7 +759,7 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
         let signature = signature.with_parity_bool();
 
         // important: must hash the tx WITHOUT the sidecar
-        let hash = self.tx.tx_hash(&signature);
+        let hash = self.tx_hash(&signature);
 
         Signed::new_unchecked(self, signature, hash)
     }
@@ -864,6 +839,12 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         self.sidecar.rlp_encode_fields(out);
     }
 
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        let payload_length = self.tx.rlp_encoded_length_with_signature(signature)
+            + self.sidecar.rlp_encoded_fields_length();
+        Header { list: true, payload_length }
+    }
+
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.rlp_header_signed(signature).encode(out);
         self.tx.rlp_encode_signed(signature, out);
@@ -881,25 +862,20 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining_len = buf.len();
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
+        let remaining = buf.len();
 
-        let chunk = &mut &buf[..remaining_len];
-        let (tx, signature) = TxEip4844::rlp_decode_with_signature(chunk)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(chunk)?;
+        let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
 
-        // Decoding did not consume the entire payload specified by the header
-        if !chunk.is_empty() {
+        if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
-        buf.advance(header.payload_length);
 
         Ok((Self { tx, sidecar }, signature))
     }
 
     fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
+        // eip4844 tx_hash is always based on the non-sidecar encoding
         self.tx.tx_hash_with_type(signature, ty)
     }
 }

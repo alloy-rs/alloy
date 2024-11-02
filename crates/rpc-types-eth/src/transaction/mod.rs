@@ -1,14 +1,11 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
-    TxEnvelope, TxLegacy, TxType,
+    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
 };
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
 use alloy_network_primitives::TransactionResponse;
-use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
-
-use alloc::vec::Vec;
+use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
 pub use alloy_consensus::BlobTransactionSidecar;
 pub use alloy_eips::{
@@ -31,169 +28,63 @@ pub use receipt::AnyTransactionReceipt;
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
-mod signature;
-pub use signature::{Parity, Signature};
-
-pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
+pub use alloy_consensus::{
+    AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
+};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Tx")]
-pub struct Transaction {
-    /// Hash
-    pub hash: TxHash,
-    /// Nonce
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub nonce: u64,
-    /// Block hash
+pub struct Transaction<T = TxEnvelope> {
+    /// The inner transaction object
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub inner: T,
+
+    /// Hash of block where transaction was included, `None` if pending
     #[cfg_attr(feature = "serde", serde(default))]
     pub block_hash: Option<BlockHash>,
-    /// Block number
+
+    /// Number of block where transaction was included, `None` if pending
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
+
     /// Transaction Index
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub transaction_index: Option<u64>,
+
     /// Sender
     pub from: Address,
-    /// Recipient
-    pub to: Option<Address>,
-    /// Transferred value
-    pub value: U256,
-    /// Gas Price
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub gas_price: Option<u128>,
-    /// Gas amount
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas: u64,
-    /// Max BaseFeePerGas the user is willing to pay.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub max_fee_per_gas: Option<u128>,
-    /// The miner's tip.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub max_priority_fee_per_gas: Option<u128>,
-    /// Configured max fee per blob gas for eip-4844 transactions
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub max_fee_per_blob_gas: Option<u128>,
-    /// Data
-    pub input: Bytes,
-    /// All _flattened_ fields of the transaction signature.
-    ///
-    /// Note: this is an option so special transaction types without a signature (e.g. <https://github.com/ethereum-optimism/optimism/blob/0bf643c4147b43cd6f25a759d331ef3a2a61a2a3/specs/deposits.md#the-deposited-transaction-type>) can be supported.
-    #[cfg_attr(feature = "serde", serde(flatten, skip_serializing_if = "Option::is_none"))]
-    pub signature: Option<Signature>,
-    /// The chain id of the transaction, if any.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub chain_id: Option<ChainId>,
-    /// Contains the blob hashes for eip-4844 transactions.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub blob_versioned_hashes: Option<Vec<B256>>,
-    /// EIP2930
-    ///
-    /// Pre-pay to warm storage access.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub access_list: Option<AccessList>,
-    /// EIP2718
-    ///
-    /// Transaction type,
-    /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559
-    /// transaction, Some(1) for AccessList transaction, None or Some(0) for Legacy
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            rename = "type",
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    #[doc(alias = "tx_type")]
-    pub transaction_type: Option<u8>,
-    /// The signed authorization list is a list of tuples that store the address to code which the
-    /// signer desires to execute in the context of their EOA and their signature.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
-impl Transaction {
-    /// Returns true if the transaction is a legacy or 2930 transaction.
-    pub const fn is_legacy_gas(&self) -> bool {
-        self.gas_price.is_none()
+impl<T> AsRef<T> for Transaction<T> {
+    fn as_ref(&self) -> &T {
+        &self.inner
     }
+}
 
+impl<T> Transaction<T>
+where
+    T: TransactionTrait,
+{
+    /// Returns true if the transaction is a legacy or 2930 transaction.
+    pub fn is_legacy_gas(&self) -> bool {
+        self.inner.gas_price().is_some()
+    }
+}
+
+impl<T> Transaction<T>
+where
+    T: Into<TransactionRequest>,
+{
     /// Converts [Transaction] into [TransactionRequest].
     ///
-    /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
-    /// part of [Transaction].
+    /// During this conversion data for [TransactionRequest::sidecar] is not
+    /// populated as it is not part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
-        let gas_price = match (self.gas_price, self.max_fee_per_gas) {
-            (Some(gas_price), None) => Some(gas_price),
-            // EIP-1559 transactions include deprecated `gasPrice` field displaying gas used by
-            // transaction.
-            // Setting this field for resulted tx request will result in it being invalid
-            (_, Some(_)) => None,
-            // unreachable
-            (None, None) => None,
-        };
-
-        let to = self.to.map(TxKind::Call);
-
-        TransactionRequest {
-            from: Some(self.from),
-            to,
-            gas: Some(self.gas),
-            gas_price,
-            value: Some(self.value),
-            input: self.input.into(),
-            nonce: Some(self.nonce),
-            chain_id: self.chain_id,
-            access_list: self.access_list,
-            transaction_type: self.transaction_type,
-            max_fee_per_gas: self.max_fee_per_gas,
-            max_priority_fee_per_gas: self.max_priority_fee_per_gas,
-            max_fee_per_blob_gas: self.max_fee_per_blob_gas,
-            blob_versioned_hashes: self.blob_versioned_hashes,
-            sidecar: None,
-            authorization_list: self.authorization_list,
-        }
+        self.inner.into()
     }
 }
 
@@ -201,18 +92,12 @@ impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-
-        let tx = TxLegacy {
-            chain_id: tx.chain_id,
-            nonce: tx.nonce,
-            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?,
-            gas_limit: tx.gas,
-            to: tx.to.into(),
-            value: tx.value,
-            input: tx.input,
-        };
-        Ok(tx.into_signed(signature))
+        match tx.inner {
+            TxEnvelope::Legacy(tx) => Ok(tx),
+            _ => {
+                Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.inner.tx_type())))
+            }
+        }
     }
 }
 
@@ -220,22 +105,13 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-
-        let tx = TxEip1559 {
-            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
-            nonce: tx.nonce,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?,
-            max_priority_fee_per_gas: tx
-                .max_priority_fee_per_gas
-                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
-            gas_limit: tx.gas,
-            to: tx.to.into(),
-            value: tx.value,
-            input: tx.input,
-            access_list: tx.access_list.unwrap_or_default(),
-        };
-        Ok(tx.into_signed(signature))
+        match tx.inner {
+            TxEnvelope::Eip1559(tx) => Ok(tx),
+            _ => Err(ConversionError::Custom(format!(
+                "expected Eip1559, got {}",
+                tx.inner.tx_type()
+            ))),
+        }
     }
 }
 
@@ -243,19 +119,13 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-
-        let tx = TxEip2930 {
-            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
-            nonce: tx.nonce,
-            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?,
-            gas_limit: tx.gas,
-            to: tx.to.into(),
-            value: tx.value,
-            input: tx.input,
-            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
-        };
-        Ok(tx.into_signed(signature))
+        match tx.inner {
+            TxEnvelope::Eip2930(tx) => Ok(tx),
+            _ => Err(ConversionError::Custom(format!(
+                "expected Eip2930, got {}",
+                tx.inner.tx_type()
+            ))),
+        }
     }
 }
 
@@ -263,27 +133,11 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-        let tx = TxEip4844 {
-            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
-            nonce: tx.nonce,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?,
-            max_priority_fee_per_gas: tx
-                .max_priority_fee_per_gas
-                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
-            gas_limit: tx.gas,
-            to: tx.to.ok_or(ConversionError::MissingTo)?,
-            value: tx.value,
-            input: tx.input,
-            access_list: tx.access_list.unwrap_or_default(),
-            blob_versioned_hashes: tx
-                .blob_versioned_hashes
-                .ok_or(ConversionError::MissingBlobVersionedHashes)?,
-            max_fee_per_blob_gas: tx
-                .max_fee_per_blob_gas
-                .ok_or(ConversionError::MissingMaxFeePerBlobGas)?,
-        };
-        Ok(tx.into_signed(signature))
+        let tx: Signed<TxEip4844Variant> = tx.try_into()?;
+
+        let (tx, sig, hash) = tx.into_parts();
+
+        Ok(Self::new_unchecked(tx.into(), sig, hash))
     }
 }
 
@@ -291,11 +145,13 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let tx: Signed<TxEip4844> = tx.try_into()?;
-        let (inner, signature, _) = tx.into_parts();
-        let tx: TxEip4844Variant = inner.into();
-
-        Ok(tx.into_signed(signature))
+        match tx.inner {
+            TxEnvelope::Eip4844(tx) => Ok(tx),
+            _ => Err(ConversionError::Custom(format!(
+                "expected TxEip4844Variant, got {}",
+                tx.inner.tx_type()
+            ))),
+        }
     }
 }
 
@@ -303,110 +159,87 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-        let tx = TxEip7702 {
-            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
-            nonce: tx.nonce,
-            gas_limit: tx.gas,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?,
-            max_priority_fee_per_gas: tx
-                .max_priority_fee_per_gas
-                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
-            to: tx.to.ok_or(ConversionError::MissingTo)?,
-            value: tx.value,
-            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
-            authorization_list: tx
-                .authorization_list
-                .ok_or(ConversionError::MissingAuthorizationList)?,
-            input: tx.input,
-        };
-        Ok(tx.into_signed(signature))
-    }
-}
-
-impl TryFrom<Transaction> for TxEnvelope {
-    type Error = ConversionError;
-
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.transaction_type.unwrap_or_default().try_into()? {
-            TxType::Legacy => Ok(Self::Legacy(tx.try_into()?)),
-            TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
-            TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
-            TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
-            TxType::Eip7702 => Ok(Self::Eip7702(tx.try_into()?)),
+        match tx.inner {
+            TxEnvelope::Eip7702(tx) => Ok(tx),
+            _ => Err(ConversionError::Custom(format!(
+                "expected Eip7702, got {}",
+                tx.inner.tx_type()
+            ))),
         }
     }
 }
 
-impl alloy_consensus::Transaction for Transaction {
-    fn chain_id(&self) -> Option<ChainId> {
-        self.chain_id
-    }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.gas
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        self.gas_price
-    }
-
-    fn max_fee_per_gas(&self) -> u128 {
-        self.max_fee_per_gas.unwrap_or_else(|| self.gas_price.unwrap_or_default())
-    }
-
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.max_priority_fee_per_gas
-    }
-
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.max_fee_per_blob_gas
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        debug_assert!(
-            self.max_fee_per_gas.is_some() || self.gas_price.is_some(),
-            "mutually exclusive fields"
-        );
-        self.max_fee_per_gas.unwrap_or_else(|| self.gas_price.unwrap_or_default())
-    }
-
-    fn kind(&self) -> TxKind {
-        self.to.into()
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
-    fn input(&self) -> &Bytes {
-        &self.input
-    }
-
-    fn ty(&self) -> u8 {
-        self.transaction_type.unwrap_or_default()
-    }
-
-    fn access_list(&self) -> Option<&AccessList> {
-        self.access_list.as_ref()
-    }
-
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        self.blob_versioned_hashes.as_deref()
-    }
-
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.authorization_list.as_deref()
+impl From<Transaction> for TxEnvelope {
+    fn from(tx: Transaction) -> Self {
+        tx.inner
     }
 }
 
-impl TransactionResponse for Transaction {
+impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.inner.chain_id()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.inner.nonce()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        self.inner.gas_price()
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.inner.max_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.inner.max_fee_per_blob_gas()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.inner.priority_fee_or_price()
+    }
+
+    fn kind(&self) -> TxKind {
+        self.inner.kind()
+    }
+
+    fn value(&self) -> U256 {
+        self.inner.value()
+    }
+
+    fn input(&self) -> &Bytes {
+        self.inner.input()
+    }
+
+    fn ty(&self) -> u8 {
+        self.inner.ty()
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        self.inner.access_list()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.inner.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.inner.authorization_list()
+    }
+}
+
+impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T> {
     fn tx_hash(&self) -> B256 {
-        self.hash
+        self.inner.trie_hash()
     }
 
     fn block_hash(&self) -> Option<BlockHash> {
@@ -429,128 +262,6 @@ impl TransactionResponse for Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::Signature as AlloySignature;
-    use arbitrary::Arbitrary;
-    use core::str::FromStr;
-    use rand::Rng;
-    use similar_asserts::assert_eq;
-
-    #[test]
-    fn arbitrary_transaction() {
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        let _: Transaction =
-            Transaction::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_transaction() {
-        let transaction = Transaction {
-            hash: B256::with_last_byte(1),
-            nonce: 2,
-            block_hash: Some(B256::with_last_byte(3)),
-            block_number: Some(4),
-            transaction_index: Some(5),
-            from: Address::with_last_byte(6),
-            to: Some(Address::with_last_byte(7)),
-            value: U256::from(8),
-            gas_price: Some(9),
-            gas: 10,
-            input: vec![11, 12, 13].into(),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: None,
-            }),
-            chain_id: Some(17),
-            blob_versioned_hashes: None,
-            access_list: None,
-            transaction_type: Some(20),
-            max_fee_per_gas: Some(21),
-            max_priority_fee_per_gas: Some(22),
-            max_fee_per_blob_gas: None,
-            authorization_list: Some(vec![(Authorization {
-                chain_id: 1,
-                address: Address::left_padding_from(&[6]),
-                nonce: 1u64,
-            })
-            .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
-        };
-        let serialized = serde_json::to_string(&transaction).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","yParity":"0x0","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"}]}"#
-        );
-        let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(transaction, deserialized);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_transaction_with_parity_bit() {
-        let transaction = Transaction {
-            hash: B256::with_last_byte(1),
-            nonce: 2,
-            block_hash: Some(B256::with_last_byte(3)),
-            block_number: Some(4),
-            transaction_index: Some(5),
-            from: Address::with_last_byte(6),
-            to: Some(Address::with_last_byte(7)),
-            value: U256::from(8),
-            gas_price: Some(9),
-            gas: 10,
-            input: vec![11, 12, 13].into(),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: Some(Parity(true)),
-            }),
-            chain_id: Some(17),
-            blob_versioned_hashes: None,
-            access_list: None,
-            transaction_type: Some(20),
-            max_fee_per_gas: Some(21),
-            max_priority_fee_per_gas: Some(22),
-            max_fee_per_blob_gas: None,
-            authorization_list: Some(vec![(Authorization {
-                chain_id: 1,
-                address: Address::left_padding_from(&[6]),
-                nonce: 1u64,
-            })
-            .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
-        };
-        let serialized = serde_json::to_string(&transaction).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","yParity":"0x0","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"}]}"#
-        );
-        let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(transaction, deserialized);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
-    fn serde_minimal_transaction() {
-        let transaction = Transaction {
-            hash: B256::with_last_byte(1),
-            nonce: 2,
-            from: Address::with_last_byte(6),
-            value: U256::from(8),
-            gas: 10,
-            input: vec![11, 12, 13].into(),
-            ..Default::default()
-        };
-        let serialized = serde_json::to_string(&transaction).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
-        );
-        let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(transaction, deserialized);
-    }
 
     #[test]
     #[cfg(feature = "serde")]
@@ -576,5 +287,13 @@ mod tests {
         let request = tx.into_request();
         assert!(request.gas_price.is_none());
         assert!(request.max_fee_per_gas.is_some());
+    }
+
+    #[test]
+    fn serde_tx_from_contract_mod() {
+        let rpc_tx = r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":"0x6e4e53d1de650d5a5ebed19b38321db369ef1dc357904284ecf4d89b8834969c","blockNumber":"0x2","transactionIndex":"0x0","from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#;
+
+        let tx = serde_json::from_str::<Transaction>(rpc_tx).unwrap();
+        assert_eq!(tx.block_number, Some(2));
     }
 }

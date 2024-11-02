@@ -175,6 +175,15 @@ pub struct WithOtherFields<T> {
     pub other: OtherFields,
 }
 
+impl<T, U> AsRef<U> for WithOtherFields<T>
+where
+    T: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.inner.as_ref()
+    }
+}
+
 impl<T> WithOtherFields<T> {
     /// Creates a new [`WithOtherFields`] instance.
     pub fn new(inner: T) -> Self {

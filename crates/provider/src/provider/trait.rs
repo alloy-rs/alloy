@@ -801,7 +801,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[cfg(feature = "pubsub")]
     async fn subscribe_blocks(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::BlockResponse>> {
+    ) -> TransportResult<alloy_pubsub::Subscription<N::HeaderResponse>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
@@ -1084,6 +1084,7 @@ mod tests {
 
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
@@ -1351,9 +1352,8 @@ mod tests {
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
-        while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number, n);
-            assert_eq!(block.transactions.hashes().len(), 0);
+        while let Some(header) = stream.next().await {
+            assert_eq!(header.number, n);
             n += 1;
         }
     }
@@ -1372,9 +1372,8 @@ mod tests {
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
-        while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number, n);
-            assert_eq!(block.transactions.hashes().len(), 0);
+        while let Some(header) = stream.next().await {
+            assert_eq!(header.number, n);
             n += 1;
         }
     }
@@ -1390,9 +1389,9 @@ mod tests {
         let provider = RootProvider::<_, Ethereum>::new(client);
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);
-        while let Some(block) = stream.next().await {
-            println!("New block {:?}", block);
-            assert!(block.header.number > 0);
+        while let Some(header) = stream.next().await {
+            println!("New block {:?}", header);
+            assert!(header.number > 0);
         }
     }
 
@@ -1628,7 +1627,7 @@ mod tests {
             .await
             .expect("failed to fetch tx")
             .expect("tx not included");
-        assert_eq!(tx.input, bytes!("deadbeef"));
+        assert_eq!(tx.input(), &bytes!("deadbeef"));
     }
 
     #[tokio::test]
