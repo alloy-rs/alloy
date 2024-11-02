@@ -28,6 +28,11 @@ impl<T, Sig> Signed<T, Sig> {
         &self.tx
     }
 
+    /// Returns a mutable reference to the transaction.
+    pub const fn tx_mut(&mut self) -> &mut T {
+        &mut self.tx
+    }
+
     /// Returns a reference to the signature.
     pub const fn signature(&self) -> &Sig {
         &self.signature
