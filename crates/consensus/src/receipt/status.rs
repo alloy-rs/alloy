@@ -80,7 +80,7 @@ mod serde_eip658 {
     //! key, and [`Eip658Value::PostState`] as `root` key.
     //!
     //! If both are present, prefers `status` key.
-    //! 
+    //!
     //! Should be used with `#[serde(flatten)]`.
     use super::*;
     use serde::{Deserialize, Serialize};
