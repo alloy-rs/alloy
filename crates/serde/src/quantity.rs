@@ -462,7 +462,7 @@ mod tests {
             inner: HashMap<u128, u128>,
         }
 
-        let mut inner_map = HashMap::new();
+        let mut inner_map = HashMap::default();
         inner_map.insert(1000, 2000);
         inner_map.insert(3000, 4000);
 
