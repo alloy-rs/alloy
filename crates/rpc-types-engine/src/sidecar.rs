@@ -2,7 +2,7 @@
 
 use crate::{CancunPayloadFields, MaybeCancunPayloadFields};
 use alloc::vec::Vec;
-use alloy_eips::eip7685::{PragueRequests, Requests};
+use alloy_eips::eip7685::{Requests, RequestsOrHash};
 use alloy_primitives::B256;
 
 /// Container type for all available additional `newPayload` request parameters that are not present
@@ -15,7 +15,7 @@ pub struct ExecutionPayloadSidecar {
     cancun: MaybeCancunPayloadFields,
     /// The EIP-7685 requests provided as additional request params to `engine_newPayloadV4` that
     /// are not present in the `ExecutionPayload`.
-    prague: Option<PragueRequests>,
+    prague: Option<RequestsOrHash>,
 }
 
 impl ExecutionPayloadSidecar {
@@ -30,7 +30,7 @@ impl ExecutionPayloadSidecar {
     }
 
     /// Creates a new instance post prague for `engine_newPayloadV4`
-    pub fn v4(cancun: CancunPayloadFields, requests: PragueRequests) -> Self {
+    pub fn v4(cancun: CancunPayloadFields, requests: RequestsOrHash) -> Self {
         Self { cancun: cancun.into(), prague: Some(requests) }
     }
 
@@ -51,10 +51,20 @@ impl ExecutionPayloadSidecar {
 
     /// Returns the EIP-7685 requests
     pub const fn requests(&self) -> Option<&Requests> {
-        if let Some(PragueRequests::Requests(ref requests)) = self.prague {
+        if let Some(RequestsOrHash::Requests(ref requests)) = self.prague {
             Some(requests)
         } else {
             None
         }
+    }
+
+    /// Calculates or retrieves the requests hash.
+    ///
+    /// - If the `prague` field contains a list of requests, it calculates the requests hash
+    ///   dynamically.
+    /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
+
+    pub fn requests_hash(&self) -> B256 {
+        self.prague.as_ref().unwrap().requests_hash()
     }
 }
