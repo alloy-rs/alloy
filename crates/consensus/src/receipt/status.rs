@@ -192,15 +192,18 @@ mod test {
     fn serde_sanity() {
         let status: Eip658Value = true.into();
         let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(json, r#""0x1""#);
+        assert_eq!(json, r#"{"status":"0x1"}"#);
         assert_eq!(serde_json::from_str::<Eip658Value>(&json).unwrap(), status);
 
         let state: Eip658Value = false.into();
         let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, r#""0x0""#);
+        assert_eq!(json, r#"{"status":"0x0"}"#);
 
         let state: Eip658Value = B256::repeat_byte(1).into();
         let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, r#""0x0101010101010101010101010101010101010101010101010101010101010101""#);
+        assert_eq!(
+            json,
+            r#"{"root":"0x0101010101010101010101010101010101010101010101010101010101010101"}"#
+        );
     }
 }
