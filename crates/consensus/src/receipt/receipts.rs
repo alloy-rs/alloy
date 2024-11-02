@@ -295,7 +295,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
 
     #[cfg(feature = "serde")]
     #[test]
