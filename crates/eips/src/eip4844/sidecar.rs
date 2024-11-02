@@ -506,6 +506,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_blob_item_serde_roundtrip() {
         let blob_item = BlobTransactionSidecarItem {
             index: 0,
