@@ -1,15 +1,12 @@
 //! Support for capturing other fields.
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String};
 use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
 
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
@@ -234,6 +231,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
     use rand::Rng;
     use similar_asserts::assert_eq;
 

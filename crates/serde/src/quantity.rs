@@ -170,11 +170,11 @@ pub mod u128_vec_vec_opt {
 /// See [`quantity`](self) for more information.
 pub mod hashmap {
     use super::private::ConvertRuint;
-    use core::{fmt, marker::PhantomData};
+    use alloy_primitives::map::HashMap;
+    use core::{fmt, hash::BuildHasher, marker::PhantomData};
     use serde::{
         de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
     };
-    use std::{collections::HashMap, hash::BuildHasher};
 
     /// Serializes a `HashMap` of primitive numbers as a "quantity" hex string.
     pub fn serialize<K, V, S, H>(map: &HashMap<K, V, H>, serializer: S) -> Result<S::Ok, S::Error>
@@ -194,7 +194,7 @@ pub mod hashmap {
     /// Deserializes a `HashMap` of primitive numbers from a "quantity" hex string.
     pub fn deserialize<'de, K, V, D, H>(deserializer: D) -> Result<HashMap<K, V, H>, D::Error>
     where
-        K: ConvertRuint + Eq + std::hash::Hash,
+        K: ConvertRuint + Eq + core::hash::Hash,
         V: Deserialize<'de>,
         D: Deserializer<'de>,
         H: BuildHasher + Default,
@@ -205,7 +205,7 @@ pub mod hashmap {
 
         impl<'de, K, V, H> serde::de::Visitor<'de> for HashMapVisitor<K, V, H>
         where
-            K: ConvertRuint + Eq + std::hash::Hash,
+            K: ConvertRuint + Eq + core::hash::Hash,
             V: Deserialize<'de>,
             H: BuildHasher + Default,
         {
@@ -345,10 +345,8 @@ mod private {
 
 #[cfg(test)]
 mod tests {
-    use serde::{Deserialize, Serialize};
-
-    #[cfg(not(feature = "std"))]
     use alloc::{string::ToString, vec, vec::Vec};
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn test_hex_u64() {
@@ -456,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_u128_hashmap_via_ruint() {
-        use std::collections::HashMap;
+        use alloy_primitives::map::HashMap;
 
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
