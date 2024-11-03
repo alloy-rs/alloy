@@ -240,8 +240,8 @@ mod tests {
         let num_key: JsonStorageKey = serde_json::from_str(&json!(cases[0]).to_string()).unwrap();
         let hash_key: JsonStorageKey = serde_json::from_str(&json!(cases[1]).to_string()).unwrap();
 
-        matches!(num_key.0, StorageKeyKind::Number(_));
-        matches!(hash_key.0, StorageKeyKind::Hash(_));
+        assert_eq!(num_key.0, StorageKeyKind::Number(U256::from_str(cases[0]).unwrap()));
+        assert_eq!(hash_key.0, StorageKeyKind::Hash(B256::from_str(cases[1]).unwrap()));
 
         assert_eq!(num_key.as_b256(), hash_key.as_b256());
     }
