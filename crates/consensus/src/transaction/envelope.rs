@@ -611,6 +611,7 @@ mod serde_from {
 mod tests {
     use super::*;
     use crate::transaction::SignableTransaction;
+    use alloc::vec::Vec;
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
@@ -619,11 +620,7 @@ mod tests {
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
-    use arbitrary::Arbitrary;
     use std::{fs, path::PathBuf, str::FromStr, vec};
-
-    #[cfg(not(feature = "std"))]
-    use std::vec::Vec;
 
     #[test]
     #[cfg(feature = "k256")]
@@ -1156,6 +1153,7 @@ mod tests {
     #[test]
     #[cfg(feature = "k256")]
     fn test_arbitrary_envelope() {
+        use arbitrary::Arbitrary;
         let mut unstructured = arbitrary::Unstructured::new(b"arbitrary tx envelope");
         let tx = TxEnvelope::arbitrary(&mut unstructured).unwrap();
 

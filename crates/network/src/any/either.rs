@@ -6,7 +6,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
-use alloy_serde::{OtherFields, WithOtherFields};
+use alloy_serde::WithOtherFields;
 
 /// Unsigned transaction type for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -17,24 +17,6 @@ pub enum AnyTypedTransaction {
     Ethereum(TypedTransaction),
     /// A transaction with unknown type.
     Unknown(UnknownTypedTransaction),
-}
-
-impl AnyTypedTransaction {
-    /// Select a field by key and attempt to deserialize it.
-    ///
-    /// This method will return `None` if the key is not present in the fields,
-    /// or if the transaction is already fully deserialized (i.e. it is an
-    /// Ethereum [`TxEnvelope`]). Otherwise, it will attempt to deserialize the
-    /// field and return the result wrapped in a `Some`.
-    pub fn deser_by_key<T: serde::de::DeserializeOwned>(
-        &self,
-        key: &str,
-    ) -> Option<serde_json::Result<T>> {
-        match self {
-            Self::Ethereum(_) => None,
-            Self::Unknown(inner) => inner.deser_by_key(key),
-        }
-    }
 }
 
 impl From<UnknownTypedTransaction> for AnyTypedTransaction {
@@ -64,7 +46,7 @@ impl From<AnyTypedTransaction> for WithOtherFields<TransactionRequest> {
             AnyTypedTransaction::Ethereum(tx) => Self::new(tx.into()),
             AnyTypedTransaction::Unknown(UnknownTypedTransaction { ty, mut fields, .. }) => {
                 fields.insert("type".to_string(), serde_json::Value::Number(ty.0.into()));
-                Self { inner: Default::default(), other: OtherFields::new(fields) }
+                Self { inner: Default::default(), other: fields }
             }
         }
     }
@@ -189,24 +171,6 @@ pub enum AnyTxEnvelope {
     Ethereum(TxEnvelope),
     /// A transaction with unknown type.
     Unknown(UnknownTxEnvelope),
-}
-
-impl AnyTxEnvelope {
-    /// Select a field by key and attempt to deserialize it.
-    ///
-    /// This method will return `None` if the key is not present in the fields,
-    /// or if the transaction is already fully deserialized (i.e. it is an
-    /// Ethereum [`TxEnvelope`]). Otherwise, it will attempt to deserialize the
-    /// field and return the result wrapped in a `Some`.
-    pub fn deser_by_key<T: serde::de::DeserializeOwned>(
-        &self,
-        key: &str,
-    ) -> Option<serde_json::Result<T>> {
-        match self {
-            Self::Ethereum(_) => None,
-            Self::Unknown(inner) => inner.inner.deser_by_key(key),
-        }
-    }
 }
 
 impl Encodable2718 for AnyTxEnvelope {

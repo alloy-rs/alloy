@@ -7,7 +7,7 @@ use derive_more::{DerefMut, From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
@@ -15,41 +15,13 @@ pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
-    #[cfg_attr(feature = "serde", serde(alias = "root"))]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub status: Eip658Value,
     /// Gas used
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub cumulative_gas_used: u128,
     /// Log send from contracts.
     pub logs: Vec<T>,
-}
-
-#[cfg(feature = "serde")]
-impl<T> serde::Serialize for Receipt<T>
-where
-    T: serde::Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        let mut s = serializer.serialize_struct("Receipt", 3)?;
-
-        // If the status is EIP-658, serialize the status field.
-        // Otherwise, serialize the root field.
-        let key = if self.status.is_eip658() { "status" } else { "root" };
-        s.serialize_field(key, &self.status)?;
-
-        s.serialize_field(
-            "cumulativeGasUsed",
-            &alloy_primitives::U128::from(self.cumulative_gas_used),
-        )?;
-        s.serialize_field("logs", &self.logs)?;
-
-        s.end()
-    }
 }
 
 impl<T> Receipt<T>
@@ -295,7 +267,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
 
     #[cfg(feature = "serde")]
     #[test]
