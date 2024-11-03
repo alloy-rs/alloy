@@ -172,7 +172,7 @@ impl JwtSecret {
     ///
     /// This strips the leading `0x`, if any.
     pub fn from_hex<S: AsRef<str>>(hex: S) -> Result<Self, JwtError> {
-        let hex: &str = hex.as_ref().trim().trim_start_matches("0x");
+        let hex = hex.as_ref().trim().trim_start_matches("0x");
         if hex.len() == JWT_SECRET_LEN {
             let hex_bytes = hex::decode(hex)?;
             // is 32bytes, see length check
@@ -188,10 +188,9 @@ impl JwtSecret {
     /// a [`JwtError`].
     #[cfg(feature = "std")]
     pub fn from_file(fpath: &Path) -> Result<Self, JwtError> {
-        let hex = fs::read_to_string(fpath)
-            .map_err(|err| JwtError::Read { source: err, path: fpath.into() })?;
-        let secret = Self::from_hex(hex)?;
-        Ok(secret)
+        fs::read_to_string(fpath)
+            .map_err(|err| JwtError::Read { source: err, path: fpath.into() })
+            .and_then(Self::from_hex)
     }
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
