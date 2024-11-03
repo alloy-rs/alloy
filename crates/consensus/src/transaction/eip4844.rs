@@ -506,19 +506,17 @@ impl RlpEcdsaTx for TxEip4844 {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_encoded_fields_length(&self) -> usize {
-        let mut len = 0;
-        len += self.chain_id.length();
-        len += self.nonce.length();
-        len += self.gas_limit.length();
-        len += self.max_fee_per_gas.length();
-        len += self.max_priority_fee_per_gas.length();
-        len += self.to.length();
-        len += self.value.length();
-        len += self.access_list.length();
-        len += self.blob_versioned_hashes.length();
-        len += self.max_fee_per_blob_gas.length();
-        len += self.input.0.length();
-        len
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.gas_limit.length()
+            + self.max_fee_per_gas.length()
+            + self.max_priority_fee_per_gas.length()
+            + self.to.length()
+            + self.value.length()
+            + self.access_list.length()
+            + self.blob_versioned_hashes.length()
+            + self.max_fee_per_blob_gas.length()
+            + self.input.0.length()
     }
 
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
