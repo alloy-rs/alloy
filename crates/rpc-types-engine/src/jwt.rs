@@ -160,7 +160,7 @@ impl Default for Claims {
 /// for the JWT, which is included in the JWT along with its payload.
 ///
 /// See also: [Secret key - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#key-distribution)
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
 pub struct JwtSecret([u8; 32]);
 
 impl JwtSecret {
