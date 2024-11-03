@@ -20,6 +20,7 @@ workspace = true
 
 [dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
+alloy-consensus-any = { workspace = true, features = ["std"] }
 alloy-eips = { workspace = true, features = ["serde"] }
 alloy-json-rpc.workspace = true
 alloy-network-primitives.workspace = true

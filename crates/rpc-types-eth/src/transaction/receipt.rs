@@ -138,7 +138,7 @@ impl<T> TransactionReceipt<T> {
 #[doc(alias = "AnyTxReceipt")]
 #[cfg(feature = "serde")]
 pub type AnyTransactionReceipt =
-    alloy_serde::WithOtherFields<TransactionReceipt<alloy_consensus::AnyReceiptEnvelope<Log>>>;
+    alloy_serde::WithOtherFields<TransactionReceipt<alloy_consensus_any::AnyReceiptEnvelope<Log>>>;
 
 impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
     fn contract_address(&self) -> Option<Address> {

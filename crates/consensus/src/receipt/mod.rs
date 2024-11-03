@@ -1,9 +1,6 @@
 use alloy_primitives::{Bloom, Log};
 use core::fmt;
 
-mod any;
-pub use any::AnyReceiptEnvelope;
-
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
