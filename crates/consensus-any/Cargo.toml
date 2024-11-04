@@ -1,6 +1,6 @@
 [package]
 name = "alloy-consensus-any"
-description = "Ethereum consensus interface"
+description = "Consensus interface for any network"
 
 version.workspace = true
 edition.workspace = true
