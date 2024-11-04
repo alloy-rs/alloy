@@ -9,7 +9,8 @@ pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::Network;
-use alloy_rpc_types_eth::{AnyTransactionReceipt, Block, Transaction, TransactionRequest};
+use alloy_rpc_types_any::AnyTransactionReceipt;
+use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
 /// A catch-all header type for handling headers on multiple networks.

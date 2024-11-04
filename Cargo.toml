@@ -50,6 +50,7 @@ alloy-pubsub = { version = "0.6", path = "crates/pubsub", default-features = fal
 alloy-rpc-client = { version = "0.6", path = "crates/rpc-client", default-features = false }
 alloy-rpc-types-admin = { version = "0.6", path = "crates/rpc-types-admin", default-features = false }
 alloy-rpc-types-anvil = { version = "0.6", path = "crates/rpc-types-anvil", default-features = false }
+alloy-rpc-types-any = { version = "0.6", path = "crates/rpc-types-any", default-features = false }
 alloy-rpc-types-beacon = { version = "0.6", path = "crates/rpc-types-beacon", default-features = false }
 alloy-rpc-types-debug = { version = "0.6", path = "crates/rpc-types-debug", default-features = false }
 alloy-rpc-types-engine = { version = "0.6", path = "crates/rpc-types-engine", default-features = false }
