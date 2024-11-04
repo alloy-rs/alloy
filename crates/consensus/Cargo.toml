@@ -43,7 +43,7 @@ derive_more = { workspace = true, features = [
     "from",
     "deref",
     "deref_mut",
-    "into_iterator"
+    "into_iterator",
 ], default-features = false }
 auto_impl.workspace = true
 

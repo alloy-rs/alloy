@@ -46,3 +46,9 @@ tokio = { workspace = true, features = ["macros"] }
 default = ["std"]
 std = ["alloy-eips/std"]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
+serde = [
+  "dep:serde",
+  "alloy-primitives/serde",
+  "dep:alloy-serde",
+  "alloy-eips/serde",
+]
