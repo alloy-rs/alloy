@@ -270,9 +270,9 @@ mod test {
         hash_set.insert(id2.clone());
         hash_set.insert(id3.clone());
 
-        btree_set.insert(id1.clone());
-        btree_set.insert(id2.clone());
-        btree_set.insert(id3.clone());
+        btree_set.insert(id1);
+        btree_set.insert(id2);
+        btree_set.insert(id3);
 
         assert_eq!(hash_set.len(), 3);
         assert_eq!(btree_set.len(), 3);
