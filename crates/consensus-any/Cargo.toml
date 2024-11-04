@@ -20,8 +20,8 @@ workspace = true
 
 [dependencies]
 alloy-consensus = { workspace = true, features = ["serde"] }
-alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
-alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-eips.workspace = true
+alloy-primitives.workspace = true
 alloy-rlp.workspace = true
 alloy-serde = { workspace = true, optional = true }
 
@@ -30,17 +30,6 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
-
-[dev-dependencies]
-alloy-consensus = { workspace = true, features = ["serde"] }
-alloy-eips = { workspace = true, features = ["arbitrary"] }
-alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
-alloy-signer.workspace = true
-
-arbitrary = { workspace = true, features = ["derive"] }
-bincode = "1.3"
-serde_json.workspace = true
-tokio = { workspace = true, features = ["macros"] }
 
 [features]
 default = ["std"]
