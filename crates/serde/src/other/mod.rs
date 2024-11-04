@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(with_other.other.inner.get("another"), Some(&json!("test")));
 
         with_other.other.remove("extra");
-        assert!(with_other.other.inner.get("extra").is_none());
+        assert!(!with_other.other.inner.contains_key("extra"));
     }
 
     #[test]
@@ -353,7 +353,7 @@ mod tests {
         let mut other_fields = OtherFields::new(map);
         let value: Option<serde_json::Result<u64>> = other_fields.remove_deserialized("key");
         assert_eq!(value.unwrap().unwrap(), 42);
-        assert!(other_fields.inner.get("key").is_none());
+        assert!(!other_fields.inner.contains_key("key"));
     }
 
     #[test]
@@ -363,7 +363,7 @@ mod tests {
         let mut other_fields = OtherFields::new(map);
         let value: Option<u64> = other_fields.remove_with("key", |v| v.as_u64().unwrap());
         assert_eq!(value, Some(42));
-        assert!(other_fields.inner.get("key").is_none());
+        assert!(!other_fields.inner.contains_key("key"));
     }
 
     #[test]
@@ -377,7 +377,7 @@ mod tests {
         let (key, value) = entry.unwrap();
         assert_eq!(key, "key");
         assert_eq!(value.unwrap(), 42);
-        assert!(other_fields.inner.get("key").is_none());
+        assert!(!other_fields.inner.contains_key("key"));
     }
 
     #[test]
