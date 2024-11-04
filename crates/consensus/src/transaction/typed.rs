@@ -327,7 +327,12 @@ mod serde_from {
     #[serde(untagged)]
     pub(crate) enum MaybeTaggedTypedTransaction {
         Tagged(TaggedTypedTransaction),
-        Untagged(TxLegacy),
+        Untagged {
+            #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
+            _ty: Option<()>,
+            #[serde(flatten)]
+            tx: TxLegacy,
+        },
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -354,7 +359,7 @@ mod serde_from {
         fn from(value: MaybeTaggedTypedTransaction) -> Self {
             match value {
                 MaybeTaggedTypedTransaction::Tagged(tagged) => tagged.into(),
-                MaybeTaggedTypedTransaction::Untagged(tx) => Self::Legacy(tx),
+                MaybeTaggedTypedTransaction::Untagged { tx, .. } => Self::Legacy(tx),
             }
         }
     }

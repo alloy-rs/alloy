@@ -11,3 +11,18 @@ where
 {
     Option::<T>::deserialize(deserializer).map(Option::unwrap_or_default)
 }
+
+/// For use with serde's `deserialize_with` on a field that must be missing.
+pub fn reject_if_some<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let value = Option::<T>::deserialize(deserializer)?;
+
+    if value.is_some() {
+        return Err(serde::de::Error::custom("unexpected value"));
+    }
+
+    Ok(value)
+}
