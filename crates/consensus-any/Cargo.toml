@@ -31,6 +31,9 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
 
+[dev-dependencies]
+arbitrary = { workspace = true, features = ["derive"] }
+
 [features]
 default = ["std"]
 std = ["alloy-eips/std"]
