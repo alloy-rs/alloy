@@ -23,7 +23,6 @@ alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-serde = { workspace = true, optional = true }
-alloy-genesis.workspace = true
 
 # k256
 k256 = { workspace = true, features = ["ecdsa"], optional = true }
