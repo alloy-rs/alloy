@@ -15,8 +15,7 @@ where
 {
     /// Method that needs to be implemented to convert to a `ProviderCall`.
     ///
-    /// This method handles serialization of the params and sends the request to relevant data
-    /// source and returns a `ProviderCall`.
+    /// This method sends the request to relevant data source and returns a `ProviderCall`.
     fn call(
         &self,
         method: Cow<'static, str>,
