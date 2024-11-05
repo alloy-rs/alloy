@@ -554,8 +554,12 @@ mod serde_from {
     #[serde(untagged)]
     pub(crate) enum MaybeTaggedTxEnvelope {
         Tagged(TaggedTxEnvelope),
-        #[serde(with = "crate::transaction::signed_legacy_serde")]
-        Untagged(Signed<TxLegacy>),
+        Untagged {
+            #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
+            _ty: Option<()>,
+            #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
+            tx: Signed<TxLegacy>,
+        },
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -577,7 +581,7 @@ mod serde_from {
         fn from(value: MaybeTaggedTxEnvelope) -> Self {
             match value {
                 MaybeTaggedTxEnvelope::Tagged(tagged) => tagged.into(),
-                MaybeTaggedTxEnvelope::Untagged(tx) => Self::Legacy(tx),
+                MaybeTaggedTxEnvelope::Untagged { tx, .. } => Self::Legacy(tx),
             }
         }
     }
@@ -1158,5 +1162,44 @@ mod tests {
         let tx = TxEnvelope::arbitrary(&mut unstructured).unwrap();
 
         assert!(tx.recover_signer().is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_untagged_legacy() {
+        let data = r#"{
+            "hash": "0x97efb58d2b42df8d68ab5899ff42b16c7e0af35ed86ae4adb8acaad7e444220c",
+            "input": "0x",
+            "r": "0x5d71a4a548503f2916d10c6b1a1557a0e7352eb041acb2bac99d1ad6bb49fd45",
+            "s": "0x2627bf6d35be48b0e56c61733f63944c0ebcaa85cb4ed6bc7cba3161ba85e0e8",
+            "v": "0x1c",
+            "gas": "0x15f90",
+            "from": "0x2a65aca4d5fc5b5c859090a6c34d164135398226",
+            "to": "0x8fbeb4488a08d60979b5aa9e13dd00b2726320b2",
+            "value": "0xf606682badd7800",
+            "nonce": "0x11f398",
+            "gasPrice": "0x4a817c800"
+        }"#;
+
+        let tx: TxEnvelope = serde_json::from_str(data).unwrap();
+
+        assert!(matches!(tx, TxEnvelope::Legacy(_)));
+
+        let data_with_wrong_type = r#"{
+            "hash": "0x97efb58d2b42df8d68ab5899ff42b16c7e0af35ed86ae4adb8acaad7e444220c",
+            "input": "0x",
+            "r": "0x5d71a4a548503f2916d10c6b1a1557a0e7352eb041acb2bac99d1ad6bb49fd45",
+            "s": "0x2627bf6d35be48b0e56c61733f63944c0ebcaa85cb4ed6bc7cba3161ba85e0e8",
+            "v": "0x1c",
+            "gas": "0x15f90",
+            "from": "0x2a65aca4d5fc5b5c859090a6c34d164135398226",
+            "to": "0x8fbeb4488a08d60979b5aa9e13dd00b2726320b2",
+            "value": "0xf606682badd7800",
+            "nonce": "0x11f398",
+            "gasPrice": "0x4a817c800",
+            "type": "0x12"
+        }"#;
+
+        assert!(serde_json::from_str::<TxEnvelope>(data_with_wrong_type).is_err());
     }
 }

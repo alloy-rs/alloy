@@ -19,6 +19,9 @@ pub type AnyRpcHeader = alloy_rpc_types_eth::Header<alloy_consensus::AnyHeader>;
 pub type AnyRpcBlock =
     WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
 
+/// A catch-all transaction type for handling transactions on multiple networks.
+pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
+
 /// Types for a catch-all network.
 ///
 /// `AnyNetwork`'s associated types allow for many different types of
@@ -65,7 +68,7 @@ impl Network for AnyNetwork {
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = WithOtherFields<Transaction<Self::TxEnvelope>>;
+    type TransactionResponse = AnyRpcTransaction;
 
     type ReceiptResponse = AnyTransactionReceipt;
 
