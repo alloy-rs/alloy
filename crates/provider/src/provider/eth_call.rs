@@ -59,7 +59,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     Preparing {
-        caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
+        caller: Arc<dyn Caller<T, N, Resp>>,
         data: &'req N::TransactionRequest,
         overrides: Option<&'req StateOverride>,
         block: Option<BlockId>,
@@ -177,7 +177,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
+    caller: Arc<dyn Caller<T, N, Resp>>,
     data: &'req N::TransactionRequest,
     overrides: Option<&'req StateOverride>,
     block: Option<BlockId>,
@@ -210,7 +210,7 @@ where
 {
     /// Create a new CallBuilder.
     pub fn new(
-        caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
+        caller: impl Caller<T, N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
@@ -226,7 +226,7 @@ where
 
     /// Create new EthCall for gas estimates.
     pub fn gas_estimate(
-        caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
+        caller: impl Caller<T, N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
