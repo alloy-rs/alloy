@@ -173,7 +173,8 @@ where
             overrides: overrides.map(Cow::Borrowed),
         };
 
-        let fut = caller.call(method.into(), params)?;
+        let fut =
+            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
 
         self.inner = EthCallFutInner::Running { map, fut };
 
