@@ -92,17 +92,10 @@ impl Genesis {
         };
 
         // fund account
-        let mut alloc = BTreeMap::default();
-        alloc.insert(
+        let alloc = BTreeMap::from([(
             signer_addr,
-            GenesisAccount {
-                balance: U256::MAX,
-                nonce: None,
-                code: None,
-                storage: None,
-                private_key: None,
-            },
-        );
+            GenesisAccount { balance: U256::MAX, ..Default::default() },
+        )]);
 
         // put signer address in the extra data, padded by the required amount of zeros
         // Clique issue: https://github.com/ethereum/EIPs/issues/225
