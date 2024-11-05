@@ -109,14 +109,12 @@ impl RlpEcdsaTx for TxLegacy {
     const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
 
     fn rlp_encoded_fields_length(&self) -> usize {
-        let mut len = 0;
-        len += self.nonce.length();
-        len += self.gas_price.length();
-        len += self.gas_limit.length();
-        len += self.to.length();
-        len += self.value.length();
-        len += self.input.0.length();
-        len
+        self.nonce.length()
+            + self.gas_price.length()
+            + self.gas_limit.length()
+            + self.to.length()
+            + self.value.length()
+            + self.input.0.length()
     }
 
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
