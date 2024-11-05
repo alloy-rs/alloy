@@ -20,10 +20,10 @@ where
     ///
     /// This method handles serialization of the params and sends the request to relevant data
     /// source and returns a `ProviderCall`.
-    fn call<'req>(
+    fn call(
         &self,
         method: Cow<'static, str>,
-        params: EthCallParams<'req, N>,
+        params: EthCallParams<'_, N>,
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>>;
 }
 
