@@ -22,12 +22,12 @@ where
     N: Network,
 {
     /// Instantiates a new `EthCallParams` with the given data (transaction).
-    pub fn new(data: &'req N::TransactionRequest) -> Self {
+    pub const fn new(data: &'req N::TransactionRequest) -> Self {
         Self { data: Cow::Borrowed(data), block: None, overrides: None }
     }
 
     /// Sets the block to use for this call.
-    pub fn with_block(mut self, block: BlockId) -> Self {
+    pub const fn with_block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }
@@ -49,7 +49,7 @@ where
     }
 
     /// Returns the block.
-    pub fn block(&self) -> Option<BlockId> {
+    pub const fn block(&self) -> Option<BlockId> {
         self.block
     }
 
