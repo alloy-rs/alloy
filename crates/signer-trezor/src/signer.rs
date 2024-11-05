@@ -1,7 +1,10 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_consensus::{SignableTransaction, TxEip1559};
-use alloy_primitives::{hex, Address, ChainId, Parity, TxKind, B256, U256};
-use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
+use alloy_primitives::{
+    hex, normalize_v, Address, ChainId, PrimitiveSignature as Signature, SignatureError, TxKind,
+    B256, U256,
+};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
@@ -275,8 +278,9 @@ fn address_to_trezor(x: &Address) -> String {
 fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signature, TrezorError> {
     let r = U256::from_be_bytes(x.r);
     let s = U256::from_be_bytes(x.s);
-    let v = Parity::Eip155(x.v);
-    Signature::from_rs_and_parity(r, s, v).map_err(Into::into)
+    let v =
+        normalize_v(x.v).ok_or(TrezorError::SignatureError(SignatureError::InvalidParity(x.v)))?;
+    Ok(Signature::new(r, s, v))
 }
 
 #[cfg(test)]

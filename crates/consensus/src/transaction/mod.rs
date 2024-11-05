@@ -30,7 +30,7 @@ mod envelope;
 pub use envelope::{TxEnvelope, TxType};
 
 mod legacy;
-pub use legacy::TxLegacy;
+pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
 
 mod rlp;
 #[doc(hidden)]
@@ -38,6 +38,9 @@ pub use rlp::RlpEcdsaTx;
 
 mod typed;
 pub use typed::TypedTransaction;
+
+#[cfg(feature = "serde")]
+pub use legacy::signed_legacy_serde;
 
 /// Bincode-compatible serde implementations for transaction types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -155,11 +158,6 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
 /// unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]
 pub trait SignableTransaction<Signature>: Transaction {
-    /// True if the transaction uses EIP-155 signatures.
-    fn use_eip155(&self) -> bool {
-        false
-    }
-
     /// Sets `chain_id`.
     ///
     /// Prefer [`set_chain_id_checked`](Self::set_chain_id_checked).

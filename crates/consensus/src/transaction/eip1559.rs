@@ -1,6 +1,6 @@
 use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -248,10 +248,6 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-1559 transaction. V should indicate the y-parity of the
-        // signature.
-        let signature = signature.with_parity_bool();
         let tx_hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, tx_hash)
     }
@@ -398,7 +394,9 @@ mod tests {
     use super::TxEip1559;
     use crate::{transaction::RlpEcdsaTx, SignableTransaction};
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use alloy_primitives::{
+        address, b256, hex, Address, PrimitiveSignature as Signature, B256, U256,
+    };
 
     #[test]
     fn recover_signer_eip1559() {
@@ -421,8 +419,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
 
         assert_eq!(
             tx.signature_hash(),
@@ -454,8 +451,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
 
         let mut buf = vec![];
         tx.rlp_encode_signed(&sig, &mut buf);

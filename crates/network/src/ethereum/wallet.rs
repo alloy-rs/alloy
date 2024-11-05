@@ -1,7 +1,6 @@
 use crate::{Network, NetworkWallet, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use alloy_primitives::{map::AddressHashMap, Address};
-use alloy_signer::Signature;
+use alloy_primitives::{map::AddressHashMap, Address, PrimitiveSignature as Signature};
 use std::sync::Arc;
 
 /// A wallet capable of signing any transaction for the Ethereum network.

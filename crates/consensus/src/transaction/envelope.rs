@@ -201,8 +201,10 @@ impl TxEnvelope {
     /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
     #[inline]
     pub const fn is_replay_protected(&self) -> bool {
-        let Self::Legacy(ref tx) = self else { return true };
-        tx.signature().v().chain_id().is_some()
+        match self {
+            Self::Legacy(tx) => tx.tx().chain_id.is_some(),
+            _ => true,
+        }
     }
 
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
@@ -555,7 +557,7 @@ mod serde_from {
         Untagged {
             #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
             _ty: Option<()>,
-            #[serde(flatten)]
+            #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
             tx: Signed<TxLegacy>,
         },
     }
@@ -563,7 +565,7 @@ mod serde_from {
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     #[serde(tag = "type")]
     pub(crate) enum TaggedTxEnvelope {
-        #[serde(rename = "0x0", alias = "0x00")]
+        #[serde(rename = "0x0", alias = "0x00", with = "crate::transaction::signed_legacy_serde")]
         Legacy(Signed<TxLegacy>),
         #[serde(rename = "0x1", alias = "0x01")]
         Eip2930(Signed<TxEip2930>),
@@ -621,7 +623,7 @@ mod tests {
     };
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
-    use alloy_primitives::{hex, Address, Parity, Signature, U256};
+    use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]
@@ -656,8 +658,8 @@ mod tests {
         .is_replay_protected());
         let r = b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565");
         let s = b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1");
-        let v = 27;
-        let valid_sig = Signature::from_scalars_and_parity(r, s, v).unwrap();
+        let v = false;
+        let valid_sig = Signature::from_scalars_and_parity(r, s, v);
         assert!(!&TxEnvelope::Legacy(Signed::new_unchecked(
             TxLegacy::default(),
             valid_sig,
@@ -786,10 +788,7 @@ mod tests {
             value: U256::from(7_u64),
             ..Default::default()
         };
-        test_encode_decode_roundtrip(
-            tx,
-            Some(Signature::test_signature().with_parity(Parity::NonEip155(true))),
-        );
+        test_encode_decode_roundtrip(tx, Some(Signature::test_signature().with_parity(true)));
     }
 
     #[test]
@@ -821,7 +820,7 @@ mod tests {
             input: vec![8].into(),
             access_list: Default::default(),
         };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
 
         test_encode_decode_roundtrip(tx, Some(signature));
     }
@@ -838,7 +837,7 @@ mod tests {
             input: vec![7].into(),
             access_list: Default::default(),
         };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -860,7 +859,7 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
@@ -888,7 +887,7 @@ mod tests {
             proofs: vec![[4; 48].into()],
         };
         let tx = TxEip4844WithSidecar { tx, sidecar };
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
 
         let tx_signed = tx.into_signed(signature);
         let tx_envelope: TxEnvelope = tx_signed.into();
@@ -921,7 +920,7 @@ mod tests {
             max_fee_per_blob_gas: 0,
         };
         let tx = TxEip4844Variant::TxEip4844(tx);
-        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 

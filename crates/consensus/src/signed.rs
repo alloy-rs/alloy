@@ -1,6 +1,6 @@
 use crate::transaction::{RlpEcdsaTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
-use alloy_primitives::{Signature, B256};
+use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
 
 /// A transaction with a signature and hash seal.
@@ -17,10 +17,20 @@ pub struct Signed<T, Sig = Signature> {
 }
 
 impl<T, Sig> Signed<T, Sig> {
+    /// Instantiate from a transaction and signature. Does not verify the signature.
+    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
+        Self { tx, signature, hash }
+    }
+
     /// Returns a reference to the transaction.
     #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
         &self.tx
+    }
+
+    /// Returns a mutable reference to the transaction.
+    pub fn tx_mut(&mut self) -> &mut T {
+        &mut self.tx
     }
 
     /// Returns a reference to the signature.
@@ -46,11 +56,6 @@ impl<T, Sig> Signed<T, Sig> {
 }
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
-    /// Instantiate from a transaction and signature. Does not verify the signature.
-    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
-    }
-
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256 {
         self.tx.signature_hash()

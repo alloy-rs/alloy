@@ -4,7 +4,9 @@ use alloy_eips::{
     eip2930::AccessList,
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
 };
-use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{
+    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
+};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -244,10 +246,6 @@ impl SignableTransaction<Signature> for TxEip7702 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-7702 transaction. V should indicate the y-parity of the
-        // signature.
-        let signature = signature.with_parity_bool();
         let tx_hash = self.tx_hash(&signature);
 
         Signed::new_unchecked(self, signature, tx_hash)
@@ -397,7 +395,7 @@ mod tests {
     use super::*;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, U256};
+    use alloy_primitives::{address, b256, hex, Address, PrimitiveSignature as Signature, U256};
 
     #[test]
     fn encode_decode_eip7702() {
@@ -418,8 +416,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
 
         let mut buf = vec![];
         tx.rlp_encode_signed(&sig, &mut buf);
@@ -446,8 +443,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
         let mut buf = vec![];
         tx.rlp_encode_signed(&sig, &mut buf);
         let decoded = TxEip7702::rlp_decode_signed(&mut &buf[..]).unwrap();
@@ -473,8 +469,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
 
         let mut buf = vec![];
         tx.rlp_encode_signed(&sig, &mut buf);
