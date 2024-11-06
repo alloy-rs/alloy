@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.6.0
 - Make withdrawals pub ([#1623](https://github.com/alloy-rs/alloy/issues/1623))
 - Fix some compile issues for no-std test ([#1606](https://github.com/alloy-rs/alloy/issues/1606))
 

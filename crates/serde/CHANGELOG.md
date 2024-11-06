@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [`serde`] StorageKeyKind ([#1597](https://github.com/alloy-rs/alloy/issues/1597))
 - Serde helpers for hashmaps and btreemaps with quantity key types ([#1579](https://github.com/alloy-rs/alloy/issues/1579))
 
+### Miscellaneous Tasks
+
+- Release 0.6.0
+
 ### Other
 
 - Add unit tests for `OtherFields` ([#1614](https://github.com/alloy-rs/alloy/issues/1614))

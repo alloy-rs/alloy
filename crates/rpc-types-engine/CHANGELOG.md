@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.6.0
 - Add default to payloadattributes ([#1625](https://github.com/alloy-rs/alloy/issues/1625))
 
 ### Other

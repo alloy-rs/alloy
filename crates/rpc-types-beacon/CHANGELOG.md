@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Relay types ([#1577](https://github.com/alloy-rs/alloy/issues/1577))
 
+### Miscellaneous Tasks
+
+- Release 0.6.0
+
 ## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
 
 ### Miscellaneous Tasks

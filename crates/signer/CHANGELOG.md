@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Integrate signature with boolean parity ([#1540](https://github.com/alloy-rs/alloy/issues/1540))
 
+### Miscellaneous Tasks
+
+- Release 0.6.0
+
 ### Refactor
 
 - [signer] Small refactor in signer utils ([#1615](https://github.com/alloy-rs/alloy/issues/1615))

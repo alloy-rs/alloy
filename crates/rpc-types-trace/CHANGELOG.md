@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make Otterscan types generic over header ([#1593](https://github.com/alloy-rs/alloy/issues/1593))
 - Embed consensus header into RPC ([#1573](https://github.com/alloy-rs/alloy/issues/1573))
 
+### Miscellaneous Tasks
+
+- Release 0.6.0
+
 ## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
 
 ### Miscellaneous Tasks
