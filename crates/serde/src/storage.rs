@@ -44,7 +44,6 @@ impl Default for StorageKeyKind {
 /// The contained [B256] and From implementation for String are used to preserve the input and
 /// implement this behavior from geth.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
-#[serde(into = "String")]
 pub struct JsonStorageKey(pub StorageKeyKind);
 
 impl JsonStorageKey {
