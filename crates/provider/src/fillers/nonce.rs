@@ -56,7 +56,7 @@ impl NonceManager for SimpleNonceManager {
 /// transaction count locally.
 #[derive(Clone, Debug, Default)]
 pub struct CachedNonceManager {
-    nonces: DashMap<Address, Arc<Mutex<u64>>>,
+    nonces: Arc<DashMap<Address, Arc<Mutex<u64>>>>,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
