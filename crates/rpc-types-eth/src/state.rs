@@ -1,11 +1,14 @@
 //! bindings for state overrides in eth_call
 
-use crate::{collections::HashMap, BlockOverrides};
+use crate::BlockOverrides;
 use alloc::boxed::Box;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{
+    map::{AddressHashMap, B256HashMap},
+    Address, Bytes, B256, U256,
+};
 
 /// A set of account overrides
-pub type StateOverride = HashMap<Address, AccountOverride>;
+pub type StateOverride = AddressHashMap<AccountOverride>;
 
 /// Custom account override used in call
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -31,11 +34,11 @@ pub struct AccountOverride {
     /// Fake key-value mapping to override all slots in the account storage before executing the
     /// call.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub state: Option<HashMap<B256, B256>>,
+    pub state: Option<B256HashMap<B256>>,
     /// Fake key-value mapping to override individual slots in the account storage before executing
     /// the call.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub state_diff: Option<HashMap<B256, B256>>,
+    pub state_diff: Option<B256HashMap<B256>>,
     /// Moves addresses precompile into the specified address. This move is done before the 'code'
     /// override is set. When the specified address is not a precompile, the behaviour is undefined
     /// and different clients might behave differently.
@@ -106,6 +109,7 @@ impl EvmOverrides {
 mod tests {
     use super::*;
     use alloy_primitives::address;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_default_account_override() {
@@ -183,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_evm_overrides_new() {
-        let state: StateOverride = HashMap::new();
+        let state = StateOverride::default();
         let block: Box<BlockOverrides> = Box::default();
 
         let evm_overrides = EvmOverrides::new(Some(state.clone()), Some(block.clone()));
@@ -196,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_evm_overrides_state() {
-        let state: StateOverride = HashMap::new();
+        let state = StateOverride::default();
         let evm_overrides = EvmOverrides::state(Some(state.clone()));
 
         assert!(evm_overrides.has_state());
@@ -216,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_evm_overrides_with_state() {
-        let state: StateOverride = HashMap::new();
+        let state = StateOverride::default();
         let mut evm_overrides = EvmOverrides::default();
 
         assert!(!evm_overrides.has_state());

@@ -1,17 +1,19 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
 
-use alloc::{format, string::String};
+use alloc::string::String;
 use alloy_primitives::hex;
 use core::{str::FromStr, time::Duration};
-use jsonwebtoken::{
-    decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
-};
+use jsonwebtoken::get_current_timestamp;
 use rand::Rng;
+
 #[cfg(feature = "std")]
 use std::{
     fs, io,
     path::{Path, PathBuf},
 };
+
+#[cfg(feature = "serde")]
+use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 
 /// Errors returned by the [`JwtSecret`]
 #[derive(Debug, derive_more::Display)]
@@ -87,9 +89,9 @@ impl std::error::Error for JwtError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::JwtSecretHexDecodeError(err) => Some(err),
-            Self::CreateDir { source, .. } => Some(source),
-            Self::Read { source, .. } => Some(source),
-            Self::Write { source, .. } => Some(source),
+            Self::CreateDir { source, .. }
+            | Self::Read { source, .. }
+            | Self::Write { source, .. } => Some(source),
             _ => None,
         }
     }
@@ -106,6 +108,7 @@ const JWT_SECRET_LEN: usize = 64;
 const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
+#[cfg(feature = "serde")]
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
 
 /// Claims in JWT are used to represent a set of information about an entity.
@@ -170,13 +173,13 @@ impl JwtSecret {
     /// This strips the leading `0x`, if any.
     pub fn from_hex<S: AsRef<str>>(hex: S) -> Result<Self, JwtError> {
         let hex: &str = hex.as_ref().trim().trim_start_matches("0x");
-        if hex.len() != JWT_SECRET_LEN {
-            Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
-        } else {
+        if hex.len() == JWT_SECRET_LEN {
             let hex_bytes = hex::decode(hex)?;
             // is 32bytes, see length check
             let bytes = hex_bytes.try_into().expect("is expected len");
             Ok(Self(bytes))
+        } else {
+            Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
         }
     }
 
@@ -223,7 +226,7 @@ impl JwtSecret {
         validation.set_required_spec_claims(&["iat"]);
         let bytes = &self.0;
 
-        match decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
+        match jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
             Ok(token) => {
                 if !token.claims.is_within_time_window() {
                     Err(JwtError::InvalidIssuanceTimestamp)?
@@ -258,6 +261,11 @@ impl JwtSecret {
         let algo = jsonwebtoken::Header::new(Algorithm::HS256);
         jsonwebtoken::encode(&algo, claims, &key)
     }
+
+    /// Returns the secret key as a byte slice.
+    pub const fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl core::fmt::Debug for JwtSecret {
@@ -279,6 +287,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use jsonwebtoken::{encode, EncodingKey, Header};
+    use similar_asserts::assert_eq;
     #[cfg(feature = "std")]
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tempfile::tempdir;

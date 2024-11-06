@@ -3,8 +3,8 @@
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
-use core::any;
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
+use core::{any, fmt};
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -35,9 +35,18 @@ pub use legacy::TxLegacy;
 mod typed;
 pub use typed::TypedTransaction;
 
+/// Bincode-compatible serde implementations for transaction types.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    pub use super::{
+        eip1559::serde_bincode_compat::*, eip2930::serde_bincode_compat::*,
+        eip7702::serde_bincode_compat::*, legacy::serde_bincode_compat::*,
+    };
+}
+
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
-pub trait Transaction: any::Any + Send + Sync + 'static {
+pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -45,7 +54,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;
@@ -100,14 +109,22 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }
 
-    /// Get `to`.
-    fn to(&self) -> TxKind;
+    /// Returns the transaction kind.
+    fn kind(&self) -> TxKind;
+
+    /// Get the transaction's address of the contract that will be called, or the address that will
+    /// receive the transfer.
+    ///
+    /// Returns `None` if this is a `CREATE` transaction.
+    fn to(&self) -> Option<Address> {
+        self.kind().to().copied()
+    }
 
     /// Get `value`.
     fn value(&self) -> U256;
 
     /// Get `data`.
-    fn input(&self) -> &[u8];
+    fn input(&self) -> &Bytes;
 
     /// Returns the transaction type
     fn ty(&self) -> u8;
@@ -197,5 +214,68 @@ impl<S: 'static> dyn SignableTransaction<S> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.inner.chain_id()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.inner.nonce()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        self.inner.gas_price()
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.inner.max_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.inner.max_fee_per_blob_gas()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.inner.priority_fee_or_price()
+    }
+
+    fn kind(&self) -> TxKind {
+        self.inner.kind()
+    }
+
+    fn value(&self) -> U256 {
+        self.inner.value()
+    }
+
+    fn input(&self) -> &Bytes {
+        self.inner.input()
+    }
+
+    fn ty(&self) -> u8 {
+        self.inner.ty()
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        self.inner.access_list()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.inner.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.inner.authorization_list()
     }
 }

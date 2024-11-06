@@ -1,7 +1,7 @@
 use crate::{u256_numeric_string, Privacy, Validity};
 
-use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};
+use alloy_primitives::{keccak256, Address, Bytes, Keccak256, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// Bundle of transactions for `eth_callBundle`
@@ -30,6 +30,95 @@ pub struct EthCallBundle {
     /// basefee of the block to use for this simulation
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub base_fee: Option<u128>,
+}
+
+impl EthCallBundle {
+    /// Creates a new bundle from the given [`Encodable2718`] transactions.
+    pub fn from_2718<I, T>(txs: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Encodable2718,
+    {
+        Self::from_raw_txs(txs.into_iter().map(|tx| tx.encoded_2718()))
+    }
+
+    /// Creates a new bundle with the given transactions.
+    pub fn from_raw_txs<I, T>(txs: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Bytes>,
+    {
+        Self { txs: txs.into_iter().map(Into::into).collect(), ..Default::default() }
+    }
+
+    /// Adds an [`Encodable2718`] transaction to the bundle.
+    pub fn append_2718_tx(self, tx: impl Encodable2718) -> Self {
+        self.append_raw_tx(tx.encoded_2718())
+    }
+
+    /// Adds an EIP-2718 envelope to the bundle.
+    pub fn append_raw_tx(mut self, tx: impl Into<Bytes>) -> Self {
+        self.txs.push(tx.into());
+        self
+    }
+
+    /// Adds multiple [`Encodable2718`] transactions to the bundle.
+    pub fn extend_2718_txs<I, T>(self, tx: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Encodable2718,
+    {
+        self.extend_raw_txs(tx.into_iter().map(|tx| tx.encoded_2718()))
+    }
+
+    /// Adds multiple calls to the block.
+    pub fn extend_raw_txs<I, T>(mut self, txs: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Bytes>,
+    {
+        self.txs.extend(txs.into_iter().map(Into::into));
+        self
+    }
+
+    /// Sets the block number for the bundle.
+    pub const fn with_block_number(mut self, block_number: u64) -> Self {
+        self.block_number = block_number;
+        self
+    }
+
+    /// Sets the state block number for the bundle.
+    pub fn with_state_block_number(
+        mut self,
+        state_block_number: impl Into<BlockNumberOrTag>,
+    ) -> Self {
+        self.state_block_number = state_block_number.into();
+        self
+    }
+
+    /// Sets the timestamp for the bundle.
+    pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    /// Sets the gas limit for the bundle.
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+        self.gas_limit = Some(gas_limit);
+        self
+    }
+
+    /// Sets the difficulty for the bundle.
+    pub const fn with_difficulty(mut self, difficulty: U256) -> Self {
+        self.difficulty = Some(difficulty);
+        self
+    }
+
+    /// Sets the base fee for the bundle.
+    pub const fn with_base_fee(mut self, base_fee: u128) -> Self {
+        self.base_fee = Some(base_fee);
+        self
+    }
 }
 
 /// Response for `eth_callBundle`
@@ -136,6 +225,37 @@ pub struct EthSendBundle {
     /// UUID that can be used to cancel/replace this bundle
     #[serde(default, rename = "replacementUuid", skip_serializing_if = "Option::is_none")]
     pub replacement_uuid: Option<String>,
+}
+
+impl EthSendBundle {
+    /// Returns the bundle hash.
+    ///
+    /// This is the keccak256 hash of the transaction hashes of the
+    /// transactions in the bundle.
+    ///
+    /// ## Note
+    ///
+    /// Logic for calculating the bundle hash is as follows:
+    /// - Calculate the hash of each transaction in the bundle
+    /// - Concatenate the hashes, in bundle order
+    /// - Calculate the keccak256 hash of the concatenated hashes
+    ///
+    /// See the [flashbots impl].
+    ///
+    /// This function will not verify transaction correctness. If the bundle
+    /// `txs` contains invalid transactions, the bundle hash will still be
+    /// calculated.
+    ///
+    /// [flashbots impl]: https://github.com/flashbots/mev-geth/blob/fddf97beec5877483f879a77b7dea2e58a58d653/internal/ethapi/api.go#L2067
+    pub fn bundle_hash(&self) -> B256 {
+        let mut hasher = Keccak256::default();
+        for tx in &self.txs {
+            // NB: the txs must contain envelopes, so the tx_hash is just the
+            // keccak256 hash of the envelope. no need to deserialize the tx
+            hasher.update(keccak256(tx));
+        }
+        hasher.finalize()
+    }
 }
 
 /// Response from the matchmaker after sending a bundle.

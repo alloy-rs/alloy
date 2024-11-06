@@ -1,7 +1,8 @@
-use crate::{Receipt, ReceiptWithBloom, TxReceipt, TxType};
+use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Decodable, Encodable};
+use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -107,9 +108,12 @@ impl<T> ReceiptEnvelope<T> {
     }
 }
 
-impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
-    fn status_or_post_state(&self) -> &crate::Eip658Value {
-        &self.as_receipt().unwrap().status
+impl<T> TxReceipt<T> for ReceiptEnvelope<T>
+where
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+{
+    fn status_or_post_state(&self) -> Eip658Value {
+        self.as_receipt().unwrap().status
     }
 
     fn status(&self) -> bool {
@@ -158,11 +162,7 @@ impl Encodable for ReceiptEnvelope {
     }
 
     fn length(&self) -> usize {
-        let mut payload_length = self.rlp_payload_length();
-        if !self.is_legacy() {
-            payload_length += length_of_length(payload_length);
-        }
-        payload_length
+        self.network_len()
     }
 }
 
@@ -230,5 +230,38 @@ where
             4 => Ok(Self::Eip7702(receipt)),
             _ => unreachable!(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deser_pre658_receipt_envelope() {
+        use alloy_primitives::b256;
+
+        let receipt = super::ReceiptWithBloom::<()> {
+            receipt: super::Receipt {
+                status: super::Eip658Value::PostState(b256!(
+                    "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
+                )),
+                cumulative_gas_used: 0,
+                logs: Default::default(),
+            },
+            logs_bloom: Default::default(),
+        };
+
+        let json = serde_json::to_string(&receipt).unwrap();
+
+        println!("Serialized {}", json);
+
+        let receipt: super::ReceiptWithBloom<()> = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(
+            receipt.receipt.status,
+            super::Eip658Value::PostState(b256!(
+                "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
+            ))
+        );
     }
 }

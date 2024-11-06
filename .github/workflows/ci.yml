@@ -89,7 +89,7 @@ jobs:
           cache-on-failure: true
       - name: cargo hack
         run: |
-          cargo hack build --workspace --target wasm32-unknown-unknown \
+          cargo hack build --workspace --ignore-unknown-features --features ws --target wasm32-unknown-unknown \
             --exclude alloy-contract \
             --exclude alloy-network \
             --exclude alloy-node-bindings \

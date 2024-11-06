@@ -84,11 +84,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
     }
 
-    fn gas_limit(&self) -> Option<u128> {
+    fn gas_limit(&self) -> Option<u64> {
         self.gas
     }
 
-    fn set_gas_limit(&mut self, gas_limit: u128) {
+    fn set_gas_limit(&mut self, gas_limit: u64) {
         self.gas = Some(gas_limit);
     }
 
@@ -203,7 +203,7 @@ mod tests {
     };
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_eips::eip7702::Authorization;
-    use alloy_primitives::{Address, Signature, U256};
+    use alloy_primitives::{Address, Signature};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
 
@@ -268,7 +268,7 @@ mod tests {
             .with_to(Address::ZERO)
             .with_access_list(AccessList::default())
             .with_authorization_list(vec![(Authorization {
-                chain_id: U256::from(1),
+                chain_id: 1,
                 address: Address::left_padding_from(&[1]),
                 nonce: 1u64,
             })

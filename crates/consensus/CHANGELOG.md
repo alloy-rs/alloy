@@ -5,7 +5,144 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
+
+### Bug Fixes
+
+- Correct implementations of Encodable and Decodable for sidecars ([#1528](https://github.com/alloy-rs/alloy/issues/1528))
+- Maybetagged serde for typed transaction ([#1495](https://github.com/alloy-rs/alloy/issues/1495))
+
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
+### Other
+
+- Add `Debug` trait bound for `Transaction` trait ([#1543](https://github.com/alloy-rs/alloy/issues/1543))
+- Use `Withdrawals` wrapper in `BlockBody` ([#1525](https://github.com/alloy-rs/alloy/issues/1525))
+
+## [0.5.2](https://github.com/alloy-rs/alloy/releases/tag/v0.5.2) - 2024-10-18
+
+### Bug Fixes
+
+- Fix requests root ([#1521](https://github.com/alloy-rs/alloy/issues/1521))
+- Use Decodable directly ([#1522](https://github.com/alloy-rs/alloy/issues/1522))
+
+### Miscellaneous Tasks
+
+- Release 0.5.2
+- Make Header encoding good ([#1524](https://github.com/alloy-rs/alloy/issues/1524))
+- Reorder bincode modules ([#1520](https://github.com/alloy-rs/alloy/issues/1520))
+
+### Testing
+
+- Extend test with rlp ([#1523](https://github.com/alloy-rs/alloy/issues/1523))
+
+## [0.5.1](https://github.com/alloy-rs/alloy/releases/tag/v0.5.1) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.1
+- Remove 7685 request variants ([#1515](https://github.com/alloy-rs/alloy/issues/1515))
+
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Bug Fixes
+
+- [`rpc-types-eth`] Receipt deser ([#1506](https://github.com/alloy-rs/alloy/issues/1506))
+- Use `requests_hash` ([#1508](https://github.com/alloy-rs/alloy/issues/1508))
+- Allow missing-tag deser of tx envelope ([#1489](https://github.com/alloy-rs/alloy/issues/1489))
+- Rename gas_limit to gas in serde def for txns ([#1486](https://github.com/alloy-rs/alloy/issues/1486))
+- Enforce correct parity for legacy transactions ([#1428](https://github.com/alloy-rs/alloy/issues/1428))
+
+### Features
+
+- From impl for variant ([#1488](https://github.com/alloy-rs/alloy/issues/1488))
+- `Encodable2718::network_len` ([#1431](https://github.com/alloy-rs/alloy/issues/1431))
+
+### Miscellaneous Tasks
+
+- Release 0.5.0
+- Flatten eip-7685 requests into a single opaque list ([#1383](https://github.com/alloy-rs/alloy/issues/1383))
+- Rename requests root to requests hash ([#1379](https://github.com/alloy-rs/alloy/issues/1379))
+- [consensus] Test use Vec::with_capacity ([#1476](https://github.com/alloy-rs/alloy/issues/1476))
+- Some lifetime simplifications ([#1467](https://github.com/alloy-rs/alloy/issues/1467))
+- Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))
+- Apply same member order ([#1408](https://github.com/alloy-rs/alloy/issues/1408))
+
+### Other
+
+- Rm redundant root hash definitions ([#1501](https://github.com/alloy-rs/alloy/issues/1501))
+- Add more constraints to `TxReceipt` trait ([#1478](https://github.com/alloy-rs/alloy/issues/1478))
+- Replace `to` by `kind` in Transaction trait ([#1484](https://github.com/alloy-rs/alloy/issues/1484))
+
+### Refactor
+
+- Change input output to Bytes ([#1487](https://github.com/alloy-rs/alloy/issues/1487))
+
+## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
+
+### Styling
+
+- Use alloc ([#1405](https://github.com/alloy-rs/alloy/issues/1405))
+
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Features
+
+- [consensus] Bincode compatibility for EIP-7702 ([#1404](https://github.com/alloy-rs/alloy/issues/1404))
+
+### Miscellaneous Tasks
+
+- Release 0.4.1
+- [consensus] Less derives for bincode compatible types ([#1401](https://github.com/alloy-rs/alloy/issues/1401))
+
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Bug Fixes
+
+- Advance buffer during 2718 decoding ([#1367](https://github.com/alloy-rs/alloy/issues/1367))
+- Correct `encode_2718_len` for legacy transactions ([#1360](https://github.com/alloy-rs/alloy/issues/1360))
+- Enforce correct parity encoding for typed transactions ([#1305](https://github.com/alloy-rs/alloy/issues/1305))
+
+### Features
+
+- [consensus] Bincode compatibility for header and transaction types ([#1397](https://github.com/alloy-rs/alloy/issues/1397))
+- Impl From<Eip2718Error> for alloy_rlp::Error ([#1359](https://github.com/alloy-rs/alloy/issues/1359))
+- Add Header::num_hash_slow ([#1357](https://github.com/alloy-rs/alloy/issues/1357))
+- [consensus] Generic Block Type ([#1319](https://github.com/alloy-rs/alloy/issues/1319))
+- [consensus] Move requests struct definition from reth ([#1326](https://github.com/alloy-rs/alloy/issues/1326))
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
+- Rm outdated comments ([#1392](https://github.com/alloy-rs/alloy/issues/1392))
+
+### Other
+
+- Add supertrait alloy_consensus::Transaction to RPC TransactionResponse ([#1387](https://github.com/alloy-rs/alloy/issues/1387))
+- Return static `Eip658Value` from `TxReceipt` trait method ([#1394](https://github.com/alloy-rs/alloy/issues/1394))
+- Auto-impl `alloy_consensus::TxReceipt` for ref ([#1395](https://github.com/alloy-rs/alloy/issues/1395))
+- Make `gas_limit` u64 for transactions ([#1382](https://github.com/alloy-rs/alloy/issues/1382))
+- Make `Header` blob fees u64 ([#1377](https://github.com/alloy-rs/alloy/issues/1377))
+- Make `Header` `base_fee_per_gas` u64 ([#1375](https://github.com/alloy-rs/alloy/issues/1375))
+- Make `Header` gas limit u64 ([#1333](https://github.com/alloy-rs/alloy/issues/1333))
+- Add `Receipts` struct ([#1247](https://github.com/alloy-rs/alloy/issues/1247))
+- Add full feature to `derive_more` ([#1335](https://github.com/alloy-rs/alloy/issues/1335))
+- Add `BlockHeader` getter trait ([#1302](https://github.com/alloy-rs/alloy/issues/1302))
+- Implement custom default for `Account` representing a valid empty account ([#1313](https://github.com/alloy-rs/alloy/issues/1313))
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 
 ### Miscellaneous Tasks
 

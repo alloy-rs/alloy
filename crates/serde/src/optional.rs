@@ -1,4 +1,5 @@
 //! Serde functions for encoding optional values.
+
 use serde::{Deserialize, Deserializer};
 
 /// For use with serde's `deserialize_with` on a sequence that must be
@@ -8,6 +9,5 @@ where
     T: Deserialize<'de> + Default,
     D: Deserializer<'de>,
 {
-    let s: Option<T> = Deserialize::deserialize(deserializer)?;
-    Ok(s.unwrap_or_default())
+    Option::<T>::deserialize(deserializer).map(Option::unwrap_or_default)
 }

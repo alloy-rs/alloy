@@ -19,9 +19,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
+alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
-alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-serde = { workspace = true, optional = true }
 
 # kzg
@@ -32,16 +32,28 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
+
+# misc
+derive_more = { workspace = true, features = [
+    "from",
+    "deref",
+    "deref_mut",
+    "into_iterator"
+], default-features = false }
+auto_impl.workspace = true
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-eips = { workspace = true, features = ["arbitrary"] }
+alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-signer.workspace = true
 
 arbitrary = { workspace = true, features = ["derive"] }
+bincode = "1.3"
 k256.workspace = true
-tokio = { workspace = true, features = ["macros"] }
+rand.workspace = true
 serde_json.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
 [features]
 default = ["std"]
@@ -55,3 +67,4 @@ serde = [
     "dep:alloy-serde",
     "alloy-eips/serde",
 ]
+serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]

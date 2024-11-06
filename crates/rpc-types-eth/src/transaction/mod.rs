@@ -75,7 +75,7 @@ pub struct Transaction {
     pub gas_price: Option<u128>,
     /// Gas amount
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas: u128,
+    pub gas: u64,
     /// Max BaseFeePerGas the user is willing to pay.
     #[cfg_attr(
         feature = "serde",
@@ -338,31 +338,94 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
-impl TransactionResponse for Transaction {
-    fn tx_hash(&self) -> B256 {
-        self.hash
+impl alloy_consensus::Transaction for Transaction {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
     }
 
-    fn from(&self) -> Address {
-        self.from
+    fn nonce(&self) -> u64 {
+        self.nonce
     }
 
-    fn to(&self) -> Option<Address> {
-        self.to
+    fn gas_limit(&self) -> u64 {
+        self.gas
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        self.gas_price
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas.unwrap_or_else(|| self.gas_price.unwrap_or_default())
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.max_priority_fee_per_gas
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.max_fee_per_blob_gas
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        debug_assert!(
+            self.max_fee_per_gas.is_some() || self.gas_price.is_some(),
+            "mutually exclusive fields"
+        );
+        self.max_fee_per_gas.unwrap_or_else(|| self.gas_price.unwrap_or_default())
+    }
+
+    fn kind(&self) -> TxKind {
+        self.to.into()
     }
 
     fn value(&self) -> U256 {
         self.value
     }
 
-    fn gas(&self) -> u128 {
-        self.gas
-    }
-
     fn input(&self) -> &Bytes {
         &self.input
     }
+
+    fn ty(&self) -> u8 {
+        self.transaction_type.unwrap_or_default()
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        self.access_list.as_ref()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.blob_versioned_hashes.as_deref()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.authorization_list.as_deref()
+    }
 }
+
+impl TransactionResponse for Transaction {
+    fn tx_hash(&self) -> B256 {
+        self.hash
+    }
+
+    fn block_hash(&self) -> Option<BlockHash> {
+        self.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.block_number
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.transaction_index
+    }
+
+    fn from(&self) -> Address {
+        self.from
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,6 +433,7 @@ mod tests {
     use arbitrary::Arbitrary;
     use core::str::FromStr;
     use rand::Rng;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn arbitrary_transaction() {
@@ -408,7 +472,7 @@ mod tests {
             max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
             authorization_list: Some(vec![(Authorization {
-                chain_id: U256::from(1u64),
+                chain_id: 1,
                 address: Address::left_padding_from(&[6]),
                 nonce: 1u64,
             })
@@ -417,7 +481,7 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":"0x1b"}]}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","yParity":"0x0","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"}]}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
@@ -452,7 +516,7 @@ mod tests {
             max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
             authorization_list: Some(vec![(Authorization {
-                chain_id: U256::from(1u64),
+                chain_id: 1,
                 address: Address::left_padding_from(&[6]),
                 nonce: 1u64,
             })
@@ -461,7 +525,7 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":"0x1b"}]}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","yParity":"0x0","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804"}]}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);

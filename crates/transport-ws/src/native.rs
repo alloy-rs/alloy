@@ -4,11 +4,17 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use tokio::time::sleep;
+pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
 };
+
+#[cfg(target_arch = "wasm32")]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::sleep;
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
@@ -21,18 +27,26 @@ pub struct WsConnect {
     pub url: String,
     /// The authorization header to use.
     pub auth: Option<Authorization>,
+    /// The websocket config.
+    pub config: Option<WebSocketConfig>,
 }
 
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
-        Self::with_auth(url, None)
+        Self { url: url.into(), auth: None, config: None }
     }
 
-    /// Creates a new websocket connection configuration with an authorization
-    /// header.
-    pub fn with_auth<S: Into<String>>(url: S, auth: Option<Authorization>) -> Self {
-        Self { url: url.into(), auth }
+    /// Sets the authorization header.
+    pub fn with_auth(mut self, auth: Authorization) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
+    /// Sets the websocket config.
+    pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
+        self.config = Some(config);
+        self
     }
 }
 
@@ -58,8 +72,9 @@ impl PubSubConnect for WsConnect {
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) =
-            tokio_tungstenite::connect_async(req).await.map_err(TransportErrorKind::custom)?;
+        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
+            .await
+            .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface };
@@ -88,9 +103,7 @@ impl WsBackend<TungsteniteStream> {
                 error!("Received binary message, expected text");
                 Err(())
             }
-            Message::Ping(_) => Ok(()),
-            Message::Pong(_) => Ok(()),
-            Message::Frame(_) => Ok(()),
+            Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => Ok(()),
         }
     }
 

@@ -19,13 +19,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
+alloy-primitives = { workspace = true, features = ["map"] }
 alloy-serde.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
 alloy-rpc-types-debug = { workspace = true, optional = true }
-alloy-rpc-types-engine = { workspace = true, optional = true }
-alloy-rpc-types-eth = { workspace = true, optional = true }
+alloy-rpc-types-engine = { workspace = true, optional = true, features = ["serde"] }
+alloy-rpc-types-eth = { workspace = true, optional = true, features = ["serde"] }
 alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
@@ -33,9 +34,14 @@ serde = { workspace = true, features = ["derive", "std"] }
 
 [dev-dependencies]
 serde_json.workspace = true
+similar-asserts.workspace = true
 
 [features]
-default = ["eth", "alloy-rpc-types-engine?/default", "alloy-rpc-types-eth?/default"]
+default = [
+    "eth",
+    "alloy-rpc-types-engine?/default",
+    "alloy-rpc-types-eth?/default",
+]
 admin = ["dep:alloy-rpc-types-admin"]
 anvil = ["dep:alloy-rpc-types-anvil"]
 beacon = ["dep:alloy-rpc-types-beacon"]

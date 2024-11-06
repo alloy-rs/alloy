@@ -30,10 +30,15 @@ thiserror.workspace = true
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
+
+# non-WASM only
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt", "time"] }
 
+# WASM only
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
+wasmtimer.workspace = true
 
 [features]
 wasm-bindgen = ["dep:wasm-bindgen-futures"]

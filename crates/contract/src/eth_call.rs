@@ -61,7 +61,7 @@ where
     }
 }
 
-impl<'req, 'coder, D, T, N> EthCall<'req, 'coder, D, T, N>
+impl<'req, D, T, N> EthCall<'req, '_, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -132,7 +132,7 @@ where
     decoder: &'coder D,
 }
 
-impl<'req, 'coder, D, T, N> std::future::Future for EthCallFut<'req, 'coder, D, T, N>
+impl<D, T, N> std::future::Future for EthCallFut<'_, '_, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,

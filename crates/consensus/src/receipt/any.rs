@@ -2,6 +2,7 @@ use crate::{Eip658Value, ReceiptWithBloom, TxReceipt};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
+use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -86,8 +87,11 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 }
 
-impl<T> TxReceipt<T> for AnyReceiptEnvelope<T> {
-    fn status_or_post_state(&self) -> &Eip658Value {
+impl<T> TxReceipt<T> for AnyReceiptEnvelope<T>
+where
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+{
+    fn status_or_post_state(&self) -> Eip658Value {
         self.inner.status_or_post_state()
     }
 

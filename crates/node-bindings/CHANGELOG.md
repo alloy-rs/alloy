@@ -5,11 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
+
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
+### Other
+
+- Small refactor with `then_some` ([#1533](https://github.com/alloy-rs/alloy/issues/1533))
+
+## [0.5.2](https://github.com/alloy-rs/alloy/releases/tag/v0.5.2) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.2
+
+## [0.5.1](https://github.com/alloy-rs/alloy/releases/tag/v0.5.1) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.1
+
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.0
+- Unify use Option ref ([#1477](https://github.com/alloy-rs/alloy/issues/1477))
+- More simplifications ([#1469](https://github.com/alloy-rs/alloy/issues/1469))
+- Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))
+
+### Testing
+
+- [node-bindings] Consolidate integration tests ([#1422](https://github.com/alloy-rs/alloy/issues/1422))
+
+## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
+
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.1
+
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
+- Fix some warnings ([#1320](https://github.com/alloy-rs/alloy/issues/1320))
+
+### Styling
+
+- Make tests that require binaries in path CI only ([#1393](https://github.com/alloy-rs/alloy/issues/1393))
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
 ### Features
 
 - [`node-bindings`] Support appending extra args ([#1299](https://github.com/alloy-rs/alloy/issues/1299))
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
 
 ## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 

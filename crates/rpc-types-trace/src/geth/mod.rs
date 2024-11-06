@@ -268,14 +268,18 @@ pub enum GethDebugBuiltInTracerType {
     /// to the nested format of `callTracer`.
     #[serde(rename = "flatCallTracer")]
     FlatCallTracer,
-    /// The prestate tracer has two modes: prestate and diff. The prestate mode returns the
-    /// accounts necessary to execute a given transaction. diff mode returns the differences
-    /// between the transaction's pre and post-state (i.e. what changed because the transaction
-    /// happened). The prestateTracer defaults to prestate mode. It reexecutes the given
-    /// transaction and tracks every part of state that is touched. This is similar to the concept
-    /// of a stateless witness, the difference being this tracer doesn't return any cryptographic
-    /// proof, rather only the trie leaves. The result is an object. The keys are addresses of
-    /// accounts.
+    /// The prestate tracer operates in two distinct modes: prestate and diff.
+    /// - In prestate mode, it retrieves the accounts required for executing a specified
+    ///   transaction.
+    /// - In diff mode, it identifies the changes between the transaction's initial and final
+    ///   states, detailing the modifications caused by the transaction.
+    ///
+    /// By default, the prestateTracer is set to prestate mode. It reexecutes the given transaction
+    /// and tracks every part of state that is accessed.
+    ///
+    /// This functionality is akin to a stateless witness, with the key distinction that this
+    /// tracer does not provide any cryptographic proofs; it only returns the trie leaves.
+    /// The output is an object where the keys correspond to account addresses.
     #[serde(rename = "prestateTracer")]
     PreStateTracer,
     /// This tracer is noop. It returns an empty object and is only meant for testing the setup.
@@ -374,6 +378,11 @@ impl From<CallConfig> for GethDebugTracerConfig {
         Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
+impl From<FlatCallConfig> for GethDebugTracerConfig {
+    fn from(value: FlatCallConfig) -> Self {
+        Self(serde_json::to_value(value).expect("is serializable"))
+    }
+}
 
 impl From<PreStateConfig> for GethDebugTracerConfig {
     fn from(value: PreStateConfig) -> Self {
@@ -418,10 +427,45 @@ pub struct GethDebugTracingOptions {
 }
 
 impl GethDebugTracingOptions {
+    /// Creates a new instance with given [`GethDebugTracerType`] configured
+    pub fn new_tracer(tracer: impl Into<GethDebugTracerType>) -> Self {
+        Self::default().with_tracer(tracer.into())
+    }
+
     /// Sets the tracer to use
     pub fn with_tracer(mut self, tracer: GethDebugTracerType) -> Self {
         self.tracer = Some(tracer);
         self
+    }
+
+    /// Creates new Options for [`GethDebugBuiltInTracerType::CallTracer`].
+    pub fn call_tracer(config: CallConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::CallTracer).with_call_config(config)
+    }
+
+    /// Creates new Options for [`GethDebugBuiltInTracerType::FlatCallTracer`].
+    pub fn flat_call_tracer(config: FlatCallConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::FlatCallTracer).with_config(config)
+    }
+
+    /// Creates new Options for [`GethDebugBuiltInTracerType::MuxTracer`].
+    pub fn mux_tracer(config: MuxConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::MuxTracer).with_config(config)
+    }
+
+    /// Creates new options for [`GethDebugBuiltInTracerType::PreStateTracer`]
+    pub fn prestate_tracer(config: PreStateConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::PreStateTracer).with_prestate_config(config)
+    }
+
+    /// Creates new options for [`GethDebugBuiltInTracerType::FourByteTracer`]
+    pub fn four_byte_tracer() -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::FourByteTracer)
+    }
+
+    /// Creates an [`GethDebugTracerType::JsTracer`] with the given js code.
+    pub fn js_tracer(code: impl Into<String>) -> Self {
+        Self::new_tracer(GethDebugTracerType::JsTracer(code.into()))
     }
 
     /// Sets the timeout to use for tracing
@@ -652,7 +696,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
         None => s.serialize_none(),
         Some(storage) => {
             let mut m = s.serialize_map(Some(storage.len()))?;
-            for (key, val) in storage.iter() {
+            for (key, val) in storage {
                 let key = format!("{:?}", key);
                 let val = format!("{:?}", val);
                 // skip the 0x prefix
@@ -666,6 +710,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_tracer_config() {
@@ -724,7 +769,7 @@ mod tests {
         let log: StructLog = serde_json::from_str(s).unwrap();
         let val = serde_json::to_value(&log).unwrap();
         let input = serde_json::from_str::<serde_json::Value>(s).unwrap();
-        similar_asserts::assert_eq!(input, val);
+        assert_eq!(input, val);
     }
 
     #[test]
@@ -752,7 +797,7 @@ mod tests {
 
         let de = serde_json::to_value(&result).unwrap();
         let val = serde_json::from_str::<serde_json::Value>(s).unwrap();
-        similar_asserts::assert_eq!(val, de);
+        assert_eq!(val, de);
     }
 
     #[test]

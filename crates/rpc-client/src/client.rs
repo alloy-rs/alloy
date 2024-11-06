@@ -218,6 +218,19 @@ impl<T> RpcClientInner<T> {
         self.transport
     }
 
+    /// Returns a reference to the pubsub frontend if the transport supports it.
+    #[cfg(feature = "pubsub")]
+    pub fn pubsub_frontend(&self) -> Option<&alloy_pubsub::PubSubFrontend>
+    where
+        T: std::any::Any,
+    {
+        let t = self.transport() as &dyn std::any::Any;
+        t.downcast_ref::<alloy_pubsub::PubSubFrontend>().or_else(|| {
+            t.downcast_ref::<BoxTransport>()
+                .and_then(|t| t.as_any().downcast_ref::<alloy_pubsub::PubSubFrontend>())
+        })
+    }
+
     /// Build a `JsonRpcRequest` with the given method and params.
     ///
     /// This function reserves an ID for the request, however the request is not sent.
@@ -361,6 +374,7 @@ mod pubsub_impl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_client_with_poll_interval() {

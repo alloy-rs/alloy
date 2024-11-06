@@ -1,11 +1,11 @@
-//! `trace_filter` types and support
+//! `trace_filter` types and support.
+
 use crate::parity::{
     Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
     TransactionTrace,
 };
-use alloy_primitives::Address;
+use alloy_primitives::{map::AddressHashSet, Address};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// Trace filter.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,8 +80,8 @@ impl TraceFilter {
 
     /// Returns a `TraceFilterMatcher` for this filter.
     pub fn matcher(&self) -> TraceFilterMatcher {
-        let from_addresses = self.from_address.iter().cloned().collect();
-        let to_addresses = self.to_address.iter().cloned().collect();
+        let from_addresses = self.from_address.iter().copied().collect();
+        let to_addresses = self.to_address.iter().copied().collect();
         TraceFilterMatcher { mode: self.mode, from_addresses, to_addresses }
     }
 }
@@ -101,7 +101,7 @@ pub enum TraceFilterMode {
 /// This is a set of addresses to match against.
 /// An empty set matches all addresses.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct AddressFilter(pub HashSet<Address>);
+pub struct AddressFilter(pub AddressHashSet);
 
 impl FromIterator<Address> for AddressFilter {
     fn from_iter<I: IntoIterator<Item = Address>>(iter: I) -> Self {
@@ -118,11 +118,11 @@ impl From<Vec<Address>> for AddressFilter {
 impl AddressFilter {
     /// Returns `true` if the given address is in the filter or the filter address set is empty.
     pub fn matches(&self, addr: &Address) -> bool {
-        self.matches_all() || self.0.contains(addr)
+        self.is_empty() || self.0.contains(addr)
     }
 
     /// Returns `true` if the address set is empty.
-    pub fn matches_all(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }
@@ -152,7 +152,7 @@ impl TraceFilterMatcher {
     ///
     /// # Behavior
     ///
-    /// The function evaluates whether the `trace` matches based on its action type:
+    /// This function evaluates whether the `trace` matches based on its action type:
     /// - `Call`: Matches if either the `from` or `to` addresses in the call action match the
     ///   filter's address criteria.
     /// - `Create`: Matches if the `from` address in action matches, and the result's address (if
@@ -162,7 +162,9 @@ impl TraceFilterMatcher {
     /// - `Reward`: Matches if the `author` address matches the filter's `to_addresses` criteria.
     ///
     /// The overall result depends on the filter mode:
-    /// - `Union` mode: The trace matches if either the `from` or `to` address matches.
+    /// - `Union` mode: The trace matches if either the `from` or `to` address matches. If either of
+    ///   the from or to address set is empty, the trace matches only if the other address matches,
+    ///   and if both are empty, the filter matches all traces.
     /// - `Intersection` mode: The trace matches only if both the `from` and `to` addresses match.
     pub fn matches(&self, trace: &TransactionTrace) -> bool {
         let (from_matches, to_matches) = match trace.action {
@@ -175,19 +177,27 @@ impl TraceFilterMatcher {
                     Some(TraceOutput::Create(CreateOutput { address: to, .. })) => {
                         self.to_addresses.matches(&to)
                     }
-                    _ => self.to_addresses.matches_all(),
+                    _ => self.to_addresses.is_empty(),
                 },
             ),
             Action::Selfdestruct(SelfdestructAction { address, refund_address, .. }) => {
                 (self.from_addresses.matches(&address), self.to_addresses.matches(&refund_address))
             }
             Action::Reward(RewardAction { author, .. }) => {
-                (self.from_addresses.matches_all(), self.to_addresses.matches(&author))
+                (self.from_addresses.is_empty(), self.to_addresses.matches(&author))
             }
         };
 
         match self.mode {
-            TraceFilterMode::Union => from_matches || to_matches,
+            TraceFilterMode::Union => {
+                if self.from_addresses.is_empty() {
+                    to_matches
+                } else if self.to_addresses.is_empty() {
+                    from_matches
+                } else {
+                    from_matches || to_matches
+                }
+            }
             TraceFilterMode::Intersection => from_matches && to_matches,
         }
     }
@@ -198,6 +208,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{Bytes, U256};
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_parse_filter() {
@@ -309,7 +320,7 @@ mod tests {
         };
         assert!(m0.matches(&trace));
         assert!(m1.matches(&trace));
-        assert!(m2.matches(&trace));
+        assert!(!m2.matches(&trace));
         assert!(m3.matches(&trace));
         assert!(m4.matches(&trace));
         assert!(m5.matches(&trace));
@@ -353,7 +364,7 @@ mod tests {
         };
         assert!(m0.matches(&trace));
         assert!(m1.matches(&trace));
-        assert!(m2.matches(&trace));
+        assert!(!m2.matches(&trace));
         assert!(m3.matches(&trace));
         assert!(m4.matches(&trace));
         assert!(m5.matches(&trace));
@@ -388,8 +399,8 @@ mod tests {
             ..Default::default()
         };
         assert!(m0.matches(&trace));
-        assert!(m1.matches(&trace));
-        assert!(m2.matches(&trace));
+        assert!(!m1.matches(&trace));
+        assert!(!m2.matches(&trace));
         assert!(!m3.matches(&trace));
         assert!(m4.matches(&trace));
         assert!(!m5.matches(&trace));

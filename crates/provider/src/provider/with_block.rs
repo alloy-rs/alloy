@@ -10,8 +10,10 @@ use crate::ProviderCall;
 /// Helper struct that houses the params along with the BlockId.
 #[derive(Debug, Clone)]
 pub struct ParamsWithBlock<Params: RpcParam> {
-    params: Params,
-    block_id: BlockId,
+    /// The params to be sent to the RPC call.
+    pub params: Params,
+    /// The block id to be used for the RPC call.
+    pub block_id: BlockId,
 }
 
 impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {

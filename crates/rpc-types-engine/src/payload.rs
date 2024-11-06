@@ -1,25 +1,20 @@
 //! Payload types.
 
+use crate::PayloadError;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{
-    eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip6110::DepositRequest,
-    eip7002::WithdrawalRequest, eip7251::ConsolidationRequest, BlockNumHash,
-};
+use alloy_eips::{eip4844::BlobTransactionSidecar, eip4895::Withdrawal, BlockNumHash};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
-/// The execution payload body response that allows for `null` values.
-pub type ExecutionPayloadBodiesV2 = Vec<Option<ExecutionPayloadBodyV2>>;
-
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadId(pub B64);
 
@@ -139,8 +134,8 @@ pub struct ExecutionPayloadEnvelopeV3 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadEnvelopeV4 {
-    /// Execution payload V4
-    pub execution_payload: ExecutionPayloadV4,
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
     /// The expected value to be received by the feeRecipient in wei
     pub block_value: U256,
     /// The blobs, commitments, and proofs associated with the executed payload.
@@ -148,6 +143,10 @@ pub struct ExecutionPayloadEnvelopeV4 {
     /// Introduced in V3, this represents a suggestion from the execution layer if the payload
     /// should be used instead of an externally provided one.
     pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Vec<Bytes>,
 }
 
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
@@ -444,157 +443,6 @@ impl ssz::Encode for ExecutionPayloadV3 {
     }
 }
 
-/// This structure maps on the ExecutionPayloadV4 structure of the beacon chain spec.
-///
-/// See also: <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#ExecutionPayloadV4>
-///
-/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositRequests
-/// and withdrawalRequests.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct ExecutionPayloadV4 {
-    /// Inner V3 payload
-    #[cfg_attr(feature = "serde", serde(flatten))]
-    pub payload_inner: ExecutionPayloadV3,
-    /// Array of deposit requests.
-    ///
-    /// This maps directly to the deposit requests defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-    pub deposit_requests: Vec<DepositRequest>,
-    /// Array of execution layer triggerable withdrawal requests.
-    ///
-    /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-    pub withdrawal_requests: Vec<WithdrawalRequest>,
-    /// Array of consolidation requests.
-    ///
-    /// See [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251).
-    pub consolidation_requests: Vec<ConsolidationRequest>,
-}
-
-impl ExecutionPayloadV4 {
-    /// Returns the withdrawals for the payload.
-    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
-        self.payload_inner.withdrawals()
-    }
-
-    /// Returns the timestamp for the payload.
-    pub const fn timestamp(&self) -> u64 {
-        self.payload_inner.payload_inner.timestamp()
-    }
-}
-
-#[cfg(feature = "ssz")]
-impl ssz::Decode for ExecutionPayloadV4 {
-    fn is_ssz_fixed_len() -> bool {
-        false
-    }
-
-    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        let mut builder = ssz::SszDecoderBuilder::new(bytes);
-
-        builder.register_type::<B256>()?;
-        builder.register_type::<Address>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<Bloom>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<Bytes>()?;
-        builder.register_type::<U256>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<Vec<Bytes>>()?;
-        builder.register_type::<Vec<Withdrawal>>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<Vec<DepositRequest>>()?;
-        builder.register_type::<Vec<WithdrawalRequest>>()?;
-        builder.register_type::<Vec<ConsolidationRequest>>()?;
-
-        let mut decoder = builder.build()?;
-
-        Ok(Self {
-            payload_inner: ExecutionPayloadV3 {
-                payload_inner: ExecutionPayloadV2 {
-                    payload_inner: ExecutionPayloadV1 {
-                        parent_hash: decoder.decode_next()?,
-                        fee_recipient: decoder.decode_next()?,
-                        state_root: decoder.decode_next()?,
-                        receipts_root: decoder.decode_next()?,
-                        logs_bloom: decoder.decode_next()?,
-                        prev_randao: decoder.decode_next()?,
-                        block_number: decoder.decode_next()?,
-                        gas_limit: decoder.decode_next()?,
-                        gas_used: decoder.decode_next()?,
-                        timestamp: decoder.decode_next()?,
-                        extra_data: decoder.decode_next()?,
-                        base_fee_per_gas: decoder.decode_next()?,
-                        block_hash: decoder.decode_next()?,
-                        transactions: decoder.decode_next()?,
-                    },
-                    withdrawals: decoder.decode_next()?,
-                },
-                blob_gas_used: decoder.decode_next()?,
-                excess_blob_gas: decoder.decode_next()?,
-            },
-            deposit_requests: decoder.decode_next()?,
-            withdrawal_requests: decoder.decode_next()?,
-            consolidation_requests: decoder.decode_next()?,
-        })
-    }
-}
-
-#[cfg(feature = "ssz")]
-impl ssz::Encode for ExecutionPayloadV4 {
-    fn is_ssz_fixed_len() -> bool {
-        false
-    }
-
-    fn ssz_append(&self, buf: &mut Vec<u8>) {
-        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 5
-            + <Address as ssz::Encode>::ssz_fixed_len()
-            + <Bloom as ssz::Encode>::ssz_fixed_len()
-            + <u64 as ssz::Encode>::ssz_fixed_len() * 6
-            + <U256 as ssz::Encode>::ssz_fixed_len()
-            + ssz::BYTES_PER_LENGTH_OFFSET * 6;
-
-        let mut encoder = ssz::SszEncoder::container(buf, offset);
-
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.parent_hash);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.fee_recipient);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.state_root);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.receipts_root);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.logs_bloom);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.prev_randao);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_number);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_limit);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_used);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.timestamp);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.extra_data);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.base_fee_per_gas);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_hash);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.transactions);
-        encoder.append(&self.payload_inner.payload_inner.withdrawals);
-        encoder.append(&self.payload_inner.blob_gas_used);
-        encoder.append(&self.payload_inner.excess_blob_gas);
-        encoder.append(&self.deposit_requests);
-        encoder.append(&self.withdrawal_requests);
-        encoder.append(&self.consolidation_requests);
-
-        encoder.finalize();
-    }
-
-    fn ssz_bytes_len(&self) -> usize {
-        <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
-            + ssz::BYTES_PER_LENGTH_OFFSET * 3
-            + self.deposit_requests.ssz_bytes_len()
-            + self.withdrawal_requests.ssz_bytes_len()
-            + self.consolidation_requests.ssz_bytes_len()
-    }
-}
-
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -733,8 +581,6 @@ pub enum ExecutionPayload {
     V2(ExecutionPayloadV2),
     /// V3 payload
     V3(ExecutionPayloadV3),
-    /// V4 payload
-    V4(ExecutionPayloadV4),
 }
 
 impl ExecutionPayload {
@@ -744,7 +590,6 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &payload.payload_inner,
             Self::V3(payload) => &payload.payload_inner.payload_inner,
-            Self::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -754,7 +599,6 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &mut payload.payload_inner,
             Self::V3(payload) => &mut payload.payload_inner.payload_inner,
-            Self::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -764,7 +608,6 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => payload.payload_inner,
             Self::V3(payload) => payload.payload_inner.payload_inner,
-            Self::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -774,7 +617,6 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&payload.payload_inner),
-            Self::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
@@ -784,7 +626,6 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&mut payload.payload_inner),
-            Self::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
@@ -793,7 +634,6 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
-            Self::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
@@ -802,23 +642,6 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
-            Self::V4(payload) => Some(&mut payload.payload_inner),
-        }
-    }
-
-    /// Returns a reference to the V4 payload, if any.
-    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
-        match self {
-            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
-            Self::V4(payload) => Some(payload),
-        }
-    }
-
-    /// Returns a mutable reference to the V4 payload, if any.
-    pub fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
-        match self {
-            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
-            Self::V4(payload) => Some(payload),
         }
     }
 
@@ -879,12 +702,6 @@ impl From<ExecutionPayloadV3> for ExecutionPayload {
     }
 }
 
-impl From<ExecutionPayloadV4> for ExecutionPayload {
-    fn from(payload: ExecutionPayloadV4) -> Self {
-        Self::V4(payload)
-    }
-}
-
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for ExecutionPayload {
@@ -895,114 +712,15 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
         #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum ExecutionPayloadDesc {
-            V4(ExecutionPayloadV4),
             V3(ExecutionPayloadV3),
             V2(ExecutionPayloadV2),
             V1(ExecutionPayloadV1),
         }
         match ExecutionPayloadDesc::deserialize(deserializer)? {
-            ExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
         }
-    }
-}
-
-/// Error that can occur when handling payloads.
-#[derive(Debug, derive_more::Display)]
-pub enum PayloadError {
-    /// Invalid payload extra data.
-    #[display("invalid payload extra data: {_0}")]
-    ExtraData(Bytes),
-    /// Invalid payload base fee.
-    #[display("invalid payload base fee: {_0}")]
-    BaseFee(U256),
-    /// Invalid payload blob gas used.
-    #[display("invalid payload blob gas used: {_0}")]
-    BlobGasUsed(U256),
-    /// Invalid payload excess blob gas.
-    #[display("invalid payload excess blob gas: {_0}")]
-    ExcessBlobGas(U256),
-    /// withdrawals present in pre-shanghai payload.
-    #[display("withdrawals present in pre-shanghai payload")]
-    PreShanghaiBlockWithWitdrawals,
-    /// withdrawals missing in post-shanghai payload.
-    #[display("withdrawals missing in post-shanghai payload")]
-    PostShanghaiBlockWithoutWitdrawals,
-    /// blob transactions present in pre-cancun payload.
-    #[display("blob transactions present in pre-cancun payload")]
-    PreCancunBlockWithBlobTransactions,
-    /// blob gas used present in pre-cancun payload.
-    #[display("blob gas used present in pre-cancun payload")]
-    PreCancunBlockWithBlobGasUsed,
-    /// excess blob gas present in pre-cancun payload.
-    #[display("excess blob gas present in pre-cancun payload")]
-    PreCancunBlockWithExcessBlobGas,
-    /// cancun fields present in pre-cancun payload.
-    #[display("cancun fields present in pre-cancun payload")]
-    PreCancunWithCancunFields,
-    /// blob transactions missing in post-cancun payload.
-    #[display("blob transactions missing in post-cancun payload")]
-    PostCancunBlockWithoutBlobTransactions,
-    /// blob gas used missing in post-cancun payload.
-    #[display("blob gas used missing in post-cancun payload")]
-    PostCancunBlockWithoutBlobGasUsed,
-    /// excess blob gas missing in post-cancun payload.
-    #[display("excess blob gas missing in post-cancun payload")]
-    PostCancunBlockWithoutExcessBlobGas,
-    /// cancun fields missing in post-cancun payload.
-    #[display("cancun fields missing in post-cancun payload")]
-    PostCancunWithoutCancunFields,
-    /// blob transactions present in pre-prague payload.
-    #[display("eip 7702 transactions present in pre-prague payload")]
-    PrePragueBlockWithEip7702Transactions,
-    /// requests present in pre-prague payload.
-    #[display("requests present in pre-prague payload")]
-    PrePragueBlockRequests,
-    /// Invalid payload block hash.
-    #[display("block hash mismatch: want {consensus}, got {execution}")]
-    BlockHash {
-        /// The block hash computed from the payload.
-        execution: B256,
-        /// The block hash provided with the payload.
-        consensus: B256,
-    },
-    /// Expected blob versioned hashes do not match the given transactions.
-    #[display("expected blob versioned hashes do not match the given transactions")]
-    InvalidVersionedHashes,
-    /// Encountered decoding error.
-    #[display("{_0}")]
-    Decode(alloy_rlp::Error),
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for PayloadError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Decode(err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl From<alloy_rlp::Error> for PayloadError {
-    fn from(value: alloy_rlp::Error) -> Self {
-        Self::Decode(value)
-    }
-}
-
-impl PayloadError {
-    /// Returns `true` if the error is caused by a block hash mismatch.
-    #[inline]
-    pub const fn is_block_hash_mismatch(&self) -> bool {
-        matches!(self, Self::BlockHash { .. })
-    }
-
-    /// Returns `true` if the error is caused by invalid block hashes (Cancun).
-    #[inline]
-    pub const fn is_invalid_versioned_hashes(&self) -> bool {
-        matches!(self, Self::InvalidVersionedHashes)
     }
 }
 
@@ -1018,34 +736,6 @@ pub struct ExecutionPayloadBodyV1 {
     ///
     /// Will always be `None` if pre shanghai.
     pub withdrawals: Option<Vec<Withdrawal>>,
-}
-
-/// This structure has the syntax of [`ExecutionPayloadBodyV1`] and appends the new fields:
-/// depositRequests and withdrawalRequests.
-///
-/// See also: <https://github.com/ethereum/execution-apis/blob/3ae3d29fc9900e5c48924c238dff7643fdc3680e/src/engine/prague.md#executionpayloadbodyv2>
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct ExecutionPayloadBodyV2 {
-    /// Enveloped encoded transactions.
-    pub transactions: Vec<Bytes>,
-    /// All withdrawals in the block.
-    ///
-    /// Will always be `None` if pre shanghai.
-    pub withdrawals: Option<Vec<Withdrawal>>,
-    /// Array of deposits requests.
-    ///
-    /// Will always be `None` if pre prague.
-    pub deposit_requests: Option<Vec<DepositRequest>>,
-    /// Array of withdrawal requests.
-    ///
-    /// Will always be `None` if pre prague.
-    pub withdrawal_requests: Option<Vec<WithdrawalRequest>>,
-    /// Array of consolidation requests.
-    ///
-    /// Will always be `None` if pre prague.
-    pub consolidation_requests: Option<Vec<ConsolidationRequest>>,
 }
 
 /// This structure contains the attributes required to initiate a payload build process in the
@@ -1231,34 +921,12 @@ impl core::fmt::Display for PayloadStatusEnum {
     }
 }
 
-/// Various errors that can occur when validating a payload or forkchoice update.
-///
-/// This is intended for the [PayloadStatusEnum::Invalid] variant.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, derive_more::Display)]
-pub enum PayloadValidationError {
-    /// Thrown when a forkchoice update's head links to a previously rejected payload.
-    #[display("links to previously rejected block")]
-    LinksToRejectedPayload,
-    /// Thrown when a new payload contains a wrong block number.
-    #[display("invalid block number")]
-    InvalidBlockNumber,
-    /// Thrown when a new payload contains a wrong state root
-    #[display("invalid merkle root: (remote: {remote:?} local: {local:?})")]
-    InvalidStateRoot {
-        /// The state root of the payload we received from remote (CL)
-        remote: B256,
-        /// The state root of the payload that we computed locally.
-        local: B256,
-    },
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for PayloadValidationError {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PayloadValidationError;
     use alloc::vec;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]
@@ -1325,7 +993,7 @@ mod tests {
                 .to_string(),
             },
         };
-        similar_asserts::assert_eq!(q, serde_json::from_str(s).unwrap());
+        assert_eq!(q, serde_json::from_str(s).unwrap());
     }
 
     #[test]

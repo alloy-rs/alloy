@@ -1,7 +1,6 @@
-//! Signature related RPC values
-use alloy_primitives::U256;
+//! Signature related RPC values.
 
-use alloc::{format, string::String};
+use alloy_primitives::U256;
 
 /// Container type for all signature fields in RPC
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -64,7 +63,7 @@ where
     D: serde::Deserializer<'de>,
 {
     use serde::Deserialize;
-    let s = String::deserialize(deserializer)?;
+    let s = alloc::string::String::deserialize(deserializer)?;
     match s.as_str() {
         "0x0" => Ok(false),
         "0x1" => Ok(true),
@@ -103,6 +102,7 @@ impl From<alloy_primitives::Signature> for Signature {
 mod tests {
     use super::*;
     use core::str::FromStr;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

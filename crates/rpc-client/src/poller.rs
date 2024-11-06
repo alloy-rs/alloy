@@ -14,6 +14,12 @@ use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::Instrument;
 
+#[cfg(target_arch = "wasm32")]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::sleep;
+
 /// The number of retries for polling a request.
 const MAX_RETRIES: usize = 3;
 
@@ -150,52 +156,53 @@ where
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
         let span = debug_span!("poller", method = %self.method);
-        let fut = async move {
-            let mut params = ParamsOnce::Typed(self.params);
-            let mut retries = MAX_RETRIES;
-            'outer: for _ in 0..self.limit {
-                let Some(client) = self.client.upgrade() else {
-                    debug!("client dropped");
+        self.into_future(tx).instrument(span).spawn_task();
+        rx.into()
+    }
+
+    async fn into_future(self, tx: broadcast::Sender<Resp>) {
+        let mut params = ParamsOnce::Typed(self.params);
+        let mut retries = MAX_RETRIES;
+        'outer: for _ in 0..self.limit {
+            let Some(client) = self.client.upgrade() else {
+                debug!("client dropped");
+                break;
+            };
+
+            // Avoid serializing the params more than once.
+            let params = match params.get() {
+                Ok(p) => p,
+                Err(err) => {
+                    error!(%err, "failed to serialize params");
                     break;
-                };
+                }
+            };
 
-                // Avoid serializing the params more than once.
-                let params = match params.get() {
-                    Ok(p) => p,
-                    Err(err) => {
-                        error!(%err, "failed to serialize params");
-                        break;
-                    }
-                };
-
-                loop {
-                    trace!("polling");
-                    match client.request(self.method.clone(), params).await {
-                        Ok(resp) => {
-                            if tx.send(resp).is_err() {
-                                debug!("channel closed");
-                                break 'outer;
-                            }
-                        }
-                        Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                            debug!(%err, "failed to poll, retrying");
-                            retries -= 1;
-                            continue;
-                        }
-                        Err(err) => {
-                            error!(%err, "failed to poll");
+            loop {
+                trace!("polling");
+                match client.request(self.method.clone(), params).await {
+                    Ok(resp) => {
+                        if tx.send(resp).is_err() {
+                            debug!("channel closed");
                             break 'outer;
                         }
                     }
-                    break;
+                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
+                        debug!(%err, "failed to poll, retrying");
+                        retries -= 1;
+                        continue;
+                    }
+                    Err(err) => {
+                        error!(%err, "failed to poll");
+                        break 'outer;
+                    }
                 }
-
-                trace!(duration=?self.poll_interval, "sleeping");
-                tokio::time::sleep(self.poll_interval).await;
+                break;
             }
-        };
-        fut.instrument(span).spawn_task();
-        rx.into()
+
+            trace!(duration=?self.poll_interval, "sleeping");
+            sleep(self.poll_interval).await;
+        }
     }
 
     /// Starts the poller and returns the stream of responses.

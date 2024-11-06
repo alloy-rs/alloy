@@ -24,13 +24,13 @@ use crate::eip1559::BaseFeeParams;
 ///
 /// For more information, refer to the [EIP-1559 spec](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md).
 pub fn calc_next_block_base_fee(
-    gas_used: u128,
-    gas_limit: u128,
-    base_fee: u128,
+    gas_used: u64,
+    gas_limit: u64,
+    base_fee: u64,
     base_fee_params: BaseFeeParams,
-) -> u128 {
+) -> u64 {
     // Calculate the target gas by dividing the gas limit by the elasticity multiplier.
-    let gas_target = gas_limit / base_fee_params.elasticity_multiplier;
+    let gas_target = gas_limit / base_fee_params.elasticity_multiplier as u64;
 
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
@@ -44,17 +44,18 @@ pub fn calc_next_block_base_fee(
                 + (core::cmp::max(
                     // Ensure a minimum increase of 1.
                     1,
-                    base_fee * (gas_used - gas_target)
-                        / (gas_target * base_fee_params.max_change_denominator),
-                ))
+                    base_fee as u128 * (gas_used - gas_target) as u128
+                        / (gas_target as u128 * base_fee_params.max_change_denominator),
+                ) as u64)
         }
         // If the gas used in the current block is less than the gas target, calculate a new
         // decreased base fee.
         core::cmp::Ordering::Less => {
             // Calculate the decrease in base fee based on the formula defined by EIP-1559.
             base_fee.saturating_sub(
-                base_fee * (gas_target - gas_used)
-                    / (gas_target * base_fee_params.max_change_denominator),
+                (base_fee as u128 * (gas_target - gas_used) as u128
+                    / (gas_target as u128 * base_fee_params.max_change_denominator))
+                    as u64,
             )
         }
     }
@@ -125,11 +126,11 @@ mod tests {
             assert_eq!(
                 next_base_fee[i],
                 calc_next_block_base_fee(
-                    gas_used[i] as u128,
-                    gas_limit[i] as u128,
-                    base_fee[i] as u128,
+                    gas_used[i],
+                    gas_limit[i],
+                    base_fee[i],
                     BaseFeeParams::optimism_sepolia(),
-                ) as u64
+                )
             );
         }
     }
@@ -157,11 +158,11 @@ mod tests {
             assert_eq!(
                 next_base_fee[i],
                 calc_next_block_base_fee(
-                    gas_used[i] as u128,
-                    gas_limit[i] as u128,
-                    base_fee[i] as u128,
+                    gas_used[i],
+                    gas_limit[i],
+                    base_fee[i],
                     BaseFeeParams::optimism(),
-                ) as u64
+                )
             );
         }
     }
@@ -189,11 +190,11 @@ mod tests {
             assert_eq!(
                 next_base_fee[i],
                 calc_next_block_base_fee(
-                    gas_used[i] as u128,
-                    gas_limit[i] as u128,
-                    base_fee[i] as u128,
+                    gas_used[i],
+                    gas_limit[i],
+                    base_fee[i],
                     BaseFeeParams::optimism_canyon(),
-                ) as u64
+                )
             );
         }
     }
@@ -221,11 +222,11 @@ mod tests {
             assert_eq!(
                 next_base_fee[i],
                 calc_next_block_base_fee(
-                    gas_used[i] as u128,
-                    gas_limit[i] as u128,
-                    base_fee[i] as u128,
+                    gas_used[i],
+                    gas_limit[i],
+                    base_fee[i],
                     BaseFeeParams::base_sepolia(),
-                ) as u64
+                )
             );
         }
     }

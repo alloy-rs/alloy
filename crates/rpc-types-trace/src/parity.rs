@@ -589,6 +589,7 @@ pub struct StorageDelta {
 mod tests {
     use super::*;
     use serde_json::{json, Value};
+    use similar_asserts::assert_eq;
     use std::str::FromStr;
 
     #[test]
@@ -637,10 +638,10 @@ mod tests {
 
         let json = serde_json::to_value(val.clone()).unwrap();
         let expect = serde_json::from_str::<serde_json::Value>(input).unwrap();
-        similar_asserts::assert_eq!(json, expect);
+        assert_eq!(json, expect);
         let s = serde_json::to_string(&val).unwrap();
         let json = serde_json::from_str::<serde_json::Value>(&s).unwrap();
-        similar_asserts::assert_eq!(json, expect);
+        assert_eq!(json, expect);
 
         let input = input.replace("suicide", "selfdestruct");
         let val = serde_json::from_str::<TransactionTrace>(&input).unwrap();
@@ -789,7 +790,7 @@ mod tests {
         let trace: LocalizedTransactionTrace = serde_json::from_str(reference_data).unwrap();
         assert!(trace.trace.action.is_call());
         let serialized = serde_json::to_string_pretty(&trace).unwrap();
-        similar_asserts::assert_eq!(serialized, reference_data);
+        assert_eq!(serialized, reference_data);
     }
 
     #[test]
@@ -816,7 +817,7 @@ mod tests {
         let trace: LocalizedTransactionTrace = serde_json::from_str(reference_data).unwrap();
         assert!(trace.trace.action.is_selfdestruct());
         let serialized = serde_json::to_string_pretty(&trace).unwrap();
-        similar_asserts::assert_eq!(serialized, reference_data);
+        assert_eq!(serialized, reference_data);
     }
 
     #[test]

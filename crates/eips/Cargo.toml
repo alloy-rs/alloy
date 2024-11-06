@@ -36,7 +36,9 @@ derive_more = { workspace = true, features = [
     "as_ref",
     "deref",
     "deref_mut",
-], default-features = false, optional = true }
+    "from",
+    "into_iterator",
+], default-features = false }
 once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
 sha2 = { workspace = true, optional = true }
 
@@ -56,14 +58,16 @@ alloy-primitives = { workspace = true, features = [
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+rand.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]
-std = ["alloy-primitives/std", "alloy-rlp/std", "derive_more?/std",
+std = ["alloy-primitives/std", "alloy-rlp/std",
 "serde?/std", "c-kzg?/std", "once_cell?/std"]
-serde = ["dep:alloy-serde", "dep:serde", "alloy-primitives/serde", 
+serde = ["dep:alloy-serde", "dep:serde", "alloy-primitives/serde",
 "c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde"]
-kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
+kzg = ["kzg-sidecar", "sha2", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
 k256 = ["alloy-eip7702/k256"]
 sha2 = ["dep:sha2"]

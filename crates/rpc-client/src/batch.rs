@@ -3,13 +3,13 @@ use alloy_json_rpc::{
     transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcParam,
     RpcReturn, SerializedRequest,
 };
+use alloy_primitives::map::HashMap;
 use alloy_transport::{Transport, TransportError, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use pin_project::pin_project;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
-    collections::HashMap,
     future::{Future, IntoFuture},
     marker::PhantomData,
     pin::Pin,
@@ -119,7 +119,7 @@ impl<'a, T> BatchRequest<'a, T> {
         Self {
             transport,
             requests: RequestPacket::Batch(Vec::with_capacity(10)),
-            channels: HashMap::with_capacity(10),
+            channels: HashMap::with_capacity_and_hasher(10, Default::default()),
         }
     }
 
@@ -142,7 +142,7 @@ impl<'a, T> BatchRequest<'a, T> {
     }
 }
 
-impl<'a, Conn> BatchRequest<'a, Conn>
+impl<Conn> BatchRequest<'_, Conn>
 where
     Conn: Transport + Clone,
 {
@@ -170,7 +170,7 @@ where
     }
 }
 
-impl<'a, T> IntoFuture for BatchRequest<'a, T>
+impl<T> IntoFuture for BatchRequest<'_, T>
 where
     T: Transport + Clone,
 {
@@ -200,10 +200,10 @@ where
             return Poll::Ready(Err(e));
         }
 
-        // We only have mut refs, and we want ownership, so we just replace
-        // with 0-capacity collections.
-        let channels = std::mem::replace(channels, HashMap::with_capacity(0));
-        let req = std::mem::replace(requests, RequestPacket::Batch(Vec::with_capacity(0)));
+        // We only have mut refs, and we want ownership, so we just replace with 0-capacity
+        // collections.
+        let channels = std::mem::take(channels);
+        let req = std::mem::replace(requests, RequestPacket::Batch(Vec::new()));
 
         let fut = transport.call(req);
         self.set(Self::AwaitingResponse { channels, fut });
@@ -236,7 +236,7 @@ where
                 }
             }
             ResponsePacket::Batch(responses) => {
-                for response in responses.into_iter() {
+                for response in responses {
                     if let Some(tx) = channels.remove(&response.id) {
                         let _ = tx.send(transform_response(response));
                     }

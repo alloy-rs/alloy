@@ -1,6 +1,7 @@
-use alloy_primitives::{Address, Bytes, B256, B512, U256};
+#![allow(unused_imports)]
 
 use alloc::{string::String, vec::Vec};
+use alloy_primitives::{Address, Bytes, B256, B512, U256};
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::Account;

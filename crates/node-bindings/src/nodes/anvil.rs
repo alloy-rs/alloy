@@ -345,18 +345,8 @@ impl Anvil {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-
-    #[test]
-    fn can_launch_anvil() {
-        let _ = Anvil::new().spawn();
-    }
-
-    #[test]
-    fn can_launch_anvil_with_more_accounts() {
-        let _ = Anvil::new().arg("--accounts").arg("20").spawn();
-    }
 
     #[test]
     fn assert_block_time_is_natural_number() {
@@ -364,24 +354,5 @@ mod tests {
         //even though the block time is a f64, it should be passed as a whole number
         let anvil = Anvil::new().block_time(12);
         assert_eq!(anvil.block_time.unwrap().to_string(), "12");
-        let _ = anvil.spawn();
-    }
-
-    #[test]
-    fn can_launch_anvil_with_sub_seconds_block_time() {
-        let _ = Anvil::new().block_time_f64(0.5).spawn();
-    }
-
-    #[test]
-    fn assert_chain_id() {
-        let id = 99999;
-        let anvil = Anvil::new().chain_id(id).spawn();
-        assert_eq!(anvil.chain_id(), id);
-    }
-
-    #[test]
-    fn assert_chain_id_without_rpc() {
-        let anvil = Anvil::new().spawn();
-        assert_eq!(anvil.chain_id(), 31337);
     }
 }

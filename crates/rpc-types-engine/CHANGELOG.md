@@ -5,12 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
+
+### Features
+
+- Derive serde for `ExecutionPayloadSidecar` ([#1535](https://github.com/alloy-rs/alloy/issues/1535))
+
+### Miscellaneous Tasks
+
+- Release 0.5.3
+
+## [0.5.2](https://github.com/alloy-rs/alloy/releases/tag/v0.5.2) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.2
+
+## [0.5.1](https://github.com/alloy-rs/alloy/releases/tag/v0.5.1) - 2024-10-18
+
+### Features
+
+- Add ExecutionPayloadSidecar type ([#1517](https://github.com/alloy-rs/alloy/issues/1517))
+
+### Miscellaneous Tasks
+
+- Release 0.5.1
+- Extract error types to new modules ([#1518](https://github.com/alloy-rs/alloy/issues/1518))
+- Remove 7685 request variants ([#1515](https://github.com/alloy-rs/alloy/issues/1515))
+
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Miscellaneous Tasks
+
+- Release 0.5.0
+- Flatten eip-7685 requests into a single opaque list ([#1383](https://github.com/alloy-rs/alloy/issues/1383))
+- Refactor some match with same arms ([#1463](https://github.com/alloy-rs/alloy/issues/1463))
+- Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))
+
+### Other
+
+- Add default to payload id ([#1442](https://github.com/alloy-rs/alloy/issues/1442))
+- Replace assert_eq! with similar_asserts::assert_eq! ([#1429](https://github.com/alloy-rs/alloy/issues/1429))
+
+## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
+
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.1
+
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Features
+
+- [rpc-types-engine] Use strum for ClientCode ([#1386](https://github.com/alloy-rs/alloy/issues/1386))
+- Replace std/hashbrown with alloy_primitives::map ([#1384](https://github.com/alloy-rs/alloy/issues/1384))
+- [engine] Add Trin Execution client code ([#1372](https://github.com/alloy-rs/alloy/issues/1372))
+- [transport-http] JWT auth layer ([#1314](https://github.com/alloy-rs/alloy/issues/1314))
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
+- Reexport BlobAndProofV1
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
 ### Features
 
 - Add block num hash helper ([#1304](https://github.com/alloy-rs/alloy/issues/1304))
 - [rpc-types-beacon] `SignedBidSubmissionV4` ([#1303](https://github.com/alloy-rs/alloy/issues/1303))
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
 
 ## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 

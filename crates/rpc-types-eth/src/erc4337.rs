@@ -1,7 +1,9 @@
-use crate::{collections::HashMap, Log, TransactionReceipt};
-use alloy_primitives::{Address, BlockNumber, Bytes, B256, U256};
-
+use crate::{Log, TransactionReceipt};
 use alloc::vec::Vec;
+use alloy_primitives::{
+    map::{AddressHashMap, HashMap},
+    Address, BlockNumber, Bytes, B256, U256,
+};
 
 /// Options for conditional raw transaction submissions.
 // reference for the implementation <https://notes.ethereum.org/@yoav/SkaX2lS9j#>
@@ -13,7 +15,7 @@ pub struct ConditionalOptions {
     /// A map of account addresses to their expected storage states.
     /// Each account can have a specified storage root or explicit slot-value pairs.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub known_accounts: HashMap<Address, AccountStorage>,
+    pub known_accounts: AddressHashMap<AccountStorage>,
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -85,10 +87,12 @@ pub struct PackedUserOperation {
     pub nonce: U256,
     /// Deployer contract address: Required exclusively for deploying new accounts that don't yet
     /// exist on the blockchain.
-    pub factory: Address,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub factory: Option<Address>,
     /// Factory data for the account creation process, applicable only when using a deployer
     /// contract.
-    pub factory_data: Bytes,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub factory_data: Option<Bytes>,
     /// The call data.
     pub call_data: Bytes,
     /// The gas limit for the call.
@@ -104,13 +108,17 @@ pub struct PackedUserOperation {
     pub max_priority_fee_per_gas: U256,
     /// Paymaster contract address: Needed if a third party is covering transaction costs; left
     /// blank for self-funded accounts.
-    pub paymaster: Address,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster: Option<Address>,
     /// The gas limit for the paymaster verification.
-    pub paymaster_verification_gas_limit: U256,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_verification_gas_limit: Option<U256>,
     /// The gas limit for the paymaster post-operation.
-    pub paymaster_post_op_gas_limit: U256,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_post_op_gas_limit: Option<U256>,
     /// The paymaster data.
-    pub paymaster_data: Bytes,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_data: Option<Bytes>,
     /// The signature of the transaction.
     pub signature: Bytes,
 }

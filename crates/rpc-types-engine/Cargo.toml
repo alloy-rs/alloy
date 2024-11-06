@@ -27,6 +27,7 @@ alloy-eips = { workspace = true, features = ["serde"] }
 
 # misc
 derive_more = { workspace = true, features = ["display"] }
+strum = { workspace = true, features = ["derive"] }
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -41,11 +42,11 @@ jsonrpsee-types = { version = "0.24", optional = true }
 
 # jwt
 rand = { workspace = true, optional = true }
-jsonwebtoken = { version = "9.3.0", optional = true }
+jsonwebtoken = { workspace = true, optional = true }
 
 [features]
 default = ["jwt", "std", "serde"]
-std = ["alloy-consensus/std", "derive_more/std"]
+std = ["alloy-consensus/std", "derive_more/std", "strum/std"]
 serde = ["dep:serde", "dep:alloy-serde"]
 jwt = ["dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]

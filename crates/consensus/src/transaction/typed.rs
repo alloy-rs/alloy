@@ -1,5 +1,5 @@
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{ChainId, TxKind, B256};
+use alloy_primitives::{Bytes, ChainId, TxKind, B256};
 
 use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
@@ -15,7 +15,13 @@ use crate::{
 /// 4. EIP4844 [`TxEip4844Variant`]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        from = "serde_from::MaybeTaggedTypedTransaction",
+        into = "serde_from::TaggedTypedTransaction"
+    )
+)]
 #[doc(alias = "TypedTx", alias = "TxTyped", alias = "TransactionTyped")]
 pub enum TypedTransaction {
     /// Legacy transaction
@@ -156,7 +162,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.gas_limit(),
             Self::Eip2930(tx) => tx.gas_limit(),
@@ -196,16 +202,6 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.priority_fee_or_price(),
-            Self::Eip2930(tx) => tx.priority_fee_or_price(),
-            Self::Eip1559(tx) => tx.priority_fee_or_price(),
-            Self::Eip4844(tx) => tx.priority_fee_or_price(),
-            Self::Eip7702(tx) => tx.priority_fee_or_price(),
-        }
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.max_fee_per_blob_gas(),
@@ -216,13 +212,23 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn to(&self) -> TxKind {
+    fn priority_fee_or_price(&self) -> u128 {
         match self {
-            Self::Legacy(tx) => tx.to(),
-            Self::Eip2930(tx) => tx.to(),
-            Self::Eip1559(tx) => tx.to(),
-            Self::Eip4844(tx) => tx.to(),
-            Self::Eip7702(tx) => tx.to(),
+            Self::Legacy(tx) => tx.priority_fee_or_price(),
+            Self::Eip2930(tx) => tx.priority_fee_or_price(),
+            Self::Eip1559(tx) => tx.priority_fee_or_price(),
+            Self::Eip4844(tx) => tx.priority_fee_or_price(),
+            Self::Eip7702(tx) => tx.priority_fee_or_price(),
+        }
+    }
+
+    fn kind(&self) -> TxKind {
+        match self {
+            Self::Legacy(tx) => tx.kind(),
+            Self::Eip2930(tx) => tx.kind(),
+            Self::Eip1559(tx) => tx.kind(),
+            Self::Eip4844(tx) => tx.kind(),
+            Self::Eip7702(tx) => tx.kind(),
         }
     }
 
@@ -236,7 +242,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         match self {
             Self::Legacy(tx) => tx.input(),
             Self::Eip2930(tx) => tx.input(),
@@ -298,5 +304,81 @@ impl<T: From<TypedTransaction>> From<TypedTransaction> for alloy_serde::WithOthe
 impl<T: From<TxEnvelope>> From<TxEnvelope> for alloy_serde::WithOtherFields<T> {
     fn from(value: TxEnvelope) -> Self {
         Self::new(value.into())
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_from {
+    //! NB: Why do we need this?
+    //!
+    //! Because the tag may be missing, we need an abstraction over tagged (with
+    //! type) and untagged (always legacy). This is
+    //! [`MaybeTaggedTypedTransaction`].
+    //!
+    //! The tagged variant is [`TaggedTypedTransaction`], which always has a
+    //! type tag.
+    //!
+    //! We serialize via [`TaggedTypedTransaction`] and deserialize via
+    //! [`MaybeTaggedTypedTransaction`].
+    use crate::{TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxLegacy, TypedTransaction};
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(untagged)]
+    pub(crate) enum MaybeTaggedTypedTransaction {
+        Tagged(TaggedTypedTransaction),
+        Untagged(TxLegacy),
+    }
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[serde(tag = "type")]
+    pub(crate) enum TaggedTypedTransaction {
+        /// Legacy transaction
+        #[serde(rename = "0x00", alias = "0x0")]
+        Legacy(TxLegacy),
+        /// EIP-2930 transaction
+        #[serde(rename = "0x01", alias = "0x1")]
+        Eip2930(TxEip2930),
+        /// EIP-1559 transaction
+        #[serde(rename = "0x02", alias = "0x2")]
+        Eip1559(TxEip1559),
+        /// EIP-4844 transaction
+        #[serde(rename = "0x03", alias = "0x3")]
+        Eip4844(TxEip4844Variant),
+        /// EIP-7702 transaction
+        #[serde(rename = "0x04", alias = "0x4")]
+        Eip7702(TxEip7702),
+    }
+
+    impl From<MaybeTaggedTypedTransaction> for TypedTransaction {
+        fn from(value: MaybeTaggedTypedTransaction) -> Self {
+            match value {
+                MaybeTaggedTypedTransaction::Tagged(tagged) => tagged.into(),
+                MaybeTaggedTypedTransaction::Untagged(tx) => Self::Legacy(tx),
+            }
+        }
+    }
+
+    impl From<TaggedTypedTransaction> for TypedTransaction {
+        fn from(value: TaggedTypedTransaction) -> Self {
+            match value {
+                TaggedTypedTransaction::Legacy(signed) => Self::Legacy(signed),
+                TaggedTypedTransaction::Eip2930(signed) => Self::Eip2930(signed),
+                TaggedTypedTransaction::Eip1559(signed) => Self::Eip1559(signed),
+                TaggedTypedTransaction::Eip4844(signed) => Self::Eip4844(signed),
+                TaggedTypedTransaction::Eip7702(signed) => Self::Eip7702(signed),
+            }
+        }
+    }
+
+    impl From<TypedTransaction> for TaggedTypedTransaction {
+        fn from(value: TypedTransaction) -> Self {
+            match value {
+                TypedTransaction::Legacy(signed) => Self::Legacy(signed),
+                TypedTransaction::Eip2930(signed) => Self::Eip2930(signed),
+                TypedTransaction::Eip1559(signed) => Self::Eip1559(signed),
+                TypedTransaction::Eip4844(signed) => Self::Eip4844(signed),
+                TypedTransaction::Eip7702(signed) => Self::Eip7702(signed),
+            }
+        }
     }
 }

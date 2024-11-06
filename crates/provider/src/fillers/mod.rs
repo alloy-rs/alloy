@@ -148,7 +148,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 
     /// Returns `true` if the filler is should continue filling.
     fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
-        tx.as_builder().map(|tx| self.status(tx).is_ready()).unwrap_or_default()
+        tx.as_builder().is_some_and(|tx| self.status(tx).is_ready())
     }
 
     /// Returns `true` if the filler is ready to fill in the transaction request.
@@ -292,7 +292,7 @@ where
     async fn send_transaction_internal(
         &self,
         mut tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
@@ -310,19 +310,19 @@ where
 }
 
 /// A trait which may be used to configure default fillers for [Network] implementations.
-pub trait RecommendedFillers {
+pub trait RecommendedFillers: Network {
     /// Recommended fillers for this network.
-    type RecomendedFillters: TxFiller;
+    type RecomendedFillers: TxFiller<Self>;
 
     /// Returns the recommended filler for this provider.
-    fn recommended_fillers() -> Self::RecomendedFillters;
+    fn recommended_fillers() -> Self::RecomendedFillers;
 }
 
 impl RecommendedFillers for Ethereum {
-    type RecomendedFillters =
+    type RecomendedFillers =
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
-    fn recommended_fillers() -> Self::RecomendedFillters {
+    fn recommended_fillers() -> Self::RecomendedFillers {
         JoinFill::new(
             GasFiller,
             JoinFill::new(
@@ -334,10 +334,10 @@ impl RecommendedFillers for Ethereum {
 }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecomendedFillters =
+    type RecomendedFillers =
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
-    fn recommended_fillers() -> Self::RecomendedFillters {
+    fn recommended_fillers() -> Self::RecomendedFillers {
         JoinFill::new(
             GasFiller,
             JoinFill::new(

@@ -1,7 +1,7 @@
 use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
-use alloy_primitives::{Address, Bytes, Log, TxHash};
+use alloy_primitives::{Address, Bytes, Log, TxHash, U256};
 use serde::{Deserialize, Serialize};
 
 /// A bundle of transactions to send to the matchmaker.
@@ -94,6 +94,12 @@ pub enum BundleItem {
         /// If true, the transaction can revert without the bundle being considered invalid.
         can_revert: bool,
     },
+    /// A nested bundle request.
+    #[serde(rename_all = "camelCase")]
+    Bundle {
+        /// A bundle request of type SendBundleRequest
+        bundle: SendBundleRequest,
+    },
 }
 
 /// Optional fields to override simulation state.
@@ -138,20 +144,23 @@ pub struct SimBundleResponse {
     #[serde(with = "alloy_serde::quantity")]
     pub state_block: u64,
     /// The gas price of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub mev_gas_price: u64,
+    pub mev_gas_price: U256,
     /// The profit of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub profit: u64,
+    pub profit: U256,
     /// The refundable value of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub refundable_value: u64,
+    pub refundable_value: U256,
     /// The gas used by the simulated block.
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// Logs returned by `mev_simBundle`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logs: Option<Vec<SimBundleLogs>>,
+    /// Error message if the bundle execution failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exec_error: Option<String>,
+    /// Contains the return data if the transaction reverted
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revert: Option<Bytes>,
 }
 
 /// Logs returned by `mev_simBundle`.
@@ -172,6 +181,7 @@ mod tests {
 
     use crate::{common::PrivacyHint, RefundConfig};
     use alloy_primitives::Bytes;
+    use similar_asserts::assert_eq;
 
     use super::*;
 
@@ -278,6 +288,32 @@ mod tests {
         };
         let expected = serde_json::from_str::<Vec<SendBundleRequest>>(str).unwrap();
         assert_eq!(bundle, expected[0]);
+    }
+
+    #[test]
+    fn can_deserialize_nested_bundle_request() {
+        let str = r#"
+        [{
+            "version": "v0.1",
+            "inclusion": {
+                "block": "0x1"
+            },
+            "body": [{
+                "bundle": {
+                    "version": "v0.1",
+                    "inclusion": {
+                        "block": "0x1"
+                    },
+                    "body": [{
+                        "tx": "0x02f86b0180843b9aca00852ecc889a0082520894c87037874aed04e51c29f582394217a0a2b89d808080c080a0a463985c616dd8ee17d7ef9112af4e6e06a27b071525b42182fe7b0b5c8b4925a00af5ca177ffef2ff28449292505d41be578bebb77110dfc09361d2fb56998260",
+                        "canRevert": false
+                    }]
+                }
+            }]
+        }]  
+        "#;
+        let res: Result<Vec<SendBundleRequest>, _> = serde_json::from_str(str);
+        assert!(res.is_ok());
     }
 
     #[test]

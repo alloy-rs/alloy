@@ -42,7 +42,7 @@ impl NonceManager for SimpleNonceManager {
         N: Network,
         T: Transport + Clone,
     {
-        provider.get_transaction_count(address).await
+        provider.get_transaction_count(address).pending().await
     }
 }
 

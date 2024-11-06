@@ -86,11 +86,11 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_max_priority_fee_per_gas(max_priority_fee_per_gas);
     }
 
-    fn gas_limit(&self) -> Option<u128> {
+    fn gas_limit(&self) -> Option<u64> {
         self.deref().gas_limit()
     }
 
-    fn set_gas_limit(&mut self, gas_limit: u128) {
+    fn set_gas_limit(&mut self, gas_limit: u64) {
         self.deref_mut().set_gas_limit(gas_limit);
     }
 

@@ -27,7 +27,7 @@ alloy-transport.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["std"] }
 alloy-json-abi.workspace = true
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["map"] }
 alloy-sol-types.workspace = true
 
 futures-util.workspace = true

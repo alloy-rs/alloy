@@ -11,10 +11,11 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
-use serde::{Deserialize, Serialize};
+use core::str::FromStr;
+use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 /// The genesis block specification.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,7 +34,7 @@ pub struct Genesis {
     pub extra_data: Bytes,
     /// The genesis header gas limit.
     #[serde(with = "alloy_serde::quantity")]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// The genesis header difficulty.
     pub difficulty: U256,
     /// The genesis header mix hash.
@@ -144,7 +145,7 @@ impl Genesis {
     }
 
     /// Set the gas limit.
-    pub const fn with_gas_limit(mut self, gas_limit: u128) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = gas_limit;
         self
     }
@@ -216,7 +217,12 @@ pub struct GenesisAccount {
     )]
     pub storage: Option<BTreeMap<B256, B256>>,
     /// The account's private key. Should only be used for testing.
-    #[serde(rename = "secretKey", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "secretKey",
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_private_key"
+    )]
     pub private_key: Option<B256>,
 }
 
@@ -243,6 +249,28 @@ impl GenesisAccount {
     pub fn with_storage(mut self, storage: Option<BTreeMap<B256, B256>>) -> Self {
         self.storage = storage;
         self
+    }
+}
+
+/// Custom deserialization function for the private key.
+///
+/// This function allows the private key to be deserialized from a string or a `null` value.
+///
+/// We need a custom function here especially to handle the case where the private key is `0x` and
+/// should be deserialized as `None`.
+fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_str: Option<String> = Option::deserialize(deserializer)?;
+
+    if let Some(ref s) = opt_str {
+        if s == "0x" {
+            return Ok(None);
+        }
+        B256::from_str(s).map(Some).map_err(D::Error::custom)
+    } else {
+        Ok(None)
     }
 }
 
@@ -392,6 +420,13 @@ pub struct ChainConfig {
     )]
     pub prague_time: Option<u64>,
 
+    /// Osaka switch time (None = no fork, 0 = already on osaka).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub osaka_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -539,6 +574,7 @@ impl Default for ChainConfig {
             shanghai_time: None,
             cancun_time: None,
             prague_time: None,
+            osaka_time: None,
             terminal_total_difficulty: None,
             terminal_total_difficulty_passed: false,
             ethash: None,
@@ -588,6 +624,7 @@ mod tests {
     use alloc::vec;
     use alloy_primitives::hex;
     use core::str::FromStr;
+    use serde_json::json;
 
     #[test]
     fn genesis_defaults_config() {
@@ -997,6 +1034,7 @@ mod tests {
         "shanghaiTime": 0,
         "cancunTime": 0,
         "pragueTime": 1,
+        "osakaTime": 2,
         "terminalTotalDifficulty": 0,
         "depositContractAddress": "0x0000000000000000000000000000000000000000",
         "terminalTotalDifficultyPassed": true
@@ -1033,6 +1071,7 @@ mod tests {
                 shanghai_time: Some(0),
                 cancun_time: Some(0),
                 prague_time: Some(1),
+                osaka_time: Some(2),
                 terminal_total_difficulty: Some(U256::ZERO),
                 terminal_total_difficulty_passed: true,
                 deposit_contract_address: Some(Address::ZERO),
@@ -1529,5 +1568,67 @@ mod tests {
         assert_eq!(actual_numeric_value, 7);
         let actual_object_value = genesis.config.extra_fields.get("object_field").unwrap();
         assert_eq!(actual_object_value, &serde_json::json!({"sub_field": "sub_value"}));
+    }
+
+    #[test]
+    fn deserialize_private_key_as_none_when_0x() {
+        // Test case where "secretKey" is "0x", expecting None
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": "0x"
+        });
+
+        let account: GenesisAccount = serde_json::from_value(json_data).unwrap();
+        assert_eq!(account.private_key, None);
+    }
+
+    #[test]
+    fn deserialize_private_key_with_valid_hex() {
+        // Test case where "secretKey" is a valid hex string
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+        });
+
+        let account: GenesisAccount = serde_json::from_value(json_data).unwrap();
+        let expected_key =
+            B256::from_str("123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
+                .unwrap();
+        assert_eq!(account.private_key, Some(expected_key));
+    }
+
+    #[test]
+    fn deserialize_private_key_as_none_when_null() {
+        // Test case where "secretKey" is null, expecting None
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": null
+        });
+
+        let account: GenesisAccount = serde_json::from_value(json_data).unwrap();
+        assert_eq!(account.private_key, None);
+    }
+
+    #[test]
+    fn deserialize_private_key_with_invalid_hex_fails() {
+        // Test case where "secretKey" is an invalid hex string, expecting an error
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": "0xINVALIDHEX"
+        });
+
+        let result: Result<GenesisAccount, _> = serde_json::from_value(json_data);
+        assert!(result.is_err()); // The deserialization should fail due to invalid hex
+    }
+
+    #[test]
+    fn deserialize_private_key_with_empty_string_fails() {
+        // Test case where "secretKey" is an empty string, expecting an error
+        let json_data = json!({
+            "secretKey": ""
+        });
+
+        let result: Result<GenesisAccount, _> = serde_json::from_value(json_data);
+        assert!(result.is_err()); // The deserialization should fail due to an empty string
     }
 }

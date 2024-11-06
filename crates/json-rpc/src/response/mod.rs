@@ -1,11 +1,15 @@
-use crate::common::Id;
+use crate::{common::Id, RpcObject};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     ser::SerializeMap,
     Deserialize, Deserializer, Serialize,
 };
 use serde_json::value::RawValue;
-use std::{borrow::Borrow, fmt, marker::PhantomData};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+    marker::PhantomData,
+};
 
 mod error;
 pub use error::{BorrowedErrorPayload, ErrorPayload};
@@ -45,6 +49,65 @@ impl BorrowedResponse<'_> {
 }
 
 impl<Payload, ErrData> Response<Payload, ErrData> {
+    /// Create a new response with a parsed error payload.
+    pub const fn parse_error(id: Id) -> Self {
+        Self { id, payload: ResponsePayload::parse_error() }
+    }
+
+    /// Create a new response with an invalid request error payload.
+    pub const fn invalid_request(id: Id) -> Self {
+        Self { id, payload: ResponsePayload::invalid_request() }
+    }
+
+    /// Create a new response with a method not found error payload.
+    pub const fn method_not_found(id: Id) -> Self {
+        Self { id, payload: ResponsePayload::method_not_found() }
+    }
+
+    /// Create a new response with an invalid params error payload.
+    pub const fn invalid_params(id: Id) -> Self {
+        Self { id, payload: ResponsePayload::invalid_params() }
+    }
+
+    /// Create a new response with an internal error payload.
+    pub const fn internal_error(id: Id) -> Self {
+        Self { id, payload: ResponsePayload::internal_error() }
+    }
+
+    /// Create a new error response for an internal error with a custom message.
+    pub const fn internal_error_message(id: Id, message: Cow<'static, str>) -> Self {
+        Self {
+            id,
+            payload: ResponsePayload::Failure(ErrorPayload::internal_error_message(message)),
+        }
+    }
+
+    /// Create a new error response for an internal error with additional data.
+    pub const fn internal_error_with_obj(id: Id, data: ErrData) -> Self
+    where
+        ErrData: RpcObject,
+    {
+        Self { id, payload: ResponsePayload::Failure(ErrorPayload::internal_error_with_obj(data)) }
+    }
+
+    /// Create a new error response for an internal error with a custom message
+    /// and additional data.
+    pub const fn internal_error_with_message_and_obj(
+        id: Id,
+        message: Cow<'static, str>,
+        data: ErrData,
+    ) -> Self
+    where
+        ErrData: RpcObject,
+    {
+        Self {
+            id,
+            payload: ResponsePayload::Failure(ErrorPayload::internal_error_with_message_and_obj(
+                message, data,
+            )),
+        }
+    }
+
     /// Returns `true` if the response is a success.
     pub const fn is_success(&self) -> bool {
         self.payload.is_success()
@@ -53,6 +116,17 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
     /// Returns `true` if the response is an error.
     pub const fn is_error(&self) -> bool {
         self.payload.is_error()
+    }
+}
+
+impl<Payload, ErrData> Response<Payload, ErrData>
+where
+    Payload: RpcObject,
+    ErrData: RpcObject,
+{
+    /// Serialize the payload of this response.
+    pub fn serialize_payload(&self) -> serde_json::Result<Response> {
+        self.payload.serialize_payload().map(|payload| Response { id: self.id.clone(), payload })
     }
 }
 
@@ -133,7 +207,7 @@ where
             {
                 struct FieldVisitor;
 
-                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                impl serde::de::Visitor<'_> for FieldVisitor {
                     type Value = Field;
 
                     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

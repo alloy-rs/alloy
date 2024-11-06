@@ -1,6 +1,4 @@
-use alloc::{format, string::String};
 use alloy_primitives::U256;
-use core::fmt;
 
 /// A hex encoded or decimal index that's intended to be used as a rust index, hence it's
 /// deserialized into a `usize`.
@@ -43,10 +41,10 @@ impl<'a> serde::Deserialize<'a> for Index {
     {
         struct IndexVisitor;
 
-        impl<'a> serde::de::Visitor<'a> for IndexVisitor {
+        impl serde::de::Visitor<'_> for IndexVisitor {
             type Value = Index;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(formatter, "hex-encoded or decimal index")
             }
 
@@ -76,13 +74,6 @@ impl<'a> serde::Deserialize<'a> for Index {
                     },
                 )
             }
-
-            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                self.visit_str(value.as_ref())
-            }
         }
 
         deserializer.deserialize_any(IndexVisitor)
@@ -94,6 +85,7 @@ mod tests {
     use super::*;
     use rand::{thread_rng, Rng};
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

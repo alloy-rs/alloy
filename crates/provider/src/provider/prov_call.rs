@@ -159,8 +159,7 @@ where
 impl<Conn, Params, Resp, Output, Map> ProviderCall<Conn, &Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
-    Params: RpcParam,
-    Params: ToOwned,
+    Params: RpcParam + ToOwned,
     Params::Owned: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,

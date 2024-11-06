@@ -334,7 +334,6 @@ pub struct PayloadAttributesData {
     pub parent_block_number: u64,
     /// the execution block hash of the parent block.
     pub parent_block_hash: B256,
-    /// The execution block number of the parent block.
     /// the validator index of the proposer at `proposal_slot` on the chain identified by
     /// `parent_block_root`.
     #[serde_as(as = "DisplayFromStr")]
@@ -351,6 +350,7 @@ pub struct PayloadAttributesData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_payload_attributes_event() {

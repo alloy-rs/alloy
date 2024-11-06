@@ -80,6 +80,11 @@ impl RawSubscription {
     pub fn into_stream(self) -> BroadcastStream<Box<RawValue>> {
         self.rx.into()
     }
+
+    /// Convert into a typed subscription.
+    pub fn into_typed<T>(self) -> Subscription<T> {
+        self.into()
+    }
 }
 
 /// An item in a typed [`Subscription`]. This is either the expected type, or

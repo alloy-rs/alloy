@@ -12,21 +12,23 @@ extern crate alloc;
 mod account;
 pub use account::Account;
 
+mod block;
+pub use block::{Block, BlockBody};
+
 pub mod constants;
+pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod encodable_signature;
 pub use encodable_signature::EncodableSignature;
 
 mod header;
-pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
+pub use header::{BlockHeader, Header};
 
 mod receipt;
 pub use receipt::{
-    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt,
+    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
+    TxReceipt,
 };
-
-mod request;
-pub use request::Request;
 
 pub mod transaction;
 #[cfg(feature = "kzg")]
@@ -48,3 +50,18 @@ pub use alloy_primitives::{Sealable, Sealed};
 
 mod signed;
 pub use signed::Signed;
+
+/// Bincode-compatible serde implementations for consensus types.
+///
+/// `bincode` crate doesn't work well with optionally serializable serde fields, but some of the
+/// consensus types require optional serialization for RPC compatibility. This module makes so that
+/// all fields are serialized.
+///
+/// Read more: <https://github.com/bincode-org/bincode/issues/326>
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    pub use super::{
+        header::serde_bincode_compat::*,
+        transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
+    };
+}

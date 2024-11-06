@@ -80,11 +80,11 @@ impl std::error::Error for ConversionError {
         match self {
             Self::Eip2718Error(err) => Some(err),
             Self::SignatureError(err) => Some(err),
-            Self::BaseFeePerGasConversion(err) => Some(err),
-            Self::GasLimitConversion(err) => Some(err),
-            Self::GasUsedConversion(err) => Some(err),
-            Self::BlobGasUsedConversion(err) => Some(err),
-            Self::ExcessBlobGasConversion(err) => Some(err),
+            Self::BaseFeePerGasConversion(err)
+            | Self::GasLimitConversion(err)
+            | Self::GasUsedConversion(err)
+            | Self::BlobGasUsedConversion(err)
+            | Self::ExcessBlobGasConversion(err) => Some(err),
             _ => None,
         }
     }

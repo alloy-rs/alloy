@@ -2,9 +2,7 @@
 //!
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
-#[cfg(not(feature = "std"))]
-use crate::alloc::{vec, vec::Vec};
-
+use crate::alloc::vec::Vec;
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use core::{
@@ -45,8 +43,24 @@ impl From<alloy_rlp::Error> for Eip2718Error {
     }
 }
 
+impl From<Eip2718Error> for alloy_rlp::Error {
+    fn from(err: Eip2718Error) -> Self {
+        match err {
+            Eip2718Error::RlpError(err) => err,
+            Eip2718Error::UnexpectedType(_) => Self::Custom("Unexpected type flag"),
+        }
+    }
+}
+
 #[cfg(feature = "std")]
-impl std::error::Error for Eip2718Error {}
+impl std::error::Error for Eip2718Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::RlpError(err) => Some(err),
+            Self::UnexpectedType(_) => None,
+        }
+    }
+}
 
 /// Decoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
 /// or a receipt with a type flag.
@@ -97,7 +111,10 @@ pub trait Decodable2718: Sized {
     /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
     fn decode_2718(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Self::extract_type_byte(buf)
-            .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
+            .map(|ty| {
+                buf.advance(1);
+                Self::typed_decode(ty, buf)
+            })
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
@@ -117,9 +134,8 @@ pub trait Decodable2718: Sized {
         // If it's a list, we need to fallback to the legacy decoding.
         if h.list {
             return Self::fallback_decode(buf);
-        } else {
-            *buf = h_decode;
         }
+        *buf = h_decode;
 
         let remaining_len = buf.len();
 
@@ -190,7 +206,7 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     /// This is a convenience method for encoding into a vec, and returning the
     /// vec.
     fn encoded_2718(&self) -> Vec<u8> {
-        let mut out = vec![];
+        let mut out = Vec::with_capacity(self.encode_2718_len());
         self.encode_2718(&mut out);
         out
     }
@@ -208,6 +224,17 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     fn seal(self) -> Sealed<Self> {
         let hash = self.trie_hash();
         Sealed::new_unchecked(self, hash)
+    }
+
+    /// The length of the 2718 encoded envelope in network format. This is the
+    /// length of the header + the length of the type flag and inner encoding.
+    fn network_len(&self) -> usize {
+        let mut payload_length = self.encode_2718_len();
+        if !self.is_legacy() {
+            payload_length += Header { list: false, payload_length }.length();
+        }
+
+        payload_length
     }
 
     /// Encode in the network format. The network format is used ONLY by the

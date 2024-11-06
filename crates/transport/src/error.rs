@@ -180,3 +180,15 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_retry_error() {
+        let err = "{\"code\":-32007,\"message\":\"100/second request limit reached - reduce calls per second or upgrade your account at quicknode.com\"}";
+        let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
+        assert!(TransportError::ErrorResp(err).is_retryable());
+    }
+}

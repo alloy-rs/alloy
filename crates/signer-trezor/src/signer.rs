@@ -170,13 +170,13 @@ impl TrezorSigner {
         let nonce = tx.nonce();
         let nonce = u64_to_trezor(nonce);
 
-        let gas_price = tx.gas_price().unwrap_or(0);
+        let gas_price = tx.max_fee_per_gas();
         let gas_price = u128_to_trezor(gas_price);
 
         let gas_limit = tx.gas_limit();
-        let gas_limit = u128_to_trezor(gas_limit);
+        let gas_limit = u64_to_trezor(gas_limit);
 
-        let to = match tx.to() {
+        let to = match tx.kind() {
             TxKind::Call(to) => address_to_trezor(&to),
             TxKind::Create => String::new(),
         };

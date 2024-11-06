@@ -6,7 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_consensus::TxReceipt;
+use alloy_consensus::{BlockHeader, TxReceipt};
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use core::fmt::{Debug, Display};
@@ -66,7 +66,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptEnvelope: Eip2718Envelope + TxReceipt;
 
     /// The network header type.
-    type Header;
+    type Header: BlockHeader;
 
     // -- JSON RPC types --
 

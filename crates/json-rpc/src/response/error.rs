@@ -4,27 +4,85 @@ use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
-use serde_json::{value::RawValue, Value};
-use std::{borrow::Borrow, fmt, marker::PhantomData};
+use serde_json::{
+    value::{to_raw_value, RawValue},
+    Value,
+};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+    marker::PhantomData,
+};
+
+use crate::RpcObject;
+
+const INTERNAL_ERROR: Cow<'static, str> = Cow::Borrowed("Internal error");
 
 /// A JSON-RPC 2.0 error object.
 ///
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
 /// included in the `message` field of the response payload.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct ErrorPayload<ErrData = Box<RawValue>> {
     /// The error code.
     pub code: i64,
     /// The error message (if any).
-    pub message: String,
+    pub message: Cow<'static, str>,
     /// The error data (if any).
     pub data: Option<ErrData>,
 }
 
 impl<E> ErrorPayload<E> {
-    /// Analyzes the [ErrorPayload] and decides if the request should be retried based on the
-    /// error code or the message.
+    /// Create a new error payload for a parse error.
+    pub const fn parse_error() -> Self {
+        Self { code: -32700, message: Cow::Borrowed("Parse error"), data: None }
+    }
+
+    /// Create a new error payload for an invalid request.
+    pub const fn invalid_request() -> Self {
+        Self { code: -32600, message: Cow::Borrowed("Invalid Request"), data: None }
+    }
+
+    /// Create a new error payload for a method not found error.
+    pub const fn method_not_found() -> Self {
+        Self { code: -32601, message: Cow::Borrowed("Method not found"), data: None }
+    }
+
+    /// Create a new error payload for an invalid params error.
+    pub const fn invalid_params() -> Self {
+        Self { code: -32602, message: Cow::Borrowed("Invalid params"), data: None }
+    }
+
+    /// Create a new error payload for an internal error.
+    pub const fn internal_error() -> Self {
+        Self { code: -32603, message: INTERNAL_ERROR, data: None }
+    }
+
+    /// Create a new error payload for an internal error with a custom message.
+    pub const fn internal_error_message(message: Cow<'static, str>) -> Self {
+        Self { code: -32603, message, data: None }
+    }
+
+    /// Create a new error payload for an internal error with a custom message
+    /// and additional data.
+    pub const fn internal_error_with_obj(data: E) -> Self
+    where
+        E: RpcObject,
+    {
+        Self { code: -32603, message: INTERNAL_ERROR, data: Some(data) }
+    }
+
+    /// Create a new error payload for an internal error with a custom message
+    pub const fn internal_error_with_message_and_obj(message: Cow<'static, str>, data: E) -> Self
+    where
+        E: RpcObject,
+    {
+        Self { code: -32603, message, data: Some(data) }
+    }
+
+    /// Analyzes the [ErrorPayload] and decides if the request should be
+    /// retried based on the error code or the message.
     pub fn is_retry_err(&self) -> bool {
         // alchemy throws it this way
         if self.code == 429 {
@@ -53,7 +111,7 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
-        match self.message.as_str() {
+        match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,
             // also thrown by infura if out of budget for the day and ratelimited
@@ -66,6 +124,32 @@ impl<E> ErrorPayload<E> {
                     || msg.contains("request limit")
             }
         }
+    }
+}
+
+impl<T> From<T> for ErrorPayload<T>
+where
+    T: std::error::Error + RpcObject,
+{
+    fn from(value: T) -> Self {
+        Self { code: -32603, message: INTERNAL_ERROR, data: Some(value) }
+    }
+}
+
+impl<E> ErrorPayload<E>
+where
+    E: RpcObject,
+{
+    /// Serialize the inner data into a [`RawValue`].
+    pub fn serialize_payload(&self) -> serde_json::Result<ErrorPayload> {
+        Ok(ErrorPayload {
+            code: self.code,
+            message: self.message.clone(),
+            data: match self.data.as_ref() {
+                Some(data) => Some(to_raw_value(data)?),
+                None => None,
+            },
+        })
     }
 }
 
@@ -133,7 +217,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
             {
                 struct FieldVisitor;
 
-                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                impl serde::de::Visitor<'_> for FieldVisitor {
                     type Value = Field;
 
                     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

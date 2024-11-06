@@ -26,7 +26,7 @@ struct TxpoolInspectSummaryVisitor;
 
 /// Walk through the deserializer to parse a txpool inspection summary into the
 /// `TxpoolInspectSummary` struct.
-impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
+impl Visitor<'_> for TxpoolInspectSummaryVisitor {
     type Value = TxpoolInspectSummary;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -54,9 +54,7 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
             return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
         }
         let to = match addr_split[0] {
-            "" => None,
-            "0x" => None,
-            "contract creation" => None,
+            "" | "0x" | "contract creation" => None,
             addr => {
                 Some(Address::from_str(addr.trim_start_matches("0x")).map_err(de::Error::custom)?)
             }
@@ -110,12 +108,18 @@ impl Serialize for TxpoolInspectSummary {
 /// as the ones that are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContent<T = Transaction> {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, T>>,
     /// queued tx
     pub queued: BTreeMap<Address, BTreeMap<String, T>>,
+}
+
+impl<T> Default for TxpoolContent<T> {
+    fn default() -> Self {
+        Self { pending: BTreeMap::new(), queued: BTreeMap::new() }
+    }
 }
 
 impl<T> TxpoolContent<T> {
@@ -133,12 +137,18 @@ impl<T> TxpoolContent<T> {
 /// Same as [TxpoolContent] but for a specific address.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContentFrom<T = Transaction> {
     /// pending tx
     pub pending: BTreeMap<String, T>,
     /// queued tx
     pub queued: BTreeMap<String, T>,
+}
+
+impl<T> Default for TxpoolContentFrom<T> {
+    fn default() -> Self {
+        Self { pending: BTreeMap::new(), queued: BTreeMap::new() }
+    }
 }
 
 /// Transaction Pool Inspect
@@ -178,6 +188,7 @@ pub struct TxpoolStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_txpool_content() {

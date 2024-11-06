@@ -9,14 +9,10 @@
 //! See also <https://github.com/ethereum/consensus-specs/blob/master/specs/deneb/beacon-chain.md#executionpayload>
 
 use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
-use alloy_eips::{
-    eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest,
-    eip7251::ConsolidationRequest,
-};
+use alloy_eips::eip4895::Withdrawal;
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
     ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
-    ExecutionPayloadV4,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
@@ -406,76 +402,6 @@ pub mod beacon_payload_v3 {
     }
 }
 
-#[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
-struct BeaconExecutionPayloadV4<'a> {
-    /// Inner V1 payload
-    #[serde(flatten)]
-    payload_inner: BeaconExecutionPayloadV3<'a>,
-    deposit_requests: Vec<DepositRequest>,
-    withdrawal_requests: Vec<WithdrawalRequest>,
-    consolidation_requests: Vec<ConsolidationRequest>,
-}
-
-impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
-    fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
-        let BeaconExecutionPayloadV4 {
-            payload_inner,
-            deposit_requests,
-            withdrawal_requests,
-            consolidation_requests,
-        } = payload;
-        Self {
-            payload_inner: payload_inner.into(),
-            deposit_requests,
-            withdrawal_requests,
-            consolidation_requests,
-        }
-    }
-}
-
-impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
-    fn from(value: &'a ExecutionPayloadV4) -> Self {
-        let ExecutionPayloadV4 {
-            payload_inner,
-            deposit_requests,
-            withdrawal_requests,
-            consolidation_requests,
-        } = value;
-        BeaconExecutionPayloadV4 {
-            payload_inner: payload_inner.into(),
-            deposit_requests: deposit_requests.clone(),
-            withdrawal_requests: withdrawal_requests.clone(),
-            consolidation_requests: consolidation_requests.clone(),
-        }
-    }
-}
-
-/// A helper serde module to convert from/to the Beacon API which uses quoted decimals rather than
-/// big-endian hex.
-pub mod beacon_payload_v4 {
-    use super::*;
-
-    /// Serialize the payload attributes for the beacon API.
-    pub fn serialize<S>(
-        payload_attributes: &ExecutionPayloadV4,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        BeaconExecutionPayloadV4::from(payload_attributes).serialize(serializer)
-    }
-
-    /// Deserialize the payload attributes for the beacon API.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV4, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        BeaconExecutionPayloadV4::deserialize(deserializer).map(Into::into)
-    }
-}
-
 /// Represents all possible payload versions.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
@@ -486,8 +412,6 @@ enum BeaconExecutionPayload<'a> {
     V2(BeaconExecutionPayloadV2<'a>),
     /// V3 payload
     V3(BeaconExecutionPayloadV3<'a>),
-    /// V4 payload
-    V4(BeaconExecutionPayloadV4<'a>),
 }
 
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
@@ -499,13 +423,11 @@ impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum BeaconExecutionPayloadDesc<'a> {
-            V4(BeaconExecutionPayloadV4<'a>),
             V3(BeaconExecutionPayloadV3<'a>),
             V2(BeaconExecutionPayloadV2<'a>),
             V1(BeaconExecutionPayloadV1<'a>),
         }
         match BeaconExecutionPayloadDesc::deserialize(deserializer)? {
-            BeaconExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             BeaconExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             BeaconExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             BeaconExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
@@ -519,7 +441,6 @@ impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
             BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
             BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
             BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
-            BeaconExecutionPayload::V4(payload) => Self::V4(ExecutionPayloadV4::from(payload)),
         }
     }
 }
@@ -536,14 +457,11 @@ impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
             ExecutionPayload::V3(payload) => {
                 BeaconExecutionPayload::V3(BeaconExecutionPayloadV3::from(payload))
             }
-            ExecutionPayload::V4(payload) => {
-                BeaconExecutionPayload::V4(BeaconExecutionPayloadV4::from(payload))
-            }
         }
     }
 }
 
-impl<'a> SerializeAs<ExecutionPayload> for BeaconExecutionPayload<'a> {
+impl SerializeAs<ExecutionPayload> for BeaconExecutionPayload<'_> {
     fn serialize_as<S>(source: &ExecutionPayload, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -589,6 +507,7 @@ pub mod beacon_payload {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_get_payload_header_response() {

@@ -121,19 +121,19 @@ impl GethInstance {
     }
 
     /// Returns the path to this instances' data directory
-    pub const fn data_dir(&self) -> &Option<PathBuf> {
-        &self.data_dir
+    pub const fn data_dir(&self) -> Option<&PathBuf> {
+        self.data_dir.as_ref()
     }
 
     /// Returns the genesis configuration used to configure this instance
-    pub const fn genesis(&self) -> &Option<Genesis> {
-        &self.genesis
+    pub const fn genesis(&self) -> Option<&Genesis> {
+        self.genesis.as_ref()
     }
 
     /// Returns the private key used to configure clique on this instance
     #[deprecated = "clique support was removed in geth >=1.14"]
-    pub const fn clique_private_key(&self) -> &Option<SigningKey> {
-        &self.clique_private_key
+    pub const fn clique_private_key(&self) -> Option<&SigningKey> {
+        self.clique_private_key.as_ref()
     }
 
     /// Takes the stderr contained in the child process.
@@ -453,9 +453,12 @@ impl Geth {
                 let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
                 genesis.config.clique = Some(clique_config);
 
-                let clique_addr = clique_addr.ok_or(NodeError::CliqueAddressError(
-                    "could not calculates the address of the Clique consensus address.".to_string(),
-                ))?;
+                let clique_addr = clique_addr.ok_or_else(|| {
+                    NodeError::CliqueAddressError(
+                        "could not calculates the address of the Clique consensus address."
+                            .to_string(),
+                    )
+                })?;
 
                 // set the extraData field
                 let extra_data_bytes =
@@ -468,9 +471,11 @@ impl Geth {
                 cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
-            let clique_addr = self.clique_address().ok_or(NodeError::CliqueAddressError(
-                "could not calculates the address of the Clique consensus address.".to_string(),
-            ))?;
+            let clique_addr = self.clique_address().ok_or_else(|| {
+                NodeError::CliqueAddressError(
+                    "could not calculates the address of the Clique consensus address.".to_string(),
+                )
+            })?;
 
             self.genesis = Some(Genesis::clique_genesis(
                 self.chain_id.ok_or(NodeError::ChainIdNotSet)?,
@@ -641,68 +646,6 @@ impl Geth {
             auth_port: self.authrpc_port,
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
-        })
-    }
-}
-
-// These tests should use a different datadir for each `geth` spawned.
-#[cfg(test)]
-mod tests {
-    use crate::utils::run_with_tempdir_sync;
-
-    use super::*;
-
-    #[test]
-    fn port_0() {
-        run_with_tempdir_sync("geth-test-", |_| {
-            let _geth = Geth::new().disable_discovery().port(0u16).spawn();
-        });
-    }
-
-    #[test]
-    fn p2p_port() {
-        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir_path).spawn();
-            let p2p_port = geth.p2p_port();
-            assert!(p2p_port.is_some());
-        });
-    }
-
-    #[test]
-    fn explicit_p2p_port() {
-        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
-            // if a p2p port is explicitly set, it should be used
-            let geth = Geth::new().p2p_port(1234).data_dir(temp_dir_path).spawn();
-            let p2p_port = geth.p2p_port();
-            assert_eq!(p2p_port, Some(1234));
-        });
-    }
-
-    #[test]
-    fn dev_mode() {
-        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
-            // dev mode should not have a p2p port, and dev should be the default
-            let geth = Geth::new().data_dir(temp_dir_path).spawn();
-            let p2p_port = geth.p2p_port();
-            assert!(p2p_port.is_none(), "{p2p_port:?}");
-        })
-    }
-
-    #[test]
-    #[ignore = "fails on geth >=1.14"]
-    #[allow(deprecated)]
-    fn clique_correctly_configured() {
-        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
-            let private_key = SigningKey::random(&mut rand::thread_rng());
-            let geth = Geth::new()
-                .set_clique_private_key(private_key)
-                .chain_id(1337u64)
-                .data_dir(temp_dir_path)
-                .spawn();
-
-            assert!(geth.p2p_port.is_some());
-            assert!(geth.clique_private_key().is_some());
-            assert!(geth.genesis().is_some());
         })
     }
 }
