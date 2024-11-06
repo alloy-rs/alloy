@@ -238,7 +238,7 @@ where
             //
             // Blob target increases are expected to be rare, thus this should be correct most of
             // the time
-            .next_block_blob_fee(latest_header.target_blob_count())
+            .next_block_blob_fee(latest_header.target_blobs_per_block())
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
     }

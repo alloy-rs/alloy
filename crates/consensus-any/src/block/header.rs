@@ -104,7 +104,7 @@ pub struct AnyHeader {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub target_blob_count: Option<u64>,
+    pub target_blobs_per_block: Option<u64>,
 }
 
 impl BlockHeader for AnyHeader {
@@ -188,8 +188,8 @@ impl BlockHeader for AnyHeader {
         self.requests_hash
     }
 
-    fn target_blob_count(&self) -> Option<u64> {
-        self.target_blob_count
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.target_blobs_per_block
     }
 
     fn extra_data(&self) -> &Bytes {
@@ -221,7 +221,7 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            target_blob_count,
+            target_blobs_per_block,
         } = value;
 
         Self {
@@ -246,7 +246,7 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            target_blob_count,
+            target_blobs_per_block,
         }
     }
 }

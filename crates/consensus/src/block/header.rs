@@ -132,7 +132,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub target_blob_count: Option<u64>,
+    pub target_blobs_per_block: Option<u64>,
 }
 
 impl AsRef<Self> for Header {
@@ -165,7 +165,7 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            target_blob_count: None,
+            target_blobs_per_block: None,
         }
     }
 }
@@ -215,16 +215,19 @@ impl Header {
     ///
     /// Returns `None` if `excess_blob_gas` is None.
     ///
-    /// If `next_block_target_blob_count` is [`Some`], uses EIP-7742 formula for calculating the
-    /// blob gas price, otherwise uses EIP-4844 formula.
+    /// If `next_block_target_blobs_per_block` is [`Some`], uses EIP-7742 formula for calculating
+    /// the blob gas price, otherwise uses EIP-4844 formula.
     ///
     /// See also [Self::next_block_excess_blob_gas]
-    pub fn next_block_blob_fee(&self, next_block_target_blob_count: Option<u64>) -> Option<u128> {
+    pub fn next_block_blob_fee(
+        &self,
+        next_block_target_blobs_per_block: Option<u64>,
+    ) -> Option<u128> {
         let next_block_excess_blob_gas = self.next_block_excess_blob_gas()?;
-        Some(next_block_target_blob_count.map_or_else(
+        Some(next_block_target_blobs_per_block.map_or_else(
             || eip4844::calc_blob_gasprice(next_block_excess_blob_gas),
-            |target_blob_count| {
-                eip7742::calc_blob_gasprice(next_block_excess_blob_gas, target_blob_count)
+            |target_blobs_per_block| {
+                eip7742::calc_blob_gasprice(next_block_excess_blob_gas, target_blobs_per_block)
             },
         ))
     }
@@ -249,10 +252,14 @@ impl Header {
         let excess_blob_gas = self.excess_blob_gas?;
         let blob_gas_used = self.blob_gas_used?;
 
-        Some(self.target_blob_count.map_or_else(
+        Some(self.target_blobs_per_block.map_or_else(
             || eip4844::calc_excess_blob_gas(excess_blob_gas, blob_gas_used),
-            |target_blob_count| {
-                eip7742::calc_excess_blob_gas(excess_blob_gas, blob_gas_used, target_blob_count)
+            |target_blobs_per_block| {
+                eip7742::calc_excess_blob_gas(
+                    excess_blob_gas,
+                    blob_gas_used,
+                    target_blobs_per_block,
+                )
             },
         ))
     }
@@ -329,8 +336,8 @@ impl Header {
             length += requests_hash.length();
         }
 
-        if let Some(target_blob_count) = self.target_blob_count {
-            length += target_blob_count.length();
+        if let Some(target_blobs_per_block) = self.target_blobs_per_block {
+            length += target_blobs_per_block.length();
         }
 
         length
@@ -434,8 +441,8 @@ impl Encodable for Header {
             requests_hash.encode(out);
         }
 
-        if let Some(ref target_blob_count) = self.target_blob_count {
-            target_blob_count.encode(out);
+        if let Some(ref target_blobs_per_block) = self.target_blobs_per_block {
+            target_blobs_per_block.encode(out);
         }
     }
 
@@ -476,7 +483,7 @@ impl Decodable for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            target_blob_count: None,
+            target_blobs_per_block: None,
         };
         if started_len - buf.len() < rlp_head.payload_length {
             this.base_fee_per_gas = Some(u64::decode(buf)?);
@@ -508,7 +515,7 @@ impl Decodable for Header {
 
         // Decode target blob count.
         if started_len - buf.len() < rlp_head.payload_length {
-            this.target_blob_count = Some(u64::decode(buf)?);
+            this.target_blobs_per_block = Some(u64::decode(buf)?);
         }
 
         let consumed = started_len - buf.len();
@@ -587,7 +594,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             parent_beacon_block_root: u.arbitrary()?,
             requests_hash: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
-            target_blob_count: u.arbitrary()?,
+            target_blobs_per_block: u.arbitrary()?,
         };
 
         Ok(generate_valid_header(
@@ -664,7 +671,7 @@ pub trait BlockHeader {
     fn requests_hash(&self) -> Option<B256>;
 
     /// Retrieves the target blob count of the block, if available
-    fn target_blob_count(&self) -> Option<u64>;
+    fn target_blobs_per_block(&self) -> Option<u64>;
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
@@ -677,10 +684,14 @@ pub trait BlockHeader {
         let excess_blob_gas = self.excess_blob_gas()?;
         let blob_gas_used = self.blob_gas_used()?;
 
-        Some(self.target_blob_count().map_or_else(
+        Some(self.target_blobs_per_block().map_or_else(
             || eip4844::calc_excess_blob_gas(excess_blob_gas, blob_gas_used),
-            |target_blob_count| {
-                eip7742::calc_excess_blob_gas(excess_blob_gas, blob_gas_used, target_blob_count)
+            |target_blobs_per_block| {
+                eip7742::calc_excess_blob_gas(
+                    excess_blob_gas,
+                    blob_gas_used,
+                    target_blobs_per_block,
+                )
             },
         ))
     }
@@ -689,16 +700,16 @@ pub trait BlockHeader {
     ///
     /// Returns `None` if `excess_blob_gas` is None.
     ///
-    /// If `next_block_target_blob_count` is [`Some`], uses EIP-7742 formula for calculating the
-    /// blob gas price, otherwise uses EIP-4844 formula.
+    /// If `next_block_target_blobs_per_block` is [`Some`], uses EIP-7742 formula for calculating
+    /// the blob gas price, otherwise uses EIP-4844 formula.
     ///
     /// See also [BlockHeader::next_block_excess_blob_gas]
-    fn next_block_blob_fee(&self, next_block_target_blob_count: Option<u64>) -> Option<u128> {
+    fn next_block_blob_fee(&self, next_block_target_blobs_per_block: Option<u64>) -> Option<u128> {
         let next_block_excess_blob_gas = self.next_block_excess_blob_gas()?;
-        Some(next_block_target_blob_count.map_or_else(
+        Some(next_block_target_blobs_per_block.map_or_else(
             || eip4844::calc_blob_gasprice(next_block_excess_blob_gas),
-            |target_blob_count| {
-                eip7742::calc_blob_gasprice(next_block_excess_blob_gas, target_blob_count)
+            |target_blobs_per_block| {
+                eip7742::calc_blob_gasprice(next_block_excess_blob_gas, target_blobs_per_block)
             },
         ))
     }
@@ -804,8 +815,8 @@ impl BlockHeader for Header {
         self.requests_hash
     }
 
-    fn target_blob_count(&self) -> Option<u64> {
-        self.target_blob_count
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.target_blobs_per_block
     }
 
     fn extra_data(&self) -> &Bytes {
@@ -956,7 +967,7 @@ pub(crate) mod serde_bincode_compat {
         #[serde(default)]
         requests_hash: Option<B256>,
         #[serde(default)]
-        target_blob_count: Option<u64>,
+        target_blobs_per_block: Option<u64>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -984,7 +995,7 @@ pub(crate) mod serde_bincode_compat {
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
                 extra_data: Cow::Borrowed(&value.extra_data),
-                target_blob_count: value.target_blob_count,
+                target_blobs_per_block: value.target_blobs_per_block,
             }
         }
     }
@@ -1013,7 +1024,7 @@ pub(crate) mod serde_bincode_compat {
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
                 extra_data: value.extra_data.into_owned(),
-                target_blob_count: value.target_blob_count,
+                target_blobs_per_block: value.target_blobs_per_block,
             }
         }
     }
