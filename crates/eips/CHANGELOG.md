@@ -5,11 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/alloy-rs/alloy/releases/tag/v0.6.0) - 2024-11-06
+
+### Bug Fixes
+
+- Add more rlp correctness checks ([#1595](https://github.com/alloy-rs/alloy/issues/1595))
+- Make a sensible encoding api ([#1496](https://github.com/alloy-rs/alloy/issues/1496))
+
+### Documentation
+
+- Expand on what `Requests` contains ([#1564](https://github.com/alloy-rs/alloy/issues/1564))
+
+### Features
+
+- [eips] Indexed Blob Hash ([#1526](https://github.com/alloy-rs/alloy/issues/1526))
+
+### Miscellaneous Tasks
+
+- Make withdrawals pub ([#1623](https://github.com/alloy-rs/alloy/issues/1623))
+- Fix some compile issues for no-std test ([#1606](https://github.com/alloy-rs/alloy/issues/1606))
+
+### Other
+
+- Add missing unit test for `MIN_PROTOCOL_BASE_FEE` ([#1558](https://github.com/alloy-rs/alloy/issues/1558))
+- Rm `BEACON_CONSENSUS_REORG_UNWIND_DEPTH` ([#1556](https://github.com/alloy-rs/alloy/issues/1556))
+- Add unit tests to secure all conversions and impl ([#1544](https://github.com/alloy-rs/alloy/issues/1544))
+
 ## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
 
 ### Bug Fixes
 
 - Sidecar rlp decoding ([#1549](https://github.com/alloy-rs/alloy/issues/1549))
+
+### Miscellaneous Tasks
+
+- Release 0.5.4
 
 ### Other
 
