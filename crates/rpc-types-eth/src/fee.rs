@@ -45,7 +45,7 @@ pub struct FeeHistory {
     pub base_fee_per_gas: Vec<u128>,
     /// An array of block gas used ratios. These are calculated as the ratio
     /// of `gasUsed` and `gasLimit`.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "gas_used_ratio_deser::deserialize"))]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub gas_used_ratio: Vec<f64>,
     /// An array of block base fees per blob gas. This includes the next block after the newest
     /// of the returned range, because this value can be derived from the newest block. Zeroes
@@ -110,20 +110,6 @@ impl FeeHistory {
             .copied()
             // Skip zero values that are returned for pre-EIP-4844 blocks.
             .filter(|fee| *fee != 0)
-    }
-}
-
-mod gas_used_ratio_deser {
-    use serde::{Deserialize, Deserializer};
-
-    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<f64>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // First try to deserialize as Option<Vec<f64>>
-        let opt = Option::<Vec<f64>>::deserialize(deserializer)?;
-        // Return empty vec if null, otherwise return the vec
-        Ok(opt.unwrap_or_default())
     }
 }
 
