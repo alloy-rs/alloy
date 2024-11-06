@@ -740,7 +740,7 @@ pub struct ExecutionPayloadBodyV1 {
 
 /// This structure contains the attributes required to initiate a payload build process in the
 /// context of an `engine_forkchoiceUpdated` call.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct PayloadAttributes {
