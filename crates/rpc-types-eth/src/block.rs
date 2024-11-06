@@ -10,8 +10,10 @@ pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_network_primitives::{BlockResponse, BlockTransactions, TransactionResponse};
-use alloy_primitives::{Address, BlockHash, Bytes, Sealable, B256, U256};
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
 use alloy_rlp::Encodable;
 
 /// Block representation
@@ -167,6 +169,98 @@ impl<H: BlockHeader> Header<H> {
     ) -> Self {
         let (inner, hash) = header.into_parts();
         Self { hash, inner, total_difficulty, size }
+    }
+}
+
+impl<H: BlockHeader> BlockHeader for Header<H> {
+    fn parent_hash(&self) -> B256 {
+        self.inner.parent_hash()
+    }
+
+    fn ommers_hash(&self) -> B256 {
+        self.inner.ommers_hash()
+    }
+
+    fn beneficiary(&self) -> Address {
+        self.inner.beneficiary()
+    }
+
+    fn state_root(&self) -> B256 {
+        self.inner.state_root()
+    }
+
+    fn transactions_root(&self) -> B256 {
+        self.inner.transactions_root()
+    }
+
+    fn receipts_root(&self) -> B256 {
+        self.inner.receipts_root()
+    }
+
+    fn withdrawals_root(&self) -> Option<B256> {
+        self.inner.withdrawals_root()
+    }
+
+    fn logs_bloom(&self) -> Bloom {
+        self.inner.logs_bloom()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.inner.difficulty()
+    }
+
+    fn number(&self) -> u64 {
+        self.inner.number()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn gas_used(&self) -> u64 {
+        self.inner.gas_used()
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.inner.timestamp()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.inner.mix_hash()
+    }
+
+    fn nonce(&self) -> Option<B64> {
+        self.inner.nonce()
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u64> {
+        self.inner.base_fee_per_gas()
+    }
+
+    fn blob_gas_used(&self) -> Option<u64> {
+        self.inner.blob_gas_used()
+    }
+
+    fn excess_blob_gas(&self) -> Option<u64> {
+        self.inner.excess_blob_gas()
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.inner.parent_beacon_block_root()
+    }
+
+    fn requests_hash(&self) -> Option<B256> {
+        self.inner.requests_hash()
+    }
+}
+
+impl<H: BlockHeader> HeaderResponse for Header<H> {
+    fn hash(&self) -> BlockHash {
+        self.hash
     }
 }
 
