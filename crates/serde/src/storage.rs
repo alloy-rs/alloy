@@ -1,27 +1,9 @@
 use core::str::FromStr;
 
-use alloc::{
-    collections::BTreeMap,
-    fmt::Write,
-    string::{String, ToString},
-};
-use alloy_primitives::{Bytes, B256, U256};
+use alloc::collections::BTreeMap;
+use alloy_primitives::{ruint::ParseError, Bytes, B256, U256};
+use core::fmt::{Display, Formatter};
 use serde::{Deserialize, Deserializer, Serialize};
-
-/// A storage key kind that can be either [B256] or [U256].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum StorageKeyKind {
-    /// A full 32-byte key (tried first during deserialization)
-    Hash(B256),
-    /// A number (fallback if B256 deserialization fails)
-    Number(U256),
-}
-
-impl Default for StorageKeyKind {
-    fn default() -> Self {
-        Self::Number(U256::ZERO)
-    }
-}
 
 /// A storage key type that can be serialized to and from a hex string up to 32 bytes. Used for
 /// `eth_getStorageAt` and `eth_getProof` RPCs.
@@ -43,40 +25,34 @@ impl Default for StorageKeyKind {
 ///
 /// The contained [B256] and From implementation for String are used to preserve the input and
 /// implement this behavior from geth.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
-pub struct JsonStorageKey(pub StorageKeyKind);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum JsonStorageKey {
+    /// A full 32-byte key (tried first during deserialization)
+    Hash(B256),
+    /// A number (fallback if B256 deserialization fails)
+    Number(U256),
+}
 
 impl JsonStorageKey {
-    /// Returns the key as a [B256] value.
+    /// Returns the key as a [`B256`] value.
     pub fn as_b256(&self) -> B256 {
-        match self.0 {
-            StorageKeyKind::Hash(hash) => hash,
-            StorageKeyKind::Number(num) => B256::from(num),
+        match self {
+            Self::Hash(hash) => *hash,
+            Self::Number(num) => B256::from(*num),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for JsonStorageKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-
-        // Try B256 first
-        if let Ok(hash) = B256::from_str(&s) {
-            return Ok(Self(StorageKeyKind::Hash(hash)));
-        }
-
-        // Fallback to U256
-        let number = U256::from_str(&s).map_err(serde::de::Error::custom)?;
-        Ok(Self(StorageKeyKind::Number(number)))
+impl Default for JsonStorageKey {
+    fn default() -> Self {
+        Self::Hash(Default::default())
     }
 }
 
 impl From<B256> for JsonStorageKey {
     fn from(value: B256) -> Self {
-        Self(StorageKeyKind::Hash(value))
+        Self::Hash(value)
     }
 }
 
@@ -88,45 +64,26 @@ impl From<[u8; 32]> for JsonStorageKey {
 
 impl From<U256> for JsonStorageKey {
     fn from(value: U256) -> Self {
-        // SAFETY: Address (B256) and U256 have the same number of bytes
-        value.to_be_bytes().into()
+        Self::Number(value)
     }
 }
 
-impl From<JsonStorageKey> for String {
-    fn from(value: JsonStorageKey) -> Self {
-        match value.0 {
-            // SAFETY: Address (B256) and U256 have the same number of bytes
-            // serialize byte by byte
-            StorageKeyKind::Hash(hash) => {
-                // For Hash variant, preserve the full 32-byte representation
-                let mut hex = Self::with_capacity(66); // 2 + 64
-                hex.push_str("0x");
-                for byte in hash.as_slice() {
-                    write!(hex, "{:02x}", byte).unwrap();
-                }
-                hex
-            }
-            StorageKeyKind::Number(num) => {
-                // this is mainly so we can return an output that hive testing expects, because the
-                // `eth_getProof` implementation in geth simply mirrors the input
-                //
-                // see the use of `hexKey` in the `eth_getProof` response:
-                // <https://github.com/ethereum/go-ethereum/blob/b87b9b45331f87fb1da379c5f17a81ebc3738c6e/internal/ethapi/api.go#L689-L763>
-                // For Number variant, use the trimmed representation
-                let bytes = num.to_be_bytes_trimmed_vec();
-                // Early return if the input is empty. This case is added to satisfy the hive tests.
-                // <https://github.com/ethereum/go-ethereum/blob/b87b9b45331f87fb1da379c5f17a81ebc3738c6e/internal/ethapi/api.go#L727-L729>
-                if bytes.is_empty() {
-                    return "0x0".to_string();
-                }
-                let mut hex = Self::with_capacity(2 + bytes.len() * 2);
-                hex.push_str("0x");
-                for byte in bytes {
-                    write!(hex, "{:02x}", byte).unwrap();
-                }
-                hex
-            }
+impl FromStr for JsonStorageKey {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(hash) = B256::from_str(s) {
+            return Ok(Self::Hash(hash));
+        }
+        s.parse().map(Self::Number)
+    }
+}
+
+impl Display for JsonStorageKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Hash(hash) => hash.fmt(f),
+            Self::Number(num) => alloc::format!("{num:#x}").fmt(f),
         }
     }
 }
@@ -181,12 +138,22 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::{String, ToString};
     use serde_json::json;
 
     #[test]
-    fn default_storage_key() {
+    fn default_number_storage_key() {
+        let key = JsonStorageKey::Number(Default::default());
+        assert_eq!(key.to_string(), String::from("0x0"));
+    }
+
+    #[test]
+    fn default_hash_storage_key() {
         let key = JsonStorageKey::default();
-        assert_eq!(String::from(key), String::from("0x0"));
+        assert_eq!(
+            key.to_string(),
+            String::from("0x0000000000000000000000000000000000000000000000000000000000000000")
+        );
     }
 
     #[test]
@@ -199,12 +166,7 @@ mod tests {
         let key: JsonStorageKey = serde_json::from_str(&json!(cases[0]).to_string()).unwrap();
         let key2: JsonStorageKey = serde_json::from_str(&json!(cases[1]).to_string()).unwrap();
 
-        assert_eq!(key, key2);
-
-        let output = String::from(key);
-        let output2 = String::from(key2);
-
-        assert_eq!(output, output2);
+        assert_eq!(key.as_b256(), key2.as_b256());
     }
 
     #[test]
@@ -213,13 +175,13 @@ mod tests {
             "0x0000000000000000000000000000000000000000000000000000000000000001", // Hash
             "0x0000000000000000000000000000000000000000000000000000000000000abc", // Hash
             "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",   // Number
-            "0x0abc",                                                             // Number
+            "0xabc",                                                              // Number
             "0xabcd",                                                             // Number
         ];
 
         for input in test_cases {
             let key: JsonStorageKey = serde_json::from_str(&json!(input).to_string()).unwrap();
-            let output = String::from(key);
+            let output = key.to_string();
 
             assert_eq!(
                 input, output,
@@ -239,8 +201,8 @@ mod tests {
         let num_key: JsonStorageKey = serde_json::from_str(&json!(cases[0]).to_string()).unwrap();
         let hash_key: JsonStorageKey = serde_json::from_str(&json!(cases[1]).to_string()).unwrap();
 
-        assert_eq!(num_key.0, StorageKeyKind::Number(U256::from_str(cases[0]).unwrap()));
-        assert_eq!(hash_key.0, StorageKeyKind::Hash(B256::from_str(cases[1]).unwrap()));
+        assert_eq!(num_key, JsonStorageKey::Number(U256::from_str(cases[0]).unwrap()));
+        assert_eq!(hash_key, JsonStorageKey::Hash(B256::from_str(cases[1]).unwrap()));
 
         assert_eq!(num_key.as_b256(), hash_key.as_b256());
     }
