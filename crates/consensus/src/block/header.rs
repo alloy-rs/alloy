@@ -910,8 +910,8 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.requests_hash()
     }
 
-    fn target_blob_count(&self) -> Option<u64> {
-        self.inner.target_blob_count()
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.inner.target_blobs_per_block()
     }
 }
 

@@ -260,8 +260,8 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
         self.inner.requests_hash()
     }
 
-    fn target_blob_count(&self) -> Option<u64> {
-        self.inner.target_blob_count()
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.inner.target_blobs_per_block()
     }
 }
 
