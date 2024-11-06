@@ -1,4 +1,4 @@
-use alloy_consensus::Transaction;
+use alloy_consensus::{BlockHeader, Transaction};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
@@ -109,6 +109,12 @@ pub trait TransactionResponse: Transaction {
             ty => Some(ty),
         }
     }
+}
+
+/// Header JSON-RPC response.
+pub trait HeaderResponse: BlockHeader {
+    /// Block hash
+    fn hash(&self) -> BlockHash;
 }
 
 /// Block JSON-RPC response.
@@ -235,5 +241,11 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 
     fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
         Some(&self.other)
+    }
+}
+
+impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
+    fn hash(&self) -> BlockHash {
+        self.inner.hash()
     }
 }
