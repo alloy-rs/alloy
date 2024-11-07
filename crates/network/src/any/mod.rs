@@ -12,6 +12,9 @@ use crate::Network;
 use alloy_rpc_types_eth::{AnyTransactionReceipt, Block, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
+mod wallet;
+pub use wallet::AnyNetworkWallet;
+
 /// A catch-all header type for handling headers on multiple networks.
 pub type AnyRpcHeader = alloy_rpc_types_eth::Header<alloy_consensus::AnyHeader>;
 

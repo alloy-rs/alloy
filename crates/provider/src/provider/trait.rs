@@ -1085,11 +1085,12 @@ mod tests {
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_consensus::Transaction;
-    use alloy_network::AnyNetwork;
+    use alloy_network::{AnyNetwork, AnyNetworkWallet, TransactionBuilder};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_client::BuiltInConnectionString;
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
+    use alloy_signer_local::PrivateKeySigner;
     // For layer transport tests
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
@@ -1727,6 +1728,32 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn any_network_wallet() {
+        use alloy_serde::WithOtherFields;
+        let anvil = Anvil::new().spawn();
+        let signer: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+        // let wallet = EthereumWallet::from(signer); - THIS WON'T WORK
+        let wallet = AnyNetworkWallet::from(signer);
+
+        let provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .network::<AnyNetwork>()
+            .wallet(wallet)
+            .on_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest::default()
+            .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"))
+            .value(U256::from(325235));
+
+        let tx = WithOtherFields::new(tx);
+
+        let builder = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+
+        assert!(builder.status());
     }
 
     #[tokio::test]
