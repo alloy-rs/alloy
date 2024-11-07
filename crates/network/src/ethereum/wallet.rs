@@ -3,6 +3,8 @@ use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_primitives::{map::AddressHashMap, Address, PrimitiveSignature as Signature};
 use std::sync::Arc;
 
+use super::Ethereum;
+
 /// A wallet capable of signing any transaction for the Ethereum network.
 #[derive(Clone, Default)]
 pub struct EthereumWallet {
@@ -160,9 +162,9 @@ impl NetworkWallet<AnyNetwork> for EthereumWallet {
         tx: AnyTypedTransaction,
     ) -> alloy_signer::Result<AnyTxEnvelope> {
         match tx {
-            AnyTypedTransaction::Ethereum(t) => match t {
-                NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?
-            },
+            AnyTypedTransaction::Ethereum(t) => Ok(AnyTxEnvelope::Ethereum(
+                NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?,
+            )),
             _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
         }
     }
