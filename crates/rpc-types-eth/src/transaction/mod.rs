@@ -36,24 +36,30 @@ pub use alloy_consensus::{
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        into = "tx_serde::TransactionSerdeHelper<T>",
+        try_from = "tx_serde::TransactionSerdeHelper<T>",
+        bound = "T: TransactionTrait + Clone + serde::Serialize + serde::de::DeserializeOwned"
+    )
+)]
 #[doc(alias = "Tx")]
 pub struct Transaction<T = TxEnvelope> {
     /// The inner transaction object
-    #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: T,
 
     /// Hash of block where transaction was included, `None` if pending
-    #[cfg_attr(feature = "serde", serde(default))]
     pub block_hash: Option<BlockHash>,
 
     /// Number of block where transaction was included, `None` if pending
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
 
     /// Transaction Index
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub transaction_index: Option<u64>,
+
+    /// Deprecated effective gas price value.
+    pub effective_gas_price: Option<u128>,
 
     /// Sender
     pub from: Address,
@@ -256,6 +262,108 @@ impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T>
 
     fn from(&self) -> Address {
         self.from
+    }
+}
+
+#[cfg(feature = "serde")]
+mod tx_serde {
+    //! Helper module for serializing and deserializing OP [`Transaction`].
+    //!
+    //! This is needed because we might need to deserialize the `gasPrice` field into both
+    //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
+    /// field if inner [`TxEnvelope`] did not consume it.
+    #[derive(Serialize, Deserialize)]
+    struct MaybeGasPrice {
+        #[serde(
+            default,
+            rename = "gasPrice",
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )]
+        pub effective_gas_price: Option<u128>,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct TransactionSerdeHelper<T> {
+        #[serde(flatten)]
+        inner: T,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        block_hash: Option<BlockHash>,
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )]
+        block_number: Option<u64>,
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )]
+        transaction_index: Option<u64>,
+        /// Sender
+        from: Address,
+
+        #[serde(flatten)]
+        gas_price: MaybeGasPrice,
+    }
+
+    impl<T: TransactionTrait> From<Transaction<T>> for TransactionSerdeHelper<T> {
+        fn from(value: Transaction<T>) -> Self {
+            let Transaction {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                effective_gas_price,
+                from,
+            } = value;
+
+            // if inner transaction has its own `gasPrice` don't serialize it in this struct.
+            let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
+
+            Self {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                from,
+                gas_price: MaybeGasPrice { effective_gas_price },
+            }
+        }
+    }
+
+    impl<T: TransactionTrait> TryFrom<TransactionSerdeHelper<T>> for Transaction<T> {
+        type Error = serde_json::Error;
+
+        fn try_from(value: TransactionSerdeHelper<T>) -> Result<Self, Self::Error> {
+            let TransactionSerdeHelper {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                from,
+                gas_price,
+            } = value;
+
+            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice`, otherwise
+            // return error
+            let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
+
+            Ok(Self {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                from,
+                effective_gas_price,
+            })
+        }
     }
 }
 
