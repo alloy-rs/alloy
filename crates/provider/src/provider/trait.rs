@@ -1085,7 +1085,7 @@ mod tests {
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_consensus::Transaction;
-    use alloy_network::{AnyNetwork, AnyNetworkWallet, TransactionBuilder};
+    use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_client::BuiltInConnectionString;
@@ -1731,13 +1731,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn any_network_wallet() {
+    async fn any_network_wallet_filler() {
         use alloy_serde::WithOtherFields;
         let anvil = Anvil::new().spawn();
         let signer: PrivateKeySigner =
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
-        // let wallet = EthereumWallet::from(signer); - THIS WON'T WORK
-        let wallet = AnyNetworkWallet::from(signer);
+        let wallet = EthereumWallet::from(signer);
 
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
