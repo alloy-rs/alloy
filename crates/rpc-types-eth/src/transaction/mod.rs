@@ -36,24 +36,30 @@ pub use alloy_consensus::{
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        into = "tx_serde::TransactionSerdeHelper<T>",
+        try_from = "tx_serde::TransactionSerdeHelper<T>",
+        bound = "T: TransactionTrait + Clone + serde::Serialize + serde::de::DeserializeOwned"
+    )
+)]
 #[doc(alias = "Tx")]
 pub struct Transaction<T = TxEnvelope> {
     /// The inner transaction object
-    #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: T,
 
     /// Hash of block where transaction was included, `None` if pending
-    #[cfg_attr(feature = "serde", serde(default))]
     pub block_hash: Option<BlockHash>,
 
     /// Number of block where transaction was included, `None` if pending
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
 
     /// Transaction Index
-    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub transaction_index: Option<u64>,
+
+    /// Deprecated effective gas price value.
+    pub effective_gas_price: Option<u128>,
 
     /// Sender
     pub from: Address,
@@ -259,6 +265,100 @@ impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T>
     }
 }
 
+#[cfg(feature = "serde")]
+mod tx_serde {
+    //! Helper module for serializing and deserializing OP [`Transaction`].
+    //!
+    //! This is needed because we might need to deserialize the `gasPrice` field into both
+    //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
+    /// field if inner [`TxEnvelope`] did not consume it.
+    #[derive(Serialize, Deserialize)]
+    struct MaybeGasPrice {
+        #[serde(
+            default,
+            rename = "gasPrice",
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )]
+        pub effective_gas_price: Option<u128>,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct TransactionSerdeHelper<T> {
+        #[serde(flatten)]
+        inner: T,
+        #[serde(default)]
+        block_hash: Option<BlockHash>,
+        #[serde(default, with = "alloy_serde::quantity::opt")]
+        block_number: Option<u64>,
+        #[serde(default, with = "alloy_serde::quantity::opt")]
+        transaction_index: Option<u64>,
+        /// Sender
+        from: Address,
+
+        #[serde(flatten)]
+        gas_price: MaybeGasPrice,
+    }
+
+    impl<T: TransactionTrait> From<Transaction<T>> for TransactionSerdeHelper<T> {
+        fn from(value: Transaction<T>) -> Self {
+            let Transaction {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                effective_gas_price,
+                from,
+            } = value;
+
+            // if inner transaction has its own `gasPrice` don't serialize it in this struct.
+            let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
+
+            Self {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                from,
+                gas_price: MaybeGasPrice { effective_gas_price },
+            }
+        }
+    }
+
+    impl<T: TransactionTrait> TryFrom<TransactionSerdeHelper<T>> for Transaction<T> {
+        type Error = serde_json::Error;
+
+        fn try_from(value: TransactionSerdeHelper<T>) -> Result<Self, Self::Error> {
+            let TransactionSerdeHelper {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                from,
+                gas_price,
+            } = value;
+
+            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice`, otherwise
+            // return error
+            let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
+
+            Ok(Self {
+                inner,
+                block_hash,
+                block_number,
+                transaction_index,
+                from,
+                effective_gas_price,
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,5 +395,19 @@ mod tests {
 
         let tx = serde_json::from_str::<Transaction>(rpc_tx).unwrap();
         assert_eq!(tx.block_number, Some(2));
+    }
+
+    #[test]
+    fn test_gas_price_present() {
+        let blob_rpc_tx = r#"{"blockHash":"0x1732a5fe86d54098c431fa4fea34387b650e41dbff65ca554370028172fcdb6a","blockNumber":"0x3","from":"0x7435ed30a8b4aeb0877cef0c6e8cffe834eb865f","gas":"0x186a0","gasPrice":"0x281d620e","maxFeePerGas":"0x281d620e","maxPriorityFeePerGas":"0x1","maxFeePerBlobGas":"0x20000","hash":"0xb0ebf0d8fca6724d5111d0be9ac61f0e7bf174208e0fafcb653f337c72465b83","input":"0xdc4c8669df128318656d6974","nonce":"0x8","to":"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df","transactionIndex":"0x0","value":"0x3","type":"0x3","accessList":[{"address":"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000000","0x462708a3c1cd03b21605715d090136df64e227f7e7792f74bb1bd7a8288f8801"]}],"chainId":"0xc72dd9d5e883e","blobVersionedHashes":["0x015a4cab4911426699ed34483de6640cf55a568afc5c5edffdcbd8bcd4452f68"],"v":"0x0","r":"0x478385a47075dd6ba56300b623038052a6e4bb03f8cfc53f367712f1c1d3e7de","s":"0x2f79ed9b154b0af2c97ddfc1f4f76e6c17725713b6d44ea922ca4c6bbc20775c","yParity":"0x0"}"#;
+        let legacy_rpc_tx = r#"{"blockHash":"0x7e5d03caac4eb2b613ae9c919ef3afcc8ed0e384f31ee746381d3c8739475d2a","blockNumber":"0x4","from":"0x7435ed30a8b4aeb0877cef0c6e8cffe834eb865f","gas":"0x5208","gasPrice":"0x23237dee","hash":"0x3f38cdc805c02e152bfed34471a3a13a786fed436b3aec0c3eca35d23e2cdd2c","input":"0x","nonce":"0xc","to":"0x4dde844b71bcdf95512fb4dc94e84fb67b512ed8","transactionIndex":"0x0","value":"0x1","type":"0x0","chainId":"0xc72dd9d5e883e","v":"0x18e5bb3abd10a0","r":"0x3d61f5d7e93eecd0669a31eb640ab3349e9e5868a44c2be1337c90a893b51990","s":"0xc55f44ba123af37d0e73ed75e578647c3f473805349936f64ea902ea9e03bc7"}"#;
+
+        let blob_tx = serde_json::from_str::<Transaction>(blob_rpc_tx).unwrap();
+        assert_eq!(blob_tx.block_number, Some(3));
+        assert_eq!(blob_tx.effective_gas_price, Some(0x281d620e));
+
+        let legacy_tx = serde_json::from_str::<Transaction>(legacy_rpc_tx).unwrap();
+        assert_eq!(legacy_tx.block_number, Some(4));
+        assert_eq!(legacy_tx.effective_gas_price, Some(0x23237dee));
     }
 }
