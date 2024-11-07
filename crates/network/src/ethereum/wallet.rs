@@ -161,32 +161,7 @@ impl NetworkWallet<AnyNetwork> for EthereumWallet {
     ) -> alloy_signer::Result<AnyTxEnvelope> {
         match tx {
             AnyTypedTransaction::Ethereum(t) => match t {
-                TypedTransaction::Legacy(mut t) => {
-                    let sig = self.sign_transaction_inner(sender, &mut t).await?;
-
-                    let signed = t.into_signed(sig);
-                    Ok(AnyTxEnvelope::Ethereum(signed.into()))
-                }
-                TypedTransaction::Eip2930(mut t) => {
-                    let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                    let signed = t.into_signed(sig);
-                    Ok(AnyTxEnvelope::Ethereum(signed.into()))
-                }
-                TypedTransaction::Eip1559(mut t) => {
-                    let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                    let signed = t.into_signed(sig);
-                    Ok(AnyTxEnvelope::Ethereum(signed.into()))
-                }
-                TypedTransaction::Eip4844(mut t) => {
-                    let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                    let signed = t.into_signed(sig);
-                    Ok(AnyTxEnvelope::Ethereum(signed.into()))
-                }
-                TypedTransaction::Eip7702(mut t) => {
-                    let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                    let signed = t.into_signed(sig);
-                    Ok(AnyTxEnvelope::Ethereum(signed.into()))
-                }
+                NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?
             },
             _ => unimplemented!("cannot sign UnknownTypedTransaction"),
         }
