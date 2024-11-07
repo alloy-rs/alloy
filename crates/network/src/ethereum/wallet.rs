@@ -163,7 +163,7 @@ impl NetworkWallet<AnyNetwork> for EthereumWallet {
             AnyTypedTransaction::Ethereum(t) => match t {
                 NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?
             },
-            _ => unimplemented!("cannot sign UnknownTypedTransaction"),
+            _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
         }
     }
 }
