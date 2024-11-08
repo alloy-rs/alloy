@@ -111,6 +111,12 @@ hyper = [
     "alloy-provider?/hyper",
     "alloy-transport-http?/hyper",
 ]
+hyper-auth = [
+    "alloy-rpc-client?/hyper",
+    "alloy-provider?/hyper",
+    "alloy-transport-http?/hyper",
+    "alloy-transport-http?/jwt-auth",
+]
 wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
 # ---------------------------------------- Main re-exports --------------------------------------- #
