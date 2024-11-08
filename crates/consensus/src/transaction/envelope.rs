@@ -273,7 +273,7 @@ impl TxEnvelope {
     }
 
     /// Return the reference to signature.
-    pub fn signature(&self) -> &Signature {
+    pub const fn signature(&self) -> &Signature {
         match self {
             Self::Legacy(tx) => tx.signature(),
             Self::Eip2930(tx) => tx.signature(),
