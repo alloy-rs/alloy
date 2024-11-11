@@ -1,6 +1,7 @@
 mod builder;
 
 mod either;
+use alloy_consensus::TxEnvelope;
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 
 mod unknowns;
@@ -9,7 +10,9 @@ pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 pub use alloy_consensus::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::Network;
-use alloy_rpc_types_eth::{AnyTransactionReceipt, Block, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{
+    AnyTransactionReceipt, Block, ConversionError, Transaction, TransactionRequest,
+};
 use alloy_serde::WithOtherFields;
 
 /// A catch-all header type for handling headers on multiple networks.
@@ -75,4 +78,16 @@ impl Network for AnyNetwork {
     type HeaderResponse = AnyRpcHeader;
 
     type BlockResponse = AnyRpcBlock;
+}
+
+impl TryFrom<AnyTxEnvelope> for TxEnvelope {
+    type Error = ConversionError;
+    fn try_from(value: AnyTxEnvelope) -> Result<Self, Self::Error> {
+        match value {
+            AnyTxEnvelope::Ethereum(tx) => Ok(tx),
+            AnyTxEnvelope::Unknown(_) => {
+                Err(ConversionError::Custom("Unknown transaction type".to_string()))
+            }
+        }
+    }
 }
