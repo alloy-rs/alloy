@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.2](https://github.com/alloy-rs/alloy/releases/tag/v0.6.2) - 2024-11-07
+## [0.6.3](https://github.com/alloy-rs/alloy/releases/tag/v0.6.3) - 2024-11-12
 
 ### Features
 
@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.6.2
+- Release 0.6.2 ([#1632](https://github.com/alloy-rs/alloy/issues/1632))
 
 ## [0.6.1](https://github.com/alloy-rs/alloy/releases/tag/v0.6.1) - 2024-11-06
 
@@ -157,11 +157,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
-- Release 0.3.5
 
 ### Refactor
 
 - Separate transaction builders for tx types ([#1259](https://github.com/alloy-rs/alloy/issues/1259))
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
 
@@ -252,7 +257,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 - Fix watching already mined transactions ([#997](https://github.com/alloy-rs/alloy/issues/997))
-- Enable tls12 in rustls ([#952](https://github.com/alloy-rs/alloy/issues/952))
 
 ### Features
 
@@ -261,20 +265,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add trace_get ([#987](https://github.com/alloy-rs/alloy/issues/987))
 - Add net rpc namespace ([#989](https://github.com/alloy-rs/alloy/issues/989))
 - Add missing debug_* rpc methods ([#986](https://github.com/alloy-rs/alloy/issues/986))
-- Add trace_filter method ([#946](https://github.com/alloy-rs/alloy/issues/946))
 
 ### Miscellaneous Tasks
 
 - Release 0.1.4
 - [provider] Simplify nonce filler ([#976](https://github.com/alloy-rs/alloy/issues/976))
-- Release 0.1.3
-- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
 
 ### Testing
 
 - Fix flaky anvil test ([#992](https://github.com/alloy-rs/alloy/issues/992))
 
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Bug Fixes
+
+- Enable tls12 in rustls ([#952](https://github.com/alloy-rs/alloy/issues/952))
+
+### Features
+
+- Add trace_filter method ([#946](https://github.com/alloy-rs/alloy/issues/946))
+
+### Miscellaneous Tasks
+
+- Release 0.1.3
+- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
+
+### Documentation
+
+- Update get_balance docs ([#938](https://github.com/alloy-rs/alloy/issues/938))
+- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
+
+### Features
+
+- Add trace_raw_transaction and trace_replay_block_transactions ([#925](https://github.com/alloy-rs/alloy/issues/925))
+- [provider] Support ethCall optional blockId serialization ([#900](https://github.com/alloy-rs/alloy/issues/900))
+
+### Miscellaneous Tasks
+
+- Release 0.1.2
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Bug Fixes
 
@@ -305,9 +340,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- Update get_balance docs ([#938](https://github.com/alloy-rs/alloy/issues/938))
-- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
 - [provider] Add examples to `raw_request{,dyn}` ([#486](https://github.com/alloy-rs/alloy/issues/486))
 - Add aliases to `get_transaction_count` ([#420](https://github.com/alloy-rs/alloy/issues/420))
 - More docs in `alloy-providers` ([#281](https://github.com/alloy-rs/alloy/issues/281))
@@ -315,8 +347,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Add trace_raw_transaction and trace_replay_block_transactions ([#925](https://github.com/alloy-rs/alloy/issues/925))
-- [provider] Support ethCall optional blockId serialization ([#900](https://github.com/alloy-rs/alloy/issues/900))
 - Add trace_replay_transaction ([#908](https://github.com/alloy-rs/alloy/issues/908))
 - Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
 - [alloy] Add `"full"` feature flag ([#877](https://github.com/alloy-rs/alloy/issues/877))
@@ -366,9 +396,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 - [clippy] Apply lint suggestions ([#903](https://github.com/alloy-rs/alloy/issues/903))
 - [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
 - [provider] Reorder methods in `Provider` trait ([#863](https://github.com/alloy-rs/alloy/issues/863))
