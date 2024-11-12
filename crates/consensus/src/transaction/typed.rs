@@ -223,6 +223,16 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        match self {
+            Self::Legacy(tx) => tx.is_dynamic_fee(),
+            Self::Eip2930(tx) => tx.is_dynamic_fee(),
+            Self::Eip1559(tx) => tx.is_dynamic_fee(),
+            Self::Eip4844(tx) => tx.is_dynamic_fee(),
+            Self::Eip7702(tx) => tx.is_dynamic_fee(),
+        }
+    }
+
     fn kind(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.kind(),

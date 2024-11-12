@@ -202,6 +202,10 @@ impl Transaction for TxEip1559 {
         self.max_priority_fee_per_gas
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
     fn kind(&self) -> TxKind {
         self.to
     }
