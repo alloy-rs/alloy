@@ -186,6 +186,13 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::TxEip4844(tx) => tx.effective_gas_price(base_fee),
+            Self::TxEip4844WithSidecar(tx) => tx.effective_gas_price(base_fee),
+        }
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::TxEip4844(tx) => tx.is_dynamic_fee(),
@@ -607,6 +614,10 @@ impl Transaction for TxEip4844 {
         self.max_priority_fee_per_gas
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.effective_gas_price(base_fee)
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         true
     }
@@ -793,6 +804,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.tx.effective_gas_price(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {

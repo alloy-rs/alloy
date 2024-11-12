@@ -146,6 +146,28 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
         self.gas_price().or(self.max_priority_fee_per_gas()).unwrap_or_default()
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.gas_price().unwrap_or(match base_fee {
+            None => self.max_fee_per_gas(),
+            Some(base_fee) => {
+                // if the tip is greater than the max priority fee per gas, set it to the max
+                // priority fee per gas + base fee
+                let max_fee = self.max_fee_per_gas();
+                if max_fee == 0 {
+                    return 0;
+                }
+                let Some(max_prio_fee) = self.max_priority_fee_per_gas() else { return max_fee };
+                let tip = max_fee.saturating_sub(base_fee as u128);
+                if tip > max_prio_fee {
+                    max_prio_fee + base_fee as u128
+                } else {
+                    // otherwise return the max fee per gas
+                    max_fee
+                }
+            }
+        })
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         self.fields.get_deserialized::<U128>("maxFeePerGas").is_some()
             || self.fields.get_deserialized::<U128>("maxFeePerBlobGas").is_some()
@@ -265,6 +287,10 @@ impl alloy_consensus::Transaction for UnknownTxEnvelope {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.inner.effective_gas_price(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {

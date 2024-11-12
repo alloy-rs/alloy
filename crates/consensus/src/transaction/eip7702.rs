@@ -200,6 +200,10 @@ impl Transaction for TxEip7702 {
         self.max_priority_fee_per_gas
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.effective_gas_price(base_fee)
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         true
     }
