@@ -1,6 +1,10 @@
 [advisories]
 version = 2
 yanked = "warn"
+ignore = [
+    # https://rustsec.org/advisories/RUSTSEC-2024-0388 used by ssz, will be removed https://github.com/sigp/ethereum_ssz/pull/34
+    "RUSTSEC-2024-0388"
+]
 
 [bans]
 multiple-versions = "warn"
