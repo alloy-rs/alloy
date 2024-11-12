@@ -223,6 +223,16 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.effective_gas_price(base_fee),
+            Self::Eip2930(tx) => tx.effective_gas_price(base_fee),
+            Self::Eip1559(tx) => tx.effective_gas_price(base_fee),
+            Self::Eip4844(tx) => tx.effective_gas_price(base_fee),
+            Self::Eip7702(tx) => tx.effective_gas_price(base_fee),
+        }
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.is_dynamic_fee(),

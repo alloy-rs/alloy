@@ -214,6 +214,10 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
         self.inner.priority_fee_or_price()
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.inner.effective_gas_price(base_fee)
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         self.inner.is_dynamic_fee()
     }

@@ -94,6 +94,11 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// non-EIP-1559 transactions.
     fn priority_fee_or_price(&self) -> u128;
 
+    /// Returns the effective gas price for the given base fee.
+    ///
+    /// If the transaction is a legacy or EIP2930 transaction, the gas price is returned.
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128;
+
     /// Returns the effective tip for this transaction.
     ///
     /// For EIP-1559 transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
@@ -254,6 +259,10 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.inner.effective_gas_price(base_fee)
     }
 
     fn kind(&self) -> TxKind {

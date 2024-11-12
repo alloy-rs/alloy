@@ -186,6 +186,13 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::TxEip4844(tx) => tx.effective_gas_price(base_fee),
+            Self::TxEip4844WithSidecar(tx) => tx.effective_gas_price(base_fee),
+        }
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::TxEip4844(tx) => tx.is_dynamic_fee(),
@@ -436,24 +443,6 @@ pub struct TxEip4844 {
 }
 
 impl TxEip4844 {
-    /// Returns the effective gas price for the given `base_fee`.
-    pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        match base_fee {
-            None => self.max_fee_per_gas,
-            Some(base_fee) => {
-                // if the tip is greater than the max priority fee per gas, set it to the max
-                // priority fee per gas + base fee
-                let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-                if tip > self.max_priority_fee_per_gas {
-                    self.max_priority_fee_per_gas + base_fee as u128
-                } else {
-                    // otherwise return the max fee per gas
-                    self.max_fee_per_gas
-                }
-            }
-        }
-    }
-
     /// Returns the total gas for all blobs in this transaction.
     #[inline]
     pub fn blob_gas(&self) -> u64 {
@@ -605,6 +594,20 @@ impl Transaction for TxEip4844 {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
+            // if the tip is greater than the max priority fee per gas, set it to the max
+            // priority fee per gas + base fee
+            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
+            if tip > self.max_priority_fee_per_gas {
+                self.max_priority_fee_per_gas + base_fee as u128
+            } else {
+                // otherwise return the max fee per gas
+                self.max_fee_per_gas
+            }
+        })
     }
 
     fn is_dynamic_fee(&self) -> bool {
@@ -793,6 +796,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.tx.effective_gas_price(base_fee)
     }
 
     fn is_dynamic_fee(&self) -> bool {

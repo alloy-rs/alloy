@@ -112,6 +112,13 @@ impl TransactionTrait for AnyTypedTransaction {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::Ethereum(inner) => inner.effective_gas_price(base_fee),
+            Self::Unknown(inner) => inner.effective_gas_price(base_fee),
+        }
+    }
+
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Ethereum(inner) => inner.is_dynamic_fee(),
@@ -278,6 +285,13 @@ impl TransactionTrait for AnyTxEnvelope {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::Ethereum(inner) => inner.effective_gas_price(base_fee),
+            Self::Unknown(inner) => inner.effective_gas_price(base_fee),
+        }
     }
 
     fn is_dynamic_fee(&self) -> bool {
