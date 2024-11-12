@@ -146,6 +146,11 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
         self.gas_price().or(self.max_priority_fee_per_gas()).unwrap_or_default()
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        self.fields.get_deserialized::<U128>("maxFeePerGas").is_some()
+            || self.fields.get_deserialized::<U128>("maxFeePerBlobGas").is_some()
+    }
+
     fn kind(&self) -> TxKind {
         self.fields
             .get("to")
@@ -260,6 +265,10 @@ impl alloy_consensus::Transaction for UnknownTxEnvelope {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner.is_dynamic_fee()
     }
 
     fn kind(&self) -> TxKind {

@@ -261,6 +261,10 @@ impl Transaction for TxLegacy {
         self.gas_price
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        false
+    }
+
     fn kind(&self) -> TxKind {
         self.to
     }

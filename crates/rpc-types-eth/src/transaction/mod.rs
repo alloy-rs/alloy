@@ -214,6 +214,10 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
         self.inner.priority_fee_or_price()
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner.is_dynamic_fee()
+    }
+
     fn kind(&self) -> TxKind {
         self.inner.kind()
     }

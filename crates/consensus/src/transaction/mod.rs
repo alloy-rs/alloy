@@ -116,6 +116,9 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }
 
+    /// Returns `true` if the transaction supports dynamic fees.
+    fn is_dynamic_fee(&self) -> bool;
+
     /// Returns the transaction kind.
     fn kind(&self) -> TxKind;
 
@@ -279,5 +282,9 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
 
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner.is_dynamic_fee()
     }
 }

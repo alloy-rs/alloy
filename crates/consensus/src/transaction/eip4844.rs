@@ -186,6 +186,13 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        match self {
+            Self::TxEip4844(tx) => tx.is_dynamic_fee(),
+            Self::TxEip4844WithSidecar(tx) => tx.is_dynamic_fee(),
+        }
+    }
+
     fn kind(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
@@ -600,6 +607,10 @@ impl Transaction for TxEip4844 {
         self.max_priority_fee_per_gas
     }
 
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
     fn kind(&self) -> TxKind {
         self.to.into()
     }
@@ -782,6 +793,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        self.tx.is_dynamic_fee()
     }
 
     fn kind(&self) -> TxKind {
