@@ -147,7 +147,11 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        self.gas_price().unwrap_or(match base_fee {
+        if let Some(gas_price) = self.gas_price() {
+            return gas_price;
+        }
+
+        match base_fee {
             None => self.max_fee_per_gas(),
             Some(base_fee) => {
                 // if the tip is greater than the max priority fee per gas, set it to the max
@@ -165,7 +169,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
                     max_fee
                 }
             }
-        })
+        }
     }
 
     fn is_dynamic_fee(&self) -> bool {
