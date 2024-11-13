@@ -229,34 +229,42 @@ impl<S: 'static> dyn SignableTransaction<S> {
 
 #[cfg(feature = "serde")]
 impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.inner.nonce()
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.inner.gas_price()
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.inner.max_fee_per_gas()
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.inner.max_priority_fee_per_gas()
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.inner.max_fee_per_blob_gas()
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
     }
@@ -265,34 +273,42 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
         self.inner.effective_gas_price(base_fee)
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         self.inner.kind()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.inner.value()
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         self.inner.input()
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         self.inner.ty()
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         self.inner.access_list()
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.inner.blob_versioned_hashes()
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         self.inner.is_dynamic_fee()
     }

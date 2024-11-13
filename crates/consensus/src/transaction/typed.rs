@@ -1,5 +1,5 @@
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, TxKind, B256};
+use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
 
 use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
@@ -143,6 +143,7 @@ impl TypedTransaction {
 }
 
 impl Transaction for TypedTransaction {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Legacy(tx) => tx.chain_id(),
@@ -153,6 +154,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.nonce(),
@@ -163,6 +165,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.gas_limit(),
@@ -173,6 +176,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.gas_price(),
@@ -183,6 +187,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.max_fee_per_gas(),
@@ -193,6 +198,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.max_priority_fee_per_gas(),
@@ -203,6 +209,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.max_fee_per_blob_gas(),
@@ -213,6 +220,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.priority_fee_or_price(),
@@ -233,6 +241,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.is_dynamic_fee(),
@@ -243,6 +252,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.kind(),
@@ -253,7 +263,8 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn value(&self) -> alloy_primitives::U256 {
+    #[inline]
+    fn value(&self) -> U256 {
         match self {
             Self::Legacy(tx) => tx.value(),
             Self::Eip2930(tx) => tx.value(),
@@ -263,6 +274,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         match self {
             Self::Legacy(tx) => tx.input(),
@@ -273,6 +285,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         match self {
             Self::Legacy(tx) => tx.ty(),
@@ -283,6 +296,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.access_list(),
@@ -293,6 +307,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Legacy(tx) => tx.blob_versioned_hashes(),
@@ -303,6 +318,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Legacy(tx) => tx.authorization_list(),

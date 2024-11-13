@@ -139,6 +139,7 @@ impl BlockHeader for AnyHeader {
         self.number
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }

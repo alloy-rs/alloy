@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 
 use alloy_consensus::TxType;
 use alloy_eips::{eip2718::Eip2718Error, eip7702::SignedAuthorization};
-use alloy_primitives::{Address, Bytes, TxKind, B256, U128, U64, U8};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U128, U256, U64, U8};
 use alloy_rpc_types_eth::AccessList;
 use alloy_serde::OtherFields;
 
@@ -104,22 +104,27 @@ pub struct UnknownTypedTransaction {
 }
 
 impl alloy_consensus::Transaction for UnknownTypedTransaction {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
         self.fields.get_deserialized::<U64>("chainId").and_then(Result::ok).map(|v| v.to())
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.fields.get_deserialized::<U64>("nonce").and_then(Result::ok).unwrap_or_default().to()
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.fields.get_deserialized::<U64>("gas").and_then(Result::ok).unwrap_or_default().to()
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.fields.get_deserialized::<U128>("gasPrice").and_then(Result::ok).map(|v| v.to())
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.fields
             .get_deserialized::<U128>("maxFeePerGas")
@@ -128,6 +133,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
             .to()
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.fields
             .get_deserialized::<U128>("maxPriorityFeePerGas")
@@ -135,6 +141,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
             .map(|v| v.to())
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.fields
             .get_deserialized::<U128>("maxFeePerBlobGas")
@@ -142,6 +149,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
             .map(|v| v.to())
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.gas_price().or(self.max_priority_fee_per_gas()).unwrap_or_default()
     }
@@ -169,11 +177,13 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
         })
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         self.fields.get_deserialized::<U128>("maxFeePerGas").is_some()
             || self.fields.get_deserialized::<U128>("maxFeePerBlobGas").is_some()
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         self.fields
             .get("to")
@@ -188,20 +198,24 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
             .unwrap_or_default()
     }
 
-    fn value(&self) -> alloy_primitives::U256 {
+    #[inline]
+    fn value(&self) -> U256 {
         self.fields.get_deserialized("value").and_then(Result::ok).unwrap_or_default()
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         self.memo.input.get_or_init(|| {
             self.fields.get_deserialized("input").and_then(Result::ok).unwrap_or_default()
         })
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         self.ty.0
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         if self.fields.contains_key("accessList") {
             Some(self.memo.access_list.get_or_init(|| {
@@ -212,6 +226,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         if self.fields.contains_key("blobVersionedHashes") {
             Some(self.memo.blob_versioned_hashes.get_or_init(|| {
@@ -225,6 +240,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
         }
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         if self.fields.contains_key("authorizationList") {
             Some(self.memo.authorization_list.get_or_init(|| {
@@ -258,34 +274,42 @@ impl AsRef<UnknownTypedTransaction> for UnknownTxEnvelope {
 }
 
 impl alloy_consensus::Transaction for UnknownTxEnvelope {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.inner.nonce()
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.inner.gas_price()
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.inner.max_fee_per_gas()
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.inner.max_priority_fee_per_gas()
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.inner.max_fee_per_blob_gas()
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
     }
@@ -294,34 +318,42 @@ impl alloy_consensus::Transaction for UnknownTxEnvelope {
         self.inner.effective_gas_price(base_fee)
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         self.inner.is_dynamic_fee()
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         self.inner.kind()
     }
 
-    fn value(&self) -> alloy_primitives::U256 {
+    #[inline]
+    fn value(&self) -> U256 {
         self.inner.value()
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         self.inner.input()
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         self.inner.ty()
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         self.inner.access_list()
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.inner.blob_versioned_hashes()
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
     }

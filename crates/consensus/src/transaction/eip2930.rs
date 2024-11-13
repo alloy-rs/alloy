@@ -120,34 +120,42 @@ impl RlpEcdsaTx for TxEip2930 {
 }
 
 impl Transaction for TxEip2930 {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         Some(self.gas_price)
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.gas_price
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.gas_price
     }
@@ -156,34 +164,42 @@ impl Transaction for TxEip2930 {
         self.gas_price
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         false
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         self.to
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         &self.input
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip2930 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }

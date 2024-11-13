@@ -4,7 +4,7 @@ use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip7702::SignedAuthorization,
 };
-use alloy_primitives::{Bytes, B256, U256};
+use alloy_primitives::{Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
@@ -59,13 +59,15 @@ impl From<AnyTxEnvelope> for WithOtherFields<TransactionRequest> {
 }
 
 impl TransactionTrait for AnyTypedTransaction {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Ethereum(inner) => inner.chain_id(),
             Self::Unknown(inner) => inner.chain_id(),
         }
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.nonce(),
@@ -73,6 +75,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.gas_limit(),
@@ -80,6 +83,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.gas_price(),
@@ -87,6 +91,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_gas(),
@@ -94,6 +99,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
@@ -101,6 +107,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_blob_gas(),
@@ -108,6 +115,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
     }
@@ -119,6 +127,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Ethereum(inner) => inner.is_dynamic_fee(),
@@ -133,6 +142,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
@@ -140,6 +150,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         match self {
             Self::Ethereum(inner) => inner.input(),
@@ -147,6 +158,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         match self {
             Self::Ethereum(inner) => inner.ty(),
@@ -154,6 +166,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
@@ -161,6 +174,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Ethereum(inner) => inner.blob_versioned_hashes(),
@@ -168,6 +182,7 @@ impl TransactionTrait for AnyTypedTransaction {
         }
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
@@ -234,13 +249,15 @@ impl Decodable2718 for AnyTxEnvelope {
 }
 
 impl TransactionTrait for AnyTxEnvelope {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Ethereum(inner) => inner.chain_id(),
             Self::Unknown(inner) => inner.chain_id(),
         }
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.nonce(),
@@ -248,6 +265,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Ethereum(inner) => inner.gas_limit(),
@@ -255,6 +273,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.gas_price(),
@@ -262,6 +281,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_gas(),
@@ -269,6 +289,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_priority_fee_per_gas(),
@@ -276,6 +297,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Ethereum(inner) => inner.max_fee_per_blob_gas(),
@@ -283,6 +305,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas().or_else(|| self.gas_price()).unwrap_or_default()
     }
@@ -294,6 +317,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Ethereum(inner) => inner.is_dynamic_fee(),
@@ -308,6 +332,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
@@ -315,6 +340,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         match self {
             Self::Ethereum(inner) => inner.input(),
@@ -322,6 +348,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         match self {
             Self::Ethereum(inner) => inner.ty(),
@@ -329,6 +356,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
@@ -336,6 +364,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Ethereum(inner) => inner.blob_versioned_hashes(),
@@ -343,6 +372,7 @@ impl TransactionTrait for AnyTxEnvelope {
         }
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),

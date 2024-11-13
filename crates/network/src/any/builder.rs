@@ -8,6 +8,7 @@ use alloy_serde::WithOtherFields;
 use std::ops::{Deref, DerefMut};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.deref().chain_id()
     }
@@ -60,6 +61,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_value(value)
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.deref().gas_price()
     }
@@ -76,6 +78,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_max_fee_per_gas(max_fee_per_gas);
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.deref().max_priority_fee_per_gas()
     }
