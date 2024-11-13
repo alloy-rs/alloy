@@ -418,4 +418,12 @@ mod tests {
         assert_eq!(legacy_tx.block_number, Some(4));
         assert_eq!(legacy_tx.effective_gas_price, Some(0x23237dee));
     }
+
+    // <https://github.com/alloy-rs/alloy/issues/1643>
+    #[test]
+    fn deserialize_7702_v() {
+        let raw = r#"{"blockHash":"0xb14eac260f0cb7c3bbf4c9ff56034defa4f566780ed3e44b7a79b6365d02887c","blockNumber":"0xb022","from":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","gas":"0xf8ac","gasPrice":"0xe07899f","maxFeePerGas":"0xe0789a0","maxPriorityFeePerGas":"0xe078998","hash":"0xadc3f24d05f05f1065debccb1c4b033eaa35917b69b343d88d9062cdf8ecad83","input":"0x","nonce":"0x1a","to":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","transactionIndex":"0x0","value":"0x0","type":"0x4","accessList":[],"chainId":"0x1a5ee289c","authorizationList":[{"chainId":"0x1a5ee289c","address":"0x529f773125642b12a44bd543005650989eceaa2a","nonce":"0x1a","v":"0x0","r":"0x9b3de20cf8bd07f3c5c55c38c920c146f081bc5ab4580d0c87786b256cdab3c2","s":"0x74841956f4832bace3c02aed34b8f0a2812450da3728752edbb5b5e1da04497"}],"v":"0x1","r":"0xb3bf7d6877864913bba04d6f93d98009a5af16ee9c12295cd634962a2346b67c","s":"0x31ca4a874afa964ec7643e58c6b56b35b1bcc7698eb1b5e15e61e78b353bd42d","yParity":"0x1"}"#;
+        let tx = serde_json::from_str::<Transaction>(raw).unwrap();
+        assert!(tx.inner.is_eip7702());
+    }
 }
