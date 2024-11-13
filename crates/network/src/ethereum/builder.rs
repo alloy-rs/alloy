@@ -7,7 +7,6 @@ use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {
-    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -60,7 +59,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.value = Some(value)
     }
 
-    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.gas_price
     }
@@ -77,7 +75,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.max_fee_per_gas = Some(max_fee_per_gas);
     }
 
-    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.max_priority_fee_per_gas
     }
@@ -94,7 +91,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.gas = Some(gas_limit);
     }
 
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         self.access_list.as_ref()
     }

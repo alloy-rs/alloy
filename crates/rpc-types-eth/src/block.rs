@@ -213,7 +213,6 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
         self.inner.number()
     }
 
-    #[inline]
     fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }

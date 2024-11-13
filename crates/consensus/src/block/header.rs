@@ -675,7 +675,6 @@ impl BlockHeader for Header {
         self.number
     }
 
-    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
@@ -763,7 +762,6 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.number()
     }
 
-    #[inline]
     fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }

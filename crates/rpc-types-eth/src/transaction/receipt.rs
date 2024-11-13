@@ -189,7 +189,6 @@ impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
         self.to
     }
 
-    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.authorization_list.as_deref()
     }

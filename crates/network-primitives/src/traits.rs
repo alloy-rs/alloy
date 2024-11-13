@@ -210,7 +210,6 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
         self.inner.to()
     }
 
-    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
     }
