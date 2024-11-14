@@ -55,6 +55,12 @@ impl fmt::Display for TxType {
     }
 }
 
+impl PartialEq<u8> for TxType {
+    fn eq(&self, other: &u8) -> bool {
+        (*self as u8) == *other
+    }
+}
+
 #[cfg(any(test, feature = "arbitrary"))]
 impl arbitrary::Arbitrary<'_> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
@@ -671,6 +677,15 @@ mod tests {
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
+
+    #[test]
+    fn check_u8_id() {
+        assert_eq!(TxType::Legacy, TxType::Legacy as u8);
+        assert_eq!(TxType::Eip2930, TxType::Eip2930 as u8);
+        assert_eq!(TxType::Eip1559, TxType::Eip1559 as u8);
+        assert_eq!(TxType::Eip7702, TxType::Eip7702 as u8);
+        assert_eq!(TxType::Eip4844, TxType::Eip4844 as u8);
+    }
 
     #[test]
     #[cfg(feature = "k256")]

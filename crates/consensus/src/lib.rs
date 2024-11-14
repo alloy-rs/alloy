@@ -24,6 +24,8 @@ pub use receipt::{
     TxReceipt,
 };
 
+pub mod proofs;
+
 pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
