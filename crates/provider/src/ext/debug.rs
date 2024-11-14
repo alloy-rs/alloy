@@ -2,6 +2,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
+use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{
     BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
 };
@@ -128,6 +129,21 @@ pub trait DebugApi<N, T>: Send + Sync {
         state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
+
+    /// The `debug_executionWitness` method allows for re-execution of a block with the purpose of
+    /// generating an execution witness. The witness comprises of a map of all hashed trie nodes to
+    /// their preimages that were required during the execution of the block, including during
+    /// state root recomputation.
+    ///
+    /// The first argument is the block number or block hash.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_execution_witness(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> TransportResult<ExecutionWitness>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -215,6 +231,13 @@ where
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>> {
         self.client().request("debug_traceCallMany", (bundles, state_context, trace_options)).await
+    }
+
+    async fn debug_execution_witness(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> TransportResult<ExecutionWitness> {
+        self.client().request("debug_executionWitness", block).await
     }
 }
 
