@@ -9,7 +9,7 @@ use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
-use alloy_primitives::{Bytes, PrimitiveSignature as Signature, TxKind, B256};
+use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
@@ -403,7 +403,8 @@ impl Encodable2718 for TxEnvelope {
 }
 
 impl Transaction for TxEnvelope {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Legacy(tx) => tx.tx().chain_id(),
             Self::Eip2930(tx) => tx.tx().chain_id(),
@@ -413,6 +414,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.tx().nonce(),
@@ -423,6 +425,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.tx().gas_limit(),
@@ -433,6 +436,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().gas_price(),
@@ -443,6 +447,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().max_fee_per_gas(),
@@ -453,6 +458,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().max_priority_fee_per_gas(),
@@ -463,6 +469,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
@@ -473,6 +480,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
@@ -493,6 +501,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.tx().is_dynamic_fee(),
@@ -503,6 +512,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.tx().kind(),
@@ -513,7 +523,8 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn value(&self) -> alloy_primitives::U256 {
+    #[inline]
+    fn value(&self) -> U256 {
         match self {
             Self::Legacy(tx) => tx.tx().value(),
             Self::Eip2930(tx) => tx.tx().value(),
@@ -523,6 +534,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         match self {
             Self::Legacy(tx) => tx.tx().input(),
@@ -533,6 +545,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         match self {
             Self::Legacy(tx) => tx.tx().ty(),
@@ -543,6 +556,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.tx().access_list(),
@@ -553,6 +567,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Legacy(tx) => tx.tx().blob_versioned_hashes(),

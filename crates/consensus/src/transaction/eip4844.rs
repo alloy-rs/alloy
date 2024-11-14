@@ -133,6 +133,7 @@ impl TxEip4844Variant {
 }
 
 impl Transaction for TxEip4844Variant {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::TxEip4844(tx) => Some(tx.chain_id),
@@ -140,6 +141,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         match self {
             Self::TxEip4844(tx) => tx.nonce,
@@ -147,6 +149,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         match self {
             Self::TxEip4844(tx) => tx.gas_limit,
@@ -154,10 +157,12 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_gas(),
@@ -165,6 +170,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::TxEip4844(tx) => tx.max_priority_fee_per_gas(),
@@ -172,6 +178,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_blob_gas(),
@@ -179,6 +186,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.priority_fee_or_price(),
@@ -193,6 +201,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::TxEip4844(tx) => tx.is_dynamic_fee(),
@@ -200,6 +209,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
@@ -208,6 +218,7 @@ impl Transaction for TxEip4844Variant {
         .into()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::TxEip4844(tx) => tx.value,
@@ -215,6 +226,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         match self {
             Self::TxEip4844(tx) => tx.input(),
@@ -222,10 +234,12 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::TxEip4844(tx) => tx.access_list(),
@@ -233,6 +247,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::TxEip4844(tx) => tx.blob_versioned_hashes(),
@@ -240,6 +255,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
@@ -564,34 +580,42 @@ impl SignableTransaction<Signature> for TxEip4844 {
 }
 
 impl Transaction for TxEip4844 {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.max_fee_per_gas
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.max_priority_fee_per_gas)
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         Some(self.max_fee_per_blob_gas)
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas
     }
@@ -610,34 +634,42 @@ impl Transaction for TxEip4844 {
         })
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         true
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         self.to.into()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         &self.input
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         Some(&self.blob_versioned_hashes)
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
@@ -766,34 +798,42 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
 }
 
 impl Transaction for TxEip4844WithSidecar {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.tx.chain_id()
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.tx.nonce()
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.tx.gas_limit()
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.tx.gas_price()
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.tx.max_fee_per_gas()
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.tx.max_priority_fee_per_gas()
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.tx.max_fee_per_blob_gas()
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
     }
@@ -802,34 +842,42 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.effective_gas_price(base_fee)
     }
 
+    #[inline]
     fn is_dynamic_fee(&self) -> bool {
         self.tx.is_dynamic_fee()
     }
 
+    #[inline]
     fn kind(&self) -> TxKind {
         self.tx.kind()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.tx.value()
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         self.tx.input()
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.tx.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.tx.blob_versioned_hashes()
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
