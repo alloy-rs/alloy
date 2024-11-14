@@ -54,6 +54,14 @@ impl<T> Default for BlockBody<T> {
     }
 }
 
+impl<T> BlockBody<T> {
+    /// Returns an iterator over all transactions.
+    #[inline]
+    pub fn transactions(&self) -> impl Iterator<Item = &T> + '_ {
+        self.transactions.iter()
+    }
+}
+
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
 /// [`BlockBody`] into [`Block`].
 mod block_rlp {
