@@ -61,6 +61,12 @@ impl PartialEq<u8> for TxType {
     }
 }
 
+impl PartialEq<TxType> for u8 {
+    fn eq(&self, other: &TxType) -> bool {
+        *self == *other as Self
+    }
+}
+
 #[cfg(any(test, feature = "arbitrary"))]
 impl arbitrary::Arbitrary<'_> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
@@ -80,6 +86,23 @@ impl TryFrom<u8> for TxType {
             4 => Self::Eip7702,
             _ => return Err(Eip2718Error::UnexpectedType(value)),
         })
+    }
+}
+
+impl Encodable for TxType {
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        (*self as u8).encode(out);
+    }
+
+    fn length(&self) -> usize {
+        1
+    }
+}
+
+impl Decodable for TxType {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let ty = u8::decode(buf)?;
+        Self::try_from(ty).map_err(|_| alloy_rlp::Error::Custom("invalid transaction type"))
     }
 }
 
