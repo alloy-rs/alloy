@@ -9,3 +9,6 @@
 mod transaction;
 #[cfg(feature = "serde")]
 pub use transaction::AnyTransactionReceipt;
+
+mod block;
+pub use block::AnyRpcHeader;

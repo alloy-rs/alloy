@@ -9,12 +9,9 @@ pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::Network;
-use alloy_rpc_types_any::AnyTransactionReceipt;
+use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
 use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
-
-/// A catch-all header type for handling headers on multiple networks.
-pub type AnyRpcHeader = alloy_rpc_types_eth::Header<alloy_consensus_any::AnyHeader>;
 
 /// A catch-all block type for handling blocks on multiple networks.
 pub type AnyRpcBlock =
@@ -63,9 +60,9 @@ impl Network for AnyNetwork {
 
     type UnsignedTx = AnyTypedTransaction;
 
-    type ReceiptEnvelope = alloy_consensus_any::AnyReceiptEnvelope;
+    type ReceiptEnvelope = AnyReceiptEnvelope;
 
-    type Header = alloy_consensus_any::AnyHeader;
+    type Header = AnyHeader;
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
