@@ -7,7 +7,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod transaction;
-#[cfg(feature = "serde")]
 pub use transaction::AnyTransactionReceipt;
 
 mod block;

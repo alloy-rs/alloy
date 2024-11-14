@@ -2,7 +2,6 @@ use alloy_rpc_types_eth::{Log, TransactionReceipt};
 
 /// Alias for a catch-all receipt type.
 #[doc(alias = "AnyTxReceipt")]
-#[cfg(feature = "serde")]
 pub type AnyTransactionReceipt =
     alloy_serde::WithOtherFields<TransactionReceipt<alloy_consensus_any::AnyReceiptEnvelope<Log>>>;
 
@@ -12,7 +11,6 @@ mod test {
     use alloy_primitives::b256;
 
     #[test]
-    #[cfg(feature = "serde")]
     fn deserialize_tx_receipt_op() {
         // OtherFields for Optimism
         #[derive(Debug, serde::Deserialize)]
@@ -88,7 +86,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
     fn deserialize_tx_receipt_arb() {
         // OtherFields for Arbitrum
         #[derive(Debug, serde::Deserialize)]

@@ -19,15 +19,12 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-alloy-consensus-any = { workspace = true, optional = true }
+alloy-consensus-any = { workspace = true, features = ["serde"] }
 alloy-rpc-types-eth.workspace = true
-alloy-serde = { workspace = true, optional = true }
+alloy-serde.workspace = true
 
 [dev-dependencies]
 alloy-primitives.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true
-
-[features]
-serde = ["dep:alloy-serde", "alloy-consensus-any/serde"]
