@@ -11,6 +11,24 @@ use core::{
 #[cfg(feature = "serde")]
 use serde::ser::SerializeStruct;
 
+/// A helper struct to store the block number/hash and its parent hash.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct BlockWithParent {
+    /// Parent hash.
+    pub parent: B256,
+    /// Block number/hash.
+    pub block: BlockNumHash,
+}
+
+impl BlockWithParent {
+    /// Creates a new [`BlockWithParent`] instance.
+    pub const fn new(parent: B256, block: BlockNumHash) -> Self {
+        Self { parent, block }
+    }
+}
+
 /// A block hash which may have a boolean `requireCanonical` field.
 ///
 /// - If false, a RPC call should raise if a block matching the hash is not found.
