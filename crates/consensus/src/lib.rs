@@ -13,7 +13,7 @@ mod account;
 pub use account::Account;
 
 mod block;
-pub use block::{AnyHeader, Block, BlockBody, BlockHeader, Header};
+pub use block::{AnyHeader, Block, BlockBody, BlockHeader, BlockWithParent, Header};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};

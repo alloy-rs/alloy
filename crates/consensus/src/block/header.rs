@@ -12,6 +12,24 @@ use alloy_primitives::{
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::mem;
 
+/// A helper struct to store the block number/hash and its parent hash.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct BlockWithParent {
+    /// Parent hash.
+    pub parent: B256,
+    /// Block number/hash.
+    pub block: BlockNumHash,
+}
+
+impl BlockWithParent {
+    /// Creates a new [`BlockWithParent`] instance.
+    pub const fn new(parent: B256, block: BlockNumHash) -> Self {
+        Self { parent, block }
+    }
+}
+
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

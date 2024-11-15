@@ -1,7 +1,7 @@
 //! Block-related consensus types.
 
 mod header;
-pub use header::{BlockHeader, Header};
+pub use header::{BlockHeader, BlockWithParent, Header};
 mod any;
 pub use any::AnyHeader;
 
