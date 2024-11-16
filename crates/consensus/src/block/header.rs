@@ -2,6 +2,7 @@ use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
+    eip1898::BlockWithParent,
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
@@ -317,6 +318,13 @@ impl Header {
     /// Note: this hashes the header.
     pub fn num_hash_slow(&self) -> BlockNumHash {
         BlockNumHash { number: self.number, hash: self.hash_slow() }
+    }
+
+    /// Returns the block's number and hash with the parent hash.
+    ///
+    /// Note: this hashes the header.
+    pub fn num_hash_with_parent_slow(&self) -> BlockWithParent {
+        BlockWithParent::new(self.parent_hash, self.num_hash_slow())
     }
 
     /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
