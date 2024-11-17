@@ -302,6 +302,8 @@ pub mod btreemap {
 /// Private implementation details of the [`quantity`](self) module.
 #[allow(unnameable_types)]
 mod private {
+    use alloy_primitives::ruint;
+
     #[doc(hidden)]
     pub trait ConvertRuint: Copy + Sized {
         // We have to use `Try*` traits because `From` is not implemented by ruint types.
@@ -340,6 +342,11 @@ mod private {
         u32  = alloy_primitives::U32,
         u64  = alloy_primitives::U64,
         u128 = alloy_primitives::U128,
+    }
+
+    // Implment CovertRuint for non-primitive types as well
+    impl ConvertRuint for alloy_primitives::U256 {
+        type Ruint = ruint::Uint<256, 4>;
     }
 }
 
