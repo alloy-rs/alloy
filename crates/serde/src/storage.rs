@@ -206,4 +206,83 @@ mod tests {
 
         assert_eq!(num_key.as_b256(), hash_key.as_b256());
     }
+
+    #[test]
+    fn test_json_storage_key_from_b256() {
+        let b256_value = B256::from([1u8; 32]);
+        let key = JsonStorageKey::from(b256_value);
+        assert_eq!(key, JsonStorageKey::Hash(b256_value));
+        assert_eq!(
+            key.to_string(),
+            "0x0101010101010101010101010101010101010101010101010101010101010101"
+        );
+    }
+
+    #[test]
+    fn test_json_storage_key_from_u256() {
+        let u256_value = U256::from(42);
+        let key = JsonStorageKey::from(u256_value);
+        assert_eq!(key, JsonStorageKey::Number(u256_value));
+        assert_eq!(key.to_string(), "0x2a");
+    }
+
+    #[test]
+    fn test_json_storage_key_from_u8_array() {
+        let bytes = [0u8; 32];
+        let key = JsonStorageKey::from(bytes);
+        assert_eq!(key, JsonStorageKey::Hash(B256::from(bytes)));
+    }
+
+    #[test]
+    fn test_from_str_parsing() {
+        let hex_str = "0x0101010101010101010101010101010101010101010101010101010101010101";
+        let key = JsonStorageKey::from_str(hex_str).unwrap();
+        assert_eq!(key, JsonStorageKey::Hash(B256::from_str(hex_str).unwrap()));
+
+        let num_str = "42";
+        let key = JsonStorageKey::from_str(num_str).unwrap();
+        assert_eq!(key, JsonStorageKey::Number(U256::from(42)));
+    }
+
+    #[test]
+    fn test_deserialize_storage_map_with_valid_data() {
+        let json_data = json!({
+            "0x0000000000000000000000000000000000000000000000000000000000000001": "0x22",
+            "0x0000000000000000000000000000000000000000000000000000000000000002": "0x33"
+        });
+
+        // Specify the deserialization type explicitly
+        let deserialized: Option<BTreeMap<B256, B256>> = deserialize_storage_map(
+            &serde_json::from_value::<serde_json::Value>(json_data).unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            deserialized.unwrap(),
+            BTreeMap::from([
+                (B256::from(U256::from(1u128)), B256::from(U256::from(0x22u128))),
+                (B256::from(U256::from(2u128)), B256::from(U256::from(0x33u128)))
+            ])
+        );
+    }
+
+    #[test]
+    fn test_deserialize_storage_map_with_empty_data() {
+        let json_data = json!({});
+        let deserialized: Option<BTreeMap<B256, B256>> = deserialize_storage_map(
+            &serde_json::from_value::<serde_json::Value>(json_data).unwrap(),
+        )
+        .unwrap();
+        assert!(deserialized.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_storage_map_with_none() {
+        let json_data = json!(null);
+        let deserialized: Option<BTreeMap<B256, B256>> = deserialize_storage_map(
+            &serde_json::from_value::<serde_json::Value>(json_data).unwrap(),
+        )
+        .unwrap();
+        assert!(deserialized.is_none());
+    }
 }
