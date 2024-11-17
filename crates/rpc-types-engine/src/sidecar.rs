@@ -64,9 +64,6 @@ impl ExecutionPayloadSidecar {
     ///   dynamically.
     /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
     pub fn requests_hash(&self) -> Option<B256> {
-        match self.prague.as_ref() {
-            Some(hash) => Some(hash.requests_hash()),
-            None => None,
-        }
+        self.prague.as_ref().map_or(None, |hash| Some(hash.requests_hash()))
     }
 }
