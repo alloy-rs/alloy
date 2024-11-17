@@ -560,6 +560,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 }
 
 /// Trait for extracting specific Ethereum block data from a header
+#[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
     /// Retrieves the parent hash of the block
     fn parent_hash(&self) -> B256;
