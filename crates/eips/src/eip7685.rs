@@ -80,8 +80,9 @@ impl Requests {
 /// A list of requests or a precomputed requests hash.
 ///
 /// For testing purposes, the `Hash` variant stores a precomputed requests hash. This can be useful
-///   when the exact contents of the requests are unnecessary, and only a consistent hash value is
+/// when the exact contents of the requests are unnecessary, and only a consistent hash value is
 /// needed   to simulate the presence of requests without holding actual data.
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RequestsOrHash {
