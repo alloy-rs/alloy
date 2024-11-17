@@ -63,7 +63,6 @@ impl ExecutionPayloadSidecar {
     /// - If the `prague` field contains a list of requests, it calculates the requests hash
     ///   dynamically.
     /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
-
     pub fn requests_hash(&self) -> Option<B256> {
         match self.prague.as_ref() {
             Some(hash) => Some(hash.requests_hash()),
