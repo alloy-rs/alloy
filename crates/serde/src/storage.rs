@@ -285,4 +285,51 @@ mod tests {
         .unwrap();
         assert!(deserialized.is_none());
     }
+
+    #[test]
+    fn test_from_bytes_to_b256_with_valid_input() {
+        // Test case with input less than 32 bytes, should be left-padded with zeros
+        let bytes = Bytes::from(vec![0x1, 0x2, 0x3, 0x4]);
+        let result = from_bytes_to_b256::<serde_json::Value>(bytes).unwrap();
+        let expected = B256::from_slice(&[
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+            2, 3, 4,
+        ]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_from_bytes_to_b256_with_exact_32_bytes() {
+        // Test case with input exactly 32 bytes long
+        let bytes = Bytes::from(vec![
+            0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF, 0x10, 0x11,
+            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+            0x20,
+        ]);
+        let result = from_bytes_to_b256::<serde_json::Value>(bytes).unwrap();
+        let expected = B256::from_slice(&[
+            0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF, 0x10, 0x11,
+            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+            0x20,
+        ]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_from_bytes_to_b256_with_input_too_long() {
+        // Test case with input longer than 32 bytes, should return an error
+        let bytes = Bytes::from(vec![0x1; 33]); // 33 bytes long
+        let result = from_bytes_to_b256::<serde_json::Value>(bytes);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "input too long to be a B256");
+    }
+
+    #[test]
+    fn test_from_bytes_to_b256_with_empty_input() {
+        // Test case with empty input, should be all zeros
+        let bytes = Bytes::from(vec![]);
+        let result = from_bytes_to_b256::<serde_json::Value>(bytes).unwrap();
+        let expected = B256::from_slice(&[0; 32]); // All zeros
+        assert_eq!(result, expected);
+    }
 }
