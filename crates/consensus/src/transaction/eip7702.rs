@@ -30,7 +30,7 @@ pub struct TxEip7702 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", alias = "gasLimit", rename = "gas"))]
     pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
