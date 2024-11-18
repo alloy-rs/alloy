@@ -10,8 +10,7 @@ pub fn deserialize_json_ttd_opt<'de, D>(deserializer: D) -> Result<Option<U256>,
 where
     D: Deserializer<'de>,
 {
-    let value = Option::<Value>::deserialize(deserializer)?;
-    value.map(|value| ttd_from_value::<'de, D>(value)).transpose()
+    Option::<Value>::deserialize(deserializer)?.map(ttd_from_value::<D>).transpose()
 }
 
 /// Converts the given [serde_json::Value] into a `U256` value for TTD deserialization.
@@ -61,11 +60,12 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     #[cfg(not(feature = "std"))]
     use alloc::{vec, vec::Vec};
     use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};
+    use serde_json::json;
 
     #[test]
     fn jsonu256_deserialize() {
@@ -112,5 +112,55 @@ mod test {
                 Ttd(Some(U256::from(58750000000000000000000u128))),
             ]
         );
+    }
+
+    #[test]
+    fn deserialize_ttd_none() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Ttd(#[serde(deserialize_with = "super::deserialize_json_ttd_opt")] Option<U256>);
+
+        // Deserialize null as None
+        let deserialized: Ttd = serde_json::from_value(json!(null)).unwrap();
+        assert_eq!(deserialized, Ttd(None));
+    }
+
+    #[test]
+    fn deserialize_ttd_invalid_string() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Ttd(#[serde(deserialize_with = "super::deserialize_json_ttd_opt")] Option<U256>);
+
+        // Invalid string that cannot be parsed into U256
+        let result: Result<Ttd, _> = serde_json::from_value(json!("invalid_string"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn deserialize_ttd_large_non_mainnet() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Ttd(#[serde(deserialize_with = "super::deserialize_json_ttd_opt")] Option<U256>);
+
+        // Test for a large number not equal to 5.875e22, which should result in an error
+        let result: Result<Ttd, _> = serde_json::from_value(json!(6.0e22));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn deserialize_ttd_negative_number() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Ttd(#[serde(deserialize_with = "super::deserialize_json_ttd_opt")] Option<U256>);
+
+        // Test for a negative number which should not be allowed
+        let result: Result<Ttd, _> = serde_json::from_value(json!(-1));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn deserialize_ttd_as_string() {
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Ttd(#[serde(deserialize_with = "super::deserialize_json_ttd_opt")] Option<U256>);
+
+        // Test for valid TTD as a string
+        let deserialized: Ttd = serde_json::from_value(json!("0x12345")).unwrap();
+        assert_eq!(deserialized, Ttd(Some(U256::from(0x12345))));
     }
 }
