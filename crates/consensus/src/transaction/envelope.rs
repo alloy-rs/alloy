@@ -1304,4 +1304,153 @@ mod tests {
 
         assert!(serde_json::from_str::<TxEnvelope>(data_with_wrong_type).is_err());
     }
+
+    #[test]
+    fn test_tx_type_try_from_u8() {
+        assert_eq!(TxType::try_from(0u8).unwrap(), TxType::Legacy);
+        assert_eq!(TxType::try_from(1u8).unwrap(), TxType::Eip2930);
+        assert_eq!(TxType::try_from(2u8).unwrap(), TxType::Eip1559);
+        assert_eq!(TxType::try_from(3u8).unwrap(), TxType::Eip4844);
+        assert_eq!(TxType::try_from(4u8).unwrap(), TxType::Eip7702);
+        assert!(TxType::try_from(5u8).is_err()); // Invalid case
+    }
+
+    #[test]
+    fn test_tx_type_try_from_u64() {
+        assert_eq!(TxType::try_from(0u64).unwrap(), TxType::Legacy);
+        assert_eq!(TxType::try_from(1u64).unwrap(), TxType::Eip2930);
+        assert_eq!(TxType::try_from(2u64).unwrap(), TxType::Eip1559);
+        assert_eq!(TxType::try_from(3u64).unwrap(), TxType::Eip4844);
+        assert_eq!(TxType::try_from(4u64).unwrap(), TxType::Eip7702);
+        assert!(TxType::try_from(10u64).is_err()); // Invalid case
+    }
+
+    #[test]
+    fn test_tx_type_from_conversions() {
+        let legacy_tx = Signed::new_unchecked(
+            TxLegacy::default(),
+            Signature::test_signature(),
+            Default::default(),
+        );
+        let eip2930_tx = Signed::new_unchecked(
+            TxEip2930::default(),
+            Signature::test_signature(),
+            Default::default(),
+        );
+        let eip1559_tx = Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        );
+        let eip4844_variant = Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            Signature::test_signature(),
+            Default::default(),
+        );
+        let eip7702_tx = Signed::new_unchecked(
+            TxEip7702::default(),
+            Signature::test_signature(),
+            Default::default(),
+        );
+
+        assert!(matches!(TxEnvelope::from(legacy_tx), TxEnvelope::Legacy(_)));
+        assert!(matches!(TxEnvelope::from(eip2930_tx), TxEnvelope::Eip2930(_)));
+        assert!(matches!(TxEnvelope::from(eip1559_tx), TxEnvelope::Eip1559(_)));
+        assert!(matches!(TxEnvelope::from(eip4844_variant), TxEnvelope::Eip4844(_)));
+        assert!(matches!(TxEnvelope::from(eip7702_tx), TxEnvelope::Eip7702(_)));
+    }
+
+    #[test]
+    fn test_tx_type_is_methods() {
+        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
+            TxEip2930::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
+            TxEip7702::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+
+        assert!(legacy_tx.is_legacy());
+        assert!(!legacy_tx.is_eip2930());
+        assert!(!legacy_tx.is_eip1559());
+        assert!(!legacy_tx.is_eip4844());
+        assert!(!legacy_tx.is_eip7702());
+
+        assert!(eip2930_tx.is_eip2930());
+        assert!(!eip2930_tx.is_legacy());
+        assert!(!eip2930_tx.is_eip1559());
+        assert!(!eip2930_tx.is_eip4844());
+        assert!(!eip2930_tx.is_eip7702());
+
+        assert!(eip1559_tx.is_eip1559());
+        assert!(!eip1559_tx.is_legacy());
+        assert!(!eip1559_tx.is_eip2930());
+        assert!(!eip1559_tx.is_eip4844());
+        assert!(!eip1559_tx.is_eip7702());
+
+        assert!(eip4844_tx.is_eip4844());
+        assert!(!eip4844_tx.is_legacy());
+        assert!(!eip4844_tx.is_eip2930());
+        assert!(!eip4844_tx.is_eip1559());
+        assert!(!eip4844_tx.is_eip7702());
+
+        assert!(eip7702_tx.is_eip7702());
+        assert!(!eip7702_tx.is_legacy());
+        assert!(!eip7702_tx.is_eip2930());
+        assert!(!eip7702_tx.is_eip1559());
+        assert!(!eip7702_tx.is_eip4844());
+    }
+
+    #[test]
+    fn test_tx_type() {
+        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
+            TxEip2930::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
+            TxEip7702::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+
+        assert_eq!(legacy_tx.tx_type(), TxType::Legacy);
+        assert_eq!(eip2930_tx.tx_type(), TxType::Eip2930);
+        assert_eq!(eip1559_tx.tx_type(), TxType::Eip1559);
+        assert_eq!(eip4844_tx.tx_type(), TxType::Eip4844);
+        assert_eq!(eip7702_tx.tx_type(), TxType::Eip7702);
+    }
 }
