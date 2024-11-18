@@ -149,9 +149,10 @@ impl<'de> Deserialize<'de> for PubSubItem {
 }
 
 #[cfg(test)]
-mod test {
-
+mod tests {
+    use super::*;
     use crate::{EthNotification, PubSubItem, SubId};
+    use serde_json::json;
 
     #[test]
     fn deserializer_test() {
@@ -171,5 +172,139 @@ mod test {
             }
             _ => panic!("unexpected deserialization result"),
         }
+    }
+
+    #[test]
+    fn subid_number() {
+        let number = U256::from(123456u64);
+        let subid: SubId = number.into();
+        assert_eq!(subid, SubId::Number(number));
+    }
+
+    #[test]
+    fn subid_string() {
+        let string = "subscription_id".to_string();
+        let subid: SubId = string.clone().into();
+        assert_eq!(subid, SubId::String(string));
+    }
+
+    #[test]
+    fn eth_notification_header() {
+        let header = json!({
+            "subscription": "0x123",
+            "result": {
+                "difficulty": "0xabc",
+                "uncles": []
+            }
+        });
+
+        let notification: EthNotification = serde_json::from_value(header).unwrap();
+        assert_eq!(notification.subscription, SubId::Number(U256::from(0x123)));
+        assert_eq!(notification.result.get(), r#"{"difficulty":"0xabc","uncles":[]}"#);
+    }
+
+    #[test]
+    fn deserializer_test_valid_response() {
+        // A valid JSON-RPC response with a result
+        let response = r#"
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": "0x123456"
+            }"#;
+
+        let deser = serde_json::from_str::<PubSubItem>(response).unwrap();
+
+        match deser {
+            PubSubItem::Response(Response { id, payload }) => {
+                assert_eq!(id, 1.into());
+                match payload {
+                    ResponsePayload::Success(result) => assert_eq!(result.get(), r#""0x123456""#),
+                    _ => panic!("unexpected payload"),
+                }
+            }
+            _ => panic!("unexpected deserialization result"),
+        }
+    }
+
+    #[test]
+    fn deserializer_test_error_response() {
+        // A JSON-RPC response with an error
+        let response = r#"
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "error": {
+                    "code": -32601,
+                    "message": "Method not found"
+                }
+            }"#;
+
+        let deser = serde_json::from_str::<PubSubItem>(response).unwrap();
+
+        match deser {
+            PubSubItem::Response(Response { id, payload }) => {
+                assert_eq!(id, 2.into());
+                match payload {
+                    ResponsePayload::Failure(error) => {
+                        assert_eq!(error.code, -32601);
+                        assert_eq!(error.message, "Method not found");
+                    }
+                    _ => panic!("unexpected payload"),
+                }
+            }
+            _ => panic!("unexpected deserialization result"),
+        }
+    }
+
+    #[test]
+    fn deserializer_test_empty_notification() {
+        // An empty notification to test deserialization handling
+        let notification = r#"
+            {
+                "jsonrpc": "2.0",
+                "method": "eth_subscription",
+                "params": {
+                    "subscription": "0x0",
+                    "result": {}
+                }
+            }"#;
+
+        let deser = serde_json::from_str::<PubSubItem>(notification).unwrap();
+
+        match deser {
+            PubSubItem::Notification(EthNotification { subscription, result }) => {
+                assert_eq!(subscription, SubId::Number(U256::from(0u64)));
+                assert_eq!(result.get(), r#"{}"#);
+            }
+            _ => panic!("unexpected deserialization result"),
+        }
+    }
+
+    #[test]
+    fn deserializer_test_invalid_structure() {
+        // An invalid structure should fail deserialization
+        let invalid_notification = r#"
+           {
+               "jsonrpc": "2.0",
+               "method": "eth_subscription"
+           }"#;
+
+        let deser = serde_json::from_str::<PubSubItem>(invalid_notification);
+        assert!(deser.is_err());
+    }
+
+    #[test]
+    fn deserializer_test_missing_fields() {
+        // A notification missing essential fields should fail
+        let missing_fields = r#"
+           {
+               "jsonrpc": "2.0",
+               "method": "eth_subscription",
+               "params": {}
+           }"#;
+
+        let deser = serde_json::from_str::<PubSubItem>(missing_fields);
+        assert!(deser.is_err());
     }
 }
