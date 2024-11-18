@@ -85,19 +85,15 @@ impl RequestPacket {
 
     /// Push a request into the packet.
     pub fn push(&mut self, req: SerializedRequest) {
-        if let Self::Batch(batch) = self {
-            batch.push(req);
-            return;
-        }
-        if matches!(self, Self::Single(_)) {
-            let old = std::mem::replace(self, Self::Batch(Vec::with_capacity(10)));
-            match old {
-                Self::Single(single) => {
+        match self {
+            Self::Batch(batch) => batch.push(req),
+            Self::Single(_) => {
+                let old = std::mem::replace(self, Self::Batch(Vec::with_capacity(10)));
+                if let Self::Single(single) = old {
                     self.push(single);
                 }
-                _ => unreachable!(),
+                self.push(req);
             }
-            self.push(req);
         }
     }
 }
@@ -264,14 +260,9 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// - If the packet contains duplicate IDs, both will be found.
     pub fn responses_by_ids(&self, ids: &HashSet<Id>) -> Vec<&Response<Payload, ErrData>> {
         match self {
-            Self::Single(single) => {
-                let mut resps = Vec::new();
-                if ids.contains(&single.id) {
-                    resps.push(single);
-                }
-                resps
-            }
+            Self::Single(single) if ids.contains(&single.id) => vec![single],
             Self::Batch(batch) => batch.iter().filter(|res| ids.contains(&res.id)).collect(),
+            _ => Vec::new(),
         }
     }
 }
