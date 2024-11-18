@@ -211,14 +211,14 @@ mod tests {
         let param = Params::None;
         assert!(!param.is_bool());
 
-        let param = Params::Logs(Box::new(Filter::default()));
+        let param = Params::Logs(Box::default());
         assert!(!param.is_bool());
     }
 
     #[test]
     fn params_is_logs() {
         // Check if the `is_logs` method correctly identifies log parameters
-        let param = Params::Logs(Box::new(Filter::default()));
+        let param = Params::Logs(Box::default());
         assert!(param.is_logs());
 
         let param = Params::None;
