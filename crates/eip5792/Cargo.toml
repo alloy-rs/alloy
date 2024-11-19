@@ -13,7 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde", "map"] }
-alloy-serde = { workspace = true, optional = true }
+alloy-serde.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 

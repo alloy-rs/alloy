@@ -1,9 +1,11 @@
-use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
+use alloy_primitives::{
+    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
+};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[doc(inline)]
@@ -12,6 +14,8 @@ pub use alloy_eips::eip4844::BlobTransactionSidecar;
 #[cfg(feature = "kzg")]
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobTransactionValidationError;
+
+use super::RlpEcdsaTx;
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -53,6 +57,20 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
         } else {
             Ok(tx.tx.into())
         }
+    }
+}
+
+impl From<Signed<TxEip4844>> for Signed<TxEip4844Variant> {
+    fn from(value: Signed<TxEip4844>) -> Self {
+        let (tx, signature, hash) = value.into_parts();
+        Self::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash)
+    }
+}
+
+impl From<Signed<TxEip4844WithSidecar>> for Signed<TxEip4844Variant> {
+    fn from(value: Signed<TxEip4844WithSidecar>) -> Self {
+        let (tx, signature, hash) = value.into_parts();
+        Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
     }
 }
 
@@ -100,7 +118,7 @@ impl TxEip4844Variant {
 
     /// Get the transaction type.
     #[doc(alias = "transaction_type")]
-    pub const fn tx_type(&self) -> TxType {
+    pub const fn tx_type() -> TxType {
         TxType::Eip4844
     }
 
@@ -112,92 +130,10 @@ impl TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => tx.tx(),
         }
     }
-
-    /// Outputs the length of the transaction's fields, without a RLP header.
-    #[doc(hidden)]
-    pub fn fields_len(&self) -> usize {
-        match self {
-            Self::TxEip4844(tx) => tx.fields_len(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().fields_len(),
-        }
-    }
-
-    /// Encodes the [TxEip4844Variant] fields as RLP, with a tx type. If `with_header` is `false`,
-    /// the following will be encoded:
-    /// `tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs])`
-    ///
-    /// If `with_header` is `true`, the following will be encoded:
-    /// `rlp(tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs]))`
-    #[doc(hidden)]
-    pub fn encode_with_signature<S>(&self, signature: &S, out: &mut dyn BufMut, with_header: bool)
-    where
-        S: EncodableSignature,
-    {
-        let payload_length = match self {
-            Self::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
-            Self::TxEip4844WithSidecar(tx) => {
-                let payload_length = tx.tx().fields_len() + signature.rlp_vrs_len();
-                let inner_header = Header { list: true, payload_length };
-                inner_header.length() + payload_length + tx.sidecar().rlp_encoded_fields_length()
-            }
-        };
-
-        if with_header {
-            Header {
-                list: false,
-                payload_length: 1
-                    + Header { list: false, payload_length }.length()
-                    + payload_length,
-            }
-            .encode(out);
-        }
-        out.put_u8(self.tx_type() as u8);
-
-        match self {
-            Self::TxEip4844(tx) => {
-                tx.encode_with_signature_fields(signature, out);
-            }
-            Self::TxEip4844WithSidecar(tx) => {
-                tx.encode_with_signature_fields(signature, out);
-            }
-        }
-    }
-
-    /// Decodes the transaction from RLP bytes, including the signature.
-    ///
-    /// This __does not__ expect the bytes to start with a transaction type byte or string
-    /// header.
-    ///
-    /// This __does__ expect the bytes to start with a list header and include a signature.
-    #[doc(hidden)]
-    pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let mut current_buf = *buf;
-        let _header = Header::decode(&mut current_buf)?;
-
-        // There are two possibilities when decoding a signed EIP-4844 transaction:
-        // If it's a historical transaction, it will only have the transaction fields, and no
-        // sidecar. If it's a transaction received during the gossip stage or sent through
-        // eth_sendRawTransaction, it will have the transaction fields and a sidecar.
-        //
-        // To disambiguate, we try to decode two list headers. If there is only one list header, we
-        // assume it's a historical transaction. If there are two, we know the transaction contains
-        // a sidecar.
-        let header = Header::decode(&mut current_buf)?;
-        if header.list {
-            let tx = TxEip4844WithSidecar::decode_signed_fields(buf)?;
-            let (tx, signature, hash) = tx.into_parts();
-            return Ok(Signed::new_unchecked(tx.into(), signature, hash));
-        }
-
-        // Since there is not a second list header, this is a historical 4844 transaction without a
-        // sidecar.
-        let tx = TxEip4844::decode_signed_fields(buf)?;
-        let (tx, signature, hash) = tx.into_parts();
-        Ok(Signed::new_unchecked(tx.into(), signature, hash))
-    }
 }
 
 impl Transaction for TxEip4844Variant {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::TxEip4844(tx) => Some(tx.chain_id),
@@ -205,6 +141,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         match self {
             Self::TxEip4844(tx) => tx.nonce,
@@ -212,6 +149,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         match self {
             Self::TxEip4844(tx) => tx.gas_limit,
@@ -219,10 +157,12 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_gas(),
@@ -230,6 +170,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::TxEip4844(tx) => tx.max_priority_fee_per_gas(),
@@ -237,6 +178,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_blob_gas(),
@@ -244,6 +186,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.priority_fee_or_price(),
@@ -251,6 +194,22 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::TxEip4844(tx) => tx.effective_gas_price(base_fee),
+            Self::TxEip4844WithSidecar(tx) => tx.effective_gas_price(base_fee),
+        }
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        match self {
+            Self::TxEip4844(tx) => tx.is_dynamic_fee(),
+            Self::TxEip4844WithSidecar(tx) => tx.is_dynamic_fee(),
+        }
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
@@ -259,6 +218,7 @@ impl Transaction for TxEip4844Variant {
         .into()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::TxEip4844(tx) => tx.value,
@@ -266,6 +226,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         match self {
             Self::TxEip4844(tx) => tx.input(),
@@ -273,10 +234,12 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::TxEip4844(tx) => tx.access_list(),
@@ -284,6 +247,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::TxEip4844(tx) => tx.blob_versioned_hashes(),
@@ -291,19 +255,110 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
+    }
+}
+
+impl RlpEcdsaTx for TxEip4844Variant {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
+    fn rlp_encoded_fields_length(&self) -> usize {
+        match self {
+            Self::TxEip4844(inner) => inner.rlp_encoded_fields_length(),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_fields_length(),
+        }
+    }
+
+    fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
+        match self {
+            Self::TxEip4844(inner) => inner.rlp_encode_fields(out),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encode_fields(out),
+        }
+    }
+
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        match self {
+            Self::TxEip4844(inner) => inner.rlp_header_signed(signature),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_header_signed(signature),
+        }
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::TxEip4844(inner) => inner.rlp_encode_signed(signature, out),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encode_signed(signature, out),
+        }
+    }
+
+    fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let needle = &mut &**buf;
+
+        // We also need to do a trial decoding of WithSidecar to see if it
+        // works. The trial ref is consumed to look for a WithSidecar.
+        let trial = &mut &**buf;
+
+        // If the next bytes are a header, one of 3 things is true:
+        // - If the header is a list, this is a WithSidecar tx
+        // - If there is no header, this is a non-sidecar tx with a single-byte chain ID.
+        // - If there is a string header, this is a non-sidecar tx with a multi-byte chain ID.
+        // To check these, we first try to decode the header. If it fails or is
+        // not a list, we lmow that it is a non-sidecar transaction.
+        if Header::decode(needle).map_or(false, |h| h.list) {
+            if let Ok(tx) = TxEip4844WithSidecar::rlp_decode_fields(trial) {
+                *buf = *trial;
+                return Ok(tx.into());
+            }
+        }
+        TxEip4844::rlp_decode_fields(buf).map(Into::into)
+    }
+
+    fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
+        // We need to determine if this has a sidecar tx or not. The needle ref
+        // is consumed to look for headers.
+        let needle = &mut &**buf;
+
+        // We also need to do a trial decoding of WithSidecar to see if it
+        // works. The original ref is consumed to look for a WithSidecar.
+        let trial = &mut &**buf;
+
+        // First we decode the outer header
+        Header::decode(needle)?;
+
+        // If the next bytes are a header, one of 3 things is true:
+        // - If the header is a list, this is a WithSidecar tx
+        // - If there is no header, this is a non-sidecar tx with a single-byte chain ID.
+        // - If there is a string header, this is a non-sidecar tx with a multi-byte chain ID.
+        // To check these, we first try to decode the header. If it fails or is
+        // not a list, we lmow that it is a non-sidecar transaction.
+        if Header::decode(needle).map_or(false, |h| h.list) {
+            if let Ok((tx, signature)) = TxEip4844WithSidecar::rlp_decode_with_signature(trial) {
+                // If succesful, we need to consume the trial buffer up to
+                // the same point.
+                *buf = *trial;
+                return Ok((tx.into(), signature));
+            }
+        }
+        TxEip4844::rlp_decode_with_signature(buf).map(|(tx, signature)| (tx.into(), signature))
+    }
+
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
+        match self {
+            Self::TxEip4844(inner) => inner.tx_hash_with_type(signature, ty),
+            Self::TxEip4844WithSidecar(inner) => inner.tx_hash_with_type(signature, ty),
+        }
     }
 }
 
 impl SignableTransaction<Signature> for TxEip4844Variant {
     fn set_chain_id(&mut self, chain_id: ChainId) {
         match self {
-            Self::TxEip4844(ref mut inner) => {
-                inner.chain_id = chain_id;
+            Self::TxEip4844(inner) => {
+                inner.set_chain_id(chain_id);
             }
-            Self::TxEip4844WithSidecar(ref mut inner) => {
-                inner.tx.chain_id = chain_id;
+            Self::TxEip4844WithSidecar(inner) => {
+                inner.set_chain_id(chain_id);
             }
         }
     }
@@ -318,22 +373,11 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
     }
 
     fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
+        self.tx().payload_len_for_signature()
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        let signature = signature.with_parity_bool();
-
-        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        // we use the inner tx to encode the fields
-        self.tx().encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
+        let hash = self.tx_hash(&signature);
 
         Signed::new_unchecked(self, signature, hash)
     }
@@ -359,7 +403,10 @@ pub struct TxEip4844 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
+    )]
     pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -415,24 +462,6 @@ pub struct TxEip4844 {
 }
 
 impl TxEip4844 {
-    /// Returns the effective gas price for the given `base_fee`.
-    pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        match base_fee {
-            None => self.max_fee_per_gas,
-            Some(base_fee) => {
-                // if the tip is greater than the max priority fee per gas, set it to the max
-                // priority fee per gas + base fee
-                let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-                if tip > self.max_priority_fee_per_gas {
-                    self.max_priority_fee_per_gas + base_fee as u128
-                } else {
-                    // otherwise return the max fee per gas
-                    self.max_fee_per_gas
-                }
-            }
-        }
-    }
-
     /// Returns the total gas for all blobs in this transaction.
     #[inline]
     pub fn blob_gas(&self) -> u64 {
@@ -462,69 +491,10 @@ impl TxEip4844 {
         sidecar.validate(&self.blob_versioned_hashes, proof_settings)
     }
 
-    /// Decodes the inner [TxEip4844Variant] fields from RLP bytes.
-    ///
-    /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
-    /// RLP fields in the following order:
-    ///
-    /// - `chain_id`
-    /// - `nonce`
-    /// - `max_priority_fee_per_gas`
-    /// - `max_fee_per_gas`
-    /// - `gas_limit`
-    /// - `to`
-    /// - `value`
-    /// - `data` (`input`)
-    /// - `access_list`
-    /// - `max_fee_per_blob_gas`
-    /// - `blob_versioned_hashes`
-    pub fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self {
-            chain_id: Decodable::decode(buf)?,
-            nonce: Decodable::decode(buf)?,
-            max_priority_fee_per_gas: Decodable::decode(buf)?,
-            max_fee_per_gas: Decodable::decode(buf)?,
-            gas_limit: Decodable::decode(buf)?,
-            to: Decodable::decode(buf)?,
-            value: Decodable::decode(buf)?,
-            input: Decodable::decode(buf)?,
-            access_list: Decodable::decode(buf)?,
-            max_fee_per_blob_gas: Decodable::decode(buf)?,
-            blob_versioned_hashes: Decodable::decode(buf)?,
-        })
-    }
-
-    /// Outputs the length of the transaction's fields, without a RLP header.
-    #[doc(hidden)]
-    pub fn fields_len(&self) -> usize {
-        let mut len = 0;
-        len += self.chain_id.length();
-        len += self.nonce.length();
-        len += self.gas_limit.length();
-        len += self.max_fee_per_gas.length();
-        len += self.max_priority_fee_per_gas.length();
-        len += self.to.length();
-        len += self.value.length();
-        len += self.access_list.length();
-        len += self.blob_versioned_hashes.length();
-        len += self.max_fee_per_blob_gas.length();
-        len += self.input.0.length();
-        len
-    }
-
-    /// Encodes only the transaction's fields into the desired buffer, without a RLP header.
-    pub(crate) fn encode_fields(&self, out: &mut dyn BufMut) {
-        self.chain_id.encode(out);
-        self.nonce.encode(out);
-        self.max_priority_fee_per_gas.encode(out);
-        self.max_fee_per_gas.encode(out);
-        self.gas_limit.encode(out);
-        self.to.encode(out);
-        self.value.encode(out);
-        self.input.0.encode(out);
-        self.access_list.encode(out);
-        self.max_fee_per_blob_gas.encode(out);
-        self.blob_versioned_hashes.encode(out);
+    /// Get transaction type.
+    #[doc(alias = "transaction_type")]
+    pub const fn tx_type() -> TxType {
+        TxType::Eip4844
     }
 
     /// Calculates a heuristic for the in-memory size of the [TxEip4844Variant] transaction.
@@ -542,127 +512,53 @@ impl TxEip4844 {
         self.blob_versioned_hashes.capacity() * mem::size_of::<B256>() + // blob hashes size
         mem::size_of::<u128>() // max_fee_per_data_gas
     }
+}
 
-    /// Returns what the encoded length should be, if the transaction were RLP encoded with the
-    /// given signature, depending on the value of `with_header`.
-    ///
-    /// If `with_header` is `true`, the payload length will include the RLP header length.
-    /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub fn encoded_len_with_signature<S>(&self, signature: &S, with_header: bool) -> usize
-    where
-        S: EncodableSignature,
-    {
-        // this counts the tx fields and signature fields
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+impl RlpEcdsaTx for TxEip4844 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
-        // this counts:
-        // * tx type byte
-        // * inner header length
-        // * inner payload length
-        let inner_payload_length =
-            1 + Header { list: true, payload_length }.length() + payload_length;
-
-        if with_header {
-            // header length plus length of the above, wrapped with a string header
-            Header { list: false, payload_length: inner_payload_length }.length()
-                + inner_payload_length
-        } else {
-            inner_payload_length
-        }
+    fn rlp_encoded_fields_length(&self) -> usize {
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.gas_limit.length()
+            + self.max_fee_per_gas.length()
+            + self.max_priority_fee_per_gas.length()
+            + self.to.length()
+            + self.value.length()
+            + self.access_list.length()
+            + self.blob_versioned_hashes.length()
+            + self.max_fee_per_blob_gas.length()
+            + self.input.0.length()
     }
 
-    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
-    /// hash that for eip2718 does not require a rlp header
-    #[doc(hidden)]
-    pub fn encode_with_signature<S>(&self, signature: &S, out: &mut dyn BufMut, with_header: bool)
-    where
-        S: EncodableSignature,
-    {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        if with_header {
-            Header {
-                list: false,
-                payload_length: 1 + Header { list: true, payload_length }.length() + payload_length,
-            }
-            .encode(out);
-        }
-        out.put_u8(self.tx_type() as u8);
-        self.encode_with_signature_fields(signature, out);
+    fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.chain_id.encode(out);
+        self.nonce.encode(out);
+        self.max_priority_fee_per_gas.encode(out);
+        self.max_fee_per_gas.encode(out);
+        self.gas_limit.encode(out);
+        self.to.encode(out);
+        self.value.encode(out);
+        self.input.0.encode(out);
+        self.access_list.encode(out);
+        self.max_fee_per_blob_gas.encode(out);
+        self.blob_versioned_hashes.encode(out);
     }
 
-    /// Encodes the transaction from RLP bytes, including the signature. This __does not__ encode a
-    /// tx type byte or string header.
-    ///
-    /// This __does__ encode a list header and include a signature.
-    pub fn encode_with_signature_fields<S>(&self, signature: &S, out: &mut dyn BufMut)
-    where
-        S: EncodableSignature,
-    {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        let header = Header { list: true, payload_length };
-        header.encode(out);
-        self.encode_fields(out);
-        signature.write_rlp_vrs(out);
-    }
-
-    /// Decodes the transaction from RLP bytes, including the signature.
-    ///
-    /// This __does not__ expect the bytes to start with a transaction type byte or string
-    /// header.
-    ///
-    /// This __does__ expect the bytes to start with a list header and include a signature.
-    #[doc(hidden)]
-    pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        // record original length so we can check encoding
-        let original_len = buf.len();
-
-        let tx = Self::decode_fields(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        if !matches!(signature.v(), Parity::Parity(_)) {
-            return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
-        }
-
-        let signed = tx.into_signed(signature);
-        if buf.len() + header.payload_length != original_len {
-            return Err(alloy_rlp::Error::ListLengthMismatch {
-                expected: header.payload_length,
-                got: original_len - buf.len(),
-            });
-        }
-
-        Ok(signed)
-    }
-
-    /// Get transaction type.
-    #[doc(alias = "transaction_type")]
-    pub const fn tx_type(&self) -> TxType {
-        TxType::Eip4844
-    }
-
-    /// Encodes the EIP-4844 transaction in RLP for signing.
-    ///
-    /// This encodes the transaction as:
-    /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
-    /// value, input, access_list, max_fee_per_blob_gas, blob_versioned_hashes)`
-    ///
-    /// Note that there is no rlp header before the transaction type byte.
-    pub fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        out.put_u8(self.tx_type() as u8);
-        Header { list: true, payload_length: self.fields_len() }.encode(out);
-        self.encode_fields(out);
-    }
-
-    /// Outputs the length of the signature RLP encoding for the transaction.
-    pub fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + Header { list: true, payload_length }.length() + payload_length
+    fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            chain_id: Decodable::decode(buf)?,
+            nonce: Decodable::decode(buf)?,
+            max_priority_fee_per_gas: Decodable::decode(buf)?,
+            max_fee_per_gas: Decodable::decode(buf)?,
+            gas_limit: Decodable::decode(buf)?,
+            to: Decodable::decode(buf)?,
+            value: Decodable::decode(buf)?,
+            input: Decodable::decode(buf)?,
+            access_list: Decodable::decode(buf)?,
+            max_fee_per_blob_gas: Decodable::decode(buf)?,
+            blob_versioned_hashes: Decodable::decode(buf)?,
+        })
     }
 }
 
@@ -672,84 +568,111 @@ impl SignableTransaction<Signature> for TxEip4844 {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.encode_for_signing(out);
+        out.put_u8(Self::tx_type() as u8);
+        self.encode(out);
     }
 
     fn payload_len_for_signature(&self) -> usize {
-        self.payload_len_for_signature()
+        self.length() + 1
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        let signature = signature.with_parity_bool();
-
-        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
-        self.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
+        let hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, hash)
     }
 }
 
 impl Transaction for TxEip4844 {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.max_fee_per_gas
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.max_priority_fee_per_gas)
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         Some(self.max_fee_per_blob_gas)
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
+            // if the tip is greater than the max priority fee per gas, set it to the max
+            // priority fee per gas + base fee
+            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
+            if tip > self.max_priority_fee_per_gas {
+                self.max_priority_fee_per_gas + base_fee as u128
+            } else {
+                // otherwise return the max fee per gas
+                self.max_fee_per_gas
+            }
+        })
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.to.into()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         &self.input
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         Some(&self.blob_versioned_hashes)
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
@@ -757,26 +680,17 @@ impl Transaction for TxEip4844 {
 
 impl Encodable for TxEip4844 {
     fn encode(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_len() }.encode(out);
-        self.encode_fields(out);
+        self.rlp_encode(out);
     }
 
     fn length(&self) -> usize {
-        let payload_length = self.fields_len();
-        length_of_length(payload_length) + payload_length
+        self.rlp_encoded_length()
     }
 }
 
 impl Decodable for TxEip4844 {
-    fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(data)?;
-        let remaining_len = data.len();
-
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-
-        Self::decode_fields(data)
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode(buf)
     }
 }
 
@@ -831,8 +745,8 @@ impl TxEip4844WithSidecar {
 
     /// Get the transaction type.
     #[doc(alias = "transaction_type")]
-    pub const fn tx_type(&self) -> TxType {
-        self.tx.tx_type()
+    pub const fn tx_type() -> TxType {
+        TxEip4844::tx_type()
     }
 
     /// Get access to the inner tx [TxEip4844].
@@ -855,75 +769,6 @@ impl TxEip4844WithSidecar {
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
-    }
-
-    /// Encodes the transaction from RLP bytes, including the signature. This __does not__ encode a
-    /// tx type byte or string header.
-    ///
-    /// This __does__ encode a list header and include a signature.
-    ///
-    /// This encodes the following:
-    /// `rlp([tx_payload, blobs, commitments, proofs])`
-    ///
-    /// where `tx_payload` is the RLP encoding of the [TxEip4844] transaction fields:
-    /// `rlp([chain_id, nonce, max_priority_fee_per_gas, ..., v, r, s])`
-    pub fn encode_with_signature_fields<S>(&self, signature: &S, out: &mut dyn BufMut)
-    where
-        S: EncodableSignature,
-    {
-        let inner_payload_length = self.tx.fields_len() + signature.rlp_vrs_len();
-        let inner_header = Header { list: true, payload_length: inner_payload_length };
-
-        let outer_payload_length =
-            inner_header.length() + inner_payload_length + self.sidecar.rlp_encoded_fields_length();
-        let outer_header = Header { list: true, payload_length: outer_payload_length };
-
-        // write the two headers
-        outer_header.encode(out);
-        inner_header.encode(out);
-
-        // now write the fields
-        self.tx.encode_fields(out);
-        signature.write_rlp_vrs(out);
-        self.sidecar.rlp_encode_fields(out);
-    }
-
-    /// Decodes the transaction from RLP bytes, including the signature.
-    ///
-    /// This __does not__ expect the bytes to start with a transaction type byte or string
-    /// header.
-    ///
-    /// This __does__ expect the bytes to start with a list header and include a signature.
-    ///
-    /// This is the inverse of [TxEip4844WithSidecar::encode_with_signature_fields].
-    #[doc(hidden)]
-    pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        // record original length so we can check encoding
-        let original_len = buf.len();
-
-        // decode the inner tx
-        let inner_tx = TxEip4844::decode_signed_fields(buf)?;
-
-        // decode the sidecar
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
-
-        if buf.len() + header.payload_length != original_len {
-            return Err(alloy_rlp::Error::ListLengthMismatch {
-                expected: header.payload_length,
-                got: original_len - buf.len(),
-            });
-        }
-
-        let (tx, signature, hash) = inner_tx.into_parts();
-
-        // create unchecked signed tx because these checks should have happened during construction
-        // of `Signed<TxEip4844>` in `TxEip4844::decode_signed_fields`
-        Ok(Signed::new_unchecked(Self::from_tx_and_sidecar(tx, sidecar), signature, hash))
     }
 }
 
@@ -948,83 +793,149 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        let signature = signature.with_parity_bool();
-
-        let mut buf = Vec::with_capacity(self.tx.encoded_len_with_signature(&signature, false));
-        // The sidecar is NOT included in the signed payload, only the transaction fields and the
-        // type byte. Include the type byte.
-        //
-        // Include the transaction fields, making sure to __not__ use the sidecar, and __not__
-        // encode a header.
-        self.tx.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
+        // important: must hash the tx WITHOUT the sidecar
+        let hash = self.tx_hash(&signature);
 
         Signed::new_unchecked(self, signature, hash)
     }
 }
 
 impl Transaction for TxEip4844WithSidecar {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.tx.chain_id()
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.tx.nonce()
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.tx.gas_limit()
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.tx.gas_price()
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.tx.max_fee_per_gas()
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.tx.max_priority_fee_per_gas()
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.tx.max_fee_per_blob_gas()
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.tx.priority_fee_or_price()
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.tx.effective_gas_price(base_fee)
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        self.tx.is_dynamic_fee()
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.tx.kind()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.tx.value()
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         self.tx.input()
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.tx.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.tx.blob_versioned_hashes()
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
+    }
+}
+
+impl RlpEcdsaTx for TxEip4844WithSidecar {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
+    fn rlp_encoded_fields_length(&self) -> usize {
+        self.sidecar.rlp_encoded_fields_length() + self.tx.rlp_encoded_length()
+    }
+
+    fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.tx.rlp_encode(out);
+        self.sidecar.rlp_encode_fields(out);
+    }
+
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        let payload_length = self.tx.rlp_encoded_length_with_signature(signature)
+            + self.sidecar.rlp_encoded_fields_length();
+        Header { list: true, payload_length }
+    }
+
+    fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        self.rlp_header_signed(signature).encode(out);
+        self.tx.rlp_encode_signed(signature, out);
+        self.sidecar.rlp_encode_fields(out);
+    }
+
+    fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let tx = TxEip4844::rlp_decode(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        Ok(Self { tx, sidecar })
+    }
+
+    fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        let remaining = buf.len();
+
+        let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
+        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok((Self { tx, sidecar }, signature))
+    }
+
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
+        // eip4844 tx_hash is always based on the non-sidecar encoding
+        self.tx.tx_hash_with_type(signature, ty)
     }
 }
 
@@ -1033,7 +944,7 @@ mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, bytes, Signature, U256};
+    use alloy_primitives::{address, b256, bytes, PrimitiveSignature as Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
@@ -1117,12 +1028,11 @@ mod tests {
                 input: bytes!("701f58c50000000000000000000000000000000000000000000000000000000000073fb1ed12e288def5b439ea074b398dbb4c967f2852baac3238c5fe4b62b871a59a6d00000000000000000000000000000000000000000000000000000000123971da000000000000000000000000000000000000000000000000000000000000000ac39b2a24e1dbdd11a1e7bd7c0f4dfd7d9b9cfa0997d033ad05f961ba3b82c6c83312c967f10daf5ed2bffe309249416e03ee0b101f2b84d2102b9e38b0e4dfdf0000000000000000000000000000000000000000000000000000000066254c8b538dcc33ecf5334bbd294469f9d4fd084a3090693599a46d6c62567747cbc8660000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000073fb20000000000000000000000000000000000000000000000000000000066254da10000000000000000000000000000000000000000000000000000000012397d5e20b09b263779fda4171c341e720af8fa469621ff548651f8dbbc06c2d320400c000000000000000000000000000000000000000000000000000000000000000b50a833bb11af92814e99c6ff7cf7ba7042827549d6f306a04270753702d897d8fc3c411b99159939ac1c16d21d3057ddc8b2333d1331ab34c938cff0eb29ce2e43241c170344db6819f76b1f1e0ab8206f3ec34120312d275c4f5bbea7f5c55700000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000480000000000000000000000000000000000000000000000000000000000000031800000000000000000000000000000000000000000000800b0000000000000000000000000000000000000000000000000000000000000004ed12e288def5b439ea074b398dbb4c967f2852baac3238c5fe4b62b871a59a6d00000ca8000000000000000000000000000000000000800b000000000000000000000000000000000000000000000000000000000000000300000000000000000000000066254da100000000000000000000000066254e9d00010ca80000000000000000000000000000000000008001000000000000000000000000000000000000000000000000000000000000000550a833bb11af92814e99c6ff7cf7ba7042827549d6f306a04270753702d897d800010ca800000000000000000000000000000000000080010000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000b00010ca8000000000000000000000000000000000000801100000000000000000000000000000000000000000000000000000000000000075c1cd5bd0fd333ce9d7c8edfc79f43b8f345b4a394f6aba12a2cc78ce4012ed700010ca80000000000000000000000000000000000008011000000000000000000000000000000000000000000000000000000000000000845392775318aa47beaafbdc827da38c9f1e88c3bdcabba2cb493062e17cbf21e00010ca800000000000000000000000000000000000080080000000000000000000000000000000000000000000000000000000000000000c094e20e7ac9b433f44a5885e3bdc07e51b309aeb993caa24ba84a661ac010c100010ca800000000000000000000000000000000000080080000000000000000000000000000000000000000000000000000000000000001ab42db8f4ed810bdb143368a2b641edf242af6e3d0de8b1486e2b0e7880d431100010ca8000000000000000000000000000000000000800800000000000000000000000000000000000000000000000000000000000000022d94e4cc4525e4e2d81e8227b6172e97076431a2cf98792d978035edd6e6f3100000000000000000000000000000000000000000000000000000000000000000000000000000012101c74dfb80a80fccb9a4022b2406f79f56305e6a7c931d30140f5d372fe793837e93f9ec6b8d89a9d0ab222eeb27547f66b90ec40fbbdd2a4936b0b0c19ca684ff78888fbf5840d7c8dc3c493b139471750938d7d2c443e2d283e6c5ee9fde3765a756542c42f002af45c362b4b5b1687a8fc24cbf16532b903f7bb289728170dcf597f5255508c623ba247735538376f494cdcdd5bd0c4cb067526eeda0f4745a28d8baf8893ecc1b8cee80690538d66455294a028da03ff2add9d8a88e6ee03ba9ffe3ad7d91d6ac9c69a1f28c468f00fe55eba5651a2b32dc2458e0d14b4dd6d0173df255cd56aa01e8e38edec17ea8933f68543cbdc713279d195551d4211bed5c91f77259a695e6768f6c4b110b2158fcc42423a96dcc4e7f6fddb3e2369d00000000000000000000000000000000000000000000000000000000000000") };
         let variant = TxEip4844Variant::TxEip4844(tx);
 
-        let signature = Signature::from_rs_and_parity(
+        let signature = Signature::new(
             b256!("6c173c3c8db3e3299f2f728d293b912c12e75243e3aa66911c2329b58434e2a4").into(),
             b256!("7dd4d1c228cedc5a414a668ab165d9e888e61e4c3b44cd7daf9cdcc4cec5d6b2").into(),
             false,
-        )
-        .unwrap();
+        );
 
         let signed = variant.into_signed(signature);
         assert_eq!(

@@ -13,22 +13,18 @@ mod account;
 pub use account::Account;
 
 mod block;
-pub use block::{Block, BlockBody};
+pub use block::{AnyHeader, Block, BlockBody, BlockHeader, Header};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
-
-mod encodable_signature;
-pub use encodable_signature::EncodableSignature;
-
-mod header;
-pub use header::{BlockHeader, Header};
 
 mod receipt;
 pub use receipt::{
     AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
     TxReceipt,
 };
+
+pub mod proofs;
 
 pub mod transaction;
 #[cfg(feature = "kzg")]
@@ -61,7 +57,7 @@ pub use signed::Signed;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub mod serde_bincode_compat {
     pub use super::{
-        header::serde_bincode_compat::*,
+        block::serde_bincode_compat::*,
         transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
 }

@@ -12,7 +12,11 @@ use derive_more::{Deref, DerefMut, From, IntoIterator};
 pub const EMPTY_REQUESTS_HASH: B256 =
     b256!("6036c41849da9c076ed79654d434017387a88fb833c2856b32e18218b3341c5f");
 
-/// A list of opaque EIP-7685 requests.
+/// A container of EIP-7685 requests.
+///
+/// The container only holds the `requests_data` as defined by their respective EIPs. The request
+/// type is prepended to `requests_data` in [`Requests::requests_hash`] to calculate the requests
+/// hash as definned in EIP-7685.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Deref, DerefMut, From, IntoIterator)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -30,11 +34,15 @@ impl Requests {
     }
 
     /// Consumes [`Requests`] and returns the inner raw opaque requests.
+    ///
+    /// # Note
+    ///
+    /// These requests are only the `requests_data` without the `request_type`.
     pub fn take(self) -> Vec<Bytes> {
         self.0
     }
 
-    /// Get an iterator over the Requests.
+    /// Get an iterator over the requests.
     pub fn iter(&self) -> core::slice::Iter<'_, Bytes> {
         self.0.iter()
     }
@@ -46,6 +54,10 @@ impl Requests {
     /// ```text
     /// sha256(sha256(requests_0) ++ sha256(requests_1) ++ ...)
     /// ```
+    ///
+    /// The request type for each requests is prepended to the `requests_data` inside of this
+    /// container. The request type for the first request in the container will be `0x00`, the
+    /// second request will have type `0x01`, and so on.
     #[cfg(feature = "sha2")]
     pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
@@ -92,6 +104,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "sha2")]
     fn test_consistent_requests_hash() {
         // We test that the empty requests hash is consistent with the EIP-7685 definition.
         assert_eq!(

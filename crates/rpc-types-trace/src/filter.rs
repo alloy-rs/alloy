@@ -334,6 +334,7 @@ mod tests {
                 gas: 10240,
                 init: Bytes::new(),
                 value: U256::from(0),
+                ..Default::default()
             }),
             result: Some(TraceOutput::Create(CreateOutput {
                 address: addr1,
@@ -358,6 +359,7 @@ mod tests {
                 gas: 100,
                 init: Bytes::new(),
                 value: U256::from(0),
+                ..Default::default()
             }),
             error: Some("out of gas".into()),
             ..Default::default()

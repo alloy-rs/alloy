@@ -3,18 +3,26 @@
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
-use alloc::vec::Vec;
-
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
 pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
+
+/// A Blob hash
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct IndexedBlobHash {
+    /// The index of the blob
+    pub index: u64,
+    /// The hash of the blob
+    pub hash: B256,
+}
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
@@ -115,9 +123,12 @@ impl BlobTransactionSidecarItem {
         result.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
 
-    /// Verify the blob sidecar against its [crate::NumHash].
-    pub fn verify_blob(&self, hash: &crate::NumHash) -> Result<(), BlobTransactionValidationError> {
-        if self.index != hash.number {
+    /// Verify the blob sidecar against its [IndexedBlobHash].
+    pub fn verify_blob(
+        &self,
+        hash: &IndexedBlobHash,
+    ) -> Result<(), BlobTransactionValidationError> {
+        if self.index != hash.index {
             let blob_hash_part = B256::from_slice(&self.blob[0..32]);
             return Err(BlobTransactionValidationError::WrongVersionedHash {
                 have: blob_hash_part,
@@ -352,7 +363,14 @@ impl BlobTransactionSidecar {
         if buf.len() < header.payload_length {
             return Err(alloy_rlp::Error::InputTooShort);
         }
-        Self::rlp_decode_fields(buf)
+        let remaining = buf.len();
+        let this = Self::rlp_decode_fields(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
     }
 }
 
@@ -488,6 +506,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_blob_item_serde_roundtrip() {
         let blob_item = BlobTransactionSidecarItem {
             index: 0,

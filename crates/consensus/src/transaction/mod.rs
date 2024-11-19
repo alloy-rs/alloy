@@ -30,10 +30,17 @@ mod envelope;
 pub use envelope::{TxEnvelope, TxType};
 
 mod legacy;
-pub use legacy::TxLegacy;
+pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
+
+mod rlp;
+#[doc(hidden)]
+pub use rlp::RlpEcdsaTx;
 
 mod typed;
 pub use typed::TypedTransaction;
+
+#[cfg(feature = "serde")]
+pub use legacy::signed_legacy_serde;
 
 /// Bincode-compatible serde implementations for transaction types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -46,6 +53,7 @@ pub mod serde_bincode_compat {
 
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
+#[auto_impl::auto_impl(&, Arc)]
 pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
@@ -87,6 +95,11 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// non-EIP-1559 transactions.
     fn priority_fee_or_price(&self) -> u128;
 
+    /// Returns the effective gas price for the given base fee.
+    ///
+    /// If the transaction is a legacy or EIP2930 transaction, the gas price is returned.
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128;
+
     /// Returns the effective tip for this transaction.
     ///
     /// For EIP-1559 transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
@@ -108,6 +121,9 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
         self.max_priority_fee_per_gas()
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }
+
+    /// Returns `true` if the transaction supports dynamic fees.
+    fn is_dynamic_fee(&self) -> bool;
 
     /// Returns the transaction kind.
     fn kind(&self) -> TxKind;
@@ -151,11 +167,6 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
 /// unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]
 pub trait SignableTransaction<Signature>: Transaction {
-    /// True if the transaction uses EIP-155 signatures.
-    fn use_eip155(&self) -> bool {
-        false
-    }
-
     /// Sets `chain_id`.
     ///
     /// Prefer [`set_chain_id_checked`](Self::set_chain_id_checked).
@@ -219,63 +230,87 @@ impl<S: 'static> dyn SignableTransaction<S> {
 
 #[cfg(feature = "serde")]
 impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.inner.nonce()
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         self.inner.gas_price()
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.inner.max_fee_per_gas()
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.inner.max_priority_fee_per_gas()
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.inner.max_fee_per_blob_gas()
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.inner.priority_fee_or_price()
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.inner.effective_gas_price(base_fee)
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.inner.kind()
     }
 
+    #[inline]
     fn value(&self) -> U256 {
         self.inner.value()
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         self.inner.input()
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         self.inner.ty()
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         self.inner.access_list()
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.inner.blob_versioned_hashes()
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner.is_dynamic_fee()
     }
 }

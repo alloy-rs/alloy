@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3](https://github.com/alloy-rs/alloy/releases/tag/v0.6.3) - 2024-11-12
+
+### Miscellaneous Tasks
+
+- Release 0.6.3
+- Release 0.6.2 ([#1632](https://github.com/alloy-rs/alloy/issues/1632))
+
+## [0.6.1](https://github.com/alloy-rs/alloy/releases/tag/v0.6.1) - 2024-11-06
+
+### Miscellaneous Tasks
+
+- Release 0.6.1
+
+## [0.6.0](https://github.com/alloy-rs/alloy/releases/tag/v0.6.0) - 2024-11-06
+
+### Bug Fixes
+
+- Relay types ([#1577](https://github.com/alloy-rs/alloy/issues/1577))
+
+### Miscellaneous Tasks
+
+- Release 0.6.0
+
+## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
+
+### Miscellaneous Tasks
+
+- Release 0.5.4
+
 ## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
 
 ### Miscellaneous Tasks

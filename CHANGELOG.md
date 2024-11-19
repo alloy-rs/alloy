@@ -5,6 +5,139 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4](https://github.com/alloy-rs/alloy/releases/tag/v0.6.4) - 2024-11-12
+
+### Bug Fixes
+
+- Make EIP-155 signatures logic safer ([#1641](https://github.com/alloy-rs/alloy/issues/1641))
+
+### Other
+
+- Add trait method `Transaction::effective_gas_price` ([#1640](https://github.com/alloy-rs/alloy/issues/1640))
+
+## [0.6.3](https://github.com/alloy-rs/alloy/releases/tag/v0.6.3) - 2024-11-12
+
+### Bug Fixes
+
+- Serde for transactions ([#1630](https://github.com/alloy-rs/alloy/issues/1630))
+- [`rpc-types`] `FeeHistory` deser ([#1629](https://github.com/alloy-rs/alloy/issues/1629))
+
+### Features
+
+- [consensus] `TxEnvelope::signature` ([#1634](https://github.com/alloy-rs/alloy/issues/1634))
+- [`network`] `AnyNetworkWallet` ([#1631](https://github.com/alloy-rs/alloy/issues/1631))
+
+### Miscellaneous Tasks
+
+- Release 0.6.3
+- Ignore derivative ([#1639](https://github.com/alloy-rs/alloy/issues/1639))
+- Release 0.6.2 ([#1632](https://github.com/alloy-rs/alloy/issues/1632))
+
+### Other
+
+- Add trait method `Transaction::is_dynamic_fee` ([#1638](https://github.com/alloy-rs/alloy/issues/1638))
+
+## [0.6.1](https://github.com/alloy-rs/alloy/releases/tag/v0.6.1) - 2024-11-06
+
+### Bug Fixes
+
+- Re-introduce HeaderResponse trait ([#1627](https://github.com/alloy-rs/alloy/issues/1627))
+
+### Miscellaneous Tasks
+
+- Release 0.6.1
+
+## [0.6.0](https://github.com/alloy-rs/alloy/releases/tag/v0.6.0) - 2024-11-06
+
+### Bug Fixes
+
+- Wrap dashmap in Arc ([#1624](https://github.com/alloy-rs/alloy/issues/1624))
+- [`provider`] Make `Caller` `EthCall` specific ([#1620](https://github.com/alloy-rs/alloy/issues/1620))
+- Serde for `AnyTxEnvelope` ([#1613](https://github.com/alloy-rs/alloy/issues/1613))
+- Receipt status serde ([#1608](https://github.com/alloy-rs/alloy/issues/1608))
+- [signer-ledger] Use `SIGN_ETH_EIP_712` instruction ([#1479](https://github.com/alloy-rs/alloy/issues/1479))
+- Hash handling ([#1604](https://github.com/alloy-rs/alloy/issues/1604))
+- Fix typo in RecommendedFillers associated type ([#1536](https://github.com/alloy-rs/alloy/issues/1536))
+- RLP for `TxEip4844` ([#1596](https://github.com/alloy-rs/alloy/issues/1596))
+- Add more rlp correctness checks ([#1595](https://github.com/alloy-rs/alloy/issues/1595))
+- Update AnyNetwork type aliases ([#1591](https://github.com/alloy-rs/alloy/issues/1591))
+- Clearer replay protection checks ([#1581](https://github.com/alloy-rs/alloy/issues/1581))
+- [`provider`] Return `Subscription<N::HeaderResponse>` ([#1586](https://github.com/alloy-rs/alloy/issues/1586))
+- [alloy-provider] `get_block_by_number` arg ([#1582](https://github.com/alloy-rs/alloy/issues/1582))
+- Relay types ([#1577](https://github.com/alloy-rs/alloy/issues/1577))
+- Make a sensible encoding api ([#1496](https://github.com/alloy-rs/alloy/issues/1496))
+- Enable std with jwt ([#1569](https://github.com/alloy-rs/alloy/issues/1569))
+
+### Dependencies
+
+- [deps] Bump wasmtimer ([#1588](https://github.com/alloy-rs/alloy/issues/1588))
+- [deps] Bump alloy-rlp requirement ([#1587](https://github.com/alloy-rs/alloy/issues/1587))
+
+### Documentation
+
+- Expand on what `Requests` contains ([#1564](https://github.com/alloy-rs/alloy/issues/1564))
+
+### Features
+
+- [`serde`] StorageKeyKind ([#1597](https://github.com/alloy-rs/alloy/issues/1597))
+- [rpc-types-trace/parity] Add creationMethod for create action ([#1621](https://github.com/alloy-rs/alloy/issues/1621))
+- Integrate signature with boolean parity ([#1540](https://github.com/alloy-rs/alloy/issues/1540))
+- Serde helpers for hashmaps and btreemaps with quantity key types ([#1579](https://github.com/alloy-rs/alloy/issues/1579))
+- Use `OtherFields` on `UnknownTypedTransaction` ([#1605](https://github.com/alloy-rs/alloy/issues/1605))
+- Implement Arbitrary for transaction types ([#1603](https://github.com/alloy-rs/alloy/issues/1603))
+- Make more Otterscan types generic over header ([#1594](https://github.com/alloy-rs/alloy/issues/1594))
+- Make Otterscan types generic over header ([#1593](https://github.com/alloy-rs/alloy/issues/1593))
+- Add impl From<Header> for AnyHeader ([#1592](https://github.com/alloy-rs/alloy/issues/1592))
+- [consensus] Protected Legacy Signature ([#1578](https://github.com/alloy-rs/alloy/issues/1578))
+- Embed consensus header into RPC ([#1573](https://github.com/alloy-rs/alloy/issues/1573))
+- Introduce `anvil_reorg` and related types. ([#1576](https://github.com/alloy-rs/alloy/issues/1576))
+- Make eth_call and eth_estimateGas default to using Pending block ([#1568](https://github.com/alloy-rs/alloy/issues/1568))
+- [eips] Indexed Blob Hash ([#1526](https://github.com/alloy-rs/alloy/issues/1526))
+
+### Miscellaneous Tasks
+
+- Release 0.6.0
+- Add default to payloadattributes ([#1625](https://github.com/alloy-rs/alloy/issues/1625))
+- Make withdrawals pub ([#1623](https://github.com/alloy-rs/alloy/issues/1623))
+- Misc clippy ([#1607](https://github.com/alloy-rs/alloy/issues/1607))
+- Fix some compile issues for no-std test ([#1606](https://github.com/alloy-rs/alloy/issues/1606))
+- [meta] Update SECURITY.md ([#1584](https://github.com/alloy-rs/alloy/issues/1584))
+- Add blockbody default ([#1559](https://github.com/alloy-rs/alloy/issues/1559))
+
+### Other
+
+- Use `ChainId` in `WalletCapabilities` ([#1622](https://github.com/alloy-rs/alloy/issues/1622))
+- Rm useless `len` var in `rlp_encoded_fields_length` ([#1612](https://github.com/alloy-rs/alloy/issues/1612))
+- Add unit tests for `OtherFields` ([#1614](https://github.com/alloy-rs/alloy/issues/1614))
+- Small refactor for `JwtSecret` ([#1611](https://github.com/alloy-rs/alloy/issues/1611))
+- Rm `Receipts` `root_slow` unused method ([#1567](https://github.com/alloy-rs/alloy/issues/1567))
+- Embed TxEnvelope into `rpc-types-eth::Transaction` ([#1460](https://github.com/alloy-rs/alloy/issues/1460))
+- Add success job ([#1589](https://github.com/alloy-rs/alloy/issues/1589))
+- Add `BadBlock` type to `debug_getbadblocks` return type ([#1566](https://github.com/alloy-rs/alloy/issues/1566))
+- Implement `root_slow` for `Receipts` ([#1563](https://github.com/alloy-rs/alloy/issues/1563))
+- Add `uncle_block_from_header` impl and test ([#1554](https://github.com/alloy-rs/alloy/issues/1554))
+- Add missing unit test for `MIN_PROTOCOL_BASE_FEE` ([#1558](https://github.com/alloy-rs/alloy/issues/1558))
+- Rm `BEACON_CONSENSUS_REORG_UNWIND_DEPTH` ([#1556](https://github.com/alloy-rs/alloy/issues/1556))
+- Add unit tests to secure all conversions and impl ([#1544](https://github.com/alloy-rs/alloy/issues/1544))
+- Fix `HOLESKY_GENESIS_HASH` ([#1555](https://github.com/alloy-rs/alloy/issues/1555))
+- Impl `From<Sealed<alloy_consensus::Header>>` for `Header` ([#1532](https://github.com/alloy-rs/alloy/issues/1532))
+
+### Refactor
+
+- [signer] Small refactor in signer utils ([#1615](https://github.com/alloy-rs/alloy/issues/1615))
+- [genesis] Small refactor ([#1618](https://github.com/alloy-rs/alloy/issues/1618))
+
+### Styling
+
+- Move txtype-specific builders to network-primitives ([#1602](https://github.com/alloy-rs/alloy/issues/1602))
+
+### Testing
+
+- [network-primitives] Add unit tests for `BlockTransactions` ([#1619](https://github.com/alloy-rs/alloy/issues/1619))
+- [transport] Add unit tests for `Authorization` methods ([#1616](https://github.com/alloy-rs/alloy/issues/1616))
+- [json-rpc] Add unit tests for `Id` ([#1617](https://github.com/alloy-rs/alloy/issues/1617))
+- Fix tests ([#1583](https://github.com/alloy-rs/alloy/issues/1583))
+
 ## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
 
 ### Bug Fixes
@@ -18,6 +151,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Add osaka time to genesis ([#1548](https://github.com/alloy-rs/alloy/issues/1548))
+
+### Miscellaneous Tasks
+
+- Release 0.5.4
 
 ### Other
 

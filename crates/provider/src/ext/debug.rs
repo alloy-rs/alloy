@@ -2,8 +2,9 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
+use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{
-    Block, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
+    BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
 };
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
@@ -27,7 +28,7 @@ pub trait DebugApi<N, T>: Send + Sync {
     async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>>;
 
     /// Returns an array of recent bad blocks that the client has seen on the network.
-    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<BadBlock>>;
 
     /// Returns the structured logs created during the execution of EVM between two blocks
     /// (excluding start) as a JSON object.
@@ -128,6 +129,21 @@ pub trait DebugApi<N, T>: Send + Sync {
         state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
+
+    /// The `debug_executionWitness` method allows for re-execution of a block with the purpose of
+    /// generating an execution witness. The witness comprises of a map of all hashed trie nodes to
+    /// their preimages that were required during the execution of the block, including during
+    /// state root recomputation.
+    ///
+    /// The first argument is the block number or block hash.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_execution_witness(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> TransportResult<ExecutionWitness>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -154,7 +170,7 @@ where
         self.client().request("debug_getRawReceipts", (block,)).await
     }
 
-    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<BadBlock>> {
         self.client().request_noparams("debug_getBadBlocks").await
     }
 
@@ -215,6 +231,13 @@ where
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>> {
         self.client().request("debug_traceCallMany", (bundles, state_context, trace_options)).await
+    }
+
+    async fn debug_execution_witness(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> TransportResult<ExecutionWitness> {
+        self.client().request("debug_executionWitness", block).await
     }
 }
 

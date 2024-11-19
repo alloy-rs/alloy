@@ -1,9 +1,8 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilder4844,
-    TransactionBuilder7702, TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilder7702,
+    TransactionBuilderError,
 };
-use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
 
@@ -167,35 +166,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 }
 
-impl TransactionBuilder4844 for TransactionRequest {
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.max_fee_per_blob_gas
-    }
-
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
-        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
-    }
-
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.sidecar.as_ref()
-    }
-
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.sidecar = Some(sidecar);
-        self.populate_blob_hashes();
-    }
-}
-
-impl TransactionBuilder7702 for TransactionRequest {
-    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
-        self.authorization_list.as_ref()
-    }
-
-    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
-        self.authorization_list = Some(authorization_list);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -203,7 +173,7 @@ mod tests {
     };
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_eips::eip7702::Authorization;
-    use alloy_primitives::{Address, Signature};
+    use alloy_primitives::{Address, PrimitiveSignature as Signature};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
 

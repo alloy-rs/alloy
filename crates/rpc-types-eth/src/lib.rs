@@ -11,24 +11,17 @@
 #[allow(unused_imports)]
 extern crate alloc;
 
-pub use alloy_eips::eip4895::Withdrawal;
+pub use alloy_eips::eip4895::{Withdrawal, Withdrawals};
+
+pub use alloy_network_primitives::{
+    BlockTransactionHashes, BlockTransactions, BlockTransactionsKind,
+};
 
 mod account;
 pub use account::*;
 
 mod block;
 pub use block::*;
-
-#[cfg(feature = "serde")]
-use alloy_serde::WithOtherFields;
-
-/// A catch-all block type for handling blocks on multiple networks.
-#[cfg(feature = "serde")]
-pub type AnyNetworkBlock = WithOtherFields<Block<WithOtherFields<Transaction>>>;
-
-pub use alloy_network_primitives::{
-    BlockTransactionHashes, BlockTransactions, BlockTransactionsKind,
-};
 
 mod call;
 pub use call::{Bundle, EthCallResponse, StateContext, TransactionIndex};
