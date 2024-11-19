@@ -113,11 +113,10 @@ impl<S> RetryBackoffService<S> {
 
 impl<S> Service<RequestPacket> for RetryBackoffService<S>
 where
-    S: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>
+    S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + 'static
         + Clone,
-    S::Future: Send + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
