@@ -103,7 +103,7 @@ impl EthCallBundle {
     }
 
     /// Sets the coinbase for the bundle.
-    pub fn with_coinbase(mut self, coinbase: Address) -> Self {
+    pub const fn with_coinbase(mut self, coinbase: Address) -> Self {
         self.coinbase = Some(coinbase);
         self
     }
@@ -115,7 +115,7 @@ impl EthCallBundle {
     }
 
     /// Sets the timeout for the bundle.
-    pub fn with_timeout(mut self, timeout: u64) -> Self {
+    pub const fn with_timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
         self
     }
