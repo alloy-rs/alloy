@@ -53,7 +53,6 @@ pub mod serde_bincode_compat {
 
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
-#[auto_impl::auto_impl(&, Arc)]
 pub trait Transaction: fmt::Debug + any::Any + Send + Sync {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
