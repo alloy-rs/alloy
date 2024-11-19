@@ -1,6 +1,5 @@
+use alloy_consensus::{BlockHeader, Header};
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
-
-use super::{BlockHeader, Header};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differencies in network implementations.
@@ -184,8 +183,8 @@ impl BlockHeader for AnyHeader {
     }
 }
 
-impl From<super::Header> for AnyHeader {
-    fn from(value: super::Header) -> Self {
+impl From<Header> for AnyHeader {
+    fn from(value: Header) -> Self {
         let Header {
             parent_hash,
             ommers_hash,

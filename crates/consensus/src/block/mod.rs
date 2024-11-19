@@ -2,8 +2,6 @@
 
 mod header;
 pub use header::{BlockHeader, Header};
-mod any;
-pub use any::AnyHeader;
 
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;

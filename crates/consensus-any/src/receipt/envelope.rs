@@ -1,4 +1,4 @@
-use crate::{Eip658Value, ReceiptWithBloom, TxReceipt};
+use alloy_consensus::{Eip658Value, ReceiptWithBloom, TxReceipt};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};

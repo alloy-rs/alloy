@@ -22,15 +22,13 @@ pub use error::ConversionError;
 mod receipt;
 pub use receipt::TransactionReceipt;
 
-#[cfg(feature = "serde")]
-pub use receipt::AnyTransactionReceipt;
-
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
 pub use alloy_consensus::{
-    AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
+    Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
 };
+pub use alloy_consensus_any::AnyReceiptEnvelope;
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
