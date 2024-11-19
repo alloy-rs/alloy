@@ -130,6 +130,18 @@ impl Params {
     }
 }
 
+impl From<Filter> for Params {
+    fn from(filter: Filter) -> Self {
+        Self::Logs(Box::new(filter))
+    }
+}
+
+impl From<bool> for Params {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
 #[cfg(feature = "serde")]
 impl serde::Serialize for Params {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -159,11 +171,11 @@ impl<'a> serde::Deserialize<'a> for Params {
         }
 
         if let Some(val) = v.as_bool() {
-            return Ok(Self::Bool(val));
+            return Ok(val.into());
         }
 
-        serde_json::from_value(v)
-            .map(|f| Self::Logs(Box::new(f)))
+        serde_json::from_value::<Filter>(v)
+            .map(Into::into)
             .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
     }
 }
@@ -176,9 +188,89 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn params_serde() {
+        // Test deserialization of boolean parameter
         let s: Params = serde_json::from_str("true").unwrap();
         assert_eq!(s, Params::Bool(true));
+
+        // Test deserialization of null (None) parameter
         let s: Params = serde_json::from_str("null").unwrap();
         assert_eq!(s, Params::None);
+
+        // Test deserialization of log parameters
+        let filter = Filter::default();
+        let s: Params = serde_json::from_str(&serde_json::to_string(&filter).unwrap()).unwrap();
+        assert_eq!(s, Params::Logs(Box::new(filter)));
+    }
+
+    #[test]
+    fn params_is_bool() {
+        // Check if the `is_bool` method correctly identifies boolean parameters
+        let param = Params::Bool(true);
+        assert!(param.is_bool());
+
+        let param = Params::None;
+        assert!(!param.is_bool());
+
+        let param = Params::Logs(Box::default());
+        assert!(!param.is_bool());
+    }
+
+    #[test]
+    fn params_is_logs() {
+        // Check if the `is_logs` method correctly identifies log parameters
+        let param = Params::Logs(Box::default());
+        assert!(param.is_logs());
+
+        let param = Params::None;
+        assert!(!param.is_logs());
+
+        let param = Params::Bool(true);
+        assert!(!param.is_logs());
+    }
+
+    #[test]
+    fn params_from_filter() {
+        let filter = Filter::default();
+        let param: Params = filter.clone().into();
+        assert_eq!(param, Params::Logs(Box::new(filter)));
+    }
+
+    #[test]
+    fn params_from_bool() {
+        let param: Params = true.into();
+        assert_eq!(param, Params::Bool(true));
+
+        let param: Params = false.into();
+        assert_eq!(param, Params::Bool(false));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_none() {
+        let param = Params::None;
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, "[]");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_bool() {
+        let param = Params::Bool(true);
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, "true");
+
+        let param = Params::Bool(false);
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, "false");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_logs() {
+        let filter = Filter::default();
+        let param = Params::Logs(Box::new(filter.clone()));
+        let serialized = serde_json::to_string(&param).unwrap();
+        let expected = serde_json::to_string(&filter).unwrap();
+        assert_eq!(serialized, expected);
     }
 }
