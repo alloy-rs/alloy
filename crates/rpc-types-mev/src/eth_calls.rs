@@ -18,9 +18,15 @@ pub struct EthCallBundle {
     pub block_number: u64,
     /// Either a hex encoded number or a block tag for which state to base this simulation on
     pub state_block_number: BlockNumberOrTag,
+    /// the coinbase to use for this bundle simulation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coinbase: Option<Address>,
     /// the timestamp to use for this bundle simulation, in seconds since the unix epoch
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
+    /// the timeout to apply to execution of this bundle, in milliseconds
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u64>,
     /// gas limit of the block to use for this simulation
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<u64>,
@@ -96,9 +102,21 @@ impl EthCallBundle {
         self
     }
 
+    /// Sets the coinbase for the bundle.
+    pub fn with_coinbase(mut self, coinbase: Address) -> Self {
+        self.coinbase = Some(coinbase);
+        self
+    }
+
     /// Sets the timestamp for the bundle.
     pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
         self.timestamp = Some(timestamp);
+        self
+    }
+
+    /// Sets the timeout for the bundle.
+    pub fn with_timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
         self
     }
 
