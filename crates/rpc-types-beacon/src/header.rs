@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 /// The response to a request for beacon block headers: `getBlockHeaders`
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeadersResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
     /// be invalidated at a later time. If the field is not present, assume the False value.
@@ -21,7 +21,7 @@ pub struct HeadersResponse {
 }
 
 /// The response to a request for a __single__ beacon block header: `headers/{id}`
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeaderResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
     /// be invalidated at a later time. If the field is not present, assume the False value.
@@ -35,7 +35,7 @@ pub struct HeaderResponse {
 }
 
 /// Container type for a beacon block header.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeaderData {
     /// root hash of the block
     pub root: B256,
@@ -46,7 +46,7 @@ pub struct HeaderData {
 }
 
 /// [BeaconBlockHeader] with a signature.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Header {
     /// The [`BeaconBlockHeader`] object from the CL spec.
     pub message: BeaconBlockHeader,
@@ -56,7 +56,7 @@ pub struct Header {
 
 /// The header of a beacon block.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct BeaconBlockHeader {
     /// The slot to which this block corresponds.
     #[serde_as(as = "DisplayFromStr")]
