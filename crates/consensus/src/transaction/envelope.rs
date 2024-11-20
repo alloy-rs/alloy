@@ -22,10 +22,11 @@ use core::fmt;
 /// [4844]: https://eips.ethereum.org/EIPS/eip-4844
 /// [7702]: https://eips.ethereum.org/EIPS/eip-7702
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[doc(alias = "TransactionType")]
 pub enum TxType {
     /// Legacy transaction type.
+    #[default]
     Legacy = 0,
     /// EIP-2930 transaction type.
     Eip2930 = 1,
