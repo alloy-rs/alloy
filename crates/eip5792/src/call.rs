@@ -64,11 +64,7 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&sample_request).unwrap();
-
         let deserialized: SendCallsRequest = serde_json::from_str(&serialized).unwrap();
-
         assert_eq!(sample_request, deserialized);
-
-        println!("Serialized JSON: {:#?}", serialized);
     }
 }
