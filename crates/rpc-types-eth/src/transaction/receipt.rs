@@ -134,7 +134,7 @@ impl<T> TransactionReceipt<T> {
     }
 }
 
-impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
+impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
     fn contract_address(&self) -> Option<Address> {
         self.contract_address
     }

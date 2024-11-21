@@ -15,7 +15,7 @@ pub use status::Eip658Value;
 #[auto_impl::auto_impl(&, Arc)]
 pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     /// The associated log type.
-    type Log: Borrow<Log>;
+    type Log;
 
     /// Returns the status or post state of the transaction.
     ///
@@ -57,7 +57,7 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     fn cumulative_gas_used(&self) -> u128;
 
     /// Returns the logs emitted by this transaction.
-    fn logs(&self) -> &[T];
+    fn logs(&self) -> &[Self::Log];
 }
 
 #[cfg(test)]

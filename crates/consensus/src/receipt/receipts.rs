@@ -41,10 +41,12 @@ where
     }
 }
 
-impl<T> TxReceipt<T> for Receipt<T>
+impl<T> TxReceipt for Receipt<T>
 where
     T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
+    type Log = T;
+
     fn status_or_post_state(&self) -> Eip658Value {
         self.status
     }
@@ -61,7 +63,7 @@ where
         self.cumulative_gas_used
     }
 
-    fn logs(&self) -> &[T] {
+    fn logs(&self) -> &[Self::Log] {
         &self.logs
     }
 }
@@ -130,10 +132,12 @@ pub struct ReceiptWithBloom<T = Log> {
     pub logs_bloom: Bloom,
 }
 
-impl<T> TxReceipt<T> for ReceiptWithBloom<T>
+impl<T> TxReceipt for ReceiptWithBloom<T>
 where
-    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
+    type Log = T;
+
     fn status_or_post_state(&self) -> Eip658Value {
         self.receipt.status
     }
@@ -154,7 +158,7 @@ where
         self.receipt.cumulative_gas_used
     }
 
-    fn logs(&self) -> &[T] {
+    fn logs(&self) -> &[Self::Log] {
         &self.receipt.logs
     }
 }
