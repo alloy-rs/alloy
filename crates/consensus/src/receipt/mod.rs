@@ -1,5 +1,5 @@
 use alloy_primitives::{Bloom, Log};
-use core::fmt;
+use core::{borrow::Borrow, fmt};
 
 mod envelope;
 pub use envelope::ReceiptEnvelope;
@@ -13,7 +13,10 @@ pub use status::Eip658Value;
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait TxReceipt<T = Log>: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
+pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
+    /// The associated log type.
+    type Log: Borrow<Log>;
+
     /// Returns the status or post state of the transaction.
     ///
     /// ## Note
