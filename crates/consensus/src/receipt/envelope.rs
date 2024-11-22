@@ -19,7 +19,7 @@ use core::fmt;
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
-pub enum ReceiptEnvelope<T = Log> {
+pub enum ReceiptEnvelope<T = Receipt<Log>> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
     Legacy(ReceiptWithBloom<T>),
@@ -45,7 +45,10 @@ pub enum ReceiptEnvelope<T = Log> {
     Eip7702(ReceiptWithBloom<T>),
 }
 
-impl<T> ReceiptEnvelope<T> {
+impl<T> ReceiptEnvelope<T>
+where
+    T: TxReceipt,
+{
     /// Return the [`TxType`] of the inner receipt.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
@@ -65,17 +68,17 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Returns the success status of the receipt's transaction.
     pub fn status(&self) -> bool {
-        self.as_receipt().unwrap().status.coerce_status()
+        self.as_receipt().unwrap().status_or_post_state().coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
     pub fn cumulative_gas_used(&self) -> u128 {
-        self.as_receipt().unwrap().cumulative_gas_used
+        self.as_receipt().unwrap().cumulative_gas_used()
     }
 
     /// Return the receipt logs.
-    pub fn logs(&self) -> &[T] {
-        &self.as_receipt().unwrap().logs
+    pub fn logs(&self) -> &[T::Log] {
+        &self.as_receipt().unwrap().logs()
     }
 
     /// Return the receipt's bloom.
@@ -97,8 +100,8 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Return the inner receipt. Currently this is infallible, however, future
     /// receipt types may be added.
-    pub const fn as_receipt(&self) -> Option<&Receipt<T>> {
-        match self {
+    pub const fn as_receipt(&self) -> Option<&T> {
+       match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
@@ -110,16 +113,16 @@ impl<T> ReceiptEnvelope<T> {
 
 impl<T> TxReceipt for ReceiptEnvelope<T>
 where
-    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: TxReceipt,
 {
-    type Log = T;
+    type Log = T::Log;
 
     fn status_or_post_state(&self) -> Eip658Value {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status_or_post_state()
     }
 
     fn status(&self) -> bool {
-        self.as_receipt().unwrap().status.coerce_status()
+        self.as_receipt().unwrap().status_or_post_state().coerce_status()
     }
 
     /// Return the receipt's bloom.
@@ -133,12 +136,12 @@ where
 
     /// Returns the cumulative gas used at this receipt.
     fn cumulative_gas_used(&self) -> u128 {
-        self.as_receipt().unwrap().cumulative_gas_used
+        self.as_receipt().unwrap().cumulative_gas_used()
     }
 
     /// Return the receipt logs.
     fn logs(&self) -> &[Self::Log] {
-        &self.as_receipt().unwrap().logs
+        &self.as_receipt().unwrap().logs()
     }
 }
 

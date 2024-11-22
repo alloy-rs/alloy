@@ -36,7 +36,7 @@ where
 
     /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
     /// type.
-    pub fn with_bloom(self) -> ReceiptWithBloom<T> {
+    pub fn with_bloom(self) -> ReceiptWithBloom<Receipt<T>> {
         self.into()
     }
 }
@@ -68,9 +68,9 @@ where
     }
 }
 
-impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
+impl<T> From<ReceiptWithBloom<Receipt<T>>> for Receipt<T> {
     /// Consume the structure, returning only the receipt
-    fn from(receipt_with_bloom: ReceiptWithBloom<T>) -> Self {
+    fn from(receipt_with_bloom: ReceiptWithBloom<Receipt<T>>) -> Self {
         receipt_with_bloom.receipt
     }
 }
@@ -124,26 +124,26 @@ impl<T> FromIterator<Vec<T>> for Receipts<T> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TransactionReceiptWithBloom", alias = "TxReceiptWithBloom")]
-pub struct ReceiptWithBloom<T = Log> {
+pub struct ReceiptWithBloom<T = Receipt<Log>> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     /// The receipt.
-    pub receipt: Receipt<T>,
+    pub receipt: T,
     /// The bloom filter.
     pub logs_bloom: Bloom,
 }
 
 impl<T> TxReceipt for ReceiptWithBloom<T>
 where
-    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: TxReceipt,
 {
-    type Log = T;
+    type Log = T::Log;
 
     fn status_or_post_state(&self) -> Eip658Value {
-        self.receipt.status
+        self.receipt.status_or_post_state()
     }
 
     fn status(&self) -> bool {
-        matches!(self.receipt.status, Eip658Value::Eip658(true) | Eip658Value::PostState(_))
+        matches!(self.receipt.status_or_post_state(), Eip658Value::Eip658(true) | Eip658Value::PostState(_))
     }
 
     fn bloom(&self) -> Bloom {
@@ -155,25 +155,25 @@ where
     }
 
     fn cumulative_gas_used(&self) -> u128 {
-        self.receipt.cumulative_gas_used
+        self.receipt.cumulative_gas_used()
     }
 
     fn logs(&self) -> &[Self::Log] {
-        &self.receipt.logs
+        &self.receipt.logs()
     }
 }
 
-impl<T> From<Receipt<T>> for ReceiptWithBloom<T>
+impl<U> From<Receipt<U>> for ReceiptWithBloom<Receipt<U>>
 where
-    T: Borrow<Log>,
+    U: Borrow<Log>,
 {
-    fn from(receipt: Receipt<T>) -> Self {
+    fn from(receipt: Receipt<U>) -> Self {
         let bloom = receipt.bloom_slow();
         Self { receipt, logs_bloom: bloom }
     }
 }
 
-impl<T: Encodable> ReceiptWithBloom<T> {
+impl<T: Encodable> ReceiptWithBloom<Receipt<T>> {
     /// Returns the rlp header for the receipt payload.
     fn receipt_rlp_header(&self) -> alloy_rlp::Header {
         alloy_rlp::Header { list: true, payload_length: self.payload_len() }
@@ -196,7 +196,7 @@ impl<T: Encodable> ReceiptWithBloom<T> {
     }
 }
 
-impl<T> ReceiptWithBloom<T> {
+impl<T> ReceiptWithBloom<Receipt<T>> {
     /// Create new [ReceiptWithBloom]
     pub const fn new(receipt: Receipt<T>, logs_bloom: Bloom) -> Self {
         Self { receipt, logs_bloom }
@@ -239,7 +239,7 @@ impl<T> ReceiptWithBloom<T> {
     }
 }
 
-impl<T: Encodable> Encodable for ReceiptWithBloom<T> {
+impl<T: Encodable> Encodable for ReceiptWithBloom<Receipt<T>> {
     fn encode(&self, out: &mut dyn BufMut) {
         self.encode_fields(out);
     }
@@ -253,14 +253,14 @@ impl<T: Encodable> Encodable for ReceiptWithBloom<T> {
     }
 }
 
-impl<T: Decodable> Decodable for ReceiptWithBloom<T> {
+impl<T: Decodable> Decodable for ReceiptWithBloom<Receipt<T>> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::decode_receipt(buf)
     }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<T>
+impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<Receipt<T>>
 where
     T: arbitrary::Arbitrary<'a>,
 {
