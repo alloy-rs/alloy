@@ -1,4 +1,4 @@
-use alloy_consensus::{Eip658Value, ReceiptWithBloom, TxReceipt};
+use alloy_consensus::{Eip658Value, ReceiptWithBloom, TxReceipt, Receipt};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
@@ -17,7 +17,7 @@ use core::fmt;
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "AnyTransactionReceiptEnvelope", alias = "AnyTxReceiptEnvelope")]
-pub struct AnyReceiptEnvelope<T = Log> {
+pub struct AnyReceiptEnvelope<T = Receipt<Log>> {
     /// The receipt envelope.
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: ReceiptWithBloom<T>,
@@ -26,7 +26,7 @@ pub struct AnyReceiptEnvelope<T = Log> {
     pub r#type: u8,
 }
 
-impl<T> AnyReceiptEnvelope<T>
+impl<T> AnyReceiptEnvelope<Receipt<T>>
 where
     T: Encodable,
 {
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<T> AnyReceiptEnvelope<T> {
+impl<T> AnyReceiptEnvelope<Receipt<T>> {
     /// Returns whether this is a legacy receipt (type 0)
     pub const fn is_legacy(&self) -> bool {
         self.r#type == 0
@@ -87,18 +87,18 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 }
 
-impl<T> TxReceipt for AnyReceiptEnvelope<T>
+impl<T> TxReceipt for AnyReceiptEnvelope<Receipt<T>>
 where
     T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     type Log = T;
 
     fn status_or_post_state(&self) -> Eip658Value {
-        self.inner.status_or_post_state()
+        self.inner.receipt.status
     }
 
     fn status(&self) -> bool {
-        self.inner.status()
+        self.inner.receipt.status.coerce_status()
     }
 
     fn bloom(&self) -> Bloom {
