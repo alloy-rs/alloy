@@ -159,11 +159,11 @@ pub struct ReceiptWithBloom<T = Receipt<Log>> {
     pub logs_bloom: Bloom,
 }
 
-impl<T> TxReceipt for ReceiptWithBloom<T>
+impl<R> TxReceipt for ReceiptWithBloom<R>
 where
-    T: TxReceipt,
+    R: TxReceipt,
 {
-    type Log = T::Log;
+    type Log = R::Log;
 
     fn status_or_post_state(&self) -> Eip658Value {
         self.receipt.status_or_post_state()
