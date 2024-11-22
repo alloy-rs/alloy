@@ -28,7 +28,7 @@ pub struct Receipt<T = Log> {
 
 impl<T> Receipt<T>
 where
-    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: Borrow<Log>,
 {
     /// Calculates [`Log`]'s bloom filter. this is slow operation and [ReceiptWithBloom] can
     /// be used to cache this value.
@@ -39,7 +39,7 @@ where
     /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
     /// type.
     pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
-        self.into()
+        ReceiptWithBloom { logs_bloom: self.bloom_slow(), receipt: self }
     }
 }
 
