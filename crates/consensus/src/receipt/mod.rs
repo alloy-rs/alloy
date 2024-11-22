@@ -1,5 +1,5 @@
-use alloy_primitives::{Bloom, Log};
-use core::{borrow::Borrow, fmt};
+use alloy_primitives::Bloom;
+use core::fmt;
 
 mod envelope;
 pub use envelope::ReceiptEnvelope;

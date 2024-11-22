@@ -134,7 +134,7 @@ pub struct ReceiptWithBloom<T = Log> {
 
 impl<T> TxReceipt for ReceiptWithBloom<T>
 where
-    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     type Log = T;
 

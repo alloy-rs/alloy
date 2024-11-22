@@ -2,7 +2,7 @@ use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::{borrow::Borrow, fmt};
+use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -110,7 +110,7 @@ impl<T> ReceiptEnvelope<T> {
 
 impl<T> TxReceipt for ReceiptEnvelope<T>
 where
-    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     type Log = T;
 
