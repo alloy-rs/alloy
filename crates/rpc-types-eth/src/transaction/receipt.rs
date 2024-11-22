@@ -1,6 +1,6 @@
 use crate::Log;
 use alloc::vec::Vec;
-use alloy_consensus::{Receipt, ReceiptEnvelope, TxReceipt, TxType};
+use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
@@ -14,7 +14,7 @@ use alloy_primitives::{Address, BlockHash, TxHash, B256};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxReceipt")]
-pub struct TransactionReceipt<T = ReceiptEnvelope<Receipt<Log>>> {
+pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: T,
@@ -73,8 +73,8 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Receipt<Log>>> {
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
-impl AsRef<ReceiptEnvelope<Receipt<Log>>> for TransactionReceipt {
-    fn as_ref(&self) -> &ReceiptEnvelope<Receipt<Log>> {
+impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
+    fn as_ref(&self) -> &ReceiptEnvelope<Log> {
         &self.inner
     }
 }

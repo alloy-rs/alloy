@@ -1,9 +1,11 @@
 use crate::receipt::{Eip658Value, TxReceipt};
 use alloc::{vec, vec::Vec};
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::{borrow::Borrow, fmt};
 use derive_more::{DerefMut, From, IntoIterator};
+
+use super::RlpReceipt;
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -26,7 +28,7 @@ pub struct Receipt<T = Log> {
 
 impl<T> Receipt<T>
 where
-    T: Borrow<Log>,
+    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     /// Calculates [`Log`]'s bloom filter. this is slow operation and [ReceiptWithBloom] can
     /// be used to cache this value.
@@ -65,6 +67,31 @@ where
 
     fn logs(&self) -> &[Self::Log] {
         &self.logs
+    }
+}
+
+impl<T: Encodable + Decodable> RlpReceipt for Receipt<T> {
+    fn rlp_encoded_fields_length_with_bloom(&self, bloom: Bloom) -> usize {
+        self.status.length()
+            + self.cumulative_gas_used.length()
+            + bloom.length()
+            + self.logs.length()
+    }
+
+    fn rlp_encode_fields_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut) {
+        self.status.encode(out);
+        self.cumulative_gas_used.encode(out);
+        bloom.encode(out);
+        self.logs.encode(out);
+    }
+
+    fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+        let status = Decodable::decode(buf)?;
+        let cumulative_gas_used = Decodable::decode(buf)?;
+        let logs_bloom = Decodable::decode(buf)?;
+        let logs = Decodable::decode(buf)?;
+
+        Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
     }
 }
 
@@ -166,109 +193,51 @@ where
     }
 }
 
-impl<U> From<Receipt<U>> for ReceiptWithBloom<Receipt<U>>
+impl<R> From<R> for ReceiptWithBloom<R>
 where
-    U: Borrow<Log>,
+    R: TxReceipt<Log: Borrow<Log>>,
 {
-    fn from(receipt: Receipt<U>) -> Self {
-        let bloom = receipt.bloom_slow();
-        Self { receipt, logs_bloom: bloom }
+    fn from(receipt: R) -> Self {
+        let logs_bloom = receipt.logs().iter().map(Borrow::borrow).collect();
+        Self { receipt, logs_bloom }
     }
 }
 
-impl<T: Encodable> ReceiptWithBloom<Receipt<T>> {
-    /// Returns the rlp header for the receipt payload.
-    fn receipt_rlp_header(&self) -> alloy_rlp::Header {
-        alloy_rlp::Header { list: true, payload_length: self.payload_len() }
-    }
-
-    /// Encodes the receipt data.
-    fn encode_fields(&self, out: &mut dyn BufMut) {
-        self.receipt_rlp_header().encode(out);
-        self.receipt.status.encode(out);
-        self.receipt.cumulative_gas_used.encode(out);
-        self.logs_bloom.encode(out);
-        self.receipt.logs.encode(out);
-    }
-
-    fn payload_len(&self) -> usize {
-        self.receipt.status.length()
-            + self.receipt.cumulative_gas_used.length()
-            + self.logs_bloom.length()
-            + self.receipt.logs.length()
-    }
-}
-
-impl<T> ReceiptWithBloom<Receipt<T>> {
+impl<R> ReceiptWithBloom<R> {
     /// Create new [ReceiptWithBloom]
-    pub const fn new(receipt: Receipt<T>, logs_bloom: Bloom) -> Self {
+    pub const fn new(receipt: R, logs_bloom: Bloom) -> Self {
         Self { receipt, logs_bloom }
     }
 
     /// Consume the structure, returning the receipt and the bloom filter
-    pub fn into_components(self) -> (Receipt<T>, Bloom) {
+    pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
-    }
-
-    /// Decodes the receipt payload
-    fn decode_receipt(buf: &mut &[u8]) -> alloy_rlp::Result<Self>
-    where
-        T: Decodable,
-    {
-        let b: &mut &[u8] = &mut &**buf;
-        let rlp_head = alloy_rlp::Header::decode(b)?;
-        if !rlp_head.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let started_len = b.len();
-
-        let success = Decodable::decode(b)?;
-        let cumulative_gas_used = Decodable::decode(b)?;
-        let bloom = Decodable::decode(b)?;
-        let logs = Decodable::decode(b)?;
-
-        let receipt = Receipt { status: success, cumulative_gas_used, logs };
-
-        let this = Self { receipt, logs_bloom: bloom };
-        let consumed = started_len - b.len();
-        if consumed != rlp_head.payload_length {
-            return Err(alloy_rlp::Error::ListLengthMismatch {
-                expected: rlp_head.payload_length,
-                got: consumed,
-            });
-        }
-        *buf = *b;
-        Ok(this)
     }
 }
 
-impl<T: Encodable> Encodable for ReceiptWithBloom<Receipt<T>> {
+impl<R: RlpReceipt> Encodable for ReceiptWithBloom<R> {
     fn encode(&self, out: &mut dyn BufMut) {
-        self.encode_fields(out);
+        self.receipt.rlp_encode_with_bloom(self.logs_bloom, out);
     }
 
     fn length(&self) -> usize {
-        let payload_length = self.receipt.status.length()
-            + self.receipt.cumulative_gas_used.length()
-            + self.logs_bloom.length()
-            + self.receipt.logs.length();
-        payload_length + length_of_length(payload_length)
+        self.receipt.rlp_encoded_length_with_bloom(self.logs_bloom)
     }
 }
 
-impl<T: Decodable> Decodable for ReceiptWithBloom<Receipt<T>> {
+impl<R: RlpReceipt> Decodable for ReceiptWithBloom<R> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::decode_receipt(buf)
+        R::rlp_decode_with_bloom(buf)
     }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<T>
+impl<'a, R> arbitrary::Arbitrary<'a> for ReceiptWithBloom<R>
 where
-    T: arbitrary::Arbitrary<'a>,
+    R: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self { receipt: T::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
+        Ok(Self { receipt: R::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
     }
 }
 

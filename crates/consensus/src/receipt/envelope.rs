@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
@@ -18,36 +20,33 @@ use alloy_rlp::{BufMut, Decodable, Encodable};
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
-pub enum ReceiptEnvelope<T = Receipt<Log>> {
+pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
-    Legacy(ReceiptWithBloom<T>),
+    Legacy(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 1, containing a [EIP-2930] receipt.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
     #[cfg_attr(feature = "serde", serde(rename = "0x1", alias = "0x01"))]
-    Eip2930(ReceiptWithBloom<T>),
+    Eip2930(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 2, containing a [EIP-1559] receipt.
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     #[cfg_attr(feature = "serde", serde(rename = "0x2", alias = "0x02"))]
-    Eip1559(ReceiptWithBloom<T>),
+    Eip1559(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 2, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
     #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
-    Eip4844(ReceiptWithBloom<T>),
+    Eip4844(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 4, containing a [EIP-7702] receipt.
     ///
     /// [EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
     #[cfg_attr(feature = "serde", serde(rename = "0x4", alias = "0x04"))]
-    Eip7702(ReceiptWithBloom<T>),
+    Eip7702(ReceiptWithBloom<Receipt<T>>),
 }
 
-impl<T> ReceiptEnvelope<T>
-where
-    T: TxReceipt,
-{
+impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
@@ -67,17 +66,17 @@ where
 
     /// Returns the success status of the receipt's transaction.
     pub fn status(&self) -> bool {
-        self.as_receipt().unwrap().status_or_post_state().coerce_status()
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
     pub fn cumulative_gas_used(&self) -> u128 {
-        self.as_receipt().unwrap().cumulative_gas_used()
+        self.as_receipt().unwrap().cumulative_gas_used
     }
 
     /// Return the receipt logs.
-    pub fn logs(&self) -> &[T::Log] {
-        self.as_receipt().unwrap().logs()
+    pub fn logs(&self) -> &[T] {
+        &self.as_receipt().unwrap().logs
     }
 
     /// Return the receipt's bloom.
@@ -87,7 +86,7 @@ where
 
     /// Return the inner receipt with bloom. Currently this is infallible,
     /// however, future receipt types may be added.
-    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<T>> {
+    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<Receipt<T>>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
@@ -99,7 +98,7 @@ where
 
     /// Return the inner receipt. Currently this is infallible, however, future
     /// receipt types may be added.
-    pub const fn as_receipt(&self) -> Option<&T> {
+    pub const fn as_receipt(&self) -> Option<&Receipt<T>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
@@ -112,16 +111,16 @@ where
 
 impl<T> TxReceipt for ReceiptEnvelope<T>
 where
-    T: TxReceipt,
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
-    type Log = T::Log;
+    type Log = T;
 
     fn status_or_post_state(&self) -> Eip658Value {
-        self.as_receipt().unwrap().status_or_post_state()
+        self.as_receipt().unwrap().status
     }
 
     fn status(&self) -> bool {
-        self.as_receipt().unwrap().status_or_post_state().coerce_status()
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Return the receipt's bloom.
@@ -135,12 +134,12 @@ where
 
     /// Returns the cumulative gas used at this receipt.
     fn cumulative_gas_used(&self) -> u128 {
-        self.as_receipt().unwrap().cumulative_gas_used()
+        self.as_receipt().unwrap().cumulative_gas_used
     }
 
     /// Return the receipt logs.
-    fn logs(&self) -> &[Self::Log] {
-        self.as_receipt().unwrap().logs()
+    fn logs(&self) -> &[T] {
+        &self.as_receipt().unwrap().logs
     }
 }
 
@@ -224,7 +223,7 @@ where
     T: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let receipt = ReceiptWithBloom::<T>::arbitrary(u)?;
+        let receipt = ReceiptWithBloom::<Receipt<T>>::arbitrary(u)?;
 
         match u.int_in_range(0..=3)? {
             0 => Ok(Self::Legacy(receipt)),

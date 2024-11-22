@@ -1,4 +1,4 @@
-use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt};
+use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, RlpReceipt, TxReceipt};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
@@ -26,9 +26,9 @@ pub struct AnyReceiptEnvelope<T = Receipt<Log>> {
     pub r#type: u8,
 }
 
-impl<T> AnyReceiptEnvelope<Receipt<T>>
+impl<R> AnyReceiptEnvelope<R>
 where
-    T: Encodable,
+    R: TxReceipt + RlpReceipt,
 {
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<T> AnyReceiptEnvelope<Receipt<T>> {
+impl<R: TxReceipt> AnyReceiptEnvelope<R> {
     /// Returns whether this is a legacy receipt (type 0)
     pub const fn is_legacy(&self) -> bool {
         self.r#type == 0
@@ -55,7 +55,7 @@ impl<T> AnyReceiptEnvelope<Receipt<T>> {
     /// for transactions before [EIP-658].
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    pub const fn is_success(&self) -> bool {
+    pub fn is_success(&self) -> bool {
         self.status()
     }
 
@@ -67,8 +67,8 @@ impl<T> AnyReceiptEnvelope<Receipt<T>> {
     /// for transactions before [EIP-658].
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    pub const fn status(&self) -> bool {
-        matches!(self.inner.receipt.status, Eip658Value::Eip658(true) | Eip658Value::PostState(_))
+    pub fn status(&self) -> bool {
+        self.inner.receipt.status()
     }
 
     /// Return the receipt's bloom.
@@ -77,13 +77,13 @@ impl<T> AnyReceiptEnvelope<Receipt<T>> {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub const fn cumulative_gas_used(&self) -> u128 {
-        self.inner.receipt.cumulative_gas_used
+    pub fn cumulative_gas_used(&self) -> u128 {
+        self.inner.receipt.cumulative_gas_used()
     }
 
     /// Return the receipt logs.
-    pub fn logs(&self) -> &[T] {
-        &self.inner.receipt.logs
+    pub fn logs(&self) -> &[R::Log] {
+        self.inner.receipt.logs()
     }
 }
 
