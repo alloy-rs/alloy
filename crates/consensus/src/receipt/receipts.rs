@@ -1,11 +1,9 @@
-use crate::receipt::{Eip658Value, TxReceipt};
+use crate::receipt::{Eip658Value, RlpReceipt, TxReceipt};
 use alloc::{vec, vec::Vec};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::{borrow::Borrow, fmt};
 use derive_more::{DerefMut, From, IntoIterator};
-
-use super::RlpReceipt;
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
