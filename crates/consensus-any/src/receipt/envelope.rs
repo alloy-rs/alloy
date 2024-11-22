@@ -2,7 +2,6 @@ use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, RlpReceipt, TxRece
 use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
-use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -86,18 +85,18 @@ impl<R: TxReceipt> AnyReceiptEnvelope<R> {
     }
 }
 
-impl<T> TxReceipt for AnyReceiptEnvelope<Receipt<T>>
+impl<R> TxReceipt for AnyReceiptEnvelope<R>
 where
-    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    R: TxReceipt
 {
-    type Log = T;
+    type Log = R::Log;
 
     fn status_or_post_state(&self) -> Eip658Value {
-        self.inner.receipt.status
+        self.inner.receipt.status_or_post_state()
     }
 
     fn status(&self) -> bool {
-        self.inner.receipt.status.coerce_status()
+        self.inner.receipt.status()
     }
 
     fn bloom(&self) -> Bloom {
@@ -105,11 +104,11 @@ where
     }
 
     fn cumulative_gas_used(&self) -> u128 {
-        self.inner.receipt.cumulative_gas_used
+        self.inner.receipt.cumulative_gas_used()
     }
 
     fn logs(&self) -> &[Self::Log] {
-        &self.inner.receipt.logs
+        self.inner.receipt.logs()
     }
 }
 
