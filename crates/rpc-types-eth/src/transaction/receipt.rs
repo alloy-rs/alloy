@@ -95,7 +95,14 @@ impl TransactionReceipt {
     /// Returns the transaction type.
     #[doc(alias = "tx_type")]
     pub const fn transaction_type(&self) -> TxType {
-        self.inner.tx_type()
+        match &self.inner {
+            ReceiptEnvelope::Eip1559(_) => TxType::Eip1559,
+            ReceiptEnvelope::Eip2930(_) => TxType::Eip2930,
+            ReceiptEnvelope::Eip4844(_) => TxType::Eip4844,
+            ReceiptEnvelope::Eip7702(_) => TxType::Eip7702,
+            ReceiptEnvelope::Legacy(_) => TxType::Legacy,
+            _ => TxType::Legacy,
+        }
     }
 
     /// Calculates the address that will be created by the transaction, if any.
