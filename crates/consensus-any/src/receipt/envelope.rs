@@ -26,10 +26,14 @@ pub struct AnyReceiptEnvelope<T = Receipt<Log>> {
     pub r#type: u8,
 }
 
-impl<R> AnyReceiptEnvelope<R>
-where
-    R: TxReceipt + RlpReceipt,
-{
+impl<R> AnyReceiptEnvelope<R> {
+    /// Returns whether this is a legacy receipt (type 0)
+    pub const fn is_legacy(&self) -> bool {
+        self.r#type == 0
+    }
+}
+
+impl<R: RlpReceipt> AnyReceiptEnvelope<R> {
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
         let length = self.inner.length();
@@ -42,11 +46,6 @@ where
 }
 
 impl<R: TxReceipt> AnyReceiptEnvelope<R> {
-    /// Returns whether this is a legacy receipt (type 0)
-    pub const fn is_legacy(&self) -> bool {
-        self.r#type == 0
-    }
-
     /// Return true if the transaction was successful.
     ///
     /// ## Note
