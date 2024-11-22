@@ -130,6 +130,15 @@ impl TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => tx.tx(),
         }
     }
+
+    /// Calculates a heuristic for the in-memory size of the [TxEip4844Variant] transaction.
+    #[inline]
+    pub fn size(&self) -> usize {
+        match self {
+            Self::TxEip4844(tx) => tx.size(),
+            Self::TxEip4844WithSidecar(tx) => tx.size(),
+        }
+    }
 }
 
 impl Transaction for TxEip4844Variant {
@@ -769,6 +778,12 @@ impl TxEip4844WithSidecar {
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
+    }
+
+    /// Calculates a heuristic for the in-memory size of the [TxEip4844WithSidecar] transaction.
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.tx.size() + self.sidecar.size()
     }
 }
 
