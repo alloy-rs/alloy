@@ -1,9 +1,12 @@
+use alloy_consensus::Receipt;
+use alloy_consensus_any::AnyReceiptEnvelope;
 use alloy_rpc_types_eth::{Log, TransactionReceipt};
+use alloy_serde::WithOtherFields;
 
 /// Alias for a catch-all receipt type.
 #[doc(alias = "AnyTxReceipt")]
 pub type AnyTransactionReceipt =
-    alloy_serde::WithOtherFields<TransactionReceipt<alloy_consensus_any::AnyReceiptEnvelope<Log>>>;
+    WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Receipt<Log>>>>;
 
 #[cfg(test)]
 mod test {

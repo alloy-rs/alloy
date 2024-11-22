@@ -2,7 +2,6 @@ use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -78,7 +77,7 @@ where
 
     /// Return the receipt logs.
     pub fn logs(&self) -> &[T::Log] {
-        &self.as_receipt().unwrap().logs()
+        self.as_receipt().unwrap().logs()
     }
 
     /// Return the receipt's bloom.
@@ -101,7 +100,7 @@ where
     /// Return the inner receipt. Currently this is infallible, however, future
     /// receipt types may be added.
     pub const fn as_receipt(&self) -> Option<&T> {
-       match self {
+        match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
@@ -141,7 +140,7 @@ where
 
     /// Return the receipt logs.
     fn logs(&self) -> &[Self::Log] {
-        &self.as_receipt().unwrap().logs()
+        self.as_receipt().unwrap().logs()
     }
 }
 
@@ -245,7 +244,9 @@ mod test {
     fn deser_pre658_receipt_envelope() {
         use alloy_primitives::b256;
 
-        let receipt = super::ReceiptWithBloom::<()> {
+        use crate::Receipt;
+
+        let receipt = super::ReceiptWithBloom::<Receipt<()>> {
             receipt: super::Receipt {
                 status: super::Eip658Value::PostState(b256!(
                     "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
@@ -260,7 +261,7 @@ mod test {
 
         println!("Serialized {}", json);
 
-        let receipt: super::ReceiptWithBloom<()> = serde_json::from_str(&json).unwrap();
+        let receipt: super::ReceiptWithBloom<Receipt<()>> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(
             receipt.receipt.status,

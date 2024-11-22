@@ -36,7 +36,7 @@ where
 
     /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
     /// type.
-    pub fn with_bloom(self) -> ReceiptWithBloom<Receipt<T>> {
+    pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
         self.into()
     }
 }
@@ -68,9 +68,9 @@ where
     }
 }
 
-impl<T> From<ReceiptWithBloom<Receipt<T>>> for Receipt<T> {
+impl<T> From<ReceiptWithBloom<Self>> for Receipt<T> {
     /// Consume the structure, returning only the receipt
-    fn from(receipt_with_bloom: ReceiptWithBloom<Receipt<T>>) -> Self {
+    fn from(receipt_with_bloom: ReceiptWithBloom<Self>) -> Self {
         receipt_with_bloom.receipt
     }
 }
@@ -143,7 +143,10 @@ where
     }
 
     fn status(&self) -> bool {
-        matches!(self.receipt.status_or_post_state(), Eip658Value::Eip658(true) | Eip658Value::PostState(_))
+        matches!(
+            self.receipt.status_or_post_state(),
+            Eip658Value::Eip658(true) | Eip658Value::PostState(_)
+        )
     }
 
     fn bloom(&self) -> Bloom {
@@ -159,7 +162,7 @@ where
     }
 
     fn logs(&self) -> &[Self::Log] {
-        &self.receipt.logs()
+        self.receipt.logs()
     }
 }
 
@@ -260,12 +263,12 @@ impl<T: Decodable> Decodable for ReceiptWithBloom<Receipt<T>> {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<Receipt<T>>
+impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<T>
 where
     T: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self { receipt: Receipt::<T>::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
+        Ok(Self { receipt: T::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::Log;
 use alloc::vec::Vec;
-use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType, Receipt};
+use alloy_consensus::{Receipt, ReceiptEnvelope, TxReceipt, TxType};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
@@ -95,14 +95,7 @@ impl TransactionReceipt {
     /// Returns the transaction type.
     #[doc(alias = "tx_type")]
     pub const fn transaction_type(&self) -> TxType {
-        match &self.inner {
-            ReceiptEnvelope::Eip1559(_) => TxType::Eip1559,
-            ReceiptEnvelope::Eip2930(_) => TxType::Eip2930,
-            ReceiptEnvelope::Eip4844(_) => TxType::Eip4844,
-            ReceiptEnvelope::Eip7702(_) => TxType::Eip7702,
-            ReceiptEnvelope::Legacy(_) => TxType::Legacy,
-            _ => TxType::Legacy,
-        }
+        self.inner.tx_type()
     }
 
     /// Calculates the address that will be created by the transaction, if any.
