@@ -275,6 +275,11 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     }
 
     #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner.is_dynamic_fee()
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.inner.kind()
     }
@@ -308,9 +313,25 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
     }
+}
 
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        self.inner.is_dynamic_fee()
-    }
+/// A trait that helps to determine the type of the transaction.
+pub trait Typed2718 {
+    /// Returns true if the type matches the given type.
+    fn is_type(&self, ty: u8) -> bool;
+
+    /// Returns true if the type is a legacy transaction.
+    fn is_legacy(&self) -> bool;
+
+    /// Returns true if the type is an EIP-2930 transaction.
+    fn is_eip2930(&self) -> bool;
+
+    /// Returns true if the type is an EIP-1559 transaction.
+    fn is_eip1559(&self) -> bool;
+
+    /// Returns true if the type is an EIP-4844 transaction.
+    fn is_eip4844(&self) -> bool;
+
+    /// Returns true if the type is an EIP-7702 transaction.
+    fn is_eip7702(&self) -> bool;
 }
