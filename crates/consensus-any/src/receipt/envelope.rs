@@ -87,7 +87,7 @@ impl<R: TxReceipt> AnyReceiptEnvelope<R> {
 
 impl<R> TxReceipt for AnyReceiptEnvelope<R>
 where
-    R: TxReceipt
+    R: TxReceipt,
 {
     type Log = R::Log;
 

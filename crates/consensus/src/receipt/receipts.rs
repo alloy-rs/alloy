@@ -168,10 +168,7 @@ where
     }
 
     fn status(&self) -> bool {
-        matches!(
-            self.receipt.status_or_post_state(),
-            Eip658Value::Eip658(true) | Eip658Value::PostState(_)
-        )
+        self.receipt.status()
     }
 
     fn bloom(&self) -> Bloom {
