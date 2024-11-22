@@ -305,7 +305,7 @@ impl RlpEcdsaTx for TxEip4844Variant {
         // - If there is a string header, this is a non-sidecar tx with a multi-byte chain ID.
         // To check these, we first try to decode the header. If it fails or is
         // not a list, we lmow that it is a non-sidecar transaction.
-        if Header::decode(needle).map_or(false, |h| h.list) {
+        if Header::decode(needle).is_ok_and(|h| h.list) {
             if let Ok(tx) = TxEip4844WithSidecar::rlp_decode_fields(trial) {
                 *buf = *trial;
                 return Ok(tx.into());
@@ -332,7 +332,7 @@ impl RlpEcdsaTx for TxEip4844Variant {
         // - If there is a string header, this is a non-sidecar tx with a multi-byte chain ID.
         // To check these, we first try to decode the header. If it fails or is
         // not a list, we lmow that it is a non-sidecar transaction.
-        if Header::decode(needle).map_or(false, |h| h.list) {
+        if Header::decode(needle).is_ok_and(|h| h.list) {
             if let Ok((tx, signature)) = TxEip4844WithSidecar::rlp_decode_with_signature(trial) {
                 // If succesful, we need to consume the trial buffer up to
                 // the same point.
