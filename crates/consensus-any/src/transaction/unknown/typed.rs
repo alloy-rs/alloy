@@ -12,6 +12,7 @@ use alloy_serde::OtherFields;
 ///
 /// [`AnyTxEnvelope`]: crate::AnyTxEnvelope
 /// [`AnyTypedTransaction`]: crate::AnyTypedTransaction
+/// [`UnknownTxEnvelope`]: crate::UnknownTxEnvelope
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[allow(unnameable_types)]
 pub struct DeserMemo {

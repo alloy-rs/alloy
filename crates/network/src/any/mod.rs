@@ -10,6 +10,9 @@ pub use alloy_rpc_types_any::{
     AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction, AnyTransactionReceipt, AnyTransactionRequest,
 };
 
+// For documentation purpose
+use alloy_serde as _;
+
 /// Types for a catch-all network.
 ///
 /// `AnyNetwork`'s associated types allow for many different types of
