@@ -31,10 +31,7 @@ impl From<AnyTxEnvelope> for AnyTypedTransaction {
     fn from(value: AnyTxEnvelope) -> Self {
         match value {
             AnyTxEnvelope::Ethereum(tx) => Self::Ethereum(tx.into()),
-            AnyTxEnvelope::Unknown(UnknownTxEnvelope { inner, .. }) => {
-                let owned: UnknownTypedTransaction = inner.clone();
-                Self::Unknown(owned)
-            }
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { inner, .. }) => Self::Unknown(inner),
         }
     }
 }
