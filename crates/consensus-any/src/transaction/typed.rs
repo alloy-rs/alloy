@@ -4,8 +4,9 @@ use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{Bytes, ChainId, B256, U256};
 
 /// Unsigned transaction type for a catch-all network.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 #[doc(alias = "AnyTypedTx")]
 pub enum AnyTypedTransaction {
     /// An Ethereum transaction.
@@ -30,7 +31,10 @@ impl From<AnyTxEnvelope> for AnyTypedTransaction {
     fn from(value: AnyTxEnvelope) -> Self {
         match value {
             AnyTxEnvelope::Ethereum(tx) => Self::Ethereum(tx.into()),
-            AnyTxEnvelope::Unknown(UnknownTxEnvelope { inner, .. }) => inner.into(),
+            AnyTxEnvelope::Unknown(UnknownTxEnvelope { inner, .. }) => {
+                let owned: UnknownTypedTransaction = inner.clone();
+                Self::Unknown(owned)
+            }
         }
     }
 }

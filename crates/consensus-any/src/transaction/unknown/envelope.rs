@@ -4,14 +4,15 @@ use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
 
 /// A transaction envelope from an unknown network.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "UnknownTransactionEnvelope")]
 pub struct UnknownTxEnvelope {
     /// Transaction hash.
     pub hash: B256,
 
     /// Transaction type.
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: UnknownTypedTransaction,
 }
 

@@ -7,7 +7,7 @@ use alloy_eips::{
     eip2930::AccessList,
     eip7702::SignedAuthorization,
 };
-use alloy_primitives::{Bytes, ChainId, B256, U256, U8};
+use alloy_primitives::{Bytes, ChainId, B256, U256};
 
 /// Transaction type for a catch-all network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,20 +40,24 @@ impl From<AnyTxType> for u8 {
     }
 }
 
+#[cfg(feature = "serde")]
 impl serde::Serialize for AnyTxType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
+        use alloy_primitives::U8;
         U8::from(self.0).serialize(serializer)
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for AnyTxType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
+        use alloy_primitives::U8;
         U8::deserialize(deserializer).map(|t| Self(t.to::<u8>()))
     }
 }
@@ -73,8 +77,9 @@ impl From<TxType> for AnyTxType {
 }
 
 /// Transaction envelope for a catch-all network.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 #[doc(alias = "AnyTransactionEnvelope")]
 pub enum AnyTxEnvelope {
     /// An Ethereum transaction.

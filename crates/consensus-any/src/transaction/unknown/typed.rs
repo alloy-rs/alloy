@@ -22,19 +22,20 @@ pub struct DeserMemo {
 }
 
 /// A typed transaction of an unknown Network
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "UnknownTypedTx")]
 pub struct UnknownTypedTransaction {
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde", serde(rename = "type"))]
     /// Transaction type.
     pub ty: AnyTxType,
 
     /// Additional fields.
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub fields: OtherFields,
 
     /// Memoization for deserialization.
-    #[serde(skip, default)]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub memo: DeserMemo,
 }
 

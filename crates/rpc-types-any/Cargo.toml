@@ -22,7 +22,7 @@ workspace = true
 alloy-consensus-any = { workspace = true, features = ["serde"] }
 alloy-eips.workspace = true
 alloy-network-primitives.workspace = true
-alloy-rpc-types-eth.workspace = true
+alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-serde.workspace = true
 
 serde.workspace = true
