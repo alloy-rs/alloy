@@ -38,6 +38,8 @@ pub use alloy_rpc_types_any::{
 /// [`Decodable2718`]: alloy_eips::eip2718::Decodable2718
 /// [`Encodable2718`]: alloy_eips::eip2718::Encodable2718
 /// [`TxEnvelope`]: alloy_consensus::TxEnvelope
+/// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+/// [`WithOtherFields`]: alloy_serde::WithOtherFields
 #[derive(Clone, Copy, Debug)]
 pub struct AnyNetwork {
     _private: (),
