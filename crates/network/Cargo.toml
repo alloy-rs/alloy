@@ -28,14 +28,11 @@ alloy-primitives = { workspace = true, features = ["map"] }
 alloy-rpc-types-any.workspace = true
 alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
 alloy-signer.workspace = true
-alloy-serde.workspace = true
 alloy-sol-types.workspace = true
 
 auto_impl.workspace = true
 async-trait.workspace = true
 futures-utils-wasm.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

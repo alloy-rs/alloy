@@ -1,24 +1,14 @@
 mod builder;
 
-mod either;
-pub use either::{AnyTxEnvelope, AnyTypedTransaction};
-
-mod unknowns;
-pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
-
-pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
+pub use alloy_consensus_any::{
+    AnyHeader, AnyReceiptEnvelope, AnyTxEnvelope, AnyTxType, AnyTypedTransaction,
+    UnknownTxEnvelope, UnknownTypedTransaction,
+};
 
 use crate::Network;
-pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
-use alloy_serde::WithOtherFields;
-
-/// A catch-all block type for handling blocks on multiple networks.
-pub type AnyRpcBlock =
-    WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
-
-/// A catch-all transaction type for handling transactions on multiple networks.
-pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
+pub use alloy_rpc_types_any::{
+    AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction, AnyTransactionReceipt, AnyTransactionRequest,
+};
 
 /// Types for a catch-all network.
 ///
@@ -64,7 +54,7 @@ impl Network for AnyNetwork {
 
     type Header = AnyHeader;
 
-    type TransactionRequest = WithOtherFields<TransactionRequest>;
+    type TransactionRequest = AnyTransactionRequest;
 
     type TransactionResponse = AnyRpcTransaction;
 

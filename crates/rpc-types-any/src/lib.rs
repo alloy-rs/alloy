@@ -7,7 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod transaction;
-pub use transaction::AnyTransactionReceipt;
+pub use transaction::{AnyRpcTransaction, AnyTransactionReceipt, AnyTransactionRequest};
 
 mod block;
-pub use block::AnyRpcHeader;
+pub use block::{AnyRpcBlock, AnyRpcHeader};

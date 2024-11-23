@@ -30,6 +30,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
@@ -40,6 +41,7 @@ std = ["alloy-eips/std"]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = [
   "dep:serde",
+  "dep:serde_json",
   "alloy-primitives/serde",
   "dep:alloy-serde",
   "alloy-eips/serde",

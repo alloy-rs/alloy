@@ -12,3 +12,8 @@ pub use block::AnyHeader;
 
 mod receipt;
 pub use receipt::AnyReceiptEnvelope;
+
+mod transaction;
+pub use transaction::{
+    AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope, UnknownTypedTransaction,
+};
