@@ -4,8 +4,7 @@ use std::ops::{Deref, DerefMut};
 use alloy_consensus_any::{AnyTxEnvelope, AnyTypedTransaction, UnknownTypedTransaction};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
-use alloy_rpc_types_eth::BlobTransactionSidecar;
-use alloy_rpc_types_eth::TransactionRequest;
+use alloy_rpc_types_eth::{BlobTransactionSidecar, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
 /// A catch-all transaction request type for handling transactions on multiple networks.
