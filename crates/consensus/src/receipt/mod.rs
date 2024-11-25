@@ -1,4 +1,5 @@
-use alloy_primitives::{Bloom, Log};
+use alloy_primitives::Bloom;
+use alloy_rlp::{BufMut, Header};
 use core::fmt;
 
 mod envelope;
@@ -13,7 +14,10 @@ pub use status::Eip658Value;
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait TxReceipt<T = Log>: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
+pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
+    /// The associated log type.
+    type Log;
+
     /// Returns the status or post state of the transaction.
     ///
     /// ## Note
@@ -54,14 +58,69 @@ pub trait TxReceipt<T = Log>: Clone + fmt::Debug + PartialEq + Eq + Send + Sync 
     fn cumulative_gas_used(&self) -> u128;
 
     /// Returns the logs emitted by this transaction.
-    fn logs(&self) -> &[T];
+    fn logs(&self) -> &[Self::Log];
+}
+
+/// Receipt type that knows how to encode and decode itself with a [`Bloom`] value.
+pub trait RlpReceipt: Sized {
+    /// Returns the length of the RLP encoded receipt fields with the provided bloom filter, without
+    /// RLP header.
+    fn rlp_encoded_fields_length_with_bloom(&self, bloom: Bloom) -> usize;
+
+    /// RLP encodes the receipt fields with the provided bloom filter, without RLP header.
+    fn rlp_encode_fields_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut);
+
+    /// Returns the RLP header for the receipt payload with the provided bloom filter.
+    fn rlp_header_with_bloom(&self, bloom: Bloom) -> alloy_rlp::Header {
+        alloy_rlp::Header {
+            list: true,
+            payload_length: self.rlp_encoded_fields_length_with_bloom(bloom),
+        }
+    }
+
+    /// Returns the length of the receipt payload with the provided bloom filter.
+    fn rlp_encoded_length_with_bloom(&self, bloom: Bloom) -> usize {
+        self.rlp_header_with_bloom(bloom).length_with_payload()
+    }
+
+    /// RLP encodes the receipt with the provided bloom filter.
+    fn rlp_encode_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut) {
+        self.rlp_header_with_bloom(bloom).encode(out);
+        self.rlp_encode_fields_with_bloom(bloom, out);
+    }
+
+    /// RLP decodes receipt's fields and [`Bloom`] into [`ReceiptWithBloom`] instance.
+    ///
+    /// Note: this should not decode an RLP header.
+    fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>>;
+
+    /// RLP decodes receipt and [`Bloom`] into [`ReceiptWithBloom`] instance.
+    fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        let remaining = buf.len();
+
+        if header.payload_length > remaining {
+            return Err(alloy_rlp::Error::InputTooShort);
+        }
+
+        let this = Self::rlp_decode_fields_with_bloom(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloy_eips::eip2718::Encodable2718;
-    use alloy_primitives::{address, b256, bytes, hex, LogData};
+    use alloy_primitives::{address, b256, bytes, hex, Log, LogData};
     use alloy_rlp::{Decodable, Encodable};
 
     // Test vector from: https://eips.ethereum.org/EIPS/eip-2481

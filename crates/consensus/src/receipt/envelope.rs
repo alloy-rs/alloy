@@ -1,8 +1,9 @@
+use core::fmt;
+
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -22,27 +23,27 @@ use core::fmt;
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
-    Legacy(ReceiptWithBloom<T>),
+    Legacy(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 1, containing a [EIP-2930] receipt.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
     #[cfg_attr(feature = "serde", serde(rename = "0x1", alias = "0x01"))]
-    Eip2930(ReceiptWithBloom<T>),
+    Eip2930(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 2, containing a [EIP-1559] receipt.
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     #[cfg_attr(feature = "serde", serde(rename = "0x2", alias = "0x02"))]
-    Eip1559(ReceiptWithBloom<T>),
+    Eip1559(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 2, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
     #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
-    Eip4844(ReceiptWithBloom<T>),
+    Eip4844(ReceiptWithBloom<Receipt<T>>),
     /// Receipt envelope with type flag 4, containing a [EIP-7702] receipt.
     ///
     /// [EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
     #[cfg_attr(feature = "serde", serde(rename = "0x4", alias = "0x04"))]
-    Eip7702(ReceiptWithBloom<T>),
+    Eip7702(ReceiptWithBloom<Receipt<T>>),
 }
 
 impl<T> ReceiptEnvelope<T> {
@@ -85,7 +86,7 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Return the inner receipt with bloom. Currently this is infallible,
     /// however, future receipt types may be added.
-    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<T>> {
+    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<Receipt<T>>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
@@ -108,10 +109,12 @@ impl<T> ReceiptEnvelope<T> {
     }
 }
 
-impl<T> TxReceipt<T> for ReceiptEnvelope<T>
+impl<T> TxReceipt for ReceiptEnvelope<T>
 where
     T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
+    type Log = T;
+
     fn status_or_post_state(&self) -> Eip658Value {
         self.as_receipt().unwrap().status
     }
@@ -220,7 +223,7 @@ where
     T: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let receipt = ReceiptWithBloom::<T>::arbitrary(u)?;
+        let receipt = ReceiptWithBloom::<Receipt<T>>::arbitrary(u)?;
 
         match u.int_in_range(0..=3)? {
             0 => Ok(Self::Legacy(receipt)),
@@ -240,7 +243,9 @@ mod test {
     fn deser_pre658_receipt_envelope() {
         use alloy_primitives::b256;
 
-        let receipt = super::ReceiptWithBloom::<()> {
+        use crate::Receipt;
+
+        let receipt = super::ReceiptWithBloom::<Receipt<()>> {
             receipt: super::Receipt {
                 status: super::Eip658Value::PostState(b256!(
                     "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
@@ -255,7 +260,7 @@ mod test {
 
         println!("Serialized {}", json);
 
-        let receipt: super::ReceiptWithBloom<()> = serde_json::from_str(&json).unwrap();
+        let receipt: super::ReceiptWithBloom<Receipt<()>> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(
             receipt.receipt.status,

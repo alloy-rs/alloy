@@ -19,7 +19,9 @@ pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
-pub use receipt::{Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts, TxReceipt};
+pub use receipt::{
+    Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpReceipt, TxReceipt,
+};
 
 pub mod proofs;
 
