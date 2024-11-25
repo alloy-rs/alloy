@@ -496,6 +496,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getFilterChanges", (id,)).await
     }
 
+    /// Retrieves a [`Vec<Log>`] for the given filter ID.
+    async fn get_filter_logs(&self, id: U256) -> TransportResult<Vec<Log>> {
+        self.client().request("eth_getFilterLogs", (id,)).await
+    }
+
     /// Watch for the confirmation of a single pending transaction with the given configuration.
     ///
     /// Note that this is handled internally rather than calling any specific RPC method, and as
