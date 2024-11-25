@@ -143,6 +143,14 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        match self {
+            Self::Ethereum(inner) => inner.is_create(),
+            Self::Unknown(inner) => inner.is_create(),
+        }
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
@@ -329,6 +337,14 @@ impl TransactionTrait for AnyTxEnvelope {
         match self {
             Self::Ethereum(inner) => inner.kind(),
             Self::Unknown(inner) => inner.kind(),
+        }
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        match self {
+            Self::Ethereum(inner) => inner.is_create(),
+            Self::Unknown(inner) => inner.is_create(),
         }
     }
 

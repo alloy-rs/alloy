@@ -228,6 +228,11 @@ impl Transaction for TxEip4844Variant {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        false
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::TxEip4844(tx) => tx.value,
@@ -657,6 +662,11 @@ impl Transaction for TxEip4844 {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        false
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
@@ -868,6 +878,11 @@ impl Transaction for TxEip4844WithSidecar {
     #[inline]
     fn kind(&self) -> TxKind {
         self.tx.kind()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        false
     }
 
     #[inline]

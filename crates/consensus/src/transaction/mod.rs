@@ -128,6 +128,11 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Returns the transaction kind.
     fn kind(&self) -> TxKind;
 
+    /// Returns true if the transaction is a contract creation.
+    /// We don't provide a default implementation via `kind` as it copies the 21-byte
+    /// [`TxKind`] for this simple check. A proper implementation shouldn't allocate.
+    fn is_create(&self) -> bool;
+
     /// Get the transaction's address of the contract that will be called, or the address that will
     /// receive the transfer.
     ///
@@ -282,6 +287,11 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]
     fn kind(&self) -> TxKind {
         self.inner.kind()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.inner.is_create()
     }
 
     #[inline]
