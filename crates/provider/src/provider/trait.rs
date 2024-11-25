@@ -501,6 +501,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getFilterLogs", (id,)).await
     }
 
+    /// Request provider to uninstall the filter with the given ID.
+    async fn uninstall_filter(&self, id: U256) -> TransportResult<bool> {
+        self.client().request("eth_uninstallFilter", (id,)).await
+    }
+
     /// Watch for the confirmation of a single pending transaction with the given configuration.
     ///
     /// Note that this is handled internally rather than calling any specific RPC method, and as
