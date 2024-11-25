@@ -199,6 +199,11 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        self.fields.get("to").map_or(true, |v| v.is_null())
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.fields.get_deserialized("value").and_then(Result::ok).unwrap_or_default()
     }
@@ -326,6 +331,11 @@ impl alloy_consensus::Transaction for UnknownTxEnvelope {
     #[inline]
     fn kind(&self) -> TxKind {
         self.inner.kind()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.inner.is_create()
     }
 
     #[inline]

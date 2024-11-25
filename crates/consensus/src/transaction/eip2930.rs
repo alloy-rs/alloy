@@ -178,6 +178,11 @@ impl Transaction for TxEip2930 {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        self.to.is_create()
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }

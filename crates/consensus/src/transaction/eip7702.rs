@@ -218,6 +218,11 @@ impl Transaction for TxEip7702 {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        false
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }

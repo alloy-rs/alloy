@@ -592,6 +592,17 @@ impl Transaction for TxEnvelope {
     }
 
     #[inline]
+    fn is_create(&self) -> bool {
+        match self {
+            Self::Legacy(tx) => tx.tx().is_create(),
+            Self::Eip2930(tx) => tx.tx().is_create(),
+            Self::Eip1559(tx) => tx.tx().is_create(),
+            Self::Eip4844(tx) => tx.tx().is_create(),
+            Self::Eip7702(tx) => tx.tx().is_create(),
+        }
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         match self {
             Self::Legacy(tx) => tx.tx().value(),

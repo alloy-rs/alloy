@@ -224,6 +224,10 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
         self.inner.kind()
     }
 
+    fn is_create(&self) -> bool {
+        self.inner.is_create()
+    }
+
     fn value(&self) -> U256 {
         self.inner.value()
     }
