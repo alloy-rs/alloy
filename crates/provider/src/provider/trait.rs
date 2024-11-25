@@ -343,6 +343,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         Ok(block)
     }
 
+    /// Returns the number of transactions in a block from a block matching the given block hash.
+    async fn get_block_transaction_count_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<u64>> {
+        self.client()
+            .request("eth_getBlockTransactionCountByHash", (hash,))
+            .await
+            .map(|opt_count: Option<U64>| opt_count.map(|count| count.to::<u64>()))
+    }
+
     /// Gets the selected block [BlockId] receipts.
     fn get_block_receipts(
         &self,
@@ -1693,6 +1704,19 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(fee_history.oldest_block, 0_u64);
+    }
+
+    #[tokio::test]
+    async fn gets_block_transaction_count_by_hash() {
+        let provider = ProviderBuilder::new().on_anvil();
+        let block = provider
+            .get_block(BlockId::latest(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
+        let hash = block.header.hash;
+        let tx_count = provider.get_block_transaction_count_by_hash(hash).await.unwrap();
+        assert!(tx_count.is_some());
     }
 
     #[tokio::test]
