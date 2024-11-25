@@ -653,6 +653,13 @@ pub trait BlockHeader {
             base_fee_params,
         ))
     }
+
+    /// Returns the parent block's number and hash
+    ///
+    /// Note: for the genesis block the parent number is 0 and the parent hash is the zero hash.
+    fn parent_num_hash(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
+    }
 }
 
 impl BlockHeader for Header {
