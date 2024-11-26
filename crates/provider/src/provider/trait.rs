@@ -1318,7 +1318,7 @@ mod tests {
 
         // These blocks are not necessary.
         {
-            let refdyn = &provider as &dyn Provider<alloy_transport_http::Http<reqwest::Client>, _>;
+            let refdyn = &provider as &dyn Provider<alloy_transport::BoxTransport, _>;
             let num = refdyn.get_block_number().await.unwrap();
             assert_eq!(0, num);
         }
@@ -1332,7 +1332,7 @@ mod tests {
 
         // Note the `Http` arg, vs no arg (defaulting to `BoxedTransport`) below.
         {
-            let refdyn = &provider as &dyn Provider<alloy_transport_http::Http<reqwest::Client>, _>;
+            let refdyn = &provider as &dyn Provider<alloy_transport::BoxTransport, _>;
             let num = refdyn.get_block_number().await.unwrap();
             assert_eq!(0, num);
         }

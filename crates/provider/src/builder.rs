@@ -376,14 +376,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using an Reqwest HTTP transport.
     pub fn on_anvil(self) -> F::Provider
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, alloy_transport::BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
+                crate::provider::RootProvider<alloy_transport::BoxTransport>,
+                alloy_transport::BoxTransport,
             >,
-            alloy_transport_http::Http<reqwest::Client>,
+            alloy_transport::BoxTransport,
         >,
     {
         self.on_anvil_with_config(std::convert::identity)
@@ -419,20 +418,21 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> F::Provider
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, alloy_transport::BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
+                crate::provider::RootProvider<alloy_transport::BoxTransport>,
+                alloy_transport::BoxTransport,
             >,
-            alloy_transport_http::Http<reqwest::Client>,
+            alloy_transport::BoxTransport,
         >,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
-        self.layer(anvil_layer).on_http(url)
+        let rpc_client = ClientBuilder::default().http(url).boxed();
+
+        self.layer(anvil_layer).on_client(rpc_client)
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport.
