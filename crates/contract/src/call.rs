@@ -574,8 +574,6 @@ mod tests {
     };
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
-    use alloy_transport_http::Http;
-    use reqwest::Client;
 
     #[test]
     fn empty_constructor() {
@@ -624,8 +622,8 @@ mod tests {
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     #[allow(clippy::type_complexity)]
     fn build_call_builder() -> CallBuilder<
-        Http<Client>,
-        AnvilProvider<RootProvider<Http<Client>>, Http<Client>>,
+        alloy_transport::BoxTransport,
+        AnvilProvider<RootProvider<alloy_transport::BoxTransport>, alloy_transport::BoxTransport>,
         PhantomData<MyContract::doStuffCall>,
     > {
         let provider = ProviderBuilder::new().on_anvil();
