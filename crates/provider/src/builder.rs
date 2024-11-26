@@ -373,7 +373,7 @@ type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 // `reqwest` feature is enabled.
 #[cfg(any(test, feature = "anvil-node"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
-    /// Build this provider with anvil, using an Reqwest HTTP transport.
+    /// Build this provider with anvil, using the BoxTransport.
     pub fn on_anvil(self) -> F::Provider
     where
         F: TxFiller<Ethereum> + ProviderLayer<L::Provider, BoxTransport, Ethereum>,
@@ -385,7 +385,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self.on_anvil_with_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport. This
+    /// Build this provider with anvil, using the BoxTransport. This
     /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
     pub fn on_anvil_with_wallet(
@@ -401,7 +401,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self.on_anvil_with_wallet_and_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport. The
+    /// Build this provider with anvil, using the BoxTransport. The
     /// given function is used to configure the anvil instance.
     pub fn on_anvil_with_config(
         self,
@@ -422,7 +422,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self.layer(anvil_layer).on_client(rpc_client)
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport.
+    /// Build this provider with anvil, using the BoxTransport.
     /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
     pub fn on_anvil_with_wallet_and_config(
         self,
@@ -438,7 +438,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self.try_on_anvil_with_wallet_and_config(f).unwrap()
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport. The
+    /// Build this provider with anvil, using the BoxTransport. The
     /// given function is used to configure the anvil instance. This
     /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
