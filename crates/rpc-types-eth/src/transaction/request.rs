@@ -1,9 +1,9 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction};
+use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
 use alloy_consensus::{
-    Transaction as _, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
-    TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
+    TxLegacy, TxType, TypedTransaction,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
@@ -140,6 +140,55 @@ impl TransactionRequest {
     pub const fn from(mut self, from: Address) -> Self {
         self.from = Some(from);
         self
+    }
+
+    /// Initializes the [`TransactionRequest`] with the provided transaction.
+    ///
+    /// Note: This leaves the `from` field empty.
+    pub fn from_transaction<T: TransactionTrait>(tx: T) -> Self {
+        let to = Some(tx.to().into());
+        let gas = tx.gas_limit();
+        let value = tx.value();
+        let input = tx.input().clone();
+        let nonce = tx.nonce();
+        let chain_id = tx.chain_id();
+        let access_list = tx.access_list().cloned();
+        let max_fee_per_blob_gas = tx.max_fee_per_blob_gas();
+        let authorization_list = tx.authorization_list().map(|l| l.to_vec());
+        let blob_versioned_hashes = tx.blob_versioned_hashes().map(Vec::from);
+        let tx_type = tx.ty();
+
+        // fees depending on the transaction type
+        let (gas_price, max_fee_per_gas) = if tx.is_dynamic_fee() {
+            (None, Some(tx.max_fee_per_gas()))
+        } else {
+            (Some(tx.max_fee_per_gas()), None)
+        };
+        let max_priority_fee_per_gas = tx.max_priority_fee_per_gas();
+
+        Self {
+            from: None,
+            to,
+            gas_price,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            gas: Some(gas),
+            value: Some(value),
+            input: TransactionInput::new(input),
+            nonce: Some(nonce),
+            chain_id,
+            access_list,
+            max_fee_per_blob_gas,
+            blob_versioned_hashes,
+            transaction_type: Some(tx_type),
+            sidecar: None,
+            authorization_list,
+        }
+    }
+
+    /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
+    pub fn from_transaction_with_sender<T: TransactionTrait>(tx: T, from: Address) -> Self {
+        Self::from_transaction(tx).from(from)
     }
 
     /// Sets the transactions type for the transactions.
