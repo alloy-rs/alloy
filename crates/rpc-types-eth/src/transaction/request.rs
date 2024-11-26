@@ -736,107 +736,6 @@ impl TransactionBuilder7702 for TransactionRequest {
     }
 }
 
-/// Helper type that supports both `data` and `input` fields that map to transaction input data.
-///
-/// This is done for compatibility reasons where older implementations used `data` instead of the
-/// newer, recommended `input` field.
-///
-/// If both fields are set, it is expected that they contain the same value, otherwise an error is
-/// returned.
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[doc(alias = "TxInput")]
-pub struct TransactionInput {
-    /// Transaction data
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub input: Option<Bytes>,
-    /// Transaction data
-    ///
-    /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub data: Option<Bytes>,
-}
-
-impl TransactionInput {
-    /// Creates a new instance with the given input data.
-    pub const fn new(data: Bytes) -> Self {
-        Self::maybe_input(Some(data))
-    }
-
-    /// Creates a new instance with the given input data and sets both `input` and `data` fields to
-    /// the same value.
-    pub fn both(data: Bytes) -> Self {
-        Self::maybe_both(Some(data))
-    }
-
-    /// Creates a new instance with the given input data.
-    pub const fn maybe_input(input: Option<Bytes>) -> Self {
-        Self { input, data: None }
-    }
-
-    /// Creates a new instance with the given input data and sets both `input` and `data` fields to
-    /// the same value.
-    pub fn maybe_both(input: Option<Bytes>) -> Self {
-        Self { data: input.clone(), input }
-    }
-
-    /// Consumes the type and returns the optional input data.
-    #[inline]
-    pub fn into_input(self) -> Option<Bytes> {
-        self.input.or(self.data)
-    }
-
-    /// Consumes the type and returns the optional input data.
-    ///
-    /// Returns an error if both `data` and `input` fields are set and not equal.
-    #[inline]
-    pub fn try_into_unique_input(self) -> Result<Option<Bytes>, TransactionInputError> {
-        self.check_unique_input().map(|()| self.into_input())
-    }
-
-    /// Returns the optional input data.
-    #[inline]
-    pub fn input(&self) -> Option<&Bytes> {
-        self.input.as_ref().or(self.data.as_ref())
-    }
-
-    /// Returns the optional input data.
-    ///
-    /// Returns an error if both `data` and `input` fields are set and not equal.
-    #[inline]
-    pub fn unique_input(&self) -> Result<Option<&Bytes>, TransactionInputError> {
-        self.check_unique_input().map(|()| self.input())
-    }
-
-    fn check_unique_input(&self) -> Result<(), TransactionInputError> {
-        if let (Some(input), Some(data)) = (&self.input, &self.data) {
-            if input != data {
-                return Err(TransactionInputError::default());
-            }
-        }
-        Ok(())
-    }
-}
-
-impl From<Vec<u8>> for TransactionInput {
-    fn from(input: Vec<u8>) -> Self {
-        Self { input: Some(input.into()), data: None }
-    }
-}
-
-impl From<Bytes> for TransactionInput {
-    fn from(input: Bytes) -> Self {
-        Self { input: Some(input), data: None }
-    }
-}
-
-impl From<Option<Bytes>> for TransactionInput {
-    fn from(input: Option<Bytes>) -> Self {
-        Self { input, data: None }
-    }
-}
-
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
         tx.into_request()
@@ -1096,6 +995,107 @@ impl From<TxEnvelope> for TransactionRequest {
             }
             _ => Default::default(),
         }
+    }
+}
+
+/// Helper type that supports both `data` and `input` fields that map to transaction input data.
+///
+/// This is done for compatibility reasons where older implementations used `data` instead of the
+/// newer, recommended `input` field.
+///
+/// If both fields are set, it is expected that they contain the same value, otherwise an error is
+/// returned.
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[doc(alias = "TxInput")]
+pub struct TransactionInput {
+    /// Transaction data
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub input: Option<Bytes>,
+    /// Transaction data
+    ///
+    /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub data: Option<Bytes>,
+}
+
+impl TransactionInput {
+    /// Creates a new instance with the given input data.
+    pub const fn new(data: Bytes) -> Self {
+        Self::maybe_input(Some(data))
+    }
+
+    /// Creates a new instance with the given input data and sets both `input` and `data` fields to
+    /// the same value.
+    pub fn both(data: Bytes) -> Self {
+        Self::maybe_both(Some(data))
+    }
+
+    /// Creates a new instance with the given input data.
+    pub const fn maybe_input(input: Option<Bytes>) -> Self {
+        Self { input, data: None }
+    }
+
+    /// Creates a new instance with the given input data and sets both `input` and `data` fields to
+    /// the same value.
+    pub fn maybe_both(input: Option<Bytes>) -> Self {
+        Self { data: input.clone(), input }
+    }
+
+    /// Consumes the type and returns the optional input data.
+    #[inline]
+    pub fn into_input(self) -> Option<Bytes> {
+        self.input.or(self.data)
+    }
+
+    /// Consumes the type and returns the optional input data.
+    ///
+    /// Returns an error if both `data` and `input` fields are set and not equal.
+    #[inline]
+    pub fn try_into_unique_input(self) -> Result<Option<Bytes>, TransactionInputError> {
+        self.check_unique_input().map(|()| self.into_input())
+    }
+
+    /// Returns the optional input data.
+    #[inline]
+    pub fn input(&self) -> Option<&Bytes> {
+        self.input.as_ref().or(self.data.as_ref())
+    }
+
+    /// Returns the optional input data.
+    ///
+    /// Returns an error if both `data` and `input` fields are set and not equal.
+    #[inline]
+    pub fn unique_input(&self) -> Result<Option<&Bytes>, TransactionInputError> {
+        self.check_unique_input().map(|()| self.input())
+    }
+
+    fn check_unique_input(&self) -> Result<(), TransactionInputError> {
+        if let (Some(input), Some(data)) = (&self.input, &self.data) {
+            if input != data {
+                return Err(TransactionInputError::default());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl From<Vec<u8>> for TransactionInput {
+    fn from(input: Vec<u8>) -> Self {
+        Self { input: Some(input.into()), data: None }
+    }
+}
+
+impl From<Bytes> for TransactionInput {
+    fn from(input: Bytes) -> Self {
+        Self { input: Some(input), data: None }
+    }
+}
+
+impl From<Option<Bytes>> for TransactionInput {
+    fn from(input: Option<Bytes>) -> Self {
+        Self { input, data: None }
     }
 }
 
