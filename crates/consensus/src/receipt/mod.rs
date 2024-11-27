@@ -1,5 +1,5 @@
 use alloy_primitives::Bloom;
-use alloy_rlp::{BufMut, Header};
+use alloy_rlp::{Buf, BufMut, Header};
 use core::fmt;
 
 mod envelope;
@@ -100,17 +100,21 @@ pub trait RlpReceipt: Sized {
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining = buf.len();
 
-        if header.payload_length > remaining {
+        if header.payload_length > buf.len() {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        let this = Self::rlp_decode_fields_with_bloom(buf)?;
+        // Note: we pass a new slice to `Self::rlp_decode_fields_with_bloom` so that it knows the
+        // length of the payload specified in header.
+        let mut fields_buf = &buf[..header.payload_length];
+        let this = Self::rlp_decode_fields_with_bloom(&mut fields_buf)?;
 
-        if buf.len() + header.payload_length != remaining {
+        if !fields_buf.is_empty() {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
+
+        buf.advance(header.payload_length);
 
         Ok(this)
     }
