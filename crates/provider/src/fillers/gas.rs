@@ -226,12 +226,14 @@ where
             }
         }
 
-        provider
+        let latest_block = provider
             .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await?
-            .ok_or(RpcError::NullResp)?
-            .header()
-            .as_ref()
+            .ok_or(RpcError::NullResp)?;
+
+        let latest_header = latest_block.header().as_ref();
+
+        latest_header
             .next_block_blob_fee()
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))

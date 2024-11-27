@@ -95,6 +95,16 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+    /// EIP-7744 target blob count.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
+    pub target_blobs_per_block: Option<u64>,
 }
 
 impl BlockHeader for AnyHeader {
@@ -178,6 +188,10 @@ impl BlockHeader for AnyHeader {
         self.requests_hash
     }
 
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.target_blobs_per_block
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
@@ -207,6 +221,7 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            target_blobs_per_block,
         } = value;
 
         Self {
@@ -231,6 +246,7 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            target_blobs_per_block,
         }
     }
 }

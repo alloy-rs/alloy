@@ -256,6 +256,10 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
     fn requests_hash(&self) -> Option<B256> {
         self.inner.requests_hash()
     }
+
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.inner.target_blobs_per_block()
+    }
 }
 
 impl<H: BlockHeader> HeaderResponse for Header<H> {
@@ -450,6 +454,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blobs_per_block: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -497,6 +502,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blobs_per_block: None,
                 },
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
@@ -542,6 +548,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blobs_per_block: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -813,6 +820,7 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                target_blobs_per_block: None,
             },
             size: None,
             total_difficulty: None,
@@ -859,6 +867,7 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                target_blobs_per_block: None,
             },
             total_difficulty: None,
             size: Some(U256::from(505)),
@@ -917,6 +926,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    target_blobs_per_block: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),
