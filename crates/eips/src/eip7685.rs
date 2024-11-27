@@ -102,6 +102,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "sha2")]
     fn test_consistent_requests_hash() {
         // We test that the empty requests hash is consistent with the EIP-7685 definition.
         assert_eq!(Requests::default().requests_hash(), EMPTY_REQUESTS_HASH);

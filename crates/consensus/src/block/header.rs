@@ -2,6 +2,7 @@ use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
+    eip1898::BlockWithParent,
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
@@ -21,11 +22,11 @@ pub struct Header {
     /// block’s header, in its entirety; formally Hp.
     pub parent_hash: B256,
     /// The Keccak 256-bit hash of the ommers list portion of this block; formally Ho.
-    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
+    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles", alias = "ommersHash"))]
     pub ommers_hash: B256,
     /// The 160-bit address to which all fees collected from the successful mining of this block
     /// be transferred; formally Hc.
-    #[cfg_attr(feature = "serde", serde(rename = "miner"))]
+    #[cfg_attr(feature = "serde", serde(rename = "miner", alias = "beneficiary"))]
     pub beneficiary: Address,
     /// The Keccak 256-bit hash of the root node of the state trie, after all transactions are
     /// executed and finalisations applied; formally Hr.
@@ -319,6 +320,13 @@ impl Header {
         BlockNumHash { number: self.number, hash: self.hash_slow() }
     }
 
+    /// Returns the block's number and hash with the parent hash.
+    ///
+    /// Note: this hashes the header.
+    pub fn num_hash_with_parent_slow(&self) -> BlockWithParent {
+        BlockWithParent::new(self.parent_hash, self.num_hash_slow())
+    }
+
     /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
     ///
     /// This function is linked to EIP-3675, proposing the consensus upgrade to Proof-of-Stake:
@@ -552,6 +560,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 }
 
 /// Trait for extracting specific Ethereum block data from a header
+#[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
     /// Retrieves the parent hash of the block
     fn parent_hash(&self) -> B256;
@@ -631,6 +640,25 @@ pub trait BlockHeader {
     /// See also [Self::next_block_excess_blob_gas]
     fn next_block_blob_fee(&self) -> Option<u128> {
         self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+    }
+
+    /// Calculate base fee for next block according to the EIP-1559 spec.
+    ///
+    /// Returns a `None` if no base fee is set, no EIP-1559 support
+    fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+        Some(calc_next_block_base_fee(
+            self.gas_used(),
+            self.gas_limit(),
+            self.base_fee_per_gas()?,
+            base_fee_params,
+        ))
+    }
+
+    /// Returns the parent block's number and hash
+    ///
+    /// Note: for the genesis block the parent number is 0 and the parent hash is the zero hash.
+    fn parent_num_hash(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
     }
 }
 
@@ -717,6 +745,93 @@ impl BlockHeader for Header {
 
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
+    fn parent_hash(&self) -> B256 {
+        self.inner.parent_hash()
+    }
+
+    fn ommers_hash(&self) -> B256 {
+        self.inner.ommers_hash()
+    }
+
+    fn beneficiary(&self) -> Address {
+        self.inner.beneficiary()
+    }
+
+    fn state_root(&self) -> B256 {
+        self.inner.state_root()
+    }
+
+    fn transactions_root(&self) -> B256 {
+        self.inner.transactions_root()
+    }
+
+    fn receipts_root(&self) -> B256 {
+        self.inner.receipts_root()
+    }
+
+    fn withdrawals_root(&self) -> Option<B256> {
+        self.inner.withdrawals_root()
+    }
+
+    fn logs_bloom(&self) -> Bloom {
+        self.inner.logs_bloom()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.inner.difficulty()
+    }
+
+    fn number(&self) -> u64 {
+        self.inner.number()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn gas_used(&self) -> u64 {
+        self.inner.gas_used()
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.inner.timestamp()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.inner.mix_hash()
+    }
+
+    fn nonce(&self) -> Option<B64> {
+        self.inner.nonce()
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u64> {
+        self.inner.base_fee_per_gas()
+    }
+
+    fn blob_gas_used(&self) -> Option<u64> {
+        self.inner.blob_gas_used()
+    }
+
+    fn excess_blob_gas(&self) -> Option<u64> {
+        self.inner.excess_blob_gas()
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.inner.parent_beacon_block_root()
+    }
+
+    fn requests_hash(&self) -> Option<B256> {
+        self.inner.requests_hash()
     }
 }
 

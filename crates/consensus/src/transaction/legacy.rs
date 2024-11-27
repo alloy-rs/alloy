@@ -1,20 +1,11 @@
 use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_primitives::{
+    keccak256, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
+};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
-
-/// Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
-macro_rules! legacy_sig {
-    ($signature:expr) => {
-        if let Parity::Parity(parity) = $signature.v() {
-            &$signature.with_parity(Parity::NonEip155(parity))
-        } else {
-            $signature
-        }
-    };
-}
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -50,11 +41,14 @@ pub struct TxLegacy {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
+    )]
     pub gas_limit: u64,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub to: TxKind,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
@@ -118,14 +112,12 @@ impl RlpEcdsaTx for TxLegacy {
     const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
 
     fn rlp_encoded_fields_length(&self) -> usize {
-        let mut len = 0;
-        len += self.nonce.length();
-        len += self.gas_price.length();
-        len += self.gas_limit.length();
-        len += self.to.length();
-        len += self.value.length();
-        len += self.input.0.length();
-        len
+        self.nonce.length()
+            + self.gas_price.length()
+            + self.gas_limit.length()
+            + self.to.length()
+            + self.value.length()
+            + self.input.0.length()
     }
 
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
@@ -137,18 +129,23 @@ impl RlpEcdsaTx for TxLegacy {
         self.input.0.encode(out);
     }
 
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        let payload_length = self.rlp_encoded_fields_length()
+            + signature.rlp_rs_len()
+            + to_eip155_value(signature.v(), self.chain_id).length();
+        Header { list: true, payload_length }
+    }
+
     fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
         // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
-        let signature = legacy_sig!(signature);
         self.rlp_header_signed(signature).length_with_payload()
     }
 
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
-        let signature = legacy_sig!(signature);
         self.rlp_header_signed(signature).encode(out);
         self.rlp_encode_fields(out);
-        signature.write_rlp_vrs(out);
+        signature.write_rlp_vrs(out, to_eip155_value(signature.v(), self.chain_id));
     }
 
     fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
@@ -191,13 +188,13 @@ impl RlpEcdsaTx for TxLegacy {
 
         let remaining = buf.len();
         let mut tx = Self::rlp_decode_fields(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        if !matches!(signature.v(), Parity::Eip155(_) | Parity::NonEip155(_)) {
-            return Err(alloy_rlp::Error::Custom("invalid parity for legacy transaction"));
-        }
-
-        tx.chain_id = signature.v().chain_id();
+        let signature = Signature::decode_rlp_vrs(buf, |buf| {
+            let value = Decodable::decode(buf)?;
+            let (parity, chain_id) =
+                from_eip155_value(value).ok_or(alloy_rlp::Error::Custom("invalid parity value"))?;
+            tx.chain_id = chain_id;
+            Ok(parity)
+        })?;
 
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -235,72 +232,97 @@ impl RlpEcdsaTx for TxLegacy {
 }
 
 impl Transaction for TxLegacy {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         Some(self.gas_price)
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.gas_price
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.gas_price
     }
 
+    fn effective_gas_price(&self, _base_fee: Option<u64>) -> u128 {
+        self.gas_price
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        false
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.to
     }
 
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.to.is_create()
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         &self.input
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Legacy as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         None
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
 }
 
 impl SignableTransaction<Signature> for TxLegacy {
-    fn use_eip155(&self) -> bool {
-        self.chain_id.is_some()
-    }
-
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = Some(chain_id);
     }
@@ -322,13 +344,6 @@ impl SignableTransaction<Signature> for TxLegacy {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
-        let signature = if let Parity::Parity(parity) = signature.v() {
-            signature.with_parity(Parity::NonEip155(parity))
-        } else {
-            signature
-        };
-
         let hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, hash)
     }
@@ -372,6 +387,141 @@ impl Decodable for TxLegacy {
         }
 
         Ok(transaction)
+    }
+}
+
+/// Helper for encoding `y_parity` boolean and optional `chain_id` into EIP-155 `v` value.
+pub const fn to_eip155_value(y_parity: bool, chain_id: Option<ChainId>) -> u128 {
+    match chain_id {
+        Some(id) => 35 + id as u128 * 2 + y_parity as u128,
+        None => 27 + y_parity as u128,
+    }
+}
+
+/// Helper for decoding EIP-155 `v` value into `y_parity` boolean and optional `chain_id`.
+pub const fn from_eip155_value(value: u128) -> Option<(bool, Option<ChainId>)> {
+    match value {
+        27 => Some((false, None)),
+        28 => Some((true, None)),
+        v @ 35.. => {
+            let y_parity = ((v - 35) % 2) != 0;
+            let chain_id = (v - 35) / 2;
+
+            if chain_id > u64::MAX as u128 {
+                return None;
+            }
+            Some((y_parity, Some(chain_id as u64)))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(feature = "serde")]
+pub mod signed_legacy_serde {
+    //! Helper module for encoding signatures of transactions wrapped into [`Signed`] in legacy
+    //! format.
+    //!
+    //! By default, signatures are encoded as a single boolean under `yParity` key. However, for
+    //! legacy transactions parity byte is encoded as `v` key respecting EIP-155 format.
+    use super::*;
+    use alloc::borrow::Cow;
+    use alloy_primitives::U128;
+    use serde::{Deserialize, Serialize};
+
+    struct LegacySignature {
+        r: U256,
+        s: U256,
+        v: U128,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct HumanReadableRepr {
+        r: U256,
+        s: U256,
+        v: U128,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    struct NonHumanReadableRepr((U256, U256, U128));
+
+    impl Serialize for LegacySignature {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            if serializer.is_human_readable() {
+                HumanReadableRepr { r: self.r, s: self.s, v: self.v }.serialize(serializer)
+            } else {
+                NonHumanReadableRepr((self.r, self.s, self.v)).serialize(serializer)
+            }
+        }
+    }
+
+    impl<'de> Deserialize<'de> for LegacySignature {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            if deserializer.is_human_readable() {
+                HumanReadableRepr::deserialize(deserializer).map(|repr| Self {
+                    r: repr.r,
+                    s: repr.s,
+                    v: repr.v,
+                })
+            } else {
+                NonHumanReadableRepr::deserialize(deserializer).map(|repr| Self {
+                    r: repr.0 .0,
+                    s: repr.0 .1,
+                    v: repr.0 .2,
+                })
+            }
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct SignedLegacy<'a> {
+        #[serde(flatten)]
+        tx: Cow<'a, TxLegacy>,
+        #[serde(flatten)]
+        signature: LegacySignature,
+        hash: B256,
+    }
+
+    /// Serializes signed transaction with `v` key for signature parity.
+    pub fn serialize<S>(signed: &crate::Signed<TxLegacy>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        SignedLegacy {
+            tx: Cow::Borrowed(signed.tx()),
+            signature: LegacySignature {
+                v: U128::from(to_eip155_value(signed.signature().v(), signed.tx().chain_id())),
+                r: signed.signature().r(),
+                s: signed.signature().s(),
+            },
+            hash: *signed.hash(),
+        }
+        .serialize(serializer)
+    }
+
+    /// Deserializes signed transaction expecting `v` key for signature parity.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<crate::Signed<TxLegacy>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
+        let (parity, chain_id) = from_eip155_value(signature.v.to())
+            .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
+        if let Some(tx_chain_id) = tx.chain_id() {
+            // Some nodes respond with 0 chain ID for legacy transactions when it is missing.
+            if tx_chain_id > 0 && chain_id != Some(tx_chain_id) {
+                return Err(serde::de::Error::custom("chain id mismatch"));
+            }
+        }
+        let mut tx = tx.into_owned();
+        tx.chain_id = chain_id;
+        Ok(Signed::new_unchecked(tx, Signature::new(signature.r, signature.s, parity), hash))
     }
 }
 
@@ -491,8 +641,13 @@ pub(super) mod serde_bincode_compat {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use crate::{SignableTransaction, TxLegacy};
-    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
+    use crate::{
+        transaction::{from_eip155_value, to_eip155_value},
+        SignableTransaction, TxLegacy,
+    };
+    use alloy_primitives::{
+        address, b256, hex, Address, PrimitiveSignature as Signature, TxKind, B256, U256,
+    };
 
     #[test]
     fn recover_signer_legacy() {
@@ -513,9 +668,8 @@ mod tests {
         let sig = Signature::from_scalars_and_parity(
             b256!("2a378831cf81d99a3f06a18ae1b6ca366817ab4d88a70053c41d7a8f0368e031"),
             b256!("450d831a05b6e418724436c05c155e0a1b7b921015d0fbc2f667aed709ac4fb5"),
-            37,
-        )
-        .unwrap();
+            false,
+        );
 
         let signed_tx = tx.into_signed(sig);
 
@@ -536,5 +690,22 @@ mod tests {
 
         assert_eq!(tx.tx().chain_id, Some(1), "Expected same chain id");
         assert_eq!(expected, recovered, "Expected same signer");
+    }
+
+    #[test]
+    fn eip155_roundtrip() {
+        assert_eq!(from_eip155_value(to_eip155_value(false, None)), Some((false, None)));
+        assert_eq!(from_eip155_value(to_eip155_value(true, None)), Some((true, None)));
+
+        for chain_id in [0, 1, 10, u64::MAX] {
+            assert_eq!(
+                from_eip155_value(to_eip155_value(false, Some(chain_id))),
+                Some((false, Some(chain_id)))
+            );
+            assert_eq!(
+                from_eip155_value(to_eip155_value(true, Some(chain_id))),
+                Some((true, Some(chain_id)))
+            );
+        }
     }
 }

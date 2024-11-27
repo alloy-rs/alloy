@@ -57,7 +57,7 @@ impl Withdrawal {
 )]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Withdrawals(Vec<Withdrawal>);
+pub struct Withdrawals(pub Vec<Withdrawal>);
 
 impl Withdrawals {
     /// Create a new Withdrawals instance.

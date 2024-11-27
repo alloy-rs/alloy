@@ -28,6 +28,18 @@ pub struct EIP1186StorageProof {
     pub proof: Vec<Bytes>,
 }
 
+#[cfg(feature = "serde")]
+impl EIP1186StorageProof {
+    /// Create a new `EIP1186StorageProof` instance.
+    pub const fn new(
+        key: alloy_serde::storage::JsonStorageKey,
+        value: U256,
+        proof: Vec<Bytes>,
+    ) -> Self {
+        Self { key, value, proof }
+    }
+}
+
 /// Response for EIP-1186 account proof `eth_getProof`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg(feature = "serde")]

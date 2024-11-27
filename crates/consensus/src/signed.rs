@@ -1,6 +1,6 @@
 use crate::transaction::{RlpEcdsaTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
-use alloy_primitives::{Signature, B256};
+use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
 
 /// A transaction with a signature and hash seal.
@@ -17,10 +17,20 @@ pub struct Signed<T, Sig = Signature> {
 }
 
 impl<T, Sig> Signed<T, Sig> {
+    /// Instantiate from a transaction and signature. Does not verify the signature.
+    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
+        Self { tx, signature, hash }
+    }
+
     /// Returns a reference to the transaction.
     #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
         &self.tx
+    }
+
+    /// Returns a mutable reference to the transaction.
+    pub fn tx_mut(&mut self) -> &mut T {
+        &mut self.tx
     }
 
     /// Returns a reference to the signature.
@@ -46,11 +56,6 @@ impl<T, Sig> Signed<T, Sig> {
 }
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
-    /// Instantiate from a transaction and signature. Does not verify the signature.
-    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
-    }
-
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256 {
         self.tx.signature_hash()
@@ -135,5 +140,30 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         let sighash = self.tx.signature_hash();
         self.signature.recover_address_from_prehash(&sighash)
+    }
+}
+
+#[cfg(all(any(test, feature = "arbitrary"), feature = "k256"))]
+impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a>
+    for Signed<T, Signature>
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use k256::{
+            ecdsa::{signature::hazmat::PrehashSigner, SigningKey},
+            NonZeroScalar,
+        };
+        use rand::{rngs::StdRng, SeedableRng};
+
+        let rng_seed = u.arbitrary::<[u8; 32]>()?;
+        let mut rand_gen = StdRng::from_seed(rng_seed);
+        let signing_key: SigningKey = NonZeroScalar::random(&mut rand_gen).into();
+
+        let tx = T::arbitrary(u)?;
+
+        let (recoverable_sig, recovery_id) =
+            signing_key.sign_prehash(tx.signature_hash().as_ref()).unwrap();
+        let signature: Signature = (recoverable_sig, recovery_id).into();
+
+        Ok(tx.into_signed(signature))
     }
 }

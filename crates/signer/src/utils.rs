@@ -2,10 +2,7 @@
 
 use alloy_primitives::{keccak256, Address};
 use elliptic_curve::sec1::ToEncodedPoint;
-use k256::{
-    ecdsa::{SigningKey, VerifyingKey},
-    AffinePoint,
-};
+use k256::ecdsa::{SigningKey, VerifyingKey};
 
 /// Converts an ECDSA private key to its corresponding Ethereum Address.
 #[inline]
@@ -16,7 +13,7 @@ pub fn secret_key_to_address(secret_key: &SigningKey) -> Address {
 /// Converts an ECDSA public key to its corresponding Ethereum address.
 #[inline]
 pub fn public_key_to_address(pubkey: &VerifyingKey) -> Address {
-    let affine: &AffinePoint = pubkey.as_ref();
+    let affine = pubkey.as_ref();
     let encoded = affine.to_encoded_point(false);
     raw_public_key_to_address(&encoded.as_bytes()[1..])
 }

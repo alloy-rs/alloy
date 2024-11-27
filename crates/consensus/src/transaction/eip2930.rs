@@ -1,6 +1,6 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -33,11 +33,14 @@ pub struct TxEip2930 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
+    )]
     pub gas_limit: u64,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub to: TxKind,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
@@ -84,16 +87,14 @@ impl RlpEcdsaTx for TxEip2930 {
 
     /// Outputs the length of the transaction's fields, without a RLP header.
     fn rlp_encoded_fields_length(&self) -> usize {
-        let mut len = 0;
-        len += self.chain_id.length();
-        len += self.nonce.length();
-        len += self.gas_price.length();
-        len += self.gas_limit.length();
-        len += self.to.length();
-        len += self.value.length();
-        len += self.input.0.length();
-        len += self.access_list.length();
-        len
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.gas_price.length()
+            + self.gas_limit.length()
+            + self.to.length()
+            + self.value.length()
+            + self.input.0.length()
+            + self.access_list.length()
     }
 
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
@@ -122,62 +123,91 @@ impl RlpEcdsaTx for TxEip2930 {
 }
 
 impl Transaction for TxEip2930 {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         Some(self.gas_price)
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.gas_price
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.gas_price
     }
 
+    fn effective_gas_price(&self, _base_fee: Option<u64>) -> u128 {
+        self.gas_price
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        false
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.to
     }
 
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.to.is_create()
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         &self.input
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip2930 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
@@ -198,10 +228,6 @@ impl SignableTransaction<Signature> for TxEip2930 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct
-        // at the time of combination for an EIP-2930 transaction. V should
-        // indicate the y-parity of the signature.
-        let signature = signature.with_parity_bool();
         let tx_hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, tx_hash)
     }
@@ -227,7 +253,7 @@ impl Decodable for TxEip2930 {
 mod tests {
     use super::TxEip2930;
     use crate::{transaction::RlpEcdsaTx, SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address, Signature, TxKind, U256};
+    use alloy_primitives::{Address, PrimitiveSignature as Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]

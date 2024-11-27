@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4](https://github.com/alloy-rs/alloy/releases/tag/v0.6.4) - 2024-11-12
+
+### Other
+
+- Add trait method `Transaction::effective_gas_price` ([#1640](https://github.com/alloy-rs/alloy/issues/1640))
+
+## [0.6.3](https://github.com/alloy-rs/alloy/releases/tag/v0.6.3) - 2024-11-12
+
+### Features
+
+- [`network`] `AnyNetworkWallet` ([#1631](https://github.com/alloy-rs/alloy/issues/1631))
+
+### Miscellaneous Tasks
+
+- Release 0.6.3
+- Release 0.6.2 ([#1632](https://github.com/alloy-rs/alloy/issues/1632))
+
+### Other
+
+- Add trait method `Transaction::is_dynamic_fee` ([#1638](https://github.com/alloy-rs/alloy/issues/1638))
+
+## [0.6.1](https://github.com/alloy-rs/alloy/releases/tag/v0.6.1) - 2024-11-06
+
+### Bug Fixes
+
+- Re-introduce HeaderResponse trait ([#1627](https://github.com/alloy-rs/alloy/issues/1627))
+
+### Miscellaneous Tasks
+
+- Release 0.6.1
+
+## [0.6.0](https://github.com/alloy-rs/alloy/releases/tag/v0.6.0) - 2024-11-06
+
+### Bug Fixes
+
+- Serde for `AnyTxEnvelope` ([#1613](https://github.com/alloy-rs/alloy/issues/1613))
+- Update AnyNetwork type aliases ([#1591](https://github.com/alloy-rs/alloy/issues/1591))
+
+### Features
+
+- Integrate signature with boolean parity ([#1540](https://github.com/alloy-rs/alloy/issues/1540))
+- Use `OtherFields` on `UnknownTypedTransaction` ([#1605](https://github.com/alloy-rs/alloy/issues/1605))
+- Embed consensus header into RPC ([#1573](https://github.com/alloy-rs/alloy/issues/1573))
+
+### Miscellaneous Tasks
+
+- Release 0.6.0
+
+### Other
+
+- Embed TxEnvelope into `rpc-types-eth::Transaction` ([#1460](https://github.com/alloy-rs/alloy/issues/1460))
+
+### Styling
+
+- Move txtype-specific builders to network-primitives ([#1602](https://github.com/alloy-rs/alloy/issues/1602))
+
+## [0.5.4](https://github.com/alloy-rs/alloy/releases/tag/v0.5.4) - 2024-10-23
+
+### Miscellaneous Tasks
+
+- Release 0.5.4
+
 ## [0.5.3](https://github.com/alloy-rs/alloy/releases/tag/v0.5.3) - 2024-10-22
 
 ### Miscellaneous Tasks

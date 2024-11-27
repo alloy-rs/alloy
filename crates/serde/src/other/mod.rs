@@ -1,15 +1,12 @@
 //! Support for capturing other fields.
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String};
 use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
 
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
@@ -40,14 +37,12 @@ impl OtherFields {
 
     /// Deserialized this type into another container type.
     pub fn deserialize_as<T: DeserializeOwned>(&self) -> serde_json::Result<T> {
-        let map = self.inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        serde_json::from_value(serde_json::Value::Object(map))
+        serde_json::from_value(Value::Object(self.inner.clone().into_iter().collect()))
     }
 
     /// Deserialized this type into another container type.
     pub fn deserialize_into<T: DeserializeOwned>(self) -> serde_json::Result<T> {
-        let map = self.inner.into_iter().collect();
-        serde_json::from_value(serde_json::Value::Object(map))
+        serde_json::from_value(serde_json::Value::Object(self.inner.into_iter().collect()))
     }
 
     /// Returns the deserialized value of the field, if it exists.
@@ -178,6 +173,15 @@ pub struct WithOtherFields<T> {
     pub other: OtherFields,
 }
 
+impl<T, U> AsRef<U> for WithOtherFields<T>
+where
+    T: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.inner.as_ref()
+    }
+}
+
 impl<T> WithOtherFields<T> {
     /// Creates a new [`WithOtherFields`] instance.
     pub fn new(inner: T) -> Self {
@@ -234,7 +238,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
     use rand::Rng;
+    use serde_json::json;
     use similar_asserts::assert_eq;
 
     #[test]
@@ -265,5 +271,130 @@ mod tests {
             with_other.other,
             OtherFields::new(BTreeMap::from_iter([("b".to_string(), serde_json::json!(2))]))
         );
+    }
+
+    #[test]
+    fn test_with_other_fields_serialization() {
+        #[derive(Serialize, Deserialize, PartialEq, Debug)]
+        struct Inner {
+            a: u64,
+            b: String,
+        }
+
+        let inner = Inner { a: 42, b: "Hello".to_string() };
+        let mut other = BTreeMap::new();
+        other.insert("extra".to_string(), json!(99));
+
+        let with_other = WithOtherFields { inner, other: OtherFields::new(other.clone()) };
+        let serialized = serde_json::to_string(&with_other).unwrap();
+
+        let expected = r#"{"a":42,"b":"Hello","extra":99}"#;
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn test_remove_and_access_other_fields() {
+        #[derive(Serialize, Deserialize, PartialEq, Debug)]
+        struct Inner {
+            a: u64,
+            b: String,
+        }
+
+        let json_data = r#"{"a":42,"b":"Hello","extra":99, "another": "test"}"#;
+        let mut with_other: WithOtherFields<Inner> = serde_json::from_str(json_data).unwrap();
+
+        assert_eq!(with_other.other.inner.get("extra"), Some(&json!(99)));
+        assert_eq!(with_other.other.inner.get("another"), Some(&json!("test")));
+
+        with_other.other.remove("extra");
+        assert!(!with_other.other.inner.contains_key("extra"));
+    }
+
+    #[test]
+    fn test_deserialize_as() {
+        let mut map = BTreeMap::new();
+        map.insert("a".to_string(), json!(1));
+        let other_fields = OtherFields::new(map);
+        let deserialized: Result<BTreeMap<String, u64>, _> = other_fields.deserialize_as();
+        assert_eq!(deserialized.unwrap().get("a"), Some(&1));
+    }
+
+    #[test]
+    fn test_deserialize_into() {
+        let mut map = BTreeMap::new();
+        map.insert("a".to_string(), json!(1));
+        let other_fields = OtherFields::new(map);
+        let deserialized: Result<BTreeMap<String, u64>, _> = other_fields.deserialize_into();
+        assert_eq!(deserialized.unwrap().get("a"), Some(&1));
+    }
+
+    #[test]
+    fn test_get_with() {
+        let mut map = BTreeMap::new();
+        map.insert("key".to_string(), json!(42));
+        let other_fields = OtherFields::new(map);
+        let value: Option<u64> = other_fields.get_with("key", |v| v.as_u64().unwrap());
+        assert_eq!(value, Some(42));
+    }
+
+    #[test]
+    fn test_get_deserialized() {
+        let mut map = BTreeMap::new();
+        map.insert("key".to_string(), json!(42));
+        let other_fields = OtherFields::new(map);
+        let value: Option<serde_json::Result<u64>> = other_fields.get_deserialized("key");
+        assert_eq!(value.unwrap().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_remove_deserialized() {
+        let mut map = BTreeMap::new();
+        map.insert("key".to_string(), json!(42));
+        let mut other_fields = OtherFields::new(map);
+        let value: Option<serde_json::Result<u64>> = other_fields.remove_deserialized("key");
+        assert_eq!(value.unwrap().unwrap(), 42);
+        assert!(!other_fields.inner.contains_key("key"));
+    }
+
+    #[test]
+    fn test_remove_with() {
+        let mut map = BTreeMap::new();
+        map.insert("key".to_string(), json!(42));
+        let mut other_fields = OtherFields::new(map);
+        let value: Option<u64> = other_fields.remove_with("key", |v| v.as_u64().unwrap());
+        assert_eq!(value, Some(42));
+        assert!(!other_fields.inner.contains_key("key"));
+    }
+
+    #[test]
+    fn test_remove_entry_deserialized() {
+        let mut map = BTreeMap::new();
+        map.insert("key".to_string(), json!(42));
+        let mut other_fields = OtherFields::new(map);
+        let entry: Option<(String, serde_json::Result<u64>)> =
+            other_fields.remove_entry_deserialized("key");
+        assert!(entry.is_some());
+        let (key, value) = entry.unwrap();
+        assert_eq!(key, "key");
+        assert_eq!(value.unwrap(), 42);
+        assert!(!other_fields.inner.contains_key("key"));
+    }
+
+    #[test]
+    fn test_try_from_value() {
+        let json_value = json!({ "key": "value" });
+        let other_fields = OtherFields::try_from(json_value).unwrap();
+        assert_eq!(other_fields.inner.get("key").unwrap(), &json!("value"));
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let mut map = BTreeMap::new();
+        map.insert("key1".to_string(), json!("value1"));
+        map.insert("key2".to_string(), json!("value2"));
+        let other_fields = OtherFields::new(map.clone());
+
+        let iterated_map: BTreeMap<_, _> = other_fields.into_iter().collect();
+        assert_eq!(iterated_map, map);
     }
 }

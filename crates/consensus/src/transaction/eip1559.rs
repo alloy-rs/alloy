@@ -1,6 +1,6 @@
 use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -22,7 +22,10 @@ pub struct TxEip1559 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
+    )]
     pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -48,7 +51,7 @@ pub struct TxEip1559 {
     pub max_priority_fee_per_gas: u128,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub to: TxKind,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
@@ -70,24 +73,6 @@ pub struct TxEip1559 {
 }
 
 impl TxEip1559 {
-    /// Returns the effective gas price for the given `base_fee`.
-    pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        match base_fee {
-            None => self.max_fee_per_gas,
-            Some(base_fee) => {
-                // if the tip is greater than the max priority fee per gas, set it to the max
-                // priority fee per gas + base fee
-                let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-                if tip > self.max_priority_fee_per_gas {
-                    self.max_priority_fee_per_gas + base_fee as u128
-                } else {
-                    // otherwise return the max fee per gas
-                    self.max_fee_per_gas
-                }
-            }
-        }
-    }
-
     /// Get the transaction type
     #[doc(alias = "transaction_type")]
     pub(crate) const fn tx_type() -> TxType {
@@ -115,17 +100,15 @@ impl RlpEcdsaTx for TxEip1559 {
 
     /// Outputs the length of the transaction's fields, without a RLP header.
     fn rlp_encoded_fields_length(&self) -> usize {
-        let mut len = 0;
-        len += self.chain_id.length();
-        len += self.nonce.length();
-        len += self.max_priority_fee_per_gas.length();
-        len += self.max_fee_per_gas.length();
-        len += self.gas_limit.length();
-        len += self.to.length();
-        len += self.value.length();
-        len += self.input.0.length();
-        len += self.access_list.length();
-        len
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.max_priority_fee_per_gas.length()
+            + self.max_fee_per_gas.length()
+            + self.gas_limit.length()
+            + self.to.length()
+            + self.value.length()
+            + self.input.0.length()
+            + self.access_list.length()
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without
@@ -172,62 +155,101 @@ impl RlpEcdsaTx for TxEip1559 {
 }
 
 impl Transaction for TxEip1559 {
+    #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
 
+    #[inline]
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
+    #[inline]
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
+    #[inline]
     fn gas_price(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn max_fee_per_gas(&self) -> u128 {
         self.max_fee_per_gas
     }
 
+    #[inline]
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.max_priority_fee_per_gas)
     }
 
+    #[inline]
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         None
     }
 
+    #[inline]
     fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas
     }
 
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
+            // if the tip is greater than the max priority fee per gas, set it to the max
+            // priority fee per gas + base fee
+            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
+            if tip > self.max_priority_fee_per_gas {
+                self.max_priority_fee_per_gas + base_fee as u128
+            } else {
+                // otherwise return the max fee per gas
+                self.max_fee_per_gas
+            }
+        })
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
+    #[inline]
     fn kind(&self) -> TxKind {
         self.to
     }
 
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.to.is_create()
+    }
+
+    #[inline]
     fn value(&self) -> U256 {
         self.value
     }
 
+    #[inline]
     fn input(&self) -> &Bytes {
         &self.input
     }
 
+    #[inline]
     fn ty(&self) -> u8 {
         TxType::Eip1559 as u8
     }
 
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
 
+    #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 
+    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
@@ -248,10 +270,6 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-1559 transaction. V should indicate the y-parity of the
-        // signature.
-        let signature = signature.with_parity_bool();
         let tx_hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, tx_hash)
     }
@@ -398,7 +416,9 @@ mod tests {
     use super::TxEip1559;
     use crate::{transaction::RlpEcdsaTx, SignableTransaction};
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use alloy_primitives::{
+        address, b256, hex, Address, PrimitiveSignature as Signature, B256, U256,
+    };
 
     #[test]
     fn recover_signer_eip1559() {
@@ -421,8 +441,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
 
         assert_eq!(
             tx.signature_hash(),
@@ -454,8 +473,7 @@ mod tests {
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
-        )
-        .unwrap();
+        );
 
         let mut buf = vec![];
         tx.rlp_encode_signed(&sig, &mut buf);

@@ -13,26 +13,24 @@ mod account;
 pub use account::Account;
 
 mod block;
-pub use block::{AnyHeader, Block, BlockBody, BlockHeader, Header};
+pub use block::{Block, BlockBody, BlockHeader, Header};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
-mod encodable_signature;
-pub use encodable_signature::EncodableSignature;
-
 mod receipt;
 pub use receipt::{
-    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
-    TxReceipt,
+    Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpReceipt, TxReceipt,
 };
+
+pub mod proofs;
 
 pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
     SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
-    TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
+    TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
 };
 
 pub use alloy_eips::eip4844::{

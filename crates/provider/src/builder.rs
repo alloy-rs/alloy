@@ -132,7 +132,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// management, and chain-id fetching.
     pub fn with_recommended_fillers(
         self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, N::RecomendedFillers>, N>
+    ) -> ProviderBuilder<L, JoinFill<Identity, N::RecommendedFillers>, N>
     where
         N: RecommendedFillers,
     {
@@ -373,92 +373,72 @@ type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 // `reqwest` feature is enabled.
 #[cfg(any(test, feature = "anvil-node"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
-    /// Build this provider with anvil, using an Reqwest HTTP transport.
+    /// Build this provider with anvil, using the BoxTransport.
     pub fn on_anvil(self) -> F::Provider
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
-            >,
-            alloy_transport_http::Http<reqwest::Client>,
+            crate::layers::AnvilProvider<crate::provider::RootProvider<BoxTransport>, BoxTransport>,
+            BoxTransport,
         >,
     {
         self.on_anvil_with_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport. This
+    /// Build this provider with anvil, using the BoxTransport. This
     /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
     pub fn on_anvil_with_wallet(
         self,
-    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<
-        L::Provider,
-        alloy_transport_http::Http<reqwest::Client>,
-    >>::Provider
+    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider, BoxTransport>>::Provider
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
-            >,
-            alloy_transport_http::Http<reqwest::Client>,
+            crate::layers::AnvilProvider<crate::provider::RootProvider<BoxTransport>, BoxTransport>,
+            BoxTransport,
         >,
     {
         self.on_anvil_with_wallet_and_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport. The
+    /// Build this provider with anvil, using the BoxTransport. The
     /// given function is used to configure the anvil instance.
     pub fn on_anvil_with_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> F::Provider
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
-            >,
-            alloy_transport_http::Http<reqwest::Client>,
+            crate::layers::AnvilProvider<crate::provider::RootProvider<BoxTransport>, BoxTransport>,
+            BoxTransport,
         >,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
-        self.layer(anvil_layer).on_http(url)
+        let rpc_client = ClientBuilder::default().http(url).boxed();
+
+        self.layer(anvil_layer).on_client(rpc_client)
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport.
+    /// Build this provider with anvil, using the BoxTransport.
     /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<
-        L::Provider,
-        alloy_transport_http::Http<reqwest::Client>,
-    >>::Provider
+    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider, BoxTransport>>::Provider
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
-            >,
-            alloy_transport_http::Http<reqwest::Client>,
+            crate::layers::AnvilProvider<crate::provider::RootProvider<BoxTransport>, BoxTransport>,
+            BoxTransport,
         >,
     {
         self.try_on_anvil_with_wallet_and_config(f).unwrap()
     }
 
-    /// Build this provider with anvil, using an Reqwest HTTP transport. The
+    /// Build this provider with anvil, using the BoxTransport. The
     /// given function is used to configure the anvil instance. This
     /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
@@ -466,20 +446,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> AnvilProviderResult<
-        <JoinedEthereumWalletFiller<F> as ProviderLayer<
-            L::Provider,
-            alloy_transport_http::Http<reqwest::Client>,
-        >>::Provider,
+        <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider, BoxTransport>>::Provider,
     >
     where
-        F: TxFiller<Ethereum>
-            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, BoxTransport, Ethereum>,
         L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<
-                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
-                alloy_transport_http::Http<reqwest::Client>,
-            >,
-            alloy_transport_http::Http<reqwest::Client>,
+            crate::layers::AnvilProvider<crate::provider::RootProvider<BoxTransport>, BoxTransport>,
+            BoxTransport,
         >,
     {
         use alloy_signer::Signer;
@@ -499,7 +472,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             wallet.register_signer(alloy_signer_local::LocalSigner::from(key.clone()))
         }
 
-        Ok(self.wallet(wallet).layer(anvil_layer).on_http(url))
+        let rpc_client = ClientBuilder::default().http(url).boxed();
+
+        Ok(self.wallet(wallet).layer(anvil_layer).on_client(rpc_client))
     }
 }
 

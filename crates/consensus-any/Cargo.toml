@@ -1,0 +1,46 @@
+[package]
+name = "alloy-consensus-any"
+description = "Consensus interface for any network"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-consensus = { workspace = true, features = ["serde"] }
+alloy-eips.workspace = true
+alloy-primitives.workspace = true
+alloy-rlp.workspace = true
+alloy-serde = { workspace = true, optional = true }
+
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+
+# serde
+serde = { workspace = true, features = ["derive"], optional = true }
+
+[dev-dependencies]
+arbitrary = { workspace = true, features = ["derive"] }
+
+[features]
+default = ["std"]
+std = ["alloy-eips/std"]
+arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
+serde = [
+  "dep:serde",
+  "alloy-primitives/serde",
+  "dep:alloy-serde",
+  "alloy-eips/serde",
+]

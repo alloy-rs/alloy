@@ -2,8 +2,6 @@
 
 mod header;
 pub use header::{BlockHeader, Header};
-mod any;
-pub use any::AnyHeader;
 
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
@@ -51,6 +49,14 @@ pub struct BlockBody<T> {
 impl<T> Default for BlockBody<T> {
     fn default() -> Self {
         Self { transactions: Vec::new(), ommers: Vec::new(), withdrawals: None }
+    }
+}
+
+impl<T> BlockBody<T> {
+    /// Returns an iterator over all transactions.
+    #[inline]
+    pub fn transactions(&self) -> impl Iterator<Item = &T> + '_ {
+        self.transactions.iter()
     }
 }
 

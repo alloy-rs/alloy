@@ -45,6 +45,7 @@ pub struct FeeHistory {
     pub base_fee_per_gas: Vec<u128>,
     /// An array of block gas used ratios. These are calculated as the ratio
     /// of `gasUsed` and `gasLimit`.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub gas_used_ratio: Vec<f64>,
     /// An array of block base fees per blob gas. This includes the next block after the newest
     /// of the returned range, because this value can be derived from the newest block. Zeroes
@@ -146,6 +147,12 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_fee_history_serde_3() {
         let json = r#"{"oldestBlock":"0xdee807","baseFeePerGas":["0x4ccf46253","0x4457de658","0x4531c5aee","0x3cfa33972","0x3d33403eb","0x399457884","0x40bdf9772","0x48d55e7c4","0x51e9ebf14","0x55f460bf9","0x4e31607e4"],"gasUsedRatio":[0.05909575012589385,0.5498182666666667,0.0249864,0.5146185,0.2633512,0.997582061117319,0.999914966153302,0.9986873805040722,0.6973219148223686,0.13879896448917434],"baseFeePerBlobGas":["0x0","0x0","0x0","0x0","0x0","0x0","0x0","0x0","0x0","0x0","0x0"],"blobGasUsedRatio":[0,0,0,0,0,0,0,0,0,0]}"#;
+        let _actual = serde_json::from_str::<FeeHistory>(json).unwrap();
+    }
+
+    #[test]
+    fn test_fee_hist_null_gas_used_ratio() {
+        let json = r#"{"oldestBlock": "0x0", "gasUsedRatio": null}"#;
         let _actual = serde_json::from_str::<FeeHistory>(json).unwrap();
     }
 }
