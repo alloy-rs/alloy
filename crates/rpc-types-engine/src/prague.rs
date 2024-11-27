@@ -10,7 +10,7 @@ use alloy_eips::eip7685::Requests;
 pub struct PraguePayloadFields {
     /// EIP-7685 requests.
     pub requests: Requests,
-    /// Target number of blobs in the block.
+    /// EIP-7742 target number of blobs in the block.
     pub target_blobs_per_block: u64,
 }
 
