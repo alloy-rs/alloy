@@ -4,7 +4,7 @@ use crate::{
     CancunPayloadFields, MaybeCancunPayloadFields, MaybePraguePayloadFields, PraguePayloadFields,
 };
 use alloc::vec::Vec;
-use alloy_eips::eip7685::{Requests, RequestsOrHash};
+use alloy_eips::eip7685::Requests;
 use alloy_primitives::B256;
 
 /// Container type for all available additional `newPayload` request parameters that are not present
@@ -57,12 +57,11 @@ impl ExecutionPayloadSidecar {
     }
 
     /// Returns the EIP-7685 requests
-    pub const fn requests(&self) -> Option<&Requests> {
-        if let Some(RequestsOrHash::Requests(ref requests)) = self.prague {
-            Some(requests)
-        } else {
-            None
-        }
+    ///
+    /// Note: if the [`PraguePayloadFields`] only contains the requests hash this will return
+    /// `None`.
+    pub fn requests(&self) -> Option<&Requests> {
+        self.prague.requests()
     }
 
     /// Calculates or retrieves the requests hash.
@@ -71,7 +70,7 @@ impl ExecutionPayloadSidecar {
     ///   dynamically.
     /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
     pub fn requests_hash(&self) -> Option<B256> {
-        self.prague.as_ref().map(|hash| hash.requests_hash())
+        self.prague.requests_hash()
     }
 
     /// Returns the target blobs per block
