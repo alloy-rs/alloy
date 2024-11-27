@@ -2,7 +2,6 @@
 //! beacon consensus engine.
 
 use alloc::vec::Vec;
-
 use alloy_primitives::B256;
 
 /// Fields introduced in `engine_newPayloadV3` that are not present in the `ExecutionPayload` RPC
@@ -18,6 +17,13 @@ pub struct CancunPayloadFields {
 
     /// The expected blob versioned hashes.
     pub versioned_hashes: Vec<B256>,
+}
+
+impl CancunPayloadFields {
+    /// Returns a new [`CancunPayloadFields`] instance.
+    pub const fn new(parent_beacon_block_root: B256, versioned_hashes: Vec<B256>) -> Self {
+        Self { parent_beacon_block_root, versioned_hashes }
+    }
 }
 
 /// A container type for [CancunPayloadFields] that may or may not be present.

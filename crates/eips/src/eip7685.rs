@@ -75,6 +75,55 @@ impl Requests {
     }
 }
 
+/// A list of requests or a precomputed requests hash.
+///
+/// For testing purposes, the `Hash` variant stores a precomputed requests hash. This can be useful
+/// when the exact contents of the requests are unnecessary, and only a consistent hash value is
+/// needed to simulate the presence of requests without holding actual data.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RequestsOrHash {
+    /// Stores a list of requests, allowing for dynamic requests hash calculation.
+    Requests(Requests),
+    /// Stores a precomputed requests hash, used primarily for testing or mocking because the
+    /// header only contains the hash.
+    Hash(B256),
+}
+
+impl RequestsOrHash {
+    /// Returns the requests hash for the enum instance.
+    ///
+    /// - If the instance contains a list of requests, this function calculates the hash using
+    ///   `requests_hash` of the [`Requests`] struct.
+    /// - If it contains a precomputed hash, it returns that hash directly.
+    #[cfg(feature = "sha2")]
+    pub fn requests_hash(&self) -> B256 {
+        match self {
+            Self::Requests(requests) => requests.requests_hash(),
+            Self::Hash(precomputed_hash) => *precomputed_hash,
+        }
+    }
+
+    /// Returns an instance with the [`EMPTY_REQUESTS_HASH`].
+    pub const fn empty() -> Self {
+        Self::Hash(EMPTY_REQUESTS_HASH)
+    }
+
+    /// Returns the requests, if any.
+    pub const fn requests(&self) -> Option<&Requests> {
+        match self {
+            Self::Requests(requests) => Some(requests),
+            Self::Hash(_) => None,
+        }
+    }
+}
+
+impl Default for RequestsOrHash {
+    fn default() -> Self {
+        Self::Requests(Requests::default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

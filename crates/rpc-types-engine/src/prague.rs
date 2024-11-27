@@ -1,7 +1,8 @@
 //! Contains types related to the Prague hardfork that will be used by RPC to communicate with the
 //! beacon consensus engine.
 
-use alloy_eips::eip7685::Requests;
+use alloy_eips::eip7685::{Requests, RequestsOrHash};
+use alloy_primitives::B256;
 
 /// Fields introduced in `engine_newPayloadV4` that are not present in the `ExecutionPayload` RPC
 /// object.
@@ -9,9 +10,16 @@ use alloy_eips::eip7685::Requests;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PraguePayloadFields {
     /// EIP-7685 requests.
-    pub requests: Requests,
+    pub requests: RequestsOrHash,
     /// EIP-7742 target number of blobs in the block.
     pub target_blobs_per_block: u64,
+}
+
+impl PraguePayloadFields {
+    /// Returns a new [`PraguePayloadFields`] instance.
+    pub fn new(requests: impl Into<RequestsOrHash>, target_blobs_per_block: u64) -> Self {
+        Self { requests: requests.into(), target_blobs_per_block }
+    }
 }
 
 /// A container type for [PraguePayloadFields] that may or may not be present.
@@ -34,12 +42,21 @@ impl MaybePraguePayloadFields {
 
     /// Returns the requests, if any.
     pub fn requests(&self) -> Option<&Requests> {
-        self.fields.as_ref().map(|fields| &fields.requests)
+        self.fields.as_ref().and_then(|fields| fields.requests.requests())
     }
 
     /// Returns the target blobs per block, if any.
     pub fn target_blobs_per_block(&self) -> Option<u64> {
         self.fields.as_ref().map(|fields| fields.target_blobs_per_block)
+    }
+
+    /// Calculates or retrieves the requests hash.
+    ///
+    /// - If the `prague` field contains a list of requests, it calculates the requests hash
+    ///   dynamically.
+    /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
+    pub fn requests_hash(&self) -> Option<B256> {
+        self.fields.as_ref().map(|fields| fields.requests.requests_hash())
     }
 
     /// Returns a reference to the inner fields.

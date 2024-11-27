@@ -57,8 +57,20 @@ impl ExecutionPayloadSidecar {
     }
 
     /// Returns the EIP-7685 requests
+    ///
+    /// Note: if the [`PraguePayloadFields`] only contains the requests hash this will return
+    /// `None`.
     pub fn requests(&self) -> Option<&Requests> {
         self.prague.requests()
+    }
+
+    /// Calculates or retrieves the requests hash.
+    ///
+    /// - If the `prague` field contains a list of requests, it calculates the requests hash
+    ///   dynamically.
+    /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
+    pub fn requests_hash(&self) -> Option<B256> {
+        self.prague.requests_hash()
     }
 
     /// Returns the target blobs per block
