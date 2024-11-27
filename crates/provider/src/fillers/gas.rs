@@ -234,11 +234,7 @@ where
         let latest_header = latest_block.header().as_ref();
 
         latest_header
-            // We assume next block blob count to be the same as the latest block
-            //
-            // Blob target increases are expected to be rare, thus this should be correct most of
-            // the time
-            .next_block_blob_fee(latest_header.target_blobs_per_block())
+            .next_block_blob_fee()
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
     }

@@ -149,11 +149,8 @@ impl<H: BlockHeader> Header<H> {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [Self::next_block_excess_blob_gas]
-    pub fn next_block_blob_fee(
-        &self,
-        next_block_target_blobs_per_block: Option<u64>,
-    ) -> Option<u128> {
-        self.inner.next_block_blob_fee(next_block_target_blobs_per_block)
+    pub fn next_block_blob_fee(&self) -> Option<u128> {
+        self.inner.next_block_blob_fee()
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
