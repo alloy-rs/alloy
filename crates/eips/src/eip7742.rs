@@ -20,7 +20,6 @@ pub const BLOB_BASE_FEE_UPDATE_FRACTION_NORMALIZED: u128 =
 pub const fn calc_excess_blob_gas_at_transition(
     parent_excess_blob_gas: u64,
     parent_blob_gas_used: u64,
-    parent_target_blobs_per_block: u64,
 ) -> u64 {
     let normalized_parent_excess_blob_gas = parent_excess_blob_gas
         * EXCESS_BLOB_GAS_NORMALIZATION_TARGET
@@ -29,7 +28,7 @@ pub const fn calc_excess_blob_gas_at_transition(
     calc_excess_blob_gas(
         normalized_parent_excess_blob_gas,
         parent_blob_gas_used,
-        parent_target_blobs_per_block,
+        eip4844::TARGET_BLOBS_PER_BLOCK,
     )
 }
 
