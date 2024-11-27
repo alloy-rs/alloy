@@ -8,15 +8,14 @@ use derive_more::{Deref, DerefMut, From, IntoIterator};
 
 /// The empty requests hash.
 ///
-/// This is equivalent to `sha256(sha256(0) ++ sha256(1) ++ sha256(2))`
+/// This is equivalent to `sha256("")`
 pub const EMPTY_REQUESTS_HASH: B256 =
-    b256!("6036c41849da9c076ed79654d434017387a88fb833c2856b32e18218b3341c5f");
+    b256!("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 
 /// A container of EIP-7685 requests.
 ///
-/// The container only holds the `requests_data` as defined by their respective EIPs. The request
-/// type is prepended to `requests_data` in [`Requests::requests_hash`] to calculate the requests
-/// hash as definned in EIP-7685.
+/// The container only holds the `requests` as defined by their respective EIPs. The first byte of
+/// each element is the `request_type` and the remaining bytes are the `request_data`.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Deref, DerefMut, From, IntoIterator)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -62,9 +61,8 @@ impl Requests {
     pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
-        for (ty, req) in self.0.iter().enumerate() {
+        for req in self.0.iter() {
             let mut req_hash = Sha256::new();
-            req_hash.update([ty as u8]);
             req_hash.update(req);
             hash.update(req_hash.finalize());
         }
@@ -107,17 +105,13 @@ mod tests {
     #[cfg(feature = "sha2")]
     fn test_consistent_requests_hash() {
         // We test that the empty requests hash is consistent with the EIP-7685 definition.
-        assert_eq!(
-            Requests(vec![Bytes::from(vec![]), Bytes::from(vec![]), Bytes::from(vec![])])
-                .requests_hash(),
-            EMPTY_REQUESTS_HASH,
-        );
+        assert_eq!(Requests::default().requests_hash(), EMPTY_REQUESTS_HASH);
 
         // Test to hash a non-empty vector of requests.
         assert_eq!(
             Requests(vec![
-                Bytes::from(vec![0x0a, 0x0b, 0x0c]),
-                Bytes::from(vec![0x0d, 0x0e, 0x0f])
+                Bytes::from(vec![0x00, 0x0a, 0x0b, 0x0c]),
+                Bytes::from(vec![0x01, 0x0d, 0x0e, 0x0f])
             ])
             .requests_hash(),
             b256!("be3a57667b9bb9e0275019c0faf0f415fdc8385a408fd03e13a5c50615e3530c"),
