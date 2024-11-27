@@ -16,6 +16,13 @@ pub struct BlockOpcodeGas {
     pub transactions: Vec<TransactionOpcodeGas>,
 }
 
+impl BlockOpcodeGas {
+    /// Returns true if the block contains the given opcode.
+    pub fn contains(&self, opcode: &str) -> bool {
+        self.transactions.iter().any(|tx| tx.contains(opcode))
+    }
+}
+
 /// Opcode gas usage for a transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +33,13 @@ pub struct TransactionOpcodeGas {
     pub transaction_hash: TxHash,
     /// The gas used by each opcode in the transaction
     pub opcode_gas: Vec<OpcodeGas>,
+}
+
+impl TransactionOpcodeGas {
+    /// Returns true if the transaction contains the given opcode.
+    pub fn contains(&self, opcode: &str) -> bool {
+        self.opcode_gas.iter().any(|op| op.opcode.eq_ignore_ascii_case(opcode))
+    }
 }
 
 /// Gas information for a single opcode.
