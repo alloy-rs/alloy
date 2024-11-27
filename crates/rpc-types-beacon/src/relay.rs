@@ -159,6 +159,9 @@ pub struct SignedBidSubmissionV4 {
     pub blobs_bundle: BlobsBundleV1,
     /// The Pectra execution requests for this bid.
     pub execution_requests: Vec<Bytes>,
+    /// The EIP-7742 blobs per block for this bid.
+    #[serde(with = "alloy_serde::quantity")]
+    pub target_blobs_per_block: u64,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
 }
