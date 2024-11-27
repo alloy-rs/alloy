@@ -105,6 +105,8 @@ pub trait RlpReceipt: Sized {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
+        // Note: we pass a new slice to `Self::rlp_decode_fields_with_bloom` so that it knows the
+        // length of the payload specified in header.
         let mut fields_buf = &buf[..header.payload_length];
         let this = Self::rlp_decode_fields_with_bloom(&mut fields_buf)?;
 
