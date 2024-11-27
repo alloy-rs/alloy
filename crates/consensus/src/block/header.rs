@@ -1,8 +1,11 @@
 use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
+    calc_blob_gasprice,
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
-    eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
+    eip1898::BlockWithParent,
+    eip4844::{self},
+    eip7742,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
 };
@@ -21,9 +24,11 @@ pub struct Header {
     /// block’s header, in its entirety; formally Hp.
     pub parent_hash: B256,
     /// The Keccak 256-bit hash of the ommers list portion of this block; formally Ho.
+    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles", alias = "ommersHash"))]
     pub ommers_hash: B256,
     /// The 160-bit address to which all fees collected from the successful mining of this block
     /// be transferred; formally Hc.
+    #[cfg_attr(feature = "serde", serde(rename = "miner", alias = "beneficiary"))]
     pub beneficiary: Address,
     /// The Keccak 256-bit hash of the root node of the state trie, after all transactions are
     /// executed and finalisations applied; formally Hr.
@@ -34,10 +39,6 @@ pub struct Header {
     /// The Keccak 256-bit hash of the root node of the trie structure populated with the receipts
     /// of each transaction in the transactions list portion of the block; formally He.
     pub receipts_root: B256,
-    /// The Keccak 256-bit hash of the withdrawals list portion of this block.
-    /// <https://eips.ethereum.org/EIPS/eip-4895>
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub withdrawals_root: Option<B256>,
     /// The Bloom filter composed from indexable information (logger address and log topics)
     /// contained in each log entry from the receipt of each transaction in the transactions list;
     /// formally Hb.
@@ -59,6 +60,9 @@ pub struct Header {
     /// formally Hs.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub timestamp: u64,
+    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
+    /// fewer; formally Hx.
+    pub extra_data: Bytes,
     /// A 256-bit hash which, combined with the
     /// nonce, proves that a sufficient amount of computation has been carried out on this block;
     /// formally Hm.
@@ -81,6 +85,10 @@ pub struct Header {
         )
     )]
     pub base_fee_per_gas: Option<u64>,
+    /// The Keccak 256-bit hash of the withdrawals list portion of this block.
+    /// <https://eips.ethereum.org/EIPS/eip-4895>
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub withdrawals_root: Option<B256>,
     /// The total amount of blob gas consumed by the transactions within the block, added in
     /// EIP-4844.
     #[cfg_attr(
@@ -119,9 +127,18 @@ pub struct Header {
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
-    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
-    /// fewer; formally Hx.
-    pub extra_data: Bytes,
+    /// The target number of blobs in the block, introduced in [EIP-7742].
+    ///
+    /// [EIP-7742]: https://eips.ethereum.org/EIPS/eip-7742
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
+    pub target_blobs_per_block: Option<u64>,
 }
 
 impl AsRef<Self> for Header {
@@ -154,6 +171,7 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            target_blobs_per_block: None,
         }
     }
 }
@@ -203,9 +221,18 @@ impl Header {
     ///
     /// Returns `None` if `excess_blob_gas` is None.
     ///
+    /// If [`Self::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for calculating
+    /// the blob gas price, otherwise uses EIP-4844 formula.
+    ///
     /// See also [Self::next_block_excess_blob_gas]
     pub fn next_block_blob_fee(&self) -> Option<u128> {
-        self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+        let next_block_excess_blob_gas = self.next_block_excess_blob_gas()?;
+
+        if self.target_blobs_per_block().is_none() {
+            Some(eip4844::calc_blob_gasprice(next_block_excess_blob_gas))
+        } else {
+            Some(eip7742::calc_blob_gasprice(next_block_excess_blob_gas))
+        }
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
@@ -223,9 +250,27 @@ impl Header {
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
+    /// If [`Self::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for calculating
+    /// the excess blob gas, otherwise uses EIP-4844 formula.
+    ///
+    /// Note: this function will return incorrect (unnormalized, lower) value at EIP-7742 activation
+    /// block. If this is undesired, consider using [`eip7742::calc_excess_blob_gas_at_transition`].
+    ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
-        Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
+        let excess_blob_gas = self.excess_blob_gas?;
+        let blob_gas_used = self.blob_gas_used?;
+
+        Some(self.target_blobs_per_block.map_or_else(
+            || eip4844::calc_excess_blob_gas(excess_blob_gas, blob_gas_used),
+            |target_blobs_per_block| {
+                eip7742::calc_excess_blob_gas(
+                    excess_blob_gas,
+                    blob_gas_used,
+                    target_blobs_per_block,
+                )
+            },
+        ))
     }
 
     /// Calculate a heuristic for the in-memory size of the [Header].
@@ -300,6 +345,10 @@ impl Header {
             length += requests_hash.length();
         }
 
+        if let Some(target_blobs_per_block) = self.target_blobs_per_block {
+            length += target_blobs_per_block.length();
+        }
+
         length
     }
 
@@ -315,6 +364,13 @@ impl Header {
     /// Note: this hashes the header.
     pub fn num_hash_slow(&self) -> BlockNumHash {
         BlockNumHash { number: self.number, hash: self.hash_slow() }
+    }
+
+    /// Returns the block's number and hash with the parent hash.
+    ///
+    /// Note: this hashes the header.
+    pub fn num_hash_with_parent_slow(&self) -> BlockWithParent {
+        BlockWithParent::new(self.parent_hash, self.num_hash_slow())
     }
 
     /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
@@ -393,6 +449,10 @@ impl Encodable for Header {
         if let Some(ref requests_hash) = self.requests_hash {
             requests_hash.encode(out);
         }
+
+        if let Some(ref target_blobs_per_block) = self.target_blobs_per_block {
+            target_blobs_per_block.encode(out);
+        }
     }
 
     fn length(&self) -> usize {
@@ -432,6 +492,7 @@ impl Decodable for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            target_blobs_per_block: None,
         };
         if started_len - buf.len() < rlp_head.payload_length {
             this.base_fee_per_gas = Some(u64::decode(buf)?);
@@ -459,6 +520,11 @@ impl Decodable for Header {
         // Decode requests hash.
         if started_len - buf.len() < rlp_head.payload_length {
             this.requests_hash = Some(B256::decode(buf)?);
+        }
+
+        // Decode target blob count.
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.target_blobs_per_block = Some(u64::decode(buf)?);
         }
 
         let consumed = started_len - buf.len();
@@ -537,6 +603,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             parent_beacon_block_root: u.arbitrary()?,
             requests_hash: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
+            target_blobs_per_block: u.arbitrary()?,
         };
 
         Ok(generate_valid_header(
@@ -550,6 +617,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 }
 
 /// Trait for extracting specific Ethereum block data from a header
+#[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
     /// Retrieves the parent hash of the block
     fn parent_hash(&self) -> B256;
@@ -590,11 +658,11 @@ pub trait BlockHeader {
     /// Retrieves the timestamp of the block
     fn timestamp(&self) -> u64;
 
-    /// Retrieves the mix hash of the block
-    fn mix_hash(&self) -> B256;
+    /// Retrieves the mix hash of the block, if available
+    fn mix_hash(&self) -> Option<B256>;
 
-    /// Retrieves the nonce of the block
-    fn nonce(&self) -> B64;
+    /// Retrieves the nonce of the block, if avaialble
+    fn nonce(&self) -> Option<B64>;
 
     /// Retrieves the base fee per gas of the block, if available
     fn base_fee_per_gas(&self) -> Option<u64>;
@@ -611,8 +679,74 @@ pub trait BlockHeader {
     /// Retrieves the requests hash of the block, if available
     fn requests_hash(&self) -> Option<B256>;
 
+    /// Retrieves the target blob count of the block, if available
+    fn target_blobs_per_block(&self) -> Option<u64>;
+
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// If [`BlockHeader::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for
+    /// calculating the excess blob gas, otherwise uses EIP-4844 formula.
+    ///
+    /// Note: this function will return incorrect (unnormalized, lower) value at EIP-7742 activation
+    /// block. If this is undesired, consider using [`eip7742::calc_excess_blob_gas_at_transition`].
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    fn next_block_excess_blob_gas(&self) -> Option<u64> {
+        let excess_blob_gas = self.excess_blob_gas()?;
+        let blob_gas_used = self.blob_gas_used()?;
+
+        Some(self.target_blobs_per_block().map_or_else(
+            || eip4844::calc_excess_blob_gas(excess_blob_gas, blob_gas_used),
+            |target_blobs_per_block| {
+                eip7742::calc_excess_blob_gas(
+                    excess_blob_gas,
+                    blob_gas_used,
+                    target_blobs_per_block,
+                )
+            },
+        ))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// If this header has `target_blobs_per_block` set, uses EIP-7742 formula for calculating
+    /// the blob gas price, otherwise uses EIP-4844 formula.
+    ///
+    /// See also [BlockHeader::next_block_excess_blob_gas]
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        let next_block_excess_blob_gas = self.next_block_excess_blob_gas()?;
+
+        if self.target_blobs_per_block().is_none() {
+            Some(eip4844::calc_blob_gasprice(next_block_excess_blob_gas))
+        } else {
+            Some(eip7742::calc_blob_gasprice(next_block_excess_blob_gas))
+        }
+    }
+
+    /// Calculate base fee for next block according to the EIP-1559 spec.
+    ///
+    /// Returns a `None` if no base fee is set, no EIP-1559 support
+    fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+        Some(calc_next_block_base_fee(
+            self.gas_used(),
+            self.gas_limit(),
+            self.base_fee_per_gas()?,
+            base_fee_params,
+        ))
+    }
+
+    /// Returns the parent block's number and hash
+    ///
+    /// Note: for the genesis block the parent number is 0 and the parent hash is the zero hash.
+    fn parent_num_hash(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
+    }
 }
 
 impl BlockHeader for Header {
@@ -668,12 +802,12 @@ impl BlockHeader for Header {
         self.timestamp
     }
 
-    fn mix_hash(&self) -> B256 {
-        self.mix_hash
+    fn mix_hash(&self) -> Option<B256> {
+        Some(self.mix_hash)
     }
 
-    fn nonce(&self) -> B64 {
-        self.nonce
+    fn nonce(&self) -> Option<B64> {
+        Some(self.nonce)
     }
 
     fn base_fee_per_gas(&self) -> Option<u64> {
@@ -696,14 +830,109 @@ impl BlockHeader for Header {
         self.requests_hash
     }
 
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.target_blobs_per_block
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
 }
 
+#[cfg(feature = "serde")]
+impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
+    fn parent_hash(&self) -> B256 {
+        self.inner.parent_hash()
+    }
+
+    fn ommers_hash(&self) -> B256 {
+        self.inner.ommers_hash()
+    }
+
+    fn beneficiary(&self) -> Address {
+        self.inner.beneficiary()
+    }
+
+    fn state_root(&self) -> B256 {
+        self.inner.state_root()
+    }
+
+    fn transactions_root(&self) -> B256 {
+        self.inner.transactions_root()
+    }
+
+    fn receipts_root(&self) -> B256 {
+        self.inner.receipts_root()
+    }
+
+    fn withdrawals_root(&self) -> Option<B256> {
+        self.inner.withdrawals_root()
+    }
+
+    fn logs_bloom(&self) -> Bloom {
+        self.inner.logs_bloom()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.inner.difficulty()
+    }
+
+    fn number(&self) -> u64 {
+        self.inner.number()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn gas_used(&self) -> u64 {
+        self.inner.gas_used()
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.inner.timestamp()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.inner.mix_hash()
+    }
+
+    fn nonce(&self) -> Option<B64> {
+        self.inner.nonce()
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u64> {
+        self.inner.base_fee_per_gas()
+    }
+
+    fn blob_gas_used(&self) -> Option<u64> {
+        self.inner.blob_gas_used()
+    }
+
+    fn excess_blob_gas(&self) -> Option<u64> {
+        self.inner.excess_blob_gas()
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.inner.parent_beacon_block_root()
+    }
+
+    fn requests_hash(&self) -> Option<B256> {
+        self.inner.requests_hash()
+    }
+
+    fn target_blobs_per_block(&self) -> Option<u64> {
+        self.inner.target_blobs_per_block()
+    }
+}
+
 /// Bincode-compatibl [`Header`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub(super) mod serde_bincode_compat {
+pub(crate) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -752,6 +981,8 @@ pub(super) mod serde_bincode_compat {
         parent_beacon_block_root: Option<B256>,
         #[serde(default)]
         requests_hash: Option<B256>,
+        #[serde(default)]
+        target_blobs_per_block: Option<u64>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -779,6 +1010,7 @@ pub(super) mod serde_bincode_compat {
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
                 extra_data: Cow::Borrowed(&value.extra_data),
+                target_blobs_per_block: value.target_blobs_per_block,
             }
         }
     }
@@ -807,6 +1039,7 @@ pub(super) mod serde_bincode_compat {
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
                 extra_data: value.extra_data.into_owned(),
+                target_blobs_per_block: value.target_blobs_per_block,
             }
         }
     }
@@ -867,7 +1100,7 @@ mod tests {
 
     #[test]
     fn test_header_serde_json_roundtrip() {
-        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
+        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","miner":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","extraData":"0x","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"}"#;
         let header = Header {
             base_fee_per_gas: Some(1),
             withdrawals_root: Some(EMPTY_ROOT_HASH),
@@ -896,7 +1129,7 @@ mod tests {
     #[test]
     fn serde_rlp_prague() {
         // Note: Some fields are renamed from eth_getHeaderByHash
-        let raw = r#"{"baseFeePerGas":"0x7","blobGasUsed":"0x20000","difficulty":"0x0","excessBlobGas":"0x40000","extraData":"0xd883010e0c846765746888676f312e32332e32856c696e7578","gasLimit":"0x1c9c380","gasUsed":"0x5208","hash":"0x661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","beneficiary":"0xf97e180c050e5ab072211ad2c213eb5aee4df134","mixHash":"0xe6d9c084dd36560520d5776a5387a82fb44793c9cd1b69afb61d53af29ee64b0","nonce":"0x0000000000000000","number":"0x315","parentBeaconBlockRoot":"0xd0bdb48ab45028568e66c8ddd600ac4c2a52522714bbfbf00ea6d20ba40f3ae2","parentHash":"0x60f1563d2c572116091a4b91421d8d972118e39604d23455d841f9431cea4b6a","receiptsRoot":"0xeaa8c40899a61ae59615cf9985f5e2194f8fd2b57d273be63bde6733e89b12ab","requestsHash":"0x6036c41849da9c076ed79654d434017387a88fb833c2856b32e18218b3341c5f","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","stateRoot":"0x8101d88f2761eb9849634740f92fe09735551ad5a4d5e9da9bcae1ef4726a475","timestamp":"0x6712ba6e","transactionsRoot":"0xf543eb3d405d2d6320344d348b06703ff1abeef71288181a24061e53f89bb5ef","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"}
+        let raw = r#"{"baseFeePerGas":"0x7","blobGasUsed":"0x20000","difficulty":"0x0","excessBlobGas":"0x40000","extraData":"0xd883010e0c846765746888676f312e32332e32856c696e7578","gasLimit":"0x1c9c380","gasUsed":"0x5208","hash":"0x661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0xf97e180c050e5ab072211ad2c213eb5aee4df134","mixHash":"0xe6d9c084dd36560520d5776a5387a82fb44793c9cd1b69afb61d53af29ee64b0","nonce":"0x0000000000000000","number":"0x315","parentBeaconBlockRoot":"0xd0bdb48ab45028568e66c8ddd600ac4c2a52522714bbfbf00ea6d20ba40f3ae2","parentHash":"0x60f1563d2c572116091a4b91421d8d972118e39604d23455d841f9431cea4b6a","receiptsRoot":"0xeaa8c40899a61ae59615cf9985f5e2194f8fd2b57d273be63bde6733e89b12ab","requestsHash":"0x6036c41849da9c076ed79654d434017387a88fb833c2856b32e18218b3341c5f","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","stateRoot":"0x8101d88f2761eb9849634740f92fe09735551ad5a4d5e9da9bcae1ef4726a475","timestamp":"0x6712ba6e","transactionsRoot":"0xf543eb3d405d2d6320344d348b06703ff1abeef71288181a24061e53f89bb5ef","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"}
 "#;
         let header = serde_json::from_str::<Header>(raw).unwrap();
         let hash = header.hash_slow();

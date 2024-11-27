@@ -418,8 +418,8 @@ impl Filter {
     /// Return `true` if filter configured to match pending block.
     /// This means that both from_block and to_block are set to the pending tag.
     pub fn is_pending_block_filter(&self) -> bool {
-        self.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
-            && self.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending)
+        self.block_option.get_from_block().is_some_and(BlockNumberOrTag::is_pending)
+            && self.block_option.get_to_block().is_some_and(BlockNumberOrTag::is_pending)
     }
 
     /// Pins the block hash for the filter
@@ -894,7 +894,7 @@ impl FilteredParams {
     /// This means that both from_block and to_block are set to the pending tag.
     /// It calls [`Filter::is_pending_block_filter`] undercover.
     pub fn is_pending_block_filter(&self) -> bool {
-        self.filter.as_ref().map_or(false, |f| f.is_pending_block_filter())
+        self.filter.as_ref().is_some_and(|f| f.is_pending_block_filter())
     }
 
     /// Returns `true` if the filter matches the given address.

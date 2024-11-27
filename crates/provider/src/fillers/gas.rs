@@ -6,10 +6,11 @@ use crate::{
     utils::Eip1559Estimation,
     Provider,
 };
+use alloy_consensus::BlockHeader;
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
-use alloy_network_primitives::{BlockResponse, HeaderResponse};
+use alloy_network_primitives::{BlockResponse, BlockTransactionsKind};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
@@ -225,11 +226,14 @@ where
             }
         }
 
-        provider
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
+        let latest_block = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
             .await?
-            .ok_or(RpcError::NullResp)?
-            .header()
+            .ok_or(RpcError::NullResp)?;
+
+        let latest_header = latest_block.header().as_ref();
+
+        latest_header
             .next_block_blob_fee()
             .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
@@ -252,7 +256,7 @@ where
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_consensus::{SidecarBuilder, SimpleCoder};
+    use alloy_consensus::{SidecarBuilder, SimpleCoder, Transaction};
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
@@ -315,7 +319,7 @@ mod tests {
 
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
 
-        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
@@ -343,7 +347,7 @@ mod tests {
 
         let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
 
-        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert!(tx.max_fee_per_blob_gas().unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),

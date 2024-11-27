@@ -31,3 +31,4 @@ url.workspace = true
 
 [dev-dependencies]
 ci_info.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -567,14 +567,13 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_consensus::Transaction;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{
         layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
     };
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
-    use alloy_transport_http::Http;
-    use reqwest::Client;
 
     #[test]
     fn empty_constructor() {
@@ -623,8 +622,8 @@ mod tests {
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     #[allow(clippy::type_complexity)]
     fn build_call_builder() -> CallBuilder<
-        Http<Client>,
-        AnvilProvider<RootProvider<Http<Client>>, Http<Client>>,
+        alloy_transport::BoxTransport,
+        AnvilProvider<RootProvider<alloy_transport::BoxTransport>, alloy_transport::BoxTransport>,
         PhantomData<MyContract::doStuffCall>,
     > {
         let provider = ProviderBuilder::new().on_anvil();
@@ -781,13 +780,13 @@ mod tests {
             .expect("failed to fetch tx")
             .expect("tx not included");
         assert_eq!(
-            transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
+            transaction.max_fee_per_gas(),
             max_fee_per_gas.to(),
             "max_fee_per_gas of the transaction should be set to the right value"
         );
         assert_eq!(
             transaction
-                .max_priority_fee_per_gas
+                .max_priority_fee_per_gas()
                 .expect("max_priority_fee_per_gas of the transaction should be set"),
             max_priority_fee_per_gas.to(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"

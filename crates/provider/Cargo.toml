@@ -31,6 +31,7 @@ alloy-rpc-client.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
+alloy-rpc-types-debug = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true, features = [
@@ -77,6 +78,7 @@ alloy-sol-types.workspace = true
 alloy-signer.workspace = true
 alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest", "jwt-auth"] }
+alloy-serde.workspace = true
 
 itertools.workspace = true
 reqwest.workspace = true
@@ -117,7 +119,7 @@ anvil-node = [
     "dep:alloy-signer-local",
     "dep:alloy-signer",
 ]
-debug-api = ["dep:alloy-rpc-types-trace"]
+debug-api = ["dep:alloy-rpc-types-trace", "dep:alloy-rpc-types-debug"]
 erc4337-api = []
 engine-api = ["dep:alloy-rpc-types-engine"]
 net-api = []

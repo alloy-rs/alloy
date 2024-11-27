@@ -152,7 +152,7 @@ pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
+pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert_ne!(denominator, 0, "attempt to divide by zero");
 
     let mut i = 1;

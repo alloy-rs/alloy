@@ -56,7 +56,7 @@ impl NonceManager for SimpleNonceManager {
 /// transaction count locally.
 #[derive(Clone, Debug, Default)]
 pub struct CachedNonceManager {
-    nonces: DashMap<Address, Arc<Mutex<u64>>>,
+    nonces: Arc<DashMap<Address, Arc<Mutex<u64>>>>,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -172,6 +172,7 @@ impl<M: NonceManager, N: Network> TxFiller<N> for NonceFiller<M> {
 mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -271,7 +272,7 @@ mod tests {
             .await
             .expect("failed to fetch tx")
             .expect("tx not included");
-        assert_eq!(mined_tx.nonce, 0);
+        assert_eq!(mined_tx.nonce(), 0);
 
         let pending = provider.send_transaction(tx).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
@@ -280,6 +281,6 @@ mod tests {
             .await
             .expect("fail to fetch tx")
             .expect("tx didn't finalize");
-        assert_eq!(mined_tx.nonce, 1);
+        assert_eq!(mined_tx.nonce(), 1);
     }
 }

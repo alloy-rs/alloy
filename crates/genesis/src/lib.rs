@@ -92,17 +92,10 @@ impl Genesis {
         };
 
         // fund account
-        let mut alloc = BTreeMap::default();
-        alloc.insert(
+        let alloc = BTreeMap::from([(
             signer_addr,
-            GenesisAccount {
-                balance: U256::MAX,
-                nonce: None,
-                code: None,
-                storage: None,
-                private_key: None,
-            },
-        );
+            GenesisAccount { balance: U256::MAX, ..Default::default() },
+        )]);
 
         // put signer address in the extra data, padded by the required amount of zeros
         // Clique issue: https://github.com/ethereum/EIPs/issues/225
@@ -541,12 +534,12 @@ impl ChainConfig {
 
     // Private function handling the comparison logic for block numbers
     fn is_active_at_block(&self, config_block: Option<u64>, block: u64) -> bool {
-        config_block.map_or(false, |cb| cb <= block)
+        config_block.is_some_and(|cb| cb <= block)
     }
 
     // Private function handling the comparison logic for timestamps
     fn is_active_at_timestamp(&self, config_timestamp: Option<u64>, timestamp: u64) -> bool {
-        config_timestamp.map_or(false, |cb| cb <= timestamp)
+        config_timestamp.is_some_and(|cb| cb <= timestamp)
     }
 }
 

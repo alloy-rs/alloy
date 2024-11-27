@@ -106,8 +106,8 @@ impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, 
     /// This means that both `from_block` and `to_block` are set to the pending
     /// tag.
     pub fn is_pending_block_filter(&self) -> bool {
-        self.filter.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
-            && self.filter.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending)
+        self.filter.block_option.get_from_block().is_some_and(BlockNumberOrTag::is_pending)
+            && self.filter.block_option.get_to_block().is_some_and(BlockNumberOrTag::is_pending)
     }
 
     /// Pins the block hash for the filter

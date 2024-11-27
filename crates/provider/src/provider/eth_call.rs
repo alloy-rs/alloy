@@ -5,29 +5,75 @@ use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
+use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
 
 use crate::{Caller, ProviderCall};
 
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
 pub struct EthCallParams<'req, N: Network> {
-    data: &'req N::TransactionRequest,
+    data: Cow<'req, N::TransactionRequest>,
     block: Option<BlockId>,
-    overrides: Option<&'req StateOverride>,
+    overrides: Option<Cow<'req, StateOverride>>,
+}
+
+impl<'req, N> EthCallParams<'req, N>
+where
+    N: Network,
+{
+    /// Instantiates a new `EthCallParams` with the given data (transaction).
+    pub const fn new(data: &'req N::TransactionRequest) -> Self {
+        Self { data: Cow::Borrowed(data), block: None, overrides: None }
+    }
+
+    /// Sets the block to use for this call.
+    pub const fn with_block(mut self, block: BlockId) -> Self {
+        self.block = Some(block);
+        self
+    }
+
+    /// Sets the state overrides for this call.
+    pub fn with_overrides(mut self, overrides: &'req StateOverride) -> Self {
+        self.overrides = Some(Cow::Borrowed(overrides));
+        self
+    }
+
+    /// Returns a reference to the state overrides if set.
+    pub fn overrides(&self) -> Option<&StateOverride> {
+        self.overrides.as_deref()
+    }
+
+    /// Returns a reference to the transaction data.
+    pub fn data(&self) -> &N::TransactionRequest {
+        &self.data
+    }
+
+    /// Returns the block.
+    pub const fn block(&self) -> Option<BlockId> {
+        self.block
+    }
+
+    /// Clones the tx data and overrides into owned data.
+    pub fn into_owned(self) -> EthCallParams<'static, N> {
+        EthCallParams {
+            data: Cow::Owned(self.data.into_owned()),
+            block: self.block,
+            overrides: self.overrides.map(|o| Cow::Owned(o.into_owned())),
+        }
+    }
 }
 
 impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if self.overrides.is_some() { 3 } else { 2 };
+        let len = if self.overrides().is_some() { 3 } else { 2 };
 
         let mut seq = serializer.serialize_seq(Some(len))?;
-        seq.serialize_element(&self.data)?;
+        seq.serialize_element(&self.data())?;
 
-        if let Some(overrides) = self.overrides {
-            seq.serialize_element(&self.block.unwrap_or_default())?;
+        if let Some(overrides) = self.overrides() {
+            seq.serialize_element(&self.block().unwrap_or_default())?;
             seq.serialize_element(overrides)?;
-        } else if let Some(block) = self.block {
+        } else if let Some(block) = self.block() {
             seq.serialize_element(&block)?;
         }
 
@@ -59,7 +105,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     Preparing {
-        caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
+        caller: Arc<dyn Caller<T, N, Resp>>,
         data: &'req N::TransactionRequest,
         overrides: Option<&'req StateOverride>,
         block: Option<BlockId>,
@@ -68,7 +114,7 @@ where
     },
     Running {
         map: Map,
-        fut: ProviderCall<T, serde_json::Value, Resp>,
+        fut: ProviderCall<T, EthCallParams<'static, N>, Resp>,
     },
     Polling,
 }
@@ -121,9 +167,14 @@ where
             unreachable!("bad state")
         };
 
-        let params = EthCallParams { data, block, overrides };
+        let params = EthCallParams {
+            data: Cow::Borrowed(data),
+            block,
+            overrides: overrides.map(Cow::Borrowed),
+        };
 
-        let fut = caller.call(method.into(), params)?;
+        let fut =
+            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
 
         self.inner = EthCallFutInner::Running { map, fut };
 
@@ -177,7 +228,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
+    caller: Arc<dyn Caller<T, N, Resp>>,
     data: &'req N::TransactionRequest,
     overrides: Option<&'req StateOverride>,
     block: Option<BlockId>,
@@ -210,7 +261,7 @@ where
 {
     /// Create a new CallBuilder.
     pub fn new(
-        caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
+        caller: impl Caller<T, N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
@@ -226,7 +277,7 @@ where
 
     /// Create new EthCall for gas estimates.
     pub fn gas_estimate(
-        caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
+        caller: impl Caller<T, N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
@@ -343,12 +394,11 @@ mod test {
         let overrides = StateOverride::default();
 
         // Expected: [data]
-        let params: EthCallParams<'_, Ethereum> =
-            EthCallParams { data: &data, block: None, overrides: None };
+        let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data);
 
-        assert_eq!(params.data, &data);
-        assert_eq!(params.block, None);
-        assert_eq!(params.overrides, None);
+        assert_eq!(params.data(), &data);
+        assert_eq!(params.block(), None);
+        assert_eq!(params.overrides(), None);
         assert_eq!(
             serde_json::to_string(&params).unwrap(),
             r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"}]"#
@@ -356,11 +406,11 @@ mod test {
 
         // Expected: [data, block, overrides]
         let params: EthCallParams<'_, Ethereum> =
-            EthCallParams { data: &data, block: Some(block), overrides: Some(&overrides) };
+            EthCallParams::new(&data).with_block(block).with_overrides(&overrides);
 
-        assert_eq!(params.data, &data);
-        assert_eq!(params.block, Some(block));
-        assert_eq!(params.overrides, Some(&overrides));
+        assert_eq!(params.data(), &data);
+        assert_eq!(params.block(), Some(block));
+        assert_eq!(params.overrides(), Some(&overrides));
         assert_eq!(
             serde_json::to_string(&params).unwrap(),
             r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1",{}]"#
@@ -368,23 +418,22 @@ mod test {
 
         // Expected: [data, (default), overrides]
         let params: EthCallParams<'_, Ethereum> =
-            EthCallParams { data: &data, block: None, overrides: Some(&overrides) };
+            EthCallParams::new(&data).with_overrides(&overrides);
 
-        assert_eq!(params.data, &data);
-        assert_eq!(params.block, None);
-        assert_eq!(params.overrides, Some(&overrides));
+        assert_eq!(params.data(), &data);
+        assert_eq!(params.block(), None);
+        assert_eq!(params.overrides(), Some(&overrides));
         assert_eq!(
             serde_json::to_string(&params).unwrap(),
             r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"latest",{}]"#
         );
 
         // Expected: [data, block]
-        let params: EthCallParams<'_, Ethereum> =
-            EthCallParams { data: &data, block: Some(block), overrides: None };
+        let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data).with_block(block);
 
-        assert_eq!(params.data, &data);
-        assert_eq!(params.block, Some(block));
-        assert_eq!(params.overrides, None);
+        assert_eq!(params.data(), &data);
+        assert_eq!(params.block(), Some(block));
+        assert_eq!(params.overrides(), None);
         assert_eq!(
             serde_json::to_string(&params).unwrap(),
             r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1"]"#

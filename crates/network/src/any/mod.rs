@@ -1,56 +1,53 @@
-use crate::Network;
-use alloy_consensus::TxType;
-use alloy_eips::eip2718::Eip2718Error;
-use alloy_rpc_types_eth::{AnyTransactionReceipt, Block, Header, Transaction, TransactionRequest};
-use alloy_serde::WithOtherFields;
-use core::fmt;
-
 mod builder;
 
-/// Transaction type for a catch-all network.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[doc(alias = "AnyTransactionType")]
-pub struct AnyTxType(u8);
+mod either;
+pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 
-impl fmt::Display for AnyTxType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AnyTxType({})", self.0)
-    }
-}
+mod unknowns;
+pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 
-impl TryFrom<u8> for AnyTxType {
-    type Error = Eip2718Error;
+pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(Self(value))
-    }
-}
+use crate::Network;
+pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
+use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
+use alloy_serde::WithOtherFields;
 
-impl From<AnyTxType> for u8 {
-    fn from(value: AnyTxType) -> Self {
-        value.0
-    }
-}
+/// A catch-all block type for handling blocks on multiple networks.
+pub type AnyRpcBlock =
+    WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
 
-impl TryFrom<AnyTxType> for TxType {
-    type Error = Eip2718Error;
-
-    fn try_from(value: AnyTxType) -> Result<Self, Self::Error> {
-        value.0.try_into()
-    }
-}
-
-impl From<TxType> for AnyTxType {
-    fn from(value: TxType) -> Self {
-        Self(value as u8)
-    }
-}
+/// A catch-all transaction type for handling transactions on multiple networks.
+pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
 
 /// Types for a catch-all network.
 ///
-/// Essentially just returns the regular Ethereum types + a catch all field.
-/// This [`Network`] should be used only when the network is not known at
-/// compile time.
+/// `AnyNetwork`'s associated types allow for many different types of
+/// transactions, using catch-all fields. This [`Network`] should be used
+/// only when the application needs to support multiple networks via the same
+/// codepaths without knowing the networks at compile time.
+///
+/// ## Rough Edges
+///
+/// Supporting arbitrary unknown types is hard, and users of this network
+/// should be aware of the following:
+///
+/// - The implementation of [`Decodable2718`] for [`AnyTxEnvelope`] will not work for non-Ethereum
+///   transaction types. It will succesfully decode an Ethereum [`TxEnvelope`], but will decode only
+///   the type for any unknown transaction type. It will also leave the buffer unconsumed, which
+///   will cause further deserialization to produce erroneous results.
+/// - The implementation of [`Encodable2718`] for [`AnyTypedTransaction`] will not work for
+///   non-Ethereum transaction types. It will encode the type for any unknown transaction type, but
+///   will not encode any other fields. This is symmetric with the decoding behavior, but still
+///   erroneous.
+/// - The [`TransactionRequest`] will build ONLY Ethereum types. It will error when attempting to
+///   build any unknown type.
+/// - The [`Network::TransactionResponse`] may deserialize unknown metadata fields into the inner
+///   [`AnyTxEnvelope`], rather than into the outer [`WithOtherFields`].
+///
+/// [`Decodable2718`]: alloy_eips::eip2718::Decodable2718
+/// [`Encodable2718`]: alloy_eips::eip2718::Encodable2718
+/// [`TxEnvelope`]: alloy_consensus::TxEnvelope
 #[derive(Clone, Copy, Debug)]
 pub struct AnyNetwork {
     _private: (),
@@ -59,21 +56,21 @@ pub struct AnyNetwork {
 impl Network for AnyNetwork {
     type TxType = AnyTxType;
 
-    type TxEnvelope = alloy_consensus::TxEnvelope;
+    type TxEnvelope = AnyTxEnvelope;
 
-    type UnsignedTx = alloy_consensus::TypedTransaction;
+    type UnsignedTx = AnyTypedTransaction;
 
-    type ReceiptEnvelope = alloy_consensus::AnyReceiptEnvelope;
+    type ReceiptEnvelope = AnyReceiptEnvelope;
 
-    type Header = alloy_consensus::Header;
+    type Header = AnyHeader;
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = WithOtherFields<Transaction>;
+    type TransactionResponse = AnyRpcTransaction;
 
     type ReceiptResponse = AnyTransactionReceipt;
 
-    type HeaderResponse = Header;
+    type HeaderResponse = AnyRpcHeader;
 
-    type BlockResponse = WithOtherFields<Block<Self::TransactionResponse, Self::HeaderResponse>>;
+    type BlockResponse = AnyRpcBlock;
 }

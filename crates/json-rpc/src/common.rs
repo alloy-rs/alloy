@@ -172,6 +172,7 @@ impl Id {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::collections::{BTreeSet, HashSet};
 
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
     struct TestCase {
@@ -192,5 +193,91 @@ mod test {
             let deserialized: TestCase = serde_json::from_str(expected).unwrap();
             assert_eq!(deserialized, case);
         }
+    }
+
+    #[test]
+    fn test_is_methods() {
+        let id_number = Id::Number(42);
+        let id_string = Id::String("test_string".to_string());
+        let id_none = Id::None;
+
+        assert!(id_number.is_number());
+        assert!(!id_number.is_string());
+        assert!(!id_number.is_none());
+
+        assert!(!id_string.is_number());
+        assert!(id_string.is_string());
+        assert!(!id_string.is_none());
+
+        assert!(!id_none.is_number());
+        assert!(!id_none.is_string());
+        assert!(id_none.is_none());
+    }
+
+    #[test]
+    fn test_as_methods() {
+        let id_number = Id::Number(42);
+        let id_string = Id::String("test_string".to_string());
+        let id_none = Id::None;
+
+        assert_eq!(id_number.as_number(), Some(42));
+        assert_eq!(id_string.as_number(), None);
+        assert_eq!(id_none.as_number(), None);
+
+        assert_eq!(id_number.as_string(), None);
+        assert_eq!(id_string.as_string(), Some("test_string"));
+        assert_eq!(id_none.as_string(), None);
+    }
+
+    #[test]
+    fn test_ordering() {
+        let id_number = Id::Number(42);
+        let id_string = Id::String("test_string".to_string());
+        let id_none = Id::None;
+
+        assert!(id_number < id_string);
+        assert!(id_string < id_none);
+        assert!(id_none == Id::None);
+    }
+
+    #[test]
+    fn test_serialization_deserialization_edge_cases() {
+        // Edge cases for large numbers, empty strings, and None.
+        let cases = [
+            (TestCase { id: Id::Number(u64::MAX) }, r#"{"id":18446744073709551615}"#),
+            (TestCase { id: Id::String("".to_string()) }, r#"{"id":""}"#),
+            (TestCase { id: Id::None }, r#"{"id":null}"#),
+        ];
+        for (case, expected) in cases {
+            let serialized = serde_json::to_string(&case).unwrap();
+            assert_eq!(serialized, expected);
+
+            let deserialized: TestCase = serde_json::from_str(expected).unwrap();
+            assert_eq!(deserialized, case);
+        }
+    }
+
+    #[test]
+    fn test_partial_eq_and_hash() {
+        let id1 = Id::Number(42);
+        let id2 = Id::String("foo".to_string());
+        let id3 = Id::None;
+
+        let mut hash_set = HashSet::new();
+        let mut btree_set = BTreeSet::new();
+
+        hash_set.insert(id1.clone());
+        hash_set.insert(id2.clone());
+        hash_set.insert(id3.clone());
+
+        btree_set.insert(id1);
+        btree_set.insert(id2);
+        btree_set.insert(id3);
+
+        assert_eq!(hash_set.len(), 3);
+        assert_eq!(btree_set.len(), 3);
+
+        assert!(hash_set.contains(&Id::Number(42)));
+        assert!(btree_set.contains(&Id::String("foo".to_string())));
     }
 }

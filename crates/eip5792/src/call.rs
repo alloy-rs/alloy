@@ -33,3 +33,38 @@ pub struct CallParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chain_id: Option<ChainId>,
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::{Address, Bytes, ChainId, U256};
+
+    #[test]
+    fn test_serialization_deserialization() {
+        let sample_request = SendCallsRequest {
+            version: "1.0".to_string(),
+            from: Address::default(),
+            calls: vec![
+                CallParams {
+                    to: Some(Address::default()),
+                    data: Some(Bytes::from("d46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675"
+                    )),
+                    value: Some(U256::from(0x9184e72au64)),
+                    chain_id: Some(ChainId::from(1u64)),
+                },
+                CallParams {
+                    to: Some(Address::default()),
+                    data: Some(Bytes::from(
+                       "fbadbaf01"),
+                    ),
+                    value: Some(U256::from(0x182183u64)),
+                    chain_id: Some(ChainId::from(1u64)),
+                },
+            ],
+            capabilities: None,
+        };
+
+        let serialized = serde_json::to_string(&sample_request).unwrap();
+        let deserialized: SendCallsRequest = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(sample_request, deserialized);
+    }
+}

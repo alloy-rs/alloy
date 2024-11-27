@@ -1,6 +1,8 @@
 //! Contains helpers for dealing with additional parameters of `newPayload` requests.
 
-use crate::{CancunPayloadFields, MaybeCancunPayloadFields};
+use crate::{
+    CancunPayloadFields, MaybeCancunPayloadFields, MaybePraguePayloadFields, PraguePayloadFields,
+};
 use alloc::vec::Vec;
 use alloy_eips::eip7685::{Requests, RequestsOrHash};
 use alloy_primitives::B256;
@@ -15,28 +17,33 @@ pub struct ExecutionPayloadSidecar {
     cancun: MaybeCancunPayloadFields,
     /// The EIP-7685 requests provided as additional request params to `engine_newPayloadV4` that
     /// are not present in the `ExecutionPayload`.
-    prague: Option<RequestsOrHash>,
+    prague: MaybePraguePayloadFields,
 }
 
 impl ExecutionPayloadSidecar {
     /// Returns a new empty instance (pre-cancun, v1, v2)
     pub const fn none() -> Self {
-        Self { cancun: MaybeCancunPayloadFields::none(), prague: None }
+        Self { cancun: MaybeCancunPayloadFields::none(), prague: MaybePraguePayloadFields::none() }
     }
 
     /// Creates a new instance for cancun with the cancun fields for `engine_newPayloadV3`
     pub fn v3(cancun: CancunPayloadFields) -> Self {
-        Self { cancun: cancun.into(), prague: None }
+        Self { cancun: cancun.into(), prague: MaybePraguePayloadFields::none() }
     }
 
     /// Creates a new instance post prague for `engine_newPayloadV4`
-    pub fn v4(cancun: CancunPayloadFields, requests: RequestsOrHash) -> Self {
-        Self { cancun: cancun.into(), prague: Some(requests) }
+    pub fn v4(cancun: CancunPayloadFields, prague: PraguePayloadFields) -> Self {
+        Self { cancun: cancun.into(), prague: prague.into() }
     }
 
     /// Returns a reference to the [`CancunPayloadFields`].
     pub const fn cancun(&self) -> Option<&CancunPayloadFields> {
         self.cancun.as_ref()
+    }
+
+    /// Returns a reference to the [`PraguePayloadFields`].
+    pub const fn prague(&self) -> Option<&PraguePayloadFields> {
+        self.prague.as_ref()
     }
 
     /// Returns the parent beacon block root, if any.
@@ -65,5 +72,10 @@ impl ExecutionPayloadSidecar {
     /// - If it contains a precomputed hash (used for testing), it returns that hash directly.
     pub fn requests_hash(&self) -> Option<B256> {
         self.prague.as_ref().map(|hash| hash.requests_hash())
+    }
+
+    /// Returns the target blobs per block
+    pub fn target_blobs_per_block(&self) -> Option<u64> {
+        self.prague.target_blobs_per_block()
     }
 }

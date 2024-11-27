@@ -1,3 +1,5 @@
+use core::borrow::Borrow;
+
 use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 
 /// Ethereum Log emitted by a transaction
@@ -148,6 +150,12 @@ impl<T> AsRef<T> for Log<T> {
 impl<T> AsMut<T> for Log<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.inner.data
+    }
+}
+
+impl<T> Borrow<alloy_primitives::Log<T>> for Log<T> {
+    fn borrow(&self) -> &alloy_primitives::Log<T> {
+        &self.inner
     }
 }
 
