@@ -1,7 +1,13 @@
 use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
-    calc_blob_gasprice, eip1559::{calc_next_block_base_fee, BaseFeeParams}, eip1898::BlockWithParent, eip4844::{self}, eip7742, merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS, BlockNumHash
+    calc_blob_gasprice,
+    eip1559::{calc_next_block_base_fee, BaseFeeParams},
+    eip1898::BlockWithParent,
+    eip4844::{self},
+    eip7742,
+    merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
+    BlockNumHash,
 };
 use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
