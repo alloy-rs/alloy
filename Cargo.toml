@@ -151,8 +151,7 @@ reqwest = { version = "0.12", default-features = false }
 schnellru = "0.2.3"
 semver = "1.0"
 strum = { version = "0.26", default-features = false }
-thiserror = "1.0"
-thiserror-no-std = "2.0.2"
+thiserror = { version = "2.0", default-features = false }
 url = "2.5"
 
 # misc-testing
