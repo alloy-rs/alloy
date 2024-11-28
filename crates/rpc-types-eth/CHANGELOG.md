@@ -5,7 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
+
+### Features
+
+- EIP-7742 ([#1600](https://github.com/alloy-rs/alloy/issues/1600))
+- Add helpers to initialize Tx request ([#1690](https://github.com/alloy-rs/alloy/issues/1690))
+- Modifiy ReceiptWithBloom and associated impls to use with Reth ([#1672](https://github.com/alloy-rs/alloy/issues/1672))
+- [consensus-tx] Enable fast `is_create` ([#1683](https://github.com/alloy-rs/alloy/issues/1683))
+- Move `AnyReceipt` and `AnyHeader` to `alloy-consensus-any` ([#1609](https://github.com/alloy-rs/alloy/issues/1609))
+
+### Miscellaneous Tasks
+
+- Move from impls to where they belong ([#1691](https://github.com/alloy-rs/alloy/issues/1691))
+- Add new fn to eip1186 ([#1692](https://github.com/alloy-rs/alloy/issues/1692))
+- Make clippy happy ([#1677](https://github.com/alloy-rs/alloy/issues/1677))
+
+### Other
+
+- Add unit tests for pubsub ([#1663](https://github.com/alloy-rs/alloy/issues/1663))
+
+### Testing
+
+- Add test for 7702 with v ([#1644](https://github.com/alloy-rs/alloy/issues/1644))
+
 ## [0.6.4](https://github.com/alloy-rs/alloy/releases/tag/v0.6.4) - 2024-11-12
+
+### Miscellaneous Tasks
+
+- Release 0.6.4
 
 ### Other
 
