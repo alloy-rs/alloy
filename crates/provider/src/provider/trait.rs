@@ -798,8 +798,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
                 Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
             }
             SendableTx::Envelope(tx) => {
-                let mut encoded_tx = vec![];
-                tx.encode_2718(&mut encoded_tx);
+                let encoded_tx = tx.encoded_2718();
                 self.send_raw_transaction(&encoded_tx).await
             }
         }
