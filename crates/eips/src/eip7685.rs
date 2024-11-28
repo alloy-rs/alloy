@@ -35,8 +35,8 @@ impl Requests {
     /// Adds a new request with the given request type into the container.
     pub fn push_request_with_type(
         &mut self,
-        request: impl IntoIterator<Item = u8>,
         request_type: u8,
+        request: impl IntoIterator<Item = u8>,
     ) {
         self.0.push(core::iter::once(request_type).chain(request).collect());
     }
