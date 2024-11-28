@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add more missing eth_callBundle arguments ([#1667](https://github.com/alloy-rs/alloy/issues/1667))
 
+### Miscellaneous Tasks
+
+- Release 0.7.0
+
 ## [0.6.4](https://github.com/alloy-rs/alloy/releases/tag/v0.6.4) - 2024-11-12
 
 ### Miscellaneous Tasks

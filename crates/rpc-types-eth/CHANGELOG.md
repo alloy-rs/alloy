@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.0
 - Move from impls to where they belong ([#1691](https://github.com/alloy-rs/alloy/issues/1691))
 - Add new fn to eip1186 ([#1692](https://github.com/alloy-rs/alloy/issues/1692))
 - Make clippy happy ([#1677](https://github.com/alloy-rs/alloy/issues/1677))

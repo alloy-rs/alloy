@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.7.0
+- Release 0.7.0
 - Relax from impl ([#1698](https://github.com/alloy-rs/alloy/issues/1698))
 - EIP-7685 changes ([#1599](https://github.com/alloy-rs/alloy/issues/1599))
 - Move from impls to where they belong ([#1691](https://github.com/alloy-rs/alloy/issues/1691))

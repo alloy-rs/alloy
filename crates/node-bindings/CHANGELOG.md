@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
 
+### Miscellaneous Tasks
+
+- Release 0.7.0
+
 ### Testing
 
 - [node-bindings] Add unit tests for node-bindings utils and refac ([#1637](https://github.com/alloy-rs/alloy/issues/1637))

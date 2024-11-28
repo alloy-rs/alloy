@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [consensus-tx] Enable fast `is_create` ([#1683](https://github.com/alloy-rs/alloy/issues/1683))
 - Move `AnyReceipt` and `AnyHeader` to `alloy-consensus-any` ([#1609](https://github.com/alloy-rs/alloy/issues/1609))
 
+### Miscellaneous Tasks
+
+- Release 0.7.0
+
 ### Other
 
 - Inline getters in impl of `Transaction` ([#1642](https://github.com/alloy-rs/alloy/issues/1642))
