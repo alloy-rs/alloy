@@ -5,11 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
+
+### Bug Fixes
+
+- Pass slice to RlpReceipt::rlp_decode_fields ([#1696](https://github.com/alloy-rs/alloy/issues/1696))
+- [`consensus`] Serde aliases to avoid breaking changes ([#1654](https://github.com/alloy-rs/alloy/issues/1654))
+
+### Features
+
+- EIP-7742 ([#1600](https://github.com/alloy-rs/alloy/issues/1600))
+- Add parent_num_hash to BlockHeader ([#1687](https://github.com/alloy-rs/alloy/issues/1687))
+- Modifiy ReceiptWithBloom and associated impls to use with Reth ([#1672](https://github.com/alloy-rs/alloy/issues/1672))
+- [consensus-tx] Enable fast `is_create` ([#1683](https://github.com/alloy-rs/alloy/issues/1683))
+- Add `next_block_base_fee` to `BlockHeader` trait ([#1682](https://github.com/alloy-rs/alloy/issues/1682))
+- Add missing size fn ([#1679](https://github.com/alloy-rs/alloy/issues/1679))
+- Introduce Typed2718 trait ([#1675](https://github.com/alloy-rs/alloy/issues/1675))
+- Move `AnyReceipt` and `AnyHeader` to `alloy-consensus-any` ([#1609](https://github.com/alloy-rs/alloy/issues/1609))
+- Add missing txtype tryfroms ([#1651](https://github.com/alloy-rs/alloy/issues/1651))
+- Add rlp for txtype ([#1648](https://github.com/alloy-rs/alloy/issues/1648))
+
+### Miscellaneous Tasks
+
+- Relax from impl ([#1698](https://github.com/alloy-rs/alloy/issues/1698))
+- Make clippy happy ([#1677](https://github.com/alloy-rs/alloy/issues/1677))
+- Export typed2718 ([#1678](https://github.com/alloy-rs/alloy/issues/1678))
+- Add default for txtype ([#1668](https://github.com/alloy-rs/alloy/issues/1668))
+- Add num hash with parent ([#1652](https://github.com/alloy-rs/alloy/issues/1652))
+- Add some proof fns ([#1645](https://github.com/alloy-rs/alloy/issues/1645))
+- Add transactions iter fn ([#1646](https://github.com/alloy-rs/alloy/issues/1646))
+- Add partialEq to txtype ([#1647](https://github.com/alloy-rs/alloy/issues/1647))
+
+### Other
+
+- Add blanket impl of Transaction, TxReceipt and BlockHeader references ([#1657](https://github.com/alloy-rs/alloy/issues/1657))
+- Add unit tests for tx envelope ([#1656](https://github.com/alloy-rs/alloy/issues/1656))
+- Inline getters in impl of `Transaction` ([#1642](https://github.com/alloy-rs/alloy/issues/1642))
+
 ## [0.6.4](https://github.com/alloy-rs/alloy/releases/tag/v0.6.4) - 2024-11-12
 
 ### Bug Fixes
 
 - Make EIP-155 signatures logic safer ([#1641](https://github.com/alloy-rs/alloy/issues/1641))
+
+### Miscellaneous Tasks
+
+- Release 0.6.4
 
 ### Other
 
