@@ -165,8 +165,7 @@ pub enum FilterBlockError {
     },
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for FilterBlockError {}
+impl core::error::Error for FilterBlockError {}
 
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

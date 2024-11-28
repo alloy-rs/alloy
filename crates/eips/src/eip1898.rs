@@ -277,8 +277,7 @@ impl Display for HexStringMissingPrefixError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for HexStringMissingPrefixError {}
+impl core::error::Error for HexStringMissingPrefixError {}
 
 /// A Block Identifier.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
@@ -799,8 +798,7 @@ impl fmt::Display for ParseBlockHashOrNumberError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ParseBlockHashOrNumberError {}
+impl core::error::Error for ParseBlockHashOrNumberError {}
 
 impl FromStr for HashOrNumber {
     type Err = ParseBlockHashOrNumberError;

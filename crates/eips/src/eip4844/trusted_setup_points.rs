@@ -131,5 +131,4 @@ impl fmt::Display for KzgErrors {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for KzgErrors {}
+impl core::error::Error for KzgErrors {}
