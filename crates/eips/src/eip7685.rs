@@ -38,7 +38,7 @@ impl Requests {
         request: impl IntoIterator<Item = u8>,
         request_type: u8,
     ) {
-        self.0.push(std::iter::once(request_type).chain(request).collect());
+        self.0.push(core::iter::once(request_type).chain(request).collect());
     }
 
     /// Consumes [`Requests`] and returns the inner raw opaque requests.
