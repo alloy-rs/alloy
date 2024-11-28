@@ -190,11 +190,11 @@ where
 
 impl<R> From<R> for ReceiptWithBloom<R>
 where
-    R: TxReceipt<Log: Borrow<Log>>,
+    R: TxReceipt,
 {
     fn from(receipt: R) -> Self {
-        let logs_bloom = receipt.logs().iter().map(Borrow::borrow).collect();
-        Self { receipt, logs_bloom }
+        let logs_bloom = receipt.bloom();
+        Self { logs_bloom, receipt }
     }
 }
 
