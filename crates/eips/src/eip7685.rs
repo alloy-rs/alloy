@@ -66,7 +66,7 @@ impl Requests {
             req_hash.update(req);
             hash.update(req_hash.finalize());
         }
-        B256::from(hash.finalize().as_ref())
+        B256::new(hash.finalize().into())
     }
 
     /// Extend this container with requests from another container.
