@@ -29,6 +29,10 @@ impl Requests {
 
     /// Add a new request into the container.
     pub fn push_request(&mut self, request: Bytes) {
+        /// Omit empty requests.
+        if request.len() == 1 {
+            return;
+        }
         self.0.push(request);
     }
 
