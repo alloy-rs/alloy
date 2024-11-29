@@ -29,6 +29,10 @@ impl Requests {
 
     /// Add a new request into the container.
     pub fn push_request(&mut self, request: Bytes) {
+        // Omit empty requests.
+        if request.len() == 1 {
+            return;
+        }
         self.0.push(request);
     }
 
@@ -38,6 +42,11 @@ impl Requests {
         request_type: u8,
         request: impl IntoIterator<Item = u8>,
     ) {
+        let mut request = request.into_iter().peekable();
+        // Omit empty requests.
+        if request.peek().is_none() {
+            return;
+        }
         self.0.push(core::iter::once(request_type).chain(request).collect());
     }
 
