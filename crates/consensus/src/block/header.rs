@@ -221,18 +221,9 @@ impl Header {
     ///
     /// Returns `None` if `excess_blob_gas` is None.
     ///
-    /// If [`Self::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for calculating
-    /// the blob gas price, otherwise uses EIP-4844 formula.
-    ///
     /// See also [Self::next_block_excess_blob_gas]
     pub fn next_block_blob_fee(&self) -> Option<u128> {
-        let next_block_excess_blob_gas = self.next_block_excess_blob_gas()?;
-
-        if self.target_blobs_per_block().is_none() {
-            Some(eip4844::calc_blob_gasprice(next_block_excess_blob_gas))
-        } else {
-            Some(eip7742::calc_blob_gasprice(next_block_excess_blob_gas))
-        }
+        Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas()?))
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
@@ -252,9 +243,6 @@ impl Header {
     ///
     /// If [`Self::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for calculating
     /// the excess blob gas, otherwise uses EIP-4844 formula.
-    ///
-    /// Note: this function will return incorrect (unnormalized, lower) value at EIP-7742 activation
-    /// block. If this is undesired, consider using [`eip7742::calc_excess_blob_gas_at_transition`].
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
@@ -691,9 +679,6 @@ pub trait BlockHeader {
     /// If [`BlockHeader::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for
     /// calculating the excess blob gas, otherwise uses EIP-4844 formula.
     ///
-    /// Note: this function will return incorrect (unnormalized, lower) value at EIP-7742 activation
-    /// block. If this is undesired, consider using [`eip7742::calc_excess_blob_gas_at_transition`].
-    ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     fn next_block_excess_blob_gas(&self) -> Option<u64> {
         let excess_blob_gas = self.excess_blob_gas()?;
@@ -715,18 +700,9 @@ pub trait BlockHeader {
     ///
     /// Returns `None` if `excess_blob_gas` is None.
     ///
-    /// If this header has `target_blobs_per_block` set, uses EIP-7742 formula for calculating
-    /// the blob gas price, otherwise uses EIP-4844 formula.
-    ///
     /// See also [BlockHeader::next_block_excess_blob_gas]
     fn next_block_blob_fee(&self) -> Option<u128> {
-        let next_block_excess_blob_gas = self.next_block_excess_blob_gas()?;
-
-        if self.target_blobs_per_block().is_none() {
-            Some(eip4844::calc_blob_gasprice(next_block_excess_blob_gas))
-        } else {
-            Some(eip7742::calc_blob_gasprice(next_block_excess_blob_gas))
-        }
+        Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas()?))
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
