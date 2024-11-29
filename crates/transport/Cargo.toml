@@ -26,7 +26,7 @@ futures-util.workspace = true
 futures-utils-wasm.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 serde.workspace = true
-thiserror.workspace = true
+thiserror = { workspace = true, features = ["std"] }
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
