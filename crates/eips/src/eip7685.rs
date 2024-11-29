@@ -29,7 +29,7 @@ impl Requests {
 
     /// Add a new request into the container.
     pub fn push_request(&mut self, request: Bytes) {
-        /// Omit empty requests.
+        // Omit empty requests.
         if request.len() == 1 {
             return;
         }
@@ -43,7 +43,7 @@ impl Requests {
         request: impl IntoIterator<Item = u8>,
     ) {
         let mut request = request.into_iter().peekable();
-        /// Omit empty requests.
+        // Omit empty requests.
         if request.peek().is_none() {
             return;
         }
