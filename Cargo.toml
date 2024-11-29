@@ -130,7 +130,7 @@ serde = { version = "1.0", default-features = false, features = [
     "alloc",
 ] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-serde_with = "3.3.0"
+serde_with = { version = "3", default-features = false, features = ["macros"] }
 
 # misc
 auto_impl = "1.2"

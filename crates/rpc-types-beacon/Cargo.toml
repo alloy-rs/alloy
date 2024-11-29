@@ -29,7 +29,7 @@ ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
 
 serde.workspace = true
-serde_with.workspace = true
+serde_with = { workspace = true, features = ["alloc"] }
 
 thiserror.workspace = true
 
