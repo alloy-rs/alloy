@@ -18,6 +18,9 @@ pub struct EthCallBundle {
     pub block_number: u64,
     /// Either a hex encoded number or a block tag for which state to base this simulation on
     pub state_block_number: BlockNumberOrTag,
+    /// The block number index to use for which state to base this simulation on (optional - overrides state_block_number)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_number_index: Option<u64>,
     /// the coinbase to use for this bundle simulation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coinbase: Option<Address>,
