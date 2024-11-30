@@ -342,20 +342,32 @@ pub trait Typed2718 {
     fn ty(&self) -> u8;
 
     /// Returns true if the type matches the given type.
-    fn is_type(&self, ty: u8) -> bool;
+    fn is_type(&self, ty: u8) -> bool {
+        self.ty() == ty
+    }
 
     /// Returns true if the type is a legacy transaction.
-    fn is_legacy(&self) -> bool;
+    fn is_legacy(&self) -> bool {
+        self.ty() == 0
+    }
 
     /// Returns true if the type is an EIP-2930 transaction.
-    fn is_eip2930(&self) -> bool;
+    fn is_eip2930(&self) -> bool {
+        self.ty() == 1
+    }
 
     /// Returns true if the type is an EIP-1559 transaction.
-    fn is_eip1559(&self) -> bool;
+    fn is_eip1559(&self) -> bool {
+        self.ty() == 2
+    }
 
     /// Returns true if the type is an EIP-4844 transaction.
-    fn is_eip4844(&self) -> bool;
+    fn is_eip4844(&self) -> bool {
+        self.ty() == 3
+    }
 
     /// Returns true if the type is an EIP-7702 transaction.
-    fn is_eip7702(&self) -> bool;
+    fn is_eip7702(&self) -> bool {
+        self.ty() == 4
+    }
 }
