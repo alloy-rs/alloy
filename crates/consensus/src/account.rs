@@ -1,4 +1,8 @@
-use crate::constants::{EMPTY_ROOT_HASH, KECCAK_EMPTY};
+use crate::{
+    constants::{EMPTY_ROOT_HASH, KECCAK_EMPTY},
+    proofs::storage_root_unhashed,
+};
+use alloy_genesis::GenesisAccount;
 use alloy_primitives::{keccak256, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -34,6 +38,29 @@ impl Account {
     /// Compute  hash as committed to in the MPT trie without memorizing.
     pub fn trie_hash_slow(&self) -> B256 {
         keccak256(alloy_rlp::encode(self))
+    }
+}
+
+impl From<GenesisAccount> for Account {
+    fn from(account: GenesisAccount) -> Self {
+        let storage_root = account
+            .storage
+            .map(|storage| {
+                storage_root_unhashed(
+                    storage
+                        .into_iter()
+                        .filter(|(_, value)| !value.is_zero())
+                        .map(|(slot, value)| (slot, U256::from_be_bytes(*value))),
+                )
+            })
+            .unwrap_or(EMPTY_ROOT_HASH);
+
+        Self {
+            nonce: account.nonce.unwrap_or_default(),
+            balance: account.balance,
+            storage_root,
+            code_hash: account.code.map_or(KECCAK_EMPTY, keccak256),
+        }
     }
 }
 
