@@ -1,4 +1,4 @@
-use crate::receipt::{Eip658Value, RlpReceipt, TxReceipt};
+use crate::receipt::{Eip658Value, TxReceipt, RlpDecodableReceipt, RlpEncodableReceipt};
 use alloc::{vec, vec::Vec};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
@@ -68,21 +68,23 @@ where
     }
 }
 
-impl<T: Encodable + Decodable> RlpReceipt for Receipt<T> {
-    fn rlp_encoded_fields_length_with_bloom(&self, bloom: Bloom) -> usize {
+impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
+    fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.status.length()
             + self.cumulative_gas_used.length()
             + bloom.length()
             + self.logs.length()
     }
 
-    fn rlp_encode_fields_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut) {
+    fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.status.encode(out);
         self.cumulative_gas_used.encode(out);
         bloom.encode(out);
         self.logs.encode(out);
     }
+}
 
+impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
     fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
         let status = Decodable::decode(buf)?;
         let cumulative_gas_used = Decodable::decode(buf)?;
@@ -210,17 +212,17 @@ impl<R> ReceiptWithBloom<R> {
     }
 }
 
-impl<R: RlpReceipt> Encodable for ReceiptWithBloom<R> {
+impl<R: RlpEncodableReceipt> Encodable for ReceiptWithBloom<R> {
     fn encode(&self, out: &mut dyn BufMut) {
-        self.receipt.rlp_encode_with_bloom(self.logs_bloom, out);
+        self.receipt.rlp_encode_with_bloom(&self.logs_bloom, out);
     }
 
     fn length(&self) -> usize {
-        self.receipt.rlp_encoded_length_with_bloom(self.logs_bloom)
+        self.receipt.rlp_encoded_length_with_bloom(&self.logs_bloom)
     }
 }
 
-impl<R: RlpReceipt> Decodable for ReceiptWithBloom<R> {
+impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         R::rlp_decode_with_bloom(buf)
     }

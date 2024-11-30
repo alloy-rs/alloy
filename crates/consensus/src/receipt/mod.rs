@@ -61,17 +61,18 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     fn logs(&self) -> &[Self::Log];
 }
 
-/// Receipt type that knows how to encode and decode itself with a [`Bloom`] value.
-pub trait RlpReceipt: Sized {
+/// Receipt type that knows how to encode itself with a [`Bloom`] value.
+#[auto_impl::auto_impl(&)]
+pub trait RlpEncodableReceipt {
     /// Returns the length of the RLP encoded receipt fields with the provided bloom filter, without
     /// RLP header.
-    fn rlp_encoded_fields_length_with_bloom(&self, bloom: Bloom) -> usize;
+    fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize;
 
     /// RLP encodes the receipt fields with the provided bloom filter, without RLP header.
-    fn rlp_encode_fields_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut);
+    fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
 
     /// Returns the RLP header for the receipt payload with the provided bloom filter.
-    fn rlp_header_with_bloom(&self, bloom: Bloom) -> alloy_rlp::Header {
+    fn rlp_header_with_bloom(&self, bloom: &Bloom) -> alloy_rlp::Header {
         alloy_rlp::Header {
             list: true,
             payload_length: self.rlp_encoded_fields_length_with_bloom(bloom),
@@ -79,16 +80,19 @@ pub trait RlpReceipt: Sized {
     }
 
     /// Returns the length of the receipt payload with the provided bloom filter.
-    fn rlp_encoded_length_with_bloom(&self, bloom: Bloom) -> usize {
+    fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.rlp_header_with_bloom(bloom).length_with_payload()
     }
 
     /// RLP encodes the receipt with the provided bloom filter.
-    fn rlp_encode_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut) {
+    fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.rlp_header_with_bloom(bloom).encode(out);
         self.rlp_encode_fields_with_bloom(bloom, out);
     }
+}
 
+/// Receipt type that knows how to decode itself with a [`Bloom`] value.
+pub trait RlpDecodableReceipt: Sized {
     /// RLP decodes receipt's fields and [`Bloom`] into [`ReceiptWithBloom`] instance.
     ///
     /// Note: this should not decode an RLP header.
@@ -226,5 +230,15 @@ mod tests {
         // receipt.clone().to_compact(&mut data);
         // let (decoded, _) = Receipt::from_compact(&data[..], data.len());
         assert_eq!(decoded, receipt);
+    }
+
+    #[test]
+    fn can_encode_by_reference() {
+        let receipt: Receipt = Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![] };
+
+        let encoded_ref = alloy_rlp::encode(&ReceiptWithBloom { receipt: &receipt, logs_bloom: receipt.bloom_slow() });
+        let encoded = alloy_rlp::encode(&ReceiptWithBloom { logs_bloom: receipt.bloom_slow(), receipt  });
+
+        assert_eq!(encoded, encoded_ref);
     }
 }

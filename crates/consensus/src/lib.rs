@@ -20,7 +20,8 @@ pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpReceipt, TxReceipt,
+    Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpDecodableReceipt,
+    RlpEncodableReceipt, TxReceipt,
 };
 
 pub mod proofs;
