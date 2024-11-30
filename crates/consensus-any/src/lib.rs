@@ -5,6 +5,7 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 mod block;
 pub use block::AnyHeader;
@@ -12,7 +13,9 @@ pub use block::AnyHeader;
 mod receipt;
 pub use receipt::AnyReceiptEnvelope;
 
+#[cfg(feature = "std")]
 mod transaction;
+#[cfg(feature = "std")]
 pub use transaction::{
     AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope, UnknownTypedTransaction,
 };

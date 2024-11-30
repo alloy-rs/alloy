@@ -19,7 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-alloy-consensus-any = { workspace = true, features = ["serde"] }
+alloy-consensus-any = { workspace = true, features = ["std", "serde"] }
 alloy-eips.workspace = true
 alloy-network-primitives.workspace = true
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
