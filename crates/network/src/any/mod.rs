@@ -49,9 +49,8 @@ pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
 /// [`Encodable2718`]: alloy_eips::eip2718::Encodable2718
 /// [`TxEnvelope`]: alloy_consensus::TxEnvelope
 #[derive(Clone, Copy, Debug)]
-pub struct AnyNetwork {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct AnyNetwork;
 
 impl Network for AnyNetwork {
     type TxType = AnyTxType;

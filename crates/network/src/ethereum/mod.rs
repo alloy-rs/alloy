@@ -7,9 +7,8 @@ pub use wallet::EthereumWallet;
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Clone, Copy, Debug)]
-pub struct Ethereum {
-    _private: (),
-}
+#[non_exhaustive]
+pub struct Ethereum;
 
 impl Network for Ethereum {
     type TxType = alloy_consensus::TxType;
