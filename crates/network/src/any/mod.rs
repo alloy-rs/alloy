@@ -1,24 +1,17 @@
 mod builder;
 
-mod either;
-pub use either::{AnyTxEnvelope, AnyTypedTransaction};
-
-mod unknowns;
-pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
-
-pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
+pub use alloy_consensus_any::{
+    AnyHeader, AnyReceiptEnvelope, AnyTxEnvelope, AnyTxType, AnyTypedTransaction,
+    UnknownTxEnvelope, UnknownTypedTransaction,
+};
 
 use crate::Network;
-pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
-use alloy_serde::WithOtherFields;
+pub use alloy_rpc_types_any::{
+    AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction, AnyTransactionReceipt, AnyTransactionRequest,
+};
 
-/// A catch-all block type for handling blocks on multiple networks.
-pub type AnyRpcBlock =
-    WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
-
-/// A catch-all transaction type for handling transactions on multiple networks.
-pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
+// For documentation purpose
+use alloy_serde as _;
 
 /// Types for a catch-all network.
 ///
@@ -48,6 +41,8 @@ pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
 /// [`Decodable2718`]: alloy_eips::eip2718::Decodable2718
 /// [`Encodable2718`]: alloy_eips::eip2718::Encodable2718
 /// [`TxEnvelope`]: alloy_consensus::TxEnvelope
+/// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+/// [`WithOtherFields`]: alloy_serde::WithOtherFields
 #[derive(Clone, Copy, Debug)]
 pub struct AnyNetwork {
     _private: (),
@@ -64,7 +59,7 @@ impl Network for AnyNetwork {
 
     type Header = AnyHeader;
 
-    type TransactionRequest = WithOtherFields<TransactionRequest>;
+    type TransactionRequest = AnyTransactionRequest;
 
     type TransactionResponse = AnyRpcTransaction;
 
