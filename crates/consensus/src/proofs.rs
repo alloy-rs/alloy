@@ -3,12 +3,14 @@
 use crate::{Account, Header, EMPTY_OMMER_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{eip2718::Encodable2718, eip4895::Withdrawal};
-use alloy_primitives::{keccak256, Address, B256, U256};
+use alloy_primitives::{keccak256, B256, U256};
 use alloy_trie::{
     root::{ordered_trie_root, ordered_trie_root_with_encoder},
     HashBuilder, Nibbles,
 };
-use itertools::Itertools;
+
+#[cfg(feature = "std")]
+use {alloy_primitives::Address, itertools::Itertools};
 
 /// Calculate a transaction root.
 ///
@@ -40,6 +42,7 @@ pub fn calculate_ommers_root(ommers: &[Header]) -> B256 {
 /// Hashes and sorts account keys, then proceeds to calculating the root hash of the state
 /// represented as MPT.
 /// See [`state_root_unsorted`] for more info.
+#[cfg(feature = "std")]
 pub fn state_root_ref_unhashed<'a, A: Into<Account> + Clone + 'a>(
     state: impl IntoIterator<Item = (&'a Address, &'a A)>,
 ) -> B256 {
@@ -51,6 +54,7 @@ pub fn state_root_ref_unhashed<'a, A: Into<Account> + Clone + 'a>(
 /// Hashes and sorts account keys, then proceeds to calculating the root hash of the state
 /// represented as MPT.
 /// See [`state_root_unsorted`] for more info.
+#[cfg(feature = "std")]
 pub fn state_root_unhashed<A: Into<Account>>(
     state: impl IntoIterator<Item = (Address, A)>,
 ) -> B256 {
@@ -59,6 +63,7 @@ pub fn state_root_unhashed<A: Into<Account>>(
 
 /// Sorts the hashed account keys and calculates the root hash of the state represented as MPT.
 /// See [`state_root`] for more info.
+#[cfg(feature = "std")]
 pub fn state_root_unsorted<A: Into<Account>>(state: impl IntoIterator<Item = (B256, A)>) -> B256 {
     state_root(state.into_iter().sorted_unstable_by_key(|(key, _)| *key))
 }
@@ -81,12 +86,14 @@ pub fn state_root<A: Into<Account>>(state: impl IntoIterator<Item = (B256, A)>) 
 
 /// Hashes storage keys, sorts them and them calculates the root hash of the storage trie.
 /// See [`storage_root_unsorted`] for more info.
+#[cfg(feature = "std")]
 pub fn storage_root_unhashed(storage: impl IntoIterator<Item = (B256, U256)>) -> B256 {
     storage_root_unsorted(storage.into_iter().map(|(slot, value)| (keccak256(slot), value)))
 }
 
 /// Sorts and calculates the root hash of account storage trie.
 /// See [`storage_root`] for more info.
+#[cfg(feature = "std")]
 pub fn storage_root_unsorted(storage: impl IntoIterator<Item = (B256, U256)>) -> B256 {
     storage_root(storage.into_iter().sorted_unstable_by_key(|(key, _)| *key))
 }

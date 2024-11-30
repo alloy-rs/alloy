@@ -1,10 +1,9 @@
-use crate::{
-    constants::{EMPTY_ROOT_HASH, KECCAK_EMPTY},
-    proofs::storage_root_unhashed,
-};
-use alloy_genesis::GenesisAccount;
+use crate::constants::{EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use alloy_primitives::{keccak256, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
+
+#[cfg(feature = "std")]
+use {crate::proofs::storage_root_unhashed, alloy_genesis::GenesisAccount};
 
 /// Represents an Account in the account trie.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, RlpDecodable, RlpEncodable)]
@@ -41,6 +40,7 @@ impl Account {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<GenesisAccount> for Account {
     fn from(account: GenesisAccount) -> Self {
         let storage_root = account
