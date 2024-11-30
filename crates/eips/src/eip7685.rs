@@ -76,9 +76,9 @@ impl Requests {
     /// sha256(sha256(requests_0) ++ sha256(requests_1) ++ ...)
     /// ```
     ///
-    /// Each request in the container is expected to already have the `request_type`　prepended
+    /// Each request in the container is expected to already have the `request_type` prepended
     /// to its corresponding `requests_data`. This function directly calculates the hash based
-    /// on the　combined `request_type` and `requests_data`.
+    /// on the combined `request_type` and `requests_data`.
     #[cfg(feature = "sha2")]
     pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
