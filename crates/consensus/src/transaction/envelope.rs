@@ -126,6 +126,10 @@ impl Decodable for TxType {
 }
 
 impl Typed2718 for TxType {
+    fn ty(&self) -> u8 {
+        (*self).into()
+    }
+
     fn is_type(&self, ty: u8) -> bool {
         *self == ty
     }

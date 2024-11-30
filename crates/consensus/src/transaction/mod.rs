@@ -336,7 +336,11 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
 }
 
 /// A trait that helps to determine the type of the transaction.
+#[auto_impl::auto_impl(&)]
 pub trait Typed2718 {
+    /// Returns the EIP-2718 type flag.
+    fn ty(&self) -> u8;
+
     /// Returns true if the type matches the given type.
     fn is_type(&self, ty: u8) -> bool;
 

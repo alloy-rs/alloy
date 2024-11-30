@@ -234,10 +234,15 @@ mod tests {
 
     #[test]
     fn can_encode_by_reference() {
-        let receipt: Receipt = Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![] };
+        let receipt: Receipt =
+            Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![] };
 
-        let encoded_ref = alloy_rlp::encode(&ReceiptWithBloom { receipt: &receipt, logs_bloom: receipt.bloom_slow() });
-        let encoded = alloy_rlp::encode(&ReceiptWithBloom { logs_bloom: receipt.bloom_slow(), receipt  });
+        let encoded_ref = alloy_rlp::encode(&ReceiptWithBloom {
+            receipt: &receipt,
+            logs_bloom: receipt.bloom_slow(),
+        });
+        let encoded =
+            alloy_rlp::encode(&ReceiptWithBloom { logs_bloom: receipt.bloom_slow(), receipt });
 
         assert_eq!(encoded, encoded_ref);
     }

@@ -1,5 +1,9 @@
-use crate::receipt::{Eip658Value, TxReceipt, RlpDecodableReceipt, RlpEncodableReceipt};
+use crate::{
+    receipt::{Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt},
+    Typed2718,
+};
 use alloc::{vec, vec::Vec};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::{borrow::Borrow, fmt};
@@ -225,6 +229,26 @@ impl<R: RlpEncodableReceipt> Encodable for ReceiptWithBloom<R> {
 impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         R::rlp_decode_with_bloom(buf)
+    }
+}
+
+impl<R> Encodable2718 for ReceiptWithBloom<R>
+where
+    R: RlpEncodableReceipt + Typed2718 + Send + Sync,
+{
+    fn type_flag(&self) -> Option<u8> {
+        (!self.receipt.is_legacy()).then_some(self.receipt.ty())
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        if let Some(ty) = self.type_flag() {
+            out.put_u8(ty);
+        }
+        self.encode(out);
+    }
+
+    fn encode_2718_len(&self) -> usize {
+        self.type_flag().is_some() as usize + self.length()
     }
 }
 

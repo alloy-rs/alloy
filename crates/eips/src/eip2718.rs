@@ -173,7 +173,7 @@ pub trait Decodable2718: Sized {
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub trait Encodable2718: Sized + Send + Sync + 'static {
+pub trait Encodable2718: Sized + Send + Sync {
     /// Return the type flag (if any).
     ///
     /// This should return `None` for the default (legacy) variant of the
