@@ -23,6 +23,9 @@ pub struct Requests(Vec<Bytes>);
 
 impl Requests {
     /// Construct a new [`Requests`] container.
+    ///
+    /// This function assumes that the request type byte is already included as the
+    /// first byte in the provided `Bytes` blob.
     pub const fn new(requests: Vec<Bytes>) -> Self {
         Self(requests)
     }
@@ -54,7 +57,8 @@ impl Requests {
     ///
     /// # Note
     ///
-    /// These requests are only the `requests_data` without the `request_type`.
+    /// These requests include the `request_type` as the first byte in each
+    /// `Bytes` element, followed by the `requests_data`.
     pub fn take(self) -> Vec<Bytes> {
         self.0
     }
@@ -72,9 +76,9 @@ impl Requests {
     /// sha256(sha256(requests_0) ++ sha256(requests_1) ++ ...)
     /// ```
     ///
-    /// The request type for each requests is prepended to the `requests_data` inside of this
-    /// container. The request type for the first request in the container will be `0x00`, the
-    /// second request will have type `0x01`, and so on.
+    /// Each request in the container is expected to already have the `request_type` prepended
+    /// to its corresponding `requests_data`. This function directly calculates the hash based
+    /// on the combined `request_type` and `requests_data`.
     #[cfg(feature = "sha2")]
     pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
