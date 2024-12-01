@@ -473,8 +473,7 @@ impl BlobsBundleV1Ssz {
     }
 
     fn unwrap(self) -> BlobsBundleV1 {
-        // SAFETY: Same repr and size
-        unsafe { std::mem::transmute(self) }
+        BlobsBundleV1 { commitments: self.commitments, proofs: self.proofs, blobs: self.blobs }
     }
 }
 
