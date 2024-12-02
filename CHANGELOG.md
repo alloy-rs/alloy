@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2](https://github.com/alloy-rs/alloy/releases/tag/v0.7.2) - 2024-12-02
+
+### Bug Fixes
+
+- Remove `Borrow` impl for RPC receipt ([#1721](https://github.com/alloy-rs/alloy/issues/1721))
+- Adjust EIP-7742 to latest spec ([#1713](https://github.com/alloy-rs/alloy/issues/1713))
+- Omit empty requests ([#1706](https://github.com/alloy-rs/alloy/issues/1706))
+- Use B256::new instead of from ([#1701](https://github.com/alloy-rs/alloy/issues/1701))
+
+### Dependencies
+
+- [deps] Bump thiserror 2 ([#1700](https://github.com/alloy-rs/alloy/issues/1700))
+- [general] Bump MSRV to 1.81, use `core::error::Error` on `no-std` compatible crates ([#1552](https://github.com/alloy-rs/alloy/issues/1552))
+
+### Documentation
+
+- Update docs for eip7685 `Requests` ([#1714](https://github.com/alloy-rs/alloy/issues/1714))
+
+### Features
+
+- Receipt root fn ([#1708](https://github.com/alloy-rs/alloy/issues/1708))
+- Impl `Encodable2718` for `ReceiptWithBloom` ([#1719](https://github.com/alloy-rs/alloy/issues/1719))
+- Feat(rpc-types-eth) add test for syncing ([#1724](https://github.com/alloy-rs/alloy/issues/1724))
+- Add blob_gas_used ([#1704](https://github.com/alloy-rs/alloy/issues/1704))
+- EIP-7685 requests helpers ([#1699](https://github.com/alloy-rs/alloy/issues/1699))
+
+### Miscellaneous Tasks
+
+- Release 0.7.2
+- Disable serde-with default features ([#1703](https://github.com/alloy-rs/alloy/issues/1703))
+- Use encoded2718 ([#1702](https://github.com/alloy-rs/alloy/issues/1702))
+
+### Other
+
+- Block_number_index added to callBundle reference type ([#1705](https://github.com/alloy-rs/alloy/issues/1705))
+- Remove wrapper BlobsBundleV1Ssz ([#1726](https://github.com/alloy-rs/alloy/issues/1726))
+- Change BlobsBundleV1Ssz unwrap implementation to safe code ([#1723](https://github.com/alloy-rs/alloy/issues/1723))
+
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
 
 ### Bug Fixes
@@ -46,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.0
 - Add changelog
 - Release 0.7.0
 - Release 0.7.0
