@@ -16,7 +16,6 @@ pub enum Eip658Value {
 }
 
 impl Eip658Value {
-
     /// Returns a successful transaction status.
     pub const fn success() -> Self {
         Self::Eip658(true)

@@ -1,6 +1,6 @@
 //! Helper function for calculating Merkle proofs and hashes.
 
-use crate::{Header, ReceiptWithBloom, RlpReceipt, EMPTY_OMMER_ROOT_HASH};
+use crate::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{eip2718::Encodable2718, eip4895::Withdrawal};
 use alloy_primitives::{keccak256, B256};
@@ -33,23 +33,83 @@ pub fn calculate_ommers_root(ommers: &[Header]) -> B256 {
     keccak256(ommers_rlp)
 }
 
-
-/// Calculates the receipt root for a header.
-pub fn calculate_receipt_root<T>(receipts: &[ReceiptWithBloom<T>]) -> B256
-where T: Encodable2718
+/// Calculates the receipt root.
+pub fn calculate_receipt_root<T>(receipts: &[T]) -> B256
+where
+    T: Encodable2718,
 {
-    // TODO - Implement this function according to https://github.com/paradigmxyz/reth/blob/b09c345257cda4a88e8e347654e946a20f9e5cb7/crates/primitives/src/proofs.rs#L27-L27
-    // ordered_trie_root_with_encoder(receipts, |r, buf| r.encode_inner(buf, false))
-    todo!()
+    ordered_trie_root_with_encoder(receipts, |r, buf| r.encode_2718(buf))
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{bloom, Address, Log, LogData};
-    use crate::{Eip658Value, Receipt};
+    use crate::{
+        Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptWithBloom, RlpEncodableReceipt,
+        TxType, Typed2718,
+    };
+    use alloy_primitives::{b256, bloom, Address, Log, LogData};
 
+    struct TypedReceipt {
+        ty: TxType,
+        receipt: Receipt,
+    }
+
+    impl RlpEncodableReceipt for TypedReceipt {
+        fn rlp_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
+            let mut payload_length = self.eip2718_encoded_length_with_bloom(bloom);
+
+            if !self.ty.is_legacy() {
+                payload_length += alloy_rlp::Header {
+                    list: false,
+                    payload_length: self.eip2718_encoded_length_with_bloom(bloom),
+                }
+                .length();
+            }
+
+            payload_length
+        }
+
+        fn rlp_encode_with_bloom(
+            &self,
+            bloom: &alloy_primitives::Bloom,
+            out: &mut dyn alloy_rlp::BufMut,
+        ) {
+            if !self.ty.is_legacy() {
+                alloy_rlp::Header {
+                    list: false,
+                    payload_length: self.eip2718_encoded_length_with_bloom(bloom),
+                }
+                .encode(out)
+            }
+            self.eip2718_encode_with_bloom(bloom, out);
+        }
+    }
+
+    impl Eip2718EncodableReceipt for TypedReceipt {
+        fn eip2718_encode_with_bloom(
+            &self,
+            bloom: &alloy_primitives::Bloom,
+            out: &mut dyn alloy_rlp::BufMut,
+        ) {
+            if !self.ty.is_legacy() {
+                out.put_u8(self.ty.ty());
+            }
+            self.receipt.rlp_encode_with_bloom(bloom, out);
+        }
+
+        fn eip2718_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
+            self.receipt.rlp_encoded_length_with_bloom(bloom) + (!self.ty.is_legacy()) as usize
+        }
+    }
+
+    impl Typed2718 for TypedReceipt {
+        fn ty(&self) -> u8 {
+            self.ty.ty()
+        }
+    }
+
+    #[test]
     fn check_receipt_root_optimism() {
         let logs = vec![Log {
             address: Address::ZERO,
@@ -57,15 +117,18 @@ mod tests {
         }];
         let logs_bloom = bloom!("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001");
         let receipt = ReceiptWithBloom {
-            receipt: Receipt {
-                status: Eip658Value::success(),
-                cumulative_gas_used: 102068,
-                logs,
+            receipt: TypedReceipt {
+                receipt: Receipt {
+                    status: Eip658Value::success(),
+                    cumulative_gas_used: 102068,
+                    logs,
+                },
+                ty: TxType::Eip2930,
             },
             logs_bloom,
         };
         let receipt = vec![receipt];
-        // let root = calculate_receipt_root(&receipt);
-        // assert_eq!(root, b256!("fe70ae4a136d98944951b2123859698d59ad251a381abc9960fa81cae3d0d4a0"));
+        let root = calculate_receipt_root(&receipt);
+        assert_eq!(root, b256!("fe70ae4a136d98944951b2123859698d59ad251a381abc9960fa81cae3d0d4a0"));
     }
 }
