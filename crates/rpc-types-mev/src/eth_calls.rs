@@ -19,9 +19,9 @@ pub struct EthCallBundle {
     pub block_number: u64,
     /// Either a hex encoded number or a block tag for which state to base this simulation on
     pub state_block_number: BlockNumberOrTag,
-    /// Inclusive number of tx to replay in block. -1 means replay all 
-    #[serde(default, skip_serializing_if = "Option::is_none")] 
-    pub transaction_index: Option<TransactionIndex>, 
+    /// Inclusive number of tx to replay in block. -1 means replay all
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction_index: Option<TransactionIndex>,
     /// the coinbase to use for this bundle simulation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coinbase: Option<Address>,
