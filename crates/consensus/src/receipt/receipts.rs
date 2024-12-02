@@ -72,21 +72,21 @@ where
 }
 
 impl<T: Encodable> Receipt<T> {
-    fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
+    pub fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.status.length()
             + self.cumulative_gas_used.length()
             + bloom.length()
             + self.logs.length()
     }
 
-    fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
+    pub fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.status.encode(out);
         self.cumulative_gas_used.encode(out);
         bloom.encode(out);
         self.logs.encode(out);
     }
 
-    fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
+    pub fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
     }
 }
@@ -103,7 +103,7 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
 }
 
 impl<T: Decodable> Receipt<T> {
-    fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+    pub fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
         let status = Decodable::decode(buf)?;
         let cumulative_gas_used = Decodable::decode(buf)?;
         let logs_bloom = Decodable::decode(buf)?;
