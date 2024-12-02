@@ -2,6 +2,7 @@ use crate::{u256_numeric_string, Privacy, Validity};
 
 use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};
 use alloy_primitives::{keccak256, Address, Bytes, Keccak256, B256, U256};
+use alloy_rpc_types_eth::TransactionIndex;
 use serde::{Deserialize, Serialize};
 
 /// Bundle of transactions for `eth_callBundle`
