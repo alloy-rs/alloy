@@ -72,6 +72,7 @@ where
 }
 
 impl<T: Encodable> Receipt<T> {
+    /// Returns length of RLP-encoded receipt fields with the given [`Bloom`] without an RLP header.
     pub fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.status.length()
             + self.cumulative_gas_used.length()
@@ -79,6 +80,7 @@ impl<T: Encodable> Receipt<T> {
             + self.logs.length()
     }
 
+    /// RLP-encodes receipt fields with the given [`Bloom`] without an RLP header.
     pub fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.status.encode(out);
         self.cumulative_gas_used.encode(out);
@@ -86,6 +88,7 @@ impl<T: Encodable> Receipt<T> {
         self.logs.encode(out);
     }
 
+    /// Returns RLP header for this receipt encoding with the given [`Bloom`].
     pub fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
     }
@@ -103,6 +106,9 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
 }
 
 impl<T: Decodable> Receipt<T> {
+    /// RLP-decodes receipt's field with a [`Bloom`].
+    ///
+    /// Does not expect an RLP header.
     pub fn rlp_decode_fields_with_bloom(
         buf: &mut &[u8],
     ) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
