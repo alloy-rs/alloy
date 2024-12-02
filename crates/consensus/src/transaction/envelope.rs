@@ -126,28 +126,8 @@ impl Decodable for TxType {
 }
 
 impl Typed2718 for TxType {
-    fn is_type(&self, ty: u8) -> bool {
-        *self == ty
-    }
-
-    fn is_legacy(&self) -> bool {
-        matches!(self, Self::Legacy)
-    }
-
-    fn is_eip2930(&self) -> bool {
-        matches!(self, Self::Eip2930)
-    }
-
-    fn is_eip1559(&self) -> bool {
-        matches!(self, Self::Eip1559)
-    }
-
-    fn is_eip4844(&self) -> bool {
-        matches!(self, Self::Eip4844)
-    }
-
-    fn is_eip7702(&self) -> bool {
-        matches!(self, Self::Eip7702)
+    fn ty(&self) -> u8 {
+        (*self).into()
     }
 }
 

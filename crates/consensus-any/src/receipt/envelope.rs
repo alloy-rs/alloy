@@ -1,4 +1,4 @@
-use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, RlpReceipt, TxReceipt};
+use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, RlpEncodableReceipt, TxReceipt};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
@@ -32,7 +32,7 @@ impl<R> AnyReceiptEnvelope<R> {
     }
 }
 
-impl<R: RlpReceipt> AnyReceiptEnvelope<R> {
+impl<R: RlpEncodableReceipt> AnyReceiptEnvelope<R> {
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
         let length = self.inner.length();

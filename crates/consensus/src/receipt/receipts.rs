@@ -1,9 +1,12 @@
-use crate::receipt::{Eip658Value, RlpReceipt, TxReceipt};
+use crate::receipt::{Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt};
 use alloc::{vec, vec::Vec};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::{borrow::Borrow, fmt};
 use derive_more::{DerefMut, From, IntoIterator};
+
+use super::Eip2718EncodableReceipt;
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -68,21 +71,38 @@ where
     }
 }
 
-impl<T: Encodable + Decodable> RlpReceipt for Receipt<T> {
-    fn rlp_encoded_fields_length_with_bloom(&self, bloom: Bloom) -> usize {
+impl<T: Encodable> Receipt<T> {
+    fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.status.length()
             + self.cumulative_gas_used.length()
             + bloom.length()
             + self.logs.length()
     }
 
-    fn rlp_encode_fields_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut) {
+    fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.status.encode(out);
         self.cumulative_gas_used.encode(out);
         bloom.encode(out);
         self.logs.encode(out);
     }
 
+    fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
+        Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
+    }
+}
+
+impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
+    fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
+        self.rlp_header_with_bloom(bloom).length_with_payload()
+    }
+
+    fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
+        self.rlp_header_with_bloom(bloom).encode(out);
+        self.rlp_encode_fields_with_bloom(bloom, out);
+    }
+}
+
+impl<T: Decodable> Receipt<T> {
     fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
         let status = Decodable::decode(buf)?;
         let cumulative_gas_used = Decodable::decode(buf)?;
@@ -90,6 +110,25 @@ impl<T: Encodable + Decodable> RlpReceipt for Receipt<T> {
         let logs = Decodable::decode(buf)?;
 
         Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
+    }
+}
+
+impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
+    fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        let remaining = buf.len();
+
+        let this = Self::rlp_decode_fields_with_bloom(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
     }
 }
 
@@ -210,19 +249,36 @@ impl<R> ReceiptWithBloom<R> {
     }
 }
 
-impl<R: RlpReceipt> Encodable for ReceiptWithBloom<R> {
+impl<R: RlpEncodableReceipt> Encodable for ReceiptWithBloom<R> {
     fn encode(&self, out: &mut dyn BufMut) {
-        self.receipt.rlp_encode_with_bloom(self.logs_bloom, out);
+        self.receipt.rlp_encode_with_bloom(&self.logs_bloom, out);
     }
 
     fn length(&self) -> usize {
-        self.receipt.rlp_encoded_length_with_bloom(self.logs_bloom)
+        self.receipt.rlp_encoded_length_with_bloom(&self.logs_bloom)
     }
 }
 
-impl<R: RlpReceipt> Decodable for ReceiptWithBloom<R> {
+impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         R::rlp_decode_with_bloom(buf)
+    }
+}
+
+impl<R> Encodable2718 for ReceiptWithBloom<R>
+where
+    R: Eip2718EncodableReceipt + Send + Sync,
+{
+    fn type_flag(&self) -> Option<u8> {
+        (!self.receipt.is_legacy()).then_some(self.receipt.ty())
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        self.receipt.eip2718_encode_with_bloom(&self.logs_bloom, out);
+    }
+
+    fn encode_2718_len(&self) -> usize {
+        self.receipt.eip2718_encoded_length_with_bloom(&self.logs_bloom)
     }
 }
 
