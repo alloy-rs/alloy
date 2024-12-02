@@ -9,7 +9,9 @@ use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
-use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64};
+use alloy_primitives::{
+    Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
+};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
@@ -41,6 +43,12 @@ pub enum TxType {
 impl From<TxType> for u8 {
     fn from(value: TxType) -> Self {
         value as Self
+    }
+}
+
+impl From<TxType> for U8 {
+    fn from(tx_type: TxType) -> Self {
+        Self::from(u8::from(tx_type))
     }
 }
 
