@@ -32,3 +32,103 @@ pub fn calculate_ommers_root(ommers: &[Header]) -> B256 {
     alloy_rlp::encode_list(ommers, &mut ommers_rlp);
     keccak256(ommers_rlp)
 }
+
+/// Calculates the receipt root.
+pub fn calculate_receipt_root<T>(receipts: &[T]) -> B256
+where
+    T: Encodable2718,
+{
+    ordered_trie_root_with_encoder(receipts, |r, buf| r.encode_2718(buf))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptWithBloom, RlpEncodableReceipt,
+        TxType, Typed2718,
+    };
+    use alloy_primitives::{b256, bloom, Address, Log, LogData};
+
+    struct TypedReceipt {
+        ty: TxType,
+        receipt: Receipt,
+    }
+
+    impl RlpEncodableReceipt for TypedReceipt {
+        fn rlp_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
+            let mut payload_length = self.eip2718_encoded_length_with_bloom(bloom);
+
+            if !self.ty.is_legacy() {
+                payload_length += alloy_rlp::Header {
+                    list: false,
+                    payload_length: self.eip2718_encoded_length_with_bloom(bloom),
+                }
+                .length();
+            }
+
+            payload_length
+        }
+
+        fn rlp_encode_with_bloom(
+            &self,
+            bloom: &alloy_primitives::Bloom,
+            out: &mut dyn alloy_rlp::BufMut,
+        ) {
+            if !self.ty.is_legacy() {
+                alloy_rlp::Header {
+                    list: false,
+                    payload_length: self.eip2718_encoded_length_with_bloom(bloom),
+                }
+                .encode(out)
+            }
+            self.eip2718_encode_with_bloom(bloom, out);
+        }
+    }
+
+    impl Eip2718EncodableReceipt for TypedReceipt {
+        fn eip2718_encode_with_bloom(
+            &self,
+            bloom: &alloy_primitives::Bloom,
+            out: &mut dyn alloy_rlp::BufMut,
+        ) {
+            if !self.ty.is_legacy() {
+                out.put_u8(self.ty.ty());
+            }
+            self.receipt.rlp_encode_with_bloom(bloom, out);
+        }
+
+        fn eip2718_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
+            self.receipt.rlp_encoded_length_with_bloom(bloom) + (!self.ty.is_legacy()) as usize
+        }
+    }
+
+    impl Typed2718 for TypedReceipt {
+        fn ty(&self) -> u8 {
+            self.ty.ty()
+        }
+    }
+
+    #[test]
+    fn check_receipt_root_optimism() {
+        let logs = vec![Log {
+            address: Address::ZERO,
+            data: LogData::new_unchecked(vec![], Default::default()),
+        }];
+        let logs_bloom = bloom!("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001");
+        let receipt = ReceiptWithBloom {
+            receipt: TypedReceipt {
+                receipt: Receipt {
+                    status: Eip658Value::success(),
+                    cumulative_gas_used: 102068,
+                    logs,
+                },
+                ty: TxType::Eip2930,
+            },
+            logs_bloom,
+        };
+        let receipt = vec![receipt];
+        let root = calculate_receipt_root(&receipt);
+        assert_eq!(root, b256!("fe70ae4a136d98944951b2123859698d59ad251a381abc9960fa81cae3d0d4a0"));
+    }
+}

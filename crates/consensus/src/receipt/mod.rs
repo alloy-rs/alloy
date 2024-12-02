@@ -84,6 +84,7 @@ pub trait RlpDecodableReceipt: Sized {
 /// Main consumer of this trait is [`ReceiptWithBloom`]. It is expected that [`RlpEncodableReceipt`]
 /// implementation for this type produces network encoding whcih is used by [`alloy_rlp::Encodable`]
 /// implementation for [`ReceiptWithBloom`].
+#[auto_impl::auto_impl(&)]
 pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {
     /// EIP-2718 encoded length with the provided bloom filter.
     fn eip2718_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize;
