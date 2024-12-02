@@ -103,7 +103,9 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
 }
 
 impl<T: Decodable> Receipt<T> {
-    pub fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+    pub fn rlp_decode_fields_with_bloom(
+        buf: &mut &[u8],
+    ) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
         let status = Decodable::decode(buf)?;
         let cumulative_gas_used = Decodable::decode(buf)?;
         let logs_bloom = Decodable::decode(buf)?;
