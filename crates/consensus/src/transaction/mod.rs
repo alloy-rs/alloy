@@ -18,6 +18,7 @@ pub use eip7702::TxEip7702;
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
 
+use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
 pub use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
     utils as eip4844_utils, Blob, BlobTransactionSidecar, Bytes48,
@@ -157,6 +158,15 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Blob versioned hashes for eip4844 transaction. For previous transaction types this is
     /// `None`.
     fn blob_versioned_hashes(&self) -> Option<&[B256]>;
+
+    /// Returns the total gas for all blobs in this transaction.
+    ///
+    /// Returns `None` for non-eip4844 transactions.
+    #[inline]
+    fn blob_gas_used(&self) -> Option<u64> {
+        // SAFETY: we don't expect u64::MAX / DATA_GAS_PER_BLOB hashes in a single transaction
+        self.blob_versioned_hashes().map(|blobs| blobs.len() as u64 * DATA_GAS_PER_BLOB)
+    }
 
     /// Returns the [`SignedAuthorization`] list of the transaction.
     ///
