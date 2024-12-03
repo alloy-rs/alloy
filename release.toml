@@ -13,3 +13,4 @@ pre-release-hook = [
     "-c",
     "$WORKSPACE_ROOT/scripts/changelog.sh --tag {{version}}",
 ]
+owners = ["github:alloy-rs:core"]
