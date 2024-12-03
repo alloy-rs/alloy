@@ -132,8 +132,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_as<R>(
         &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
     where
         R: RpcReturn + serde::de::DeserializeOwned;
@@ -150,8 +151,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_js(
         &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value>;
 
     /// Reruns the transaction specified by the hash and returns the trace as a call frame.
@@ -166,8 +168,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_callframe(
         &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame>;
 
     /// Return a full stack trace of all invoked opcodes of all transaction that were included in
@@ -287,33 +290,6 @@ where
         self.debug_trace_transaction_as::<CallFrame>(hash, trace_options).await
     }
 
-    async fn debug_trace_call_as<R>(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<R>
-    where
-        R: RpcReturn,
-    {
-        self.client().request("debug_traceCall", (hash, trace_options)).await
-    }
-
-    async fn debug_trace_call_js(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<serde_json::Value> {
-        self.debug_trace_call_as::<serde_json::Value>(hash, trace_options).await
-    }
-
-    async fn debug_trace_call_callframe(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<CallFrame> {
-        self.debug_trace_call_as::<CallFrame>(hash, trace_options).await
-    }
-
     async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawBlock", (block,)).await
     }
@@ -378,6 +354,36 @@ where
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
         self.client().request("debug_traceCall", (tx, block, trace_options)).await
+    }
+
+    async fn debug_trace_call_as<R>(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<R>
+    where
+        R: RpcReturn,
+    {
+        self.client().request("debug_traceCall", (tx, block, trace_options)).await
+    }
+
+    async fn debug_trace_call_js(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<serde_json::Value> {
+        self.debug_trace_call_as::<serde_json::Value>(tx, block, trace_options).await
+    }
+
+    async fn debug_trace_call_callframe(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<CallFrame> {
+        self.debug_trace_call_as::<CallFrame>(tx, block, trace_options).await
     }
 
     async fn debug_trace_call_many(
