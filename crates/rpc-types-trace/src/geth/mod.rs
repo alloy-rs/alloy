@@ -668,6 +668,11 @@ pub struct GethDebugTracingCallOptions {
 }
 
 impl GethDebugTracingCallOptions {
+    /// Creates a new instance with the given tracing options
+    pub const fn new(tracing_options: GethDebugTracingOptions) -> Self {
+        Self { tracing_options, state_overrides: None, block_overrides: None }
+    }
+
     /// Enables state overrides
     pub fn with_state_overrides(mut self, overrides: StateOverride) -> Self {
         self.state_overrides = Some(overrides);
@@ -684,6 +689,12 @@ impl GethDebugTracingCallOptions {
     pub fn with_tracing_options(mut self, options: GethDebugTracingOptions) -> Self {
         self.tracing_options = options;
         self
+    }
+}
+
+impl From<GethDebugTracingOptions> for GethDebugTracingCallOptions {
+    fn from(value: GethDebugTracingOptions) -> Self {
+        Self::new(value)
     }
 }
 
