@@ -80,13 +80,13 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn debug_trace_transaction_as<Z>(
+    async fn debug_trace_transaction_as<R>(
         &self,
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Z>
+    ) -> TransportResult<R>
     where
-        Z: RpcReturn + serde::de::DeserializeOwned;
+        R: RpcReturn + serde::de::DeserializeOwned;
 
     /// Reruns the transaction specified by the hash and returns the trace as a JSON object.
     ///
@@ -210,13 +210,13 @@ where
         self.client().request("debug_getRawHeader", (block,)).await
     }
 
-    async fn debug_trace_transaction_as<Z>(
+    async fn debug_trace_transaction_as<R>(
         &self,
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Z>
+    ) -> TransportResult<R>
     where
-        Z: RpcReturn,
+        R: RpcReturn,
     {
         self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
