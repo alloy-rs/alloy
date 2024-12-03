@@ -212,14 +212,6 @@ impl Typed2718 for TxEip2930 {
     fn ty(&self) -> u8 {
         TxType::Eip2930 as u8
     }
-    fn is_type(&self, ty: u8) -> bool {
-        self.ty() == ty
-    }
-
-    /// Returns true if the type is an EIP-2930 transaction.
-    fn is_eip2930(&self) -> bool {
-        self.ty() == 1
-    }
 }
 
 impl SignableTransaction<Signature> for TxEip2930 {

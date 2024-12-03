@@ -273,33 +273,6 @@ impl Typed2718 for TxEip4844 {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
-    fn is_type(&self, ty: u8) -> bool {
-        self.ty() == ty
-    }
-
-    /// Returns true if the type is a legacy transaction.
-    fn is_legacy(&self) -> bool {
-        self.ty() == 0
-    }
-    /// Returns true if the type is an EIP-2930 transaction.
-    fn is_eip2930(&self) -> bool {
-        self.ty() == 1
-    }
-
-    /// Returns true if the type is an EIP-1559 transaction.
-    fn is_eip1559(&self) -> bool {
-        self.ty() == 2
-    }
-
-    /// Returns true if the type is an EIP-4844 transaction.
-    fn is_eip4844(&self) -> bool {
-        self.ty() == 3
-    }
-
-    /// Returns true if the type is an EIP-7702 transaction.
-    fn is_eip7702(&self) -> bool {
-        self.ty() == 4
-    }
 }
 
 impl RlpEcdsaTx for TxEip4844Variant {
@@ -395,33 +368,6 @@ impl RlpEcdsaTx for TxEip4844Variant {
 impl Typed2718 for TxEip4844Variant {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
-    }
-    fn is_type(&self, ty: u8) -> bool {
-        self.ty() == ty
-    }
-
-    /// Returns true if the type is a legacy transaction.
-    fn is_legacy(&self) -> bool {
-        self.ty() == 0
-    }
-    /// Returns true if the type is an EIP-2930 transaction.
-    fn is_eip2930(&self) -> bool {
-        self.ty() == 1
-    }
-
-    /// Returns true if the type is an EIP-1559 transaction.
-    fn is_eip1559(&self) -> bool {
-        self.ty() == 2
-    }
-
-    /// Returns true if the type is an EIP-4844 transaction.
-    fn is_eip4844(&self) -> bool {
-        self.ty() == 3
-    }
-
-    /// Returns true if the type is an EIP-7702 transaction.
-    fn is_eip7702(&self) -> bool {
-        self.ty() == 4
     }
 }
 
@@ -969,33 +915,6 @@ impl Transaction for TxEip4844WithSidecar {
 impl Typed2718 for TxEip4844WithSidecar {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
-    }
-    fn is_type(&self, ty: u8) -> bool {
-        self.ty() == ty
-    }
-
-    /// Returns true if the type is a legacy transaction.
-    fn is_legacy(&self) -> bool {
-        self.ty() == 0
-    }
-    /// Returns true if the type is an EIP-2930 transaction.
-    fn is_eip2930(&self) -> bool {
-        self.ty() == 1
-    }
-
-    /// Returns true if the type is an EIP-1559 transaction.
-    fn is_eip1559(&self) -> bool {
-        self.ty() == 2
-    }
-
-    /// Returns true if the type is an EIP-4844 transaction.
-    fn is_eip4844(&self) -> bool {
-        self.ty() == 3
-    }
-
-    /// Returns true if the type is an EIP-7702 transaction.
-    fn is_eip7702(&self) -> bool {
-        self.ty() == 4
     }
 }
 
