@@ -203,7 +203,7 @@ impl ExecutionPayloadV1 {
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadV2 {
     /// Inner V1 payload
     #[cfg_attr(feature = "serde", serde(flatten))]
