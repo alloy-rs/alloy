@@ -9,7 +9,7 @@ use alloy_trie::root::{ordered_trie_root, ordered_trie_root_with_encoder};
 /// Calculate a transaction root.
 ///
 /// `(rlp(index), encoded(tx))` pairs.
-pub fn calculate_transaction_root<T, E>(transactions: &[T]) -> B256
+pub fn calculate_transaction_root<T>(transactions: &[T]) -> B256
 where
     T: Encodable2718,
 {
