@@ -1,9 +1,10 @@
 //! Helper function for calculating Merkle proofs and hashes.
 
-use crate::{Header, EMPTY_OMMER_ROOT_HASH};
+use crate::EMPTY_OMMER_ROOT_HASH;
 use alloc::vec::Vec;
 use alloy_eips::{eip2718::Encodable2718, eip4895::Withdrawal};
 use alloy_primitives::{keccak256, B256};
+use alloy_rlp::Encodable;
 use alloy_trie::root::{ordered_trie_root, ordered_trie_root_with_encoder};
 
 /// Calculate a transaction root.
@@ -22,7 +23,12 @@ pub fn calculate_withdrawals_root(withdrawals: &[Withdrawal]) -> B256 {
 }
 
 /// Calculates the root hash for ommer/uncle headers.
-pub fn calculate_ommers_root(ommers: &[Header]) -> B256 {
+///
+/// See [`Header`](crate::Header).
+pub fn calculate_ommers_root<T>(ommers: &[T]) -> B256
+where
+    T: Encodable,
+{
     // Check if `ommers` list is empty
     if ommers.is_empty() {
         return EMPTY_OMMER_ROOT_HASH;
