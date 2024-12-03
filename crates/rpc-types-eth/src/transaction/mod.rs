@@ -180,7 +180,7 @@ impl From<Transaction> for TxEnvelope {
     }
 }
 
-impl<T: TransactionTrait + Typed2718> TransactionTrait for Transaction<T> {
+impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }

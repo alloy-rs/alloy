@@ -350,14 +350,6 @@ impl Typed2718 for TxLegacy {
     fn ty(&self) -> u8 {
         TxType::Legacy as u8
     }
-    fn is_type(&self, ty: u8) -> bool {
-        self.ty() == ty
-    }
-
-    /// Returns true if the type is a legacy transaction.
-    fn is_legacy(&self) -> bool {
-        self.ty() == 0
-    }
 }
 
 impl Encodable for TxLegacy {

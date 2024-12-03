@@ -200,15 +200,6 @@ impl Typed2718 for AnyTypedTransaction {
     }
 }
 
-impl Typed2718 for AnyTxEnvelope {
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Ethereum(inner) => inner.ty(),
-            Self::Unknown(inner) => inner.ty(),
-        }
-    }
-}
-
 /// Transaction envelope for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -218,6 +209,15 @@ pub enum AnyTxEnvelope {
     Ethereum(TxEnvelope),
     /// A transaction with unknown type.
     Unknown(UnknownTxEnvelope),
+}
+
+impl Typed2718 for AnyTxEnvelope {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Ethereum(inner) => inner.ty(),
+            Self::Unknown(inner) => inner.ty(),
+        }
+    }
 }
 
 impl Encodable2718 for AnyTxEnvelope {
