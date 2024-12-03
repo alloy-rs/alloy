@@ -613,17 +613,6 @@ impl Transaction for TxEnvelope {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Legacy(tx) => tx.tx().ty(),
-            Self::Eip2930(tx) => tx.tx().ty(),
-            Self::Eip1559(tx) => tx.tx().ty(),
-            Self::Eip4844(tx) => tx.tx().ty(),
-            Self::Eip7702(tx) => tx.tx().ty(),
-        }
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.tx().access_list(),
@@ -653,6 +642,46 @@ impl Transaction for TxEnvelope {
             Self::Eip4844(tx) => tx.tx().authorization_list(),
             Self::Eip7702(tx) => tx.tx().authorization_list(),
         }
+    }
+}
+
+impl Typed2718 for TxEnvelope {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Legacy(tx) => tx.tx().ty(),
+            Self::Eip2930(tx) => tx.tx().ty(),
+            Self::Eip1559(tx) => tx.tx().ty(),
+            Self::Eip4844(tx) => tx.tx().ty(),
+            Self::Eip7702(tx) => tx.tx().ty(),
+        }
+    }
+
+    fn is_type(&self, ty: u8) -> bool {
+        self.ty() == ty
+    }
+
+    /// Returns true if the type is a legacy transaction.
+    fn is_legacy(&self) -> bool {
+        self.ty() == 0
+    }
+    /// Returns true if the type is an EIP-2930 transaction.
+    fn is_eip2930(&self) -> bool {
+        self.ty() == 1
+    }
+
+    /// Returns true if the type is an EIP-1559 transaction.
+    fn is_eip1559(&self) -> bool {
+        self.ty() == 2
+    }
+
+    /// Returns true if the type is an EIP-4844 transaction.
+    fn is_eip4844(&self) -> bool {
+        self.ty() == 3
+    }
+
+    /// Returns true if the type is an EIP-7702 transaction.
+    fn is_eip7702(&self) -> bool {
+        self.ty() == 4
     }
 }
 

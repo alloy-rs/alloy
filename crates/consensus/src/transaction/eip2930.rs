@@ -4,7 +4,7 @@ use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, 
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
-use super::RlpEcdsaTx;
+use super::{RlpEcdsaTx, Typed2718};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -193,11 +193,6 @@ impl Transaction for TxEip2930 {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        TxType::Eip2930 as u8
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
@@ -210,6 +205,20 @@ impl Transaction for TxEip2930 {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
+    }
+}
+
+impl Typed2718 for TxEip2930 {
+    fn ty(&self) -> u8 {
+        TxType::Eip2930 as u8
+    }
+    fn is_type(&self, ty: u8) -> bool {
+        self.ty() == ty
+    }
+
+    /// Returns true if the type is an EIP-2930 transaction.
+    fn is_eip2930(&self) -> bool {
+        self.ty() == 1
     }
 }
 

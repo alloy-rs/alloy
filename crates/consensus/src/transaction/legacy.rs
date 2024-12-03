@@ -7,6 +7,8 @@ use alloy_primitives::{
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
+use super::Typed2718;
+
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -302,11 +304,6 @@ impl Transaction for TxLegacy {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        TxType::Legacy as u8
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         None
     }
@@ -346,6 +343,39 @@ impl SignableTransaction<Signature> for TxLegacy {
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         let hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, hash)
+    }
+}
+
+impl Typed2718 for TxLegacy {
+    fn ty(&self) -> u8 {
+        TxType::Legacy as u8
+    }
+    fn is_type(&self, ty: u8) -> bool {
+        self.ty() == ty
+    }
+
+    /// Returns true if the type is a legacy transaction.
+    fn is_legacy(&self) -> bool {
+        self.ty() == 0
+    }
+    /// Returns true if the type is an EIP-2930 transaction.
+    fn is_eip2930(&self) -> bool {
+        self.ty() == 1
+    }
+
+    /// Returns true if the type is an EIP-1559 transaction.
+    fn is_eip1559(&self) -> bool {
+        self.ty() == 2
+    }
+
+    /// Returns true if the type is an EIP-4844 transaction.
+    fn is_eip4844(&self) -> bool {
+        self.ty() == 3
+    }
+
+    /// Returns true if the type is an EIP-7702 transaction.
+    fn is_eip7702(&self) -> bool {
+        self.ty() == 4
     }
 }
 

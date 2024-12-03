@@ -55,7 +55,7 @@ pub mod serde_bincode_compat {
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
+pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static + Typed2718 {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -147,9 +147,6 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
 
     /// Get `data`.
     fn input(&self) -> &Bytes;
-
-    /// Returns the transaction type
-    fn ty(&self) -> u8;
 
     /// Returns the EIP-2930 `access_list` for the particular transaction type. Returns `None` for
     /// older transaction types.
@@ -244,6 +241,14 @@ impl<S: 'static> dyn SignableTransaction<S> {
 }
 
 #[cfg(feature = "serde")]
+impl<T: Typed2718> Typed2718 for alloy_serde::WithOtherFields<T> {
+    #[inline]
+    fn ty(&self) -> u8 {
+        self.inner.ty()
+    }
+}
+
+#[cfg(feature = "serde")]
 impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
@@ -312,11 +317,6 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]
     fn input(&self) -> &Bytes {
         self.inner.input()
-    }
-
-    #[inline]
-    fn ty(&self) -> u8 {
-        self.inner.ty()
     }
 
     #[inline]

@@ -2,6 +2,7 @@
 
 use alloy_consensus::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
+    Typed2718,
 };
 use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
 use alloy_network_primitives::TransactionResponse;
@@ -179,7 +180,7 @@ impl From<Transaction> for TxEnvelope {
     }
 }
 
-impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
+impl<T: TransactionTrait + Typed2718> TransactionTrait for Transaction<T> {
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }
@@ -236,10 +237,6 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
         self.inner.input()
     }
 
-    fn ty(&self) -> u8 {
-        self.inner.ty()
-    }
-
     fn access_list(&self) -> Option<&AccessList> {
         self.inner.access_list()
     }
@@ -272,6 +269,12 @@ impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T>
 
     fn from(&self) -> Address {
         self.from
+    }
+}
+
+impl<T: Typed2718> Typed2718 for Transaction<T> {
+    fn ty(&self) -> u8 {
+        self.inner.ty()
     }
 }
 
