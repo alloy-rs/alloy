@@ -1,5 +1,6 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
+use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
@@ -7,7 +8,8 @@ use alloy_rpc_types_eth::{
     BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
 };
 use alloy_rpc_types_trace::geth::{
-    BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
+    BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
+    TraceResult,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -67,6 +69,56 @@ pub trait DebugApi<N, T>: Send + Sync {
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<GethTrace>;
+
+    /// Reruns the transaction specified by the hash and returns the trace in a specified format.
+    ///
+    /// This method allows for the trace to be returned as a type that implements `RpcReturn` and
+    /// `serde::de::DeserializeOwned`.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_transaction_as<R>(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<R>
+    where
+        R: RpcReturn + serde::de::DeserializeOwned;
+
+    /// Reruns the transaction specified by the hash and returns the trace as a JSON object.
+    ///
+    /// This method provides the trace in a JSON format, which can be useful for further processing
+    /// or inspection.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_transaction_js(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<serde_json::Value>;
+
+    /// Reruns the transaction specified by the hash and returns the trace as a call frame.
+    ///
+    /// This method provides the trace in the form of a `CallFrame`, which can be useful for
+    /// analyzing the call stack and execution details.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_transaction_call(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<CallFrame>;
 
     /// Return a full stack trace of all invoked opcodes of all transaction that were included in
     /// this block.
@@ -156,6 +208,33 @@ where
 {
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawHeader", (block,)).await
+    }
+
+    async fn debug_trace_transaction_as<R>(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<R>
+    where
+        R: RpcReturn,
+    {
+        self.client().request("debug_traceTransaction", (hash, trace_options)).await
+    }
+
+    async fn debug_trace_transaction_js(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<serde_json::Value> {
+        self.debug_trace_transaction_as::<serde_json::Value>(hash, trace_options).await
+    }
+
+    async fn debug_trace_transaction_call(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<CallFrame> {
+        self.debug_trace_transaction_as::<CallFrame>(hash, trace_options).await
     }
 
     async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes> {
