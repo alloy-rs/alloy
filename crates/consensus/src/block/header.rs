@@ -192,14 +192,6 @@ impl Header {
         keccak256(&out)
     }
 
-    /// Checks if the header is empty - has no transactions and no ommers
-    pub fn is_empty(&self) -> bool {
-        let txs_and_ommers_empty = self.transaction_root_is_empty() && self.ommers_hash_is_empty();
-        self.withdrawals_root.map_or(txs_and_ommers_empty, |withdrawals_root| {
-            txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
-        })
-    }
-
     /// Check if the ommers hash equals to empty hash list.
     pub fn ommers_hash_is_empty(&self) -> bool {
         self.ommers_hash == EMPTY_OMMER_ROOT_HASH
@@ -723,6 +715,15 @@ pub trait BlockHeader {
     fn parent_num_hash(&self) -> BlockNumHash {
         BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
     }
+
+    /// Checks if the header is considered empty - has no transactions, no ommers or withdrawals
+    fn is_empty(&self) -> bool {
+        let txs_and_ommers_empty = self.transactions_root() == EMPTY_ROOT_HASH
+            && self.ommers_hash() == EMPTY_OMMER_ROOT_HASH;
+        self.withdrawals_root().map_or(txs_and_ommers_empty, |withdrawals_root| {
+            txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
+        })
+    }
 }
 
 impl BlockHeader for Header {
@@ -903,6 +904,10 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
 
     fn target_blobs_per_block(&self) -> Option<u64> {
         self.inner.target_blobs_per_block()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 
