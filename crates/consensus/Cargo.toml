@@ -22,7 +22,7 @@ workspace = true
 alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
-alloy-trie.workspace = true
+alloy-trie = { workspace = true, features = ["ethereum"] }
 alloy-serde = { workspace = true, optional = true }
 
 # k256
@@ -71,5 +71,6 @@ serde = [
     "alloy-primitives/serde",
     "dep:alloy-serde",
     "alloy-eips/serde",
+    "alloy-trie/serde",
 ]
 serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]

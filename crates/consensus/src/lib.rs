@@ -9,8 +9,10 @@
 
 extern crate alloc;
 
-mod account;
-pub use account::Account;
+pub use alloy_trie::TrieAccount;
+
+#[deprecated(since = "0.7.3", note = "use TrieAccount instead")]
+pub use alloy_trie::TrieAccount as Account;
 
 mod block;
 pub use block::{Block, BlockBody, BlockHeader, Header};

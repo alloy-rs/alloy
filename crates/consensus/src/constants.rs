@@ -1,6 +1,8 @@
 //! Ethereum protocol-related constants
 use alloy_primitives::{b256, B256};
 
+pub use alloy_trie::{EMPTY_ROOT_HASH, KECCAK_EMPTY};
+
 /// The first four bytes of the call data for a function call specifies the function to be called.
 pub const SELECTOR_LEN: usize = 4;
 
@@ -47,17 +49,9 @@ pub const GOERLI_OP_GENESIS: B256 =
 pub const GOERLI_BASE_GENESIS: B256 =
     b256!("a3ab140f15ea7f7443a4702da64c10314eb04d488e72974e02e2d728096b4f76");
 
-/// Keccak256 over empty array.
-pub const KECCAK_EMPTY: B256 =
-    b256!("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
-
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
     b256!("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
-
-/// Root hash of an empty trie.
-pub const EMPTY_ROOT_HASH: B256 =
-    b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
 
 /// Transactions root of empty receipts set.
 pub const EMPTY_RECEIPTS: B256 = EMPTY_ROOT_HASH;
