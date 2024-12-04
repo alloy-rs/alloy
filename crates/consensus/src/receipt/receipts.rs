@@ -1,12 +1,12 @@
-use crate::receipt::{Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt};
+use crate::receipt::{
+    Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
+};
 use alloc::{vec, vec::Vec};
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::{borrow::Borrow, fmt};
-use derive_more::{DerefMut, From, IntoIterator};
-
-use super::Eip2718EncodableReceipt;
+use derive_more::{From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -148,9 +148,7 @@ impl<T> From<ReceiptWithBloom<Self>> for Receipt<T> {
 }
 
 /// Receipt containing result of transaction execution.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Default, From, derive_more::Deref, DerefMut, IntoIterator,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, From, IntoIterator)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts<T> {
     /// A two-dimensional vector of [`Receipt`] instances.
@@ -183,6 +181,22 @@ impl<T> From<Vec<T>> for Receipts<T> {
 impl<T> FromIterator<Vec<T>> for Receipts<T> {
     fn from_iter<I: IntoIterator<Item = Vec<T>>>(iter: I) -> Self {
         Self { receipt_vec: iter.into_iter().collect() }
+    }
+}
+
+impl<T: Encodable> Encodable for Receipts<T> {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.receipt_vec.encode(out)
+    }
+
+    fn length(&self) -> usize {
+        self.receipt_vec.length()
+    }
+}
+
+impl<T: Decodable> Decodable for Receipts<T> {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self { receipt_vec: Decodable::decode(buf)? })
     }
 }
 
@@ -302,6 +316,9 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::ReceiptEnvelope;
+    use alloy_rlp::{Decodable, Encodable};
 
     #[cfg(feature = "serde")]
     #[test]
@@ -343,5 +360,19 @@ mod test {
                 "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
             ))
         );
+    }
+
+    #[test]
+    fn rountrip_encodable_eip1559() {
+        let receipts =
+            Receipts { receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(Default::default())]] };
+
+        let mut out = vec![];
+        receipts.encode(&mut out);
+
+        let mut out = out.as_slice();
+        let decoded = Receipts::<ReceiptEnvelope>::decode(&mut out).unwrap();
+
+        assert_eq!(receipts, decoded);
     }
 }
