@@ -669,7 +669,7 @@ pub trait BlockHeader {
     ///
     /// Returns `None` if `excess_blob_gas` is None
     fn blob_fee(&self) -> Option<u128> {
-        self.excess_blob_gas()?.map(calc_blob_gasprice)
+        self.excess_blob_gas().map(calc_blob_gasprice)
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
