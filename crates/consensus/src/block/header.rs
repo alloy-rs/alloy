@@ -665,6 +665,13 @@ pub trait BlockHeader {
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
 
+    /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None
+    fn blob_fee(&self) -> Option<u128> {
+        self.excess_blob_gas().map(calc_blob_gasprice)
+    }
+
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
