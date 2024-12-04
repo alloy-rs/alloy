@@ -643,12 +643,11 @@ pub struct ParliaConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
+    use alloc::{collections::BTreeMap, vec};
     use alloy_primitives::{hex, Bytes};
     use alloy_trie::{root::storage_root_unhashed, TrieAccount};
     use core::str::FromStr;
     use serde_json::json;
-    use std::collections::BTreeMap;
 
     #[test]
     fn genesis_defaults_config() {
