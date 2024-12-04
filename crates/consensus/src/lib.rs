@@ -9,8 +9,7 @@
 
 extern crate alloc;
 
-mod account;
-pub use account::Account;
+pub use alloy_trie::TrieAccount as Account;
 
 mod block;
 pub use block::{Block, BlockBody, BlockHeader, Header};
