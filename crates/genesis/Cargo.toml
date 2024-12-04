@@ -21,6 +21,7 @@ workspace = true
 [dependencies]
 alloy-primitives.workspace = true
 alloy-serde.workspace = true
+alloy-trie = { workspace = true, features = ["ethereum"] }
 
 # serde
 serde.workspace = true
@@ -30,4 +31,4 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-serde/std", "serde/std"]
+std = ["alloy-primitives/std", "alloy-serde/std", "serde/std", "alloy-trie/std"]
