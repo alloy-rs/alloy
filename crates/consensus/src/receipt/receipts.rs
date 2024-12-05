@@ -295,12 +295,12 @@ where
         (!self.receipt.is_legacy()).then_some(self.receipt.ty())
     }
 
-    fn encode_2718(&self, out: &mut dyn BufMut) {
-        self.receipt.eip2718_encode_with_bloom(&self.logs_bloom, out);
-    }
-
     fn encode_2718_len(&self) -> usize {
         self.receipt.eip2718_encoded_length_with_bloom(&self.logs_bloom)
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        self.receipt.eip2718_encode_with_bloom(&self.logs_bloom, out);
     }
 }
 
@@ -319,6 +319,14 @@ mod test {
     use super::*;
     use crate::ReceiptEnvelope;
     use alloy_rlp::{Decodable, Encodable};
+
+    const fn assert_tx_receipt<T: TxReceipt>() {}
+
+    #[test]
+    const fn assert_receipt() {
+        assert_tx_receipt::<Receipt>();
+        assert_tx_receipt::<ReceiptWithBloom<Receipt>>();
+    }
 
     #[cfg(feature = "serde")]
     #[test]
