@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.2](https://github.com/alloy-rs/alloy/releases/tag/v0.7.2) - 2024-12-02
+## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
 ### Bug Fixes
 
+- Wrong func sig ([#1742](https://github.com/alloy-rs/alloy/issues/1742))
 - Remove `Borrow` impl for RPC receipt ([#1721](https://github.com/alloy-rs/alloy/issues/1721))
 - Adjust EIP-7742 to latest spec ([#1713](https://github.com/alloy-rs/alloy/issues/1713))
 - Omit empty requests ([#1706](https://github.com/alloy-rs/alloy/issues/1706))
@@ -21,10 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Fix `SignableTransaction` docs to use `PrimitiveSignature` ([#1743](https://github.com/alloy-rs/alloy/issues/1743))
 - Update docs for eip7685 `Requests` ([#1714](https://github.com/alloy-rs/alloy/issues/1714))
 
 ### Features
 
+- Impl Encodable / Decodable for Receipts ([#1752](https://github.com/alloy-rs/alloy/issues/1752))
+- Add TrieAccount conversion for genesis account ([#1755](https://github.com/alloy-rs/alloy/issues/1755))
+- Add `BlockHeader::blob_fee` ([#1754](https://github.com/alloy-rs/alloy/issues/1754))
+- Migrate to `TrieAccount` of alloy-trie ([#1750](https://github.com/alloy-rs/alloy/issues/1750))
+- Move is_empty to trait function ([#1749](https://github.com/alloy-rs/alloy/issues/1749))
+- Add missing new fn ([#1747](https://github.com/alloy-rs/alloy/issues/1747))
+- Specialized geth tracer ([#1739](https://github.com/alloy-rs/alloy/issues/1739))
+- Make Receipt rlp methods pub ([#1731](https://github.com/alloy-rs/alloy/issues/1731))
 - Receipt root fn ([#1708](https://github.com/alloy-rs/alloy/issues/1708))
 - Impl `Encodable2718` for `ReceiptWithBloom` ([#1719](https://github.com/alloy-rs/alloy/issues/1719))
 - Feat(rpc-types-eth) add test for syncing ([#1724](https://github.com/alloy-rs/alloy/issues/1724))
@@ -33,12 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.7.2
+- Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
+- Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
+- Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))
+- Rm redundant generic ([#1737](https://github.com/alloy-rs/alloy/issues/1737))
+- Relax ommers root fn ([#1736](https://github.com/alloy-rs/alloy/issues/1736))
+- Add missing from impl ([#1732](https://github.com/alloy-rs/alloy/issues/1732))
+- Update release.toml ([#1730](https://github.com/alloy-rs/alloy/issues/1730))
+- Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 - Disable serde-with default features ([#1703](https://github.com/alloy-rs/alloy/issues/1703))
 - Use encoded2718 ([#1702](https://github.com/alloy-rs/alloy/issues/1702))
 
 ### Other
 
+- Specialized geth tracer for debug trace call ([#1741](https://github.com/alloy-rs/alloy/issues/1741))
+- Add non strict JSON decoding for engine Payloadv2 type ([#1740](https://github.com/alloy-rs/alloy/issues/1740))
 - Block_number_index added to callBundle reference type ([#1705](https://github.com/alloy-rs/alloy/issues/1705))
 - Remove wrapper BlobsBundleV1Ssz ([#1726](https://github.com/alloy-rs/alloy/issues/1726))
 - Change BlobsBundleV1Ssz unwrap implementation to safe code ([#1723](https://github.com/alloy-rs/alloy/issues/1723))
