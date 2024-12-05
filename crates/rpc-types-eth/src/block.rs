@@ -61,13 +61,13 @@ impl<T: TransactionResponse, H> Block<T, H> {
     }
 }
 
-impl<T> Block<T> {
+impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
     /// Constructs an "uncle block" from the provided header.
     ///
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
     /// using the provided [`alloy_consensus::Header`].
-    pub fn uncle_from_header(header: alloy_consensus::Header) -> Self {
-        let block = alloy_consensus::Block::<TxEnvelope>::uncle(header);
+    pub fn uncle_from_header(header: H) -> Self {
+        let block = alloy_consensus::Block::<TxEnvelope, H>::uncle(header);
         let size = U256::from(block.length());
         Self {
             uncles: vec![],
@@ -76,7 +76,9 @@ impl<T> Block<T> {
             withdrawals: None,
         }
     }
+}
 
+impl<T> Block<T> {
     /// Constructs block from a consensus block and `total_difficulty`.
     pub fn from_consensus(block: alloy_consensus::Block<T>, total_difficulty: Option<U256>) -> Self
     where
@@ -114,6 +116,18 @@ pub struct Header<H = alloy_consensus::Header> {
     /// Integer the size of this block in bytes.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub size: Option<U256>,
+}
+
+impl<H> Header<H> {
+    /// Create a new [`Header`] from a sealed consensus header and additional fields.
+    pub fn from_consensus(
+        header: Sealed<H>,
+        total_difficulty: Option<U256>,
+        size: Option<U256>,
+    ) -> Self {
+        let (inner, hash) = header.into_parts();
+        Self { hash, inner, total_difficulty, size }
+    }
 }
 
 impl<H> Deref for Header<H> {
@@ -159,16 +173,6 @@ impl<H: BlockHeader> Header<H> {
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         self.inner.next_block_excess_blob_gas()
-    }
-
-    /// Create a new [`Header`] from a sealed [`alloy_consensus::Header`] and additional fields.
-    pub fn from_consensus(
-        header: Sealed<H>,
-        total_difficulty: Option<U256>,
-        size: Option<U256>,
-    ) -> Self {
-        let (inner, hash) = header.into_parts();
-        Self { hash, inner, total_difficulty, size }
     }
 }
 
