@@ -5,10 +5,7 @@
 use crate::alloc::vec::Vec;
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
-use core::{
-    fmt,
-    fmt::{Display, Formatter},
-};
+use core::fmt;
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
 const TX_TYPE_BYTE_MAX: u8 = 0x7f;
@@ -28,8 +25,8 @@ pub enum Eip2718Error {
 /// Result type for [EIP-2718] decoding.
 pub type Eip2718Result<T, E = Eip2718Error> = core::result::Result<T, E>;
 
-impl Display for Eip2718Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Eip2718Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::RlpError(err) => write!(f, "{err}"),
             Self::UnexpectedType(t) => write!(f, "Unexpected type flag. Got {t}."),

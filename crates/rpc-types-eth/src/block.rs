@@ -1,20 +1,20 @@
 //! Block RPC types.
 
-use core::ops::{Deref, DerefMut};
-
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
 use alloy_eips::eip4895::Withdrawals;
-pub use alloy_eips::{
-    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
-    BlockNumberOrTag, ForkBlock, RpcBlockHash,
-};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
 use alloy_rlp::Encodable;
+use core::ops::{Deref, DerefMut};
+
+pub use alloy_eips::{
+    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
+    BlockNumberOrTag, ForkBlock, RpcBlockHash,
+};
 
 /// Block representation
 #[derive(Clone, Debug, PartialEq, Eq)]
