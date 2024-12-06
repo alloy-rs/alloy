@@ -1,4 +1,6 @@
-use crate::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
+//! Contains constants and utility functions for [EIP-7691](https://eips.ethereum.org/EIPS/eip-7691)
+
+use crate::eip4844::{fake_exponential, BLOB_TX_MIN_BLOB_GASPRICE};
 
 /// CL-enforced target blobs per block after Pectra hardfork activation.
 pub const TARGET_BLOBS_PER_BLOCK_ELECTRA: u64 = 6;
