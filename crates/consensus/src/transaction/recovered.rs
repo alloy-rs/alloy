@@ -46,8 +46,8 @@ impl<T> Recovered<T> {
     ///
     /// Note: This does not check if the signer is the actual signer of the transaction.
     #[inline]
-    pub const fn new_unchecked(signed_transaction: T, signer: Address) -> Self {
-        Self { signed_transaction, signer }
+    pub const fn new_unchecked(tx: T, signer: Address) -> Self {
+        Self { tx, signer }
     }
 
     /// Applies the given closure to the inner transactions.
