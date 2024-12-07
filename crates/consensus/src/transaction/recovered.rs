@@ -28,8 +28,8 @@ impl<T> Recovered<T> {
     }
 
     /// Returns a reference to [`TransactionSigned`]
-    pub const fn as_signed(&self) -> &T {
-        &self.signed_transaction
+    pub const fn tx(&self) -> &T {
+        &self.tx
     }
 
     /// Transform back to [`TransactionSigned`]
