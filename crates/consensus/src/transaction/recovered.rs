@@ -11,7 +11,7 @@ pub struct Recovered<T> {
     /// Signed transaction
     #[deref]
     #[as_ref]
-    signed_transaction: T,
+    tx: T,
 }
 
 // === impl RecoveredTx ===
