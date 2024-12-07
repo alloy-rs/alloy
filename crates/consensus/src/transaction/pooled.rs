@@ -33,10 +33,10 @@ pub enum PooledTransaction {
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
     Eip1559(Signed<TxEip1559>),
+     /// A EIP-4844 transaction, which includes the transaction, blob data, commitments, and proofs.
+    Eip4844(Signed<TxEip4844WithSidecar>),
     /// A [`TxEip7702`] tagged with type 4.
     Eip7702(Signed<TxEip7702>),
-    /// A EIP-4844 transaction, which includes the transaction, blob data, commitments, and proofs.
-    Eip4844(Signed<TxEip4844WithSidecar>),
 }
 
 impl PooledTransaction {
