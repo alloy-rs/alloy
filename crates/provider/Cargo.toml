@@ -73,6 +73,7 @@ alloy-consensus = { workspace = true, features = ["kzg"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
+alloy-rpc-types-any = { workspace = true }
 alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 alloy-signer.workspace = true

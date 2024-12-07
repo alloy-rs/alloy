@@ -21,7 +21,6 @@ workspace = true
 [dependencies]
 alloy-eips.workspace = true
 alloy-consensus.workspace = true
-alloy-consensus-any.workspace = true
 alloy-network-primitives.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "map"] }

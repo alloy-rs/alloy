@@ -28,7 +28,6 @@ pub use request::{TransactionInput, TransactionRequest};
 pub use alloy_consensus::{
     Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
 };
-pub use alloy_consensus_any::AnyReceiptEnvelope;
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

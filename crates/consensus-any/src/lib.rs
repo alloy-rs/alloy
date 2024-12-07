@@ -12,3 +12,10 @@ pub use block::AnyHeader;
 
 mod receipt;
 pub use receipt::AnyReceiptEnvelope;
+
+#[cfg(feature = "std")]
+mod transaction;
+#[cfg(feature = "std")]
+pub use transaction::{
+    AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope, UnknownTypedTransaction,
+};
