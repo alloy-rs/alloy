@@ -1,8 +1,6 @@
-use core::str::FromStr;
-
 use alloc::collections::BTreeMap;
 use alloy_primitives::{ruint::ParseError, Bytes, B256, U256};
-use core::fmt::{Display, Formatter};
+use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// A storage key type that can be serialized to and from a hex string up to 32 bytes. Used for
@@ -79,8 +77,8 @@ impl FromStr for JsonStorageKey {
     }
 }
 
-impl Display for JsonStorageKey {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+impl fmt::Display for JsonStorageKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hash(hash) => hash.fmt(f),
             Self::Number(num) => alloc::format!("{num:#x}").fmt(f),
