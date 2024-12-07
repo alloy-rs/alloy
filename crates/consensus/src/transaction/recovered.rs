@@ -38,8 +38,8 @@ impl<T> Recovered<T> {
     }
 
     /// Dissolve Self to its component
-    pub fn to_components(self) -> (T, Address) {
-        (self.signed_transaction, self.signer)
+    pub fn into_parts(self) -> (T, Address) {
+        (self.tx, self.signer)
     }
 
     /// Create [`Recovered`] from the given transaction and [`Address`] of the signer.
