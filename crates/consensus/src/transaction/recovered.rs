@@ -56,8 +56,6 @@ impl<T> Recovered<T> {
 
 impl<T: Encodable> Encodable for Recovered<T> {
     /// This encodes the transaction _with_ the signature, and an rlp header.
-    ///
-    /// Refer to docs for [`TransactionSigned::encode`] for details on the exact format.
     fn encode(&self, out: &mut dyn bytes::BufMut) {
         self.tx.encode(out)
     }
