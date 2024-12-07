@@ -14,8 +14,6 @@ pub struct Recovered<T> {
     tx: T,
 }
 
-// === impl RecoveredTx ===
-
 impl<T> Recovered<T> {
     /// Signer of transaction recovered from signature
     pub const fn signer(&self) -> Address {
@@ -27,12 +25,12 @@ impl<T> Recovered<T> {
         &self.signer
     }
 
-    /// Returns a reference to [`TransactionSigned`]
+    /// Returns a reference to the transaction.
     pub const fn tx(&self) -> &T {
         &self.tx
     }
 
-    /// Transform back to [`TransactionSigned`]
+    /// Transform back to the transaction.
     pub fn into_tx(self) -> T {
         self.tx
     }
@@ -101,8 +99,6 @@ impl<T: Encodable2718> Encodable2718 for Recovered<T> {
 ///
 /// This is a helper trait that only provides the ability to recover the signer (address) of a
 /// transaction.
-///
-/// This
 pub trait SignerRecoverable {
     /// Recover signer from signature and hash.
     ///
