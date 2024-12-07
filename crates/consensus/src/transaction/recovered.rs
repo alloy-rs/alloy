@@ -52,7 +52,7 @@ impl<T> Recovered<T> {
 
     /// Applies the given closure to the inner transactions.
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
-        Recovered::new_unchecked(f(self.signed_transaction), self.signer)
+        Recovered::new_unchecked(f(self.tx), self.signer)
     }
 }
 
@@ -61,39 +61,39 @@ impl<T: Encodable> Encodable for Recovered<T> {
     ///
     /// Refer to docs for [`TransactionSigned::encode`] for details on the exact format.
     fn encode(&self, out: &mut dyn bytes::BufMut) {
-        self.signed_transaction.encode(out)
+        self.tx.encode(out)
     }
 
     fn length(&self) -> usize {
-        self.signed_transaction.length()
+        self.tx.length()
     }
 }
 
 impl<T: Decodable + SignerRecoverable> Decodable for Recovered<T> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let signed_transaction = T::decode(buf)?;
-        let signer = signed_transaction.recover_signer().map_err(|_| {
+        let tx = T::decode(buf)?;
+        let signer = tx.recover_signer().map_err(|_| {
             alloy_rlp::Error::Custom("Unable to recover decoded transaction signer.")
         })?;
-        Ok(Self::new_unchecked(signed_transaction, signer))
+        Ok(Self::new_unchecked(tx, signer))
     }
 }
 
 impl<T: Encodable2718> Encodable2718 for Recovered<T> {
     fn type_flag(&self) -> Option<u8> {
-        self.signed_transaction.type_flag()
+        self.tx.type_flag()
     }
 
     fn encode_2718_len(&self) -> usize {
-        self.signed_transaction.encode_2718_len()
+        self.tx.encode_2718_len()
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.signed_transaction.encode_2718(out)
+        self.tx.encode_2718(out)
     }
 
     fn trie_hash(&self) -> B256 {
-        self.signed_transaction.trie_hash()
+        self.tx.trie_hash()
     }
 }
 
