@@ -33,8 +33,8 @@ impl<T> Recovered<T> {
     }
 
     /// Transform back to [`TransactionSigned`]
-    pub fn into_signed(self) -> T {
-        self.signed_transaction
+    pub fn into_tx(self) -> T {
+        self.tx
     }
 
     /// Dissolve Self to its component
