@@ -1,15 +1,17 @@
-//! Defines the exact transaction variant that are allowed to be propagated over the eth p2p protocol.
+//! Defines the exact transaction variant that are allowed to be propagated over the eth p2p
+//! protocol.
 
-use crate::{transaction::{TxEip1559, TxEip2930, TxEip4844, TxLegacy}, SignableTransaction, Signed, TxEip4844WithSidecar, TxEnvelope};
-use crate::{Transaction, TxEip7702};
+use crate::{
+    transaction::{RlpEcdsaTx, TxEip1559, TxEip2930, TxEip4844, TxLegacy},
+    SignableTransaction, Signed, Transaction, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxType,
+};
 use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Result, Encodable2718},
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
     eip7702::SignedAuthorization,
 };
-use alloy_primitives::bytes;
 use alloy_primitives::{
-    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
+    bytes, Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
 };
 use alloy_rlp::{Decodable, Encodable, Header};
 use core::hash::{Hash, Hasher};
@@ -18,7 +20,9 @@ use core::hash::{Hash, Hasher};
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
 /// non-4844 signed transaction.
 ///
-/// The difference between this and the [`TxEnvelope`] is that this type always requires the [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only be propagated with the sidecar over p2p.
+/// The difference between this and the [`TxEnvelope`] is that this type always requires the
+/// [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only be propagated with the
+/// sidecar over p2p.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
@@ -36,7 +40,6 @@ pub enum PooledTransaction {
 }
 
 impl PooledTransaction {
-
     /// Heavy operation that return signature hash over rlp encoded transaction.
     /// It is only for signature signing or signer recovery.
     pub fn signature_hash(&self) -> B256 {
@@ -84,9 +87,7 @@ impl PooledTransaction {
 
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
-    pub fn recover_signer(
-        &self,
-    ) -> Result<Address, alloy_primitives::SignatureError> {
+    pub fn recover_signer(&self) -> Result<Address, alloy_primitives::SignatureError> {
         match self {
             Self::Legacy(tx) => tx.recover_signer(),
             Self::Eip2930(tx) => tx.recover_signer(),
@@ -168,6 +169,37 @@ impl PooledTransaction {
     }
 }
 
+impl From<Signed<TxLegacy>> for PooledTransaction {
+    fn from(v: Signed<TxLegacy>) -> Self {
+        Self::Legacy(v)
+    }
+}
+
+impl From<Signed<TxEip2930>> for PooledTransaction {
+    fn from(v: Signed<TxEip2930>) -> Self {
+        Self::Eip2930(v)
+    }
+}
+
+impl From<Signed<TxEip1559>> for PooledTransaction {
+    fn from(v: Signed<TxEip1559>) -> Self {
+        Self::Eip1559(v)
+    }
+}
+
+impl From<Signed<TxEip4844WithSidecar>> for PooledTransaction {
+    fn from(v: Signed<TxEip4844WithSidecar>) -> Self {
+        let (tx, signature, hash) = v.into_parts();
+        Self::Eip4844(Signed::new_unchecked(tx, signature, hash))
+    }
+}
+
+impl From<Signed<TxEip7702>> for PooledTransaction {
+    fn from(v: Signed<TxEip7702>) -> Self {
+        Self::Eip7702(v)
+    }
+}
+
 impl Hash for PooledTransaction {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.trie_hash().hash(state);
@@ -188,7 +220,7 @@ impl Encodable for PooledTransaction {
     }
 
     fn length(&self) -> usize {
-       self.network_len()
+        self.network_len()
     }
 }
 
@@ -197,7 +229,7 @@ impl Decodable for PooledTransaction {
     ///
     /// CAUTION: this expects that `buf` is `rlp(tx_type || rlp(tx-data))`
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        todo!()
+        Ok(Self::network_decode(buf)?)
     }
 }
 
@@ -239,11 +271,17 @@ impl Encodable2718 for PooledTransaction {
 
 impl Decodable2718 for PooledTransaction {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-       todo!()
+        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
+            TxType::Eip2930 => Ok(TxEip2930::rlp_decode_signed(buf)?.into()),
+            TxType::Eip1559 => Ok(TxEip1559::rlp_decode_signed(buf)?.into()),
+            TxType::Eip4844 => Ok(TxEip4844WithSidecar::rlp_decode_signed(buf)?.into()),
+            TxType::Eip7702 => Ok(TxEip7702::rlp_decode_signed(buf)?.into()),
+            TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
+        }
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-       todo!()
+        TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
     }
 }
 
@@ -429,7 +467,6 @@ impl Transaction for PooledTransaction {
     }
 }
 
-
 impl From<PooledTransaction> for TxEnvelope {
     fn from(tx: PooledTransaction) -> Self {
         tx.into_envelope()
@@ -439,9 +476,7 @@ impl From<PooledTransaction> for TxEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_consensus::Transaction as _;
     use alloy_primitives::{address, hex};
-    use assert_matches::assert_matches;
     use bytes::Bytes;
 
     #[test]
@@ -491,10 +526,7 @@ mod tests {
 );
 
         let res = PooledTransaction::decode_2718(&mut &data[..]).unwrap();
-        assert_eq!(
-            res.into_transaction().to(),
-            Some(address!("714b6a4ea9b94a8a7d9fd362ed72630688c8898c"))
-        );
+        assert_eq!(res.to(), Some(address!("714b6a4ea9b94a8a7d9fd362ed72630688c8898c")));
     }
 
     #[test]
@@ -513,18 +545,11 @@ mod tests {
 
         let input_rlp = &mut &data[..];
         let res = PooledTransaction::decode(input_rlp);
-        assert_matches!(res, Ok(_tx));
-        assert!(input_rlp.is_empty());
-
-        // this is a legacy tx so we can attempt the same test with
-        // decode_rlp_legacy_transaction_tuple
-        let input_rlp = &mut &data[..];
-        let res = TransactionSigned::decode_rlp_legacy_transaction_tuple(input_rlp);
-        assert_matches!(res, Ok(_tx));
+        assert!(res.is_ok());
         assert!(input_rlp.is_empty());
 
         // we can also decode_enveloped
         let res = PooledTransaction::decode_2718(&mut &data[..]);
-        assert_matches!(res, Ok(_tx));
+        assert!(res.is_ok());
     }
 }
