@@ -1,4 +1,4 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
+use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType, Typed2718};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
@@ -235,11 +235,6 @@ impl Transaction for TxEip1559 {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        TxType::Eip1559 as u8
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
@@ -252,6 +247,12 @@ impl Transaction for TxEip1559 {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
+    }
+}
+
+impl Typed2718 for TxEip1559 {
+    fn ty(&self) -> u8 {
+        TxType::Eip1559 as u8
     }
 }
 

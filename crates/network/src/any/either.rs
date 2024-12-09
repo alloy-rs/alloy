@@ -1,5 +1,5 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
-use alloy_consensus::{Transaction as TransactionTrait, TxEnvelope, TypedTransaction};
+use alloy_consensus::{Transaction as TransactionTrait, TxEnvelope, Typed2718, TypedTransaction};
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip7702::SignedAuthorization,
@@ -167,14 +167,6 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Ethereum(inner) => inner.ty(),
-            Self::Unknown(inner) => inner.ty(),
-        }
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
@@ -199,6 +191,15 @@ impl TransactionTrait for AnyTypedTransaction {
     }
 }
 
+impl Typed2718 for AnyTypedTransaction {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Ethereum(inner) => inner.ty(),
+            Self::Unknown(inner) => inner.ty(),
+        }
+    }
+}
+
 /// Transaction envelope for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -208,6 +209,15 @@ pub enum AnyTxEnvelope {
     Ethereum(TxEnvelope),
     /// A transaction with unknown type.
     Unknown(UnknownTxEnvelope),
+}
+
+impl Typed2718 for AnyTxEnvelope {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Ethereum(inner) => inner.ty(),
+            Self::Unknown(inner) => inner.ty(),
+        }
+    }
 }
 
 impl Encodable2718 for AnyTxEnvelope {
@@ -361,14 +371,6 @@ impl TransactionTrait for AnyTxEnvelope {
         match self {
             Self::Ethereum(inner) => inner.input(),
             Self::Unknown(inner) => inner.input(),
-        }
-    }
-
-    #[inline]
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Ethereum(inner) => inner.ty(),
-            Self::Unknown(inner) => inner.ty(),
         }
     }
 
