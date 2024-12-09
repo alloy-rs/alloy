@@ -12,7 +12,7 @@ use core::{
 use serde::ser::SerializeStruct;
 
 /// A helper struct to store the block number/hash and its parent hash.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BlockWithParent {
