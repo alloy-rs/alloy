@@ -1,0 +1,10 @@
+name: deny
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  deny:
+    uses: ithacaxyz/ci/.github/workflows/deny.yml@main
