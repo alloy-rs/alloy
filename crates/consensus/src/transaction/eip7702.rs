@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType, Typed2718};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2930::AccessList,
@@ -233,6 +233,11 @@ impl Transaction for TxEip7702 {
     }
 
     #[inline]
+    fn ty(&self) -> u8 {
+        TxType::Eip7702 as u8
+    }
+
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
@@ -266,12 +271,6 @@ impl SignableTransaction<Signature> for TxEip7702 {
         let tx_hash = self.tx_hash(&signature);
 
         Signed::new_unchecked(self, signature, tx_hash)
-    }
-}
-
-impl Typed2718 for TxEip7702 {
-    fn ty(&self) -> u8 {
-        TxType::Eip7702 as u8
     }
 }
 

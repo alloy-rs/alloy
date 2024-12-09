@@ -7,8 +7,6 @@ use alloy_primitives::{
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
-use super::Typed2718;
-
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -304,6 +302,11 @@ impl Transaction for TxLegacy {
     }
 
     #[inline]
+    fn ty(&self) -> u8 {
+        TxType::Legacy as u8
+    }
+
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         None
     }
@@ -343,12 +346,6 @@ impl SignableTransaction<Signature> for TxLegacy {
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         let hash = self.tx_hash(&signature);
         Signed::new_unchecked(self, signature, hash)
-    }
-}
-
-impl Typed2718 for TxLegacy {
-    fn ty(&self) -> u8 {
-        TxType::Legacy as u8
     }
 }
 
