@@ -1,7 +1,7 @@
 use core::fmt;
 use std::sync::OnceLock;
 
-use alloy_consensus::{TxType, Typed2718};
+use alloy_consensus::TxType;
 use alloy_eips::{eip2718::Eip2718Error, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U128, U256, U64, U8};
 use alloy_rpc_types_eth::AccessList;
@@ -216,6 +216,11 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
     }
 
     #[inline]
+    fn ty(&self) -> u8 {
+        self.ty.0
+    }
+
+    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         if self.fields.contains_key("accessList") {
             Some(self.memo.access_list.get_or_init(|| {
@@ -252,18 +257,6 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
         } else {
             None
         }
-    }
-}
-
-impl Typed2718 for UnknownTxEnvelope {
-    fn ty(&self) -> u8 {
-        self.inner.ty.0
-    }
-}
-
-impl Typed2718 for UnknownTypedTransaction {
-    fn ty(&self) -> u8 {
-        self.ty.0
     }
 }
 
@@ -353,6 +346,11 @@ impl alloy_consensus::Transaction for UnknownTxEnvelope {
     #[inline]
     fn input(&self) -> &Bytes {
         self.inner.input()
+    }
+
+    #[inline]
+    fn ty(&self) -> u8 {
+        self.inner.ty()
     }
 
     #[inline]
