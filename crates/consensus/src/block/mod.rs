@@ -5,7 +5,6 @@ pub use header::{BlockHeader, Header};
 
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
-use serde::{Deserialize, Serialize};
 
 use crate::Transaction;
 use alloc::vec::Vec;
@@ -38,7 +37,7 @@ impl<T, H> Block<T, H> {
 /// A response to `GetBlockBodies`, containing bodies if any bodies were found.
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
-#[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[rlp(trailing)]
 pub struct BlockBody<T> {
     /// Transactions in this block.
