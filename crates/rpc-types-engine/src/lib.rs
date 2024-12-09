@@ -21,6 +21,9 @@ pub use sidecar::*;
 mod forkchoice;
 pub use forkchoice::*;
 
+mod version;
+pub use version::ForkchoiceUpdateVersion;
+
 mod identification;
 pub use identification::*;
 

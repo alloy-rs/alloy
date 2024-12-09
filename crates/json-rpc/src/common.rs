@@ -1,5 +1,5 @@
 use serde::{de::Visitor, Deserialize, Serialize};
-use std::fmt::Display;
+use std::fmt;
 
 /// A JSON-RPC 2.0 ID object. This may be a number, a string, or null.
 ///
@@ -44,8 +44,8 @@ impl From<String> for Id {
     }
 }
 
-impl Display for Id {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Number(n) => write!(f, "{n}"),
             Self::String(s) => f.write_str(s),
@@ -74,7 +74,7 @@ impl<'de> Deserialize<'de> for Id {
         impl Visitor<'_> for IdVisitor {
             type Value = Id;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(formatter, "a string, a number, or null")
             }
 

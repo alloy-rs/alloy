@@ -6,11 +6,9 @@ use crate::{
     utils::Eip1559Estimation,
     Provider,
 };
-use alloy_consensus::BlockHeader;
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
-use alloy_network_primitives::{BlockResponse, BlockTransactionsKind};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
@@ -226,17 +224,13 @@ where
             }
         }
 
-        let latest_block = provider
-            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+        provider
+            .get_fee_history(2, BlockNumberOrTag::Latest, &[])
             .await?
-            .ok_or(RpcError::NullResp)?;
-
-        let latest_header = latest_block.header().as_ref();
-
-        latest_header
-            .next_block_blob_fee()
-            .map(Into::into)
-            .ok_or(RpcError::UnsupportedFeature("eip4844"))
+            .base_fee_per_blob_gas
+            .last()
+            .ok_or(RpcError::NullResp)
+            .copied()
     }
 
     async fn fill(

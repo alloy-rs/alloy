@@ -17,6 +17,8 @@ pub use eip7702::TxEip7702;
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
+pub mod pooled;
+pub use pooled::PooledTransaction;
 
 use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
 pub use alloy_eips::eip4844::{
@@ -39,6 +41,9 @@ pub use rlp::RlpEcdsaTx;
 
 mod typed;
 pub use typed::TypedTransaction;
+
+mod recovered;
+pub use recovered::{Recovered, SignerRecoverable};
 
 #[cfg(feature = "serde")]
 pub use legacy::signed_legacy_serde;
