@@ -5,7 +5,7 @@ use alloc::{vec, vec::Vec};
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
-use core::{borrow::Borrow, fmt};
+use core::fmt;
 use derive_more::{From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
@@ -29,12 +29,12 @@ pub struct Receipt<T = Log> {
 
 impl<T> Receipt<T>
 where
-    T: Borrow<Log>,
+    T: AsRef<Log>,
 {
     /// Calculates [`Log`]'s bloom filter. this is slow operation and [ReceiptWithBloom] can
     /// be used to cache this value.
     pub fn bloom_slow(&self) -> Bloom {
-        self.logs.iter().map(Borrow::borrow).collect()
+        self.logs.iter().map(AsRef::as_ref).collect()
     }
 
     /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
@@ -46,7 +46,7 @@ where
 
 impl<T> TxReceipt for Receipt<T>
 where
-    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: AsRef<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     type Log = T;
 

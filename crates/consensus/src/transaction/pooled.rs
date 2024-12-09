@@ -11,7 +11,7 @@ use alloy_eips::{
     eip7702::SignedAuthorization,
 };
 use alloy_primitives::{
-    bytes, Address, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
+    bytes, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
 };
 use alloy_rlp::{Decodable, Encodable, Header};
 use core::hash::{Hash, Hasher};
@@ -87,7 +87,9 @@ impl PooledTransaction {
 
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
-    pub fn recover_signer(&self) -> Result<Address, alloy_primitives::SignatureError> {
+    pub fn recover_signer(
+        &self,
+    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         match self {
             Self::Legacy(tx) => tx.recover_signer(),
             Self::Eip2930(tx) => tx.recover_signer(),

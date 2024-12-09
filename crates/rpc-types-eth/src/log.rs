@@ -151,12 +151,6 @@ impl<T> AsMut<T> for Log<T> {
     }
 }
 
-impl<T> core::borrow::Borrow<alloy_primitives::Log<T>> for Log<T> {
-    fn borrow(&self) -> &alloy_primitives::Log<T> {
-        &self.inner
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
