@@ -80,11 +80,6 @@ pub trait TransactionResponse: Transaction {
     /// Sender of the transaction
     fn from(&self) -> Address;
 
-    /// Recipient of the transaction. Returns `None` if transaction is a contract creation.
-    fn to(&self) -> Option<Address> {
-        self.kind().to().copied()
-    }
-
     /// Gas Price, this is the RPC format for `max_fee_per_gas`, pre-eip-1559.
     fn gas_price(&self) -> Option<u128> {
         if self.ty() < 2 {
