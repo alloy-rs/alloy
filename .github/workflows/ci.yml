@@ -195,6 +195,9 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all --check
 
+  deny:
+    uses: ithacaxyz/ci/.github/workflows/deny.yml@main
+
   ci-success:
     name: ci success
     runs-on: ubuntu-latest
@@ -209,6 +212,7 @@ jobs:
       - clippy
       - docs
       - fmt
+      - deny
     steps:
       - name: Decide whether the needed jobs succeeded or failed
         uses: re-actors/alls-green@release/v1
