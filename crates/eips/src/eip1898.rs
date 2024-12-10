@@ -8,13 +8,11 @@ use core::{
     str::FromStr,
 };
 
-#[cfg(feature = "serde")]
-use serde::ser::SerializeStruct;
-
 /// A helper struct to store the block number/hash and its parent hash.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlockWithParent {
     /// Parent hash.
     pub parent: B256,
@@ -457,6 +455,8 @@ impl serde::Serialize for BlockId {
     where
         S: serde::Serializer,
     {
+        use serde::ser::SerializeStruct;
+
         match self {
             Self::Hash(RpcBlockHash { block_hash, require_canonical }) => {
                 let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
@@ -644,6 +644,7 @@ impl FromStr for BlockId {
 /// A number and a hash.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct NumHash {
     /// The number
     pub number: u64,
