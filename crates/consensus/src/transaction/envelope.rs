@@ -81,7 +81,7 @@ impl PartialEq<TxType> for u8 {
 #[cfg(any(test, feature = "arbitrary"))]
 impl arbitrary::Arbitrary<'_> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(u.int_in_range(0u8..=3)?.try_into().unwrap())
+        Ok(u.int_in_range(0u8..=4)?.try_into().unwrap())
     }
 }
 
