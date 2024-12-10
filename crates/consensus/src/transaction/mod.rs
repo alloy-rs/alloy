@@ -1,9 +1,6 @@
 //! Transaction types.
 
-use crate::{
-    constants::{EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID},
-    Signed,
-};
+use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
@@ -177,18 +174,6 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     ///
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
-
-    /// Returns true if the transaction is an EIP-4844 transaction.
-    #[inline]
-    fn is_eip4844(&self) -> bool {
-        self.ty() == EIP4844_TX_TYPE_ID
-    }
-
-    /// Returns true if the transaction is an EIP-7702 transaction.
-    #[inline]
-    fn is_eip7702(&self) -> bool {
-        self.ty() == EIP7702_TX_TYPE_ID
-    }
 }
 
 /// A signable transaction.
