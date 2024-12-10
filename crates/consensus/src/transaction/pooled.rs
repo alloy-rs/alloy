@@ -4,6 +4,7 @@
 use crate::{
     transaction::{RlpEcdsaTx, TxEip1559, TxEip2930, TxEip4844, TxLegacy},
     SignableTransaction, Signed, Transaction, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxType,
+    Typed2718,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
@@ -78,7 +79,7 @@ impl PooledTransaction {
     /// length of the header + the length of the type flag and inner encoding.
     fn network_len(&self) -> usize {
         let mut payload_length = self.encode_2718_len();
-        if !self.is_legacy() {
+        if !Encodable2718::is_legacy(self) {
             payload_length += Header { list: false, payload_length }.length();
         }
 
@@ -428,16 +429,6 @@ impl Transaction for PooledTransaction {
         }
     }
 
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Legacy(tx) => tx.tx().ty(),
-            Self::Eip2930(tx) => tx.tx().ty(),
-            Self::Eip1559(tx) => tx.tx().ty(),
-            Self::Eip7702(tx) => tx.tx().ty(),
-            Self::Eip4844(tx) => tx.tx().ty(),
-        }
-    }
-
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.tx().access_list(),
@@ -465,6 +456,18 @@ impl Transaction for PooledTransaction {
             Self::Eip1559(tx) => tx.tx().authorization_list(),
             Self::Eip7702(tx) => tx.tx().authorization_list(),
             Self::Eip4844(tx) => tx.tx().authorization_list(),
+        }
+    }
+}
+
+impl Typed2718 for PooledTransaction {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Legacy(tx) => tx.tx().ty(),
+            Self::Eip2930(tx) => tx.tx().ty(),
+            Self::Eip1559(tx) => tx.tx().ty(),
+            Self::Eip7702(tx) => tx.tx().ty(),
+            Self::Eip4844(tx) => tx.tx().ty(),
         }
     }
 }

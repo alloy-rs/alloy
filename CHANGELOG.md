@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
+
+### Bug Fixes
+
+- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
+- Use `feeHistory` when estimating blob fee ([#1764](https://github.com/alloy-rs/alloy/issues/1764))
+
+### Documentation
+
+- Add `consensus-any` and `rpc-types-any` to the README ([#1759](https://github.com/alloy-rs/alloy/issues/1759))
+
+### Features
+
+- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
+- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
+- [engine] Forkchoice Version ([#1744](https://github.com/alloy-rs/alloy/issues/1744))
+- Remove duplicated `to` method in `TransactionResponse` ([#1770](https://github.com/alloy-rs/alloy/issues/1770))
+- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
+- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
+- Relax RPC `Block` bounds ([#1757](https://github.com/alloy-rs/alloy/issues/1757))
+
+### Miscellaneous Tasks
+
+- Release 0.8.0
+- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
+- Introduce recovered and recoverable ([#1768](https://github.com/alloy-rs/alloy/issues/1768))
+- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
+
+### Other
+
+- Reapply "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1773](https://github.com/alloy-rs/alloy/issues/1773))
+- Move deny into ci ([#1774](https://github.com/alloy-rs/alloy/issues/1774))
+- Update deny.yml ([#1771](https://github.com/alloy-rs/alloy/issues/1771))
+- Revert "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1772](https://github.com/alloy-rs/alloy/issues/1772))
+
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
 ### Bug Fixes
@@ -43,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
 - Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
 - Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))
