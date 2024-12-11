@@ -93,22 +93,16 @@ impl<T: Transaction> BlockBody<T> {
         self.transactions.iter().any(|tx| tx.is_eip7702())
     }
 
-    /// Helper for blob_transactions_iter function
-    #[inline]
-    fn is_eip4844(tx: &T) -> bool {
-        tx.is_eip4844()
-    }
-
     /// Returns an iterator over all blob transactions of the block
     #[inline]
     pub fn blob_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
-        self.transactions.iter().filter(|tx| Self::is_eip4844(tx))
+        self.transactions.iter().filter(|tx| tx.is_eip4844())
     }
 
     /// Returns only the blob transactions, if any, from the block body.
     #[inline]
-    pub fn blob_transactions(&self) -> Vec<&T> {
-        self.blob_transactions_iter().collect()
+    pub fn blob_transactions(&self) -> impl Iterator<Item = &T> + '_ {
+        self.blob_transactions_iter()
     }
 }
 
