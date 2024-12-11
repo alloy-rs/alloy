@@ -1,8 +1,10 @@
-//! Contains the system contract, first introduced in the [Prague hardfork](https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md).
+//! Contains the system contract and [WithdrawalRequest] types, first introduced in the [Prague hardfork](https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md).
 //!
 //! See also [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002): Execution layer triggerable withdrawals
 
-use alloy_primitives::{address, bytes, Address, Bytes};
+use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
+#[cfg(feature = "serde")]
+use serde_with::{serde_as, DisplayFromStr};
 
 /// The caller to be used when calling the EIP-7002 withdrawal requests contract at the end of the
 /// block.
@@ -17,3 +19,61 @@ pub static WITHDRAWAL_REQUEST_PREDEPLOY_CODE: Bytes = bytes!("   3373fffffffffff
 
 /// The [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685) request type for withdrawal requests.
 pub const WITHDRAWAL_REQUEST_TYPE: u8 = 0x01;
+
+/// Represents an execution layer triggerable withdrawal request.
+///
+/// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
+#[cfg_attr(feature = "serde", serde_as)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct WithdrawalRequest {
+    /// Address of the source of the exit.
+    pub source_address: Address,
+    /// Validator public key.
+    pub validator_pubkey: FixedBytes<48>,
+    /// Amount of withdrawn ether in gwei.
+    #[serde_as(as = "DisplayFromStr")]
+    pub amount: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::hex;
+    use core::str::FromStr;
+
+    #[test]
+    fn test_serde_withdrawal_request() {
+        // Sample JSON input representing a withdrawal request
+        let json_data = r#"{
+            "source_address":"0xAE0E8770147AaA6828a0D6f642504663F10F7d1E",
+            "validator_pubkey":"0x8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b",
+            "amount":"1"
+        }"#;
+
+        // Deserialize the JSON into a WithdrawalRequest struct
+        let withdrawal_request: WithdrawalRequest =
+            serde_json::from_str(json_data).expect("Failed to deserialize");
+
+        // Verify the deserialized content
+        assert_eq!(
+            withdrawal_request.source_address,
+            Address::from_str("0xAE0E8770147AaA6828a0D6f642504663F10F7d1E").unwrap()
+        );
+        assert_eq!(
+            withdrawal_request.validator_pubkey,
+            FixedBytes::<48>::from(hex!("8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b"))
+        );
+        assert_eq!(withdrawal_request.amount, 1);
+
+        // Serialize the struct back into JSON
+        let serialized_json =
+            serde_json::to_string(&withdrawal_request).expect("Failed to serialize");
+
+        // Check if the serialized JSON matches the expected JSON structure
+        let expected_json = r#"{"source_address":"0xae0e8770147aaa6828a0d6f642504663f10f7d1e","validator_pubkey":"0x8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b","amount":"1"}"#;
+        assert_eq!(serialized_json, expected_json);
+    }
+}
