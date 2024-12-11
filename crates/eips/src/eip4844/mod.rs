@@ -140,7 +140,14 @@ pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
         BLOB_GASPRICE_UPDATE_FRACTION,
     )
 }
-
+/// Calculate the blob gas price using an update fraction.
+pub fn calc_blob_gasprice_with_update_fraction(excess_blob_gas: u64, update_fraction: f64) -> u128 {
+    fake_exponential(
+        BLOB_TX_MIN_BLOB_GASPRICE,
+        (excess_blob_gas as f64 * update_fraction) as u128,
+        BLOB_GASPRICE_UPDATE_FRACTION,
+    )
+}
 /// Approximates `factor * e ** (numerator / denominator)` using Taylor expansion.
 ///
 /// This is used to calculate the blob price.
