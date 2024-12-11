@@ -56,6 +56,20 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
         None
     }
 
+    /// Returns [`ReceiptWithBloom`] with the computed bloom filter [`Self::bloom`] and a reference
+    /// to the receipt.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn with_bloom_ref(&self) -> ReceiptWithBloom<&Self> {
+        ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
+    }
+
+    /// Consumes the type and converts it into [`ReceiptWithBloom`] with the computed bloom filter
+    /// [`Self::bloom`] and the receipt.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn into_with_bloom(self) -> ReceiptWithBloom<Self> {
+        ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
+    }
+
     /// Returns the cumulative gas used in the block after this transaction was executed.
     fn cumulative_gas_used(&self) -> u128;
 
