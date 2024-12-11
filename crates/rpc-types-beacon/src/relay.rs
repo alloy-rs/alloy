@@ -2,6 +2,7 @@
 //!
 //! See also <https://flashbots.github.io/relay-specs/>
 
+use crate::requests::ExecutionRequestsV4;
 use crate::{BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
@@ -9,7 +10,6 @@ use alloy_rpc_types_engine::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use crate::requests::ExecutionRequestsV4;
 
 /// Represents an entry of the `/relay/v1/builder/validators` endpoint
 #[serde_as]

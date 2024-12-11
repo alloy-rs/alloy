@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
 use alloy_eips::eip6110::DepositRequest;
 use alloy_eips::eip7002::WithdrawalRequest;
 use alloy_eips::eip7251::ConsolidationRequest;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
