@@ -6,7 +6,7 @@ pub use header::{BlockHeader, Header};
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
-use crate::Transaction;
+use crate::Typed2718;
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
 use alloy_primitives::B256;
@@ -80,10 +80,10 @@ impl<T> BlockBody<T> {
     }
 }
 
-impl<T: Transaction> BlockBody<T> {
+impl<T: Typed2718> BlockBody<T> {
     /// Returns whether or not the block body contains any blob transactions.
     #[inline]
-    pub fn has_blob_transactions(&self) -> bool {
+    pub fn has_eip4844_transactions(&self) -> bool {
         self.transactions.iter().any(|tx| tx.is_eip4844())
     }
 
@@ -95,14 +95,8 @@ impl<T: Transaction> BlockBody<T> {
 
     /// Returns an iterator over all blob transactions of the block
     #[inline]
-    pub fn blob_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
+    pub fn eip4844_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
         self.transactions.iter().filter(|tx| tx.is_eip4844())
-    }
-
-    /// Returns only the blob transactions, if any, from the block body.
-    #[inline]
-    pub fn blob_transactions(&self) -> impl Iterator<Item = &T> + '_ {
-        self.blob_transactions_iter()
     }
 }
 
