@@ -111,6 +111,8 @@ pub struct Header<H = alloy_consensus::Header> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: H,
     /// Total difficulty
+    ///
+    /// Note: This field is now effectively deprecated: <https://github.com/ethereum/execution-apis/pull/570>
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub total_difficulty: Option<U256>,
     /// Integer the size of this block in bytes.
