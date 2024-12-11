@@ -4,7 +4,7 @@ use alloy_eips::{
     calc_blob_gasprice,
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip1898::BlockWithParent,
-    eip4844::{self},
+    eip4844::{self, calc_blob_gasprice_with_update_fraction},
     eip7742,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
@@ -14,8 +14,6 @@ use alloy_primitives::{
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::mem;
-
-const BLOB_BASE_FEE_UPDATE_FRACTION_ELECTRA: f64 = 0.145;
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -216,7 +214,10 @@ impl Header {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [Self::next_block_excess_blob_gas]
-    #[deprecated(note = "Use `next_block_blob_fee_with_fraction` to account for update fractions")]
+    #[deprecated(
+        since = "0.8.1",
+        note = "Use `next_block_blob_fee_with_fraction` to account for update fractions"
+    )]
     pub fn next_block_blob_fee(&self) -> Option<u128> {
         Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas()?))
     }
@@ -224,31 +225,26 @@ impl Header {
     /// Returns the blob fee for the next block according to the EIP-4844 spec,
     /// applying the provided update fraction.
     ///
-    /// If no fraction is provided, the default is `BLOB_BASE_FEE_UPDATE_FRACTION_ELECTRA`.
-    ///
     /// # Arguments
     ///
-    /// - `update_fraction`: Optional fraction (between 0 and 1) that adjusts the calculation.
+    /// - `update_fraction`: Fraction for the fee adjustment calculation (must be between 0.0 and
+    ///   1.0).
     ///
     /// # Returns
     ///
-    /// - `Some(u128)` containing the calculated blob fee if `next_block_excess_blob_gas` is `Some`.
-    /// - `None` if `next_block_excess_blob_gas` is `None`.
+    /// - `Some(u128)` containing the calculated blob fee if `excess_blob_gas` is `Some`.
+    /// - `None` if `excess_blob_gas` is `None`.
     ///
     /// # Panics
     ///
-    /// - Panics if `update_fraction` is provided and not within the range [0.0, 1.0].
-    pub fn next_block_blob_fee_with_fraction(&self, update_fraction: Option<f64>) -> Option<u128> {
-        let fraction = update_fraction.unwrap_or(BLOB_BASE_FEE_UPDATE_FRACTION_ELECTRA);
-
-        if !(0.0..=1.0).contains(&fraction) {
+    /// - Panics if `update_fraction` is not within the range [0.0, 1.0].
+    pub fn next_block_blob_fee_with_fraction(&self, update_fraction: f64) -> Option<u128> {
+        if !(0.0..=1.0).contains(&update_fraction) {
             panic!("update_fraction must be between 0.0 and 1.0");
         }
 
         let excess_blob_gas = self.next_block_excess_blob_gas()?;
-        let adjusted_blob_gas = (excess_blob_gas as f64 * fraction) as u64;
-
-        Some(eip4844::calc_blob_gasprice(adjusted_blob_gas))
+        Some(calc_blob_gasprice_with_update_fraction(excess_blob_gas, update_fraction))
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
@@ -763,6 +759,17 @@ pub trait BlockHeader {
         self.withdrawals_root().map_or(txs_and_ommers_empty, |withdrawals_root| {
             txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
         })
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec,
+    /// applying the provided update fraction.
+    fn next_block_blob_fee_with_fraction(&self, update_fraction: f64) -> Option<u128> {
+        if !(0.0..=1.0).contains(&update_fraction) {
+            panic!("update_fraction must be between 0.0 and 1.0");
+        }
+
+        let excess_blob_gas = self.next_block_excess_blob_gas()?;
+        Some(calc_blob_gasprice_with_update_fraction(excess_blob_gas, update_fraction))
     }
 }
 
