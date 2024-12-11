@@ -659,18 +659,16 @@ impl TransactionRequest {
         Some(pref)
     }
 
-    /// Build an [`TypedTransaction`]
+    /// Build a [`TypedTransaction`]
     ///
-    /// In case `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_, e.g.
-    /// sendable to the network.
+    /// When `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_. Which
+    /// is to say, that it is signable, and the signed versino can be sent to the network.
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
-        let tx_type = self.buildable_type();
-
-        if tx_type.is_none() {
+        let Some(tx_type) = self.buildable_type() else {
             return Err(self);
-        }
+        };
 
-        Ok(match tx_type.expect("checked") {
+        Ok(match tx_type {
             TxType::Legacy => self.build_legacy().expect("checked)").into(),
             TxType::Eip2930 => self.build_2930().expect("checked)").into(),
             TxType::Eip1559 => self.build_1559().expect("checked)").into(),
@@ -680,14 +678,15 @@ impl TransactionRequest {
         })
     }
 
-    /// Build an [`TypedTransaction`].
+    /// Build a [`TypedTransaction`].
     ///
-    /// In case `Ok(...)` is returned, the `TypedTransaction` does not guarantee to be _complete_,
-    /// e.g. sendable to the network.
+    /// When `Ok(...)` is returned, the `TypedTransaction` is not guaranteed to be _complete_,
+    /// only signable.
     ///
     /// E.g. a particular case is when the transaction is of type `Eip4844` and the `sidecar` is not
-    /// set, in this case the transaction is not _complete_. It can still be used to calculate the
-    /// signature of the transaction though.
+    /// set, in this case the transaction is not _complete_, i.e. it cannot be sent to the network
+    /// once signed. However, it can still be used to calculate the signing hash, signature of
+    /// the transaction, and transaction trie hash.
     ///
     /// In case the requirement is to build a _complete_ transaction, use `build_typed_tx` instead.
     pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
