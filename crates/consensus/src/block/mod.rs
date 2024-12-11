@@ -6,8 +6,10 @@ pub use header::{BlockHeader, Header};
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
+use crate::Typed2718;
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
+use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -57,6 +59,44 @@ impl<T> BlockBody<T> {
     #[inline]
     pub fn transactions(&self) -> impl Iterator<Item = &T> + '_ {
         self.transactions.iter()
+    }
+
+    /// Create a [`Block`] from the body and its header.
+    pub const fn into_block(self, header: Header) -> Block<T> {
+        Block { header, body: self }
+    }
+}
+
+impl<T> BlockBody<T> {
+    /// Calculate the ommers root for the block body.
+    pub fn calculate_ommers_root(&self) -> B256 {
+        crate::proofs::calculate_ommers_root(&self.ommers)
+    }
+
+    /// Calculate the withdrawals root for the block body, if withdrawals exist. If there are no
+    /// withdrawals, this will return `None`.
+    pub fn calculate_withdrawals_root(&self) -> Option<B256> {
+        self.withdrawals.as_ref().map(|w| crate::proofs::calculate_withdrawals_root(w))
+    }
+}
+
+impl<T: Typed2718> BlockBody<T> {
+    /// Returns whether or not the block body contains any blob transactions.
+    #[inline]
+    pub fn has_eip4844_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip4844())
+    }
+
+    /// Returns whether or not the block body contains any EIP-7702 transactions.
+    #[inline]
+    pub fn has_eip7702_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip7702())
+    }
+
+    /// Returns an iterator over all blob transactions of the block
+    #[inline]
+    pub fn eip4844_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
+        self.transactions.iter().filter(|tx| tx.is_eip4844())
     }
 }
 
