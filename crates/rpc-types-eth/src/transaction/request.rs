@@ -686,7 +686,7 @@ impl TransactionRequest {
     /// E.g. a particular case is when the transaction is of type `Eip4844` and the `sidecar` is not
     /// set, in this case the transaction is not _complete_, i.e. it cannot be sent to the network
     /// once signed. However, it can still be used to calculate the signing hash, signature of
-    /// the transaction, and trie hash.
+    /// the transaction, and transaction trie hash.
     ///
     /// In case the requirement is to build a _complete_ transaction, use `build_typed_tx` instead.
     pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
