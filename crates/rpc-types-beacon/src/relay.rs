@@ -2,8 +2,7 @@
 //!
 //! See also <https://flashbots.github.io/relay-specs/>
 
-use crate::requests::ExecutionRequestsV4;
-use crate::{BlsPublicKey, BlsSignature};
+use crate::{requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
