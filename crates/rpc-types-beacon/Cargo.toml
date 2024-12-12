@@ -31,6 +31,7 @@ serde.workspace = true
 serde_with = { workspace = true, features = ["alloc"] }
 
 thiserror.workspace = true
+ssz_types = { version = "0.9.0", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
@@ -42,3 +43,4 @@ ssz = [
     "dep:ethereum_ssz_derive",
     "alloy-rpc-types-engine/ssz",
 ]
+ssz_types = ["dep:ssz_types"]
