@@ -49,6 +49,7 @@ ethereum_ssz = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
+cfg_eval = "0.1.2"
 
 
 [dev-dependencies]

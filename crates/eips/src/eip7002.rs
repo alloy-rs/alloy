@@ -23,8 +23,8 @@ pub const WITHDRAWAL_REQUEST_TYPE: u8 = 0x01;
 /// Represents an execution layer triggerable withdrawal request.
 ///
 /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-#[cfg_attr(feature = "serde", serde_as)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -34,7 +34,7 @@ pub struct WithdrawalRequest {
     /// Validator public key.
     pub validator_pubkey: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
-    #[serde_as(as = "DisplayFromStr")]
+    #[cfg_attr(feature = "serde", serde_as(as = "DisplayFromStr"))]
     pub amount: u64,
 }
 
@@ -45,6 +45,7 @@ mod tests {
     use core::str::FromStr;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_serde_withdrawal_request() {
         // Sample JSON input representing a withdrawal request
         let json_data = r#"{

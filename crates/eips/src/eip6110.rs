@@ -14,8 +14,8 @@ pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
 pub const DEPOSIT_REQUEST_TYPE: u8 = 0x00;
 
 /// This structure maps onto the deposit object from [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-#[cfg_attr(feature = "serde", serde_as)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -25,12 +25,12 @@ pub struct DepositRequest {
     /// Withdrawal credentials
     pub withdrawal_credentials: B256,
     /// Amount of ether deposited in gwei
-    #[serde_as(as = "DisplayFromStr")]
+    #[cfg_attr(feature = "serde", serde_as(as = "DisplayFromStr"))]
     pub amount: u64,
     /// Deposit signature
     pub signature: FixedBytes<96>,
     /// Deposit index
-    #[serde_as(as = "DisplayFromStr")]
+    #[cfg_attr(feature = "serde", serde_as(as = "DisplayFromStr"))]
     pub index: u64,
 }
 
@@ -40,6 +40,7 @@ mod tests {
     use alloy_primitives::hex;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_serde_deposit_request() {
         // Sample JSON input representing a deposit request
         let json_data = r#"{"pubkey":"0x8e01a8f21bdc38991ada53ca86d6c78d874675a450a38431cc6aa0f12d5661e344784c56c8a211f7025224d1303ee801","withdrawal_credentials":"0x010000000000000000000000af6df504f08ddf582d604d2f0a593bc153c25dbd","amount":"18112749083033600","signature":"0xb65f3db79405544528d6d92040282f29171f4ff6e5abb2d59f9ee1f1254aced2a7000f87bc2684f543e913a7cc1007ea0e97289b349c553eecdf253cd3ef5814088ba3d4ac286f2634dac3d026d9a01e4c166dc75e249d626a0f1c180dab75ce","index":"13343631333247680512"}"#;
