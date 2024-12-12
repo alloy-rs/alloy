@@ -1,9 +1,12 @@
-use crate::receipt::{Eip658Value, RlpReceipt, TxReceipt};
+use crate::receipt::{
+    Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
+};
 use alloc::{vec, vec::Vec};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::{borrow::Borrow, fmt};
-use derive_more::{DerefMut, From, IntoIterator};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use core::fmt;
+use derive_more::{From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -26,12 +29,12 @@ pub struct Receipt<T = Log> {
 
 impl<T> Receipt<T>
 where
-    T: Borrow<Log>,
+    T: AsRef<Log>,
 {
     /// Calculates [`Log`]'s bloom filter. this is slow operation and [ReceiptWithBloom] can
     /// be used to cache this value.
     pub fn bloom_slow(&self) -> Bloom {
-        self.logs.iter().map(Borrow::borrow).collect()
+        self.logs.iter().map(AsRef::as_ref).collect()
     }
 
     /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
@@ -43,7 +46,7 @@ where
 
 impl<T> TxReceipt for Receipt<T>
 where
-    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+    T: AsRef<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     type Log = T;
 
@@ -68,28 +71,72 @@ where
     }
 }
 
-impl<T: Encodable + Decodable> RlpReceipt for Receipt<T> {
-    fn rlp_encoded_fields_length_with_bloom(&self, bloom: Bloom) -> usize {
+impl<T: Encodable> Receipt<T> {
+    /// Returns length of RLP-encoded receipt fields with the given [`Bloom`] without an RLP header.
+    pub fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.status.length()
             + self.cumulative_gas_used.length()
             + bloom.length()
             + self.logs.length()
     }
 
-    fn rlp_encode_fields_with_bloom(&self, bloom: Bloom, out: &mut dyn BufMut) {
+    /// RLP-encodes receipt fields with the given [`Bloom`] without an RLP header.
+    pub fn rlp_encode_fields_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.status.encode(out);
         self.cumulative_gas_used.encode(out);
         bloom.encode(out);
         self.logs.encode(out);
     }
 
-    fn rlp_decode_fields_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+    /// Returns RLP header for this receipt encoding with the given [`Bloom`].
+    pub fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
+        Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
+    }
+}
+
+impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
+    fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
+        self.rlp_header_with_bloom(bloom).length_with_payload()
+    }
+
+    fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
+        self.rlp_header_with_bloom(bloom).encode(out);
+        self.rlp_encode_fields_with_bloom(bloom, out);
+    }
+}
+
+impl<T: Decodable> Receipt<T> {
+    /// RLP-decodes receipt's field with a [`Bloom`].
+    ///
+    /// Does not expect an RLP header.
+    pub fn rlp_decode_fields_with_bloom(
+        buf: &mut &[u8],
+    ) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
         let status = Decodable::decode(buf)?;
         let cumulative_gas_used = Decodable::decode(buf)?;
         let logs_bloom = Decodable::decode(buf)?;
         let logs = Decodable::decode(buf)?;
 
         Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
+    }
+}
+
+impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
+    fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        let remaining = buf.len();
+
+        let this = Self::rlp_decode_fields_with_bloom(buf)?;
+
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
     }
 }
 
@@ -101,9 +148,7 @@ impl<T> From<ReceiptWithBloom<Self>> for Receipt<T> {
 }
 
 /// Receipt containing result of transaction execution.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Default, From, derive_more::Deref, DerefMut, IntoIterator,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, From, IntoIterator)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts<T> {
     /// A two-dimensional vector of [`Receipt`] instances.
@@ -136,6 +181,22 @@ impl<T> From<Vec<T>> for Receipts<T> {
 impl<T> FromIterator<Vec<T>> for Receipts<T> {
     fn from_iter<I: IntoIterator<Item = Vec<T>>>(iter: I) -> Self {
         Self { receipt_vec: iter.into_iter().collect() }
+    }
+}
+
+impl<T: Encodable> Encodable for Receipts<T> {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.receipt_vec.encode(out)
+    }
+
+    fn length(&self) -> usize {
+        self.receipt_vec.length()
+    }
+}
+
+impl<T: Decodable> Decodable for Receipts<T> {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self { receipt_vec: Decodable::decode(buf)? })
     }
 }
 
@@ -210,19 +271,36 @@ impl<R> ReceiptWithBloom<R> {
     }
 }
 
-impl<R: RlpReceipt> Encodable for ReceiptWithBloom<R> {
+impl<R: RlpEncodableReceipt> Encodable for ReceiptWithBloom<R> {
     fn encode(&self, out: &mut dyn BufMut) {
-        self.receipt.rlp_encode_with_bloom(self.logs_bloom, out);
+        self.receipt.rlp_encode_with_bloom(&self.logs_bloom, out);
     }
 
     fn length(&self) -> usize {
-        self.receipt.rlp_encoded_length_with_bloom(self.logs_bloom)
+        self.receipt.rlp_encoded_length_with_bloom(&self.logs_bloom)
     }
 }
 
-impl<R: RlpReceipt> Decodable for ReceiptWithBloom<R> {
+impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         R::rlp_decode_with_bloom(buf)
+    }
+}
+
+impl<R> Encodable2718 for ReceiptWithBloom<R>
+where
+    R: Eip2718EncodableReceipt + Send + Sync,
+{
+    fn type_flag(&self) -> Option<u8> {
+        (!self.receipt.is_legacy()).then_some(self.receipt.ty())
+    }
+
+    fn encode_2718_len(&self) -> usize {
+        self.receipt.eip2718_encoded_length_with_bloom(&self.logs_bloom)
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        self.receipt.eip2718_encode_with_bloom(&self.logs_bloom, out);
     }
 }
 
@@ -238,6 +316,17 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::ReceiptEnvelope;
+    use alloy_rlp::{Decodable, Encodable};
+
+    const fn assert_tx_receipt<T: TxReceipt>() {}
+
+    #[test]
+    const fn assert_receipt() {
+        assert_tx_receipt::<Receipt>();
+        assert_tx_receipt::<ReceiptWithBloom<Receipt>>();
+    }
 
     #[cfg(feature = "serde")]
     #[test]
@@ -279,5 +368,19 @@ mod test {
                 "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
             ))
         );
+    }
+
+    #[test]
+    fn rountrip_encodable_eip1559() {
+        let receipts =
+            Receipts { receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(Default::default())]] };
+
+        let mut out = vec![];
+        receipts.encode(&mut out);
+
+        let mut out = out.as_slice();
+        let decoded = Receipts::<ReceiptEnvelope>::decode(&mut out).unwrap();
+
+        assert_eq!(receipts, decoded);
     }
 }

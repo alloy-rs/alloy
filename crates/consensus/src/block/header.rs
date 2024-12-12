@@ -192,14 +192,6 @@ impl Header {
         keccak256(&out)
     }
 
-    /// Checks if the header is empty - has no transactions and no ommers
-    pub fn is_empty(&self) -> bool {
-        let txs_and_ommers_empty = self.transaction_root_is_empty() && self.ommers_hash_is_empty();
-        self.withdrawals_root.map_or(txs_and_ommers_empty, |withdrawals_root| {
-            txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
-        })
-    }
-
     /// Check if the ommers hash equals to empty hash list.
     pub fn ommers_hash_is_empty(&self) -> bool {
         self.ommers_hash == EMPTY_OMMER_ROOT_HASH
@@ -359,28 +351,6 @@ impl Header {
     /// Note: this hashes the header.
     pub fn num_hash_with_parent_slow(&self) -> BlockWithParent {
         BlockWithParent::new(self.parent_hash, self.num_hash_slow())
-    }
-
-    /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
-    ///
-    /// This function is linked to EIP-3675, proposing the consensus upgrade to Proof-of-Stake:
-    /// [EIP-3675](https://eips.ethereum.org/EIPS/eip-3675#replacing-difficulty-with-0)
-    ///
-    /// Verifies whether, as per the EIP, the block's difficulty is updated to zero,
-    /// signifying the transition to a Proof-of-Stake mechanism.
-    ///
-    /// Returns `true` if the block's difficulty matches the constant zero set by the EIP.
-    pub fn is_zero_difficulty(&self) -> bool {
-        self.difficulty.is_zero()
-    }
-
-    /// Checks if the block's timestamp is in the future based on the present timestamp.
-    ///
-    /// Clock can drift but this can be consensus issue.
-    ///
-    /// Note: This check is relevant only pre-merge.
-    pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
-        self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
     }
 
     /// Seal the header with a known hash.
@@ -673,6 +643,13 @@ pub trait BlockHeader {
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
 
+    /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None
+    fn blob_fee(&self) -> Option<u128> {
+        self.excess_blob_gas().map(calc_blob_gasprice)
+    }
+
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
@@ -722,6 +699,44 @@ pub trait BlockHeader {
     /// Note: for the genesis block the parent number is 0 and the parent hash is the zero hash.
     fn parent_num_hash(&self) -> BlockNumHash {
         BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
+    }
+
+    /// Checks if the header is considered empty - has no transactions, no ommers or withdrawals
+    fn is_empty(&self) -> bool {
+        let txs_and_ommers_empty = self.transactions_root() == EMPTY_ROOT_HASH
+            && self.ommers_hash() == EMPTY_OMMER_ROOT_HASH;
+        self.withdrawals_root().map_or(txs_and_ommers_empty, |withdrawals_root| {
+            txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
+        })
+    }
+
+    /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
+    ///
+    /// This function is linked to EIP-3675, proposing the consensus upgrade to Proof-of-Stake:
+    /// [EIP-3675](https://eips.ethereum.org/EIPS/eip-3675#replacing-difficulty-with-0)
+    ///
+    /// Verifies whether, as per the EIP, the block's difficulty is updated to zero,
+    /// signifying the transition to a Proof-of-Stake mechanism.
+    ///
+    /// Returns `true` if the block's difficulty matches the constant zero set by the EIP.
+    fn is_zero_difficulty(&self) -> bool {
+        self.difficulty().is_zero()
+    }
+
+    /// Checks if the block's timestamp is in the future based on the present timestamp.
+    ///
+    /// Clock can drift but this can be consensus issue.
+    ///
+    /// Note: This check is relevant only pre-merge.
+    fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
+        self.timestamp() > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
+    }
+
+    /// Checks if the nonce exists, and if it exists, if it's zero.
+    ///
+    /// If the nonce is `None`, then this returns `false`.
+    fn is_nonce_zero(&self) -> bool {
+        self.nonce().is_some_and(|nonce| nonce.is_zero())
     }
 }
 
@@ -903,6 +918,10 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
 
     fn target_blobs_per_block(&self) -> Option<u64> {
         self.inner.target_blobs_per_block()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 

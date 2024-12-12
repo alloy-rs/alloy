@@ -19,6 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 alloy-eips = { workspace = true, features = ["serde"] }
 alloy-primitives.workspace = true
 alloy-serde.workspace = true
+alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 
 serde.workspace = true
 serde_json.workspace = true

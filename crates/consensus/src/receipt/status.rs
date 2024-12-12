@@ -16,6 +16,11 @@ pub enum Eip658Value {
 }
 
 impl Eip658Value {
+    /// Returns a successful transaction status.
+    pub const fn success() -> Self {
+        Self::Eip658(true)
+    }
+
     /// Returns true if the transaction was successful OR if the transaction
     /// is pre-[EIP-658].
     ///

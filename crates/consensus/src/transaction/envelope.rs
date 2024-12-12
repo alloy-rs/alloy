@@ -9,7 +9,9 @@ use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
-use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64};
+use alloy_primitives::{
+    Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
+};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
@@ -23,6 +25,8 @@ use core::fmt;
 /// [7702]: https://eips.ethereum.org/EIPS/eip-7702
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(into = "U8", try_from = "U64"))]
 #[doc(alias = "TransactionType")]
 pub enum TxType {
     /// Legacy transaction type.
@@ -41,6 +45,12 @@ pub enum TxType {
 impl From<TxType> for u8 {
     fn from(value: TxType) -> Self {
         value as Self
+    }
+}
+
+impl From<TxType> for U8 {
+    fn from(tx_type: TxType) -> Self {
+        Self::from(u8::from(tx_type))
     }
 }
 
@@ -71,7 +81,7 @@ impl PartialEq<TxType> for u8 {
 #[cfg(any(test, feature = "arbitrary"))]
 impl arbitrary::Arbitrary<'_> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(u.int_in_range(0u8..=3)?.try_into().unwrap())
+        Ok(u.int_in_range(0u8..=4)?.try_into().unwrap())
     }
 }
 
@@ -126,28 +136,8 @@ impl Decodable for TxType {
 }
 
 impl Typed2718 for TxType {
-    fn is_type(&self, ty: u8) -> bool {
-        *self == ty
-    }
-
-    fn is_legacy(&self) -> bool {
-        matches!(self, Self::Legacy)
-    }
-
-    fn is_eip2930(&self) -> bool {
-        matches!(self, Self::Eip2930)
-    }
-
-    fn is_eip1559(&self) -> bool {
-        matches!(self, Self::Eip1559)
-    }
-
-    fn is_eip4844(&self) -> bool {
-        matches!(self, Self::Eip4844)
-    }
-
-    fn is_eip7702(&self) -> bool {
-        matches!(self, Self::Eip7702)
+    fn ty(&self) -> u8 {
+        (*self).into()
     }
 }
 
@@ -625,17 +615,6 @@ impl Transaction for TxEnvelope {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Legacy(tx) => tx.tx().ty(),
-            Self::Eip2930(tx) => tx.tx().ty(),
-            Self::Eip1559(tx) => tx.tx().ty(),
-            Self::Eip4844(tx) => tx.tx().ty(),
-            Self::Eip7702(tx) => tx.tx().ty(),
-        }
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.tx().access_list(),
@@ -664,6 +643,18 @@ impl Transaction for TxEnvelope {
             Self::Eip1559(tx) => tx.tx().authorization_list(),
             Self::Eip4844(tx) => tx.tx().authorization_list(),
             Self::Eip7702(tx) => tx.tx().authorization_list(),
+        }
+    }
+}
+
+impl Typed2718 for TxEnvelope {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Legacy(tx) => tx.tx().ty(),
+            Self::Eip2930(tx) => tx.tx().ty(),
+            Self::Eip1559(tx) => tx.tx().ty(),
+            Self::Eip4844(tx) => tx.tx().ty(),
+            Self::Eip7702(tx) => tx.tx().ty(),
         }
     }
 }

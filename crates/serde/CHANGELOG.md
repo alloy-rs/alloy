@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
+## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
+
+### Miscellaneous Tasks
+
+- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
+
+## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
+
+### Miscellaneous Tasks
+
+- Release 0.7.3
+- Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
+- Release 0.7.0
 
 ### Other
 
@@ -125,11 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
-
-## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
-
-### Miscellaneous Tasks
-
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
@@ -171,18 +178,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
-### Miscellaneous Tasks
-
-- Release 0.1.4
-
-## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
-
 ### Bug Fixes
 
 - Deserialization of null storage keys in AccessListItem ([#955](https://github.com/alloy-rs/alloy/issues/955))
 
 ### Miscellaneous Tasks
 
+- Release 0.1.4
 - Release 0.1.3
 - Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
 
@@ -191,14 +193,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
-
-### Miscellaneous Tasks
-
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
-
-## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Features
 
@@ -211,6 +205,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 - [clippy] Apply lint suggestions ([#903](https://github.com/alloy-rs/alloy/issues/903))
 - [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
 - Improve hyper http error messages ([#469](https://github.com/alloy-rs/alloy/issues/469))

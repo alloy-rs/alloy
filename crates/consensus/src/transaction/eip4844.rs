@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Signed, Transaction, TxType, Typed2718};
 
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
@@ -139,6 +139,15 @@ impl TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => tx.size(),
         }
     }
+
+    /// Tries to unwrap the [`TxEip4844WithSidecar`] returns the transaction as error if it is not a
+    /// [`TxEip4844WithSidecar`]
+    pub fn try_into_4844_with_sidecar(self) -> Result<TxEip4844WithSidecar, Self> {
+        match self {
+            Self::TxEip4844WithSidecar(tx) => Ok(tx),
+            _ => Err(self),
+        }
+    }
 }
 
 impl Transaction for TxEip4844Variant {
@@ -249,11 +258,6 @@ impl Transaction for TxEip4844Variant {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        TxType::Eip4844 as u8
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::TxEip4844(tx) => tx.access_list(),
@@ -272,6 +276,11 @@ impl Transaction for TxEip4844Variant {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
+    }
+}
+impl Typed2718 for TxEip4844 {
+    fn ty(&self) -> u8 {
+        TxType::Eip4844 as u8
     }
 }
 
@@ -362,6 +371,12 @@ impl RlpEcdsaTx for TxEip4844Variant {
             Self::TxEip4844(inner) => inner.tx_hash_with_type(signature, ty),
             Self::TxEip4844WithSidecar(inner) => inner.tx_hash_with_type(signature, ty),
         }
+    }
+}
+
+impl Typed2718 for TxEip4844Variant {
+    fn ty(&self) -> u8 {
+        TxType::Eip4844 as u8
     }
 }
 
@@ -677,11 +692,6 @@ impl Transaction for TxEip4844 {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        TxType::Eip4844 as u8
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
@@ -896,11 +906,6 @@ impl Transaction for TxEip4844WithSidecar {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        TxType::Eip4844 as u8
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.tx.access_list)
     }
@@ -913,6 +918,12 @@ impl Transaction for TxEip4844WithSidecar {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
+    }
+}
+
+impl Typed2718 for TxEip4844WithSidecar {
+    fn ty(&self) -> u8 {
+        TxType::Eip4844 as u8
     }
 }
 

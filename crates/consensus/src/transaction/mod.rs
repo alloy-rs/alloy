@@ -17,6 +17,8 @@ pub use eip7702::TxEip7702;
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
+pub mod pooled;
+pub use pooled::PooledTransaction;
 
 use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
 pub use alloy_eips::eip4844::{
@@ -40,6 +42,9 @@ pub use rlp::RlpEcdsaTx;
 mod typed;
 pub use typed::TypedTransaction;
 
+mod recovered;
+pub use recovered::{Recovered, SignerRecoverable};
+
 #[cfg(feature = "serde")]
 pub use legacy::signed_legacy_serde;
 
@@ -55,7 +60,7 @@ pub mod serde_bincode_compat {
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
+pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -148,9 +153,6 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `data`.
     fn input(&self) -> &Bytes;
 
-    /// Returns the transaction type
-    fn ty(&self) -> u8;
-
     /// Returns the EIP-2930 `access_list` for the particular transaction type. Returns `None` for
     /// older transaction types.
     fn access_list(&self) -> Option<&AccessList>;
@@ -177,9 +179,9 @@ pub trait Transaction: fmt::Debug + any::Any + Send + Sync + 'static {
 /// A signable transaction.
 ///
 /// A transaction can have multiple signature types. This is usually
-/// [`alloy_primitives::Signature`], however, it may be different for future EIP-2718 transaction
-/// types, or in other networks. For example, in Optimism, the deposit transaction signature is the
-/// unit type `()`.
+/// [`alloy_primitives::PrimitiveSignature`], however, it may be different for future EIP-2718
+/// transaction types, or in other networks. For example, in Optimism, the deposit transaction
+/// signature is the unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]
 pub trait SignableTransaction<Signature>: Transaction {
     /// Sets `chain_id`.
@@ -240,6 +242,14 @@ impl<S: 'static> dyn SignableTransaction<S> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: Typed2718> Typed2718 for alloy_serde::WithOtherFields<T> {
+    #[inline]
+    fn ty(&self) -> u8 {
+        self.inner.ty()
     }
 }
 
@@ -315,11 +325,6 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     }
 
     #[inline]
-    fn ty(&self) -> u8 {
-        self.inner.ty()
-    }
-
-    #[inline]
     fn access_list(&self) -> Option<&AccessList> {
         self.inner.access_list()
     }
@@ -336,22 +341,38 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
 }
 
 /// A trait that helps to determine the type of the transaction.
+#[auto_impl::auto_impl(&)]
 pub trait Typed2718 {
+    /// Returns the EIP-2718 type flag.
+    fn ty(&self) -> u8;
+
     /// Returns true if the type matches the given type.
-    fn is_type(&self, ty: u8) -> bool;
+    fn is_type(&self, ty: u8) -> bool {
+        self.ty() == ty
+    }
 
     /// Returns true if the type is a legacy transaction.
-    fn is_legacy(&self) -> bool;
+    fn is_legacy(&self) -> bool {
+        self.ty() == 0
+    }
 
     /// Returns true if the type is an EIP-2930 transaction.
-    fn is_eip2930(&self) -> bool;
+    fn is_eip2930(&self) -> bool {
+        self.ty() == 1
+    }
 
     /// Returns true if the type is an EIP-1559 transaction.
-    fn is_eip1559(&self) -> bool;
+    fn is_eip1559(&self) -> bool {
+        self.ty() == 2
+    }
 
     /// Returns true if the type is an EIP-4844 transaction.
-    fn is_eip4844(&self) -> bool;
+    fn is_eip4844(&self) -> bool {
+        self.ty() == 3
+    }
 
     /// Returns true if the type is an EIP-7702 transaction.
-    fn is_eip7702(&self) -> bool;
+    fn is_eip7702(&self) -> bool {
+        self.ty() == 4
+    }
 }

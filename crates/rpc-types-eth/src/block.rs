@@ -1,20 +1,20 @@
 //! Block RPC types.
 
-use core::ops::{Deref, DerefMut};
-
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
 use alloy_eips::eip4895::Withdrawals;
-pub use alloy_eips::{
-    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
-    BlockNumberOrTag, ForkBlock, RpcBlockHash,
-};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
 use alloy_rlp::Encodable;
+use core::ops::{Deref, DerefMut};
+
+pub use alloy_eips::{
+    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
+    BlockNumberOrTag, ForkBlock, RpcBlockHash,
+};
 
 /// Block representation
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,13 +61,13 @@ impl<T: TransactionResponse, H> Block<T, H> {
     }
 }
 
-impl<T> Block<T> {
+impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
     /// Constructs an "uncle block" from the provided header.
     ///
     /// This function creates a new [`Block`] structure for uncle blocks (ommer blocks),
     /// using the provided [`alloy_consensus::Header`].
-    pub fn uncle_from_header(header: alloy_consensus::Header) -> Self {
-        let block = alloy_consensus::Block::<TxEnvelope>::uncle(header);
+    pub fn uncle_from_header(header: H) -> Self {
+        let block = alloy_consensus::Block::<TxEnvelope, H>::uncle(header);
         let size = U256::from(block.length());
         Self {
             uncles: vec![],
@@ -76,7 +76,9 @@ impl<T> Block<T> {
             withdrawals: None,
         }
     }
+}
 
+impl<T> Block<T> {
     /// Constructs block from a consensus block and `total_difficulty`.
     pub fn from_consensus(block: alloy_consensus::Block<T>, total_difficulty: Option<U256>) -> Self
     where
@@ -109,11 +111,25 @@ pub struct Header<H = alloy_consensus::Header> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: H,
     /// Total difficulty
+    ///
+    /// Note: This field is now effectively deprecated: <https://github.com/ethereum/execution-apis/pull/570>
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub total_difficulty: Option<U256>,
     /// Integer the size of this block in bytes.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub size: Option<U256>,
+}
+
+impl<H> Header<H> {
+    /// Create a new [`Header`] from a sealed consensus header and additional fields.
+    pub fn from_consensus(
+        header: Sealed<H>,
+        total_difficulty: Option<U256>,
+        size: Option<U256>,
+    ) -> Self {
+        let (inner, hash) = header.into_parts();
+        Self { hash, inner, total_difficulty, size }
+    }
 }
 
 impl<H> Deref for Header<H> {
@@ -159,16 +175,6 @@ impl<H: BlockHeader> Header<H> {
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         self.inner.next_block_excess_blob_gas()
-    }
-
-    /// Create a new [`Header`] from a sealed [`alloy_consensus::Header`] and additional fields.
-    pub fn from_consensus(
-        header: Sealed<H>,
-        total_difficulty: Option<U256>,
-        size: Option<U256>,
-    ) -> Self {
-        let (inner, hash) = header.into_parts();
-        Self { hash, inner, total_difficulty, size }
     }
 }
 

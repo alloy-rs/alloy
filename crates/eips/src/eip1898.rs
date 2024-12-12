@@ -3,18 +3,16 @@
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
 use core::{
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Formatter},
     num::ParseIntError,
     str::FromStr,
 };
 
-#[cfg(feature = "serde")]
-use serde::ser::SerializeStruct;
-
 /// A helper struct to store the block number/hash and its parent hash.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlockWithParent {
     /// Parent hash.
     pub parent: B256,
@@ -35,7 +33,7 @@ impl BlockWithParent {
 /// - If true, a RPC call should additionally raise if the block is not in the canonical chain.
 ///
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename = "camelCase"))]
 pub struct RpcBlockHash {
@@ -71,20 +69,33 @@ impl AsRef<B256> for RpcBlockHash {
     }
 }
 
-impl Display for RpcBlockHash {
+impl fmt::Display for RpcBlockHash {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self { block_hash, require_canonical } = self;
         if *require_canonical == Some(true) {
-            write!(f, "canonical ")?
+            f.write_str("canonical ")?;
         }
-        write!(f, "hash {}", block_hash)
+        write!(f, "hash {block_hash}")
+    }
+}
+
+impl fmt::Debug for RpcBlockHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.require_canonical {
+            Some(require_canonical) => f
+                .debug_struct("RpcBlockHash")
+                .field("block_hash", &self.block_hash)
+                .field("require_canonical", &require_canonical)
+                .finish(),
+            None => fmt::Debug::fmt(&self.block_hash, f),
+        }
     }
 }
 
 /// A block Number (or tag - "latest", "earliest", "pending")
 ///
 /// This enum allows users to specify a block in a flexible manner.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum BlockNumberOrTag {
     /// Latest block
     #[default]
@@ -191,7 +202,7 @@ impl FromStr for BlockNumberOrTag {
             "safe" => Self::Safe,
             "earliest" => Self::Earliest,
             "pending" => Self::Pending,
-            _number => {
+            s => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
                     u64::from_str_radix(hex_val, 16)?.into()
                 } else {
@@ -204,14 +215,20 @@ impl FromStr for BlockNumberOrTag {
 
 impl fmt::Display for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Number(x) => write!(f, "0x{x:x}"),
-            Self::Latest => f.write_str("latest"),
-            Self::Finalized => f.write_str("finalized"),
-            Self::Safe => f.write_str("safe"),
-            Self::Earliest => f.write_str("earliest"),
-            Self::Pending => f.write_str("pending"),
+        match *self {
+            Self::Number(x) => write!(f, "number 0x{x:x}"),
+            Self::Latest => f.pad("latest"),
+            Self::Finalized => f.pad("finalized"),
+            Self::Safe => f.pad("safe"),
+            Self::Earliest => f.pad("earliest"),
+            Self::Pending => f.pad("pending"),
         }
+    }
+}
+
+impl fmt::Debug for BlockNumberOrTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 }
 
@@ -238,7 +255,7 @@ impl std::error::Error for ParseBlockNumberError {
     }
 }
 
-impl Display for ParseBlockNumberError {
+impl fmt::Display for ParseBlockNumberError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ParseIntErr(err) => write!(f, "{err}"),
@@ -271,7 +288,7 @@ impl From<HexStringMissingPrefixError> for ParseBlockNumberError {
 #[non_exhaustive]
 pub struct HexStringMissingPrefixError;
 
-impl Display for HexStringMissingPrefixError {
+impl fmt::Display for HexStringMissingPrefixError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("hex string without 0x prefix")
     }
@@ -281,15 +298,13 @@ impl core::error::Error for HexStringMissingPrefixError {}
 
 /// A Block Identifier.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BlockId {
     /// A block hash and an optional bool that defines if it's canonical
     Hash(RpcBlockHash),
     /// A block number
     Number(BlockNumberOrTag),
 }
-
-// === impl BlockId ===
 
 impl BlockId {
     /// Returns the block hash if it is [BlockId::Hash]
@@ -440,6 +455,8 @@ impl serde::Serialize for BlockId {
     where
         S: serde::Serializer,
     {
+        use serde::ser::SerializeStruct;
+
         match self {
             Self::Hash(RpcBlockHash { block_hash, require_canonical }) => {
                 let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
@@ -543,16 +560,20 @@ impl<'de> serde::Deserialize<'de> for BlockId {
     }
 }
 
-impl Display for BlockId {
+impl fmt::Display for BlockId {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Hash(hash) => write!(f, "{}", hash),
-            Self::Number(num) => {
-                if num.is_number() {
-                    return write!(f, "number {}", num);
-                }
-                write!(f, "{}", num)
-            }
+            Self::Hash(hash) => hash.fmt(f),
+            Self::Number(num) => num.fmt(f),
+        }
+    }
+}
+
+impl fmt::Debug for BlockId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(hash) => hash.fmt(f),
+            Self::Number(num) => num.fmt(f),
         }
     }
 }
@@ -568,7 +589,7 @@ pub enum ParseBlockIdError {
     FromHexError(FromHexError),
 }
 
-impl Display for ParseBlockIdError {
+impl fmt::Display for ParseBlockIdError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ParseIntError(err) => write!(f, "{err}"),
@@ -623,6 +644,7 @@ impl FromStr for BlockId {
 /// A number and a hash.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct NumHash {
     /// The number
     pub number: u64,

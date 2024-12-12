@@ -9,8 +9,10 @@
 
 extern crate alloc;
 
-mod account;
-pub use account::Account;
+pub use alloy_trie::TrieAccount;
+
+#[deprecated(since = "0.7.3", note = "use TrieAccount instead")]
+pub use alloy_trie::TrieAccount as Account;
 
 mod block;
 pub use block::{Block, BlockBody, BlockHeader, Header};
@@ -20,7 +22,8 @@ pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpReceipt, TxReceipt,
+    Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
+    RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
 
 pub mod proofs;
