@@ -102,6 +102,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
         match ty {
             TxType::Legacy => self.complete_legacy(),
+            TxType::Seismic => self.complete_legacy(),
             TxType::Eip2930 => self.complete_2930(),
             TxType::Eip1559 => self.complete_1559(),
             TxType::Eip4844 => self.complete_4844(),

@@ -2,8 +2,7 @@
 
 use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
 use alloy_consensus::{
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
-    TxLegacy, TxType, Typed2718, TypedTransaction,
+    transaction::TxSeismic, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
@@ -443,6 +442,24 @@ impl TransactionRequest {
         })
     }
 
+    /// Build a seismic transaction.
+    ///
+    /// Returns an error if required fields are missing.
+    /// Use `complete_legacy` to check if the request can be built.
+    fn build_seismic(self) -> Result<TxSeismic, &'static str> {
+        let checked_to = self.to.ok_or("Missing 'to' field for seismic transaction.")?;
+
+        Ok(TxSeismic {
+            chain_id: self.chain_id.unwrap_or(1),
+            nonce: self.nonce.ok_or("Missing 'nonce' field for legacy transaction.")?,
+            gas_price: self.gas_price.ok_or("Missing 'gas_price' for legacy transaction.")?,
+            gas_limit: self.gas.ok_or("Missing 'gas_limit' for legacy transaction.")?,
+            to: checked_to,
+            value: self.value.unwrap_or_default(),
+            input: self.input.into_input().unwrap_or_default(),
+        })
+    }
+
     fn check_reqd_fields(&self) -> Vec<&'static str> {
         let mut missing = Vec::with_capacity(12);
         if self.nonce.is_none() {
@@ -513,6 +530,16 @@ impl TransactionRequest {
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
             }
+            TxType::Seismic => {
+                self.gas_price = None;
+                self.max_fee_per_gas = None;
+                self.max_priority_fee_per_gas = None;
+                self.max_fee_per_blob_gas = None;
+                self.blob_versioned_hashes = None;
+                self.sidecar = None;
+                self.access_list = None;
+                self.authorization_list = None;
+            }
         }
     }
 
@@ -548,6 +575,7 @@ impl TransactionRequest {
         let pref = self.preferred_type();
         if let Err(missing) = match pref {
             TxType::Legacy => self.complete_legacy(),
+            TxType::Seismic => self.complete_legacy(),
             TxType::Eip2930 => self.complete_2930(),
             TxType::Eip1559 => self.complete_1559(),
             TxType::Eip4844 => self.complete_4844(),
@@ -651,6 +679,7 @@ impl TransactionRequest {
         let pref = self.preferred_type();
         match pref {
             TxType::Legacy => self.complete_legacy().ok(),
+            TxType::Seismic => self.complete_legacy().ok(), // the same as legacy
             TxType::Eip2930 => self.complete_2930().ok(),
             TxType::Eip1559 => self.complete_1559().ok(),
             TxType::Eip4844 => self.complete_4844().ok(),
@@ -670,6 +699,7 @@ impl TransactionRequest {
 
         Ok(match tx_type {
             TxType::Legacy => self.build_legacy().expect("checked)").into(),
+            TxType::Seismic => self.build_legacy().expect("checked)").into(),
             TxType::Eip2930 => self.build_2930().expect("checked)").into(),
             TxType::Eip1559 => self.build_1559().expect("checked)").into(),
             // `sidecar` is a hard requirement since this must be a _sendable_ transaction.
@@ -692,6 +722,7 @@ impl TransactionRequest {
     pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
         match self.preferred_type() {
             TxType::Legacy => self.clone().build_legacy().map(Into::into),
+            TxType::Seismic => self.clone().build_seismic().map(Into::into),
             TxType::Eip2930 => self.clone().build_2930().map(Into::into),
             TxType::Eip1559 => self.clone().build_1559().map(Into::into),
             TxType::Eip4844 => self.clone().build_4844_variant().map(Into::into),
@@ -892,10 +923,29 @@ impl From<TxEip7702> for TransactionRequest {
     }
 }
 
+impl From<TxSeismic> for TransactionRequest {
+    fn from(tx: TxSeismic) -> Self {
+        let ty = tx.ty();
+        let TxSeismic { chain_id, nonce, gas_price, gas_limit, to, value, input } = tx;
+        Self {
+            to: if let TxKind::Call(to) = to { Some(to.into()) } else { None },
+            gas_price: Some(gas_price),
+            gas: Some(gas_limit),
+            value: Some(value),
+            input: input.into(),
+            nonce: Some(nonce),
+            chain_id: Some(chain_id),
+            transaction_type: Some(ty),
+            ..Default::default()
+        }
+    }
+}
+
 impl From<TypedTransaction> for TransactionRequest {
     fn from(tx: TypedTransaction) -> Self {
         match tx {
             TypedTransaction::Legacy(tx) => tx.into(),
+            TypedTransaction::Seismic(tx) => tx.into(),
             TypedTransaction::Eip2930(tx) => tx.into(),
             TypedTransaction::Eip1559(tx) => tx.into(),
             TypedTransaction::Eip4844(tx) => tx.into(),

@@ -15,6 +15,8 @@ use alloy_primitives::{
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
+use super::TxSeismic;
+
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].
 ///
@@ -40,6 +42,8 @@ pub enum TxType {
     Eip4844 = 3,
     /// EIP-7702 transaction type.
     Eip7702 = 4,
+    // Seismic transaction type
+    Seismic = 0x4A,
 }
 
 impl From<TxType> for u8 {
@@ -58,6 +62,7 @@ impl fmt::Display for TxType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Legacy => write!(f, "Legacy"),
+            Self::Seismic => write!(f, "Seismic"),
             Self::Eip2930 => write!(f, "EIP-2930"),
             Self::Eip1559 => write!(f, "EIP-1559"),
             Self::Eip4844 => write!(f, "EIP-4844"),
@@ -95,6 +100,7 @@ impl TryFrom<u8> for TxType {
             2 => Self::Eip1559,
             3 => Self::Eip4844,
             4 => Self::Eip7702,
+            74 => Self::Seismic,
             _ => return Err(Eip2718Error::UnexpectedType(value)),
         })
     }
@@ -164,6 +170,8 @@ impl Typed2718 for TxType {
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     Legacy(Signed<TxLegacy>),
+    /// An untagged [`TxSeismic`].
+    Seismic(Signed<TxSeismic>),
     /// A [`TxEip2930`] tagged with type 1.
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
@@ -224,11 +232,23 @@ impl From<Signed<TxEip7702>> for TxEnvelope {
     }
 }
 
+impl From<Signed<TxSeismic>> for TxEnvelope {
+    fn from(v: Signed<TxSeismic>) -> Self {
+        Self::Seismic(v)
+    }
+}
+
 impl TxEnvelope {
     /// Returns true if the transaction is a legacy transaction.
     #[inline]
     pub const fn is_legacy(&self) -> bool {
         matches!(self, Self::Legacy(_))
+    }
+
+    /// Returns true if the transaction is a seismic transaction.
+    #[inline]
+    pub const fn is_seismic(&self) -> bool {
+        matches!(self, Self::Seismic(_))
     }
 
     /// Returns true if the transaction is an EIP-2930 transaction.
@@ -279,6 +299,14 @@ impl TxEnvelope {
         }
     }
 
+    /// Returns the [`TxSeismic`] variant if the transaction is a legacy transaction.
+    pub const fn as_seismic(&self) -> Option<&Signed<TxSeismic>> {
+        match self {
+            Self::Seismic(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
     /// Returns the [`TxEip2930`] variant if the transaction is an EIP-2930 transaction.
     pub const fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
         match self {
@@ -318,6 +346,7 @@ impl TxEnvelope {
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         match self {
             Self::Legacy(tx) => tx.recover_signer(),
+            Self::Seismic(tx) => tx.recover_signer(),
             Self::Eip2930(tx) => tx.recover_signer(),
             Self::Eip1559(tx) => tx.recover_signer(),
             Self::Eip4844(tx) => tx.recover_signer(),
@@ -329,6 +358,7 @@ impl TxEnvelope {
     pub fn signature_hash(&self) -> B256 {
         match self {
             Self::Legacy(tx) => tx.signature_hash(),
+            Self::Seismic(tx) => tx.signature_hash(),
             Self::Eip2930(tx) => tx.signature_hash(),
             Self::Eip1559(tx) => tx.signature_hash(),
             Self::Eip4844(tx) => tx.signature_hash(),
@@ -340,6 +370,7 @@ impl TxEnvelope {
     pub const fn signature(&self) -> &Signature {
         match self {
             Self::Legacy(tx) => tx.signature(),
+            Self::Seismic(tx) => tx.signature(),
             Self::Eip2930(tx) => tx.signature(),
             Self::Eip1559(tx) => tx.signature(),
             Self::Eip4844(tx) => tx.signature(),
@@ -352,6 +383,7 @@ impl TxEnvelope {
     pub const fn tx_hash(&self) -> &B256 {
         match self {
             Self::Legacy(tx) => tx.hash(),
+            Self::Seismic(tx) => tx.hash(),
             Self::Eip2930(tx) => tx.hash(),
             Self::Eip1559(tx) => tx.hash(),
             Self::Eip4844(tx) => tx.hash(),
@@ -364,6 +396,7 @@ impl TxEnvelope {
     pub const fn tx_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,
+            Self::Seismic(_) => TxType::Seismic,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
@@ -375,6 +408,7 @@ impl TxEnvelope {
     pub fn eip2718_encoded_length(&self) -> usize {
         match self {
             Self::Legacy(t) => t.eip2718_encoded_length(),
+            Self::Seismic(t) => t.eip2718_encoded_length(),
             Self::Eip2930(t) => t.eip2718_encoded_length(),
             Self::Eip1559(t) => t.eip2718_encoded_length(),
             Self::Eip4844(t) => t.eip2718_encoded_length(),
@@ -407,6 +441,7 @@ impl Decodable2718 for TxEnvelope {
             TxType::Eip4844 => Ok(TxEip4844Variant::rlp_decode_signed(buf)?.into()),
             TxType::Eip7702 => Ok(TxEip7702::rlp_decode_signed(buf)?.into()),
             TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
+            TxType::Seismic => Ok(TxSeismic::rlp_decode_signed(buf)?.into()),
         }
     }
 
@@ -419,6 +454,7 @@ impl Encodable2718 for TxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
             Self::Legacy(_) => None,
+            Self::Seismic(_) => Some(TxType::Seismic.into()),
             Self::Eip2930(_) => Some(TxType::Eip2930.into()),
             Self::Eip1559(_) => Some(TxType::Eip1559.into()),
             Self::Eip4844(_) => Some(TxType::Eip4844.into()),
@@ -434,6 +470,7 @@ impl Encodable2718 for TxEnvelope {
         match self {
             // Legacy transactions have no difference between network and 2718
             Self::Legacy(tx) => tx.eip2718_encode(out),
+            Self::Seismic(tx) => tx.eip2718_encode(out),
             Self::Eip2930(tx) => {
                 tx.eip2718_encode(out);
             }
@@ -452,6 +489,7 @@ impl Encodable2718 for TxEnvelope {
     fn trie_hash(&self) -> B256 {
         match self {
             Self::Legacy(tx) => *tx.hash(),
+            Self::Seismic(tx) => *tx.hash(),
             Self::Eip2930(tx) => *tx.hash(),
             Self::Eip1559(tx) => *tx.hash(),
             Self::Eip4844(tx) => *tx.hash(),
@@ -465,6 +503,7 @@ impl Transaction for TxEnvelope {
     fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Legacy(tx) => tx.tx().chain_id(),
+            Self::Seismic(tx) => tx.tx().chain_id(),
             Self::Eip2930(tx) => tx.tx().chain_id(),
             Self::Eip1559(tx) => tx.tx().chain_id(),
             Self::Eip4844(tx) => tx.tx().chain_id(),
@@ -476,6 +515,7 @@ impl Transaction for TxEnvelope {
     fn nonce(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.tx().nonce(),
+            Self::Seismic(tx) => tx.tx().nonce(),
             Self::Eip2930(tx) => tx.tx().nonce(),
             Self::Eip1559(tx) => tx.tx().nonce(),
             Self::Eip4844(tx) => tx.tx().nonce(),
@@ -487,6 +527,7 @@ impl Transaction for TxEnvelope {
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.tx().gas_limit(),
+            Self::Seismic(tx) => tx.tx().gas_limit(),
             Self::Eip2930(tx) => tx.tx().gas_limit(),
             Self::Eip1559(tx) => tx.tx().gas_limit(),
             Self::Eip4844(tx) => tx.tx().gas_limit(),
@@ -498,6 +539,7 @@ impl Transaction for TxEnvelope {
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().gas_price(),
+            Self::Seismic(tx) => tx.tx().gas_price(),
             Self::Eip2930(tx) => tx.tx().gas_price(),
             Self::Eip1559(tx) => tx.tx().gas_price(),
             Self::Eip4844(tx) => tx.tx().gas_price(),
@@ -509,6 +551,7 @@ impl Transaction for TxEnvelope {
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().max_fee_per_gas(),
+            Self::Seismic(tx) => tx.tx().max_fee_per_gas(),
             Self::Eip2930(tx) => tx.tx().max_fee_per_gas(),
             Self::Eip1559(tx) => tx.tx().max_fee_per_gas(),
             Self::Eip4844(tx) => tx.tx().max_fee_per_gas(),
@@ -520,6 +563,7 @@ impl Transaction for TxEnvelope {
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().max_priority_fee_per_gas(),
+            Self::Seismic(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip2930(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip1559(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip4844(tx) => tx.tx().max_priority_fee_per_gas(),
@@ -531,6 +575,7 @@ impl Transaction for TxEnvelope {
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Seismic(tx) => tx.tx().max_fee_per_blob_gas(),
             Self::Eip2930(tx) => tx.tx().max_fee_per_blob_gas(),
             Self::Eip1559(tx) => tx.tx().max_fee_per_blob_gas(),
             Self::Eip4844(tx) => tx.tx().max_fee_per_blob_gas(),
@@ -542,6 +587,7 @@ impl Transaction for TxEnvelope {
     fn priority_fee_or_price(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
+            Self::Seismic(tx) => tx.tx().priority_fee_or_price(),
             Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
             Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
             Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
@@ -552,6 +598,7 @@ impl Transaction for TxEnvelope {
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().effective_gas_price(base_fee),
+            Self::Seismic(tx) => tx.tx().effective_gas_price(base_fee),
             Self::Eip2930(tx) => tx.tx().effective_gas_price(base_fee),
             Self::Eip1559(tx) => tx.tx().effective_gas_price(base_fee),
             Self::Eip4844(tx) => tx.tx().effective_gas_price(base_fee),
@@ -563,6 +610,7 @@ impl Transaction for TxEnvelope {
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.tx().is_dynamic_fee(),
+            Self::Seismic(tx) => tx.tx().is_dynamic_fee(),
             Self::Eip2930(tx) => tx.tx().is_dynamic_fee(),
             Self::Eip1559(tx) => tx.tx().is_dynamic_fee(),
             Self::Eip4844(tx) => tx.tx().is_dynamic_fee(),
@@ -574,6 +622,7 @@ impl Transaction for TxEnvelope {
     fn kind(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.tx().kind(),
+            Self::Seismic(tx) => tx.tx().kind(),
             Self::Eip2930(tx) => tx.tx().kind(),
             Self::Eip1559(tx) => tx.tx().kind(),
             Self::Eip4844(tx) => tx.tx().kind(),
@@ -585,6 +634,7 @@ impl Transaction for TxEnvelope {
     fn is_create(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.tx().is_create(),
+            Self::Seismic(tx) => tx.tx().is_create(),
             Self::Eip2930(tx) => tx.tx().is_create(),
             Self::Eip1559(tx) => tx.tx().is_create(),
             Self::Eip4844(tx) => tx.tx().is_create(),
@@ -596,6 +646,7 @@ impl Transaction for TxEnvelope {
     fn value(&self) -> U256 {
         match self {
             Self::Legacy(tx) => tx.tx().value(),
+            Self::Seismic(tx) => tx.tx().value(),
             Self::Eip2930(tx) => tx.tx().value(),
             Self::Eip1559(tx) => tx.tx().value(),
             Self::Eip4844(tx) => tx.tx().value(),
@@ -607,6 +658,7 @@ impl Transaction for TxEnvelope {
     fn input(&self) -> &Bytes {
         match self {
             Self::Legacy(tx) => tx.tx().input(),
+            Self::Seismic(tx) => tx.tx().input(),
             Self::Eip2930(tx) => tx.tx().input(),
             Self::Eip1559(tx) => tx.tx().input(),
             Self::Eip4844(tx) => tx.tx().input(),
@@ -618,6 +670,7 @@ impl Transaction for TxEnvelope {
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.tx().access_list(),
+            Self::Seismic(tx) => tx.tx().access_list(),
             Self::Eip2930(tx) => tx.tx().access_list(),
             Self::Eip1559(tx) => tx.tx().access_list(),
             Self::Eip4844(tx) => tx.tx().access_list(),
@@ -629,6 +682,7 @@ impl Transaction for TxEnvelope {
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Legacy(tx) => tx.tx().blob_versioned_hashes(),
+            Self::Seismic(tx) => tx.tx().blob_versioned_hashes(),
             Self::Eip2930(tx) => tx.tx().blob_versioned_hashes(),
             Self::Eip1559(tx) => tx.tx().blob_versioned_hashes(),
             Self::Eip4844(tx) => tx.tx().blob_versioned_hashes(),
@@ -639,6 +693,7 @@ impl Transaction for TxEnvelope {
     fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
         match self {
             Self::Legacy(tx) => tx.tx().authorization_list(),
+            Self::Seismic(tx) => tx.tx().authorization_list(),
             Self::Eip2930(tx) => tx.tx().authorization_list(),
             Self::Eip1559(tx) => tx.tx().authorization_list(),
             Self::Eip4844(tx) => tx.tx().authorization_list(),
@@ -651,6 +706,7 @@ impl Typed2718 for TxEnvelope {
     fn ty(&self) -> u8 {
         match self {
             Self::Legacy(tx) => tx.tx().ty(),
+            Self::Seismic(tx) => tx.tx().ty(),
             Self::Eip2930(tx) => tx.tx().ty(),
             Self::Eip1559(tx) => tx.tx().ty(),
             Self::Eip4844(tx) => tx.tx().ty(),
@@ -670,7 +726,7 @@ mod serde_from {
     //!
     //! We serialize via [`TaggedTxEnvelope`] and deserialize via
     //! [`MaybeTaggedTxEnvelope`].
-    use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy};
+    use crate::{transaction::TxSeismic, Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy};
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(untagged)]
@@ -697,6 +753,8 @@ mod serde_from {
         Eip4844(Signed<TxEip4844Variant>),
         #[serde(rename = "0x4", alias = "0x04")]
         Eip7702(Signed<TxEip7702>),
+        #[serde(rename = "0x0", alias = "0x4A")]
+        Seismic(Signed<TxSeismic>),
     }
 
     impl From<MaybeTaggedTxEnvelope> for TxEnvelope {
@@ -712,6 +770,7 @@ mod serde_from {
         fn from(value: TaggedTxEnvelope) -> Self {
             match value {
                 TaggedTxEnvelope::Legacy(signed) => Self::Legacy(signed),
+                TaggedTxEnvelope::Seismic(signed) => Self::Seismic(signed),
                 TaggedTxEnvelope::Eip2930(signed) => Self::Eip2930(signed),
                 TaggedTxEnvelope::Eip1559(signed) => Self::Eip1559(signed),
                 TaggedTxEnvelope::Eip4844(signed) => Self::Eip4844(signed),
@@ -724,6 +783,7 @@ mod serde_from {
         fn from(value: TxEnvelope) -> Self {
             match value {
                 TxEnvelope::Legacy(signed) => Self::Legacy(signed),
+                TxEnvelope::Seismic(signed) => Self::Seismic(signed),
                 TxEnvelope::Eip2930(signed) => Self::Eip2930(signed),
                 TxEnvelope::Eip1559(signed) => Self::Eip1559(signed),
                 TxEnvelope::Eip4844(signed) => Self::Eip4844(signed),
@@ -751,6 +811,7 @@ mod tests {
     #[test]
     fn check_u8_id() {
         assert_eq!(TxType::Legacy, TxType::Legacy as u8);
+        assert_eq!(TxType::Seismic, TxType::Seismic as u8);
         assert_eq!(TxType::Eip2930, TxType::Eip2930 as u8);
         assert_eq!(TxType::Eip1559, TxType::Eip1559 as u8);
         assert_eq!(TxType::Eip7702, TxType::Eip7702 as u8);
@@ -1272,6 +1333,21 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    fn test_serde_roundtrip_seismic() {
+        let tx = TxSeismic {
+            chain_id: Some(1),
+            nonce: 100,
+            gas_price: 3_000_000_000,
+            gas_limit: 50_000,
+            to: Address::default().into(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+        };
+        test_serde_roundtrip(tx);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_from_contract_call() {
         let rpc_tx = r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":"0x3ca295f1dcaf8ac073c543dc0eccf18859f411206df181731e374e9917252931","blockNumber":"0x2","transactionIndex":"0x0","from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#;
 
@@ -1341,6 +1417,7 @@ mod tests {
         assert_eq!(TxType::try_from(2u8).unwrap(), TxType::Eip1559);
         assert_eq!(TxType::try_from(3u8).unwrap(), TxType::Eip4844);
         assert_eq!(TxType::try_from(4u8).unwrap(), TxType::Eip7702);
+        assert_eq!(TxType::try_from(74u8).unwrap(), TxType::Seismic);
         assert!(TxType::try_from(5u8).is_err()); // Invalid case
     }
 
@@ -1351,6 +1428,7 @@ mod tests {
         assert_eq!(TxType::try_from(2u64).unwrap(), TxType::Eip1559);
         assert_eq!(TxType::try_from(3u64).unwrap(), TxType::Eip4844);
         assert_eq!(TxType::try_from(4u64).unwrap(), TxType::Eip7702);
+        assert_eq!(TxType::try_from(74u64).unwrap(), TxType::Seismic);
         assert!(TxType::try_from(10u64).is_err()); // Invalid case
     }
 
@@ -1381,12 +1459,18 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         );
+        let seismic_tx = Signed::new_unchecked(
+            TxSeismic::default(),
+            Signature::test_signature(),
+            Default::default(),
+        );
 
         assert!(matches!(TxEnvelope::from(legacy_tx), TxEnvelope::Legacy(_)));
         assert!(matches!(TxEnvelope::from(eip2930_tx), TxEnvelope::Eip2930(_)));
         assert!(matches!(TxEnvelope::from(eip1559_tx), TxEnvelope::Eip1559(_)));
         assert!(matches!(TxEnvelope::from(eip4844_variant), TxEnvelope::Eip4844(_)));
         assert!(matches!(TxEnvelope::from(eip7702_tx), TxEnvelope::Eip7702(_)));
+        assert!(matches!(TxEnvelope::from(seismic_tx), TxEnvelope::Seismic(_)));
     }
 
     #[test]
@@ -1413,6 +1497,11 @@ mod tests {
         ));
         let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
             TxEip7702::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        let seismic_tx = TxEnvelope::Seismic(Signed::new_unchecked(
+            TxSeismic::default(),
             Signature::test_signature(),
             Default::default(),
         ));
@@ -1446,6 +1535,13 @@ mod tests {
         assert!(!eip7702_tx.is_eip2930());
         assert!(!eip7702_tx.is_eip1559());
         assert!(!eip7702_tx.is_eip4844());
+
+        assert!(seismic_tx.is_seismic());
+        assert!(!seismic_tx.is_legacy());
+        assert!(!seismic_tx.is_eip2930());
+        assert!(!seismic_tx.is_eip1559());
+        assert!(!seismic_tx.is_eip4844());
+        assert!(!seismic_tx.is_eip7702());
     }
 
     #[test]
@@ -1475,11 +1571,17 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
+        let seismic_tx = TxEnvelope::Seismic(Signed::new_unchecked(
+            TxSeismic::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
 
         assert_eq!(legacy_tx.tx_type(), TxType::Legacy);
         assert_eq!(eip2930_tx.tx_type(), TxType::Eip2930);
         assert_eq!(eip1559_tx.tx_type(), TxType::Eip1559);
         assert_eq!(eip4844_tx.tx_type(), TxType::Eip4844);
         assert_eq!(eip7702_tx.tx_type(), TxType::Eip7702);
+        assert_eq!(seismic_tx.tx_type(), TxType::Seismic);
     }
 }

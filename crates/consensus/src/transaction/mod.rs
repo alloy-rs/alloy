@@ -1,7 +1,5 @@
 //! Transaction types.
-
-use crate::Signed;
-use alloc::vec::Vec;
+use crate::Signed; use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
 use core::{any, fmt};
@@ -56,6 +54,9 @@ pub mod serde_bincode_compat {
         eip7702::serde_bincode_compat::*, legacy::serde_bincode_compat::*,
     };
 }
+
+mod seismic;
+pub use seismic::TxSeismic;
 
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
