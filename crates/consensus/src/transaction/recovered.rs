@@ -35,6 +35,14 @@ impl<T> Recovered<T> {
         self.tx
     }
 
+    /// Clone the inner transaction.
+    pub fn clone_tx(&self) -> T
+    where
+        T: Clone,
+    {
+        self.tx.clone()
+    }
+
     /// Dissolve Self to its component
     pub fn into_parts(self) -> (T, Address) {
         (self.tx, self.signer)
