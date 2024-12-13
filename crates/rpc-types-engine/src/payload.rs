@@ -6,7 +6,9 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip7685::Requests, BlockNumHash};
+use alloy_eips::{
+    eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip7685::Requests, BlockNumHash,
+};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
