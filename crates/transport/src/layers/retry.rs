@@ -37,7 +37,7 @@ pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
 }
 
 impl RetryBackoffLayer {
-    /// Creates a new retry layer with the given parameters.
+    /// Creates a new retry layer with the given parameters and the default [RateLimitRetryPolicy].
     pub const fn new(
         max_rate_limit_retries: u32,
         initial_backoff: u64,
@@ -53,9 +53,14 @@ impl RetryBackoffLayer {
 }
 
 impl<P: RetryPolicy> RetryBackoffLayer<P> {
-    /// Sets the retry policy for the layer.
-    pub fn with_policy(self, policy: P) -> Self {
-        Self { policy, ..self }
+    /// Creates a new retry layer with the given parameters and [RetryPolicy].
+    pub const fn new_with_policy(
+        max_rate_limit_retries: u32,
+        initial_backoff: u64,
+        compute_units_per_second: u64,
+        policy: P,
+    ) -> Self {
+        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second, policy }
     }
 }
 
@@ -86,13 +91,13 @@ impl RetryPolicy for RateLimitRetryPolicy {
     }
 }
 
-impl<S> Layer<S> for RetryBackoffLayer {
-    type Service = RetryBackoffService<S>;
+impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
+    type Service = RetryBackoffService<S, P>;
 
     fn layer(&self, inner: S) -> Self::Service {
         RetryBackoffService {
             inner,
-            policy: self.policy,
+            policy: self.policy.clone(),
             max_rate_limit_retries: self.max_rate_limit_retries,
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
@@ -119,18 +124,19 @@ pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     requests_enqueued: Arc<AtomicU32>,
 }
 
-impl<S> RetryBackoffService<S> {
+impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
     const fn initial_backoff(&self) -> Duration {
         Duration::from_millis(self.initial_backoff)
     }
 }
 
-impl<S> Service<RequestPacket> for RetryBackoffService<S>
+impl<S, P> Service<RequestPacket> for RetryBackoffService<S, P>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + 'static
         + Clone,
+    P: RetryPolicy + Clone + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;

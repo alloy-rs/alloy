@@ -1119,9 +1119,10 @@ mod tests {
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rpc_client::BuiltInConnectionString;
+    use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
+    use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
     // For layer transport tests
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
@@ -1425,6 +1426,32 @@ mod tests {
             println!("New block {:?}", header);
             assert!(header.number > 0);
         }
+    }
+
+    #[tokio::test]
+    async fn test_custom_retry_policy() {
+        #[derive(Debug, Clone)]
+        struct CustomPolicy;
+        impl RetryPolicy for CustomPolicy {
+            fn should_retry(&self, _err: &alloy_transport::TransportError) -> bool {
+                true
+            }
+
+            fn backoff_hint(
+                &self,
+                _error: &alloy_transport::TransportError,
+            ) -> Option<std::time::Duration> {
+                None
+            }
+        }
+
+        let retry_layer = RetryBackoffLayer::new_with_policy(10, 100, 10000, CustomPolicy);
+        let anvil = Anvil::new().spawn();
+        let client = RpcClient::builder().layer(retry_layer).http(anvil.endpoint_url());
+
+        let provider = RootProvider::<_, Ethereum>::new(client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[tokio::test]
