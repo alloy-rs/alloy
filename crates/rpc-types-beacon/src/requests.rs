@@ -23,6 +23,7 @@ pub use ssz_requests_conversions::TryFromRequestsError;
 #[cfg(feature = "ssz")]
 mod ssz_requests_conversions {
     use super::*;
+    use crate::requests::TryFromRequestsError::SszDecodeError;
     use alloy_eips::{
         eip6110::{DepositRequest, DEPOSIT_REQUEST_TYPE, MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD},
         eip7002::{WithdrawalRequest, MAX_WITHDRAWAL_REQUESTS_PER_BLOCK, WITHDRAWAL_REQUEST_TYPE},
@@ -45,7 +46,8 @@ mod ssz_requests_conversions {
 
                     match request[0] {
                         DEPOSIT_REQUEST_TYPE => {
-                            let list: Vec<DepositRequest> = Vec::from_ssz_bytes(&request[1..])?;
+                            let list: Vec<DepositRequest> = Vec::from_ssz_bytes(&request[1..])
+                                .map_err(|e| SszDecodeError(DEPOSIT_REQUEST_TYPE, e))?;
                             let size = list.len();
                             if size > MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD {
                                 return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
@@ -56,7 +58,9 @@ mod ssz_requests_conversions {
                             acc.0.extend(list);
                         }
                         WITHDRAWAL_REQUEST_TYPE => {
-                            let list: Vec<WithdrawalRequest> = Vec::from_ssz_bytes(&request[1..])?;
+                            let list: Vec<WithdrawalRequest> =
+                                Vec::from_ssz_bytes(&request[1..])
+                                    .map_err(|e| SszDecodeError(WITHDRAWAL_REQUEST_TYPE, e))?;
                             let size = list.len();
                             if size > MAX_WITHDRAWAL_REQUESTS_PER_BLOCK {
                                 return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
@@ -68,7 +72,8 @@ mod ssz_requests_conversions {
                         }
                         CONSOLIDATION_REQUEST_TYPE => {
                             let list: Vec<ConsolidationRequest> =
-                                Vec::from_ssz_bytes(&request[1..])?;
+                                Vec::from_ssz_bytes(&request[1..])
+                                    .map_err(|e| SszDecodeError(CONSOLIDATION_REQUEST_TYPE, e))?;
                             let size = list.len();
                             if size > MAX_CONSOLIDATION_REQUESTS_PER_BLOCK {
                                 return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
@@ -89,22 +94,20 @@ mod ssz_requests_conversions {
     }
 
     /// Errors possible converting a [Requests] to [ExecutionRequestsV4]
-    #[derive(Debug)]
+    #[derive(Debug, thiserror::Error)]
     pub enum TryFromRequestsError {
         /// One of the Bytes is empty.
+        #[error("empty bytes in requests body")]
         EmptyRequest,
         /// Bytes prefix is not a known EIP-7685 request_type in Electra.
+        #[error("unknown request_type prefix: {0}")]
         UnknownRequestType(u8),
         /// Remaining bytes could not be decoded as SSZ requests_data.
-        SszDecodeError(DecodeError),
+        #[error("ssz error decoding requests_type: {0}")]
+        SszDecodeError(u8, DecodeError),
         /// Requests of request_type exceeds Electra size limits
+        #[error("requests_data payload for request_type {0} exceeds Electra size limit {1}")]
         RequestPayloadSizeExceeded(u8, usize),
-    }
-
-    impl From<DecodeError> for TryFromRequestsError {
-        fn from(value: DecodeError) -> Self {
-            Self::SszDecodeError(value)
-        }
     }
 
     impl From<&ExecutionRequestsV4> for Requests {
