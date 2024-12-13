@@ -1,7 +1,7 @@
 //! Serde functions for encoding SSZ primitives.
 
 /// Serde functions for encoding SSZ primitives using the "canonical JSON mapping" described
-/// in the consensus-specs here: ,https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md#json-mapping>
+/// in the consensus-specs here: <https://github.com/ethereum/consensus-specs/blob/dev/ssz/simple-serialize.md#json-mapping>
 pub mod json {
     /// Serde functions for (de)serializing SSZ `uintN` types as quoted decimal strings.
     ///
@@ -28,7 +28,7 @@ pub mod json {
         use core::{fmt, str::FromStr};
         use serde::{Deserialize, Deserializer, Serializer};
 
-        /// Serialize a `uintN` compatible type [T] as a decimal quoted string.
+        /// Serialize a `uintN` compatible type `T` as a decimal quoted string.
         pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
         where
             T: fmt::Display,
@@ -37,7 +37,7 @@ pub mod json {
             serializer.collect_str(&value.to_string())
         }
 
-        /// Deserialize a decimal quoted string to a `uintN` compatible type [T].
+        /// Deserialize a decimal quoted string to a `uintN` compatible type `T`.
         pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
         where
             D: Deserializer<'de>,
