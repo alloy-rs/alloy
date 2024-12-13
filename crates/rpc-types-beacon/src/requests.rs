@@ -116,7 +116,7 @@ mod ssz_requests_conversions {
             let withdrawals_bytes = val.withdrawals.as_ssz_bytes();
             let consolidations_bytes = val.consolidations.as_ssz_bytes();
 
-            let mut requests = Self::default();
+            let mut requests = Self::with_capacity(3);
             requests.push_request_with_type(DEPOSIT_REQUEST_TYPE, deposit_bytes);
             requests.push_request_with_type(WITHDRAWAL_REQUEST_TYPE, withdrawals_bytes);
             requests.push_request_with_type(CONSOLIDATION_REQUEST_TYPE, consolidations_bytes);
