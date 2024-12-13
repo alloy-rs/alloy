@@ -6,7 +6,9 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{eip4844::BlobTransactionSidecar, eip4895::Withdrawal, BlockNumHash};
+use alloy_eips::{
+    eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip7685::Requests, BlockNumHash,
+};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
@@ -130,23 +132,20 @@ pub struct ExecutionPayloadEnvelopeV3 {
 ///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#engine_getpayloadv4>
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, derive_more::Deref, derive_more::DerefMut)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadEnvelopeV4 {
-    /// Execution payload V3
-    pub execution_payload: ExecutionPayloadV3,
-    /// The expected value to be received by the feeRecipient in wei
-    pub block_value: U256,
-    /// The blobs, commitments, and proofs associated with the executed payload.
-    pub blobs_bundle: BlobsBundleV1,
-    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
-    /// should be used instead of an externally provided one.
-    pub should_override_builder: bool,
+    /// Inner [`ExecutionPayloadEnvelopeV3`].
+    #[deref]
+    #[deref_mut]
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub envelope_inner: ExecutionPayloadEnvelopeV3,
+
     /// A list of opaque [EIP-7685][eip7685] requests.
     ///
     /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
-    pub execution_requests: Vec<Bytes>,
+    pub execution_requests: Requests,
 }
 
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
