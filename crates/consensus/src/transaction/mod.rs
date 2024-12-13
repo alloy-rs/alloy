@@ -42,6 +42,9 @@ pub use rlp::RlpEcdsaTx;
 mod typed;
 pub use typed::TypedTransaction;
 
+mod meta;
+pub use meta::{TransactionInfo, TransactionMeta};
+
 mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
 
