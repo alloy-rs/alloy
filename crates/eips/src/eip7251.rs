@@ -15,6 +15,9 @@ pub static CONSOLIDATION_REQUEST_PREDEPLOY_CODE: Bytes = bytes!("3373fffffffffff
 /// The [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685) request type for consolidation requests.
 pub const CONSOLIDATION_REQUEST_TYPE: u8 = 0x02;
 
+/// The [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251) defined maximum number of consolidation requests per block.
+pub const MAX_CONSOLIDATION_REQUESTS_PER_BLOCK: usize = 2;
+
 /// This structure maps onto the consolidation request object from [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

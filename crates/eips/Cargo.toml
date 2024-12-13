@@ -30,6 +30,7 @@ alloy-rlp = { workspace = true, features = ["derive"] }
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
+cfg_eval = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, optional = true }
@@ -49,8 +50,6 @@ ethereum_ssz = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
-cfg_eval = "0.1.2"
-
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -67,7 +66,7 @@ default = ["std", "kzg-sidecar"]
 std = ["alloy-primitives/std", "alloy-rlp/std",
 "serde?/std", "c-kzg?/std", "once_cell?/std"]
 serde = ["dep:alloy-serde", "dep:serde", "dep:serde_with", "alloy-primitives/serde",
-"c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde"]
+"c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde", "dep:cfg_eval"]
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
 kzg = ["kzg-sidecar", "sha2", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]

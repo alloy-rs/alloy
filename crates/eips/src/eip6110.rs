@@ -4,6 +4,8 @@
 
 use alloy_primitives::{address, Address, FixedBytes, B256};
 #[cfg(feature = "serde")]
+use cfg_eval::cfg_eval;
+#[cfg(feature = "serde")]
 use serde_with::{serde_as, DisplayFromStr};
 
 /// Mainnet deposit contract address.
@@ -13,9 +15,12 @@ pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
 /// The [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685) request type for deposit requests.
 pub const DEPOSIT_REQUEST_TYPE: u8 = 0x00;
 
+/// The [EIP-6110 Consensus Specs](https://github.com/ethereum/consensus-specs/blob/2660af05390aa61f06142e1c6311a3a3c633f720/specs/_features/eip6110/beacon-chain.md#constants) defined maximum payload size.
+pub const MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD: usize = 8192;
+
 /// This structure maps onto the deposit object from [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_as)]
+#[cfg_attr(feature = "serde", cfg_eval, serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]

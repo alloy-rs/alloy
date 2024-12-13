@@ -4,6 +4,8 @@
 
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 #[cfg(feature = "serde")]
+use cfg_eval::cfg_eval;
+#[cfg(feature = "serde")]
 use serde_with::{serde_as, DisplayFromStr};
 
 /// The caller to be used when calling the EIP-7002 withdrawal requests contract at the end of the
@@ -20,11 +22,14 @@ pub static WITHDRAWAL_REQUEST_PREDEPLOY_CODE: Bytes = bytes!("   3373fffffffffff
 /// The [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685) request type for withdrawal requests.
 pub const WITHDRAWAL_REQUEST_TYPE: u8 = 0x01;
 
+/// The [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002) defined maximum withdrawal requests per block.
+pub const MAX_WITHDRAWAL_REQUESTS_PER_BLOCK: usize = 16;
+
 /// Represents an execution layer triggerable withdrawal request.
 ///
 /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_as)]
+#[cfg_attr(feature = "serde", cfg_eval, serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]

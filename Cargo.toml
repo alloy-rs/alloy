@@ -136,6 +136,7 @@ serde_with = { version = "3", default-features = false, features = ["macros"] }
 auto_impl = "1.2"
 base64 = "0.22"
 bimap = "0.6"
+cfg_eval = "0.1.2"
 cfg-if = "1"
 derive_more = { version = "1.0.0", default-features = false }
 home = "0.5"
