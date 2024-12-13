@@ -36,60 +36,83 @@ mod ssz_requests_conversions {
 
     impl TryFrom<&Requests> for ExecutionRequestsV4 {
         type Error = TryFromRequestsError;
+
         fn try_from(value: &Requests) -> Result<Self, Self::Error> {
-            let (deposits, withdrawals, consolidations) = value.iter().try_fold(
-                (Vec::new(), Vec::new(), Vec::new()),
-                |mut acc, request| {
+            #[derive(Default)]
+            struct RequestAccumulator {
+                deposits: Vec<DepositRequest>,
+                withdrawals: Vec<WithdrawalRequest>,
+                consolidations: Vec<ConsolidationRequest>,
+            }
+
+            impl RequestAccumulator {
+                fn parse_request_payload<T>(
+                    payload: &[u8],
+                    max_size: usize,
+                    request_type: u8,
+                ) -> Result<Vec<T>, TryFromRequestsError>
+                where
+                    Vec<T>: Decode + Encode,
+                {
+                    let list: Vec<T> = Vec::from_ssz_bytes(payload)
+                        .map_err(|e| SszDecodeError(request_type, e))?;
+
+                    if list.len() > max_size {
+                        return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
+                            request_type,
+                            list.len(),
+                        ));
+                    }
+
+                    Ok(list)
+                }
+
+                fn accumulate(mut self, request: &[u8]) -> Result<Self, TryFromRequestsError> {
                     if request.is_empty() {
                         return Err(TryFromRequestsError::EmptyRequest);
                     }
 
-                    match request[0] {
+                    let (request_type, payload) =
+                        request.split_first().expect("already checked for empty");
+
+                    match *request_type {
                         DEPOSIT_REQUEST_TYPE => {
-                            let list: Vec<DepositRequest> = Vec::from_ssz_bytes(&request[1..])
-                                .map_err(|e| SszDecodeError(DEPOSIT_REQUEST_TYPE, e))?;
-                            let size = list.len();
-                            if size > MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD {
-                                return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
-                                    DEPOSIT_REQUEST_TYPE,
-                                    size,
-                                ));
-                            }
-                            acc.0.extend(list);
+                            self.deposits = Self::parse_request_payload(
+                                payload,
+                                MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD,
+                                DEPOSIT_REQUEST_TYPE,
+                            )?;
                         }
                         WITHDRAWAL_REQUEST_TYPE => {
-                            let list: Vec<WithdrawalRequest> =
-                                Vec::from_ssz_bytes(&request[1..])
-                                    .map_err(|e| SszDecodeError(WITHDRAWAL_REQUEST_TYPE, e))?;
-                            let size = list.len();
-                            if size > MAX_WITHDRAWAL_REQUESTS_PER_BLOCK {
-                                return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
-                                    WITHDRAWAL_REQUEST_TYPE,
-                                    size,
-                                ));
-                            }
-                            acc.1.extend(list);
+                            self.withdrawals = Self::parse_request_payload(
+                                payload,
+                                MAX_WITHDRAWAL_REQUESTS_PER_BLOCK,
+                                WITHDRAWAL_REQUEST_TYPE,
+                            )?;
                         }
                         CONSOLIDATION_REQUEST_TYPE => {
-                            let list: Vec<ConsolidationRequest> =
-                                Vec::from_ssz_bytes(&request[1..])
-                                    .map_err(|e| SszDecodeError(CONSOLIDATION_REQUEST_TYPE, e))?;
-                            let size = list.len();
-                            if size > MAX_CONSOLIDATION_REQUESTS_PER_BLOCK {
-                                return Err(TryFromRequestsError::RequestPayloadSizeExceeded(
-                                    CONSOLIDATION_REQUEST_TYPE,
-                                    size,
-                                ));
-                            }
-                            acc.2.extend(list);
+                            self.consolidations = Self::parse_request_payload(
+                                payload,
+                                MAX_CONSOLIDATION_REQUESTS_PER_BLOCK,
+                                CONSOLIDATION_REQUEST_TYPE,
+                            )?;
                         }
                         unknown => return Err(TryFromRequestsError::UnknownRequestType(unknown)),
                     }
-                    Ok(acc)
-                },
-            )?;
 
-            Ok(Self { deposits, withdrawals, consolidations })
+                    Ok(self)
+                }
+            }
+
+            let accumulator = value
+                .iter()
+                .try_fold(RequestAccumulator::default(), |acc, request| acc.accumulate(request))?;
+
+            Ok(Self {
+                deposits: accumulator.deposits,
+                withdrawals: accumulator.withdrawals,
+                consolidations: accumulator.consolidations,
+            })
         }
     }
 
