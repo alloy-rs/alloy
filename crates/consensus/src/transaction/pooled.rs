@@ -170,6 +170,51 @@ impl PooledTransaction {
             _ => None,
         }
     }
+
+    /// Attempts to unwrap the transaction into a legacy transaction variant.
+    /// If the transaction is not a legacy transaction, it will return `Err(self)`.
+    pub fn try_into_legacy(self) -> Result<Signed<TxLegacy>, Self> {
+        match self {
+            Self::Legacy(tx) => Ok(tx),
+            tx => Err(tx),
+        }
+    }
+
+    /// Attempts to unwrap the transaction into an EIP-2930 transaction variant.
+    /// If the transaction is not an EIP-2930 transaction, it will return `Err(self)`.
+    pub fn try_into_eip2930(self) -> Result<Signed<TxEip2930>, Self> {
+        match self {
+            Self::Eip2930(tx) => Ok(tx),
+            tx => Err(tx),
+        }
+    }
+
+    /// Attempts to unwrap the transaction into an EIP-1559 transaction variant.
+    /// If the transaction is not an EIP-1559 transaction, it will return `Err(self)`.
+    pub fn try_into_eip1559(self) -> Result<Signed<TxEip1559>, Self> {
+        match self {
+            Self::Eip1559(tx) => Ok(tx),
+            tx => Err(tx),
+        }
+    }
+
+    /// Attempts to unwrap the transaction into an EIP-4844 transaction variant.
+    /// If the transaction is not an EIP-4844 transaction, it will return `Err(self)`.
+    pub fn try_into_eip4844(self) -> Result<Signed<TxEip4844WithSidecar>, Self> {
+        match self {
+            Self::Eip4844(tx) => Ok(tx),
+            tx => Err(tx),
+        }
+    }
+
+    /// Attempts to unwrap the transaction into an EIP-7702 transaction variant.
+    /// If the transaction is not an EIP-7702 transaction, it will return `Err(self)`.
+    pub fn try_into_eip7702(self) -> Result<Signed<TxEip7702>, Self> {
+        match self {
+            Self::Eip7702(tx) => Ok(tx),
+            tx => Err(tx),
+        }
+    }
 }
 
 impl From<Signed<TxLegacy>> for PooledTransaction {
