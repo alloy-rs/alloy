@@ -22,6 +22,11 @@ pub const EMPTY_REQUESTS_HASH: B256 =
 pub struct Requests(Vec<Bytes>);
 
 impl Requests {
+    /// Construct a new [`Requests`] container with the given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
     /// Construct a new [`Requests`] container.
     ///
     /// This function assumes that the request type byte is already included as the
