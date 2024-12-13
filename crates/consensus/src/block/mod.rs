@@ -6,7 +6,7 @@ pub use header::{BlockHeader, Header};
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
-use crate::Typed2718;
+use crate::{Transaction, Typed2718};
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
 use alloy_primitives::B256;
@@ -80,6 +80,14 @@ impl<T> BlockBody<T> {
     }
 }
 
+impl<T: Transaction> BlockBody<T> {
+    /// Returns an iterator over all blob versioned hashes from the block body.
+    #[inline]
+    pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
+        self.eip4844_transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+    }
+}
+
 impl<T: Typed2718> BlockBody<T> {
     /// Returns whether or not the block body contains any blob transactions.
     #[inline]
@@ -93,7 +101,7 @@ impl<T: Typed2718> BlockBody<T> {
         self.transactions.iter().any(|tx| tx.is_eip7702())
     }
 
-    /// Returns an iterator over all blob transactions of the block
+    /// Returns an iterator over all blob transactions of the block.
     #[inline]
     pub fn eip4844_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
         self.transactions.iter().filter(|tx| tx.is_eip4844())
