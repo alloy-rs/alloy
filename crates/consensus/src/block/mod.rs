@@ -34,6 +34,26 @@ impl<T, H> Block<T, H> {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a, T> arbitrary::Arbitrary<'a> for Block<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // first generate up to 100 txs
+        let transactions =
+            (0..100).map(|_| T::arbitrary(u)).collect::<arbitrary::Result<Vec<_>>>()?;
+
+        // then generate up to 2 ommers
+        let ommers = (0..2).map(|_| Header::arbitrary(u)).collect::<arbitrary::Result<Vec<_>>>()?;
+
+        Ok(Self {
+            header: u.arbitrary()?,
+            body: BlockBody { transactions, ommers, withdrawals: u.arbitrary()? },
+        })
+    }
+}
+
 /// A response to `GetBlockBodies`, containing bodies if any bodies were found.
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
