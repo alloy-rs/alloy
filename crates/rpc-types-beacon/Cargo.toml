@@ -43,4 +43,4 @@ ssz = [
     "dep:ethereum_ssz_derive",
     "alloy-rpc-types-engine/ssz",
 ]
-ssz_types = ["dep:ssz_types"]
+ssz_types = ["ssz", "dep:ssz_types"]
