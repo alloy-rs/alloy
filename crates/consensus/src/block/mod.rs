@@ -40,12 +40,15 @@ where
     T: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // first generate up to 100 txs
-        let transactions =
-            (0..100).map(|_| T::arbitrary(u)).collect::<arbitrary::Result<Vec<_>>>()?;
+        // first generate a reasonable amount of txs
+        let transactions = (0..u.int_in_range(0..=100)?)
+            .map(|_| T::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
 
         // then generate up to 2 ommers
-        let ommers = (0..2).map(|_| Header::arbitrary(u)).collect::<arbitrary::Result<Vec<_>>>()?;
+        let ommers = (0..u.int_in_range(0..=1)?)
+            .map(|_| Header::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
 
         Ok(Self {
             header: u.arbitrary()?,
