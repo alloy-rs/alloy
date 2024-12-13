@@ -31,6 +31,9 @@ pub mod ttd;
 pub use ttd::*;
 
 mod other;
+
+pub mod ssz;
+
 pub use other::{OtherFields, WithOtherFields};
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.

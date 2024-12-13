@@ -3,10 +3,6 @@
 //! See also [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110): Supply validator deposits on chain
 
 use alloy_primitives::{address, Address, FixedBytes, B256};
-#[cfg(feature = "serde")]
-use cfg_eval::cfg_eval;
-#[cfg(feature = "serde")]
-use serde_with::{serde_as, DisplayFromStr};
 
 /// Mainnet deposit contract address.
 pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
@@ -20,7 +16,6 @@ pub const MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD: usize = 8192;
 
 /// This structure maps onto the deposit object from [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", cfg_eval, serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -30,12 +25,12 @@ pub struct DepositRequest {
     /// Withdrawal credentials
     pub withdrawal_credentials: B256,
     /// Amount of ether deposited in gwei
-    #[cfg_attr(feature = "serde", serde_as(as = "DisplayFromStr"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::ssz::json::uint"))]
     pub amount: u64,
     /// Deposit signature
     pub signature: FixedBytes<96>,
     /// Deposit index
-    #[cfg_attr(feature = "serde", serde_as(as = "DisplayFromStr"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::ssz::json::uint"))]
     pub index: u64,
 }
 

@@ -3,11 +3,11 @@ use alloy_eips::{
 };
 use serde::{Deserialize, Serialize};
 
+/// An Electra-compatible execution requests payload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
-/// An Electra-compatible execution requests payload.
 pub struct ExecutionRequestsV4 {
     /// The requested deposits.
     pub deposits: Vec<DepositRequest>,
@@ -118,6 +118,13 @@ mod ssz_requests_conversions {
             requests.push_request_with_type(WITHDRAWAL_REQUEST_TYPE, withdrawals_bytes);
             requests.push_request_with_type(CONSOLIDATION_REQUEST_TYPE, consolidations_bytes);
             requests
+        }
+    }
+
+    impl ExecutionRequestsV4 {
+        /// Convert the [ExecutionRequestsV4] into a [Requests].
+        pub fn to_requests(&self) -> Requests {
+            self.into()
         }
     }
 

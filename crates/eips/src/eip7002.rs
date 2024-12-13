@@ -3,10 +3,6 @@
 //! See also [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002): Execution layer triggerable withdrawals
 
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
-#[cfg(feature = "serde")]
-use cfg_eval::cfg_eval;
-#[cfg(feature = "serde")]
-use serde_with::{serde_as, DisplayFromStr};
 
 /// The caller to be used when calling the EIP-7002 withdrawal requests contract at the end of the
 /// block.
@@ -29,7 +25,6 @@ pub const MAX_WITHDRAWAL_REQUESTS_PER_BLOCK: usize = 16;
 ///
 /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", cfg_eval, serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -39,7 +34,7 @@ pub struct WithdrawalRequest {
     /// Validator public key.
     pub validator_pubkey: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
-    #[cfg_attr(feature = "serde", serde_as(as = "DisplayFromStr"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::ssz::json::uint"))]
     pub amount: u64,
 }
 
@@ -47,7 +42,6 @@ pub struct WithdrawalRequest {
 mod tests {
     use super::*;
     use alloy_primitives::hex;
-    use core::str::FromStr;
 
     #[test]
     #[cfg(feature = "serde")]
@@ -66,7 +60,7 @@ mod tests {
         // Verify the deserialized content
         assert_eq!(
             withdrawal_request.source_address,
-            Address::from_str("0xAE0E8770147AaA6828a0D6f642504663F10F7d1E").unwrap()
+            address!("AE0E8770147AaA6828a0D6f642504663F10F7d1E")
         );
         assert_eq!(
             withdrawal_request.validator_pubkey,
