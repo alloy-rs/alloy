@@ -25,13 +25,15 @@ use tokio::time::sleep;
 ///
 /// TransportError: crate::error::TransportError
 #[derive(Debug, Clone)]
-pub struct RetryBackoffLayer {
+pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The initial backoff in milliseconds
     initial_backoff: u64,
     /// The number of compute units per second for this provider
     compute_units_per_second: u64,
+    /// The [RetryPolicy] to use. Defaults to [RateLimitRetryPolicy]
+    policy: P,
 }
 
 impl RetryBackoffLayer {
@@ -41,7 +43,19 @@ impl RetryBackoffLayer {
         initial_backoff: u64,
         compute_units_per_second: u64,
     ) -> Self {
-        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second }
+        Self {
+            max_rate_limit_retries,
+            initial_backoff,
+            compute_units_per_second,
+            policy: RateLimitRetryPolicy,
+        }
+    }
+}
+
+impl<P: RetryPolicy> RetryBackoffLayer<P> {
+    /// Sets the retry policy for the layer.
+    pub fn with_policy(self, policy: P) -> Self {
+        Self { policy, ..self }
     }
 }
 
@@ -78,7 +92,7 @@ impl<S> Layer<S> for RetryBackoffLayer {
     fn layer(&self, inner: S) -> Self::Service {
         RetryBackoffService {
             inner,
-            policy: RateLimitRetryPolicy,
+            policy: self.policy,
             max_rate_limit_retries: self.max_rate_limit_retries,
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
@@ -90,11 +104,11 @@ impl<S> Layer<S> for RetryBackoffLayer {
 /// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
 #[derive(Debug, Clone)]
-pub struct RetryBackoffService<S> {
+pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
     inner: S,
-    /// The retry policy
-    policy: RateLimitRetryPolicy,
+    /// The [RetryPolicy] to use.
+    policy: P,
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The initial backoff in milliseconds
