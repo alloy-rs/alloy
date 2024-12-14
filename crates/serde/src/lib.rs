@@ -18,6 +18,8 @@ use serde::Serializer;
 mod bool;
 pub use self::bool::*;
 
+pub mod displayfromstr;
+
 mod optional;
 pub use self::optional::*;
 
@@ -31,8 +33,6 @@ pub mod ttd;
 pub use ttd::*;
 
 mod other;
-
-pub mod ssz;
 
 pub use other::{OtherFields, WithOtherFields};
 

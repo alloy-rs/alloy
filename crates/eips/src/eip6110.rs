@@ -25,12 +25,12 @@ pub struct DepositRequest {
     /// Withdrawal credentials
     pub withdrawal_credentials: B256,
     /// Amount of ether deposited in gwei
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::ssz::json::uint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::displayfromstr"))]
     pub amount: u64,
     /// Deposit signature
     pub signature: FixedBytes<96>,
     /// Deposit index
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::ssz::json::uint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::displayfromstr"))]
     pub index: u64,
 }
 

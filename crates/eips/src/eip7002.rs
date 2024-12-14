@@ -34,7 +34,7 @@ pub struct WithdrawalRequest {
     /// Validator public key.
     pub validator_pubkey: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::ssz::json::uint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::displayfromstr"))]
     pub amount: u64,
 }
 

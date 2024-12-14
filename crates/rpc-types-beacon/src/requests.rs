@@ -1,3 +1,5 @@
+#[cfg(feature = "ssz")]
+use alloy_eips::eip7685::Requests;
 use alloy_eips::{
     eip6110::DepositRequest, eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
 };
@@ -15,6 +17,14 @@ pub struct ExecutionRequestsV4 {
     pub withdrawals: Vec<WithdrawalRequest>,
     /// The requested consolidations.
     pub consolidations: Vec<ConsolidationRequest>,
+}
+
+impl ExecutionRequestsV4 {
+    /// Convert the [ExecutionRequestsV4] into a [Requests].
+    #[cfg(feature = "ssz")]
+    pub fn to_requests(&self) -> Requests {
+        self.into()
+    }
 }
 
 #[cfg(feature = "ssz")]
@@ -144,13 +154,6 @@ mod ssz_requests_conversions {
             requests.push_request_with_type(WITHDRAWAL_REQUEST_TYPE, withdrawals_bytes);
             requests.push_request_with_type(CONSOLIDATION_REQUEST_TYPE, consolidations_bytes);
             requests
-        }
-    }
-
-    impl ExecutionRequestsV4 {
-        /// Convert the [ExecutionRequestsV4] into a [Requests].
-        pub fn to_requests(&self) -> Requests {
-            self.into()
         }
     }
 
