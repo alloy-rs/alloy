@@ -371,7 +371,7 @@ mod test {
     }
 
     #[test]
-    fn rountrip_encodable_eip1559() {
+    fn roundtrip_encodable_eip1559() {
         let receipts =
             Receipts { receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(Default::default())]] };
 

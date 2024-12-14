@@ -619,7 +619,7 @@ pub trait BlockHeader {
     /// Retrieves the mix hash of the block, if available
     fn mix_hash(&self) -> Option<B256>;
 
-    /// Retrieves the nonce of the block, if avaialble
+    /// Retrieves the nonce of the block, if available
     fn nonce(&self) -> Option<B64>;
 
     /// Retrieves the base fee per gas of the block, if available

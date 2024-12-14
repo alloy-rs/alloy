@@ -258,7 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - More lints and warns and errors
 - Add warns and denies to some lib files
 - Propagate generic error payload
-- Improve id docs and ser
+- Improve id docs and set
 - CI and more rustdoc
 
 ### Other

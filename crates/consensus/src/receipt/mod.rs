@@ -96,7 +96,7 @@ pub trait RlpDecodableReceipt: Sized {
 /// Receipt type that knows its EIP-2718 encoding.
 ///
 /// Main consumer of this trait is [`ReceiptWithBloom`]. It is expected that [`RlpEncodableReceipt`]
-/// implementation for this type produces network encoding whcih is used by [`alloy_rlp::Encodable`]
+/// implementation for this type produces network encoding which is used by [`alloy_rlp::Encodable`]
 /// implementation for [`ReceiptWithBloom`].
 #[auto_impl::auto_impl(&)]
 pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {

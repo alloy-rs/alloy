@@ -357,7 +357,7 @@ impl RlpEcdsaTx for TxEip4844Variant {
         // not a list, we lmow that it is a non-sidecar transaction.
         if Header::decode(needle).is_ok_and(|h| h.list) {
             if let Ok((tx, signature)) = TxEip4844WithSidecar::rlp_decode_with_signature(trial) {
-                // If succesful, we need to consume the trial buffer up to
+                // If successful, we need to consume the trial buffer up to
                 // the same point.
                 *buf = *trial;
                 return Ok((tx.into(), signature));

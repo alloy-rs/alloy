@@ -38,7 +38,7 @@ pub enum PendingTransactionError {
     #[error(transparent)]
     TransportError(#[from] TransportError),
 
-    /// Error occured while getting response from the heartbeat.
+    /// Error occurred while getting response from the heartbeat.
     #[error(transparent)]
     Recv(#[from] oneshot::error::RecvError),
 

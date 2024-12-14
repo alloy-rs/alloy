@@ -207,7 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Joinable transaction fillers ([#426](https://github.com/alloy-rs/alloy/issues/426))
 - `std` feature flag for `alloy-consensus` ([#461](https://github.com/alloy-rs/alloy/issues/461))
 - Rename alloy-rpc-*-types to alloy-rpc-types-* ([#435](https://github.com/alloy-rs/alloy/issues/435))
-- Improve and complete `alloy` prelude crate feature flag compatiblity ([#421](https://github.com/alloy-rs/alloy/issues/421))
+- Improve and complete `alloy` prelude crate feature flag compatibility ([#421](https://github.com/alloy-rs/alloy/issues/421))
 - [providers] Connect_boxed api ([#342](https://github.com/alloy-rs/alloy/issues/342))
 - Enable default features for `coins_bip39` to export default wordlist ([#309](https://github.com/alloy-rs/alloy/issues/309))
 - Move local signers to a separate crate, fix wasm ([#306](https://github.com/alloy-rs/alloy/issues/306))

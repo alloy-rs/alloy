@@ -313,7 +313,7 @@ impl TransactionRequest {
 
     /// Build an EIP-1559 transaction.
     ///
-    /// Returns ane error if required fields are missing. Use `complete_1559` to check if the
+    /// Returns and error if required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
     fn build_1559(self) -> Result<TxEip1559, &'static str> {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip1559 transaction.")?;
@@ -662,7 +662,7 @@ impl TransactionRequest {
     /// Build a [`TypedTransaction`]
     ///
     /// When `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_. Which
-    /// is to say, that it is signable, and the signed versino can be sent to the network.
+    /// is to say, that it is signable, and the signed version can be sent to the network.
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
         let Some(tx_type) = self.buildable_type() else {
             return Err(self);

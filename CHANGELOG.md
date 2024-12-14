@@ -124,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add parent_num_hash to BlockHeader ([#1687](https://github.com/alloy-rs/alloy/issues/1687))
 - Get_block_transaction_count_by_hash in Provider trait ([#1686](https://github.com/alloy-rs/alloy/issues/1686))
 - Get_filter_logs in Provider trait ([#1684](https://github.com/alloy-rs/alloy/issues/1684))
-- Modifiy ReceiptWithBloom and associated impls to use with Reth ([#1672](https://github.com/alloy-rs/alloy/issues/1672))
+- Modify ReceiptWithBloom and associated impls to use with Reth ([#1672](https://github.com/alloy-rs/alloy/issues/1672))
 - [consensus-tx] Enable fast `is_create` ([#1683](https://github.com/alloy-rs/alloy/issues/1683))
 - Add `next_block_base_fee` to `BlockHeader` trait ([#1682](https://github.com/alloy-rs/alloy/issues/1682))
 - Add missing size fn ([#1679](https://github.com/alloy-rs/alloy/issues/1679))
@@ -1232,7 +1232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add section contributions related to spelling ([#764](https://github.com/alloy-rs/alloy/issues/764))
 - Unhide `sol!` wrapper in meta crate ([#654](https://github.com/alloy-rs/alloy/issues/654))
 - Fix docs link in README.md ([#629](https://github.com/alloy-rs/alloy/issues/629))
-- Add required softwares to run tests in Contributing.md ([#627](https://github.com/alloy-rs/alloy/issues/627))
+- Add required software to run tests in Contributing.md ([#627](https://github.com/alloy-rs/alloy/issues/627))
 - Fix 404s on docs site via absolute paths ([#537](https://github.com/alloy-rs/alloy/issues/537))
 - Redirect index.html to alloy meta crate ([#520](https://github.com/alloy-rs/alloy/issues/520))
 - Update txtype docs ([#497](https://github.com/alloy-rs/alloy/issues/497))
@@ -1311,7 +1311,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Derive proptest arbitrary for `Request` ([#732](https://github.com/alloy-rs/alloy/issues/732))
 - Serde for `Request` ([#731](https://github.com/alloy-rs/alloy/issues/731))
 - Derive arbitrary for `Request` ([#729](https://github.com/alloy-rs/alloy/issues/729))
-- Duplicate funtions of  in crates/contract/src/call.rs ([#534](https://github.com/alloy-rs/alloy/issues/534)) ([#726](https://github.com/alloy-rs/alloy/issues/726))
+- Duplicate functions of  in crates/contract/src/call.rs ([#534](https://github.com/alloy-rs/alloy/issues/534)) ([#726](https://github.com/alloy-rs/alloy/issues/726))
 - Rlp enc/dec for requests ([#728](https://github.com/alloy-rs/alloy/issues/728))
 - [consensus, eips] EIP-7002 system contract ([#727](https://github.com/alloy-rs/alloy/issues/727))
 - Beacon sidecar iterator ([#718](https://github.com/alloy-rs/alloy/issues/718))
@@ -1367,7 +1367,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use AnyReceiptEnvelope for AnyNetwork ([#457](https://github.com/alloy-rs/alloy/issues/457))
 - Add AnyReceiptEnvelope ([#446](https://github.com/alloy-rs/alloy/issues/446))
 - Rename alloy-rpc-*-types to alloy-rpc-types-* ([#435](https://github.com/alloy-rs/alloy/issues/435))
-- Improve and complete `alloy` prelude crate feature flag compatiblity ([#421](https://github.com/alloy-rs/alloy/issues/421))
+- Improve and complete `alloy` prelude crate feature flag compatibility ([#421](https://github.com/alloy-rs/alloy/issues/421))
 - [rpc] Add `blockTimestamp` to Log ([#429](https://github.com/alloy-rs/alloy/issues/429))
 - Default to Ethereum network in `alloy-provider` and `alloy-contract` ([#356](https://github.com/alloy-rs/alloy/issues/356))
 - Embed primitives Log in rpc Log and consensus Receipt in rpc Receipt ([#396](https://github.com/alloy-rs/alloy/issues/396))
@@ -1449,8 +1449,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SerializedRequest
 - Docs note and try_as fns
 - Eth-notification and expanded json-rpc
-- Wasm-compatability
-- Wasm-compatability
+- Wasm-compatibility
+- Wasm-compatibility
 - Hyper_http in request builder
 - Hyper support
 - Seal transport
@@ -1581,7 +1581,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add evalir to codeowners
 - Add `rpc-types` to bug form
 - Propagate generic error payload
-- Improve id docs and ser
+- Improve id docs and set
 - Some batch request cleanup
 - Fix cargo hack ci
 - Update link in provider readme

@@ -42,7 +42,7 @@ impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
 type ProviderCallProducer<T, Params, Resp, Output, Map> =
     Box<dyn Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
 
-/// Container for varous types of calls dependent on a block id.
+/// Container for various types of calls dependent on a block id.
 enum WithBlockInner<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,

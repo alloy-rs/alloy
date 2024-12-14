@@ -221,7 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc] Add remaining anvil rpc methods to provider ([#831](https://github.com/alloy-rs/alloy/issues/831))
 - Feat(contract) : add reference to TransactionRequest type ([#828](https://github.com/alloy-rs/alloy/issues/828))
 - Add overrides to eth_estimateGas ([#802](https://github.com/alloy-rs/alloy/issues/802))
-- Duplicate funtions of  in crates/contract/src/call.rs ([#534](https://github.com/alloy-rs/alloy/issues/534)) ([#726](https://github.com/alloy-rs/alloy/issues/726))
+- Duplicate functions of  in crates/contract/src/call.rs ([#534](https://github.com/alloy-rs/alloy/issues/534)) ([#726](https://github.com/alloy-rs/alloy/issues/726))
 - Eth_call builder  ([#645](https://github.com/alloy-rs/alloy/issues/645))
 - Support changing CallBuilder decoders ([#641](https://github.com/alloy-rs/alloy/issues/641))
 - Add set_sidecar to the callbuilder ([#594](https://github.com/alloy-rs/alloy/issues/594))

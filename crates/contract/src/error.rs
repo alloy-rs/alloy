@@ -28,7 +28,7 @@ pub enum Error {
     /// An error occurred interacting with a contract over RPC.
     #[error(transparent)]
     TransportError(#[from] TransportError),
-    /// An error occured while waiting for a pending transaction.
+    /// An error occurred while waiting for a pending transaction.
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
 }

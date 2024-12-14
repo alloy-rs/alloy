@@ -395,7 +395,7 @@ impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BadBlock {
-    /// Underyling block object.
+    /// Underlying block object.
     block: Block,
     /// Hash of the block.
     hash: BlockHash,
