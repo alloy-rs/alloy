@@ -9,13 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.8.0
+- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
 ### Miscellaneous Tasks
 
 - Release 0.7.3
+
+## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
+
+### Miscellaneous Tasks
+
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28

@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
+
+### Bug Fixes
+
+- [`transport`] Allow `RetryPolicy` to be set via layer ([#1790](https://github.com/alloy-rs/alloy/issues/1790))
+
+### Documentation
+
+- Remove stray sentence ([#1804](https://github.com/alloy-rs/alloy/issues/1804))
+- Add note about deprecated total difficulty ([#1784](https://github.com/alloy-rs/alloy/issues/1784))
+
+### Features
+
+- [relay] ExecutionRequestsV4 with eip7685::Requests conversion ([#1787](https://github.com/alloy-rs/alloy/issues/1787))
+- Add requests with capacity ([#1794](https://github.com/alloy-rs/alloy/issues/1794))
+- Add some helper functions for blockbody ([#1796](https://github.com/alloy-rs/alloy/issues/1796))
+- Add info tx types ([#1793](https://github.com/alloy-rs/alloy/issues/1793))
+- Reth's block body fns ([#1775](https://github.com/alloy-rs/alloy/issues/1775))
+- Add serde for `TxType` ([#1780](https://github.com/alloy-rs/alloy/issues/1780))
+
+### Miscellaneous Tasks
+
+- Add arbitrary for block ([#1797](https://github.com/alloy-rs/alloy/issues/1797))
+- Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
+- Reuse v3 envelope in v4 envelope ([#1795](https://github.com/alloy-rs/alloy/issues/1795))
+- Add helpers to unwrap a variant ([#1792](https://github.com/alloy-rs/alloy/issues/1792))
+- Add clone_tx ([#1791](https://github.com/alloy-rs/alloy/issues/1791))
+- Add TxReceipt default helpers ([#1783](https://github.com/alloy-rs/alloy/issues/1783))
+- Add consensus helper methods to BlockHeader ([#1781](https://github.com/alloy-rs/alloy/issues/1781))
+- Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
+
+### Other
+
+- Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
+- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
+
 ## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
 
 ### Bug Fixes
@@ -28,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.8.0
+- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 - Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
 - Introduce recovered and recoverable ([#1768](https://github.com/alloy-rs/alloy/issues/1768))
 - Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
@@ -41,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revert "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1772](https://github.com/alloy-rs/alloy/issues/1772))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
+
+### Miscellaneous Tasks
+
+- Release 0.7.3
+
+## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
 
 ### Bug Fixes
 
@@ -78,7 +120,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.7.3
 - Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
 - Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
 - Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))
