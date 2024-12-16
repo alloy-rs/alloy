@@ -2,8 +2,8 @@
 //!
 //! See also <https://flashbots.github.io/relay-specs/>
 
-use crate::{BlsPublicKey, BlsSignature};
-use alloy_primitives::{Address, Bytes, B256, U256};
+use crate::{requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
@@ -146,6 +146,7 @@ pub struct SignedBidSubmissionV3 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Electra).
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -158,9 +159,9 @@ pub struct SignedBidSubmissionV4 {
     /// The Electra block bundle for this bid.
     pub blobs_bundle: BlobsBundleV1,
     /// The Pectra execution requests for this bid.
-    pub execution_requests: Vec<Bytes>,
+    pub execution_requests: ExecutionRequestsV4,
     /// The EIP-7742 blobs per block for this bid.
-    #[serde(with = "alloy_serde::quantity")]
+    #[serde_as(as = "DisplayFromStr")]
     pub target_blobs_per_block: u64,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
@@ -475,6 +476,15 @@ mod tests {
         let s = r#"{"message":{"slot":"1","parent_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","block_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","builder_pubkey":"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a", "proposer_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a","proposer_fee_recipient":"0xabcf8e0d4e9587369b2301d0790347320302cc09","gas_limit":"1","gas_used":"1","value":"1"},"execution_payload":{"parent_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","fee_recipient":"0xabcf8e0d4e9587369b2301d0790347320302cc09","state_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","receipts_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","logs_bloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prev_randao":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","block_number":"1","gas_limit":"1","gas_used":"1","timestamp":"1","extra_data":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","base_fee_per_gas":"1","block_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","transactions":["0x02f878831469668303f51d843b9ac9f9843b9aca0082520894c93269b73096998db66be0441e836d873535cb9c8894a19041886f000080c001a031cc29234036afbf9a1fb9476b463367cb1f957ac0b919b69bbc798436e604aaa018c4e9c3914eb27aadd0b91e10b18655739fcf8c1fc398763a9f1beecb8ddc86"],"withdrawals":[{"index":"1","validator_index":"1","address":"0xabcf8e0d4e9587369b2301d0790347320302cc09","amount":"32000000000"}], "blob_gas_used":"1","excess_blob_gas":"1"},"blobs_bundle":{"commitments":[],"proofs":[],"blobs":[]},"signature":"0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"}"#;
 
         let bid = serde_json::from_str::<SignedBidSubmissionV3>(s).unwrap();
+        let json: serde_json::Value = serde_json::from_str(s).unwrap();
+        assert_eq!(json, serde_json::to_value(bid).unwrap());
+    }
+
+    #[test]
+    fn electra_bid_submission() {
+        let s = include_str!("examples/relay_builder_block_validation_request_v4.json");
+
+        let bid = serde_json::from_str::<SignedBidSubmissionV4>(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
         assert_eq!(json, serde_json::to_value(bid).unwrap());
     }
