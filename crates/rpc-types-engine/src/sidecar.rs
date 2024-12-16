@@ -72,9 +72,4 @@ impl ExecutionPayloadSidecar {
     pub fn requests_hash(&self) -> Option<B256> {
         self.prague.requests_hash()
     }
-
-    /// Returns the target blobs per block
-    pub fn target_blobs_per_block(&self) -> Option<u64> {
-        self.prague.target_blobs_per_block()
-    }
 }
