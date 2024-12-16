@@ -159,6 +159,5 @@
       }
     ]
   },
-  "target_blobs_per_block": "6",
   "signature": "0xa37afc405ef69e4f331e79f9de77e0df870609898c0e10a1cfcd8162e8771c4e4fefa7258059d83f72fb599b12f1bb73068476ebfaedc65e5a068425693ba272f277d83e11334e87a7d1425a2fbd369ed9351f0eb14fdc8bd93115543f6a4c67"
 }

@@ -108,12 +108,6 @@ struct BeaconPayloadAttributes {
     withdrawals: Option<Vec<Withdrawal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parent_beacon_block_root: Option<B256>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    target_blobs_per_block: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    max_blobs_per_block: Option<u64>,
 }
 
 /// Optimism Payload Attributes
@@ -155,8 +149,6 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: payload_attributes.suggested_fee_recipient,
             withdrawals: payload_attributes.withdrawals.clone(),
             parent_beacon_block_root: payload_attributes.parent_beacon_block_root,
-            target_blobs_per_block: payload_attributes.target_blobs_per_block,
-            max_blobs_per_block: payload_attributes.max_blobs_per_block,
         };
         beacon_api_payload_attributes.serialize(serializer)
     }
@@ -173,8 +165,6 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: beacon_api_payload_attributes.suggested_fee_recipient,
             withdrawals: beacon_api_payload_attributes.withdrawals,
             parent_beacon_block_root: beacon_api_payload_attributes.parent_beacon_block_root,
-            target_blobs_per_block: beacon_api_payload_attributes.target_blobs_per_block,
-            max_blobs_per_block: beacon_api_payload_attributes.max_blobs_per_block,
         })
     }
 }
