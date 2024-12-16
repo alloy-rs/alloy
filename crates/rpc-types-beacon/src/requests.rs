@@ -44,6 +44,14 @@ mod ssz_requests_conversions {
     };
     use ssz::{Decode, DecodeError, Encode};
 
+    impl TryFrom<Requests> for ExecutionRequestsV4 {
+        type Error = TryFromRequestsError;
+
+        fn try_from(value: Requests) -> Result<Self, Self::Error> {
+            Self::try_from(&value)
+        }
+    }
+
     impl TryFrom<&Requests> for ExecutionRequestsV4 {
         type Error = TryFromRequestsError;
 
