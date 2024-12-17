@@ -35,6 +35,7 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
         key_colon = format!("{}: ", key).into();
     }
 
+
     // Try to find the key with '='
     if let Some(pos) = line.find(key_equal.as_ref()) {
         let start = pos + key_equal.len();
@@ -107,6 +108,18 @@ mod tests {
     fn test_extract_value_not_found() {
         let line = "unrelated text";
         assert_eq!(extract_value("key", line), None);
+    }
+
+    #[test]
+    fn test_extract_value_equals_no_space() {
+        let line = "INFO key=";
+        assert_eq!(extract_value("key", line), Some(""))
+    }
+    
+    #[test]
+    fn test_extract_value_colon_no_comma() {
+        let line = "INFO key: value";
+        assert_eq!(extract_value("key", line), Some("value"))
     }
 
     #[test]
