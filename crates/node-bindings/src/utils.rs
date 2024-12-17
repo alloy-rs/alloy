@@ -22,7 +22,10 @@ pub(crate) fn unused_port() -> u16 {
 }
 
 /// Extracts the value for the given key from the line of text.
+/// 
 /// It supports keys that end with '=' or ': '.
+/// For keys end with '=', find value until ' ' is encountered or end of line
+/// For keys end with ':', find value until ',' is encountered or end of line
 pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     let mut key_equal = Cow::from(key);
     let mut key_colon = Cow::from(key);
