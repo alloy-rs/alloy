@@ -22,7 +22,7 @@ pub(crate) fn unused_port() -> u16 {
 }
 
 /// Extracts the value for the given key from the line of text.
-/// 
+///
 /// It supports keys that end with '=' or ': '.
 /// For keys end with '=', find value until ' ' is encountered or end of line
 /// For keys end with ':', find value until ',' is encountered or end of line
@@ -38,7 +38,6 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
         key_colon = format!("{}: ", key).into();
     }
 
-
     // Try to find the key with '='
     if let Some(pos) = line.find(key_equal.as_ref()) {
         let start = pos + key_equal.len();
@@ -51,7 +50,7 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     // If not found, try to find the key with ': '
     if let Some(pos) = line.find(key_colon.as_ref()) {
         let start = pos + key_colon.len();
-        let end = line[start..].find(',').map(|i| start + i ).unwrap_or(line.len()); // Assuming comma or end of line
+        let end = line[start..].find(',').map(|i| start + i).unwrap_or(line.len()); // Assuming comma or end of line
         if start <= line.len() && end <= line.len() {
             return Some(line[start..end].trim());
         }
@@ -118,7 +117,7 @@ mod tests {
         let line = "INFO key=";
         assert_eq!(extract_value("key", line), Some(""))
     }
-    
+
     #[test]
     fn test_extract_value_colon_no_comma() {
         let line = "INFO key: value";
