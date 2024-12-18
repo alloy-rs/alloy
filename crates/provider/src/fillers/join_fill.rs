@@ -13,7 +13,7 @@ use futures::try_join;
 /// This struct is itself a [`TxFiller`], and can be nested to compose any number of fill layers.
 ///
 /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct JoinFill<L, R> {
     left: L,
     right: R,
@@ -136,7 +136,7 @@ where
     N: Network,
 {
     type Provider = FillProvider<Self, P, T, N>;
-    fn layer(&self, inner: P) -> Self::Provider {
-        FillProvider::new(inner, self.clone())
+    fn layer(self, inner: P) -> Self::Provider {
+        FillProvider::new(inner, self)
     }
 }
