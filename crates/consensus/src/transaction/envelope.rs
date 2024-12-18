@@ -673,15 +673,50 @@ mod serde_from {
     use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy};
 
     #[derive(Debug, serde::Deserialize)]
-    #[serde(untagged)]
+    pub(crate) struct UntaggedLegacy {
+        #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
+        pub _ty: Option<()>,
+        #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
+        pub tx: Signed<TxLegacy>,
+    }
+
+    #[derive(Debug)]
     pub(crate) enum MaybeTaggedTxEnvelope {
         Tagged(TaggedTxEnvelope),
-        Untagged {
-            #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
-            _ty: Option<()>,
-            #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
-            tx: Signed<TxLegacy>,
-        },
+        Untagged(UntaggedLegacy),
+    }
+
+    // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`] attempt.
+    // Note: This use private serde API
+    impl<'de> serde::Deserialize<'de> for MaybeTaggedTxEnvelope {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let content =
+                serde::__private::de::Content::deserialize(deserializer)?;
+            let deserializer =
+                serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
+
+            let tagged_res =
+                TaggedTxEnvelope::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Tagged);
+
+            if tagged_res.is_ok() {
+                // return tagged if successful
+                return tagged_res;
+            }
+
+            // proceed with untagged legacy
+            if let Ok(val) =
+                UntaggedLegacy::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Untagged)
+            {
+                return Ok(val);
+            }
+
+            // return the original error, which is more useful than the untagged error
+            //  > "data did not match any variant of untagged enum MaybeTaggedTxEnvelope"
+            tagged_res
+        }
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -703,7 +738,7 @@ mod serde_from {
         fn from(value: MaybeTaggedTxEnvelope) -> Self {
             match value {
                 MaybeTaggedTxEnvelope::Tagged(tagged) => tagged.into(),
-                MaybeTaggedTxEnvelope::Untagged { tx, .. } => Self::Legacy(tx),
+                MaybeTaggedTxEnvelope::Untagged(UntaggedLegacy { tx, .. }) => Self::Legacy(tx),
             }
         }
     }
