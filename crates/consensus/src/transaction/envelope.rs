@@ -731,6 +731,58 @@ mod serde_from {
             }
         }
     }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x7",
+      "hash": "0x2cb125e083d6d2631e3752bd2b3d757bf31bf02bfe21de0ffa46fbb118d28b19",
+      "from": "0x03e5badf3bb1ade1a8f33f94536c827b6531948d",
+      "to": "0x3267e72dc8780a1512fa69da7759ec66f30350e3",
+      "input": "0x62e4c545000000000000000000000000464c8ec100f2f42fb4e42e07e203da2324f9fc6700000000000000000000000003e5badf3bb1ade1a8f33f94536c827b6531948d000000000000000000000000a064bfb5c7e81426647dc20a0d854da1538559dc00000000000000000000000000000000000000000000000000c6f3b40b6c0000",
+      "nonce": "0x2a8",
+      "value": "0x0",
+      "gas": "0x28afd",
+      "gasPrice": "0x23ec5dbc2",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1546d71",
+      "r": "0x809b9f0a1777e376cd1ee5d2f551035643755edf26ea65b7a00c822a24504962",
+      "s": "0x6a57bb8e21fe85c7e092868ee976fef71edca974d8c452fcf303f9180c764f64"
+    }"#;
+
+        let _ = serde_json::from_str::<MaybeTaggedTxEnvelope>(rpc_tx).unwrap();
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx_legacy_chain_id() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x8",
+      "hash": "0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6",
+      "from": "0x8b87f0a788cc14b4f0f374da59920f5017ff05de",
+      "to": "0xcb33aa5b38d79e3d9fa8b10aff38aa201399a7e3",
+      "input": "0xaf7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce80000000000000000000000000000000000000000000000000000000000000064",
+      "nonce": "0x2",
+      "value": "0x0",
+      "gas": "0x2dc6c0",
+      "gasPrice": "0x18ef61d0a",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1c",
+      "r": "0x5e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664",
+      "s": "0x2353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4"
+    }"#;
+
+        let _ = serde_json::from_str::<TaggedTxEnvelope>(rpc_tx).unwrap();
+    }
 }
 
 #[cfg(test)]
@@ -1481,5 +1533,13 @@ mod tests {
         assert_eq!(eip1559_tx.tx_type(), TxType::Eip1559);
         assert_eq!(eip4844_tx.tx_type(), TxType::Eip4844);
         assert_eq!(eip7702_tx.tx_type(), TxType::Eip7702);
+    }
+
+    // <https://sepolia.etherscan.io/getRawTx?tx=0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6>
+    #[test]
+    fn decode_raw_legacy() {
+        let raw = hex!("f8aa0285018ef61d0a832dc6c094cb33aa5b38d79e3d9fa8b10aff38aa201399a7e380b844af7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce800000000000000000000000000000000000000000000000000000000000000641ca05e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664a02353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4");
+        let tx = TxEnvelope::decode_2718(&mut raw.as_ref()).unwrap();
+        assert!(tx.chain_id().is_none());
     }
 }
