@@ -420,10 +420,10 @@ impl<Params: RpcParam> RequestType<Params> {
     /// "pending".
     const fn has_block_tag(&self) -> bool {
         if let Some(block_id) = self.block_id {
-            return match block_id {
-                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)) => false,
-                _ => true,
-            };
+            return !matches!(
+                block_id,
+                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
+            );
         }
         false
     }
