@@ -686,15 +686,14 @@ mod serde_from {
         Untagged(UntaggedLegacy),
     }
 
-    // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`] attempt.
-    // Note: This use private serde API
+    // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`]
+    // attempt. Note: This use private serde API
     impl<'de> serde::Deserialize<'de> for MaybeTaggedTxEnvelope {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            let content =
-                serde::__private::de::Content::deserialize(deserializer)?;
+            let content = serde::__private::de::Content::deserialize(deserializer)?;
             let deserializer =
                 serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
 
