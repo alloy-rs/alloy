@@ -518,7 +518,7 @@ pub mod signed_legacy_serde {
             .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
 
         // Note: some implementations always set the chain id in the response, so we only check if
-        // the differ if both are set.
+        // they differ if both are set.
         if let Some((tx_chain_id, chain_id)) = tx.chain_id().zip(chain_id) {
             if tx_chain_id != chain_id {
                 return Err(serde::de::Error::custom("chain id mismatch"));
