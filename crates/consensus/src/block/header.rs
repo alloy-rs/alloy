@@ -884,10 +884,6 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.timestamp()
     }
 
-    fn extra_data(&self) -> &Bytes {
-        self.inner.extra_data()
-    }
-
     fn mix_hash(&self) -> Option<B256> {
         self.inner.mix_hash()
     }
@@ -918,6 +914,10 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
 
     fn target_blobs_per_block(&self) -> Option<u64> {
         self.inner.target_blobs_per_block()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
     }
 
     fn is_empty(&self) -> bool {

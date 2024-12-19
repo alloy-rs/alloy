@@ -99,6 +99,10 @@ mod tests {
     }
 
     impl Eip2718EncodableReceipt for TypedReceipt {
+        fn eip2718_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
+            self.receipt.rlp_encoded_length_with_bloom(bloom) + (!self.ty.is_legacy()) as usize
+        }
+
         fn eip2718_encode_with_bloom(
             &self,
             bloom: &alloy_primitives::Bloom,
@@ -108,10 +112,6 @@ mod tests {
                 out.put_u8(self.ty.ty());
             }
             self.receipt.rlp_encode_with_bloom(bloom, out);
-        }
-
-        fn eip2718_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
-            self.receipt.rlp_encoded_length_with_bloom(bloom) + (!self.ty.is_legacy()) as usize
         }
     }
 
