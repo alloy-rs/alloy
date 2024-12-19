@@ -158,12 +158,12 @@ impl RlpEcdsaTx for TxLegacy {
         self.rlp_encode_signed(signature, out);
     }
 
-    fn network_encoded_length(&self, signature: &Signature) -> usize {
-        self.rlp_encoded_length_with_signature(signature)
-    }
-
     fn network_header(&self, signature: &Signature) -> Header {
         self.rlp_header_signed(signature)
+    }
+
+    fn network_encoded_length(&self, signature: &Signature) -> usize {
+        self.rlp_encoded_length_with_signature(signature)
     }
 
     fn network_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {

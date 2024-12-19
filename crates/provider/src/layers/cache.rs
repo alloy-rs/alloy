@@ -153,21 +153,6 @@ where
         self.inner.root()
     }
 
-    async fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let req = RequestType::new("eth_getBlockByNumber", (number, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
-    }
-
     async fn get_block_by_hash(
         &self,
         hash: BlockHash,
@@ -181,6 +166,21 @@ where
         let req = RequestType::new("eth_getBlockByHash", (hash, full));
 
         cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_hash(hash, kind)).await
+    }
+
+    async fn get_block_by_number(
+        &self,
+        number: BlockNumberOrTag,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<N::BlockResponse>> {
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
+
+        let req = RequestType::new("eth_getBlockByNumber", (number, full));
+
+        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
     }
 
     fn get_block_receipts(
@@ -223,6 +223,36 @@ where
         }))
     }
 
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getCode", address).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, client, req)
+        })
+    }
+
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+        let req = RequestType::new("eth_getLogs", filter.clone());
+
+        let params_hash = req.params_hash().ok();
+
+        if let Some(hash) = params_hash {
+            if let Some(cached) = self.cache.get_deserialized(&hash)? {
+                return Ok(cached);
+            }
+        }
+
+        let result = self.inner.get_logs(filter).await?;
+
+        let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
+
+        let hash = req.params_hash()?;
+        let _ = self.cache.put(hash, json_str);
+
+        Ok(result)
+    }
+
     fn get_proof(
         &self,
         address: Address,
@@ -248,46 +278,6 @@ where
             let req = RequestType::new("eth_getStorageAt", (address, key)).with_block_id(block_id);
             cache_rpc_call_with_block!(cache, client, req)
         })
-    }
-
-    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
-        let client = self.inner.weak_client();
-        let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::new("eth_getCode", address).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
-        })
-    }
-
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
-        let client = self.inner.weak_client();
-        let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
-
-            cache_rpc_call_with_block!(cache, client, req)
-        })
-    }
-
-    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
-        let req = RequestType::new("eth_getLogs", filter.clone());
-
-        let params_hash = req.params_hash().ok();
-
-        if let Some(hash) = params_hash {
-            if let Some(cached) = self.cache.get_deserialized(&hash)? {
-                return Ok(cached);
-            }
-        }
-
-        let result = self.inner.get_logs(filter).await?;
-
-        let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-
-        let hash = req.params_hash()?;
-        let _ = self.cache.put(hash, json_str);
-
-        Ok(result)
     }
 
     fn get_transaction_by_hash(
@@ -348,6 +338,16 @@ where
 
             Ok(result)
         }))
+    }
+
+    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
+
+            cache_rpc_call_with_block!(cache, client, req)
+        })
     }
 
     fn get_transaction_receipt(
@@ -420,10 +420,10 @@ impl<Params: RpcParam> RequestType<Params> {
     /// "pending".
     const fn has_block_tag(&self) -> bool {
         if let Some(block_id) = self.block_id {
-            match block_id {
-                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
-                _ => return true,
-            }
+            return !matches!(
+                block_id,
+                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
+            );
         }
         false
     }

@@ -263,33 +263,6 @@ where
         self.client().request("debug_getRawHeader", (block,)).await
     }
 
-    async fn debug_trace_transaction_as<R>(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<R>
-    where
-        R: RpcReturn,
-    {
-        self.client().request("debug_traceTransaction", (hash, trace_options)).await
-    }
-
-    async fn debug_trace_transaction_js(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<serde_json::Value> {
-        self.debug_trace_transaction_as::<serde_json::Value>(hash, trace_options).await
-    }
-
-    async fn debug_trace_transaction_call(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<CallFrame> {
-        self.debug_trace_transaction_as::<CallFrame>(hash, trace_options).await
-    }
-
     async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawBlock", (block,)).await
     }
@@ -331,29 +304,31 @@ where
         self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
 
-    async fn debug_trace_block_by_hash(
+    async fn debug_trace_transaction_as<R>(
         &self,
-        block: B256,
+        hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<TraceResult>> {
-        self.client().request("debug_traceBlockByHash", (block, trace_options)).await
+    ) -> TransportResult<R>
+    where
+        R: RpcReturn,
+    {
+        self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
 
-    async fn debug_trace_block_by_number(
+    async fn debug_trace_transaction_js(
         &self,
-        block: BlockNumberOrTag,
+        hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<TraceResult>> {
-        self.client().request("debug_traceBlockByNumber", (block, trace_options)).await
+    ) -> TransportResult<serde_json::Value> {
+        self.debug_trace_transaction_as::<serde_json::Value>(hash, trace_options).await
     }
 
-    async fn debug_trace_call(
+    async fn debug_trace_transaction_call(
         &self,
-        tx: TransactionRequest,
-        block: BlockId,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<GethTrace> {
-        self.client().request("debug_traceCall", (tx, block, trace_options)).await
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<CallFrame> {
+        self.debug_trace_transaction_as::<CallFrame>(hash, trace_options).await
     }
 
     async fn debug_trace_call_as<R>(
@@ -384,6 +359,31 @@ where
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame> {
         self.debug_trace_call_as::<CallFrame>(tx, block, trace_options).await
+    }
+
+    async fn debug_trace_block_by_hash(
+        &self,
+        block: B256,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<Vec<TraceResult>> {
+        self.client().request("debug_traceBlockByHash", (block, trace_options)).await
+    }
+
+    async fn debug_trace_block_by_number(
+        &self,
+        block: BlockNumberOrTag,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<Vec<TraceResult>> {
+        self.client().request("debug_traceBlockByNumber", (block, trace_options)).await
+    }
+
+    async fn debug_trace_call(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<GethTrace> {
+        self.client().request("debug_traceCall", (tx, block, trace_options)).await
     }
 
     async fn debug_trace_call_many(

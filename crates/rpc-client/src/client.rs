@@ -119,11 +119,10 @@ impl<T: Transport + Clone> RpcClient<T> {
     /// This will create a new client if this instance is not the only reference to the inner
     /// client.
     pub fn boxed(self) -> RpcClient<BoxTransport> {
-        let inner = match Arc::try_unwrap(self.0) {
-            Ok(inner) => inner,
-            Err(inner) => RpcClientInner::new(inner.transport.clone(), inner.is_local)
-                .with_id(inner.id.load(Ordering::Relaxed)),
-        };
+        let inner = Arc::try_unwrap(self.0).unwrap_or_else(|inner| {
+            RpcClientInner::new(inner.transport.clone(), inner.is_local)
+                .with_id(inner.id.load(Ordering::Relaxed))
+        });
         RpcClient::from_inner(inner.boxed())
     }
 }
