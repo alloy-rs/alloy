@@ -19,7 +19,7 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 /// Taken from [reth-primitives](https://github.com/paradigmxyz/reth)
 ///
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block<T, H = Header> {
     /// Block header.
     pub header: H,
@@ -31,6 +31,15 @@ impl<T, H> Block<T, H> {
     /// Creates a new empty uncle block.
     pub fn uncle(header: H) -> Self {
         Self { header, body: Default::default() }
+    }
+}
+
+impl<T, H> Default for Block<T, H>
+where
+    H: Default,
+{
+    fn default() -> Self {
+        Self { header: Default::default(), body: Default::default() }
     }
 }
 
