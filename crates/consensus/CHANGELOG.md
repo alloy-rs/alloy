@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2](https://github.com/alloy-rs/alloy/releases/tag/v0.8.2) - 2024-12-19
+
+### Bug Fixes
+
+- Relax legacy chain id check ([#1809](https://github.com/alloy-rs/alloy/issues/1809))
+
+### Miscellaneous Tasks
+
+- Manual default impl ([#1813](https://github.com/alloy-rs/alloy/issues/1813))
+- Misc clippy ([#1812](https://github.com/alloy-rs/alloy/issues/1812))
+
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
 ### Features
@@ -16,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Add arbitrary for block ([#1797](https://github.com/alloy-rs/alloy/issues/1797))
 - Add helpers to unwrap a variant ([#1792](https://github.com/alloy-rs/alloy/issues/1792))
 - Add clone_tx ([#1791](https://github.com/alloy-rs/alloy/issues/1791))

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2](https://github.com/alloy-rs/alloy/releases/tag/v0.8.2) - 2024-12-19
+
+### Bug Fixes
+
+- Relax legacy chain id check ([#1809](https://github.com/alloy-rs/alloy/issues/1809))
+
+### Miscellaneous Tasks
+
+- Manual default impl ([#1813](https://github.com/alloy-rs/alloy/issues/1813))
+- Misc clippy ([#1812](https://github.com/alloy-rs/alloy/issues/1812))
+- Remove difficulty field from admin_nodeInfo response ([#1811](https://github.com/alloy-rs/alloy/issues/1811))
+- Add convenience tryfrom impl ([#1806](https://github.com/alloy-rs/alloy/issues/1806))
+- Derive default ([#1805](https://github.com/alloy-rs/alloy/issues/1805))
+
+### Other
+
+- Add edge case tests for `extract_value` and fix the newly discovered bug ([#1808](https://github.com/alloy-rs/alloy/issues/1808))
+
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
 ### Bug Fixes
@@ -27,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Add arbitrary for block ([#1797](https://github.com/alloy-rs/alloy/issues/1797))
 - Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
 - Reuse v3 envelope in v4 envelope ([#1795](https://github.com/alloy-rs/alloy/issues/1795))

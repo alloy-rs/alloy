@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
 - Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
 
