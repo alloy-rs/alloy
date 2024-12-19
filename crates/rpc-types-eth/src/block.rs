@@ -955,4 +955,11 @@ mod tests {
         let deserialized: BadBlock = serde_json::from_str(&serialized).unwrap();
         assert_eq!(bad_block, deserialized);
     }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn deserde_tenderly_block() {
+        let s = include_str!("../testdata/tenderly.sepolia.json");
+        let _block: Block = serde_json::from_str(s).unwrap();
+    }
 }

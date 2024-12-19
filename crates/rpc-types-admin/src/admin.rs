@@ -66,7 +66,18 @@ pub struct EthProtocolInfo {
     /// The eth network version.
     pub network: u64,
     /// The total difficulty of the host's blockchain.
-    pub difficulty: U256,
+    ///
+    /// NOTE: This is deprecated as total difficulty related fields are being removed from RPC,
+    /// since the merge has long passed.
+    ///
+    /// See changes to geth's `NodeInfo` structs:
+    /// * <https://github.com/ethereum/go-ethereum/pull/30744>
+    /// * <https://github.com/ethereum/go-ethereum/blob/314e18193eeca3e47b627408da47e33132d72aa8/eth/protocols/eth/handler.go#L119-L126>
+    #[deprecated(
+        since = "0.8.2",
+        note = "The difficulty field of admin_nodeInfo is being removed from the response, see https://github.com/ethereum/go-ethereum/pull/30744"
+    )]
+    pub difficulty: Option<U256>,
     /// The Keccak hash of the host's genesis block.
     pub genesis: B256,
     /// The chain configuration for the host's fork rules.
