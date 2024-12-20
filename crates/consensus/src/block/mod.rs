@@ -71,6 +71,7 @@ where
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 #[rlp(trailing)]
 pub struct BlockBody<T> {
     /// Transactions in this block.
