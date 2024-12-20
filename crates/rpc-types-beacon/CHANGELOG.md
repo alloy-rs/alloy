@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.8.2
 - Add convenience tryfrom impl ([#1806](https://github.com/alloy-rs/alloy/issues/1806))
 - Derive default ([#1805](https://github.com/alloy-rs/alloy/issues/1805))
 
