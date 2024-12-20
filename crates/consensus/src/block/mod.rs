@@ -20,6 +20,7 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 ///
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct Block<T, H = Header> {
     /// Block header.
     pub header: H,
