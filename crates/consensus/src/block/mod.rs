@@ -3,14 +3,15 @@
 mod header;
 pub use header::{BlockHeader, Header};
 
-#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub(crate) use header::serde_bincode_compat;
-
 use crate::{Transaction, Typed2718};
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
 use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
+
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(crate) mod serde_bincode_compat;
+
 
 /// Ethereum full block.
 ///
