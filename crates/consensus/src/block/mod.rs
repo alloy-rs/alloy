@@ -33,6 +33,16 @@ impl<T, H> Block<T, H> {
     pub fn uncle(header: H) -> Self {
         Self { header, body: Default::default() }
     }
+
+    /// Consumes the block and returns the header.
+    pub fn into_header(self) -> H {
+        self.header
+    }
+
+    /// Consumes the block and returns the body.
+    pub fn into_body(self) -> BlockBody<T> {
+        self.body
+    }
 }
 
 impl<T, H> Default for Block<T, H>
@@ -41,6 +51,12 @@ where
 {
     fn default() -> Self {
         Self { header: Default::default(), body: Default::default() }
+    }
+}
+
+impl<T, H> From<Block<T, H>> for BlockBody<T> {
+    fn from(block: Block<T, H>) -> Self {
+        block.into_body()
     }
 }
 
