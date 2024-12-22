@@ -3,7 +3,8 @@ use crate::eip4844::Blob;
 use c_kzg::{KzgCommitment, KzgProof};
 
 use crate::eip4844::{
-    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK,
+    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES,
+    MAX_BLOBS_PER_BLOCK,
 };
 use alloc::vec::Vec;
 
@@ -246,8 +247,21 @@ impl SidecarCoder for SimpleCoder {
     fn finish(self, _builder: &mut PartialSidecar) {}
 
     fn decode_all(&mut self, blobs: &[Blob]) -> Option<Vec<Vec<u8>>> {
-        let mut fes =
-            blobs.iter().flat_map(|blob| blob.chunks(32).map(WholeFe::new)).map(Option::unwrap);
+        if blobs.len() > MAX_BLOBS_PER_BLOCK {
+            return None;
+        }
+
+        if blobs
+            .iter()
+            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES).map(WholeFe::new))
+            .any(|fe| fe.is_none())
+        {
+            return None;
+        }
+
+        let mut fes = blobs
+            .iter()
+            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES).map(WholeFe::new_unchecked));
 
         let mut res = Vec::new();
         loop {
