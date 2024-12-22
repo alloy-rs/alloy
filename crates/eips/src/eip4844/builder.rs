@@ -192,10 +192,12 @@ impl SimpleCoder {
     /// Decode an some bytes from an iterator of valid FEs.
     ///
     /// Returns `Ok(Some(data))` if there is some data.
-    /// Returns `Ok(None)` if there is no data (length prefix is 0).
+    /// Returns `Ok(None)` if there is no data (empty iterator, length prefix is 0).
     /// Returns `Err(())` if there is an error.
     fn decode_one<'a>(mut fes: impl Iterator<Item = WholeFe<'a>>) -> Result<Option<Vec<u8>>, ()> {
-        let first = fes.next().ok_or(())?;
+        let Some(first) = fes.next() else {
+            return Ok(None);
+        };
         let mut num_bytes = u64::from_be_bytes(first.as_ref()[1..9].try_into().unwrap()) as usize;
 
         // if no more bytes is 0, we're done
@@ -431,6 +433,17 @@ mod tests {
         data.iter().for_each(|data| SimpleCoder.code(&mut builder, data.as_slice()));
 
         let decoded = SimpleCoder.decode_all(builder.blobs()).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn big_ingestion_strategy() {
+        let data = vec![1u8; 126_945];
+        let builder = SidecarBuilder::<SimpleCoder>::from_slice(&data);
+
+        let blobs = builder.take();
+        let decoded = SimpleCoder.decode_all(&blobs).unwrap().concat();
+
         assert_eq!(decoded, data);
     }
 
