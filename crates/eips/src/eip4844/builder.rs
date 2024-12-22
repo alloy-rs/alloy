@@ -247,7 +247,7 @@ impl SidecarCoder for SimpleCoder {
     fn finish(self, _builder: &mut PartialSidecar) {}
 
     fn decode_all(&mut self, blobs: &[Blob]) -> Option<Vec<Vec<u8>>> {
-        if blobs.len() > MAX_BLOBS_PER_BLOCK {
+        if !matches!(blobs.len(), 1..=MAX_BLOBS_PER_BLOCK) {
             return None;
         }
 
@@ -459,6 +459,17 @@ mod tests {
         let decoded = SimpleCoder.decode_all(&blobs).unwrap().concat();
 
         assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn decode_all_rejects_invalid_data() {
+        assert_eq!(SimpleCoder.decode_all(&[]), None);
+        assert_eq!(
+            SimpleCoder
+                .decode_all(&vec![Blob::new([0u8; BYTES_PER_BLOB]); MAX_BLOBS_PER_BLOCK + 1]),
+            None
+        );
+        assert_eq!(SimpleCoder.decode_all(&[Blob::new([0xffu8; BYTES_PER_BLOB])]), None);
     }
 
     #[test]
