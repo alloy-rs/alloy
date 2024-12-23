@@ -6,10 +6,12 @@ use crate::{eip4844, eip7691};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobScheduleItem {
+    /// Target blob count for the block.
     #[cfg_attr(feature = "serde", serde(rename = "target"))]
-    target_blob_count: u64,
+    pub target_blob_count: u64,
+    /// Max blob count for the block.
     #[cfg_attr(feature = "serde", serde(rename = "max"))]
-    max_blob_count: u64,
+    pub max_blob_count: u64,
 }
 
 /// Configuration for the blob-related calculations.
