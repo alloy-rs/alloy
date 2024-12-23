@@ -47,7 +47,7 @@ impl<T, H> Block<T, H> {
     /// Converts the block's transaction type by applying a function to each transaction.
     ///
     /// Returns the block with the new transaction type.
-    pub fn map_transactions<U>(self, f: impl Fn(T) -> U) -> Block<U, H> {
+    pub fn map_transactions<U>(self, f: impl FnMut(T) -> U) -> Block<U, H> {
         Block {
             header: self.header,
             body: BlockBody {
@@ -63,7 +63,7 @@ impl<T, H> Block<T, H> {
     /// Returns the block with the new transaction type if all transactions were successfully.
     pub fn try_map_transactions<U, E>(
         self,
-        f: impl Fn(T) -> Result<U, E>,
+        f: impl FnMut(T) -> Result<U, E>,
     ) -> Result<Block<U, H>, E> {
         Ok(Block {
             header: self.header,
