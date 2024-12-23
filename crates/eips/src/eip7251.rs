@@ -4,8 +4,7 @@
 
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 
-/// The address for the EIP-7251 consolidation requests contract:
-/// `0x00b42dbF2194e931E80326D950320f7d9Dbeac02`
+/// The address for the EIP-7251 consolidation requests contract.
 pub const CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS: Address =
     address!("0046BB33B9eA028AE30BAd20702e36Ea8099BBbb");
 
