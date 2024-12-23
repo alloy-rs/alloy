@@ -56,6 +56,26 @@ impl<T, H: Default> Default for Block<T, H> {
 }
 
 impl<T, H> Block<T, H> {
+    /// Converts the block's header type by applying a function to it.
+    pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
+        Block {
+            header: f(self.header),
+            uncles: self.uncles,
+            transactions: self.transactions,
+            withdrawals: self.withdrawals,
+        }
+    }
+
+    /// Converts the block's header type by applying a fallible function to it.
+    pub fn try_map_header<U, E>(self, f: impl FnOnce(H) -> Result<U, E>) -> Result<Block<T, U>, E> {
+        Ok(Block {
+            header: f(self.header)?,
+            uncles: self.uncles,
+            transactions: self.transactions,
+            withdrawals: self.withdrawals,
+        })
+    }
+
     /// Converts the block's transaction type by applying a function to each transaction.
     ///
     /// Returns the block with the new transaction type.
