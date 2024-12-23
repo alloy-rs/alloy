@@ -62,6 +62,34 @@ pub struct ConditionalOptions {
     pub timestamp_max: Option<u64>,
 }
 
+impl ConditionalOptions {
+    /// Computes the aggregate cost of the preconditions; total number of storage lookups required
+    pub fn cost(&self) -> u64 {
+        let mut cost = 0;
+        for account in self.known_accounts.values() {
+            // default cost to handle empty accounts
+            cost += 1;
+            match account {
+                AccountStorage::RootHash(_) => {
+                    cost += 1;
+                }
+                AccountStorage::Slots(slots) => {
+                    cost += slots.len() as u64;
+                }
+            }
+        }
+
+        if self.block_number_min.is_some() || self.block_number_max.is_some() {
+            cost += 1;
+        }
+        if self.timestamp_min.is_some() || self.timestamp_max.is_some() {
+            cost += 1;
+        }
+
+        cost
+    }
+}
+
 /// Represents the expected state of an account for a transaction to be conditionally accepted.
 ///
 /// Allows for a user to express their preference of a known prestate at a particular account. Only
@@ -77,6 +105,21 @@ pub enum AccountStorage {
     RootHash(B256),
     /// Explicit storage slots and their expected values.
     Slots(HashMap<U256, B256>),
+}
+
+impl AccountStorage {
+    /// Returns `true` if the account storage is a root hash.
+    pub const fn is_root(&self) -> bool {
+        matches!(self, Self::RootHash(_))
+    }
+
+    /// Returns the slot values if the account storage is a slot map.
+    pub const fn as_slots(&self) -> Option<&HashMap<U256, B256>> {
+        match self {
+            Self::Slots(slots) => Some(slots),
+            _ => None,
+        }
+    }
 }
 
 /// [`UserOperation`] in the spec: Entry Point V0.6
