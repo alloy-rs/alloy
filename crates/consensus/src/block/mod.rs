@@ -43,6 +43,42 @@ impl<T, H> Block<T, H> {
     pub fn into_body(self) -> BlockBody<T> {
         self.body
     }
+
+    /// Converts the block's transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map_transactions<U>(self, f: impl Fn(T) -> U) -> Block<U, H> {
+        Block {
+            header: self.header,
+            body: BlockBody {
+                transactions: self.body.transactions.into_iter().map(f).collect(),
+                ommers: self.body.ommers,
+                withdrawals: self.body.withdrawals,
+            },
+        }
+    }
+
+    /// Converts the block's transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map_transactions<U, E>(
+        self,
+        f: impl Fn(T) -> Result<U, E>,
+    ) -> Result<Block<U, H>, E> {
+        Ok(Block {
+            header: self.header,
+            body: BlockBody {
+                transactions: self
+                    .body
+                    .transactions
+                    .into_iter()
+                    .map(f)
+                    .collect::<Result<_, _>>()?,
+                ommers: self.body.ommers,
+                withdrawals: self.body.withdrawals,
+            },
+        })
+    }
 }
 
 impl<T, H> Default for Block<T, H>
