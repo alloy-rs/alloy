@@ -19,6 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
+alloy-eips = { workspace = true, features = ["serde"] }
 alloy-primitives.workspace = true
 alloy-serde.workspace = true
 alloy-trie = { workspace = true, features = ["ethereum"] }

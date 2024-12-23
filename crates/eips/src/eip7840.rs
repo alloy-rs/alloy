@@ -2,8 +2,18 @@
 
 use crate::{eip4844, eip7691};
 
+/// A single item of `blobSchedule` defined in EIP-7840.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BlobScheduleItem {
+    #[cfg_attr(feature = "serde", serde(rename = "target"))]
+    target_blob_count: u64,
+    #[cfg_attr(feature = "serde", serde(rename = "max"))]
+    max_blob_count: u64,
+}
+
 /// Configuration for the blob-related calculations.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlobParams {
     /// Target blob count for the block.
     pub target_blob_count: u64,

@@ -11,11 +11,11 @@ use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U2
 use alloy_rlp::Encodable;
 use core::ops::{Deref, DerefMut};
 
+use alloy_eips::eip7840::BlobParams;
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_eips::eip7840::BlobParams;
 
 /// Block representation
 #[derive(Clone, Debug, PartialEq, Eq)]
