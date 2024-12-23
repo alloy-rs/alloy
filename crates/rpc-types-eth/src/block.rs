@@ -275,24 +275,14 @@ impl<H: BlockHeader> HeaderResponse for Header<H> {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Clone, Copy, Debug, derive_more::Display)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
     /// A transaction failed sender recovery
-    #[display("transaction failed sender recovery")]
+    #[error("transaction failed sender recovery")]
     InvalidSignature,
     /// A raw block failed to decode
-    #[display("failed to decode raw block {_0}")]
+    #[error("failed to decode raw block {0}")]
     RlpDecodeRawBlock(alloy_rlp::Error),
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for BlockError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::RlpDecodeRawBlock(err) => Some(err),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(feature = "serde")]
