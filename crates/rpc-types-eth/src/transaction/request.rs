@@ -992,7 +992,6 @@ impl From<TxEnvelope> for TransactionRequest {
                     tx.strip_signature().into()
                 }
             }
-            _ => Default::default(),
         }
     }
 }
