@@ -132,7 +132,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            target_blobs_per_block,
         } = self;
 
         Ok(Header {
@@ -157,7 +156,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            target_blobs_per_block,
         })
     }
 
@@ -187,7 +185,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            target_blobs_per_block,
         } = self;
 
         Header {
@@ -212,7 +209,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            target_blobs_per_block,
         }
     }
 }
