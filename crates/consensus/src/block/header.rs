@@ -852,7 +852,6 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.requests_hash()
     }
 
-
     fn extra_data(&self) -> &Bytes {
         self.inner.extra_data()
     }
