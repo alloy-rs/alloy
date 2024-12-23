@@ -18,7 +18,6 @@ use alloy_rlp::{BufMut, Decodable, Encodable};
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
-#[non_exhaustive]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
