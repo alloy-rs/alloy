@@ -482,6 +482,8 @@ pub struct ChainConfig {
     pub deposit_contract_address: Option<Address>,
 
     /// The blob schedule for the chain, indexed by hardfork name.
+    /// 
+    /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub blob_schedule: BTreeMap<String, BlobScheduleItem>,
 }
