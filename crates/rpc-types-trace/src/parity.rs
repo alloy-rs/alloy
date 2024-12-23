@@ -329,6 +329,8 @@ pub struct CreateAction {
     /// The value with which the new account is endowed.
     pub value: U256,
     /// The contract creation method.
+    // Note: this deserializes default because it's not yet supported by all clients
+    #[serde(default)]
     pub creation_method: CreationMethod,
 }
 
