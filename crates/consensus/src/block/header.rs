@@ -1,7 +1,6 @@
 use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 use alloc::vec::Vec;
 use alloy_eips::{
-    calc_blob_gasprice,
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip1898::BlockWithParent,
     eip7840::BlobParams,
@@ -599,8 +598,8 @@ pub trait BlockHeader {
     /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None
-    fn blob_fee(&self) -> Option<u128> {
-        self.excess_blob_gas().map(calc_blob_gasprice)
+    fn blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.excess_blob_gas()?))
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
