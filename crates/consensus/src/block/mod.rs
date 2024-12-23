@@ -44,6 +44,16 @@ impl<T, H> Block<T, H> {
         self.body
     }
 
+    /// Converts the block's header type by applying a function to it.
+    pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
+        Block { header: f(self.header), body: self.body }
+    }
+
+    /// Converts the block's header type by applying a fallible function to it.
+    pub fn try_map_header<U, E>(self, f: impl FnOnce(H) -> Result<U, E>) -> Result<Block<T, U>, E> {
+        Ok(Block { header: f(self.header)?, body: self.body })
+    }
+
     /// Converts the block's transaction type by applying a function to each transaction.
     ///
     /// Returns the block with the new transaction type.
