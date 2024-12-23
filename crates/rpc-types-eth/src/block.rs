@@ -16,7 +16,7 @@ pub use alloy_eips::{
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
 
-/// Block representation
+/// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -51,6 +51,35 @@ impl<T, H: Default> Default for Block<T, H> {
             transactions: Default::default(),
             withdrawals: Default::default(),
         }
+    }
+}
+
+impl<T, H> Block<T, H> {
+    /// Converts the block's transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map_transactions<U>(self, f: impl FnMut(T) -> U) -> Block<U, H> {
+        Block {
+            header: self.header,
+            uncles: self.uncles,
+            transactions: self.transactions.map(f),
+            withdrawals: self.withdrawals,
+        }
+    }
+
+    /// Converts the block's transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map_transactions<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<Block<U, H>, E> {
+        Ok(Block {
+            header: self.header,
+            uncles: self.uncles,
+            transactions: self.transactions.try_map(f)?,
+            withdrawals: self.withdrawals,
+        })
     }
 }
 
