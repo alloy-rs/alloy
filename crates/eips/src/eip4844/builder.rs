@@ -3,7 +3,7 @@ use crate::eip4844::Blob;
 use c_kzg::{KzgCommitment, KzgProof};
 
 use crate::eip4844::{
-    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES,
+    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
     MAX_BLOBS_PER_BLOCK,
 };
 use alloc::vec::Vec;
@@ -255,7 +255,7 @@ impl SidecarCoder for SimpleCoder {
 
         if blobs
             .iter()
-            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES).map(WholeFe::new))
+            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES_USIZE).map(WholeFe::new))
             .any(|fe| fe.is_none())
         {
             return None;
@@ -263,7 +263,7 @@ impl SidecarCoder for SimpleCoder {
 
         let mut fes = blobs
             .iter()
-            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES).map(WholeFe::new_unchecked));
+            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES_USIZE).map(WholeFe::new_unchecked));
 
         let mut res = Vec::new();
         loop {

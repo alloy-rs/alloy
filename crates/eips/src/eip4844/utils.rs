@@ -3,15 +3,15 @@
 //!
 //! [`SidecarCoder`]: crate::eip4844::builder::SidecarCoder
 
-use crate::eip4844::{FIELD_ELEMENT_BYTES, USABLE_BITS_PER_FIELD_ELEMENT};
+use crate::eip4844::{FIELD_ELEMENT_BYTES_USIZE, USABLE_BITS_PER_FIELD_ELEMENT};
 
 /// Determine whether a slice of bytes can be contained in a field element.
 pub const fn fits_in_fe(data: &[u8]) -> bool {
-    const FIELD_ELEMENT_BYTES_PLUS_ONE: usize = FIELD_ELEMENT_BYTES + 1;
+    const FIELD_ELEMENT_BYTES_USIZE_PLUS_ONE: usize = FIELD_ELEMENT_BYTES_USIZE + 1;
 
     match data.len() {
-        FIELD_ELEMENT_BYTES_PLUS_ONE.. => false,
-        FIELD_ELEMENT_BYTES => data[0] & 0b1100_0000 == 0, // first two bits must be zero
+        FIELD_ELEMENT_BYTES_USIZE_PLUS_ONE.. => false,
+        FIELD_ELEMENT_BYTES_USIZE => data[0] & 0b1100_0000 == 0, // first two bits must be zero
         _ => true,
     }
 }
@@ -39,7 +39,7 @@ impl<'a> WholeFe<'a> {
     /// Instantiate a new `WholeFe` from a slice of bytes, if it is a valid
     /// field element.
     pub const fn new(data: &'a [u8]) -> Option<Self> {
-        if data.len() == FIELD_ELEMENT_BYTES && fits_in_fe(data) {
+        if data.len() == FIELD_ELEMENT_BYTES_USIZE && fits_in_fe(data) {
             Some(Self::new_unchecked(data))
         } else {
             None
