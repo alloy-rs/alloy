@@ -1,5 +1,8 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
-use alloy_consensus::{Transaction as TransactionTrait, TxEnvelope, Typed2718, TypedTransaction};
+use alloy_consensus::{
+    Signed, Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702,
+    TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
+};
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip7702::SignedAuthorization,
@@ -209,6 +212,65 @@ pub enum AnyTxEnvelope {
     Ethereum(TxEnvelope),
     /// A transaction with unknown type.
     Unknown(UnknownTxEnvelope),
+}
+
+impl AnyTxEnvelope {
+    /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
+    pub const fn as_envelope(&self) -> Option<&TxEnvelope> {
+        match self {
+            Self::Ethereum(inner) => Some(inner),
+            Self::Unknown(_) => None,
+        }
+    }
+
+    /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
+    /// If the transaction is not an Ethereum transaction, it is returned as an error.
+    pub fn try_into_envelope(self) -> Result<TxEnvelope, Self> {
+        match self {
+            Self::Ethereum(inner) => Ok(inner),
+            this => Err(this),
+        }
+    }
+
+    /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
+    pub const fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
+        match self.as_envelope() {
+            Some(TxEnvelope::Legacy(tx)) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip2930`] variant if the transaction is an EIP-2930 transaction.
+    pub const fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
+        match self.as_envelope() {
+            Some(TxEnvelope::Eip2930(tx)) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip1559`] variant if the transaction is an EIP-1559 transaction.
+    pub const fn as_eip1559(&self) -> Option<&Signed<TxEip1559>> {
+        match self.as_envelope() {
+            Some(TxEnvelope::Eip1559(tx)) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip4844Variant`] variant if the transaction is an EIP-4844 transaction.
+    pub const fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
+        match self.as_envelope() {
+            Some(TxEnvelope::Eip4844(tx)) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip7702`] variant if the transaction is an EIP-7702 transaction.
+    pub const fn as_eip7702(&self) -> Option<&Signed<TxEip7702>> {
+        match self.as_envelope() {
+            Some(TxEnvelope::Eip7702(tx)) => Some(tx),
+            _ => None,
+        }
+    }
 }
 
 impl Typed2718 for AnyTxEnvelope {
