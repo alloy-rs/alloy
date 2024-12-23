@@ -11,6 +11,7 @@ use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U2
 use alloy_rlp::Encodable;
 use core::ops::{Deref, DerefMut};
 
+use alloy_eips::eip7840::BlobParams;
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
@@ -194,16 +195,16 @@ impl<H: BlockHeader> Header<H> {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [Self::next_block_excess_blob_gas]
-    pub fn next_block_blob_fee(&self) -> Option<u128> {
-        self.inner.next_block_blob_fee()
+    pub fn next_block_blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        self.inner.next_block_blob_fee(blob_params)
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
-        self.inner.next_block_excess_blob_gas()
+    pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
+        self.inner.next_block_excess_blob_gas(blob_params)
     }
 }
 

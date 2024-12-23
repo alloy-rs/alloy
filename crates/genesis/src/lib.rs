@@ -12,6 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
+use alloy_eips::eip7840::BlobScheduleItem;
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
@@ -479,6 +480,12 @@ pub struct ChainConfig {
     /// The deposit contract address
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deposit_contract_address: Option<Address>,
+
+    /// The blob schedule for the chain, indexed by hardfork name.
+    ///
+    /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub blob_schedule: BTreeMap<String, BlobScheduleItem>,
 }
 
 impl ChainConfig {
@@ -604,6 +611,7 @@ impl Default for ChainConfig {
             parlia: None,
             extra_fields: Default::default(),
             deposit_contract_address: None,
+            blob_schedule: Default::default(),
         }
     }
 }
