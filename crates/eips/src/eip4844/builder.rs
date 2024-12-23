@@ -4,7 +4,6 @@ use c_kzg::{KzgCommitment, KzgProof};
 
 use crate::eip4844::{
     utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
-    MAX_BLOBS_PER_BLOCK,
 };
 use alloc::vec::Vec;
 
@@ -209,7 +208,8 @@ impl SimpleCoder {
         }
 
         // if there are too many bytes
-        if num_bytes > BYTES_PER_BLOB * MAX_BLOBS_PER_BLOCK {
+        const MAX_ALLOCATION_SIZE: usize = 2_097_152; //2 MiB
+        if num_bytes > MAX_ALLOCATION_SIZE {
             return Err(());
         }
 
@@ -249,7 +249,7 @@ impl SidecarCoder for SimpleCoder {
     fn finish(self, _builder: &mut PartialSidecar) {}
 
     fn decode_all(&mut self, blobs: &[Blob]) -> Option<Vec<Vec<u8>>> {
-        if !matches!(blobs.len(), 1..=MAX_BLOBS_PER_BLOCK) {
+        if blobs.is_empty() {
             return None;
         }
 
@@ -473,11 +473,6 @@ mod tests {
     #[test]
     fn decode_all_rejects_invalid_data() {
         assert_eq!(SimpleCoder.decode_all(&[]), None);
-        assert_eq!(
-            SimpleCoder
-                .decode_all(&vec![Blob::new([0u8; BYTES_PER_BLOB]); MAX_BLOBS_PER_BLOCK + 1]),
-            None
-        );
         assert_eq!(SimpleCoder.decode_all(&[Blob::new([0xffu8; BYTES_PER_BLOB])]), None);
     }
 
