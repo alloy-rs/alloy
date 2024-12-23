@@ -46,6 +46,33 @@ impl<T> BlockTransactions<T> {
         matches!(self, Self::Full(_))
     }
 
+    /// Converts the transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> BlockTransactions<U> {
+        match self {
+            Self::Full(txs) => BlockTransactions::Full(txs.into_iter().map(f).collect()),
+            Self::Hashes(hashes) => BlockTransactions::Hashes(hashes),
+            Self::Uncle => BlockTransactions::Uncle,
+        }
+    }
+
+    /// Converts the transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<BlockTransactions<U>, E> {
+        match self {
+            Self::Full(txs) => {
+                Ok(BlockTransactions::Full(txs.into_iter().map(f).collect::<Result<_, _>>()?))
+            }
+            Self::Hashes(hashes) => Ok(BlockTransactions::Hashes(hashes)),
+            Self::Uncle => Ok(BlockTransactions::Uncle),
+        }
+    }
+
     /// Fallibly cast to a slice of transactions.
     ///
     /// Returns `None` if the enum variant is not `Full`.

@@ -5,36 +5,108 @@ use alloy_primitives::{
     Address, BlockNumber, Bytes, B256, U256,
 };
 
+/// Alias for backwards compat
+#[deprecated(
+    since = "0.8.4",
+    note = "Please use `TransactionConditional` instead of `ConditionalOptions`."
+)]
+pub type ConditionalOptions = TransactionConditional;
+
 /// Options for conditional raw transaction submissions.
-// reference for the implementation <https://notes.ethereum.org/@yoav/SkaX2lS9j#>
-// See also <https://pkg.go.dev/github.com/aK0nshin/go-ethereum/arbitrum_types#ConditionalOptions>
+///
+/// TransactionConditional represents the preconditions that determine the inclusion of the
+/// transaction, enforced out-of-protocol by the sequencer.
+///
+/// See also <https://github.com/ethereum-optimism/op-geth/blob/928070c7fc097362ed2d40a4f72889ba91544931/core/types/transaction_conditional.go#L74-L76>.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct ConditionalOptions {
+pub struct TransactionConditional {
     /// A map of account addresses to their expected storage states.
     /// Each account can have a specified storage root or explicit slot-value pairs.
     #[cfg_attr(feature = "serde", serde(default))]
     pub known_accounts: AddressHashMap<AccountStorage>,
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub block_number_min: Option<BlockNumber>,
     /// The maximal block number at which the transaction can be included.
     /// `None` indicates no maximum block number constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub block_number_max: Option<BlockNumber>,
     /// The minimal timestamp at which the transaction can be included.
     /// `None` indicates no minimum timestamp constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub timestamp_min: Option<u64>,
     /// The maximal timestamp at which the transaction can be included.
     /// `None` indicates no maximum timestamp constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub timestamp_max: Option<u64>,
 }
 
+impl TransactionConditional {
+    /// Computes the aggregate cost of the preconditions; total number of storage lookups required
+    pub fn cost(&self) -> u64 {
+        let mut cost = 0;
+        for account in self.known_accounts.values() {
+            // default cost to handle empty accounts
+            cost += 1;
+            match account {
+                AccountStorage::RootHash(_) => {
+                    cost += 1;
+                }
+                AccountStorage::Slots(slots) => {
+                    cost += slots.len() as u64;
+                }
+            }
+        }
+
+        if self.block_number_min.is_some() || self.block_number_max.is_some() {
+            cost += 1;
+        }
+        if self.timestamp_min.is_some() || self.timestamp_max.is_some() {
+            cost += 1;
+        }
+
+        cost
+    }
+}
+
 /// Represents the expected state of an account for a transaction to be conditionally accepted.
+///
+/// Allows for a user to express their preference of a known prestate at a particular account. Only
+/// one of the storage root or storage slots is allowed to be set. If the storage root is set, then
+/// the user prefers their transaction to only be included in a block if the account's storage root
+/// matches. If the storage slots are set, then the user prefers their transaction to only be
+/// included if the particular storage slot values from state match.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -43,6 +115,21 @@ pub enum AccountStorage {
     RootHash(B256),
     /// Explicit storage slots and their expected values.
     Slots(HashMap<U256, B256>),
+}
+
+impl AccountStorage {
+    /// Returns `true` if the account storage is a root hash.
+    pub const fn is_root(&self) -> bool {
+        matches!(self, Self::RootHash(_))
+    }
+
+    /// Returns the slot values if the account storage is a slot map.
+    pub const fn as_slots(&self) -> Option<&HashMap<U256, B256>> {
+        match self {
+            Self::Slots(slots) => Some(slots),
+            _ => None,
+        }
+    }
 }
 
 /// [`UserOperation`] in the spec: Entry Point V0.6

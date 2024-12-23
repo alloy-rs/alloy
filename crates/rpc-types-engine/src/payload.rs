@@ -699,26 +699,6 @@ pub struct PayloadAttributes {
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3>
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
-    /// Target blob count for the block enabled with V4.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            with = "alloy_serde::quantity::opt",
-            skip_serializing_if = "Option::is_none"
-        )
-    )]
-    pub target_blobs_per_block: Option<u64>,
-    /// Max blob count for block enabled with V4.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            with = "alloy_serde::quantity::opt",
-            skip_serializing_if = "Option::is_none"
-        )
-    )]
-    pub max_blobs_per_block: Option<u64>,
 }
 
 /// This structure contains the result of processing a payload or fork choice update.

@@ -16,7 +16,7 @@ pub use alloy_eips::{
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
 
-/// Block representation
+/// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -51,6 +51,35 @@ impl<T, H: Default> Default for Block<T, H> {
             transactions: Default::default(),
             withdrawals: Default::default(),
         }
+    }
+}
+
+impl<T, H> Block<T, H> {
+    /// Converts the block's transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map_transactions<U>(self, f: impl FnMut(T) -> U) -> Block<U, H> {
+        Block {
+            header: self.header,
+            uncles: self.uncles,
+            transactions: self.transactions.map(f),
+            withdrawals: self.withdrawals,
+        }
+    }
+
+    /// Converts the block's transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map_transactions<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<Block<U, H>, E> {
+        Ok(Block {
+            header: self.header,
+            uncles: self.uncles,
+            transactions: self.transactions.try_map(f)?,
+            withdrawals: self.withdrawals,
+        })
     }
 }
 
@@ -259,10 +288,6 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
         self.inner.requests_hash()
     }
 
-    fn target_blobs_per_block(&self) -> Option<u64> {
-        self.inner.target_blobs_per_block()
-    }
-
     fn extra_data(&self) -> &Bytes {
         self.inner.extra_data()
     }
@@ -275,24 +300,14 @@ impl<H: BlockHeader> HeaderResponse for Header<H> {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Clone, Copy, Debug, derive_more::Display)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
     /// A transaction failed sender recovery
-    #[display("transaction failed sender recovery")]
+    #[error("transaction failed sender recovery")]
     InvalidSignature,
     /// A raw block failed to decode
-    #[display("failed to decode raw block {_0}")]
+    #[error("failed to decode raw block {0}")]
     RlpDecodeRawBlock(alloy_rlp::Error),
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for BlockError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::RlpDecodeRawBlock(err) => Some(err),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(feature = "serde")]
@@ -460,7 +475,6 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
-                    target_blobs_per_block: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -508,7 +522,6 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
-                    target_blobs_per_block: None,
                 },
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
@@ -554,7 +567,6 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
-                    target_blobs_per_block: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -826,7 +838,6 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
-                target_blobs_per_block: None,
             },
             size: None,
             total_difficulty: None,
@@ -873,7 +884,6 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
-                target_blobs_per_block: None,
             },
             total_difficulty: None,
             size: Some(U256::from(505)),
@@ -932,7 +942,6 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
-                    target_blobs_per_block: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),

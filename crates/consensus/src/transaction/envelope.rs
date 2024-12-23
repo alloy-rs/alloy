@@ -295,7 +295,7 @@ impl TxEnvelope {
         }
     }
 
-    /// Returns the [`TxEip4844`] variant if the transaction is an EIP-4844 transaction.
+    /// Returns the [`TxEip4844Variant`] variant if the transaction is an EIP-4844 transaction.
     pub const fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
         match self {
             Self::Eip4844(tx) => Some(tx),

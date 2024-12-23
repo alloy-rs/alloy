@@ -33,6 +33,52 @@ impl<T, H> Block<T, H> {
     pub fn uncle(header: H) -> Self {
         Self { header, body: Default::default() }
     }
+
+    /// Consumes the block and returns the header.
+    pub fn into_header(self) -> H {
+        self.header
+    }
+
+    /// Consumes the block and returns the body.
+    pub fn into_body(self) -> BlockBody<T> {
+        self.body
+    }
+
+    /// Converts the block's transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map_transactions<U>(self, f: impl FnMut(T) -> U) -> Block<U, H> {
+        Block {
+            header: self.header,
+            body: BlockBody {
+                transactions: self.body.transactions.into_iter().map(f).collect(),
+                ommers: self.body.ommers,
+                withdrawals: self.body.withdrawals,
+            },
+        }
+    }
+
+    /// Converts the block's transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map_transactions<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<Block<U, H>, E> {
+        Ok(Block {
+            header: self.header,
+            body: BlockBody {
+                transactions: self
+                    .body
+                    .transactions
+                    .into_iter()
+                    .map(f)
+                    .collect::<Result<_, _>>()?,
+                ommers: self.body.ommers,
+                withdrawals: self.body.withdrawals,
+            },
+        })
+    }
 }
 
 impl<T, H> Default for Block<T, H>
@@ -41,6 +87,12 @@ where
 {
     fn default() -> Self {
         Self { header: Default::default(), body: Default::default() }
+    }
+}
+
+impl<T, H> From<Block<T, H>> for BlockBody<T> {
+    fn from(block: Block<T, H>) -> Self {
+        block.into_body()
     }
 }
 
