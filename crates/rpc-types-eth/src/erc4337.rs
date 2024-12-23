@@ -18,23 +18,57 @@ pub struct ConditionalOptions {
     pub known_accounts: AddressHashMap<AccountStorage>,
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub block_number_min: Option<BlockNumber>,
     /// The maximal block number at which the transaction can be included.
     /// `None` indicates no maximum block number constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub block_number_max: Option<BlockNumber>,
     /// The minimal timestamp at which the transaction can be included.
     /// `None` indicates no minimum timestamp constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub timestamp_min: Option<u64>,
     /// The maximal timestamp at which the transaction can be included.
     /// `None` indicates no maximum timestamp constraint.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub timestamp_max: Option<u64>,
 }
 
 /// Represents the expected state of an account for a transaction to be conditionally accepted.
+///
+/// Allows for a user to express their preference of a known prestate at a particular account. Only
+/// one of the storage root or storage slots is allowed to be set. If the storage root is set, then
+/// the user prefers their transaction to only be included in a block if the account's storage root
+/// matches. If the storage slots are set, then the user prefers their transaction to only be
+/// included if the particular storage slot values from state match.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
