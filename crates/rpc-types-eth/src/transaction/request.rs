@@ -1099,14 +1099,11 @@ impl From<Option<Bytes>> for TransactionInput {
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, derive_more::Display)]
-#[display("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[derive(Debug, Default, thiserror::Error)]
+#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
 #[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
-
-#[cfg(feature = "std")]
-impl std::error::Error for TransactionInputError {}
 
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]
