@@ -8,6 +8,7 @@ use alloy_eips::{
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
 };
+use alloy_eips::eip7840::BlobParams;
 use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
@@ -610,7 +611,7 @@ pub trait BlockHeader {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    fn next_block_excess_blob_gas(&self) -> Option<u64> {
+    fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
         let excess_blob_gas = self.excess_blob_gas()?;
         let blob_gas_used = self.blob_gas_used()?;
 
@@ -622,8 +623,8 @@ pub trait BlockHeader {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [BlockHeader::next_block_excess_blob_gas]
-    fn next_block_blob_fee(&self) -> Option<u128> {
-        Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas()?))
+    fn next_block_blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas(blob_params)?))
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
