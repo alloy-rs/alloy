@@ -97,7 +97,8 @@ impl PartialSidecar {
 
     /// Get a mutable reference to the current blob.
     fn current_blob_mut(&mut self) -> &mut Blob {
-        self.blobs.last_mut().expect("never empty")
+        let last_unused_blob_index = self.fe / FIELD_ELEMENTS_PER_BLOB as usize;
+        self.blobs.get_mut(last_unused_blob_index).expect("never empty")
     }
 
     /// Get a mutable reference to the field element at the given index, in
