@@ -160,7 +160,6 @@ impl Typed2718 for TxType {
 )]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[doc(alias = "TransactionEnvelope")]
-#[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     Legacy(Signed<TxLegacy>),

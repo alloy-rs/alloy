@@ -45,3 +45,5 @@ pub mod eip7685;
 pub mod eip7691;
 
 pub mod eip7702;
+
+pub mod eip7840;
