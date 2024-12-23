@@ -126,6 +126,7 @@ impl PartialSidecar {
     /// If the data is >=32 bytes. Or if there are not enough free FEs to
     /// encode the data.
     pub fn ingest_partial_fe(&mut self, data: &[u8]) {
+        self.alloc_fes(1);
         let fe = self.next_unused_fe_mut();
         fe[1..1 + data.len()].copy_from_slice(data);
         self.fe += 1;
@@ -443,7 +444,14 @@ mod tests {
     #[test]
     fn ingestion_strategy() {
         let mut builder = PartialSidecar::new();
-        let data = &[vec![1u8; 32], vec![2u8; 372], vec![3u8; 17], vec![4u8; 5]];
+        let data = &[
+            vec![1u8; 32],
+            vec![2u8; 372],
+            vec![3u8; 17],
+            vec![4u8; 5],
+            vec![5u8; 126_945],
+            vec![6u8; 2 * 126_945],
+        ];
 
         data.iter().for_each(|data| SimpleCoder.code(&mut builder, data.as_slice()));
 
