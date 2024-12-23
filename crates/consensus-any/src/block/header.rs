@@ -107,6 +107,126 @@ pub struct AnyHeader {
     pub target_blobs_per_block: Option<u64>,
 }
 
+impl AnyHeader {
+    /// Attempts to convert this header into a `Header`.
+    ///
+    /// This can fail if the header is missing required fields:
+    /// - nonce
+    /// - mix_hash
+    ///
+    /// If the conversion fails, the original [`AnyHeader`] is returned.
+    pub fn try_into_header(self) -> Result<Header, Self> {
+        if self.nonce.is_none() || self.mix_hash.is_none() {
+            return Err(self);
+        }
+
+        let Self {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+            target_blobs_per_block,
+        } = self;
+
+        Ok(Header {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash: mix_hash.unwrap(),
+            nonce: nonce.unwrap(),
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+            target_blobs_per_block,
+        })
+    }
+
+    /// Converts this header into a [`Header`] with default values for missing mandatory fields:
+    /// - mix_hash
+    /// - nonce
+    pub fn into_header_with_defaults(self) -> Header {
+        let Self {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+            target_blobs_per_block,
+        } = self;
+
+        Header {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash: mix_hash.unwrap_or_default(),
+            nonce: nonce.unwrap_or_default(),
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+            target_blobs_per_block,
+        }
+    }
+}
+
 impl BlockHeader for AnyHeader {
     fn parent_hash(&self) -> B256 {
         self.parent_hash
@@ -248,5 +368,13 @@ impl From<Header> for AnyHeader {
             requests_hash,
             target_blobs_per_block,
         }
+    }
+}
+
+impl TryFrom<AnyHeader> for Header {
+    type Error = AnyHeader;
+
+    fn try_from(value: AnyHeader) -> Result<Self, Self::Error> {
+        value.try_into_header()
     }
 }
