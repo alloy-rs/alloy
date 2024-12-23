@@ -35,6 +35,19 @@ impl OtherFields {
         Self { inner }
     }
 
+    /// Inserts a given value as serialized [`serde_json::Value`] into the map.
+    pub fn insert_value(&mut self, key: String, value: impl Serialize) -> serde_json::Result<()> {
+        self.inner.insert(key, serde_json::to_value(value)?);
+        Ok(())
+    }
+
+    /// Inserts a given value as serialized [`serde_json::Value`] into the map and returns the
+    /// updated instance.
+    pub fn with_value(mut self, key: String, value: impl Serialize) -> serde_json::Result<Self> {
+        self.insert_value(key, value)?;
+        Ok(self)
+    }
+
     /// Deserialized this type into another container type.
     pub fn deserialize_as<T: DeserializeOwned>(&self) -> serde_json::Result<T> {
         serde_json::from_value(Value::Object(self.inner.clone().into_iter().collect()))
