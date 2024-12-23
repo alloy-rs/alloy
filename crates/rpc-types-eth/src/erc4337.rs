@@ -5,13 +5,23 @@ use alloy_primitives::{
     Address, BlockNumber, Bytes, B256, U256,
 };
 
+/// Alias for backwards compat
+#[deprecated(
+    since = "0.8.4",
+    note = "Please use `TransactionConditional` instead of `ConditionalOptions`."
+)]
+pub type ConditionalOptions = TransactionConditional;
+
 /// Options for conditional raw transaction submissions.
-// reference for the implementation <https://notes.ethereum.org/@yoav/SkaX2lS9j#>
-// See also <https://pkg.go.dev/github.com/aK0nshin/go-ethereum/arbitrum_types#ConditionalOptions>
+///
+/// TransactionConditional represents the preconditions that determine the inclusion of the
+/// transaction, enforced out-of-protocol by the sequencer.
+///
+/// See also <https://github.com/ethereum-optimism/op-geth/blob/928070c7fc097362ed2d40a4f72889ba91544931/core/types/transaction_conditional.go#L74-L76>.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct ConditionalOptions {
+pub struct TransactionConditional {
     /// A map of account addresses to their expected storage states.
     /// Each account can have a specified storage root or explicit slot-value pairs.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -62,7 +72,7 @@ pub struct ConditionalOptions {
     pub timestamp_max: Option<u64>,
 }
 
-impl ConditionalOptions {
+impl TransactionConditional {
     /// Computes the aggregate cost of the preconditions; total number of storage lookups required
     pub fn cost(&self) -> u64 {
         let mut cost = 0;
