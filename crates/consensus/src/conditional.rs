@@ -11,3 +11,10 @@ pub struct BlockConditionalAttributes {
     /// The block's timestamp
     pub timestamp: u64,
 }
+
+impl BlockConditionalAttributes {
+    /// Creates a new `BlockConditionalAttributes` with the given block number and timestamp.
+    pub const fn new(number: u64, timestamp: u64) -> Self {
+        Self { number, timestamp }
+    }
+}
