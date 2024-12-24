@@ -2,18 +2,6 @@
 
 use alloy_primitives::{BlockHash, TxHash, B256};
 
-/// Contains attributes of a block that are relevant for block conditional transactions.
-///
-/// These attributes are used to determine preconditions for inclusion in the block with the given
-/// attributes (EIP-4337 transactions)
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
-pub struct BlockConditionalAttributes {
-    /// The number of the block.
-    pub number: u64,
-    /// The block's timestamp
-    pub timestamp: u64,
-}
-
 /// Additional fields in the context of a block that contains this _mined_ transaction.
 ///
 /// This contains mandatory block fields (block hash, number, timestamp, index).

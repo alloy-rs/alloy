@@ -26,6 +26,7 @@ pub use receipt::{
     RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
 
+pub mod conditional;
 pub mod proofs;
 
 pub mod transaction;
