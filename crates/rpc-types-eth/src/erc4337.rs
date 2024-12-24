@@ -1,5 +1,6 @@
 use crate::{Log, TransactionReceipt};
 use alloc::vec::Vec;
+use alloy_consensus::conditional::BlockConditionalAttributes;
 use alloy_primitives::{
     map::{AddressHashMap, HashMap},
     Address, BlockNumber, Bytes, B256, U256,
@@ -73,6 +74,41 @@ pub struct TransactionConditional {
 }
 
 impl TransactionConditional {
+    /// Returns `true` if the transaction matches the given block attributes.
+    pub const fn matches_block_attributes(&self, block: &BlockConditionalAttributes) -> bool {
+        self.matches_block_number(block.number) && self.matches_timestamp(block.timestamp)
+    }
+
+    /// Returns `true` if the transaction matches the given block number.
+    pub const fn matches_block_number(&self, block_number: BlockNumber) -> bool {
+        if let Some(min) = self.block_number_min {
+            if block_number < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.block_number_max {
+            if block_number > max {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns `true` if the transaction matches the given timestamp.
+    pub const fn matches_timestamp(&self, timestamp: u64) -> bool {
+        if let Some(min) = self.timestamp_min {
+            if timestamp < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.timestamp_max {
+            if timestamp > max {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Computes the aggregate cost of the preconditions; total number of storage lookups required
     pub fn cost(&self) -> u64 {
         let mut cost = 0;
