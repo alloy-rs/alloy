@@ -3,7 +3,7 @@ use crate::eip4844::Blob;
 use c_kzg::{KzgCommitment, KzgProof};
 
 use crate::eip4844::{
-    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK,
+    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
 };
 use alloc::vec::Vec;
 
@@ -96,7 +96,8 @@ impl PartialSidecar {
 
     /// Get a mutable reference to the current blob.
     fn current_blob_mut(&mut self) -> &mut Blob {
-        self.blobs.last_mut().expect("never empty")
+        let last_unused_blob_index = self.fe / FIELD_ELEMENTS_PER_BLOB as usize;
+        self.blobs.get_mut(last_unused_blob_index).expect("never empty")
     }
 
     /// Get a mutable reference to the field element at the given index, in
@@ -124,6 +125,7 @@ impl PartialSidecar {
     /// If the data is >=32 bytes. Or if there are not enough free FEs to
     /// encode the data.
     pub fn ingest_partial_fe(&mut self, data: &[u8]) {
+        self.alloc_fes(1);
         let fe = self.next_unused_fe_mut();
         fe[1..1 + data.len()].copy_from_slice(data);
         self.fe += 1;
@@ -192,10 +194,12 @@ impl SimpleCoder {
     /// Decode an some bytes from an iterator of valid FEs.
     ///
     /// Returns `Ok(Some(data))` if there is some data.
-    /// Returns `Ok(None)` if there is no data (length prefix is 0).
+    /// Returns `Ok(None)` if there is no data (empty iterator, length prefix is 0).
     /// Returns `Err(())` if there is an error.
     fn decode_one<'a>(mut fes: impl Iterator<Item = WholeFe<'a>>) -> Result<Option<Vec<u8>>, ()> {
-        let first = fes.next().ok_or(())?;
+        let Some(first) = fes.next() else {
+            return Ok(None);
+        };
         let mut num_bytes = u64::from_be_bytes(first.as_ref()[1..9].try_into().unwrap()) as usize;
 
         // if no more bytes is 0, we're done
@@ -204,7 +208,8 @@ impl SimpleCoder {
         }
 
         // if there are too many bytes
-        if num_bytes > BYTES_PER_BLOB * MAX_BLOBS_PER_BLOCK {
+        const MAX_ALLOCATION_SIZE: usize = 2_097_152; //2 MiB
+        if num_bytes > MAX_ALLOCATION_SIZE {
             return Err(());
         }
 
@@ -244,8 +249,21 @@ impl SidecarCoder for SimpleCoder {
     fn finish(self, _builder: &mut PartialSidecar) {}
 
     fn decode_all(&mut self, blobs: &[Blob]) -> Option<Vec<Vec<u8>>> {
-        let mut fes =
-            blobs.iter().flat_map(|blob| blob.chunks(32).map(WholeFe::new)).map(Option::unwrap);
+        if blobs.is_empty() {
+            return None;
+        }
+
+        if blobs
+            .iter()
+            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES_USIZE).map(WholeFe::new))
+            .any(|fe| fe.is_none())
+        {
+            return None;
+        }
+
+        let mut fes = blobs
+            .iter()
+            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES_USIZE).map(WholeFe::new_unchecked));
 
         let mut res = Vec::new();
         loop {
@@ -426,12 +444,36 @@ mod tests {
     #[test]
     fn ingestion_strategy() {
         let mut builder = PartialSidecar::new();
-        let data = &[vec![1u8; 32], vec![2u8; 372], vec![3u8; 17], vec![4u8; 5]];
+        let data = &[
+            vec![1u8; 32],
+            vec![2u8; 372],
+            vec![3u8; 17],
+            vec![4u8; 5],
+            vec![5u8; 126_945],
+            vec![6u8; 2 * 126_945],
+        ];
 
         data.iter().for_each(|data| SimpleCoder.code(&mut builder, data.as_slice()));
 
         let decoded = SimpleCoder.decode_all(builder.blobs()).unwrap();
         assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn big_ingestion_strategy() {
+        let data = vec![1u8; 126_945];
+        let builder = SidecarBuilder::<SimpleCoder>::from_slice(&data);
+
+        let blobs = builder.take();
+        let decoded = SimpleCoder.decode_all(&blobs).unwrap().concat();
+
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn decode_all_rejects_invalid_data() {
+        assert_eq!(SimpleCoder.decode_all(&[]), None);
+        assert_eq!(SimpleCoder.decode_all(&[Blob::new([0xffu8; BYTES_PER_BLOB])]), None);
     }
 
     #[test]

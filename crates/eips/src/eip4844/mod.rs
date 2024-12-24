@@ -38,6 +38,9 @@ pub const BLS_MODULUS: U256 = U256::from_be_bytes(BLS_MODULUS_BYTES.0);
 /// Size a single field element in bytes.
 pub const FIELD_ELEMENT_BYTES: u64 = 32;
 
+/// Size a single field element in bytes.
+pub const FIELD_ELEMENT_BYTES_USIZE: usize = FIELD_ELEMENT_BYTES as usize;
+
 /// How many field elements are stored in a single data blob.
 pub const FIELD_ELEMENTS_PER_BLOB: u64 = 4096;
 
