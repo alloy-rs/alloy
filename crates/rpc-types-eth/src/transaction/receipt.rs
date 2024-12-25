@@ -33,7 +33,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_used: u128,
+    pub gas_used: u64,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
     /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
     /// that's actually paid by users can only be determined post-execution
@@ -50,7 +50,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
             default
         )
     )]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// The price paid by the eip-4844 transaction per blob gas.
     #[cfg_attr(
         feature = "serde",
@@ -158,7 +158,7 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.transaction_index
     }
 
-    fn gas_used(&self) -> u128 {
+    fn gas_used(&self) -> u64 {
         self.gas_used
     }
 
@@ -166,7 +166,7 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.effective_gas_price
     }
 
-    fn blob_gas_used(&self) -> Option<u128> {
+    fn blob_gas_used(&self) -> Option<u64> {
         self.blob_gas_used
     }
 
@@ -186,7 +186,7 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.authorization_list.as_deref()
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.inner.cumulative_gas_used()
     }
 
@@ -226,7 +226,7 @@ mod test {
         );
 
         const EXPECTED_BLOOM: Bloom = bloom!("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000200000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000800000000000000000000000000000000004000000000000000000800000000100000020000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000010000000000000000000000000000");
-        const EXPECTED_CGU: u128 = 0xa42aec;
+        const EXPECTED_CGU: u64 = 0xa42aec;
 
         assert!(matches!(
             receipt.inner,

@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
-            DATA_GAS_PER_BLOB as u128
+            DATA_GAS_PER_BLOB
         );
     }
 
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(receipt.gas_used, 21000);
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
-            DATA_GAS_PER_BLOB as u128
+            DATA_GAS_PER_BLOB
         );
     }
 }

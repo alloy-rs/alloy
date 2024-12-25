@@ -76,7 +76,7 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub const fn cumulative_gas_used(&self) -> u128 {
+    pub const fn cumulative_gas_used(&self) -> u64 {
         self.inner.receipt.cumulative_gas_used
     }
 
@@ -104,7 +104,7 @@ where
         self.bloom()
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.cumulative_gas_used()
     }
 

@@ -57,10 +57,10 @@ pub struct Genesis {
     pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub excess_blob_gas: Option<u128>,
+    pub excess_blob_gas: Option<u64>,
     /// The genesis header blob gas used
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
@@ -170,13 +170,13 @@ impl Genesis {
     }
 
     /// Set the excess blob gas.
-    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u128>) -> Self {
+    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
         self.excess_blob_gas = excess_blob_gas;
         self
     }
 
     /// Set the blob gas used.
-    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u128>) -> Self {
+    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
         self
     }
