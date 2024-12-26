@@ -22,7 +22,7 @@ pub struct Receipt<T = Log> {
     pub status: Eip658Value,
     /// Gas used
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub cumulative_gas_used: u128,
+    pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<T>,
 }
@@ -62,7 +62,7 @@ where
         self.bloom_slow()
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.cumulative_gas_used
     }
 
@@ -240,7 +240,7 @@ where
         Some(self.logs_bloom)
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.receipt.cumulative_gas_used()
     }
 

@@ -69,7 +69,7 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub fn cumulative_gas_used(&self) -> u128 {
+    pub fn cumulative_gas_used(&self) -> u64 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 
@@ -132,7 +132,7 @@ where
     }
 
     /// Returns the cumulative gas used at this receipt.
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 
