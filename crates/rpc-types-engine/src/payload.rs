@@ -299,7 +299,7 @@ impl ExecutionPayloadV2 {
         self.payload_inner.timestamp
     }
 
-    /// Converts [`ExecutionPayloadV2`] to [`Block`]
+    /// Converts [`ExecutionPayloadV2`] to [`Block`].
     ///
     /// This performs the same conversion as the underlying V1 payload, but calculates the
     /// withdrawals root and adds withdrawals.
@@ -446,9 +446,10 @@ impl ExecutionPayloadV3 {
         self.payload_inner.payload_inner.timestamp
     }
 
-    /// Converts [`ExecutionPayloadV3`] to [`Block`]
-    // This performs the same conversion as the underlying V2 payload, but inserts the blob gas used
-    // and excess blob gas.
+    /// Converts [`ExecutionPayloadV3`] to [`Block`].
+    ///
+    /// This performs the same conversion as the underlying V2 payload, but inserts the blob gas
+    /// used and excess blob gas.
     ///
     /// See also [`ExecutionPayloadV2::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
