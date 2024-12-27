@@ -5,11 +5,15 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{
-    eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip7685::Requests, BlockNumHash,
+use alloy_consensus::{
+    constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, Bytes48, Header,
+    EMPTY_OMMER_ROOT_HASH,
 };
-use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
+use alloy_eips::{
+    eip2718::Decodable2718, eip4844::BlobTransactionSidecar, eip4895::Withdrawal,
+    eip7685::Requests, BlockNumHash,
+};
+use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -194,6 +198,82 @@ impl ExecutionPayloadV1 {
     /// Returns the block number and hash as a [`BlockNumHash`].
     pub const fn block_num_hash(&self) -> BlockNumHash {
         BlockNumHash::new(self.block_number, self.block_hash)
+    }
+
+    /// Converts [`ExecutionPayloadV1`] to [`Block`]
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
+            return Err(PayloadError::ExtraData(self.extra_data));
+        }
+
+        if self.base_fee_per_gas.is_zero() {
+            return Err(PayloadError::BaseFee(self.base_fee_per_gas));
+        }
+
+        let transactions = self
+            .transactions
+            .iter()
+            .map(|tx| {
+                let mut buf = tx.as_ref();
+
+                let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
+
+                if !buf.is_empty() {
+                    return Err(alloy_rlp::Error::UnexpectedLength);
+                }
+
+                Ok(tx)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Reuse the encoded bytes for root calculation
+        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
+            &self.transactions,
+            |item, buf| buf.put_slice(item),
+        );
+
+        let header = Header {
+            parent_hash: self.parent_hash,
+            beneficiary: self.fee_recipient,
+            state_root: self.state_root,
+            transactions_root,
+            receipts_root: self.receipts_root,
+            withdrawals_root: None,
+            logs_bloom: self.logs_bloom,
+            number: self.block_number,
+            gas_limit: self.gas_limit,
+            gas_used: self.gas_used,
+            timestamp: self.timestamp,
+            mix_hash: self.prev_randao,
+            // WARNING: It’s allowed for a base fee in EIP1559 to increase unbounded. We assume that
+            // it will fit in an u64. This is not always necessarily true, although it is extremely
+            // unlikely not to be the case, a u64 maximum would have 2^64 which equates to 18 ETH
+            // per gas.
+            base_fee_per_gas: Some(
+                self.base_fee_per_gas
+                    .try_into()
+                    .map_err(|_| PayloadError::BaseFee(self.base_fee_per_gas))?,
+            ),
+            blob_gas_used: None,
+            excess_blob_gas: None,
+            parent_beacon_block_root: None,
+            requests_hash: None,
+            extra_data: self.extra_data,
+            // Defaults
+            ommers_hash: EMPTY_OMMER_ROOT_HASH,
+            difficulty: Default::default(),
+            nonce: Default::default(),
+        };
+
+        Ok(Block { header, body: BlockBody { transactions, ommers: vec![], withdrawals: None } })
+    }
+}
+
+impl<T: Decodable2718> TryFrom<ExecutionPayloadV1> for Block<T> {
+    type Error = PayloadError;
+
+    fn try_from(value: ExecutionPayloadV1) -> Result<Self, Self::Error> {
+        value.try_into_block()
     }
 }
 
