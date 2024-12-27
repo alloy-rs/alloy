@@ -83,6 +83,25 @@ pub struct ExecutionPayloadInputV2 {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
+impl ExecutionPayloadInputV2 {
+    /// Converts [`ExecutionPayloadInputV2`] to [`ExecutionPayload`]
+    pub fn into_payload(self) -> ExecutionPayload {
+        match self.withdrawals {
+            Some(withdrawals) => ExecutionPayload::V2(ExecutionPayloadV2 {
+                payload_inner: self.execution_payload,
+                withdrawals,
+            }),
+            None => ExecutionPayload::V1(self.execution_payload),
+        }
+    }
+}
+
+impl From<ExecutionPayloadInputV2> for ExecutionPayload {
+    fn from(input: ExecutionPayloadInputV2) -> Self {
+        input.into_payload()
+    }
+}
+
 /// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
 /// V2.
 ///
@@ -297,6 +316,20 @@ impl ExecutionPayloadV2 {
     /// Returns the timestamp for the execution payload.
     pub const fn timestamp(&self) -> u64 {
         self.payload_inner.timestamp
+    }
+
+    /// Converts [`ExecutionPayloadV2`] to [`ExecutionPayloadInputV2`].
+    ///
+    /// An [`ExecutionPayloadInputV2`] should have a [`Some`] withdrawals field if shanghai is
+    /// active, otherwise the withdrawals field should be [`None`], so the `is_shanghai_active`
+    /// argument is provided which will either:
+    /// - include the withdrawals field as [`Some`] if true
+    /// - set the withdrawals field to [`None`] if false
+    pub fn into_payload_input_v2(self, is_shanghai_active: bool) -> ExecutionPayloadInputV2 {
+        ExecutionPayloadInputV2 {
+            execution_payload: self.payload_inner,
+            withdrawals: is_shanghai_active.then_some(self.withdrawals),
+        }
     }
 
     /// Converts [`ExecutionPayloadV2`] to [`Block`].
