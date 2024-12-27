@@ -649,6 +649,15 @@ pub enum ExecutionPayload {
 }
 
 impl ExecutionPayload {
+    /// Converts [`ExecutionPayloadV1`] to [`Block`]
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        match self {
+            Self::V1(payload) => payload.try_into_block(),
+            Self::V2(payload) => payload.try_into_block(),
+            Self::V3(payload) => payload.try_into_block(),
+        }
+    }
+
     /// Returns a reference to the V1 payload.
     pub const fn as_v1(&self) -> &ExecutionPayloadV1 {
         match self {
@@ -764,6 +773,14 @@ impl From<ExecutionPayloadV2> for ExecutionPayload {
 impl From<ExecutionPayloadV3> for ExecutionPayload {
     fn from(payload: ExecutionPayloadV3) -> Self {
         Self::V3(payload)
+    }
+}
+
+impl<T: Decodable2718> TryFrom<ExecutionPayload> for Block<T> {
+    type Error = PayloadError;
+
+    fn try_from(value: ExecutionPayload) -> Result<Self, Self::Error> {
+        value.try_into_block()
     }
 }
 
