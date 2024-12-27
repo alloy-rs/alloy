@@ -298,6 +298,29 @@ impl ExecutionPayloadV2 {
     pub const fn timestamp(&self) -> u64 {
         self.payload_inner.timestamp
     }
+
+    /// Converts [`ExecutionPayloadV2`] to [`Block`]
+    ///
+    /// This performs the same conversion as the underlying V1 payload, but calculates the
+    /// withdrawals root and adds withdrawals.
+    ///
+    /// See also [`ExecutionPayloadV1::try_into_block`].
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        let mut base_sealed_block = self.payload_inner.try_into_block()?;
+        let withdrawals_root =
+            alloy_consensus::proofs::calculate_withdrawals_root(&self.withdrawals);
+        base_sealed_block.body.withdrawals = Some(self.withdrawals.into());
+        base_sealed_block.header.withdrawals_root = Some(withdrawals_root);
+        Ok(base_sealed_block)
+    }
+}
+
+impl<T: Decodable2718> TryFrom<ExecutionPayloadV2> for Block<T> {
+    type Error = PayloadError;
+
+    fn try_from(value: ExecutionPayloadV2) -> Result<Self, Self::Error> {
+        value.try_into_block()
+    }
 }
 
 #[cfg(feature = "ssz")]
