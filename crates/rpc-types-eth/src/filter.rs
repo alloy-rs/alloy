@@ -54,7 +54,7 @@ impl<T: Eq + Hash> Hash for FilterSet<T> {
 
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
-        Self(src.into_iter().map(Into::into).collect())
+        Self(src.into_iter().collect())
     }
 }
 
