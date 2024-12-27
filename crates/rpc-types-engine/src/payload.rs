@@ -1,6 +1,6 @@
 //! Payload types.
 
-use crate::PayloadError;
+use crate::{ExecutionPayloadSidecar, PayloadError};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -682,7 +682,34 @@ pub enum ExecutionPayload {
 }
 
 impl ExecutionPayload {
-    /// Converts [`ExecutionPayloadV1`] to [`Block`]
+    /// Tries to create a new unsealed block from the given payload and payload sidecar.
+    ///
+    /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    ///
+    /// # Note
+    ///
+    /// The log bloom is assumed to be validated during serialization.
+    ///
+    /// See <https://github.com/ethereum/go-ethereum/blob/79a478bb6176425c2400e949890e668a3d9a3d05/core/beacon/types.go#L145>
+    pub fn try_into_block_with_sidecar<T: Decodable2718>(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+    ) -> Result<Block<T>, PayloadError> {
+        let mut base_payload = self.try_into_block()?;
+        base_payload.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
+        base_payload.header.requests_hash = sidecar.requests_hash();
+
+        Ok(base_payload)
+    }
+
+    /// Converts [`ExecutionPayloadV1`] to [`Block`].
+    ///
+    /// Caution: This does not set fields that are not part of the payload and only part of the
+    /// [`ExecutionPayloadSidecar`]:
+    /// - parent_beacon_block_root
+    /// - requests_hash
+    ///
+    /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
         match self {
             Self::V1(payload) => payload.try_into_block(),
