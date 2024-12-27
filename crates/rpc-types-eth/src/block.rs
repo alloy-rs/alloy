@@ -56,6 +56,47 @@ impl<T, H: Default> Default for Block<T, H> {
 }
 
 impl<T, H> Block<T, H> {
+    /// Creates a new empty block (without transactions).
+    pub const fn empty(header: H) -> Self {
+        Self::new(header, BlockTransactions::Full(vec![]))
+    }
+
+    /// Creates a new [`Block`] with the given header and transactions.
+    ///
+    /// Note: This does not set the withdrawals for the block.
+    ///
+    /// ```
+    /// use alloy_eips::eip4895::Withdrawals;
+    /// use alloy_network_primitives::BlockTransactions;
+    /// use alloy_rpc_types_eth::{Block, Header, Transaction};
+    /// let block = Block::new(
+    ///     Header::new(alloy_consensus::Header::default()),
+    ///     BlockTransactions::<Transaction>::Full(vec![]),
+    /// )
+    /// .with_withdrawals(Some(Withdrawals::default()));
+    /// ```
+    pub const fn new(header: H, transactions: BlockTransactions<T>) -> Self {
+        Self { header, uncles: vec![], transactions, withdrawals: None }
+    }
+
+    /// Sets the transactions for the block.
+    pub fn with_transactions(mut self, transactions: BlockTransactions<T>) -> Self {
+        self.transactions = transactions;
+        self
+    }
+
+    /// Sets the withdrawals for the block.
+    pub fn with_withdrawals(mut self, withdrawals: Option<Withdrawals>) -> Self {
+        self.withdrawals = withdrawals;
+        self
+    }
+
+    /// Sets the uncles for the block.
+    pub fn with_uncles(mut self, uncles: Vec<B256>) -> Self {
+        self.uncles = uncles;
+        self
+    }
+
     /// Converts the block's header type by applying a function to it.
     pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
         Block {
@@ -150,6 +191,8 @@ impl<T> Block<T> {
 }
 
 /// RPC representation of block header, wrapping a consensus header.
+///
+/// This wraps the consensus header and adds additional fields for RPC.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -171,6 +214,24 @@ pub struct Header<H = alloy_consensus::Header> {
 }
 
 impl<H> Header<H> {
+    /// Create a new [`Header`] from a consensus header.
+    ///
+    /// Note: This will compute the hash of the header.
+    pub fn new(inner: H) -> Self
+    where
+        H: Sealable,
+    {
+        Self::from_sealed(Sealed::new(inner))
+    }
+
+    /// Create a new [`Header`] from a sealed consensus header.
+    ///
+    /// Note: This does not set the total difficulty or size of the block.
+    pub fn from_sealed(header: Sealed<H>) -> Self {
+        let (inner, hash) = header.into_parts();
+        Self { hash, inner, total_difficulty: None, size: None }
+    }
+
     /// Create a new [`Header`] from a sealed consensus header and additional fields.
     pub fn from_consensus(
         header: Sealed<H>,
@@ -179,6 +240,18 @@ impl<H> Header<H> {
     ) -> Self {
         let (inner, hash) = header.into_parts();
         Self { hash, inner, total_difficulty, size }
+    }
+
+    /// Set the total difficulty of the block.
+    pub const fn with_total_difficulty(mut self, total_difficulty: Option<U256>) -> Self {
+        self.total_difficulty = total_difficulty;
+        self
+    }
+
+    /// Set the size of the block.
+    pub const fn with_size(mut self, size: Option<U256>) -> Self {
+        self.size = size;
+        self
     }
 }
 

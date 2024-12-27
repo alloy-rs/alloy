@@ -130,6 +130,11 @@ impl<T> BlockTransactions<T> {
 }
 
 impl<T: TransactionResponse> BlockTransactions<T> {
+    /// Creates a new [`BlockTransactions::Hashes`] variant from the given iterator of transactions.
+    pub fn new_hashes(txs: impl IntoIterator<Item = T>) -> Self {
+        Self::Hashes(txs.into_iter().map(|tx| tx.tx_hash()).collect())
+    }
+
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn convert_to_hashes(&mut self) {
