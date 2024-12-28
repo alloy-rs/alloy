@@ -996,7 +996,7 @@ mod tests {
 
         let id = BlockId::number(100000);
 
-        assert_eq!(id.to_string(), "number 0x186a0");
+        assert_eq!(id.to_string(), "0x186a0");
 
         let id = BlockId::latest();
 
