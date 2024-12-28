@@ -216,7 +216,7 @@ impl FromStr for BlockNumberOrTag {
 impl fmt::Display for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::Number(x) => write!(f, "number 0x{x:x}"),
+            Self::Number(x) => write!(f, "0x{x:x}"),
             Self::Latest => f.pad("latest"),
             Self::Finalized => f.pad("finalized"),
             Self::Safe => f.pad("safe"),
@@ -996,7 +996,7 @@ mod tests {
 
         let id = BlockId::number(100000);
 
-        assert_eq!(id.to_string(), "number 0x186a0");
+        assert_eq!(id.to_string(), "0x186a0");
 
         let id = BlockId::latest();
 
