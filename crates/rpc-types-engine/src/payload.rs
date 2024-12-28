@@ -68,6 +68,14 @@ impl ExecutionPayloadFieldV2 {
             Self::V2(payload) => payload.payload_inner,
         }
     }
+
+    /// Converts this payload variant into the corresponding [ExecutionPayload]
+    pub fn into_payload(self) -> ExecutionPayload {
+        match self {
+            Self::V1(payload) => ExecutionPayload::V1(payload),
+            Self::V2(payload) => ExecutionPayload::V2(payload),
+        }
+    }
 }
 
 /// This is the input to `engine_newPayloadV2`, which may or may not have a withdrawals field.
@@ -827,6 +835,12 @@ impl From<ExecutionPayloadV1> for ExecutionPayload {
 impl From<ExecutionPayloadV2> for ExecutionPayload {
     fn from(payload: ExecutionPayloadV2) -> Self {
         Self::V2(payload)
+    }
+}
+
+impl From<ExecutionPayloadFieldV2> for ExecutionPayload {
+    fn from(payload: ExecutionPayloadFieldV2) -> Self {
+        payload.into_payload()
     }
 }
 
