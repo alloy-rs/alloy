@@ -216,7 +216,7 @@ impl FromStr for BlockNumberOrTag {
 impl fmt::Display for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::Number(x) => write!(f, "number 0x{x:x}"),
+            Self::Number(x) => write!(f, "0x{x:x}"),
             Self::Latest => f.pad("latest"),
             Self::Finalized => f.pad("finalized"),
             Self::Safe => f.pad("safe"),
