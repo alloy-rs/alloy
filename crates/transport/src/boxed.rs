@@ -37,10 +37,8 @@ impl<T: Transport + Clone> IntoBoxTransport for T {
 /// allows for complex behavior abstracting across several different clients
 /// with different transport types.
 ///
-/// All higher-level types, such as [`RpcClient`], use this type internally
+/// All higher-level types, such as `RpcClient`, use this type internally
 /// rather than a generic [`Transport`] parameter.
-///
-/// [`RpcClient`]: crate::client::RpcClient
 pub struct BoxTransport {
     inner: Box<dyn CloneTransport>,
 }

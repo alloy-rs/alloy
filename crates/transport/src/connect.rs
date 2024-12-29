@@ -11,7 +11,7 @@ use futures_utils_wasm::impl_future;
 /// Users may want to implement transport-connect for the following reasons:
 /// - You want to customize a `reqwest::Client` before using it.
 /// - You need to provide special authentication information to a remote provider.
-/// - You have implemented a custom [`Transport`].
+/// - You have implemented a custom [`Transport`](crate::Transport).
 /// - You require a specific websocket reconnection strategy.
 pub trait TransportConnect: Sized + Send + Sync + 'static {
     /// Returns `true` if the transport connects to a local resource.

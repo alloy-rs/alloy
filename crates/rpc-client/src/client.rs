@@ -132,7 +132,7 @@ impl Deref for RpcClient {
 
 /// A JSON-RPC client.
 ///
-/// This struct manages a [`Transport`] and a request ID counter. It is used to
+/// This struct manages a [`BoxTransport`] and a request ID counter. It is used to
 /// build [`RpcCall`] and [`BatchRequest`] objects. The client delegates
 /// transport access to the calls.
 ///
