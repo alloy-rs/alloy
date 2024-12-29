@@ -1,6 +1,6 @@
 use crate::{Transport, TransportError, TransportFut};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
-use std::fmt;
+use std::{any::TypeId, fmt};
 use tower::Service;
 
 #[allow(unnameable_types)]
@@ -20,6 +20,12 @@ pub trait IntoBoxTransport: Transport + Clone + private::Sealed {
 
 impl<T: Transport + Clone> IntoBoxTransport for T {
     fn into_box_transport(self) -> BoxTransport {
+        // "specialization" to re-use `BoxTransport`.
+        if TypeId::of::<T>() == TypeId::of::<BoxTransport>() {
+            // SAFETY: `self` is `BoxTransport`. This is a no-op.
+            let this = std::mem::ManuallyDrop::new(self);
+            return unsafe { std::mem::transmute_copy(&this) };
+        }
         BoxTransport { inner: Box::new(self) }
     }
 }
@@ -111,6 +117,25 @@ impl Service<RequestPacket> for BoxTransport {
 mod test {
     use super::*;
 
+    #[derive(Clone)]
+    struct DummyTransport<T>(T);
+    impl<T> Service<RequestPacket> for DummyTransport<T> {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(
+            &mut self,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            unimplemented!()
+        }
+
+        fn call(&mut self, _req: RequestPacket) -> Self::Future {
+            unimplemented!()
+        }
+    }
+
     // checks trait + send + sync + 'static
     fn _compile_check() {
         const fn inner<T>()
@@ -119,5 +144,34 @@ mod test {
         {
         }
         inner::<BoxTransport>();
+    }
+
+    #[test]
+    fn no_reboxing() {
+        let id = TypeId::of::<DummyTransport<()>>();
+        no_reboxing_(DummyTransport(()), id);
+        no_reboxing_(BoxTransport::new(DummyTransport(())), id);
+
+        let wrap = String::from("hello");
+        let id = TypeId::of::<DummyTransport<String>>();
+        no_reboxing_(DummyTransport(wrap.clone()), id);
+        no_reboxing_(BoxTransport::new(DummyTransport(wrap)), id);
+    }
+
+    fn no_reboxing_<T: IntoBoxTransport>(t: T, id: TypeId) {
+        eprintln!("{}", std::any::type_name::<T>());
+
+        let t1 = BoxTransport::new(t);
+        let t1p = &raw const *t1.inner;
+        let t1id = t1.as_any().type_id();
+
+        // This shouldn't wrap `t1` in another box (`BoxTransport<BoxTransport<_>>`).
+        let t2 = BoxTransport::new(t1);
+        let t2p = &raw const *t2.inner;
+        let t2id = t2.as_any().type_id();
+
+        assert_eq!(t1id, id);
+        assert_eq!(t1id, t2id);
+        assert!(std::ptr::eq(t1p, t2p));
     }
 }
