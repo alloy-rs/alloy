@@ -160,12 +160,12 @@ mod test {
         eprintln!("{}", std::any::type_name::<T>());
 
         let t1 = BoxTransport::new(t);
-        let t1p = &raw const *t1.inner;
+        let t1p = std::ptr::addr_of!(*t1.inner);
         let t1id = t1.as_any().type_id();
 
         // This shouldn't wrap `t1` in another box (`BoxTransport<BoxTransport<_>>`).
         let t2 = BoxTransport::new(t1);
-        let t2p = &raw const *t2.inner;
+        let t2p = std::ptr::addr_of!(*t2.inner);
         let t2id = t2.as_any().type_id();
 
         assert_eq!(t1id, id);
