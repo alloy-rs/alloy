@@ -316,13 +316,7 @@ impl RecommendedFillers for Ethereum {
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        JoinFill::new(
-            GasFiller,
-            JoinFill::new(
-                BlobGasFiller,
-                JoinFill::new(NonceFiller::default(), ChainIdFiller::default()),
-            ),
-        )
+        Default::default()
     }
 }
 
@@ -331,12 +325,6 @@ impl RecommendedFillers for AnyNetwork {
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        JoinFill::new(
-            GasFiller,
-            JoinFill::new(
-                BlobGasFiller,
-                JoinFill::new(NonceFiller::default(), ChainIdFiller::default()),
-            ),
-        )
+        Default::default()
     }
 }

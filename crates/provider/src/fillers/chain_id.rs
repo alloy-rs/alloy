@@ -70,7 +70,7 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
                 if builder.chain_id().is_none() {
                     builder.set_chain_id(*chain_id)
                 }
-            };
+            }
         }
     }
 
