@@ -1740,7 +1740,7 @@ mod tests {
     async fn connect_boxed() {
         let anvil = Anvil::new().spawn();
 
-        let provider = RootProvider::<Ethereum>::connect_builtin(anvil.endpoint().as_str()).await;
+        let provider = RootProvider::<Ethereum>::connect(anvil.endpoint().as_str()).await;
 
         match provider {
             Ok(provider) => {

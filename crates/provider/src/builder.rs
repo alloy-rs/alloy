@@ -9,7 +9,7 @@ use crate::{
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::ChainId;
-use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
+use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -262,7 +262,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         P: Provider<N>,
         N: Network,
     {
-        let Self { layer, filler, .. } = self;
+        let Self { layer, filler, network: PhantomData } = self;
         let stack = Stack::new(layer, filler);
         stack.layer(provider)
     }
@@ -290,8 +290,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
         N: Network,
     {
-        let connect: BuiltInConnectionString = s.parse()?;
-        let client = ClientBuilder::default().connect_boxed(connect).await?;
+        let client = ClientBuilder::default().connect(s).await?;
         Ok(self.on_client(client))
     }
 

@@ -1,6 +1,7 @@
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
-    utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
+    utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
+    TransportFut,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
@@ -140,20 +141,12 @@ where
 }
 
 impl TransportConnect for HttpConnect<HyperTransport> {
-    type Transport = HyperTransport;
-
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
     }
 
-    fn get_transport<'a: 'b, 'b>(
-        &'a self,
-    ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
-        Box::pin(async move {
-            let hyper_t = HyperClient::new();
-
-            Ok(Http::with_client(hyper_t, self.url.clone()))
-        })
+    async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
+        Ok(BoxTransport::new(Http::with_client(HyperClient::new(), self.url.clone())))
     }
 }
 

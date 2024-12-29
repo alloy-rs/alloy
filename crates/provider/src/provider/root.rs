@@ -5,7 +5,7 @@ use crate::{
 };
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, ClientRef, RpcClient, WeakClient};
-use alloy_transport::{BoxTransportConnect, TransportError};
+use alloy_transport::{TransportConnect, TransportError};
 use std::{
     fmt,
     marker::PhantomData,
@@ -52,24 +52,36 @@ impl<N: Network> RootProvider<N> {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
     }
 
-    /// Connects to a boxed transport with the given connector.
-    pub async fn connect_boxed<C: BoxTransportConnect>(conn: C) -> Result<Self, TransportError> {
-        let client = ClientBuilder::default().connect_boxed(conn).await?;
-        Ok(Self::new(client))
+    /// Creates a new root provider from the provided string.
+    ///
+    /// See [`BuiltInConnectionString`] for more information.
+    pub async fn connect(s: &str) -> Result<Self, TransportError> {
+        Self::connect_with(s.parse::<BuiltInConnectionString>()?).await
     }
 
     /// Creates a new root provider from the provided connection details.
+    #[deprecated(since = "0.9.0", note = "use `connect` instead")]
     pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
-        let conn: BuiltInConnectionString = s.parse()?;
+        Self::connect(s).await
+    }
 
-        let client = ClientBuilder::default().connect_boxed(conn).await?;
-        Ok(Self::new(client))
+    /// Connects to a transport with the given connector.
+    pub async fn connect_with<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
+        ClientBuilder::default().connect_with(conn).await.map(Self::new)
+    }
+
+    /// Connects to a boxed transport with the given connector.
+    #[deprecated(
+        since = "0.9.0",
+        note = "RootProvider is now always boxed, use `connect_with` instead"
+    )]
+    pub async fn connect_boxed<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
+        Self::connect_with(conn).await
     }
 }
 
 impl<N: Network> RootProvider<N> {
     /// Boxes the inner client.
-    #[doc(hidden)]
     #[deprecated(since = "0.9.0", note = "RootProvider is now always boxed")]
     #[allow(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {

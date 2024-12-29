@@ -299,7 +299,6 @@ impl RpcClientInner {
 
     /// Type erase the service in the transport, allowing it to be used in a
     /// generic context.
-    #[doc(hidden)]
     #[deprecated(since = "0.9.0", note = "RpcClientInner is now always boxed")]
     #[allow(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {

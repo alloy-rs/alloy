@@ -10,7 +10,7 @@ mod boxed;
 pub use boxed::{BoxTransport, IntoBoxTransport};
 
 mod connect;
-pub use connect::{BoxTransportConnect, TransportConnect};
+pub use connect::TransportConnect;
 
 mod common;
 pub use common::Authorization;

@@ -1,7 +1,5 @@
-use crate::RpcClient;
-use alloy_transport::{
-    BoxTransport, BoxTransportConnect, IntoBoxTransport, TransportConnect, TransportResult,
-};
+use crate::{BuiltInConnectionString, RpcClient};
+use alloy_transport::{BoxTransport, IntoBoxTransport, TransportConnect, TransportResult};
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
@@ -113,12 +111,22 @@ impl<L> ClientBuilder<L> {
         self.pubsub(ipc_connect).await
     }
 
-    /// Connect a transport, producing an [`RpcClient`] with the provided
-    /// connection.
-    pub async fn connect<C>(self, connect: C) -> TransportResult<RpcClient>
+    /// Connect a transport specified by the given string, producing an [`RpcClient`].
+    ///
+    /// See [`BuiltInConnectionString`] for more information.
+    pub async fn connect(self, s: &str) -> TransportResult<RpcClient>
+    where
+        L: Layer<BoxTransport>,
+        L::Service: IntoBoxTransport,
+    {
+        self.connect_with(s.parse::<BuiltInConnectionString>()?).await
+    }
+
+    /// Connect a transport, producing an [`RpcClient`].
+    pub async fn connect_with<C>(self, connect: C) -> TransportResult<RpcClient>
     where
         C: TransportConnect,
-        L: Layer<C::Transport>,
+        L: Layer<BoxTransport>,
         L::Service: IntoBoxTransport,
     {
         let transport = connect.get_transport().await?;
@@ -127,13 +135,16 @@ impl<L> ClientBuilder<L> {
 
     /// Connect a transport, producing an [`RpcClient`] with a [`BoxTransport`]
     /// connection.
+    #[deprecated(
+        since = "0.9.0",
+        note = "RpcClient is now always boxed, use `connect_with` instead"
+    )]
     pub async fn connect_boxed<C>(self, connect: C) -> TransportResult<RpcClient>
     where
-        C: BoxTransportConnect,
+        C: TransportConnect,
         L: Layer<BoxTransport>,
         L::Service: IntoBoxTransport,
     {
-        let transport = connect.get_boxed_transport().await?;
-        Ok(self.transport(transport, connect.is_local()))
+        self.connect_with(connect).await
     }
 }
