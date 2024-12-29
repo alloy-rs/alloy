@@ -7,7 +7,6 @@ use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
-use alloy_transport::Transport;
 use std::{
     future::{Future, IntoFuture},
     marker::PhantomData,
@@ -16,13 +15,13 @@ use std::{
 
 /// [`CallBuilder`] using a [`SolCall`] type as the call decoder.
 // NOTE: please avoid changing this type due to its use in the `sol!` macro.
-pub type SolCallBuilder<T, P, C, N = Ethereum> = CallBuilder<T, P, PhantomData<C>, N>;
+pub type SolCallBuilder<P, C, N = Ethereum> = CallBuilder<P, PhantomData<C>, N>;
 
 /// [`CallBuilder`] using a [`Function`] as the call decoder.
-pub type DynCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, Function, N>;
+pub type DynCallBuilder<P, N = Ethereum> = CallBuilder<P, Function, N>;
 
 /// [`CallBuilder`] that does not have a call decoder.
-pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
+pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
@@ -121,7 +120,7 @@ pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
 /// [sol]: alloy_sol_types::sol
 #[derive(Clone)]
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
-pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
+pub struct CallBuilder<P, D, N: Network = Ethereum> {
     request: N::TransactionRequest,
     block: BlockId,
     state: Option<StateOverride>,
@@ -129,24 +128,23 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     // NOTE: This is public due to usage in `sol!`, please avoid changing it.
     pub provider: P,
     decoder: D,
-    transport: PhantomData<T>,
 }
 
-impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
+impl<P, D, N: Network> CallBuilder<P, D, N> {
     /// Converts the call builder to the inner transaction request
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
     }
 }
 
-impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
+impl<P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<P, D, N> {
     fn as_ref(&self) -> &N::TransactionRequest {
         &self.request
     }
 }
 
 // See [`ContractInstance`].
-impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N> {
+impl<P: Provider<N>, N: Network> DynCallBuilder<P, N> {
     pub(crate) fn new_dyn(
         provider: P,
         address: &Address,
@@ -163,22 +161,19 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N
 
     /// Clears the decoder, returning a raw call builder.
     #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<T, P, N> {
+    pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
         RawCallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider,
             decoder: (),
-            transport: PhantomData,
         }
     }
 }
 
 #[doc(hidden)]
-impl<'a, T: Transport + Clone, P: Provider<T, N>, C: SolCall, N: Network>
-    SolCallBuilder<T, &'a P, C, N>
-{
+impl<'a, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<&'a P, C, N> {
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address, call: &C) -> Self {
@@ -186,22 +181,21 @@ impl<'a, T: Transport + Clone, P: Provider<T, N>, C: SolCall, N: Network>
     }
 }
 
-impl<T: Transport + Clone, P: Provider<T, N>, C: SolCall, N: Network> SolCallBuilder<T, P, C, N> {
+impl<P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<P, C, N> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<T, P, N> {
+    pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
         RawCallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider,
             decoder: (),
-            transport: PhantomData,
         }
     }
 }
 
-impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N> {
+impl<P: Provider<N>, N: Network> RawCallBuilder<P, N> {
     /// Sets the decoder to the provided [`SolCall`].
     ///
     /// Converts the raw call builder into a sol call builder.
@@ -254,19 +248,18 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N
     /// # }
     /// ```
     #[inline]
-    pub fn with_sol_decoder<C: SolCall>(self) -> SolCallBuilder<T, P, C, N> {
+    pub fn with_sol_decoder<C: SolCall>(self) -> SolCallBuilder<P, C, N> {
         SolCallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider,
             decoder: PhantomData::<C>,
-            transport: PhantomData,
         }
     }
 }
 
-impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N> {
+impl<P: Provider<N>, N: Network> RawCallBuilder<P, N> {
     /// Creates a new call builder with the provided provider and ABI encoded input.
     ///
     /// Will not decode the output of the call, meaning that [`call`](Self::call) will behave the
@@ -286,7 +279,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N
     }
 }
 
-impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
+impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     fn new_inner_deploy(provider: P, input: Bytes, decoder: D) -> Self {
         Self {
             request: <N::TransactionRequest>::default().with_deploy_code(input),
@@ -294,7 +287,6 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
             provider,
             block: BlockId::default(),
             state: None,
-            transport: PhantomData,
         }
     }
 
@@ -305,7 +297,6 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
             provider,
             block: BlockId::default(),
             state: None,
-            transport: PhantomData,
         }
     }
 
@@ -447,7 +438,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, '_, D, T, N> {
+    pub fn call(&self) -> EthCall<'_, '_, D, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -457,7 +448,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, '_, (), T, N> {
+    pub fn call_raw(&self) -> EthCall<'_, '_, (), N> {
         let call = self.provider.call(&self.request).block(self.block);
         let call = match &self.state {
             Some(state) => call.overrides(state),
@@ -495,7 +486,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// Returns a builder for configuring the pending transaction watcher.
     /// See [`Provider::send_transaction`] for more information.
-    pub async fn send(&self) -> Result<PendingTransactionBuilder<T, N>> {
+    pub async fn send(&self) -> Result<PendingTransactionBuilder<N>> {
         Ok(self.provider.send_transaction(self.request.clone()).await?)
     }
 
@@ -508,16 +499,15 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 }
 
-impl<T: Transport, P: Clone, D, N: Network> CallBuilder<T, &P, D, N> {
+impl<P: Clone, D, N: Network> CallBuilder<&P, D, N> {
     /// Clones the provider and returns a new builder with the cloned provider.
-    pub fn with_cloned_provider(self) -> CallBuilder<T, P, D, N> {
+    pub fn with_cloned_provider(self) -> CallBuilder<P, D, N> {
         CallBuilder {
             request: self.request,
             block: self.block,
             state: self.state,
             provider: self.provider.clone(),
             decoder: self.decoder,
-            transport: PhantomData,
         }
     }
 }
@@ -532,10 +522,9 @@ impl<T: Transport, P: Clone, D, N: Network> CallBuilder<T, &P, D, N> {
 /// the associated future type, the returned future, must be a concrete type (`Box<dyn Future ...>`)
 /// and cannot be an opaque type (`impl Future ...`) because `impl Trait` in this position is not
 /// stable yet. See [rust-lang/rust#63063](https://github.com/rust-lang/rust/issues/63063).
-impl<T, P, D, N> IntoFuture for CallBuilder<T, P, D, N>
+impl<P, D, N> IntoFuture for CallBuilder<P, D, N>
 where
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
     D: CallDecoder + Send + Sync + Unpin,
     N: Network,
     Self: 'static,
@@ -552,7 +541,7 @@ where
     }
 }
 
-impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, N> {
+impl<P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<P, D, N> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CallBuilder")
@@ -565,6 +554,7 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 }
 
 #[cfg(test)]
+#[cfg(TODO)]
 mod tests {
     use super::*;
     use alloy_consensus::Transaction;

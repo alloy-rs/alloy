@@ -6,21 +6,23 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+// For features.
+#[cfg(any(feature = "reqwest", feature = "hyper"))]
+use alloy_transport_http as _;
+
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a
 /// reqwest client.
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(any(test, feature = "reqwest"))]
-pub type ReqwestProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::Http<reqwest::Client>, N>;
+pub type ReqwestProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a hyper
 /// client.
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(feature = "hyper")]
-pub type HyperProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::HyperTransport, N>;
+pub type HyperProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 #[macro_use]
 extern crate tracing;

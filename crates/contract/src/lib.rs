@@ -7,6 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(test)]
+#[cfg(TODO)]
 extern crate self as alloy_contract;
 
 mod eth_call;

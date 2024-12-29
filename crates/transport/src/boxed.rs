@@ -22,8 +22,8 @@ pub struct BoxTransport {
 
 impl BoxTransport {
     /// Instantiate a new box transport from a suitable transport.
-    pub fn new<T: Transport + Clone + Send + Sync>(inner: T) -> Self {
-        Self { inner: Box::new(inner) }
+    pub fn new<T: IntoBoxTransport>(transport: T) -> Self {
+        transport.into_box_transport()
     }
 
     /// Returns a reference to the inner transport.
@@ -41,6 +41,24 @@ impl fmt::Debug for BoxTransport {
 impl Clone for BoxTransport {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone_box() }
+    }
+}
+
+#[allow(unnameable_types)]
+mod private {
+    pub trait Sealed {}
+    impl<T: super::Transport + Clone> Sealed for T {}
+}
+
+/// Trait for converting a transport into a boxed transport.
+pub trait IntoBoxTransport: Transport + Clone + private::Sealed {
+    /// Boxes the transport.
+    fn into_box_transport(self) -> BoxTransport;
+}
+
+impl<T: Transport + Clone> IntoBoxTransport for T {
+    fn into_box_transport(self) -> BoxTransport {
+        BoxTransport { inner: Box::new(self) }
     }
 }
 
