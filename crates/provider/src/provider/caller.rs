@@ -3,12 +3,11 @@ use crate::ProviderCall;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_rpc_client::WeakClient;
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{TransportErrorKind, TransportResult};
 
 /// Trait that helpes convert `EthCall` into a `ProviderCall`.
-pub trait Caller<T, N, Resp>: Send + Sync
+pub trait Caller<N, Resp>: Send + Sync
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
 {
@@ -18,42 +17,41 @@ where
     fn call(
         &self,
         params: EthCallParams<'_, N>,
-    ) -> TransportResult<ProviderCall<T, EthCallParams<'static, N>, Resp>>;
+    ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>>;
 
     /// Method that needs to be implemented for estimating gas using "eth_estimateGas" for the
     /// transaction.
     fn estimate_gas(
         &self,
         params: EthCallParams<'_, N>,
-    ) -> TransportResult<ProviderCall<T, EthCallParams<'static, N>, Resp>>;
+    ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>>;
 }
 
-impl<T, N, Resp> Caller<T, N, Resp> for WeakClient<T>
+impl<N, Resp> Caller<N, Resp> for WeakClient
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
 {
     fn call(
         &self,
         params: EthCallParams<'_, N>,
-    ) -> TransportResult<ProviderCall<T, EthCallParams<'static, N>, Resp>> {
+    ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
         provider_rpc_call(self, "eth_call", params)
     }
 
     fn estimate_gas(
         &self,
         params: EthCallParams<'_, N>,
-    ) -> TransportResult<ProviderCall<T, EthCallParams<'static, N>, Resp>> {
+    ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
         provider_rpc_call(self, "eth_estimateGas", params)
     }
 }
 
-fn provider_rpc_call<T: Transport + Clone, N: Network, Resp: RpcReturn>(
-    client: &WeakClient<T>,
+fn provider_rpc_call<N: Network, Resp: RpcReturn>(
+    client: &WeakClient,
     method: &'static str,
     params: EthCallParams<'_, N>,
-) -> TransportResult<ProviderCall<T, EthCallParams<'static, N>, Resp>> {
+) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
     let client = client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
 
     let rpc_call = client.request(method, params.into_owned());

@@ -7,10 +7,7 @@ use alloy_primitives::{
 };
 
 /// Alias for backwards compat
-#[deprecated(
-    since = "0.8.4",
-    note = "Please use `TransactionConditional` instead of `ConditionalOptions`."
-)]
+#[deprecated(since = "0.8.4", note = "use `TransactionConditional` instead")]
 pub type ConditionalOptions = TransactionConditional;
 
 /// Options for conditional raw transaction submissions.

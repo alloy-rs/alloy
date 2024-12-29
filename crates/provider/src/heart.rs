@@ -8,7 +8,7 @@ use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, B256,
 };
-use alloy_transport::{utils::Spawnable, Transport, TransportError};
+use alloy_transport::{utils::Spawnable, TransportError};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -83,22 +83,19 @@ pub enum PendingTransactionError {
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
 #[doc(alias = "PendingTxBuilder")]
-pub struct PendingTransactionBuilder<T, N: Network> {
+pub struct PendingTransactionBuilder<N: Network> {
     config: PendingTransactionConfig,
-    provider: RootProvider<T, N>,
+    provider: RootProvider<N>,
 }
 
-impl<T: Transport + Clone, N: Network> PendingTransactionBuilder<T, N> {
+impl<N: Network> PendingTransactionBuilder<N> {
     /// Creates a new pending transaction builder.
-    pub const fn new(provider: RootProvider<T, N>, tx_hash: TxHash) -> Self {
+    pub const fn new(provider: RootProvider<N>, tx_hash: TxHash) -> Self {
         Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
     /// Creates a new pending transaction builder from the given configuration.
-    pub const fn from_config(
-        provider: RootProvider<T, N>,
-        config: PendingTransactionConfig,
-    ) -> Self {
+    pub const fn from_config(provider: RootProvider<N>, config: PendingTransactionConfig) -> Self {
         Self { config, provider }
     }
 
@@ -113,12 +110,12 @@ impl<T: Transport + Clone, N: Network> PendingTransactionBuilder<T, N> {
     }
 
     /// Returns the provider.
-    pub const fn provider(&self) -> &RootProvider<T, N> {
+    pub const fn provider(&self) -> &RootProvider<N> {
         &self.provider
     }
 
     /// Consumes this builder, returning the provider and the configuration.
-    pub fn split(self) -> (RootProvider<T, N>, PendingTransactionConfig) {
+    pub fn split(self) -> (RootProvider<N>, PendingTransactionConfig) {
         (self.provider, self.config)
     }
 
@@ -324,10 +321,10 @@ impl PendingTransactionConfig {
     }
 
     /// Wraps this configuration with a provider to expose watching methods.
-    pub const fn with_provider<T: Transport + Clone, N: Network>(
+    pub const fn with_provider<N: Network>(
         self,
-        provider: RootProvider<T, N>,
-    ) -> PendingTransactionBuilder<T, N> {
+        provider: RootProvider<N>,
+    ) -> PendingTransactionBuilder<N> {
         PendingTransactionBuilder::from_config(provider, self)
     }
 }

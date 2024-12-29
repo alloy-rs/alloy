@@ -8,7 +8,7 @@ use alloy_primitives::{
 use alloy_rpc_types_eth::{
     BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
 };
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{TransportErrorKind, TransportResult};
 use parking_lot::RwLock;
 use schnellru::{ByLength, LruMap};
 use serde::{Deserialize, Serialize};
@@ -45,13 +45,12 @@ impl CacheLayer {
     }
 }
 
-impl<P, T, N> ProviderLayer<P, T, N> for CacheLayer
+impl<P, N> ProviderLayer<P, N> for CacheLayer
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
-    type Provider = CacheProvider<P, T, N>;
+    type Provider = CacheProvider<P, N>;
 
     fn layer(&self, inner: P) -> Self::Provider {
         CacheProvider::new(inner, self.cache())
@@ -66,19 +65,18 @@ where
 /// to the provider interface, allowing users to save the cache to disk and load it
 /// from there on demand.
 #[derive(Debug, Clone)]
-pub struct CacheProvider<P, T, N> {
+pub struct CacheProvider<P, N> {
     /// Inner provider.
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
     cache: SharedCache,
     /// Phantom data
-    _pd: PhantomData<(T, N)>,
+    _pd: PhantomData<N>,
 }
 
-impl<P, T, N> CacheProvider<P, T, N>
+impl<P, N> CacheProvider<P, N>
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     /// Instantiate a new cache provider.
@@ -142,14 +140,13 @@ macro_rules! cache_rpc_call_with_block {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<P, T, N> Provider<T, N> for CacheProvider<P, T, N>
+impl<P, N> Provider<N> for CacheProvider<P, N>
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     #[inline(always)]
-    fn root(&self) -> &RootProvider<T, N> {
+    fn root(&self) -> &RootProvider<N> {
         self.inner.root()
     }
 
@@ -186,7 +183,7 @@ where
     fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> ProviderCall<T, (BlockId,), Option<Vec<N::ReceiptResponse>>> {
+    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,));
 
         let redirect =
@@ -223,7 +220,7 @@ where
         }))
     }
 
-    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
@@ -257,7 +254,7 @@ where
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+    ) -> RpcWithBlock<(Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
@@ -271,7 +268,7 @@ where
         &self,
         address: Address,
         key: U256,
-    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+    ) -> RpcWithBlock<(Address, U256), StorageValue> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
@@ -283,7 +280,7 @@ where
     fn get_transaction_by_hash(
         &self,
         hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<N::TransactionResponse>> {
+    ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
         let req = RequestType::new("eth_getTransactionByHash", (hash,));
 
         let params_hash = req.params_hash().ok();
@@ -309,10 +306,7 @@ where
         }))
     }
 
-    fn get_raw_transaction_by_hash(
-        &self,
-        hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<Bytes>> {
+    fn get_raw_transaction_by_hash(&self, hash: TxHash) -> ProviderCall<(TxHash,), Option<Bytes>> {
         let req = RequestType::new("eth_getRawTransactionByHash", (hash,));
 
         let params_hash = req.params_hash().ok();
@@ -340,7 +334,7 @@ where
         }))
     }
 
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
+    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<Address, U64, u64> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
@@ -353,7 +347,7 @@ where
     fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<N::ReceiptResponse>> {
+    ) -> ProviderCall<(TxHash,), Option<N::ReceiptResponse>> {
         let req = RequestType::new("eth_getTransactionReceipt", (hash,));
 
         let params_hash = req.params_hash().ok();

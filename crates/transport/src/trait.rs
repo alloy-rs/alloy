@@ -1,4 +1,4 @@
-use crate::{BoxTransport, TransportError, TransportFut};
+use crate::{BoxTransport, IntoBoxTransport, TransportError, TransportFut};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use tower::Service;
 
@@ -46,7 +46,7 @@ pub trait Transport:
     /// Convert this transport into a boxed trait object.
     fn boxed(self) -> BoxTransport
     where
-        Self: Sized + Clone,
+        Self: IntoBoxTransport,
     {
         BoxTransport::new(self)
     }
@@ -54,7 +54,7 @@ pub trait Transport:
     /// Make a boxed trait object by cloning this transport.
     fn as_boxed(&self) -> BoxTransport
     where
-        Self: Sized + Clone,
+        Self: IntoBoxTransport,
     {
         self.clone().boxed()
     }
