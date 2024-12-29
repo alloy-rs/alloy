@@ -82,7 +82,7 @@ impl<P: Provider<N>, N: Network> ContractInstance<P, N> {
         &self,
         name: &str,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<&P, Function, N>> {
+    ) -> Result<CallBuilder<(), &P, Function, N>> {
         let function = self.interface.get_from_name(name)?;
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
@@ -92,13 +92,13 @@ impl<P: Provider<N>, N: Network> ContractInstance<P, N> {
         &self,
         selector: &Selector,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<&P, Function, N>> {
+    ) -> Result<CallBuilder<(), &P, Function, N>> {
         let function = self.interface.get_from_selector(selector)?;
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
 
     /// Returns an [`Event`] builder with the provided filter.
-    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<&P, E, N> {
+    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<(), &P, E, N> {
         Event::new(&self.provider, filter)
     }
 }

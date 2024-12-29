@@ -7,7 +7,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(test)]
-#[cfg(TODO)]
 extern crate self as alloy_contract;
 
 mod eth_call;
@@ -36,6 +35,10 @@ pub use call::*;
 #[doc(hidden)]
 pub mod private {
     pub use alloy_network::{Ethereum, Network};
-    pub use alloy_provider::Provider;
-    pub use alloy_transport::Transport;
+
+    pub trait Provider<T, N: Network>: alloy_provider::Provider<N> {}
+    impl<N: Network, P: alloy_provider::Provider<N>> Provider<(), N> for P {}
+
+    pub trait Transport {}
+    impl Transport for () {}
 }

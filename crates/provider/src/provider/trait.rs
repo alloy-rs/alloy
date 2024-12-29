@@ -137,7 +137,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # use alloy_eips::BlockId;
     /// # use alloy_rpc_types_eth::state::StateOverride;
     /// # use alloy_transport::BoxTransport;
-    /// # async fn example<P: Provider<BoxTransport>>(
+    /// # async fn example<P: Provider>(
     /// #    provider: P,
     /// #    my_overrides: StateOverride
     /// # ) -> Result<(), Box<dyn std::error::Error>> {

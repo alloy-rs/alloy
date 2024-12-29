@@ -50,8 +50,8 @@ const MAX_RETRIES: usize = 3;
 /// use alloy_rpc_client::PollerBuilder;
 /// use futures_util::StreamExt;
 ///
-/// let poller: PollerBuilder<_, (), U64> = client
-///     .prepare_static_poller("eth_blockNumber", ())
+/// let poller: PollerBuilder<alloy_rpc_client::NoParams, U64> = client
+///     .prepare_static_poller("eth_blockNumber", [])
 ///     .with_poll_interval(std::time::Duration::from_secs(5));
 /// let mut stream = poller.into_stream();
 /// while let Some(block_number) = stream.next().await {
