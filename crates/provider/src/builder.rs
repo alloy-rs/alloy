@@ -329,7 +329,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     #[cfg(any(test, feature = "reqwest"))]
     pub fn on_http(self, url: reqwest::Url) -> F::Provider
     where
-        L: ProviderLayer<crate::ReqwestProvider<N>, N>,
+        L: ProviderLayer<crate::RootProvider<N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
         N: Network,
     {
@@ -341,7 +341,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> F::Provider
     where
-        L: ProviderLayer<crate::HyperProvider<N>, N>,
+        L: ProviderLayer<crate::RootProvider<N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
         N: Network,
     {

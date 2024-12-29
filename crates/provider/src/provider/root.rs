@@ -73,7 +73,7 @@ impl<N: Network> RootProvider<N> {
     /// Connects to a boxed transport with the given connector.
     #[deprecated(
         since = "0.9.0",
-        note = "RootProvider is now always boxed, use `connect_with` instead"
+        note = "`RootProvider` is now always boxed, use `connect_with` instead"
     )]
     pub async fn connect_boxed<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
         Self::connect_with(conn).await
@@ -82,7 +82,7 @@ impl<N: Network> RootProvider<N> {
 
 impl<N: Network> RootProvider<N> {
     /// Boxes the inner client.
-    #[deprecated(since = "0.9.0", note = "RootProvider is now always boxed")]
+    #[deprecated(since = "0.9.0", note = "`RootProvider` is now always boxed")]
     #[allow(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self

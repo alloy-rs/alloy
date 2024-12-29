@@ -15,6 +15,7 @@ use alloy_transport_http as _;
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(any(test, feature = "reqwest"))]
+#[deprecated(since = "0.9.0", note = "use `RootProvider` instead")]
 pub type ReqwestProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a hyper
@@ -22,6 +23,7 @@ pub type ReqwestProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(feature = "hyper")]
+#[deprecated(since = "0.9.0", note = "use `RootProvider` instead")]
 pub type HyperProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 #[macro_use]

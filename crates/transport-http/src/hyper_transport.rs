@@ -1,3 +1,4 @@
+use crate::{Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
@@ -12,8 +13,6 @@ use hyper_util::client::legacy::Error;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
-
-use crate::{Http, HttpConnect};
 
 type Hyper = hyper_util::client::legacy::Client<
     hyper_util::client::legacy::connect::HttpConnector,

@@ -108,7 +108,7 @@ impl RpcClient {
     }
 
     /// Boxes the transport.
-    #[deprecated(since = "0.9.0", note = "RpcClient is now always boxed")]
+    #[deprecated(since = "0.9.0", note = "`RpcClient` is now always boxed")]
     #[allow(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self
@@ -299,7 +299,7 @@ impl RpcClientInner {
 
     /// Type erase the service in the transport, allowing it to be used in a
     /// generic context.
-    #[deprecated(since = "0.9.0", note = "RpcClientInner is now always boxed")]
+    #[deprecated(since = "0.9.0", note = "`RpcClientInner` is now always boxed")]
     #[allow(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self
