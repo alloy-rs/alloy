@@ -1,6 +1,7 @@
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
+    TransportResult,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
@@ -79,63 +80,46 @@ where
     ResBody::Error: std::error::Error + Send + Sync + 'static,
     ResBody::Data: Send,
 {
-    /// Make a request to the server using the given service.
-    fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
-        let this = self.clone();
-        let span = debug_span!("HyperClient", url = %this.url);
-        Box::pin(
-            async move {
-                debug!(count = req.len(), "sending request packet to server");
-                let ser = req.serialize().map_err(TransportError::ser_err)?;
-                // convert the Box<RawValue> into a hyper request<B>
-                let body = ser.get().as_bytes().to_owned().into();
+    async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
+        debug!(count = req.len(), "sending request packet to server");
+        let ser = req.serialize().map_err(TransportError::ser_err)?;
+        // convert the Box<RawValue> into a hyper request<B>
+        let body = ser.get().as_bytes().to_owned().into();
 
-                let req = hyper::Request::builder()
-                    .method(hyper::Method::POST)
-                    .uri(this.url.as_str())
-                    .header(
-                        header::CONTENT_TYPE,
-                        header::HeaderValue::from_static("application/json"),
-                    )
-                    .body(body)
-                    .expect("request parts are invalid");
+        let req = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri(self.url.as_str())
+            .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"))
+            .body(body)
+            .expect("request parts are invalid");
 
-                let mut service = this.client.service.clone();
-                let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
+        let mut service = self.client.service;
+        let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
 
-                let status = resp.status();
+        let status = resp.status();
 
-                debug!(%status, "received response from server");
+        debug!(%status, "received response from server");
 
-                // Unpack data from the response body. We do this regardless of
-                // the status code, as we want to return the error in the body
-                // if there is one.
-                let body = resp
-                    .into_body()
-                    .collect()
-                    .await
-                    .map_err(TransportErrorKind::custom)?
-                    .to_bytes();
+        // Unpack data from the response body. We do this regardless of
+        // the status code, as we want to return the error in the body
+        // if there is one.
+        let body = resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
 
-                debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-                trace!(body = %String::from_utf8_lossy(&body), "response body");
+        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        trace!(body = %String::from_utf8_lossy(&body), "response body");
 
-                if status != hyper::StatusCode::OK {
-                    return Err(TransportErrorKind::http_error(
-                        status.as_u16(),
-                        String::from_utf8_lossy(&body).into_owned(),
-                    ));
-                }
+        if status != hyper::StatusCode::OK {
+            return Err(TransportErrorKind::http_error(
+                status.as_u16(),
+                String::from_utf8_lossy(&body).into_owned(),
+            ));
+        }
 
-                // Deserialize a Box<RawValue> from the body. If deserialization fails, return
-                // the body as a string in the error. The conversion to String
-                // is lossy and may not cover all the bytes in the body.
-                serde_json::from_slice(&body).map_err(|err| {
-                    TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref()))
-                })
-            }
-            .instrument(span),
-        )
+        // Deserialize a Box<RawValue> from the body. If deserialization fails, return
+        // the body as a string in the error. The conversion to String
+        // is lossy and may not cover all the bytes in the body.
+        serde_json::from_slice(&body)
+            .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref())))
     }
 }
 
@@ -168,12 +152,14 @@ where
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        task::Poll::Ready(Ok(()))
+    #[inline]
+    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        (&*self).poll_ready(cx)
     }
 
+    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request_hyper(req)
+        (&*self).call(req)
     }
 }
 
@@ -188,11 +174,15 @@ where
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
+    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        // `hyper` always returns `Ok(())`.
         task::Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request_hyper(req)
+        let this = self.clone();
+        let span = debug_span!("HyperTransport", url = %this.url);
+        Box::pin(this.do_hyper(req).instrument(span))
     }
 }

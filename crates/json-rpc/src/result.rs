@@ -22,9 +22,7 @@ pub type BorrowedRpcResult<'a, E> = RpcResult<&'a RawValue, E, &'a RawValue>;
 /// Transform a transport response into an [`RpcResult`], discarding the [`Id`].
 ///
 /// [`Id`]: crate::Id
-pub fn transform_response<T, E, ErrResp>(
-    response: Response<T, ErrResp>,
-) -> Result<T, RpcError<E, ErrResp>>
+pub fn transform_response<T, E, ErrResp>(response: Response<T, ErrResp>) -> RpcResult<T, E, ErrResp>
 where
     ErrResp: RpcReturn,
 {
