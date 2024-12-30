@@ -1,7 +1,7 @@
 //! Types for the `txpool` namespace: <https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool>
 
 use alloy_primitives::{Address, U256};
-use alloy_rpc_types_eth::Transaction;
+use alloy_rpc_types_eth::{Transaction, TransactionTrait};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -19,6 +19,24 @@ pub struct TxpoolInspectSummary {
     pub gas: u64,
     /// Gas Price
     pub gas_price: u128,
+}
+
+impl TxpoolInspectSummary {
+    /// Extracts the [`TxpoolInspectSummary`] from a transaction.
+    pub fn from_tx<T: TransactionTrait>(tx: T) -> Self {
+        TxpoolInspectSummary {
+            to: tx.to(),
+            value: tx.value(),
+            gas: tx.gas_limit(),
+            gas_price: tx.max_fee_per_gas(),
+        }
+    }
+}
+
+impl<T: TransactionTrait> From<T> for TxpoolInspectSummary {
+    fn from(value: T) -> Self {
+        Self::from_tx(value)
+    }
 }
 
 /// Visitor struct for TxpoolInspectSummary.
