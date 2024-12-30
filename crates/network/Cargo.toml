@@ -39,8 +39,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-alloy-signer-local.workspace = true
-tokio.workspace = true
 
 [features]
 k256 = ["alloy-primitives/k256", "alloy-consensus/k256"]
