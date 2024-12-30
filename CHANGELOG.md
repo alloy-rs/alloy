@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
+
+### Features
+
+- Add deref for block ([#1868](https://github.com/alloy-rs/alloy/issues/1868))
+- Add helper for txpool inspect summary ([#1866](https://github.com/alloy-rs/alloy/issues/1866))
+
+### Miscellaneous Tasks
+
+- Add arbitrary for blockbody ([#1867](https://github.com/alloy-rs/alloy/issues/1867))
+- Add history serve window ([#1865](https://github.com/alloy-rs/alloy/issues/1865))
+
 ## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
 
 ### Bug Fixes
@@ -43,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.9.0
 - Rm unused alloy-signer dep ([#1862](https://github.com/alloy-rs/alloy/issues/1862))
 - Simplify Service impls ([#1861](https://github.com/alloy-rs/alloy/issues/1861))
 - Make clippy happy ([#1849](https://github.com/alloy-rs/alloy/issues/1849))

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use default for creation method ([#1820](https://github.com/alloy-rs/alloy/issues/1820))
 
+### Miscellaneous Tasks
+
+- Release 0.9.0
+
 ## [0.8.3](https://github.com/alloy-rs/alloy/releases/tag/v0.8.3) - 2024-12-20
 
 ### Miscellaneous Tasks

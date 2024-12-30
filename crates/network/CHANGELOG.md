@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add helpers to any tx envelope ([#1817](https://github.com/alloy-rs/alloy/issues/1817))
 
+### Miscellaneous Tasks
+
+- Release 0.9.0
+
 ### Other
 
 - Change `chain_id` type to `U256` ([#1839](https://github.com/alloy-rs/alloy/issues/1839))
