@@ -1,4 +1,4 @@
-#![cfg_attr(not(doctest), doc = include_str!("../Readme.md"))]
+// #![cfg_attr(not(doctest), doc = include_str!("../Readme.md"))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
