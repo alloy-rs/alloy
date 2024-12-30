@@ -35,13 +35,8 @@ alloy-dyn-abi = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
-alloy-consensus = { workspace = true, features = ["std"] }
-alloy-network.workspace = true
-alloy-signer-local.workspace = true
 assert_matches.workspace = true
-serde_json.workspace = true
 serde.workspace = true
-tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
