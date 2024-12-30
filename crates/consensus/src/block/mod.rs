@@ -107,25 +107,13 @@ impl<T, H> From<Block<T, H>> for BlockBody<T> {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for Block<T>
+impl<'a, T, H> arbitrary::Arbitrary<'a> for Block<T, H>
 where
     T: arbitrary::Arbitrary<'a>,
+    H: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // first generate a reasonable amount of txs
-        let transactions = (0..u.int_in_range(0..=100)?)
-            .map(|_| T::arbitrary(u))
-            .collect::<arbitrary::Result<Vec<_>>>()?;
-
-        // then generate up to 2 ommers
-        let ommers = (0..u.int_in_range(0..=1)?)
-            .map(|_| Header::arbitrary(u))
-            .collect::<arbitrary::Result<Vec<_>>>()?;
-
-        Ok(Self {
-            header: u.arbitrary()?,
-            body: BlockBody { transactions, ommers, withdrawals: u.arbitrary()? },
-        })
+        Ok(Self { header: u.arbitrary()?, body: u.arbitrary()? })
     }
 }
 
@@ -251,5 +239,26 @@ mod block_rlp {
             let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a, T> arbitrary::Arbitrary<'a> for BlockBody<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // first generate up to 100 txs
+        // first generate a reasonable amount of txs
+        let transactions = (0..u.int_in_range(0..=100)?)
+            .map(|_| T::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        // then generate up to 2 ommers
+        let ommers = (0..u.int_in_range(0..=1)?)
+            .map(|_| Header::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        Ok(Self { transactions, ommers, withdrawals: u.arbitrary()? })
     }
 }
