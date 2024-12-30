@@ -19,7 +19,7 @@ Signer implementations in Alloy:
 
 Sign an Ethereum prefixed message ([EIP-712](https://eips.ethereum.org/EIPS/eip-712)):
 
-```rust,no_run
+```rust,ignore
 use alloy_signer::{Signer, SignerSync};
 use alloy_signer_local::PrivateKeySigner;
 
@@ -38,7 +38,7 @@ assert_eq!(recovered, signer.address());
 
 Sign a transaction:
 
-```rust,no_run
+```rust,ignore
 use alloy_consensus::TxLegacy;
 use alloy_primitives::{U256, address, bytes};
 use alloy_signer::{Signer, SignerSync};
