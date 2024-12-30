@@ -24,7 +24,7 @@ pub struct TxpoolInspectSummary {
 impl TxpoolInspectSummary {
     /// Extracts the [`TxpoolInspectSummary`] from a transaction.
     pub fn from_tx<T: TransactionTrait>(tx: T) -> Self {
-        TxpoolInspectSummary {
+        Self {
             to: tx.to(),
             value: tx.value(),
             gas: tx.gas_limit(),
