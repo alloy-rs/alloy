@@ -19,10 +19,11 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 /// Taken from [reth-primitives](https://github.com/paradigmxyz/reth)
 ///
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, derive_more::Deref)]
 #[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct Block<T, H = Header> {
     /// Block header.
+    #[deref]
     pub header: H,
     /// Block body.
     pub body: BlockBody<T>,
@@ -107,25 +108,13 @@ impl<T, H> From<Block<T, H>> for BlockBody<T> {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for Block<T>
+impl<'a, T, H> arbitrary::Arbitrary<'a> for Block<T, H>
 where
     T: arbitrary::Arbitrary<'a>,
+    H: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // first generate a reasonable amount of txs
-        let transactions = (0..u.int_in_range(0..=100)?)
-            .map(|_| T::arbitrary(u))
-            .collect::<arbitrary::Result<Vec<_>>>()?;
-
-        // then generate up to 2 ommers
-        let ommers = (0..u.int_in_range(0..=1)?)
-            .map(|_| Header::arbitrary(u))
-            .collect::<arbitrary::Result<Vec<_>>>()?;
-
-        Ok(Self {
-            header: u.arbitrary()?,
-            body: BlockBody { transactions, ommers, withdrawals: u.arbitrary()? },
-        })
+        Ok(Self { header: u.arbitrary()?, body: u.arbitrary()? })
     }
 }
 
@@ -251,5 +240,26 @@ mod block_rlp {
             let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a, T> arbitrary::Arbitrary<'a> for BlockBody<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // first generate up to 100 txs
+        // first generate a reasonable amount of txs
+        let transactions = (0..u.int_in_range(0..=100)?)
+            .map(|_| T::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        // then generate up to 2 ommers
+        let ommers = (0..u.int_in_range(0..=1)?)
+            .map(|_| Header::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        Ok(Self { transactions, ommers, withdrawals: u.arbitrary()? })
     }
 }

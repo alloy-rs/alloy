@@ -5,11 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
+
+### Features
+
+- Add deref for block ([#1868](https://github.com/alloy-rs/alloy/issues/1868))
+
+### Miscellaneous Tasks
+
+- Add arbitrary for blockbody ([#1867](https://github.com/alloy-rs/alloy/issues/1867))
+
+## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
+
+### Bug Fixes
+
+- Use u64 for all gas values ([#1848](https://github.com/alloy-rs/alloy/issues/1848))
+
+### Features
+
+- Add tryfrom payloadv1 for block ([#1851](https://github.com/alloy-rs/alloy/issues/1851))
+- Add match functions ([#1847](https://github.com/alloy-rs/alloy/issues/1847))
+- Add BlockConditional ([#1846](https://github.com/alloy-rs/alloy/issues/1846))
+- EIP-7840 ([#1828](https://github.com/alloy-rs/alloy/issues/1828))
+- Return tagged variant deserde error ([#1810](https://github.com/alloy-rs/alloy/issues/1810))
+- [pectra] Revert EIP-7742 ([#1807](https://github.com/alloy-rs/alloy/issues/1807))
+- Add map transactions fn ([#1827](https://github.com/alloy-rs/alloy/issues/1827))
+- Add helpers for block ([#1816](https://github.com/alloy-rs/alloy/issues/1816))
+- Add helpers to any tx envelope ([#1817](https://github.com/alloy-rs/alloy/issues/1817))
+
+### Miscellaneous Tasks
+
+- Rm unused alloy-signer dep ([#1862](https://github.com/alloy-rs/alloy/issues/1862))
+- Rm non exhaustive from ReceiptEnvelope ([#1843](https://github.com/alloy-rs/alloy/issues/1843))
+- Rm non exhaustive for envelope ([#1842](https://github.com/alloy-rs/alloy/issues/1842))
+- Map header fns ([#1840](https://github.com/alloy-rs/alloy/issues/1840))
+
+### Other
+
+- Change `chain_id` type to `U256` ([#1839](https://github.com/alloy-rs/alloy/issues/1839))
+
 ## [0.8.3](https://github.com/alloy-rs/alloy/releases/tag/v0.8.3) - 2024-12-20
 
 ### Features
 
 - Add serde for block ([#1814](https://github.com/alloy-rs/alloy/issues/1814))
+
+### Miscellaneous Tasks
+
+- Release 0.8.3
 
 ## [0.8.2](https://github.com/alloy-rs/alloy/releases/tag/v0.8.2) - 2024-12-19
 

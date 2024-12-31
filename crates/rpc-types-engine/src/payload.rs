@@ -10,8 +10,11 @@ use alloy_consensus::{
     EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
-    eip2718::Decodable2718, eip4844::BlobTransactionSidecar, eip4895::Withdrawal,
-    eip7685::Requests, BlockNumHash,
+    eip2718::{Decodable2718, Encodable2718},
+    eip4844::BlobTransactionSidecar,
+    eip4895::{Withdrawal, Withdrawals},
+    eip7685::Requests,
+    BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
@@ -293,6 +296,35 @@ impl ExecutionPayloadV1 {
         };
 
         Ok(Block { header, body: BlockBody { transactions, ommers: vec![], withdrawals: None } })
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow<T: Encodable2718>(block: &Block<T>) -> Self {
+        Self::from_block_unchecked(block.hash_slow(), block)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`] using the given block hash.
+    pub fn from_block_unchecked<T: Encodable2718>(block_hash: B256, block: &Block<T>) -> Self {
+        let transactions =
+            block.body.transactions().map(|tx| tx.encoded_2718().into()).collect::<Vec<_>>();
+        Self {
+            parent_hash: block.parent_hash,
+            fee_recipient: block.beneficiary,
+            state_root: block.state_root,
+            receipts_root: block.receipts_root,
+            logs_bloom: block.logs_bloom,
+            prev_randao: block.mix_hash,
+            block_number: block.number,
+            gas_limit: block.gas_limit,
+            gas_used: block.gas_used,
+            timestamp: block.timestamp,
+            base_fee_per_gas: U256::from(block.base_fee_per_gas.unwrap_or_default()),
+            extra_data: block.header.extra_data.clone(),
+            block_hash,
+            transactions,
+        }
     }
 }
 
@@ -892,6 +924,22 @@ pub struct ExecutionPayloadBodyV1 {
     ///
     /// Will always be `None` if pre shanghai.
     pub withdrawals: Option<Vec<Withdrawal>>,
+}
+
+impl ExecutionPayloadBodyV1 {
+    /// Converts a [`alloy_consensus::Block`] into an execution payload body.
+    pub fn from_block<T: Encodable2718, H>(block: Block<T, H>) -> Self {
+        Self {
+            transactions: block.body.transactions().map(|tx| tx.encoded_2718().into()).collect(),
+            withdrawals: block.body.withdrawals.map(Withdrawals::into_inner),
+        }
+    }
+}
+
+impl<T: Encodable2718, H> From<Block<T, H>> for ExecutionPayloadBodyV1 {
+    fn from(value: Block<T, H>) -> Self {
+        Self::from_block(value)
+    }
 }
 
 /// This structure contains the attributes required to initiate a payload build process in the

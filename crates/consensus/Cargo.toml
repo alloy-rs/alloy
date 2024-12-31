@@ -51,7 +51,6 @@ auto_impl.workspace = true
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
-alloy-signer.workspace = true
 
 arbitrary = { workspace = true, features = ["derive"] }
 bincode = "1.3"
