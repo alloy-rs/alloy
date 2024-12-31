@@ -198,7 +198,7 @@ impl<T> Block<T> {
     pub fn into_consensus(self) -> alloy_consensus::Block<T> {
         let Self { header, transactions, withdrawals, .. } = self;
         alloy_consensus::BlockBody {
-            transactions: transactions.into_vec(),
+            transactions: transactions.into_transactions_vec(),
             ommers: vec![],
             withdrawals,
         }

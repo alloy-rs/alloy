@@ -109,7 +109,7 @@ impl<T> BlockTransactions<T> {
     /// Consumes the type and returns the transactions as a vector.
     ///
     /// Note: if this is an uncle or hashes, this will return an empty vector.
-    pub fn into_vec(self) -> Vec<T> {
+    pub fn into_transactions_vec(self) -> Vec<T> {
         match self {
             Self::Full(txs) => txs,
             _ => vec![],
