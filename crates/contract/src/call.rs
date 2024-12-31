@@ -532,8 +532,9 @@ impl<T, P: Clone, D, N: Network> CallBuilder<T, &P, D, N> {
 /// the associated future type, the returned future, must be a concrete type (`Box<dyn Future ...>`)
 /// and cannot be an opaque type (`impl Future ...`) because `impl Trait` in this position is not
 /// stable yet. See [rust-lang/rust#63063](https://github.com/rust-lang/rust/issues/63063).
-impl<T: Send + Sync, P, D, N> IntoFuture for CallBuilder<T, P, D, N>
+impl<T, P, D, N> IntoFuture for CallBuilder<T, P, D, N>
 where
+    T: Send + Sync,
     P: Provider<N>,
     D: CallDecoder + Send + Sync + Unpin,
     N: Network,

@@ -22,6 +22,8 @@ impl<T: Transport + Clone> IntoBoxTransport for T {
     fn into_box_transport(self) -> BoxTransport {
         // "specialization" to re-use `BoxTransport`.
         if TypeId::of::<T>() == TypeId::of::<BoxTransport>() {
+            // This is not `transmute` because it doesn't allow size mismatch at compile time.
+            // `transmute_copy` is a work-around for `transmute_unchecked` not being stable.
             // SAFETY: `self` is `BoxTransport`. This is a no-op.
             let this = std::mem::ManuallyDrop::new(self);
             return unsafe { std::mem::transmute_copy(&this) };
