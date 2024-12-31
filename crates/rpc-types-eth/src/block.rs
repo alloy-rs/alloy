@@ -188,6 +188,22 @@ impl<T> Block<T> {
             withdrawals,
         }
     }
+
+    /// Consumes the block and returns the [`alloy_consensus::Block`].
+    ///
+    /// This has two caveats:
+    ///  - The returned block will always have empty uncles.
+    ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
+    ///    have an empty transaction vec.
+    pub fn into_consensus(self) -> alloy_consensus::Block<T> {
+        let Self { header, transactions, withdrawals, .. } = self;
+        alloy_consensus::BlockBody {
+            transactions: transactions.into_vec(),
+            ommers: vec![],
+            withdrawals,
+        }
+        .into_block(header.into_consensus())
+    }
 }
 
 /// RPC representation of block header, wrapping a consensus header.
@@ -230,6 +246,11 @@ impl<H> Header<H> {
     pub fn from_sealed(header: Sealed<H>) -> Self {
         let (inner, hash) = header.into_parts();
         Self { hash, inner, total_difficulty: None, size: None }
+    }
+
+    /// Consumes the type and returns the wrapped consensus header.
+    pub fn into_consensus(self) -> H {
+        self.inner
     }
 
     /// Create a new [`Header`] from a sealed consensus header and additional fields.
@@ -393,6 +414,12 @@ impl<H: BlockHeader> HeaderResponse for Header<H> {
     }
 }
 
+impl From<Header> for alloy_consensus::Header {
+    fn from(header: Header) -> Self {
+        header.into_consensus()
+    }
+}
+
 /// Error that can occur when converting other types to blocks
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
@@ -504,7 +531,7 @@ impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BadBlock {
-    /// Underyling block object.
+    /// Underlying block object.
     block: Block,
     /// Hash of the block.
     hash: BlockHash,
