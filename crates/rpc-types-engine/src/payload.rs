@@ -10,8 +10,11 @@ use alloy_consensus::{
     EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
-    eip2718::Decodable2718, eip4844::BlobTransactionSidecar, eip4895::Withdrawal,
-    eip7685::Requests, BlockNumHash,
+    eip2718::{Decodable2718, Encodable2718},
+    eip4844::BlobTransactionSidecar,
+    eip4895::{Withdrawal, Withdrawals},
+    eip7685::Requests,
+    BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
@@ -892,6 +895,22 @@ pub struct ExecutionPayloadBodyV1 {
     ///
     /// Will always be `None` if pre shanghai.
     pub withdrawals: Option<Vec<Withdrawal>>,
+}
+
+impl ExecutionPayloadBodyV1 {
+    /// Converts a [`alloy_consensus::Block`] into an execution payload body.
+    pub fn from_block<T: Encodable2718, H>(block: Block<T, H>) -> Self {
+        Self {
+            transactions: block.body.transactions().map(|tx| tx.encoded_2718().into()).collect(),
+            withdrawals: block.body.withdrawals.map(Withdrawals::into_inner),
+        }
+    }
+}
+
+impl<T: Encodable2718, H> From<Block<T, H>> for ExecutionPayloadBodyV1 {
+    fn from(value: Block<T, H>) -> Self {
+        Self::from_block(value)
+    }
 }
 
 /// This structure contains the attributes required to initiate a payload build process in the
