@@ -92,7 +92,7 @@ impl Requests {
         let mut requests: Vec<_> = self.0.iter().collect();
         requests.retain(|req| req.len() > 1);
         requests.sort();
-    
+
         for req in requests {
             let mut req_hash = Sha256::new();
             req_hash.update(req);
