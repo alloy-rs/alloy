@@ -88,12 +88,12 @@ impl Requests {
     pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
-        for req in self.0.iter() {
-            if req.is_empty() {
-                // Sanity check: empty requests are omitted from the hash calculation.
-                continue;
-            }
 
+        let mut requests: Vec<_> = self.0.iter().collect();
+        requests.retain(|req| req.len() > 1);
+        requests.sort();
+    
+        for req in requests {
             let mut req_hash = Sha256::new();
             req_hash.update(req);
             hash.update(req_hash.finalize());
