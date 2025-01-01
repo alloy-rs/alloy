@@ -424,7 +424,7 @@ mod tests {
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        provider.anvil_mine(Some(10 as u64), None).await.unwrap();
+        provider.anvil_mine(Some(10), None).await.unwrap();
 
         let num = provider.get_block_number().await.unwrap();
 
@@ -952,7 +952,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         // Mine two blocks
-        provider.anvil_mine(Some(2 as u64), None).await.unwrap();
+        provider.anvil_mine(Some(2), None).await.unwrap();
 
         let reorged_block = provider
             .get_block_by_number(2.into(), BlockTransactionsKind::Hashes)
