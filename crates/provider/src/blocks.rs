@@ -182,7 +182,6 @@ mod tests {
     use super::*;
     use crate::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::U256;
     use std::{future::Future, time::Duration};
 
     async fn timeout<T: Future>(future: T) -> T::Output {
@@ -215,7 +214,7 @@ mod tests {
         }
 
         // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(U256::from(1)), None).await.unwrap();
+        provider.anvil_mine(Some(1), None).await.unwrap();
 
         let block = timeout(stream.next()).await.expect("Block wasn't fetched");
         assert_eq!(block.header.number, 1);
@@ -246,7 +245,7 @@ mod tests {
         }
 
         // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(U256::from(BLOCKS_TO_MINE)), None).await.unwrap();
+        provider.anvil_mine(Some(BLOCKS_TO_MINE as u64), None).await.unwrap();
 
         let blocks = timeout(stream.take(BLOCKS_TO_MINE).collect::<Vec<_>>()).await;
         assert_eq!(blocks.len(), BLOCKS_TO_MINE);

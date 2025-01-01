@@ -34,8 +34,8 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
     /// Mines a series of blocks.
     async fn anvil_mine(
         &self,
-        num_blocks: Option<U256>,
-        interval: Option<U256>,
+        num_blocks: Option<u64>,
+        interval: Option<u64>,
     ) -> TransportResult<()>;
 
     /// Sets the mining behavior to interval with the given interval (seconds).
@@ -62,7 +62,7 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
     async fn anvil_set_code(&self, address: Address, code: Bytes) -> TransportResult<()>;
 
     /// Sets the nonce of an address.
-    async fn anvil_set_nonce(&self, address: Address, nonce: U256) -> TransportResult<()>;
+    async fn anvil_set_nonce(&self, address: Address, nonce: u64) -> TransportResult<()>;
 
     /// Writes a single slot of the account's storage.
     async fn anvil_set_storage_at(
@@ -76,10 +76,10 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
     async fn anvil_set_logging(&self, enable: bool) -> TransportResult<()>;
 
     /// Set the minimum gas price for the node.
-    async fn anvil_set_min_gas_price(&self, gas: U256) -> TransportResult<()>;
+    async fn anvil_set_min_gas_price(&self, gas: u128) -> TransportResult<()>;
 
     /// Sets the base fee of the next block.
-    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: U256) -> TransportResult<()>;
+    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: u128) -> TransportResult<()>;
 
     /// Sets the coinbase address.
     async fn anvil_set_coinbase(&self, address: Address) -> TransportResult<()>;
@@ -109,7 +109,7 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
     async fn anvil_revert(&self, id: U256) -> TransportResult<bool>;
 
     /// Jump forward in time by the given amount of time, in seconds.
-    async fn anvil_increase_time(&self, seconds: U256) -> TransportResult<i64>;
+    async fn anvil_increase_time(&self, seconds: u64) -> TransportResult<i64>;
 
     /// Similar to `evm_increaseTime` but takes the exact timestamp that you want in the next block.
     async fn anvil_set_next_block_timestamp(&self, timestamp: u64) -> TransportResult<()>;
@@ -119,7 +119,7 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
     async fn anvil_set_time(&self, timestamp: u64) -> TransportResult<u64>;
 
     /// Set the next block gas limit.
-    async fn anvil_set_block_gas_limit(&self, gas_limit: U256) -> TransportResult<bool>;
+    async fn anvil_set_block_gas_limit(&self, gas_limit: u64) -> TransportResult<bool>;
 
     /// Sets an interval for the block timestamp.
     async fn anvil_set_block_timestamp_interval(&self, seconds: u64) -> TransportResult<()>;
@@ -178,8 +178,8 @@ where
 
     async fn anvil_mine(
         &self,
-        num_blocks: Option<U256>,
-        interval: Option<U256>,
+        num_blocks: Option<u64>,
+        interval: Option<u64>,
     ) -> TransportResult<()> {
         self.client().request("anvil_mine", (num_blocks, interval)).await
     }
@@ -212,7 +212,7 @@ where
         self.client().request("anvil_setCode", (address, code)).await
     }
 
-    async fn anvil_set_nonce(&self, address: Address, nonce: U256) -> TransportResult<()> {
+    async fn anvil_set_nonce(&self, address: Address, nonce: u64) -> TransportResult<()> {
         self.client().request("anvil_setNonce", (address, nonce)).await
     }
 
@@ -229,11 +229,11 @@ where
         self.client().request("anvil_setLoggingEnabled", (enable,)).await
     }
 
-    async fn anvil_set_min_gas_price(&self, gas: U256) -> TransportResult<()> {
+    async fn anvil_set_min_gas_price(&self, gas: u128) -> TransportResult<()> {
         self.client().request("anvil_setMinGasPrice", (gas,)).await
     }
 
-    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: U256) -> TransportResult<()> {
+    async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: u128) -> TransportResult<()> {
         self.client().request("anvil_setNextBlockBaseFeePerGas", (basefee,)).await
     }
 
@@ -269,7 +269,7 @@ where
         self.client().request("evm_revert", (id,)).await
     }
 
-    async fn anvil_increase_time(&self, seconds: U256) -> TransportResult<i64> {
+    async fn anvil_increase_time(&self, seconds: u64) -> TransportResult<i64> {
         self.client().request("evm_increaseTime", (seconds,)).await
     }
 
@@ -281,7 +281,7 @@ where
         self.client().request("evm_setTime", (timestamp,)).await
     }
 
-    async fn anvil_set_block_gas_limit(&self, gas_limit: U256) -> TransportResult<bool> {
+    async fn anvil_set_block_gas_limit(&self, gas_limit: u64) -> TransportResult<bool> {
         self.client().request("evm_setBlockGasLimit", (gas_limit,)).await
     }
 
@@ -424,7 +424,7 @@ mod tests {
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        provider.anvil_mine(Some(U256::from(10)), None).await.unwrap();
+        provider.anvil_mine(Some(10 as u64), None).await.unwrap();
 
         let num = provider.get_block_number().await.unwrap();
 
@@ -566,11 +566,11 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let address = Address::random();
-        let nonce = U256::from(1337);
+        let nonce = 1337;
         provider.anvil_set_nonce(address, nonce).await.unwrap();
 
         let new_nonce = provider.get_transaction_count(address).await.unwrap();
-        assert_eq!(new_nonce, nonce.to::<u64>());
+        assert_eq!(new_nonce, nonce);
     }
 
     #[tokio::test]
@@ -599,7 +599,7 @@ mod tests {
 
         let gas = U256::from(1337);
 
-        if let Err(e) = provider.anvil_set_min_gas_price(gas).await {
+        if let Err(e) = provider.anvil_set_min_gas_price(gas.try_into().unwrap()).await {
             assert_eq!(
                 e.to_string(),
                 "server returned an error response: error code -32602: anvil_setMinGasPrice is not supported when EIP-1559 is active"
@@ -611,7 +611,7 @@ mod tests {
     async fn test_anvil_set_next_block_base_fee_per_gas() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let basefee = U256::from(1337);
+        let basefee = 1337;
         provider.anvil_set_next_block_base_fee_per_gas(basefee).await.unwrap();
 
         provider.evm_mine(None).await.unwrap();
@@ -622,7 +622,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u64>()));
+        assert_eq!(block.header.base_fee_per_gas, Some(basefee as u64));
     }
 
     #[tokio::test]
@@ -762,7 +762,7 @@ mod tests {
             .header
             .timestamp;
 
-        let seconds = provider.anvil_increase_time(U256::from(1337)).await.unwrap();
+        let seconds = provider.anvil_increase_time(1337).await.unwrap();
 
         assert_eq!(timestamp as i64 + seconds, timestamp as i64 + 1337_i64);
     }
@@ -806,7 +806,7 @@ mod tests {
     async fn test_anvil_set_block_gas_limit() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let block_gas_limit = U256::from(1337);
+        let block_gas_limit = 1337;
         assert!(provider.anvil_set_block_gas_limit(block_gas_limit).await.unwrap());
 
         provider.evm_mine(None).await.unwrap();
@@ -816,7 +816,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(block_gas_limit.to::<u64>(), latest_block.header.gas_limit);
+        assert_eq!(block_gas_limit, latest_block.header.gas_limit);
     }
 
     #[tokio::test]
@@ -952,7 +952,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         // Mine two blocks
-        provider.anvil_mine(Some(U256::from(2)), None).await.unwrap();
+        provider.anvil_mine(Some(2 as u64), None).await.unwrap();
 
         let reorged_block = provider
             .get_block_by_number(2.into(), BlockTransactionsKind::Hashes)
