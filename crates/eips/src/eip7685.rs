@@ -84,16 +84,21 @@ impl Requests {
     /// Each request in the container is expected to already have the `request_type` prepended
     /// to its corresponding `requests_data`. This function directly calculates the hash based
     /// on the combined `request_type` and `requests_data`.
+    ///
+    /// Empty requests are omitted from the hash calculation.
+    /// Requests are sorted by their `request_type` before hashing, see also [Ordering](https://eips.ethereum.org/EIPS/eip-7685#ordering)
     #[cfg(feature = "sha2")]
     pub fn requests_hash(&self) -> B256 {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
-        for req in self.0.iter() {
-            if req.is_empty() {
-                // Sanity check: empty requests are omitted from the hash calculation.
-                continue;
-            }
 
+        let mut requests: Vec<_> = self.0.iter().filter(|req| !req.is_empty()).collect();
+        requests.sort_unstable_by_key(|req| {
+            // SAFETY: only includes non-empty requests
+            req[0]
+        });
+
+        for req in requests {
             let mut req_hash = Sha256::new();
             req_hash.update(req);
             hash.update(req_hash.finalize());
