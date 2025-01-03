@@ -44,6 +44,19 @@ impl From<Anvil> for AnvilLayer {
     }
 }
 
+impl<'a, P, T> ProviderLayer<P, T, Ethereum> for &'a AnvilLayer
+where
+    P: Provider<T>,
+    T: Transport + Clone,
+{
+    type Provider = AnvilProvider<P, T>;
+
+    fn layer(self, inner: P) -> Self::Provider {
+        let anvil = self.instance();
+        AnvilProvider::new(inner, anvil.clone())
+    }
+}
+
 impl<P, T> ProviderLayer<P, T, Ethereum> for AnvilLayer
 where
     P: Provider<T>,
@@ -51,7 +64,7 @@ where
 {
     type Provider = AnvilProvider<P, T>;
 
-    fn layer(&self, inner: P) -> Self::Provider {
+    fn layer(self, inner: P) -> Self::Provider {
         let anvil = self.instance();
         AnvilProvider::new(inner, anvil.clone())
     }
