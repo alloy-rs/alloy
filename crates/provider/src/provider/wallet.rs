@@ -4,7 +4,6 @@ use crate::{
 };
 use alloy_network::{Ethereum, Network, NetworkWallet};
 use alloy_primitives::Address;
-use alloy_transport::Transport;
 
 /// Trait for Providers, Fill stacks, etc, which contain [`NetworkWallet`].
 pub trait WalletProvider<N: Network = Ethereum> {
@@ -71,11 +70,10 @@ where
     }
 }
 
-impl<F, P, T, N> WalletProvider<N> for FillProvider<F, P, T, N>
+impl<F, P, N> WalletProvider<N> for FillProvider<F, P, N>
 where
     F: TxFiller<N> + WalletProvider<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     type Wallet = F::Wallet;

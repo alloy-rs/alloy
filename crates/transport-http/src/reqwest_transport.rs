@@ -1,8 +1,8 @@
 use crate::{Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
-    utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
-    TransportResult,
+    utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
+    TransportFut, TransportResult,
 };
 use std::task;
 use tower::Service;
@@ -19,16 +19,12 @@ pub type ReqwestTransport = Http<Client>;
 pub type ReqwestConnect = HttpConnect<ReqwestTransport>;
 
 impl TransportConnect for ReqwestConnect {
-    type Transport = ReqwestTransport;
-
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
     }
 
-    fn get_transport<'a: 'b, 'b>(
-        &'a self,
-    ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
-        Box::pin(async move { Ok(Http::with_client(Client::new(), self.url.clone())) })
+    async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
+        Ok(BoxTransport::new(Http::with_client(Client::new(), self.url.clone())))
     }
 }
 

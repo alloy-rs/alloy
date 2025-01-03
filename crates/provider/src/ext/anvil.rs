@@ -5,12 +5,12 @@ use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
 use alloy_rpc_types_eth::Block;
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait AnvilApi<N: Network, T>: Send + Sync {
+pub trait AnvilApi<N: Network>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
     // - anvil_set_block: Not implemented / wired correctly in the Anvil RPC API.
@@ -150,11 +150,10 @@ pub trait AnvilApi<N: Network, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> AnvilApi<N, T> for P
+impl<N, P> AnvilApi<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()> {
         self.client().request("anvil_impersonateAccount", (address,)).await

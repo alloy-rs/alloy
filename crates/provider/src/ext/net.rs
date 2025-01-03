@@ -1,12 +1,12 @@
 //! This module extends the Ethereum JSON-RPC provider with the Net namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// Net namespace rpc interface that provides access to network information of the node.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait NetApi<N, T>: Send + Sync {
+pub trait NetApi<N>: Send + Sync {
     /// Returns a `bool` indicating whether or not the node is listening for network connections.
     async fn net_listening(&self) -> TransportResult<bool>;
     /// Returns the number of peers connected to the node.
@@ -17,11 +17,10 @@ pub trait NetApi<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> NetApi<N, T> for P
+impl<N, P> NetApi<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     async fn net_listening(&self) -> TransportResult<bool> {
         self.client().request_noparams("net_listening").await

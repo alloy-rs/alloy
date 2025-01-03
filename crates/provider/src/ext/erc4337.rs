@@ -4,7 +4,7 @@ use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::erc4337::{
     SendUserOperation, SendUserOperationResponse, UserOperationGasEstimation, UserOperationReceipt,
 };
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// ERC-4337 Account Abstraction API
 ///
@@ -12,7 +12,7 @@ use alloy_transport::{Transport, TransportResult};
 /// as defined in ERC-4337.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait Erc4337Api<N, T>: Send + Sync {
+pub trait Erc4337Api<N>: Send + Sync {
     /// Sends a user operation to the bundler, as defined in ERC-4337.
     ///
     /// Entry point changes based on the user operation type.
@@ -45,11 +45,10 @@ pub trait Erc4337Api<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> Erc4337Api<N, T> for P
+impl<N, P> Erc4337Api<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     async fn send_user_operation(
         &self,
