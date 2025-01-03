@@ -353,6 +353,30 @@ pub struct ExecutionPayloadV2 {
 }
 
 impl ExecutionPayloadV2 {
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV2`].
+    ///
+    /// If the block does not have any withdrawals, an empty vector is used.
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow<T: Encodable2718>(block: &Block<T>) -> Self {
+        Self::from_block_unchecked(block.hash_slow(), block)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV2`] using the given block hash.
+    ///
+    /// If the block does not have any withdrawals, an empty vector is used.
+    pub fn from_block_unchecked<T: Encodable2718>(block_hash: B256, block: &Block<T>) -> Self {
+        Self {
+            withdrawals: block
+                .body
+                .withdrawals
+                .clone()
+                .map(Withdrawals::into_inner)
+                .unwrap_or_default(),
+            payload_inner: ExecutionPayloadV1::from_block_unchecked(block_hash, block),
+        }
+    }
+
     /// Returns the timestamp for the execution payload.
     pub const fn timestamp(&self) -> u64 {
         self.payload_inner.timestamp
