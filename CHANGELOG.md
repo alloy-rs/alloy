@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2](https://github.com/alloy-rs/alloy/releases/tag/v0.9.2) - 2025-01-03
+
+### Bug Fixes
+
+- [eip7251] Update contract address and bytecode ([#1877](https://github.com/alloy-rs/alloy/issues/1877))
+- Skip empty request objects ([#1873](https://github.com/alloy-rs/alloy/issues/1873))
+
+### Features
+
+- Sort and skip empty requests for hash ([#1878](https://github.com/alloy-rs/alloy/issues/1878))
+- Add conversions from rpc block to consensus ([#1869](https://github.com/alloy-rs/alloy/issues/1869))
+- Add block to payloadv1 ([#1875](https://github.com/alloy-rs/alloy/issues/1875))
+- Add block to payloadbodyv1 ([#1874](https://github.com/alloy-rs/alloy/issues/1874))
+
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
 ### Features
@@ -14,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.9.1
 - Add arbitrary for blockbody ([#1867](https://github.com/alloy-rs/alloy/issues/1867))
 - Add history serve window ([#1865](https://github.com/alloy-rs/alloy/issues/1865))
 
