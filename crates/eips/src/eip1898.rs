@@ -244,13 +244,12 @@ pub enum ParseBlockNumberError {
 }
 
 /// Error variants when parsing a [BlockNumberOrTag]
-#[cfg(feature = "std")]
-impl std::error::Error for ParseBlockNumberError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for ParseBlockNumberError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            Self::ParseIntErr(err) => std::error::Error::source(err),
-            Self::ParseErr(err) => std::error::Error::source(err),
-            Self::MissingPrefix(err) => std::error::Error::source(err),
+            Self::ParseIntErr(err) => Some(err),
+            Self::MissingPrefix(err) => Some(err),
+            Self::ParseErr(_) => None,
         }
     }
 }
@@ -599,13 +598,12 @@ impl fmt::Display for ParseBlockIdError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ParseBlockIdError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for ParseBlockIdError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            Self::ParseIntError(err) => std::error::Error::source(err),
-            Self::FromHexError(err) => std::error::Error::source(err),
-            Self::ParseError(err) => std::error::Error::source(err),
+            Self::ParseIntError(err) => Some(err),
+            Self::FromHexError(err) => Some(err),
+            Self::ParseError(_) => None,
         }
     }
 }
@@ -826,7 +824,6 @@ impl FromStr for HashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        #[cfg(not(feature = "std"))]
         use alloc::string::ToString;
 
         match u64::from_str(s) {

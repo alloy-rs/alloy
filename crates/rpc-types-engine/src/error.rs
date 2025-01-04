@@ -69,15 +69,7 @@ pub enum PayloadError {
     Decode(alloy_rlp::Error),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for PayloadError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Decode(err) => Some(err),
-            _ => None,
-        }
-    }
-}
+impl core::error::Error for PayloadError {}
 
 impl From<alloy_rlp::Error> for PayloadError {
     fn from(value: alloy_rlp::Error) -> Self {
