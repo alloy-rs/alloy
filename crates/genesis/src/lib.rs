@@ -246,6 +246,14 @@ impl GenesisAccount {
         self
     }
 
+    /// Returns an iterator over the storage slots in (`B256`, `U256`) format.
+    pub fn storage_slots(&self) -> impl Iterator<Item = (B256, U256)> + '_ {
+        self.storage.as_ref().into_iter().flat_map(|storage| storage.iter()).map(|(key, value)| {
+            let value = U256::from_be_bytes(value.0);
+            (*key, value)
+        })
+    }
+
     /// Convert the genesis account into the [`TrieAccount`] format.
     pub fn into_trie_account(self) -> TrieAccount {
         self.into()
