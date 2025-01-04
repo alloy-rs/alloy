@@ -456,17 +456,7 @@ pub enum BlobTransactionValidationError {
 }
 
 #[cfg(feature = "kzg")]
-impl core::error::Error for BlobTransactionValidationError {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            Self::KZGError(source) => Some(source),
-            Self::InvalidProof { .. }
-            | Self::NotBlobTransaction { .. }
-            | Self::MissingSidecar { .. }
-            | Self::WrongVersionedHash { .. } => None,
-        }
-    }
-}
+impl core::error::Error for BlobTransactionValidationError {}
 
 #[cfg(feature = "kzg")]
 impl core::fmt::Display for BlobTransactionValidationError {
