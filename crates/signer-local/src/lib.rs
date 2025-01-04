@@ -289,4 +289,15 @@ mod test {
         let expected_error = alloy_signer::Error::TransactionChainIdMismatch { signer: 1, tx: 2 };
         assert_eq!(error.to_string(), expected_error.to_string());
     }
+
+    // <https://github.com/alloy-rs/core/issues/705>
+    #[test]
+    fn test_parity() {
+        let signer = PrivateKeySigner::random();
+        let message = b"hello";
+        let signature = signer.sign_message_sync(message).unwrap();
+        let value = signature.as_bytes().to_vec();
+        let recovered_signature: Signature = value.as_slice().try_into().unwrap();
+        assert_eq!(signature, recovered_signature);
+    }
 }
