@@ -60,6 +60,14 @@ impl<T> Recovered<T> {
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.tx), self.signer)
     }
+
+    /// Applies the given fallible closure to the inner transactions.
+    pub fn try_map_transaction<Tx, E>(
+        self,
+        f: impl FnOnce(T) -> Result<Tx, E>,
+    ) -> Result<Recovered<Tx>, E> {
+        Ok(Recovered::new_unchecked(f(self.tx)?, self.signer))
+    }
 }
 
 impl<T: Encodable> Encodable for Recovered<T> {
