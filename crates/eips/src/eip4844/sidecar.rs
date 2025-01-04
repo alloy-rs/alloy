@@ -56,8 +56,11 @@ impl core::fmt::Debug for BlobTransactionSidecar {
 }
 
 impl BlobTransactionSidecar {
-    /// Matches versioned hashes and returns an iterator of (index, BlobAndProofV1) pairs
-    /// where index is the position in versioned_hashes that matched.
+    /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV1`]) pairs
+    /// where index is the position in `versioned_hashes` that matched the versioned hash in the
+    /// sidecar.
+    ///
+    /// This is used for the `engine_getBlobsV1` RPC endpoint of the engine API
     pub fn match_versioned_hashes<'a>(
         &'a self,
         versioned_hashes: &'a [B256],
@@ -65,13 +68,13 @@ impl BlobTransactionSidecar {
         self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
             versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
                 if blob_versioned_hash == *target_hash {
-                    Some((
-                        j,
-                        BlobAndProofV1 { blob: Box::new(self.blobs[i]), proof: self.proofs[i] },
-                    ))
-                } else {
-                    None
+                    if let Some((blob, proof)) =
+                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
+                    {
+                        return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
+                    }
                 }
+                None
             })
         })
     }
