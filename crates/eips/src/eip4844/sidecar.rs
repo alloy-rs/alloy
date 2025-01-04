@@ -1,7 +1,8 @@
 //! EIP-4844 sidecar type
 
 use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
+    BYTES_PER_PROOF,
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -51,6 +52,24 @@ impl core::fmt::Debug for BlobTransactionSidecar {
             .field("commitments", &self.commitments)
             .field("proofs", &self.proofs)
             .finish()
+    }
+}
+
+impl BlobTransactionSidecar {
+    /// Matches versioned hashes and constructs `BlobAndProofV1` objects.
+    pub fn match_versioned_hashes(&self, versioned_hashes: &[B256]) -> Vec<Option<BlobAndProofV1>> {
+        let mut result = vec![None; versioned_hashes.len()];
+        for (i, blob_versioned_hash) in self.versioned_hashes().enumerate() {
+            for (j, target_versioned_hash) in versioned_hashes.iter().enumerate() {
+                if blob_versioned_hash == *target_versioned_hash {
+                    result[j].get_or_insert_with(|| BlobAndProofV1 {
+                        blob: Box::new(self.blobs[i]),
+                        proof: self.proofs[i],
+                    });
+                }
+            }
+        }
+        result
     }
 }
 
