@@ -824,7 +824,6 @@ impl FromStr for HashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        #[cfg(not(feature = "std"))]
         use alloc::string::ToString;
 
         match u64::from_str(s) {
