@@ -56,20 +56,24 @@ impl core::fmt::Debug for BlobTransactionSidecar {
 }
 
 impl BlobTransactionSidecar {
-    /// Matches versioned hashes and constructs `BlobAndProofV1` objects.
-    pub fn match_versioned_hashes(&self, versioned_hashes: &[B256]) -> Vec<Option<BlobAndProofV1>> {
-        let mut result = vec![None; versioned_hashes.len()];
-        for (i, blob_versioned_hash) in self.versioned_hashes().enumerate() {
-            for (j, target_versioned_hash) in versioned_hashes.iter().enumerate() {
-                if blob_versioned_hash == *target_versioned_hash {
-                    result[j].get_or_insert_with(|| BlobAndProofV1 {
-                        blob: Box::new(self.blobs[i]),
-                        proof: self.proofs[i],
-                    });
+    /// Matches versioned hashes and returns an iterator of (index, BlobAndProofV1) pairs
+    /// where index is the position in versioned_hashes that matched.
+    pub fn match_versioned_hashes<'a>(
+        &'a self,
+        versioned_hashes: &'a [B256],
+    ) -> impl Iterator<Item = (usize, BlobAndProofV1)> + 'a {
+        self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
+            versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
+                if blob_versioned_hash == *target_hash {
+                    Some((
+                        j,
+                        BlobAndProofV1 { blob: Box::new(self.blobs[i]), proof: self.proofs[i] },
+                    ))
+                } else {
+                    None
                 }
-            }
-        }
-        result
+            })
+        })
     }
 }
 
