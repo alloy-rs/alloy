@@ -11,6 +11,14 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde", "map"] }
 alloy-serde.workspace = true
