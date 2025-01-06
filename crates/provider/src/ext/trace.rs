@@ -189,7 +189,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     async fn trace_call() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -241,7 +241,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     async fn trace_call_many() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
