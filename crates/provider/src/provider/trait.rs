@@ -150,7 +150,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
-        EthCall::new(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
+        EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.

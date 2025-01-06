@@ -104,9 +104,7 @@ where
 {
     Preparing {
         caller: Arc<dyn Caller<N, Resp>>,
-        data: &'req N::TransactionRequest,
-        overrides: Option<&'req StateOverride>,
-        block: Option<BlockId>,
+        params: EthCallParams<'req, N>,
         method: &'static str,
         map: Map,
     },
@@ -126,13 +124,9 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Preparing { caller: _, data, overrides, block, method, map: _ } => f
-                .debug_struct("Preparing")
-                .field("data", data)
-                .field("overrides", overrides)
-                .field("block", block)
-                .field("method", method)
-                .finish(),
+            Self::Preparing { caller: _, params, method, map: _ } => {
+                f.debug_struct("Preparing").field("params", params).field("method", method).finish()
+            }
             Self::Running { .. } => f.debug_tuple("Running").finish(),
             Self::Polling => f.debug_tuple("Polling").finish(),
         }
@@ -157,16 +151,10 @@ where
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Preparing { caller, data, overrides, block, method, map } =
+        let EthCallFutInner::Preparing { caller, params, method, map } =
             std::mem::replace(&mut self.inner, EthCallFutInner::Polling)
         else {
             unreachable!("bad state")
-        };
-
-        let params = EthCallParams {
-            data: Cow::Borrowed(data),
-            block,
-            overrides: overrides.map(Cow::Borrowed),
         };
 
         let fut =
@@ -223,9 +211,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     caller: Arc<dyn Caller<N, Resp>>,
-    data: &'req N::TransactionRequest,
-    overrides: Option<&'req StateOverride>,
-    block: Option<BlockId>,
+    params: EthCallParams<'req, N>,
     method: &'static str,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
@@ -238,10 +224,8 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("EthCall")
+            .field("params", &self.params)
             .field("method", &self.method)
-            .field("data", &self.data)
-            .field("block", &self.block)
-            .field("overrides", &self.overrides)
             .finish()
     }
 }
@@ -251,33 +235,32 @@ where
     N: Network,
     Resp: RpcReturn,
 {
-    /// Create a new CallBuilder.
-    pub fn new(caller: impl Caller<N, Resp> + 'static, data: &'req N::TransactionRequest) -> Self {
+    /// Create a new [`EthCall`].
+    pub fn new(
+        caller: impl Caller<N, Resp> + 'static,
+        method: &'static str,
+        data: &'req N::TransactionRequest,
+    ) -> Self {
         Self {
             caller: Arc::new(caller),
-            data,
-            overrides: None,
-            block: None,
-            method: "eth_call",
+            params: EthCallParams::new(data),
+            method,
             map: std::convert::identity,
             _pd: PhantomData,
         }
     }
 
-    /// Create new EthCall for gas estimates.
+    /// Create a new [`EthCall`] with method set to `"eth_call"`.
+    pub fn call(caller: impl Caller<N, Resp> + 'static, data: &'req N::TransactionRequest) -> Self {
+        Self::new(caller, "eth_call", data)
+    }
+
+    /// Create a new [`EthCall`] with method set to `"eth_estimateGas"`.
     pub fn gas_estimate(
         caller: impl Caller<N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
-        Self {
-            caller: Arc::new(caller),
-            data,
-            overrides: None,
-            block: None,
-            method: "eth_estimateGas",
-            map: std::convert::identity,
-            _pd: PhantomData,
-        }
+        Self::new(caller, "eth_estimateGas", data)
     }
 }
 
@@ -307,9 +290,7 @@ where
     {
         EthCall {
             caller: self.caller,
-            data: self.data,
-            overrides: self.overrides,
-            block: self.block,
+            params: self.params,
             method: self.method,
             map,
             _pd: PhantomData,
@@ -317,14 +298,14 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub const fn overrides(mut self, overrides: &'req StateOverride) -> Self {
-        self.overrides = Some(overrides);
+    pub fn overrides(mut self, overrides: &'req StateOverride) -> Self {
+        self.params.overrides = Some(Cow::Borrowed(overrides));
         self
     }
 
     /// Set the block to use for this call.
     pub const fn block(mut self, block: BlockId) -> Self {
-        self.block = Some(block);
+        self.params.block = Some(block);
         self
     }
 }
@@ -344,9 +325,7 @@ where
         EthCallFut {
             inner: EthCallFutInner::Preparing {
                 caller: self.caller,
-                data: self.data,
-                overrides: self.overrides,
-                block: self.block,
+                params: self.params,
                 method: self.method,
                 map: self.map,
             },
