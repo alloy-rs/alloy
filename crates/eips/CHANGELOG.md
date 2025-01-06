@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/alloy-rs/alloy/releases/tag/v0.10.0) - 2025-01-06
+
+### Documentation
+
+- Enable some useful rustdoc features on docs.rs ([#1890](https://github.com/alloy-rs/alloy/issues/1890))
+
+### Features
+
+- Add match_versioned_hashes ([#1882](https://github.com/alloy-rs/alloy/issues/1882))
+
+### Miscellaneous Tasks
+
+- Improve FromStr for `BlockNumberOrTag` to be case-insensitive ([#1891](https://github.com/alloy-rs/alloy/issues/1891))
+- Shift std::error impls to core ([#1888](https://github.com/alloy-rs/alloy/issues/1888))
+- Use core::error for blob validation error ([#1887](https://github.com/alloy-rs/alloy/issues/1887))
+- Use safe get api  ([#1886](https://github.com/alloy-rs/alloy/issues/1886))
+
 ## [0.9.2](https://github.com/alloy-rs/alloy/releases/tag/v0.9.2) - 2025-01-03
 
 ### Bug Fixes
@@ -15,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Sort and skip empty requests for hash ([#1878](https://github.com/alloy-rs/alloy/issues/1878))
+
+### Miscellaneous Tasks
+
+- Release 0.9.2
 
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
