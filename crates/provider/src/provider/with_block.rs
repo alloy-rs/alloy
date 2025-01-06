@@ -2,7 +2,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_primitives::B256;
 use alloy_rpc_client::RpcCall;
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 use std::future::IntoFuture;
 
 use crate::ProviderCall;
@@ -39,26 +39,24 @@ impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
     }
 }
 
-type ProviderCallProducer<T, Params, Resp, Output, Map> =
-    Box<dyn Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
+type ProviderCallProducer<Params, Resp, Output, Map> =
+    Box<dyn Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
 
 /// Container for varous types of calls dependent on a block id.
-enum WithBlockInner<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+enum WithBlockInner<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
     /// [RpcCall] which params are getting wrapped into [ParamsWithBlock] once the block id is set.
-    RpcCall(RpcCall<T, Params, Resp, Output, Map>),
+    RpcCall(RpcCall<Params, Resp, Output, Map>),
     /// Closure that produces a [ProviderCall] once the block id is set.
-    ProviderCall(ProviderCallProducer<T, Params, Resp, Output, Map>),
+    ProviderCall(ProviderCallProducer<Params, Resp, Output, Map>),
 }
 
-impl<T, Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
@@ -78,70 +76,63 @@ where
 /// By default this will use "latest".
 #[pin_project::pin_project]
 #[derive(Debug)]
-pub struct RpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct RpcWithBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    inner: WithBlockInner<T, Params, Resp, Output, Map>,
+    inner: WithBlockInner<Params, Resp, Output, Map>,
     block_id: BlockId,
 }
 
-impl<T, Params, Resp, Output, Map> RpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> RpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
     /// Create a new [`RpcWithBlock`] from a [`RpcCall`].
-    pub fn new_rpc(inner: RpcCall<T, Params, Resp, Output, Map>) -> Self {
+    pub fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self { inner: WithBlockInner::RpcCall(inner), block_id: Default::default() }
     }
 
     /// Create a new [`RpcWithBlock`] from a closure producing a [`ProviderCall`].
     pub fn new_provider<F>(get_call: F) -> Self
     where
-        F: Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map>
-            + Send
-            + 'static,
+        F: Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send + 'static,
     {
         let get_call = Box::new(get_call);
         Self { inner: WithBlockInner::ProviderCall(get_call), block_id: Default::default() }
     }
 }
 
-impl<T, Params, Resp, Output, Map> From<RpcCall<T, Params, Resp, Output, Map>>
-    for RpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
+    for RpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    fn from(inner: RpcCall<T, Params, Resp, Output, Map>) -> Self {
+    fn from(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self::new_rpc(inner)
     }
 }
 
-impl<F, T, Params, Resp, Output, Map> From<F> for RpcWithBlock<T, Params, Resp, Output, Map>
+impl<F, Params, Resp, Output, Map> From<F> for RpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
-    F: Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send + 'static,
+    F: Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send + 'static,
 {
     fn from(inner: F) -> Self {
         Self::new_provider(inner)
     }
 }
 
-impl<T, Params, Resp, Output, Map> RpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> RpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
@@ -195,9 +186,8 @@ where
     }
 }
 
-impl<T, Params, Resp, Output, Map> IntoFuture for RpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> IntoFuture for RpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
@@ -205,7 +195,7 @@ where
 {
     type Output = TransportResult<Output>;
 
-    type IntoFuture = ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map>;
+    type IntoFuture = ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
         match self.inner {

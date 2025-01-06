@@ -2,7 +2,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_rpc_types_eth::state::StateOverride;
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
 use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
@@ -86,40 +86,37 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
 #[doc(hidden)] // Not public API.
 #[allow(unnameable_types)]
 #[pin_project::pin_project]
-pub struct EthCallFut<'req, T, N, Resp, Output, Map>
+pub struct EthCallFut<'req, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
-    inner: EthCallFutInner<'req, T, N, Resp, Output, Map>,
+    inner: EthCallFutInner<'req, N, Resp, Output, Map>,
 }
 
-enum EthCallFutInner<'req, T, N, Resp, Output, Map>
+enum EthCallFutInner<'req, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
     Preparing {
-        caller: Arc<dyn Caller<T, N, Resp>>,
+        caller: Arc<dyn Caller<N, Resp>>,
         params: EthCallParams<'req, N>,
         method: &'static str,
         map: Map,
     },
     Running {
         map: Map,
-        fut: ProviderCall<T, EthCallParams<'static, N>, Resp>,
+        fut: ProviderCall<EthCallParams<'static, N>, Resp>,
     },
     Polling,
 }
 
-impl<T, N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<'_, T, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<'_, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Output: 'static,
@@ -136,9 +133,8 @@ where
     }
 }
 
-impl<T, N, Resp, Output, Map> EthCallFut<'_, T, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> EthCallFut<'_, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Output: 'static,
@@ -178,9 +174,8 @@ where
     }
 }
 
-impl<T, N, Resp, Output, Map> Future for EthCallFut<'_, T, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> Future for EthCallFut<'_, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Output: 'static,
@@ -209,23 +204,21 @@ where
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone)]
-pub struct EthCall<'req, T, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct EthCall<'req, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    caller: Arc<dyn Caller<T, N, Resp>>,
+    caller: Arc<dyn Caller<N, Resp>>,
     params: EthCallParams<'req, N>,
     method: &'static str,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<T, N, Resp> core::fmt::Debug for EthCall<'_, T, N, Resp>
+impl<N, Resp> core::fmt::Debug for EthCall<'_, N, Resp>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
 {
@@ -237,15 +230,14 @@ where
     }
 }
 
-impl<'req, T, N, Resp> EthCall<'req, T, N, Resp>
+impl<'req, N, Resp> EthCall<'req, N, Resp>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
 {
     /// Create a new [`EthCall`].
     pub fn new(
-        caller: impl Caller<T, N, Resp> + 'static,
+        caller: impl Caller<N, Resp> + 'static,
         method: &'static str,
         data: &'req N::TransactionRequest,
     ) -> Self {
@@ -259,25 +251,21 @@ where
     }
 
     /// Create a new [`EthCall`] with method set to `"eth_call"`.
-    pub fn call(
-        caller: impl Caller<T, N, Resp> + 'static,
-        data: &'req N::TransactionRequest,
-    ) -> Self {
+    pub fn call(caller: impl Caller<N, Resp> + 'static, data: &'req N::TransactionRequest) -> Self {
         Self::new(caller, "eth_call", data)
     }
 
     /// Create a new [`EthCall`] with method set to `"eth_estimateGas"`.
     pub fn gas_estimate(
-        caller: impl Caller<T, N, Resp> + 'static,
+        caller: impl Caller<N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self::new(caller, "eth_estimateGas", data)
     }
 }
 
-impl<'req, T, N, Resp, Output, Map> EthCall<'req, T, N, Resp, Output, Map>
+impl<'req, N, Resp, Output, Map> EthCall<'req, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
@@ -296,7 +284,7 @@ where
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
-    ) -> EthCall<'req, T, N, Resp, NewOutput, NewMap>
+    ) -> EthCall<'req, N, Resp, NewOutput, NewMap>
     where
         NewMap: Fn(Resp) -> NewOutput,
     {
@@ -322,10 +310,8 @@ where
     }
 }
 
-impl<'req, T, N, Resp, Output, Map> std::future::IntoFuture
-    for EthCall<'req, T, N, Resp, Output, Map>
+impl<'req, N, Resp, Output, Map> std::future::IntoFuture for EthCall<'req, N, Resp, Output, Map>
 where
-    T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Output: 'static,
@@ -333,7 +319,7 @@ where
 {
     type Output = TransportResult<Output>;
 
-    type IntoFuture = EthCallFut<'req, T, N, Resp, Output, Map>;
+    type IntoFuture = EthCallFut<'req, N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut {

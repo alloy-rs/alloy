@@ -70,18 +70,17 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
                 if builder.chain_id().is_none() {
                     builder.set_chain_id(*chain_id)
                 }
-            };
+            }
         }
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         provider: &P,
         _tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: crate::Provider<T, N>,
-        T: alloy_transport::Transport + Clone,
+        P: crate::Provider<N>,
     {
         match self.0.get().copied() {
             Some(chain_id) => Ok(chain_id),

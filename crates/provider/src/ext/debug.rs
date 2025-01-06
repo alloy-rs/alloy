@@ -11,12 +11,12 @@ use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
     TraceResult,
 };
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait DebugApi<N, T>: Send + Sync {
+pub trait DebugApi<N>: Send + Sync {
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
 
@@ -253,11 +253,10 @@ pub trait DebugApi<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> DebugApi<N, T> for P
+impl<N, P> DebugApi<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawHeader", (block,)).await
