@@ -7,7 +7,12 @@ use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{borrow::Cow, future::Future, marker::PhantomData, task::Poll};
+use std::{
+    borrow::Cow,
+    future::{Future, IntoFuture},
+    marker::PhantomData,
+    task::Poll,
+};
 
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
@@ -81,7 +86,12 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
     }
 }
 
-/// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
+/// The [`EthCallFut`] future is the future type for an `"eth_call"` RPC
+/// request.
+///
+/// This future is intended to handle RPC requests that take the same
+/// parameters as `"eth_call"`, e.g. `"eth_estimateGas"`. It is instantiated by
+/// [`EthCall::into_future`], and wraps .
 #[derive(Debug)]
 #[doc(hidden)] // Not public API.
 #[allow(unnameable_types)]
@@ -207,6 +217,11 @@ where
 /// A builder for an `"eth_call"` request. This type is returned by the
 /// [`Provider::call`] method.
 ///
+/// This type is intended to handle RPC requests that take the same
+/// parameters as `"eth_call"`, e.g. `"eth_estimateGas"`. It is instantiated by
+/// [`Provider::call`] and executed by calling [`IntoFuture::into_future`],
+/// or via `.await`.
+///
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone)]
@@ -268,6 +283,31 @@ where
     pub fn gas_estimate(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
         Self::new(client, "eth_estimateGas", data)
     }
+
+    /// Create a new [`EthCall`] with method set to `"eth_call"`.
+    pub fn method(&self) -> &'static str {
+        self.method
+    }
+
+    /// Set the method for this call.
+    pub fn set_method(&mut self, method: &'static str) {
+        self.method = method;
+    }
+
+    /// Returns a reference to the parameters.
+    pub fn params(&self) -> &EthCallParams<'req, N> {
+        &self.params
+    }
+
+    /// Returns a mutable reference to the parameters.
+    pub fn params_mut(&mut self) -> &mut EthCallParams<'req, N> {
+        &mut self.params
+    }
+
+    /// Get a weak reference to the client.
+    pub fn client(&self) -> WeakClient<T> {
+        self.client.clone()
+    }
 }
 
 impl<'req, T, N, Resp, Output, Map> EthCall<'req, T, N, Resp, Output, Map>
@@ -317,8 +357,7 @@ where
     }
 }
 
-impl<'req, T, N, Resp, Output, Map> std::future::IntoFuture
-    for EthCall<'req, T, N, Resp, Output, Map>
+impl<'req, T, N, Resp, Output, Map> IntoFuture for EthCall<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
