@@ -1,13 +1,13 @@
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
+use alloy_rpc_client::WeakClient;
 use alloy_rpc_types_eth::state::StateOverride;
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
-
-use crate::{Caller, ProviderCall};
+use std::{borrow::Cow, future::Future, marker::PhantomData, task::Poll};
 
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
@@ -105,7 +105,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     Preparing {
-        caller: Arc<dyn Caller<T, N, Resp>>,
+        client: WeakClient<T>,
         params: EthCallParams<'req, N>,
         method: &'static str,
         map: Map,
@@ -127,7 +127,7 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Preparing { caller: _, params, method, map: _ } => {
+            Self::Preparing { client: _, params, method, map: _ } => {
                 f.debug_struct("Preparing").field("params", params).field("method", method).finish()
             }
             Self::Running { .. } => f.debug_tuple("Running").finish(),
@@ -155,14 +155,15 @@ where
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Preparing { caller, params, method, map } =
+        let EthCallFutInner::Preparing { client, params, method, map } =
             std::mem::replace(&mut self.inner, EthCallFutInner::Polling)
         else {
             unreachable!("bad state")
         };
 
-        let fut =
-            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
+        let client = client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
+
+        let fut = client.request(method, params.into_owned()).into();
 
         self.inner = EthCallFutInner::Running { map, fut };
 
@@ -216,7 +217,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    caller: Arc<dyn Caller<T, N, Resp>>,
+    client: WeakClient<T>,
     params: EthCallParams<'req, N>,
     method: &'static str,
     map: Map,
@@ -245,12 +246,12 @@ where
 {
     /// Create a new [`EthCall`].
     pub fn new(
-        caller: impl Caller<T, N, Resp> + 'static,
+        client: WeakClient<T>,
         method: &'static str,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
-            caller: Arc::new(caller),
+            client,
             params: EthCallParams::new(data),
             method,
             map: std::convert::identity,
@@ -259,19 +260,13 @@ where
     }
 
     /// Create a new [`EthCall`] with method set to `"eth_call"`.
-    pub fn call(
-        caller: impl Caller<T, N, Resp> + 'static,
-        data: &'req N::TransactionRequest,
-    ) -> Self {
-        Self::new(caller, "eth_call", data)
+    pub fn call(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+        Self::new(client, "eth_call", data)
     }
 
     /// Create a new [`EthCall`] with method set to `"eth_estimateGas"`.
-    pub fn gas_estimate(
-        caller: impl Caller<T, N, Resp> + 'static,
-        data: &'req N::TransactionRequest,
-    ) -> Self {
-        Self::new(caller, "eth_estimateGas", data)
+    pub fn gas_estimate(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+        Self::new(client, "eth_estimateGas", data)
     }
 }
 
@@ -301,7 +296,7 @@ where
         NewMap: Fn(Resp) -> NewOutput,
     {
         EthCall {
-            caller: self.caller,
+            client: self.client,
             params: self.params,
             method: self.method,
             map,
@@ -338,7 +333,7 @@ where
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut {
             inner: EthCallFutInner::Preparing {
-                caller: self.caller,
+                client: self.client,
                 params: self.params,
                 method: self.method,
                 map: self.map,
