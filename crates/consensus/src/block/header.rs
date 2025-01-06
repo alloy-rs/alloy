@@ -1,4 +1,7 @@
-use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
+use crate::{
+    constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
+    Block, BlockBody,
+};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
@@ -168,6 +171,11 @@ impl Sealable for Header {
 }
 
 impl Header {
+    /// Create a [`Block`] from the body and its header.
+    pub const fn into_block<T>(self, body: BlockBody<T>) -> Block<T> {
+        body.into_block(self)
+    }
+
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
     ///
     /// Use [`Header::seal_slow`] and unlock if you need the hash to be persistent.

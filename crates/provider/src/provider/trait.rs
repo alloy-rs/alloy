@@ -23,14 +23,14 @@ use alloy_rpc_types_eth::{
     AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
     FilterChanges, Index, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportResult};
+use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
 /// See [`PollerBuilder`] for more details.
-pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
+pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 
 // todo: adjust docs
 // todo: reorder
@@ -70,11 +70,9 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
-pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
-    Send + Sync
-{
+pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Returns the root provider.
-    fn root(&self) -> &RootProvider<T, N>;
+    fn root(&self) -> &RootProvider<N>;
 
     /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
     fn builder() -> ProviderBuilder<Identity, Identity, N>
@@ -88,7 +86,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// NOTE: this method should not be overridden.
     #[inline]
-    fn client(&self) -> ClientRef<'_, T> {
+    fn client(&self) -> ClientRef<'_> {
         self.root().client()
     }
 
@@ -96,18 +94,18 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// NOTE: this method should not be overridden.
     #[inline]
-    fn weak_client(&self) -> WeakClient<T> {
+    fn weak_client(&self) -> WeakClient {
         self.root().weak_client()
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
-    fn get_accounts(&self) -> ProviderCall<T, NoParams, Vec<Address>> {
+    fn get_accounts(&self) -> ProviderCall<NoParams, Vec<Address>> {
         self.client().request_noparams("eth_accounts").into()
     }
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
-    fn get_blob_base_fee(&self) -> ProviderCall<T, NoParams, U128, u128> {
+    fn get_blob_base_fee(&self) -> ProviderCall<NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_blobBaseFee")
             .map_resp(utils::convert_u128 as fn(U128) -> u128)
@@ -115,7 +113,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Get the last block number available.
-    fn get_block_number(&self) -> ProviderCall<T, NoParams, U64, BlockNumber> {
+    fn get_block_number(&self) -> ProviderCall<NoParams, U64, BlockNumber> {
         self.client()
             .request_noparams("eth_blockNumber")
             .map_resp(utils::convert_u64 as fn(U64) -> u64)
@@ -139,7 +137,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # use alloy_eips::BlockId;
     /// # use alloy_rpc_types_eth::state::StateOverride;
     /// # use alloy_transport::BoxTransport;
-    /// # async fn example<P: Provider<BoxTransport>>(
+    /// # async fn example<P: Provider>(
     /// #    provider: P,
     /// #    my_overrides: StateOverride
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
@@ -151,8 +149,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
-        EthCall::new(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
+    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+        EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.
@@ -162,12 +160,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn simulate<'req>(
         &self,
         payload: &'req SimulatePayload,
-    ) -> RpcWithBlock<T, &'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
+    ) -> RpcWithBlock<&'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
         self.client().request("eth_simulateV1", payload).into()
     }
 
     /// Gets the chain ID.
-    fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
+    fn get_chain_id(&self) -> ProviderCall<NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
             .map_resp(utils::convert_u64 as fn(U64) -> u64)
@@ -180,7 +178,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn create_access_list<'a>(
         &self,
         request: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListResult> {
+    ) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
         self.client().request("eth_createAccessList", request).into()
     }
 
@@ -197,7 +195,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, U64, u64> {
+    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
             .map_resp(utils::convert_u64)
@@ -257,7 +255,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    fn get_gas_price(&self) -> ProviderCall<T, NoParams, U128, u128> {
+    fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_gasPrice")
             .map_resp(utils::convert_u128 as fn(U128) -> u128)
@@ -266,14 +264,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
     /// at the particular [BlockId].
-    fn get_account(&self, address: Address) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
         self.client().request("eth_getAccount", address).into()
     }
 
     /// Gets the balance of the account.
     ///
     /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
-    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256, U256> {
+    fn get_balance(&self, address: Address) -> RpcWithBlock<Address, U256, U256> {
         self.client().request("eth_getBalance", address).into()
     }
 
@@ -369,12 +367,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> ProviderCall<T, (BlockId,), Option<Vec<N::ReceiptResponse>>> {
+    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         self.client().request("eth_getBlockReceipts", (block,)).into()
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.client().request("eth_getCode", address).into()
     }
 
@@ -400,7 +398,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
+    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -427,7 +425,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
+    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         let id = self.new_pending_transactions_filter(false).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -460,7 +458,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<T, Log>> {
+    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -493,7 +491,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```
     async fn watch_full_pending_transactions(
         &self,
-    ) -> TransportResult<FilterPollerBuilder<T, N::TransactionResponse>> {
+    ) -> TransportResult<FilterPollerBuilder<N::TransactionResponse>> {
         let id = self.new_pending_transactions_filter(true).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -552,7 +550,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+    ) -> RpcWithBlock<(Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
         self.client().request("eth_getProof", (address, keys)).into()
     }
 
@@ -561,7 +559,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         key: U256,
-    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+    ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.client().request("eth_getStorageAt", (address, key)).into()
     }
 
@@ -569,7 +567,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_transaction_by_hash(
         &self,
         hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<N::TransactionResponse>> {
+    ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
         self.client().request("eth_getTransactionByHash", (hash,)).into()
     }
 
@@ -578,7 +576,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         block_hash: B256,
         index: usize,
-    ) -> ProviderCall<T, (B256, Index), Option<N::TransactionResponse>> {
+    ) -> ProviderCall<(B256, Index), Option<N::TransactionResponse>> {
         self.client()
             .request("eth_getTransactionByBlockHashAndIndex", (block_hash, Index(index)))
             .into()
@@ -589,7 +587,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         block_hash: B256,
         index: usize,
-    ) -> ProviderCall<T, (B256, Index), Option<Bytes>> {
+    ) -> ProviderCall<(B256, Index), Option<Bytes>> {
         self.client()
             .request("eth_getRawTransactionByBlockHashAndIndex", (block_hash, Index(index)))
             .into()
@@ -600,7 +598,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         block_number: BlockNumberOrTag,
         index: usize,
-    ) -> ProviderCall<T, (BlockNumberOrTag, Index), Option<N::TransactionResponse>> {
+    ) -> ProviderCall<(BlockNumberOrTag, Index), Option<N::TransactionResponse>> {
         self.client()
             .request("eth_getTransactionByBlockNumberAndIndex", (block_number, Index(index)))
             .into()
@@ -611,7 +609,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         block_number: BlockNumberOrTag,
         index: usize,
-    ) -> ProviderCall<T, (BlockNumberOrTag, Index), Option<Bytes>> {
+    ) -> ProviderCall<(BlockNumberOrTag, Index), Option<Bytes>> {
         self.client()
             .request("eth_getRawTransactionByBlockNumberAndIndex", (block_number, Index(index)))
             .into()
@@ -625,10 +623,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// [TxEip4844](alloy_consensus::transaction::eip4844::TxEip4844).
     ///
     /// This can be decoded into [TxEnvelope](alloy_consensus::transaction::TxEnvelope).
-    fn get_raw_transaction_by_hash(
-        &self,
-        hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<Bytes>> {
+    fn get_raw_transaction_by_hash(&self, hash: TxHash) -> ProviderCall<(TxHash,), Option<Bytes>> {
         self.client().request("eth_getRawTransactionByHash", (hash,)).into()
     }
 
@@ -638,7 +633,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
+    ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
         self.client()
             .request("eth_getTransactionCount", address)
             .map_resp(utils::convert_u64 as fn(U64) -> u64)
@@ -649,7 +644,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<N::ReceiptResponse>> {
+    ) -> ProviderCall<(TxHash,), Option<N::ReceiptResponse>> {
         self.client().request("eth_getTransactionReceipt", (hash,)).into()
     }
 
@@ -685,7 +680,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
-    fn get_max_priority_fee_per_gas(&self) -> ProviderCall<T, NoParams, U128, u128> {
+    fn get_max_priority_fee_per_gas(&self) -> ProviderCall<NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_maxPriorityFeePerGas")
             .map_resp(utils::convert_u128 as fn(U128) -> u128)
@@ -731,7 +726,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_raw_transaction(
         &self,
         encoded_tx: &[u8],
-    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
         let rlp_hex = hex::encode_prefixed(encoded_tx);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
@@ -760,7 +755,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
@@ -771,7 +766,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_tx_envelope(
         &self,
         tx: N::TxEnvelope,
-    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
@@ -786,7 +781,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_transaction_internal(
         &self,
         tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
         // Make sure to initialize heartbeat before we submit transaction, so that
         // we don't miss it if user will subscriber to it immediately after sending.
         let _handle = self.root().get_heart();
@@ -972,24 +967,24 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets syncing info.
-    fn syncing(&self) -> ProviderCall<T, NoParams, SyncStatus> {
+    fn syncing(&self) -> ProviderCall<NoParams, SyncStatus> {
         self.client().request_noparams("eth_syncing").into()
     }
 
     /// Gets the client version.
     #[doc(alias = "web3_client_version")]
-    fn get_client_version(&self) -> ProviderCall<T, NoParams, String> {
+    fn get_client_version(&self) -> ProviderCall<NoParams, String> {
         self.client().request_noparams("web3_clientVersion").into()
     }
 
     /// Gets the `Keccak-256` hash of the given data.
     #[doc(alias = "web3_sha3")]
-    fn get_sha3(&self, data: &[u8]) -> ProviderCall<T, (String,), B256> {
+    fn get_sha3(&self, data: &[u8]) -> ProviderCall<(String,), B256> {
         self.client().request("web3_sha3", (hex::encode_prefixed(data),)).into()
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    fn get_net_version(&self) -> ProviderCall<T, NoParams, U64, u64> {
+    fn get_net_version(&self) -> ProviderCall<NoParams, U64, u64> {
         self.client()
             .request_noparams("net_version")
             .map_resp(utils::convert_u64 as fn(U64) -> u64)
@@ -1068,19 +1063,19 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
+impl<N: Network> Provider<N> for RootProvider<N> {
     #[inline]
     fn root(&self) -> &Self {
         self
     }
 
     #[inline]
-    fn client(&self) -> ClientRef<'_, T> {
+    fn client(&self) -> ClientRef<'_> {
         self.inner.client_ref()
     }
 
     #[inline]
-    fn weak_client(&self) -> WeakClient<T> {
+    fn weak_client(&self) -> WeakClient {
         self.inner.weak_client()
     }
 
@@ -1141,8 +1136,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_provider_builder() {
-        let provider =
-            RootProvider::<BoxTransport, Ethereum>::builder().with_recommended_fillers().on_anvil();
+        let provider = RootProvider::builder().with_recommended_fillers().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
@@ -1162,7 +1156,7 @@ mod tests {
 
         let rpc_client = alloy_rpc_client::RpcClient::new(hyper_t, true);
 
-        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let provider = RootProvider::<Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
@@ -1247,7 +1241,7 @@ mod tests {
 
         let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
-        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let provider = RootProvider::<Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
 
@@ -1256,13 +1250,14 @@ mod tests {
 
         let rpc_client = alloy_rpc_client::RpcClient::new(cloned_t, true);
 
-        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let provider = RootProvider::<Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
 
-    #[cfg(all(feature = "hyper", not(windows)))]
+    #[cfg(feature = "hyper")]
     #[tokio::test]
+    #[cfg_attr(windows, ignore)]
     async fn test_auth_layer_transport() {
         crate::ext::test::async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
@@ -1294,7 +1289,7 @@ mod tests {
 
             let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
-            let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+            let provider = RootProvider::<Ethereum>::new(rpc_client);
 
             let num = provider.get_block_number().await.unwrap();
             assert_eq!(0, num);
@@ -1316,33 +1311,8 @@ mod tests {
     async fn object_safety() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        // These blocks are not necessary.
-        {
-            let refdyn = &provider as &dyn Provider<alloy_transport::BoxTransport, _>;
-            let num = refdyn.get_block_number().await.unwrap();
-            assert_eq!(0, num);
-        }
-
-        // Clones the underlying provider too.
-        {
-            let clone_boxed = provider.root().clone().boxed();
-            let num = clone_boxed.get_block_number().await.unwrap();
-            assert_eq!(0, num);
-        }
-
-        // Note the `Http` arg, vs no arg (defaulting to `BoxedTransport`) below.
-        {
-            let refdyn = &provider as &dyn Provider<alloy_transport::BoxTransport, _>;
-            let num = refdyn.get_block_number().await.unwrap();
-            assert_eq!(0, num);
-        }
-
-        let boxed = provider.root().clone().boxed();
-        let num = boxed.get_block_number().await.unwrap();
-        assert_eq!(0, num);
-
-        let boxed_boxdyn = Box::new(boxed) as Box<dyn Provider<_>>;
-        let num = boxed_boxdyn.get_block_number().await.unwrap();
+        let refdyn = &provider as &dyn Provider<_>;
+        let num = refdyn.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
 
@@ -1372,35 +1342,16 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "ws", not(windows)))]
+    #[cfg(feature = "ws")]
     #[tokio::test]
+    #[cfg_attr(windows, ignore)]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
         let anvil = Anvil::new().block_time(1).spawn();
         let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
         let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
-        let provider = RootProvider::<_, Ethereum>::new(client);
-
-        let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(2);
-        let mut n = 1;
-        while let Some(header) = stream.next().await {
-            assert_eq!(header.number, n);
-            n += 1;
-        }
-    }
-
-    #[cfg(all(feature = "ws", not(windows)))]
-    #[tokio::test]
-    async fn subscribe_blocks_ws_boxed() {
-        use futures::stream::StreamExt;
-
-        let anvil = Anvil::new().block_time(1).spawn();
-        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-        let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
-        let provider = RootProvider::<_, Ethereum>::new(client);
-        let provider = provider.boxed();
+        let provider = RootProvider::<Ethereum>::new(client);
 
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(2);
@@ -1419,7 +1370,7 @@ mod tests {
         let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
         let ws = alloy_rpc_client::WsConnect::new(url);
         let Ok(client) = alloy_rpc_client::RpcClient::connect_pubsub(ws).await else { return };
-        let provider = RootProvider::<_, Ethereum>::new(client);
+        let provider = RootProvider::<Ethereum>::new(client);
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);
         while let Some(header) = stream.next().await {
@@ -1449,7 +1400,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
         let client = RpcClient::builder().layer(retry_layer).http(anvil.endpoint_url());
 
-        let provider = RootProvider::<_, Ethereum>::new(client);
+        let provider = RootProvider::<Ethereum>::new(client);
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
@@ -1791,9 +1742,7 @@ mod tests {
     async fn connect_boxed() {
         let anvil = Anvil::new().spawn();
 
-        let provider =
-            RootProvider::<BoxTransport, Ethereum>::connect_builtin(anvil.endpoint().as_str())
-                .await;
+        let provider = RootProvider::<Ethereum>::connect(anvil.endpoint().as_str()).await;
 
         match provider {
             Ok(provider) => {
@@ -1844,7 +1793,7 @@ mod tests {
 
         let client = alloy_rpc_client::RpcClient::new(transport, true);
 
-        let provider = RootProvider::<BoxTransport, Ethereum>::new(client);
+        let provider = RootProvider::<Ethereum>::new(client);
 
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);

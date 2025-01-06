@@ -35,6 +35,13 @@ pub use call::*;
 #[doc(hidden)]
 pub mod private {
     pub use alloy_network::{Ethereum, Network};
-    pub use alloy_provider::Provider;
-    pub use alloy_transport::Transport;
+
+    // Fake traits to mitigate `sol!` macro breaking changes.
+    pub trait Provider<T, N: Network>: alloy_provider::Provider<N> {}
+    impl<N: Network, P: alloy_provider::Provider<N>> Provider<(), N> for P {}
+
+    // This is done so that the compiler can infer the `T` type to be `()`, which is the only type
+    // that implements this fake `Transport` trait.
+    pub trait Transport {}
+    impl Transport for () {}
 }

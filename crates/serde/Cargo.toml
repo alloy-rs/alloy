@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -41,8 +45,4 @@ similar-asserts.workspace = true
 [features]
 default = ["std"]
 std = ["alloy-primitives/std", "serde/std", "serde_json/std"]
-arbitrary = [
-    "dep:arbitrary",
-    "alloy-primitives/arbitrary",
-    "std",
-]
+arbitrary = ["dep:arbitrary", "alloy-primitives/arbitrary", "std"]

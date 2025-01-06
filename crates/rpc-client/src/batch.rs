@@ -4,7 +4,9 @@ use alloy_json_rpc::{
     RpcReturn, SerializedRequest,
 };
 use alloy_primitives::map::HashMap;
-use alloy_transport::{Transport, TransportError, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    BoxTransport, TransportError, TransportErrorKind, TransportFut, TransportResult,
+};
 use futures::FutureExt;
 use pin_project::pin_project;
 use serde_json::value::RawValue;
@@ -19,6 +21,7 @@ use std::{
     },
 };
 use tokio::sync::oneshot;
+use tower::Service;
 
 pub(crate) type Channel = oneshot::Sender<TransportResult<Box<RawValue>>>;
 pub(crate) type ChannelMap = HashMap<Id, Channel>;
@@ -27,9 +30,9 @@ pub(crate) type ChannelMap = HashMap<Id, Channel>;
 /// call.
 #[derive(Debug)]
 #[must_use = "A BatchRequest does nothing unless sent via `send_batch` and `.await`"]
-pub struct BatchRequest<'a, T> {
+pub struct BatchRequest<'a> {
     /// The transport via which the batch will be sent.
-    transport: ClientRef<'a, T>,
+    transport: ClientRef<'a>,
 
     /// The requests to be sent.
     requests: RequestPacket,
@@ -96,11 +99,10 @@ where
 }
 
 #[pin_project::pin_project(project = CallStateProj)]
-#[derive(Debug)]
-#[allow(unnameable_types)]
-pub enum BatchFuture<Conn: Transport> {
+#[allow(unnameable_types, missing_debug_implementations)]
+pub enum BatchFuture {
     Prepared {
-        transport: Conn,
+        transport: BoxTransport,
         requests: RequestPacket,
         channels: ChannelMap,
     },
@@ -108,14 +110,14 @@ pub enum BatchFuture<Conn: Transport> {
     AwaitingResponse {
         channels: ChannelMap,
         #[pin]
-        fut: Conn::Future,
+        fut: TransportFut<'static>,
     },
     Complete,
 }
 
-impl<'a, T> BatchRequest<'a, T> {
+impl<'a> BatchRequest<'a> {
     /// Create a new batch request.
-    pub fn new(transport: &'a RpcClientInner<T>) -> Self {
+    pub fn new(transport: &'a RpcClientInner) -> Self {
         Self {
             transport,
             requests: RequestPacket::Batch(Vec::with_capacity(10)),
@@ -140,12 +142,7 @@ impl<'a, T> BatchRequest<'a, T> {
         let ser = request.serialize().map_err(TransportError::ser_err)?;
         Ok(self.push_raw(ser).into())
     }
-}
 
-impl<Conn> BatchRequest<'_, Conn>
-where
-    Conn: Transport + Clone,
-{
     /// Add a call to the batch.
     ///
     /// ### Errors
@@ -161,7 +158,7 @@ where
     }
 
     /// Send the batch future via its connection.
-    pub fn send(self) -> BatchFuture<Conn> {
+    pub fn send(self) -> BatchFuture {
         BatchFuture::Prepared {
             transport: self.transport.transport.clone(),
             requests: self.requests,
@@ -170,22 +167,16 @@ where
     }
 }
 
-impl<T> IntoFuture for BatchRequest<'_, T>
-where
-    T: Transport + Clone,
-{
-    type Output = <BatchFuture<T> as Future>::Output;
-    type IntoFuture = BatchFuture<T>;
+impl IntoFuture for BatchRequest<'_> {
+    type Output = <BatchFuture as Future>::Output;
+    type IntoFuture = BatchFuture;
 
     fn into_future(self) -> Self::IntoFuture {
         self.send()
     }
 }
 
-impl<T> BatchFuture<T>
-where
-    T: Transport + Clone,
-{
+impl BatchFuture {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
@@ -269,10 +260,7 @@ where
     }
 }
 
-impl<T> Future for BatchFuture<T>
-where
-    T: Transport + Clone,
-{
+impl Future for BatchFuture {
     type Output = TransportResult<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {

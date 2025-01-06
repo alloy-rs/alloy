@@ -30,6 +30,11 @@ pub struct Block<T, H = Header> {
 }
 
 impl<T, H> Block<T, H> {
+    /// Creates a new block with the given header and body.
+    pub const fn new(header: H, body: BlockBody<T>) -> Self {
+        Self { header, body }
+    }
+
     /// Creates a new empty uncle block.
     pub fn uncle(header: H) -> Self {
         Self { header, body: Default::default() }

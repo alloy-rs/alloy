@@ -8,7 +8,7 @@ use alloy_rpc_types_trace::{
     filter::TraceFilter,
     parity::{LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType},
 };
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
@@ -16,10 +16,9 @@ pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [T
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait TraceApi<N, T>: Send + Sync
+pub trait TraceApi<N>: Send + Sync
 where
     N: Network,
-    T: Transport + Clone,
 {
     /// Executes the given transaction and returns a number of possible traces.
     ///
@@ -30,7 +29,7 @@ where
         &self,
         request: &'a N::TransactionRequest,
         trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
+    ) -> RpcWithBlock<(&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -43,7 +42,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>>;
+    ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -100,25 +99,23 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> TraceApi<N, T> for P
+impl<N, P> TraceApi<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     fn trace_call<'a, 'b>(
         &self,
         request: &'a <N as Network>::TransactionRequest,
         trace_types: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
-    {
+    ) -> RpcWithBlock<(&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults> {
         self.client().request("trace_call", (request, trace_types)).into()
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>> {
+    ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>> {
         self.client().request("trace_callMany", (request,)).into()
     }
 
@@ -192,7 +189,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     async fn trace_call() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -244,7 +241,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     async fn trace_call_many() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {

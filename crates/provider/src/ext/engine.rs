@@ -7,7 +7,7 @@ use alloy_rpc_types_engine::{
     ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
     PayloadId, PayloadStatus,
 };
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// Extension trait that gives access to engine API RPC methods.
 ///
@@ -15,7 +15,7 @@ use alloy_transport::{Transport, TransportResult};
 /// > The provider should use a JWT authentication layer.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait EngineApi<N, T>: Send + Sync {
+pub trait EngineApi<N>: Send + Sync {
     /// Sends the given payload to the execution layer client, as specified for the Paris fork.
     ///
     /// Caution: This should not accept the `withdrawals` field
@@ -181,11 +181,10 @@ pub trait EngineApi<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> EngineApi<N, T> for P
+impl<N, P> EngineApi<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     async fn new_payload_v1(&self, payload: ExecutionPayloadV1) -> TransportResult<PayloadStatus> {
         self.client().request("engine_newPayloadV1", (payload,)).await

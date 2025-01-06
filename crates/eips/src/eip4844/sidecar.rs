@@ -1,7 +1,8 @@
 //! EIP-4844 sidecar type
 
 use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
+    BYTES_PER_PROOF,
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -51,6 +52,31 @@ impl core::fmt::Debug for BlobTransactionSidecar {
             .field("commitments", &self.commitments)
             .field("proofs", &self.proofs)
             .finish()
+    }
+}
+
+impl BlobTransactionSidecar {
+    /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV1`]) pairs
+    /// where index is the position in `versioned_hashes` that matched the versioned hash in the
+    /// sidecar.
+    ///
+    /// This is used for the `engine_getBlobsV1` RPC endpoint of the engine API
+    pub fn match_versioned_hashes<'a>(
+        &'a self,
+        versioned_hashes: &'a [B256],
+    ) -> impl Iterator<Item = (usize, BlobAndProofV1)> + 'a {
+        self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
+            versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
+                if blob_versioned_hash == *target_hash {
+                    if let Some((blob, proof)) =
+                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
+                    {
+                        return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
+                    }
+                }
+                None
+            })
+        })
     }
 }
 
@@ -429,18 +455,8 @@ pub enum BlobTransactionValidationError {
     },
 }
 
-#[cfg(all(feature = "kzg", feature = "std"))]
-impl std::error::Error for BlobTransactionValidationError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::KZGError(source) => Some(source),
-            Self::InvalidProof { .. }
-            | Self::NotBlobTransaction { .. }
-            | Self::MissingSidecar { .. }
-            | Self::WrongVersionedHash { .. } => None,
-        }
-    }
-}
+#[cfg(feature = "kzg")]
+impl core::error::Error for BlobTransactionValidationError {}
 
 #[cfg(feature = "kzg")]
 impl core::fmt::Display for BlobTransactionValidationError {

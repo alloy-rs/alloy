@@ -1,11 +1,7 @@
 use alloy_network::Ethereum;
 use alloy_node_bindings::{Anvil, AnvilInstance};
-use alloy_transport::Transport;
 use reqwest::Url;
-use std::{
-    marker::PhantomData,
-    sync::{Arc, OnceLock},
-};
+use std::sync::{Arc, OnceLock};
 
 use crate::{Provider, ProviderLayer, RootProvider};
 
@@ -44,12 +40,11 @@ impl From<Anvil> for AnvilLayer {
     }
 }
 
-impl<P, T> ProviderLayer<P, T, Ethereum> for AnvilLayer
+impl<P> ProviderLayer<P, Ethereum> for AnvilLayer
 where
-    P: Provider<T>,
-    T: Transport + Clone,
+    P: Provider,
 {
-    type Provider = AnvilProvider<P, T>;
+    type Provider = AnvilProvider<P>;
 
     fn layer(&self, inner: P) -> Self::Provider {
         let anvil = self.instance();
@@ -60,31 +55,29 @@ where
 /// A provider that wraps an [`AnvilInstance`], preventing the instance from
 /// being dropped while the provider is in use.
 #[derive(Clone, Debug)]
-pub struct AnvilProvider<P, T> {
+pub struct AnvilProvider<P> {
     inner: P,
     _anvil: Arc<AnvilInstance>,
-    _pd: PhantomData<fn() -> T>,
 }
 
-impl<P, T> AnvilProvider<P, T>
+impl<P> AnvilProvider<P>
 where
-    P: Provider<T>,
-    T: Transport + Clone,
+    P: Provider,
 {
     /// Creates a new `AnvilProvider` with the given inner provider and anvil
     /// instance.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn new(inner: P, _anvil: Arc<AnvilInstance>) -> Self {
-        Self { inner, _anvil, _pd: PhantomData }
+        Self { inner, _anvil }
     }
 }
 
-impl<P, T> Provider<T> for AnvilProvider<P, T>
+impl<P> Provider for AnvilProvider<P>
 where
-    P: Provider<T>,
-    T: Transport + Clone,
+    P: Provider,
 {
     #[inline(always)]
-    fn root(&self) -> &RootProvider<T> {
+    fn root(&self) -> &RootProvider {
         self.inner.root()
     }
 }
