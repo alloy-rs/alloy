@@ -187,7 +187,7 @@ impl<'de> serde::Deserialize<'de> for BlockNumberOrTag {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = alloc::string::String::deserialize(deserializer)?.to_lowercase();
+        let s = alloc::string::String::deserialize(deserializer)?;
         s.parse().map_err(serde::de::Error::custom)
     }
 }
@@ -196,7 +196,7 @@ impl FromStr for BlockNumberOrTag {
     type Err = ParseBlockNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
+        Ok(match s.to_lowercase().as_str() {
             "latest" => Self::Latest,
             "finalized" => Self::Finalized,
             "safe" => Self::Safe,
