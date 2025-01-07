@@ -1,7 +1,5 @@
 use crate::Log;
-use alloc::vec::Vec;
 use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
-use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 
@@ -67,10 +65,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub to: Option<Address>,
     /// Contract address created, or None if not a deployment.
     pub contract_address: Option<Address>,
-    /// The authorization list is a list of tuples that store the address to code which the signer
-    /// desires to execute in the context of their EOA.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
 impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
@@ -128,7 +122,6 @@ impl<T> TransactionReceipt<T> {
             from: self.from,
             to: self.to,
             contract_address: self.contract_address,
-            authorization_list: self.authorization_list,
         }
     }
 }
@@ -180,10 +173,6 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
 
     fn to(&self) -> Option<Address> {
         self.to
-    }
-
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.authorization_list.as_deref()
     }
 
     fn cumulative_gas_used(&self) -> u64 {

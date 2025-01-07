@@ -1,9 +1,7 @@
+use crate::BlockTransactions;
 use alloy_consensus::{BlockHeader, Transaction};
-use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
-
-use crate::BlockTransactions;
 
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
@@ -49,9 +47,6 @@ pub trait ReceiptResponse {
 
     /// Address of the receiver.
     fn to(&self) -> Option<Address>;
-
-    /// EIP-7702 Authorization list.
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 
     /// Returns the cumulative gas used at this receipt.
     fn cumulative_gas_used(&self) -> u64;
@@ -203,10 +198,6 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
 
     fn to(&self) -> Option<Address> {
         self.inner.to()
-    }
-
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.inner.authorization_list()
     }
 
     fn cumulative_gas_used(&self) -> u64 {
