@@ -22,6 +22,9 @@ pub enum Error {
     /// `contractAddress` was not found in the deployment transaction’s receipt.
     #[error("missing `contractAddress` from deployment transaction receipt")]
     ContractNotDeployed,
+    /// The contract returned no data.
+    #[error("contract call to `{0}` returned no data (\"0x\"); the called address might not be a contract")]
+    ZeroData(String, #[source] AbiError),
     /// An error occurred ABI encoding or decoding.
     #[error(transparent)]
     AbiError(#[from] AbiError),
@@ -37,5 +40,16 @@ impl From<alloy_sol_types::Error> for Error {
     #[inline]
     fn from(e: alloy_sol_types::Error) -> Self {
         Self::AbiError(e.into())
+    }
+}
+
+impl Error {
+    #[cold]
+    pub(crate) fn decode(name: &str, data: &[u8], error: AbiError) -> Self {
+        if data.is_empty() {
+            let name = name.split('(').next().unwrap_or(name);
+            return Self::ZeroData(name.to_string(), error);
+        }
+        Self::AbiError(error)
     }
 }
