@@ -2,7 +2,7 @@
 
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
+use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
 use alloy_rpc_types_eth::Block;
 use alloy_transport::TransportResult;
@@ -180,7 +180,9 @@ where
         num_blocks: Option<u64>,
         interval: Option<u64>,
     ) -> TransportResult<()> {
-        self.client().request("anvil_mine", (num_blocks, interval)).await
+        self.client()
+            .request("anvil_mine", (num_blocks.map(U64::from), interval.map(U64::from)))
+            .await
     }
 
     async fn anvil_set_interval_mining(&self, secs: u64) -> TransportResult<()> {
@@ -212,7 +214,7 @@ where
     }
 
     async fn anvil_set_nonce(&self, address: Address, nonce: u64) -> TransportResult<()> {
-        self.client().request("anvil_setNonce", (address, nonce)).await
+        self.client().request("anvil_setNonce", (address, U64::from(nonce))).await
     }
 
     async fn anvil_set_storage_at(
@@ -229,11 +231,11 @@ where
     }
 
     async fn anvil_set_min_gas_price(&self, gas: u128) -> TransportResult<()> {
-        self.client().request("anvil_setMinGasPrice", (gas,)).await
+        self.client().request("anvil_setMinGasPrice", (U128::from(gas),)).await
     }
 
     async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: u128) -> TransportResult<()> {
-        self.client().request("anvil_setNextBlockBaseFeePerGas", (basefee,)).await
+        self.client().request("anvil_setNextBlockBaseFeePerGas", (U128::from(basefee),)).await
     }
 
     async fn anvil_set_coinbase(&self, address: Address) -> TransportResult<()> {
@@ -269,7 +271,7 @@ where
     }
 
     async fn anvil_increase_time(&self, seconds: u64) -> TransportResult<i64> {
-        self.client().request("evm_increaseTime", (seconds,)).await
+        self.client().request("evm_increaseTime", (U64::from(seconds),)).await
     }
 
     async fn anvil_set_next_block_timestamp(&self, seconds: u64) -> TransportResult<()> {
@@ -281,7 +283,7 @@ where
     }
 
     async fn anvil_set_block_gas_limit(&self, gas_limit: u64) -> TransportResult<bool> {
-        self.client().request("evm_setBlockGasLimit", (gas_limit,)).await
+        self.client().request("evm_setBlockGasLimit", (U64::from(gas_limit),)).await
     }
 
     async fn anvil_set_block_timestamp_interval(&self, seconds: u64) -> TransportResult<()> {
