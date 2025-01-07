@@ -199,7 +199,7 @@ mod tests {
         {
             use crate::ext::AnvilApi;
             filler.nonce_manager.nonces.clear();
-            provider.anvil_set_nonce(address, U256::from(69)).await.unwrap();
+            provider.anvil_set_nonce(address, 69).await.unwrap();
             check_nonces(&filler, &provider, address, 69).await;
         }
     }
