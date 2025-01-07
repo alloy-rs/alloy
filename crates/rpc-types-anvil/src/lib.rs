@@ -85,12 +85,15 @@ pub struct NodeInfo {
 #[serde(rename_all = "camelCase")]
 pub struct NodeEnvironment {
     /// Base fee of the current block
+    #[serde(with = "alloy_serde::quantity")]
     pub base_fee: u128,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Configured block gas limit
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_limit: u64,
     /// Configured gas price
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_price: u128,
 }
 
