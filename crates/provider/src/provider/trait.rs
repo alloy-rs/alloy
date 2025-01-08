@@ -1106,7 +1106,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{str::FromStr, time::Duration};
 
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
@@ -1838,5 +1838,21 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(block.transactions.is_hashes());
+    }
+
+    #[tokio::test]
+    async fn disable_test() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil();
+
+        let tx = TransactionRequest::default()
+            .with_kind(alloy_primitives::TxKind::Create)
+            .value(U256::from(1235))
+            .with_input(Bytes::from_str("ffffffffffffff").unwrap());
+
+        let err = provider.send_transaction(tx).await.unwrap_err().to_string();
+        assert!(err.contains("missing properties: [(\"NonceManager\", [\"from\"])]"));
     }
 }
