@@ -20,6 +20,8 @@ pub use eip1898::{
     RpcBlockHash,
 };
 
+pub mod eip2124;
+
 pub mod eip2718;
 
 pub mod eip2930;
