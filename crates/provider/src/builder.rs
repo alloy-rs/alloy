@@ -112,25 +112,6 @@ pub struct ProviderBuilder<L, F, N = Ethereum> {
     network: PhantomData<fn() -> N>,
 }
 
-// impl ProviderBuilder<Identity, Identity, Ethereum> {
-//     /// Create a new [`ProviderBuilder`] with recommended fillers enabled.
-//     pub const fn new() -> Self {
-//         let p: ProviderBuilder<
-//             Identity,
-//             JoinFill<
-//                 Identity,
-//                 JoinFill<
-//                     GasFiller,
-//                     JoinFill<crate::fillers::BlobGasFiller, JoinFill<NonceFiller,
-// ChainIdFiller>>,                 >,
-//             >,
-//         > = Self { layer: Identity, filler: Identity, network: PhantomData }
-//         > .with_recommended_fillers();
-
-//         p
-//     }
-// }
-
 impl
     ProviderBuilder<
         Identity,
