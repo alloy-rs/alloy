@@ -280,8 +280,9 @@ pub(crate) mod subscription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::U256;
+    use alloy_primitives::{address, U256};
     use alloy_sol_types::sol;
+    use MyContract::MyContractInstance;
 
     sol! {
         // solc v0.8.24; solc a.sol --via-ir --optimize --bin
@@ -309,9 +310,13 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
 
         let anvil = alloy_node_bindings::Anvil::new().spawn();
+
         let provider = alloy_provider::ProviderBuilder::new().on_http(anvil.endpoint_url());
 
-        let contract = MyContract::deploy(&provider).await.unwrap();
+        let from = address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
+        let contract_addr =
+            MyContract::deploy_builder(&provider).from(from).deploy().await.unwrap();
+        let contract = MyContractInstance::new(contract_addr, &provider);
 
         let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
@@ -322,8 +327,15 @@ mod tests {
 
         let poller = event.watch().await.unwrap();
 
-        let _receipt =
-            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+        let _receipt = contract
+            .doEmit()
+            .from(from)
+            .send()
+            .await
+            .unwrap()
+            .get_receipt()
+            .await
+            .expect("no receipt");
 
         let expected_event = MyContract::MyEvent {
             _0: 42,
@@ -350,6 +362,7 @@ mod tests {
         // send the wrong event and make sure it is NOT picked up by the event filter
         let _wrong_receipt = contract
             .doEmitWrongEvent()
+            .from(from)
             .send()
             .await
             .unwrap()
@@ -374,7 +387,15 @@ mod tests {
 
             let sub = event.subscribe().await.unwrap();
 
-            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+            contract
+                .doEmit()
+                .from(from)
+                .send()
+                .await
+                .unwrap()
+                .get_receipt()
+                .await
+                .expect("no receipt");
 
             let mut stream = sub.into_stream();
 
@@ -390,6 +411,7 @@ mod tests {
             // send the request to emit the wrong event
             contract
                 .doEmitWrongEvent()
+                .from(from)
                 .send()
                 .await
                 .unwrap()
@@ -412,7 +434,10 @@ mod tests {
         let anvil = alloy_node_bindings::Anvil::new().spawn();
         let provider = alloy_provider::ProviderBuilder::new().on_http(anvil.endpoint_url());
 
-        let contract = MyContract::deploy(&provider).await.unwrap();
+        let from = address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
+        let contract_addr =
+            MyContract::deploy_builder(&provider).from(from).deploy().await.unwrap();
+        let contract = MyContractInstance::new(contract_addr, &provider);
 
         let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
             .address(*contract.address())
@@ -422,8 +447,15 @@ mod tests {
 
         let poller = event.watch().await.unwrap();
 
-        let _receipt =
-            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+        let _receipt = contract
+            .doEmit()
+            .from(from)
+            .send()
+            .await
+            .unwrap()
+            .get_receipt()
+            .await
+            .expect("no receipt");
 
         let expected_event = MyContract::MyEvent {
             _0: 42,
@@ -450,6 +482,7 @@ mod tests {
         // send the wrong event and make sure it is NOT picked up by the event filter
         let _wrong_receipt = contract
             .doEmitWrongEvent()
+            .from(from)
             .send()
             .await
             .unwrap()
@@ -476,7 +509,15 @@ mod tests {
 
             let sub = event.subscribe().await.unwrap();
 
-            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+            contract
+                .doEmit()
+                .from(from)
+                .send()
+                .await
+                .unwrap()
+                .get_receipt()
+                .await
+                .expect("no receipt");
 
             let mut stream = sub.into_stream();
 
@@ -492,6 +533,7 @@ mod tests {
             // send the request to emit the wrong event
             contract
                 .doEmitWrongEvent()
+                .from(from)
                 .send()
                 .await
                 .unwrap()
