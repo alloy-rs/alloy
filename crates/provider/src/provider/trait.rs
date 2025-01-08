@@ -1830,7 +1830,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "hyper")]
+    #[cfg(feature = "hyper-tls")]
     async fn hyper_https() {
         let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
 

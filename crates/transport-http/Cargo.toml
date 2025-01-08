@@ -54,7 +54,6 @@ reqwest = [
 ]
 hyper = [
     "dep:hyper",
-    "dep:hyper-tls",
     "dep:hyper-util",
     "dep:http-body-util",
     "dep:alloy-json-rpc",
@@ -62,6 +61,7 @@ hyper = [
     "dep:tower",
     "dep:tracing",
 ]
+hyper-tls = ["hyper", "dep:hyper-tls"]
 jwt-auth = [
     "hyper",
     "dep:alloy-rpc-types-engine",
