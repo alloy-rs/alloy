@@ -127,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn contract_interface() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let abi_str = r#"[{"inputs":[],"name":"counter","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"increment","outputs":[],"stateMutability":"nonpayable","type":"function"}]"#;
         let abi = serde_json::from_str::<JsonAbi>(abi_str).unwrap();

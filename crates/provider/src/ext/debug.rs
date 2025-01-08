@@ -413,7 +413,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_transaction() {
         async_ci_only(|| async move {
-            let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+            let provider = ProviderBuilder::new().on_anvil_with_wallet();
             let from = provider.default_signer_address();
 
             let gas_price = provider.get_gas_price().await.unwrap();
@@ -542,8 +542,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider =
-                    ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
                 let tx1 = TransactionRequest::default()
                     .with_from(address!("0000000000000000000000000000000000000123"))

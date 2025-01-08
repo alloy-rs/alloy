@@ -1407,7 +1407,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_tx() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -1430,7 +1430,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_watch_confirmed_tx() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -1622,7 +1622,7 @@ mod tests {
 
     #[tokio::test]
     async fn gets_transaction_by_hash() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let req = TransactionRequest::default()
             .from(provider.default_signer_address())
@@ -1767,7 +1767,6 @@ mod tests {
         let wallet = EthereumWallet::from(signer);
 
         let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .network::<AnyNetwork>()
             .wallet(wallet)
             .on_http(anvil.endpoint_url());

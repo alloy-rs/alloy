@@ -112,16 +112,56 @@ pub struct ProviderBuilder<L, F, N = Ethereum> {
     network: PhantomData<fn() -> N>,
 }
 
-impl ProviderBuilder<Identity, Identity, Ethereum> {
-    /// Create a new [`ProviderBuilder`].
-    pub const fn new() -> Self {
-        Self { layer: Identity, filler: Identity, network: PhantomData }
+// impl ProviderBuilder<Identity, Identity, Ethereum> {
+//     /// Create a new [`ProviderBuilder`] with recommended fillers enabled.
+//     pub const fn new() -> Self {
+//         let p: ProviderBuilder<
+//             Identity,
+//             JoinFill<
+//                 Identity,
+//                 JoinFill<
+//                     GasFiller,
+//                     JoinFill<crate::fillers::BlobGasFiller, JoinFill<NonceFiller,
+// ChainIdFiller>>,                 >,
+//             >,
+//         > = Self { layer: Identity, filler: Identity, network: PhantomData }
+//         > .with_recommended_fillers();
+
+//         p
+//     }
+// }
+
+impl
+    ProviderBuilder<
+        Identity,
+        JoinFill<Identity, <alloy_network::Ethereum as RecommendedFillers>::RecommendedFillers>,
+        Ethereum,
+    >
+{
+    /// Create a new [`ProviderBuilder`] with the recommended filler enabled.
+    ///
+    /// Recommended fillers are preconfigured set of fillers that handle gas estimation, nonce
+    /// management, and chain-id fetching.
+    ///
+    /// Building a provider with this setting enabled will return a [`crate::fillers::FillProvider`]
+    /// with [`crate::utils::JoinedRecommendedFillers`].
+    ///
+    /// You can opt-out of using these fillers by using the `.disable_recommended_fillers()` method.
+    pub fn new() -> Self {
+        ProviderBuilder::default().with_recommended_fillers()
     }
 }
 
 impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     fn default() -> Self {
         Self { layer: Identity, filler: Identity, network: PhantomData }
+    }
+}
+
+impl<L, F, N> ProviderBuilder<L, F, N> {
+    /// Opt-out of the recommended fillers by reseting the fillers stack in the [`ProviderBuilder`].
+    pub fn disable_recommended_fillers(self) -> ProviderBuilder<L, Identity, N> {
+        ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
     }
 }
 
@@ -384,6 +424,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         >,
     {
         self.on_anvil_with_wallet_and_config(std::convert::identity)
+            .expect("failed to build provider")
     }
 
     /// Build this provider with anvil, using the BoxTransport. The
@@ -409,23 +450,6 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using the BoxTransport.
     /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
     pub fn on_anvil_with_wallet_and_config(
-        self,
-        f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider>>::Provider
-    where
-        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
-        L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<crate::provider::RootProvider>,
-        >,
-    {
-        self.try_on_anvil_with_wallet_and_config(f).unwrap()
-    }
-
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance. This
-    /// function configures a wallet backed by anvil keys, and is intended for
-    /// use in tests.
-    pub fn try_on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> AnvilProviderResult<<JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider>>::Provider>

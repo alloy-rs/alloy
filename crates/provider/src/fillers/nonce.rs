@@ -232,7 +232,10 @@ mod tests {
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -248,7 +251,10 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
-        let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil_with_wallet();
 
         let from = provider.default_signer_address();
         let tx = TransactionRequest {

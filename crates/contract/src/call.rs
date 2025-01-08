@@ -570,7 +570,8 @@ mod tests {
     use alloy_consensus::Transaction;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{
-        layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
+        fillers::FillProvider, layers::AnvilProvider, utils::JoinedRecommendedFillers, Provider,
+        ProviderBuilder, RootProvider, WalletProvider,
     };
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
@@ -619,10 +620,12 @@ mod tests {
         }
     }
 
+    type AnvilFillProvider =
+        FillProvider<JoinedRecommendedFillers, AnvilProvider<RootProvider>, Ethereum>;
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     #[allow(clippy::type_complexity)]
     fn build_call_builder(
-    ) -> CallBuilder<(), AnvilProvider<RootProvider>, PhantomData<MyContract::doStuffCall>> {
+    ) -> CallBuilder<(), AnvilFillProvider, PhantomData<MyContract::doStuffCall>> {
         let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
@@ -730,7 +733,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let expected_address = provider.default_signer_address().create(0);
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
@@ -756,7 +759,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call_with_priority() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
         let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
         let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();

@@ -724,8 +724,7 @@ mod tests {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
-            let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).on_anvil_with_wallet();
 
             let path = dir.join("rpc-cache-code.txt");
             shared_cache.load_cache(path.clone()).unwrap();
