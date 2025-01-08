@@ -37,6 +37,7 @@ tracing = { workspace = true, optional = true }
 http-body-util = { workspace = true, optional = true }
 hyper = { workspace = true, default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["full"], optional = true }
+hyper-tls = { workspace = true, optional = true }
 
 # auth layer
 alloy-rpc-types-engine = { workspace = true, optional = true }
@@ -53,6 +54,7 @@ reqwest = [
 ]
 hyper = [
     "dep:hyper",
+    "dep:hyper-tls",
     "dep:hyper-util",
     "dep:http-body-util",
     "dep:alloy-json-rpc",
