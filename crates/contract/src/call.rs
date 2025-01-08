@@ -569,10 +569,7 @@ mod tests {
     use super::*;
     use alloy_consensus::Transaction;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
-    use alloy_provider::{
-        fillers::FillProvider, layers::AnvilProvider, utils::JoinedRecommendedFillers, Provider,
-        ProviderBuilder, RootProvider, WalletProvider,
-    };
+    use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
 
@@ -620,12 +617,10 @@ mod tests {
         }
     }
 
-    type AnvilFillProvider =
-        FillProvider<JoinedRecommendedFillers, AnvilProvider<RootProvider>, Ethereum>;
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     #[allow(clippy::type_complexity)]
-    fn build_call_builder(
-    ) -> CallBuilder<(), AnvilFillProvider, PhantomData<MyContract::doStuffCall>> {
+    fn build_call_builder() -> CallBuilder<(), impl Provider, PhantomData<MyContract::doStuffCall>>
+    {
         let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();

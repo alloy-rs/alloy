@@ -52,7 +52,7 @@ pub enum GasFillable {
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::new()
+/// let provider = ProviderBuilder::default()
 ///     .with_gas_estimation()
 ///     .wallet(wallet)
 ///     .on_http(url);
