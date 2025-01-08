@@ -80,6 +80,7 @@ alloy-trie = { version = "0.7.6", default-features = false }
 alloy-chains = { version = "0.1.18", default-features = false }
 
 # eips
+alloy-eip2124 = { version = "0.1.0", default-features = false }
 alloy-eip2930 = { version = "0.1.0", default-features = false }
 alloy-eip7702 = { version = "0.5.0", default-features = false }
 

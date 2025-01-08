@@ -24,6 +24,7 @@ workspace = true
 
 [dependencies]
 # eips
+alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
 
