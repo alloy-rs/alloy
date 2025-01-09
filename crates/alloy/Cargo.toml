@@ -65,7 +65,7 @@ alloy-transport-ws = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "alloy-core/default"]
+default = ["std", "reqwest", "alloy-core/default", "full"]
 
 # std
 std = [
