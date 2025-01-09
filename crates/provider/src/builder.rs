@@ -131,18 +131,16 @@ impl
     pub fn new() -> Self {
         ProviderBuilder::default().with_recommended_fillers()
     }
+
+    /// Opt-out of the recommended fillers by reseting the fillers stack in the [`ProviderBuilder`].
+    pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
+        ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
+    }
 }
 
 impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     fn default() -> Self {
         Self { layer: Identity, filler: Identity, network: PhantomData }
-    }
-}
-
-impl<L, F, N> ProviderBuilder<L, F, N> {
-    /// Opt-out of the recommended fillers by reseting the fillers stack in the [`ProviderBuilder`].
-    pub fn disable_recommended_fillers(self) -> ProviderBuilder<L, Identity, N> {
-        ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
     }
 }
 
