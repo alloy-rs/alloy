@@ -104,6 +104,13 @@ where
 /// This type is similar to [`tower::ServiceBuilder`], with extra complication
 /// around maintaining the network and transport types.
 ///
+/// The [`ProviderBuilder`] can be instantiated in two ways, using `ProviderBuilder::new()` or
+/// `ProviderBuilder::default()`.
+///
+/// `ProviderBuilder::new()` will create a new [`ProviderBuilder`] with the [`RecommendedFillers`]
+/// enabled, whereas `ProviderBuilder::default()` will instantiate it in its vanilla
+/// [`ProviderBuilder`] form i.e with no fillers enabled.
+///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 #[derive(Debug)]
 pub struct ProviderBuilder<L, F, N = Ethereum> {
