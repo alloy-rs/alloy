@@ -280,7 +280,9 @@ pub(crate) mod subscription {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_network::EthereumWallet;
     use alloy_primitives::U256;
+    use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
 
     sol! {
@@ -309,8 +311,15 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
 
         let anvil = alloy_node_bindings::Anvil::new().spawn();
-        let provider = alloy_provider::ProviderBuilder::new().on_http(anvil.endpoint_url());
 
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+        let wallet = EthereumWallet::from(pk);
+        let provider = alloy_provider::ProviderBuilder::new()
+            .wallet(wallet.clone())
+            .on_http(anvil.endpoint_url());
+
+        // let from = address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
         let contract = MyContract::deploy(&provider).await.unwrap();
 
         let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
@@ -365,6 +374,7 @@ mod tests {
         #[cfg(feature = "pubsub")]
         {
             let provider = alloy_provider::ProviderBuilder::new()
+                .wallet(wallet)
                 .on_builtin(&anvil.ws_endpoint())
                 .await
                 .unwrap();
@@ -410,7 +420,12 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
 
         let anvil = alloy_node_bindings::Anvil::new().spawn();
-        let provider = alloy_provider::ProviderBuilder::new().on_http(anvil.endpoint_url());
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+        let wallet = EthereumWallet::from(pk);
+        let provider = alloy_provider::ProviderBuilder::new()
+            .wallet(wallet.clone())
+            .on_http(anvil.endpoint_url());
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
@@ -465,6 +480,7 @@ mod tests {
         #[cfg(feature = "pubsub")]
         {
             let provider = alloy_provider::ProviderBuilder::new()
+                .wallet(wallet)
                 .on_builtin(&anvil.ws_endpoint())
                 .await
                 .unwrap();

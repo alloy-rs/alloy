@@ -26,7 +26,7 @@ use crate::{
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::new()
+/// let provider = ProviderBuilder::default()
 ///     .with_chain_id(1)
 ///     .wallet(wallet)
 ///     .on_http(url);
