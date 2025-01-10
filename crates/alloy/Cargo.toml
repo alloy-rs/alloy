@@ -65,7 +65,7 @@ alloy-transport-ws = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "alloy-core/default", "full"]
+default = ["std", "reqwest", "alloy-core/default", "essentials"]
 
 # std
 std = [
@@ -75,6 +75,9 @@ std = [
     "alloy-serde?/std",
     "alloy-consensus?/std",
 ]
+
+# essential features that enable bare minimal network interactions out of the box.
+essentials = ["contract", "provider-http", "rpc-types", "signer-local"]
 
 # full
 full = [
