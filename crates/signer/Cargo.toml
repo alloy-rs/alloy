@@ -38,6 +38,9 @@ alloy-dyn-abi = { workspace = true, optional = true, features = [
     "eip712",
 ] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [dev-dependencies]
 assert_matches.workspace = true
 serde.workspace = true

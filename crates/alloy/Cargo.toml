@@ -76,7 +76,7 @@ std = [
     "alloy-consensus?/std",
 ]
 
-# essential features that enable bare minimal network interactions out of the box.
+# essential features that enable basic network interactions out of the box.
 essentials = ["contract", "provider-http", "rpc-types", "signer-local"]
 
 # full
