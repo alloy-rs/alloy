@@ -140,6 +140,8 @@ impl
     }
 
     /// Opt-out of the recommended fillers by reseting the fillers stack in the [`ProviderBuilder`].
+    ///
+    /// This is equivalent to creating the builder using `ProviderBuilder::default()`.
     pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
         ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
     }
