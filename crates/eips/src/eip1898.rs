@@ -1,7 +1,7 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, B256, U64};
-use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
+use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError, RlpDecodable, RlpEncodable};
 use core::{
     fmt::{self, Formatter},
     num::ParseIntError,
@@ -640,14 +640,14 @@ impl FromStr for BlockId {
 }
 
 /// A number and a hash.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct NumHash {
-    /// The number
-    pub number: u64,
     /// The hash.
     pub hash: B256,
+    /// The number
+    pub number: u64,
 }
 
 /// Block number and hash of the forked block.
