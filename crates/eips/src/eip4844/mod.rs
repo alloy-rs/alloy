@@ -98,13 +98,13 @@ pub struct Blob {
 }
 impl Default for Blob {
     fn default() -> Self {
-        let default_bytes = Bytes::from(vec![0u8; 131072]); // A blob filled with 131072 zeros
+        let default_bytes = Bytes::from(vec![0u8; BYTES_PER_BLOB]); 
         Self { inner: Arc::new(Mutex::new(default_bytes)) }
     }
 }
 
 impl From<[u8; 131072]> for Blob {
-    fn from(array: [u8; 131072]) -> Self {
+    fn from(array: [u8; BYTES_PER_BLOB]) -> Self {
         Self { inner: Arc::new(Mutex::new(Bytes::from(array.to_vec()))) }
     }
 }
@@ -125,8 +125,8 @@ impl Decodable for Blob {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for Blob {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // Generate exactly 131072 bytes for a valid Blob
-        let data: Vec<u8> = u.arbitrary::<[u8; 131072]>()?.to_vec();
+    
+        let data: Vec<u8> = u.arbitrary::<[u8; BYTES_PER_BLOB]>()?.to_vec();
 
         Ok(Self { inner: Arc::new(Mutex::new(Bytes::from(data))) })
     }
@@ -153,9 +153,9 @@ impl serde::Serialize for Blob {
         S: serde::Serializer,
     {
         let lock = self.inner.lock().unwrap();
-        if lock.len() != 131072 {
+        if lock.len() != BYTES_PER_BLOB {
             return Err(serde::ser::Error::custom(format!(
-                "Invalid blob length: expected 131072, got {}",
+                "Invalid blob length: expected 130,048, got {}",
                 lock.len()
             )));
         }
@@ -170,9 +170,9 @@ impl<'de> serde::Deserialize<'de> for Blob {
         D: serde::Deserializer<'de>,
     {
         let data: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
-        if data.len() != 131072 {
+        if data.len() != BYTES_PER_BLOB {
             return Err(serde::de::Error::custom(format!(
-                "Invalid blob length: expected 131072, got {}",
+                "Invalid blob length: expected 130,048, got {}",
                 data.len()
             )));
         }
@@ -184,7 +184,7 @@ impl Blob {
     pub fn new(data: Bytes) -> Result<Self, String> {
         if data.len() != BYTES_PER_BLOB {
             return Err(format!(
-                "Invalid blob length: expected {}, got {}",
+                "Invalid blob length: expected 130,048 {}, got {}",
                 BYTES_PER_BLOB,
                 data.len()
             ));
@@ -193,12 +193,12 @@ impl Blob {
     }
 
     pub fn repeat_byte(byte: u8) -> Result<Self, String> {
-        let data = vec![byte; 131072];
+        let data = vec![byte; BYTES_PER_BLOB];
         Self::new(Bytes::from(data))
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        let lock = self.inner.lock().expect("Mutex poisoned");
+        let lock = self.inner.lock().unwrap();
         lock.clone()
     }
 
@@ -206,16 +206,16 @@ impl Blob {
         self.inner.lock().unwrap()
     }
 
-    /// Return a mutable vector of the bytes.
+    
     pub fn bytes_mut(&self) -> Vec<u8> {
-        let lock = self.inner.lock().unwrap(); // Lock the Mutex
-        lock.to_vec() // Convert Bytes to Vec<u8>
+        let lock = self.inner.lock().unwrap(); 
+        lock.to_vec() 
     }
 
-    /// Update the blob's bytes after mutation.
+    
     pub fn update_bytes(&self, new_data: Vec<u8>) {
-        let mut lock = self.inner.lock().unwrap(); // Lock the Mutex mutably
-        *lock = alloy_primitives::Bytes::from(new_data); // Convert Vec<u8> back to Bytes
+        let mut lock = self.inner.lock().unwrap(); 
+        *lock = alloy_primitives::Bytes::from(new_data); 
     }
 
     pub fn as_slice(&self) -> Vec<u8> {
