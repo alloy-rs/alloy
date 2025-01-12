@@ -14,15 +14,20 @@ pub mod builder;
 pub mod utils;
 
 mod engine;
+use core::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex};
+
+use alloy_rlp::{Decodable, Encodable};
 pub use engine::*;
 
 /// Contains sidecar related types
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;
+
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256};
 
 use crate::eip7840;
 
@@ -87,8 +92,169 @@ pub const BYTES_PER_COMMITMENT: usize = 48;
 /// How many bytes are in a proof
 pub const BYTES_PER_PROOF: usize = 48;
 
-/// A Blob serialized as 0x-prefixed hex string
-pub type Blob = FixedBytes<BYTES_PER_BLOB>;
+#[derive(Clone, Debug)]
+pub struct Blob {
+    inner: Arc<Mutex<Bytes>>,
+}
+impl Default for Blob {
+    fn default() -> Self {
+        let default_bytes = Bytes::from(vec![0u8; 131072]); // A blob filled with 131072 zeros
+        Self { inner: Arc::new(Mutex::new(default_bytes)) }
+    }
+}
+
+impl From<[u8; 131072]> for Blob {
+    fn from(array: [u8; 131072]) -> Self {
+        Self { inner: Arc::new(Mutex::new(Bytes::from(array.to_vec()))) }
+    }
+}
+impl Encodable for Blob {
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        let lock = self.inner.lock().unwrap();
+
+        lock.encode(out);
+    }
+}
+impl Decodable for Blob {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let bytes = Bytes::decode(buf)?;
+
+        Ok(Self { inner: Arc::new(Mutex::new(bytes)) })
+    }
+}
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for Blob {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate exactly 131072 bytes for a valid Blob
+        let data: Vec<u8> = u.arbitrary::<[u8; 131072]>()?.to_vec();
+
+        Ok(Self { inner: Arc::new(Mutex::new(Bytes::from(data))) })
+    }
+}
+impl Eq for Blob {}
+
+impl PartialEq for Blob {
+    fn eq(&self, other: &Self) -> bool {
+        let self_lock = self.inner.lock().unwrap();
+        let other_lock = other.inner.lock().unwrap();
+        *self_lock == *other_lock
+    }
+}
+impl Hash for Blob {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let lock = self.inner.lock().unwrap();
+        lock.hash(state);
+    }
+}
+#[cfg(feature = "serde")]
+impl serde::Serialize for Blob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let lock = self.inner.lock().unwrap();
+        if lock.len() != 131072 {
+            return Err(serde::ser::Error::custom(format!(
+                "Invalid blob length: expected 131072, got {}",
+                lock.len()
+            )));
+        }
+        serializer.serialize_bytes(lock.as_ref())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Blob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+        if data.len() != 131072 {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid blob length: expected 131072, got {}",
+                data.len()
+            )));
+        }
+        Ok(Blob { inner: Arc::new(Mutex::new(Bytes::from(data))) })
+    }
+}
+
+impl Blob {
+    pub fn new(data: Bytes) -> Result<Self, String> {
+        if data.len() != BYTES_PER_BLOB {
+            return Err(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                data.len()
+            ));
+        }
+        Ok(Self { inner: Arc::new(Mutex::new(data)) })
+    }
+
+    pub fn repeat_byte(byte: u8) -> Result<Self, String> {
+        let data = vec![byte; 131072];
+        Self::new(Bytes::from(data))
+    }
+
+    pub fn as_bytes(&self) -> Bytes {
+        let lock = self.inner.lock().expect("Mutex poisoned");
+        lock.clone()
+    }
+
+    pub fn as_bytes_mut(&self) -> std::sync::MutexGuard<'_, Bytes> {
+        self.inner.lock().unwrap()
+    }
+
+    /// Return a mutable vector of the bytes.
+    pub fn bytes_mut(&self) -> Vec<u8> {
+        let lock = self.inner.lock().unwrap(); // Lock the Mutex
+        lock.to_vec() // Convert Bytes to Vec<u8>
+    }
+
+    /// Update the blob's bytes after mutation.
+    pub fn update_bytes(&self, new_data: Vec<u8>) {
+        let mut lock = self.inner.lock().unwrap(); // Lock the Mutex mutably
+        *lock = alloy_primitives::Bytes::from(new_data); // Convert Vec<u8> back to Bytes
+    }
+
+    pub fn as_slice(&self) -> Vec<u8> {
+        let lock = self.inner.lock().expect("Mutex poisoned");
+        lock.clone().to_vec()
+    }
+
+    pub fn len(&self) -> usize {
+        let lock = self.inner.lock().expect("Mutex poisoned");
+        lock.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl TryFrom<Vec<u8>> for Blob {
+    type Error = String;
+
+    fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
+        Blob::try_from(data.as_slice())
+    }
+}
+
+impl TryFrom<&[u8]> for Blob {
+    type Error = String;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        if data.len() != BYTES_PER_BLOB {
+            return Err(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                data.len()
+            ));
+        }
+        Ok(Self { inner: Arc::new(Mutex::new(Bytes::copy_from_slice(data))) })
+    }
+}
 
 /// Helper function to deserialize boxed blobs.
 #[cfg(feature = "serde")]
