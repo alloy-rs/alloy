@@ -45,7 +45,8 @@ impl PartialSidecar {
     /// an empty blob to it.
     pub fn with_capacity(capacity: usize) -> Self {
         let mut blobs = Vec::with_capacity(capacity);
-        blobs.push(Blob::new([0u8; BYTES_PER_BLOB]));
+        blobs.push(Blob::new([0u8; BYTES_PER_BLOB].into()).expect("Failed to create a Blob"));
+
         Self { blobs, fe: 0 }
     }
 
@@ -74,7 +75,7 @@ impl PartialSidecar {
 
     /// Push an empty blob to the builder.
     fn push_empty_blob(&mut self) {
-        self.blobs.push(Blob::new([0u8; BYTES_PER_BLOB]));
+        self.blobs.push(Blob::new([0u8; BYTES_PER_BLOB].into()).expect("Failed to create a Blob"));
     }
 
     /// Allocate enough space for the required number of new field elements.
@@ -100,15 +101,26 @@ impl PartialSidecar {
         self.blobs.get_mut(last_unused_blob_index).expect("never empty")
     }
 
-    /// Get a mutable reference to the field element at the given index, in
-    /// the current blob.
-    fn fe_at_mut(&mut self, index: usize) -> &mut [u8] {
-        &mut self.current_blob_mut()[index * 32..(index + 1) * 32]
+    /// Get a mutable reference to the field element at the given index in the current blob.
+    fn fe_at_mut(&mut self, index: usize) -> Vec<u8> {
+        let range = index * 32..(index + 1) * 32;
+
+        // Convert immutable `Bytes` to a mutable `Vec<u8>`.
+        let mut bytes = self.current_blob_mut().as_bytes().to_vec();
+
+        // Ensure the range is valid.
+        if range.end > bytes.len() {
+            panic!("Index out of bounds: field element range exceeds blob size");
+        }
+
+        // Get the slice from the mutable bytes, modify as needed, and return it as Vec<u8>.
+        let slice = &mut bytes[range];
+        slice.to_vec()
     }
 
-    /// Get a mutable reference to the next unused field element.
-    fn next_unused_fe_mut(&mut self) -> &mut [u8] {
-        self.fe_at_mut(self.first_unused_fe_index_in_current_blob())
+    /// Get the next unused field element as an owned Vec<u8>.
+    fn next_unused_fe_mut(&mut self) -> Vec<u8> {
+        self.fe_at_mut(self.first_unused_fe_index_in_current_blob()).to_vec()
     }
 
     /// Ingest a field element into the current blobs.
@@ -126,7 +138,7 @@ impl PartialSidecar {
     /// encode the data.
     pub fn ingest_partial_fe(&mut self, data: &[u8]) {
         self.alloc_fes(1);
-        let fe = self.next_unused_fe_mut();
+        let mut fe = self.next_unused_fe_mut();
         fe[1..1 + data.len()].copy_from_slice(data);
         self.fe += 1;
     }
@@ -253,17 +265,26 @@ impl SidecarCoder for SimpleCoder {
             return None;
         }
 
-        if blobs
+        // Collect chunks into a vector to ensure their lifetime is valid.
+        let chunks: Vec<Vec<u8>> = blobs
             .iter()
-            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES_USIZE).map(WholeFe::new))
-            .any(|fe| fe.is_none())
-        {
+            .flat_map(|blob| {
+                blob.as_bytes()
+                    .chunks(FIELD_ELEMENT_BYTES_USIZE)
+                    .map(|chunk| chunk.to_vec())
+                    .collect::<Vec<_>>() // Ensure iterator allocation
+            })
+            .collect();
+
+        // Ensure all field elements are valid.
+        if chunks.iter().any(|chunk| WholeFe::new(chunk).is_none()) {
             return None;
         }
 
-        let mut fes = blobs
-            .iter()
-            .flat_map(|blob| blob.chunks(FIELD_ELEMENT_BYTES_USIZE).map(WholeFe::new_unchecked));
+        // Map over chunks and decode.
+        let mut fes = chunks
+            .into_iter()
+            .map(|chunk| WholeFe::new_unchecked(Box::leak(chunk.into_boxed_slice())));
 
         let mut res = Vec::new();
         loop {
@@ -473,7 +494,10 @@ mod tests {
     #[test]
     fn decode_all_rejects_invalid_data() {
         assert_eq!(SimpleCoder.decode_all(&[]), None);
-        assert_eq!(SimpleCoder.decode_all(&[Blob::new([0xffu8; BYTES_PER_BLOB])]), None);
+        assert_eq!(
+            SimpleCoder.decode_all(&[Blob::new([0xffu8; BYTES_PER_BLOB].into()).unwrap()]),
+            None
+        );
     }
 
     #[test]
