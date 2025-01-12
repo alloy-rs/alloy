@@ -69,7 +69,7 @@ impl BlobTransactionSidecar {
             versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
                 if blob_versioned_hash == *target_hash {
                     if let Some((blob, proof)) =
-                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
+                        self.blobs.get(i).cloned().zip(self.proofs.get(i).cloned())
                     {
                         return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
                     }
@@ -134,7 +134,7 @@ impl BlobTransactionSidecarItem {
         let binding = crate::eip4844::env_settings::EnvKzgSettings::Default;
         let settings = binding.get();
 
-        let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
+        let blob = c_kzg::Blob::from_bytes(&self.blob.as_slice())
             .map_err(BlobTransactionValidationError::KZGError)?;
 
         let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
@@ -155,7 +155,7 @@ impl BlobTransactionSidecarItem {
         hash: &IndexedBlobHash,
     ) -> Result<(), BlobTransactionValidationError> {
         if self.index != hash.index {
-            let blob_hash_part = B256::from_slice(&self.blob[0..32]);
+            let blob_hash_part = B256::from_slice(&self.blob.as_ref().as_slice()[0..32]);
             return Err(BlobTransactionValidationError::WrongVersionedHash {
                 have: blob_hash_part,
                 expected: hash.hash,
@@ -335,7 +335,7 @@ impl BlobTransactionSidecar {
     /// a RLP header.
     #[doc(hidden)]
     pub fn rlp_encoded_fields_length(&self) -> usize {
-        self.blobs.length() + self.commitments.length() + self.proofs.length()
+        self.blobs.len() + self.commitments.length() + self.proofs.length()
     }
 
     /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, __without__ a RLP header.
