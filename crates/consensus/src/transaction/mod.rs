@@ -1,6 +1,12 @@
 //! Transaction types.
 
-use crate::Signed;
+use crate::{
+    constants::{
+        EIP1559_TX_TYPE_ID, EIP2930_TX_TYPE_ID, EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID,
+        LEGACY_TX_TYPE_ID,
+    },
+    Signed,
+};
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
@@ -356,26 +362,26 @@ pub trait Typed2718 {
 
     /// Returns true if the type is a legacy transaction.
     fn is_legacy(&self) -> bool {
-        self.ty() == 0
+        self.ty() == LEGACY_TX_TYPE_ID
     }
 
     /// Returns true if the type is an EIP-2930 transaction.
     fn is_eip2930(&self) -> bool {
-        self.ty() == 1
+        self.ty() == EIP2930_TX_TYPE_ID
     }
 
     /// Returns true if the type is an EIP-1559 transaction.
     fn is_eip1559(&self) -> bool {
-        self.ty() == 2
+        self.ty() == EIP1559_TX_TYPE_ID
     }
 
     /// Returns true if the type is an EIP-4844 transaction.
     fn is_eip4844(&self) -> bool {
-        self.ty() == 3
+        self.ty() == EIP4844_TX_TYPE_ID
     }
 
     /// Returns true if the type is an EIP-7702 transaction.
     fn is_eip7702(&self) -> bool {
-        self.ty() == 4
+        self.ty() == EIP7702_TX_TYPE_ID
     }
 }
