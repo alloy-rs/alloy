@@ -1379,8 +1379,11 @@ mod tests {
             use alloy_eips::eip4844::{Blob, BlobTransactionSidecar};
 
             // Positive case
-            let sidecar =
-                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let sidecar = BlobTransactionSidecar::new(
+                vec![Blob::repeat_byte(0xFA).unwrap()],
+                Vec::new(),
+                Vec::new(),
+            );
             let eip4844_request = TransactionRequest {
                 to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
                 max_fee_per_gas: Some(1234),
