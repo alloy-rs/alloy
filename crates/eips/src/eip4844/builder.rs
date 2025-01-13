@@ -113,12 +113,12 @@ impl PartialSidecar {
             panic!("Index out of bounds: field element range exceeds blob size");
         }
 
-        // Get the slice from the mutable bytes, modify as needed, and return it as Vec<u8>.
+        // Get the slice from the mutable bytes, modify as needed, and return it as `Vec<u8>`.
         let slice = &mut bytes[range];
         slice.to_vec()
     }
 
-    /// Get the next unused field element as an owned Vec<u8>.
+    /// Get the next unused field element as an owned `Vec<u8>`.
     fn next_unused_fe_mut(&mut self) -> Vec<u8> {
         self.fe_at_mut(self.first_unused_fe_index_in_current_blob()).to_vec()
     }
