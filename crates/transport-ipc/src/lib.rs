@@ -102,7 +102,7 @@ const CAPACITY: usize = 4096;
 /// A stream of JSON-RPC items, read from an [`AsyncRead`] stream.
 #[derive(Debug)]
 #[pin_project::pin_project]
-pub struct ReadJsonStream<T> {
+pub struct ReadJsonStream<T, Item = alloy_json_rpc::PubSubItem> {
     /// The underlying reader.
     #[pin]
     reader: T,
@@ -110,11 +110,19 @@ pub struct ReadJsonStream<T> {
     buf: BytesMut,
     /// Whether the buffer has been drained.
     drained: bool,
+
+    /// PhantomData marking the item type this stream will yield.
+    _pd: std::marker::PhantomData<Item>,
 }
 
-impl<T: AsyncRead> ReadJsonStream<T> {
+impl<T: AsyncRead, U> ReadJsonStream<T, U> {
     fn new(reader: T) -> Self {
-        Self { reader, buf: BytesMut::with_capacity(CAPACITY), drained: true }
+        Self {
+            reader,
+            buf: BytesMut::with_capacity(CAPACITY),
+            drained: true,
+            _pd: core::marker::PhantomData,
+        }
     }
 }
 
@@ -124,8 +132,11 @@ impl<T: AsyncRead> From<T> for ReadJsonStream<T> {
     }
 }
 
-impl<T: AsyncRead> futures::stream::Stream for ReadJsonStream<T> {
-    type Item = alloy_json_rpc::PubSubItem;
+impl<T: AsyncRead, Item> futures::stream::Stream for ReadJsonStream<T, Item>
+where
+    Item: serde::de::DeserializeOwned,
+{
+    type Item = Item;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
