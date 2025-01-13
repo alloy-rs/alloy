@@ -215,6 +215,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_json_rpc::PubSubItem;
     use std::future::poll_fn;
 
     #[tokio::test]
@@ -228,7 +229,7 @@ mod tests {
             .read(r#", "params": {"subscription": "0xcd0c3e8af590364c09d0fa6a1210faf5", "result": {"difficulty": "0xd9263f42a87", "uncles": []}} }"#.as_bytes())
             .build();
 
-        let mut reader = ReadJsonStream::new(mock);
+        let mut reader = ReadJsonStream::<_, PubSubItem>::new(mock);
         poll_fn(|cx| {
             let res = reader.poll_next_unpin(cx);
             assert!(res.is_pending());
@@ -249,7 +250,7 @@ mod tests {
             .read(vec![b'a'; CAPACITY].as_ref())
             .build();
 
-        let mut reader = ReadJsonStream::new(mock);
+        let mut reader = ReadJsonStream::<_, PubSubItem>::new(mock);
         poll_fn(|cx| {
             let res = reader.poll_next_unpin(cx);
             assert!(res.is_pending());
@@ -281,7 +282,7 @@ mod tests {
             .read(second_page)
             .build();
 
-        let mut reader = ReadJsonStream::new(mock);
+        let mut reader = ReadJsonStream::<_, PubSubItem>::new(mock);
         poll_fn(|cx| {
             let res = reader.poll_next_unpin(cx);
             assert!(res.is_pending());
