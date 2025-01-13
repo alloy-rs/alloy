@@ -1,4 +1,4 @@
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{bytes, Address, B256};
 use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
@@ -91,11 +91,13 @@ impl<T: Decodable + SignerRecoverable> Decodable for Recovered<T> {
     }
 }
 
-impl<T: Encodable2718> Encodable2718 for Recovered<T> {
-    fn type_flag(&self) -> Option<u8> {
-        self.tx.type_flag()
+impl<T: Typed2718> Typed2718 for Recovered<T> {
+    fn ty(&self) -> u8 {
+        self.tx.ty()
     }
+}
 
+impl<T: Encodable2718> Encodable2718 for Recovered<T> {
     fn encode_2718_len(&self) -> usize {
         self.tx.encode_2718_len()
     }

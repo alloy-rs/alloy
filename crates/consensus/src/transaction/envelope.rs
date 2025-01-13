@@ -1,13 +1,14 @@
 use crate::{
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaTx, Typed2718,
+        RlpEcdsaTx,
     },
     Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
+    Typed2718,
 };
 use alloy_primitives::{
     Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
@@ -415,16 +416,6 @@ impl Decodable2718 for TxEnvelope {
 }
 
 impl Encodable2718 for TxEnvelope {
-    fn type_flag(&self) -> Option<u8> {
-        match self {
-            Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930.into()),
-            Self::Eip1559(_) => Some(TxType::Eip1559.into()),
-            Self::Eip4844(_) => Some(TxType::Eip4844.into()),
-            Self::Eip7702(_) => Some(TxType::Eip7702.into()),
-        }
-    }
-
     fn encode_2718_len(&self) -> usize {
         self.eip2718_encoded_length()
     }

@@ -23,6 +23,7 @@ pub use eip1898::{
 pub mod eip2124;
 
 pub mod eip2718;
+pub use eip2718::{Decodable2718, Encodable2718, Typed2718};
 
 pub mod eip2930;
 
