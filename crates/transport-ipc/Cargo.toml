@@ -33,7 +33,7 @@ serde_json.workspace = true
 tokio.workspace = true
 tokio-util = { workspace = true, features = ["io"] }
 tracing.workspace = true
-serde = { workspace = true }
+serde.workspace = true
 
 bytes = "1.5.0"
 interprocess = { version = "2", features = ["tokio"] }
