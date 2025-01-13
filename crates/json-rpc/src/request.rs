@@ -1,4 +1,3 @@
-
 use crate::{common::Id, RpcObject, RpcParam};
 use alloy_primitives::{keccak256, B256};
 use serde::{
