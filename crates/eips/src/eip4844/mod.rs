@@ -15,9 +15,8 @@ pub mod utils;
 
 mod engine;
 use core::hash::Hash;
-use std::sync::Arc;
 
-use alloy_rlp::{BytesMut, RlpDecodable, RlpEncodable};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use arbitrary::{Arbitrary, Unstructured};
 pub use engine::*;
 
@@ -92,8 +91,9 @@ pub const BYTES_PER_COMMITMENT: usize = 48;
 
 /// How many bytes are in a proof
 pub const BYTES_PER_PROOF: usize = 48;
-/// A fixed-size container for binary data, hold 131,072 bytes.
+/// A fixed-size container for binary data, designed to hold exactly 131,072 bytes.
 #[derive(Clone, Debug, RlpEncodable, RlpDecodable, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Blob {
     inner: Bytes,
 }
@@ -171,7 +171,7 @@ impl Blob {
     }
 
     /// Returns an immutable reference to the underlying `Bytes`.
-    pub fn as_bytes(&self) -> &Bytes {
+    pub const fn as_bytes(&self) -> &Bytes {
         &self.inner
     }
 
@@ -180,10 +180,7 @@ impl Blob {
         self.inner.to_vec()
     }
 
-    /// Overwrite this Blob with the provided bytes (must be length 131,072).
-    ///
-    /// Note that this requires `&mut self` because we’re fully replacing the
-    /// underlying `Bytes`.
+    /// Overwrite this Blob with the provided bytes.
     pub fn update_bytes(&mut self, new_data: Vec<u8>) -> Result<(), String> {
         if new_data.len() != BYTES_PER_BLOB {
             return Err(format!(
@@ -216,7 +213,7 @@ impl TryFrom<Vec<u8>> for Blob {
     type Error = String;
 
     fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
-        Blob::try_from(data.as_slice())
+        Self::try_from(data.as_slice())
     }
 }
 /// Converts a slice (`&[u8]`) into a `Blob`.
