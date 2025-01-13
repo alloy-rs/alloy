@@ -126,7 +126,7 @@ impl<T: AsyncRead, U> ReadJsonStream<T, U> {
     }
 }
 
-impl<T: AsyncRead> From<T> for ReadJsonStream<T> {
+impl<T: AsyncRead, U> From<T> for ReadJsonStream<T, U> {
     fn from(reader: T) -> Self {
         Self::new(reader)
     }
