@@ -1,6 +1,10 @@
 //! Ethereum protocol-related constants
 use alloy_primitives::{b256, B256};
 
+pub use alloy_eips::eip2718::{
+    EIP1559_TX_TYPE_ID, EIP2930_TX_TYPE_ID, EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID,
+    LEGACY_TX_TYPE_ID,
+};
 pub use alloy_trie::{EMPTY_ROOT_HASH, KECCAK_EMPTY};
 
 /// The first four bytes of the call data for a function call specifies the function to be called.
