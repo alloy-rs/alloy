@@ -109,6 +109,7 @@ reqwest = [
     "alloy-rpc-client/reqwest",
 ]
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
+hyper-tls = ["hyper", "alloy-transport-http/hyper-tls"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
 reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
