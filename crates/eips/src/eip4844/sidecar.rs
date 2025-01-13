@@ -134,7 +134,7 @@ impl BlobTransactionSidecarItem {
         let binding = crate::eip4844::env_settings::EnvKzgSettings::Default;
         let settings = binding.get();
 
-        let blob = c_kzg::Blob::from_bytes(&self.blob.as_slice())
+        let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
             .map_err(BlobTransactionValidationError::KZGError)?;
 
         let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
