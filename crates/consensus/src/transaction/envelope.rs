@@ -658,6 +658,67 @@ impl Typed2718 for TxEnvelope {
     }
 }
 
+/// Transaction envelope.
+#[auto_impl::auto_impl(&, Arc)]
+pub trait TransactionEnvelope: Typed2718 {
+    /// Returns ref to [`Signed<TxLegacy>`] if transaction is a legacy transaction.
+    fn as_legacy(&self) -> Option<&Signed<TxLegacy>>;
+
+    /// Returns ref to [`Signed<TxEip2930>`] if transaction is an EIP-2930 transaction.
+    fn as_eip2930(&self) -> Option<&Signed<TxEip2930>>;
+
+    /// Returns ref to [`Signed<TxEip1559>`] if transaction is an EIP-1559 transaction.
+    fn as_eip1559(&self) -> Option<&Signed<TxEip1559>>;
+
+    /// Returns ref to [`Signed<TxEip4844>`] if this is an EIP-4844 transaction.
+    fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>>;
+
+    /// Returns ref to [`Signed<TxEip7702>`] if this is an EIP-7702 transaction.
+    fn as_eip7702(&self) -> Option<&Signed<TxEip7702>>;
+}
+
+impl TransactionEnvelope for TxEnvelope {
+    #[inline]
+    fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
+        match self {
+            Self::Legacy(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
+        match self {
+            Self::Eip2930(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn as_eip1559(&self) -> Option<&Signed<TxEip1559>> {
+        match self {
+            Self::Eip1559(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
+        match self {
+            Self::Eip4844(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn as_eip7702(&self) -> Option<&Signed<TxEip7702>> {
+        match self {
+            Self::Eip7702(tx) => Some(tx),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(feature = "serde")]
 mod serde_from {
     //! NB: Why do we need this?

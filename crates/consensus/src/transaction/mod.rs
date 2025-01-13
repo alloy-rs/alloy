@@ -36,7 +36,7 @@ pub use eip4844::BlobTransactionValidationError;
 pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
 mod envelope;
-pub use envelope::{TxEnvelope, TxType};
+pub use envelope::{TransactionEnvelope, TxEnvelope, TxType};
 
 mod legacy;
 pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
