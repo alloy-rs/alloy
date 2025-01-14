@@ -656,7 +656,10 @@ mod tests {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer)
+                .on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-tx.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -724,8 +727,7 @@ mod tests {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
-            let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::default().with_gas_estimation().layer(cache_layer).on_anvil_with_wallet();
 
             let path = dir.join("rpc-cache-code.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -734,7 +736,7 @@ mod tests {
                 // solc v0.8.26; solc Counter.sol --via-ir --optimize --bin
                 "6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033"
             ).unwrap();
-            let tx = TransactionRequest::default().with_deploy_code(bytecode);
+            let tx = TransactionRequest::default().with_nonce(0).with_deploy_code(bytecode).with_chain_id(31337);
 
             let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 

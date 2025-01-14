@@ -14,6 +14,13 @@ use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 
+#[cfg(feature = "hyper-tls")]
+type Hyper = hyper_util::client::legacy::Client<
+    hyper_tls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+    http_body_util::Full<::hyper::body::Bytes>,
+>;
+
+#[cfg(not(feature = "hyper-tls"))]
 type Hyper = hyper_util::client::legacy::Client<
     hyper_util::client::legacy::connect::HttpConnector,
     http_body_util::Full<::hyper::body::Bytes>,
@@ -49,9 +56,13 @@ impl HyperClient {
     pub fn new() -> Self {
         let executor = hyper_util::rt::TokioExecutor::new();
 
+        #[cfg(feature = "hyper-tls")]
+        let service = hyper_util::client::legacy::Client::builder(executor)
+            .build(hyper_tls::HttpsConnector::new());
+
+        #[cfg(not(feature = "hyper-tls"))]
         let service =
             hyper_util::client::legacy::Client::builder(executor).build_http::<Full<Bytes>>();
-
         Self { service, _pd: PhantomData }
     }
 }

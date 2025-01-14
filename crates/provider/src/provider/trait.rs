@@ -1106,7 +1106,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{str::FromStr, time::Duration};
 
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
@@ -1407,7 +1407,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_tx() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -1430,7 +1430,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_watch_confirmed_tx() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -1622,7 +1622,7 @@ mod tests {
 
     #[tokio::test]
     async fn gets_transaction_by_hash() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let req = TransactionRequest::default()
             .from(provider.default_signer_address())
@@ -1767,7 +1767,6 @@ mod tests {
         let wallet = EthereumWallet::from(signer);
 
         let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .network::<AnyNetwork>()
             .wallet(wallet)
             .on_http(anvil.endpoint_url());
@@ -1830,6 +1829,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "hyper-tls")]
+    async fn hyper_https() {
+        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+
+        // With the `hyper` feature enabled .on_builtin builds the provider based on
+        // `HyperTransport`.
+        let provider = ProviderBuilder::new().on_builtin(url).await.unwrap();
+
+        let _num = provider.get_block_number().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().on_anvil();
 
@@ -1839,5 +1850,21 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(block.transactions.is_hashes());
+    }
+
+    #[tokio::test]
+    async fn disable_test() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil();
+
+        let tx = TransactionRequest::default()
+            .with_kind(alloy_primitives::TxKind::Create)
+            .value(U256::from(1235))
+            .with_input(Bytes::from_str("ffffffffffffff").unwrap());
+
+        let err = provider.send_transaction(tx).await.unwrap_err().to_string();
+        assert!(err.contains("missing properties: [(\"NonceManager\", [\"from\"])]"));
     }
 }

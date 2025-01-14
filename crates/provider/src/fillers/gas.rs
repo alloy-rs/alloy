@@ -52,7 +52,7 @@ pub enum GasFillable {
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::new()
+/// let provider = ProviderBuilder::default()
 ///     .with_gas_estimation()
 ///     .wallet(wallet)
 ///     .on_http(url);
@@ -253,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
@@ -273,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest {
@@ -292,7 +292,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_max_fee_per_blob_gas() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
         let sidecar = sidecar.build().unwrap();
@@ -319,7 +319,7 @@ mod tests {
 
     #[tokio::test]
     async fn zero_max_fee_per_blob_gas() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
         let sidecar = sidecar.build().unwrap();
