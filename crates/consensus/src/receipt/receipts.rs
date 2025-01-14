@@ -2,7 +2,7 @@ use crate::receipt::{
     Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
 use alloc::{vec, vec::Vec};
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
@@ -287,14 +287,16 @@ impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     }
 }
 
+impl<R: Typed2718> Typed2718 for ReceiptWithBloom<R> {
+    fn ty(&self) -> u8 {
+        self.receipt.ty()
+    }
+}
+
 impl<R> Encodable2718 for ReceiptWithBloom<R>
 where
     R: Eip2718EncodableReceipt + Send + Sync,
 {
-    fn type_flag(&self) -> Option<u8> {
-        (!self.receipt.is_legacy()).then_some(self.receipt.ty())
-    }
-
     fn encode_2718_len(&self) -> usize {
         self.receipt.eip2718_encoded_length_with_bloom(&self.logs_bloom)
     }

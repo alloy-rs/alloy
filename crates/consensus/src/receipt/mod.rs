@@ -11,7 +11,7 @@ pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 mod status;
 pub use status::Eip658Value;
 
-use crate::Typed2718;
+use alloy_eips::Typed2718;
 
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]

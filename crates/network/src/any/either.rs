@@ -283,13 +283,6 @@ impl Typed2718 for AnyTxEnvelope {
 }
 
 impl Encodable2718 for AnyTxEnvelope {
-    fn type_flag(&self) -> Option<u8> {
-        match self {
-            Self::Ethereum(t) => t.type_flag(),
-            Self::Unknown(inner) => Some(inner.ty()),
-        }
-    }
-
     fn encode_2718_len(&self) -> usize {
         match self {
             Self::Ethereum(t) => t.encode_2718_len(),

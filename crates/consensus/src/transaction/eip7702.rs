@@ -1,8 +1,9 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType, Typed2718};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2930::AccessList,
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
+    Typed2718,
 };
 use alloy_primitives::{
     Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
