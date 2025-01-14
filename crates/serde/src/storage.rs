@@ -1,5 +1,8 @@
 use alloc::collections::BTreeMap;
-use alloy_primitives::{ruint::ParseError, Bytes, B256, U256};
+use alloy_primitives::{
+    ruint::{BaseConvertError, ParseError},
+    Bytes, B256, U256,
+};
 use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -70,6 +73,13 @@ impl FromStr for JsonStorageKey {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let hex_str = s.strip_prefix("0x").unwrap_or(s);
+        let is_prefixed = s.starts_with("0x");
+
+        if (is_prefixed && hex_str.len() > 64) || (!is_prefixed && hex_str.len() > 66) {
+            return Err(ParseError::BaseConvertError(BaseConvertError::Overflow));
+        }
+
         if let Ok(hash) = B256::from_str(s) {
             return Ok(Self::Hash(hash));
         }
@@ -240,6 +250,14 @@ mod tests {
         let num_str = "42";
         let key = JsonStorageKey::from_str(num_str).unwrap();
         assert_eq!(key, JsonStorageKey::Number(U256::from(42)));
+    }
+
+    #[test]
+    fn test_from_str_with_too_long_hex_string() {
+        let long_hex_str = "0x".to_string() + &"1".repeat(65);
+        let result = JsonStorageKey::from_str(&long_hex_str);
+
+        assert!(matches!(result, Err(ParseError::BaseConvertError(BaseConvertError::Overflow))));
     }
 
     #[test]
