@@ -82,16 +82,13 @@ essentials = ["contract", "provider-http", "rpc-types", "signer-local"]
 # full
 full = [
     "consensus",
-    "contract",
     "eips",
+    "essentials",
     "k256",
     "kzg",
     "network",
-    "provider-http",
     "provider-ws",
     "provider-ipc",
-    "rpc-types",
-    "signer-local",
 ]
 
 # configuration
