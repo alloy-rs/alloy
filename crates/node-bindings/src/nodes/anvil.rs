@@ -7,7 +7,7 @@ use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,
     path::PathBuf,
-    process::{Child, Command},
+    process::{Child, ChildStdout, Command},
     str::FromStr,
     time::{Duration, Instant},
 };
@@ -28,6 +28,7 @@ pub struct AnvilInstance {
     addresses: Vec<Address>,
     port: u16,
     chain_id: Option<ChainId>,
+    reader: BufReader<ChildStdout>,
 }
 
 impl AnvilInstance {
@@ -39,6 +40,16 @@ impl AnvilInstance {
     /// Returns a mutable reference to the child process.
     pub fn child_mut(&mut self) -> &mut Child {
         &mut self.child
+    }
+
+    /// Returns a reference to the stdout reader of the child process.
+    pub fn read(&self) -> &BufReader<ChildStdout> {
+        &self.reader
+    }
+
+    /// Returns a mutable reference to the stdout reader of the child process.
+    pub fn read_mut(&mut self) -> &mut BufReader<ChildStdout> {
+        &mut self.reader
     }
 
     /// Returns the private keys used to instantiate this instance
@@ -340,6 +351,7 @@ impl Anvil {
             addresses,
             port,
             chain_id: self.chain_id.or(chain_id),
+            reader,
         })
     }
 }
