@@ -1884,7 +1884,11 @@ mod tests {
         anvil.child_mut().kill().unwrap();
 
         let mut output = String::new();
-        anvil.read_mut().read_to_string(&mut output).unwrap();
+        anvil.child_mut().stdout.take().unwrap().read_to_string(&mut output).unwrap();
+
+        assert_eq!(anvil.chain_id(), 31337);
+        assert_eq!(anvil.addresses().len(), 10);
+        assert_eq!(anvil.keys().len(), 10);
 
         assert!(output.contains("eth_sendTransaction"));
         assert!(output.contains("Block Number: 1"))
