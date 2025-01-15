@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn test_from_str_without_prefix() {
         let no_prefix_str = "1234567890abcdef";
-        let result = JsonStorageKey::from_str(&no_prefix_str);
+        let result = JsonStorageKey::from_str(no_prefix_str);
 
         assert!(matches!(result, Err(ParseError::InvalidDigit('1'))));
     }
