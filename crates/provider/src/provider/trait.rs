@@ -1829,6 +1829,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "hyper-tls")]
+    async fn hyper_https() {
+        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+
+        // With the `hyper` feature enabled .on_builtin builds the provider based on
+        // `HyperTransport`.
+        let provider = ProviderBuilder::new().on_builtin(url).await.unwrap();
+
+        let _num = provider.get_block_number().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().on_anvil();
 

@@ -2,28 +2,30 @@
 
 use crate::{eip4844, eip7691};
 
-/// A single item of `blobSchedule` defined in EIP-7840.
+const DEFAULT_BLOB_FEE_GETTER: fn() -> u128 = || eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
+const IS_DEFAULT_BLOB_FEE: fn(&u128) -> bool = |&x| x == eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
+
+/// Configuration for the blob-related calculations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlobScheduleItem {
+pub struct BlobParams {
     /// Target blob count for the block.
     #[cfg_attr(feature = "serde", serde(rename = "target"))]
     pub target_blob_count: u64,
     /// Max blob count for the block.
     #[cfg_attr(feature = "serde", serde(rename = "max"))]
     pub max_blob_count: u64,
-}
-
-/// Configuration for the blob-related calculations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BlobParams {
-    /// Target blob count for the block.
-    pub target_blob_count: u64,
-    /// Max blob count for the block.
-    pub max_blob_count: u64,
     /// Update fraction for excess blob gas calculation.
+    #[cfg_attr(feature = "serde", serde(rename = "baseFeeUpdateFraction"))]
     pub update_fraction: u128,
     /// Minimum gas price for a data blob.
+    ///
+    /// Not required per EIP-7840 and assumed to be the default
+    /// [`eip4844::BLOB_TX_MIN_BLOB_GASPRICE`] if not set.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "DEFAULT_BLOB_FEE_GETTER", skip_serializing_if = "IS_DEFAULT_BLOB_FEE")
+    )]
     pub min_blob_fee: u128,
 }
 

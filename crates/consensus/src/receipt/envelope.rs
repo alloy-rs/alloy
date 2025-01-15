@@ -1,7 +1,13 @@
 use core::fmt;
 
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
+use alloy_eips::{
+    eip2718::{
+        Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, EIP1559_TX_TYPE_ID,
+        EIP2930_TX_TYPE_ID, EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID, LEGACY_TX_TYPE_ID,
+    },
+    Typed2718,
+};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 
@@ -175,17 +181,19 @@ impl Decodable for ReceiptEnvelope {
     }
 }
 
-impl Encodable2718 for ReceiptEnvelope {
-    fn type_flag(&self) -> Option<u8> {
+impl Typed2718 for ReceiptEnvelope {
+    fn ty(&self) -> u8 {
         match self {
-            Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
-            Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
-            Self::Eip7702(_) => Some(TxType::Eip7702 as u8),
+            Self::Legacy(_) => LEGACY_TX_TYPE_ID,
+            Self::Eip2930(_) => EIP2930_TX_TYPE_ID,
+            Self::Eip1559(_) => EIP1559_TX_TYPE_ID,
+            Self::Eip4844(_) => EIP4844_TX_TYPE_ID,
+            Self::Eip7702(_) => EIP7702_TX_TYPE_ID,
         }
     }
+}
 
+impl Encodable2718 for ReceiptEnvelope {
     fn encode_2718_len(&self) -> usize {
         self.inner_length() + !self.is_legacy() as usize
     }

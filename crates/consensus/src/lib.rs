@@ -37,13 +37,16 @@ pub mod transaction;
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
     SignableTransaction, Transaction, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844,
-    TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718,
+    TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType,
     TypedTransaction,
 };
 
-pub use alloy_eips::eip4844::{
-    builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
-    utils, Blob, BlobTransactionSidecar, Bytes48,
+pub use alloy_eips::{
+    eip4844::{
+        builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
+        utils, Blob, BlobTransactionSidecar, Bytes48,
+    },
+    Typed2718,
 };
 
 #[cfg(feature = "kzg")]
