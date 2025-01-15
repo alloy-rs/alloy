@@ -1106,7 +1106,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, time::Duration};
+    use std::{io::Read, str::FromStr, time::Duration};
 
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
@@ -1866,5 +1866,31 @@ mod tests {
 
         let err = provider.send_transaction(tx).await.unwrap_err().to_string();
         assert!(err.contains("missing properties: [(\"NonceManager\", [\"from\"])]"));
+    }
+
+    #[tokio::test]
+    async fn capture_anvil_logs() {
+        let mut anvil = Anvil::new().spawn();
+
+        let provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest::default()
+            .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .value(U256::from(100));
+
+        let _ = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+
+        anvil.child_mut().kill().unwrap();
+
+        let mut output = String::new();
+        anvil.child_mut().stdout.take().unwrap().read_to_string(&mut output).unwrap();
+
+        assert_eq!(anvil.chain_id(), 31337);
+        assert_eq!(anvil.addresses().len(), 10);
+        assert_eq!(anvil.keys().len(), 10);
+
+        assert!(output.contains("eth_sendTransaction"));
+        assert!(output.contains("Block Number: 1"))
     }
 }
