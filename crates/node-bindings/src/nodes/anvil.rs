@@ -40,6 +40,7 @@ impl AnvilInstance {
     pub fn child_mut(&mut self) -> &mut Child {
         &mut self.child
     }
+
     /// Returns the private keys used to instantiate this instance
     pub fn keys(&self) -> &[K256SecretKey] {
         &self.private_keys
