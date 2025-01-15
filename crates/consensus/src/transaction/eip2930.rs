@@ -1,10 +1,8 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
-
-use super::{RlpEcdsaTx, Typed2718};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]

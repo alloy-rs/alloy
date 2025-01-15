@@ -1,13 +1,11 @@
 use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{
     keccak256, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
-
-use super::Typed2718;
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
