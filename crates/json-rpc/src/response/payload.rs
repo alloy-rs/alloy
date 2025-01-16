@@ -1,4 +1,4 @@
-use crate::{ErrorPayload, RpcObject};
+use crate::{ErrorPayload, RpcSend};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::value::{to_raw_value, RawValue};
 use std::borrow::{Borrow, Cow};
@@ -78,7 +78,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// and additional data.
     pub const fn internal_error_with_obj(data: ErrData) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self::Failure(ErrorPayload::internal_error_with_obj(data))
     }
@@ -90,7 +90,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
         data: ErrData,
     ) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self::Failure(ErrorPayload::internal_error_with_message_and_obj(message, data))
     }
@@ -124,8 +124,8 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
 
 impl<Payload, ErrData> ResponsePayload<Payload, ErrData>
 where
-    Payload: RpcObject,
-    ErrData: RpcObject,
+    Payload: RpcSend,
+    ErrData: RpcSend,
 {
     /// Convert the inner types into a [`RawValue`] by serializing them.
     pub fn serialize_payload(&self) -> serde_json::Result<ResponsePayload> {

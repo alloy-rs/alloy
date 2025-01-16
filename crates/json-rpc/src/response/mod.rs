@@ -1,4 +1,4 @@
-use crate::{common::Id, RpcObject};
+use crate::{common::Id, RpcSend};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     ser::SerializeMap,
@@ -85,7 +85,7 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
     /// Create a new error response for an internal error with additional data.
     pub const fn internal_error_with_obj(id: Id, data: ErrData) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self { id, payload: ResponsePayload::Failure(ErrorPayload::internal_error_with_obj(data)) }
     }
@@ -98,7 +98,7 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
         data: ErrData,
     ) -> Self
     where
-        ErrData: RpcObject,
+        ErrData: RpcSend,
     {
         Self {
             id,
@@ -121,8 +121,8 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
 
 impl<Payload, ErrData> Response<Payload, ErrData>
 where
-    Payload: RpcObject,
-    ErrData: RpcObject,
+    Payload: RpcSend,
+    ErrData: RpcSend,
 {
     /// Serialize the payload of this response.
     pub fn serialize_payload(&self) -> serde_json::Result<Response> {

@@ -10,7 +10,7 @@ use crate::{
 };
 use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
-use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
 use alloy_primitives::{
@@ -501,7 +501,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// The return value depends on what stream `id` corresponds to.
     /// See [`FilterChanges`] for all possible return values.
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    async fn get_filter_changes<R: RpcReturn>(&self, id: U256) -> TransportResult<Vec<R>>
+    async fn get_filter_changes<R: RpcRecv>(&self, id: U256) -> TransportResult<Vec<R>>
     where
         Self: Sized,
     {
@@ -951,8 +951,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
     where
-        P: RpcParam,
-        R: RpcReturn,
+        P: RpcSend,
+        R: RpcRecv,
         Self: Sized,
     {
         self.root().pubsub_frontend()?;
@@ -1017,8 +1017,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
-        P: RpcParam,
-        R: RpcReturn,
+        P: RpcSend,
+        R: RpcRecv,
         Self: Sized,
     {
         self.client().request(method, &params).await

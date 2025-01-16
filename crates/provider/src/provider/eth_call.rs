@@ -1,5 +1,5 @@
 use alloy_eips::BlockId;
-use alloy_json_rpc::RpcReturn;
+use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::TransportResult;
@@ -89,7 +89,7 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
 pub struct EthCallFut<'req, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
@@ -99,7 +99,7 @@ where
 enum EthCallFutInner<'req, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     Preparing {
@@ -118,7 +118,7 @@ where
 impl<N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<'_, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
@@ -136,7 +136,7 @@ where
 impl<N, Resp, Output, Map> EthCallFut<'_, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
@@ -177,7 +177,7 @@ where
 impl<N, Resp, Output, Map> Future for EthCallFut<'_, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
@@ -207,7 +207,7 @@ where
 pub struct EthCall<'req, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     caller: Arc<dyn Caller<N, Resp>>,
@@ -220,7 +220,7 @@ where
 impl<N, Resp> core::fmt::Debug for EthCall<'_, N, Resp>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("EthCall")
@@ -233,7 +233,7 @@ where
 impl<'req, N, Resp> EthCall<'req, N, Resp>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
 {
     /// Create a new [`EthCall`].
     pub fn new(
@@ -267,7 +267,7 @@ where
 impl<'req, N, Resp, Output, Map> EthCall<'req, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Map the response to a different type. This is usable for converting
@@ -313,7 +313,7 @@ where
 impl<'req, N, Resp, Output, Map> std::future::IntoFuture for EthCall<'req, N, Resp, Output, Map>
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {

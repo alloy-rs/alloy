@@ -1,7 +1,7 @@
 use crate::{client::RpcClientInner, ClientRef};
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcParam,
-    RpcReturn, SerializedRequest,
+    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcSend,
+    RpcRecv, SerializedRequest,
 };
 use alloy_primitives::map::HashMap;
 use alloy_transport::{
@@ -80,7 +80,7 @@ impl<Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>> for Waiter<Re
 
 impl<Resp, Output, Map> std::future::Future for Waiter<Resp, Output, Map>
 where
-    Resp: RpcReturn,
+    Resp: RpcRecv,
     Map: FnOnce(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
@@ -135,7 +135,7 @@ impl<'a> BatchRequest<'a> {
         rx
     }
 
-    fn push<Params: RpcParam, Resp: RpcReturn>(
+    fn push<Params: RpcSend, Resp: RpcRecv>(
         &mut self,
         request: Request<Params>,
     ) -> TransportResult<Waiter<Resp>> {
@@ -148,7 +148,7 @@ impl<'a> BatchRequest<'a> {
     /// ### Errors
     ///
     /// If the request cannot be serialized, this will return an error.
-    pub fn add_call<Params: RpcParam, Resp: RpcReturn>(
+    pub fn add_call<Params: RpcSend, Resp: RpcRecv>(
         &mut self,
         method: impl Into<Cow<'static, str>>,
         params: &Params,

@@ -1,6 +1,6 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Request, RequestPacket, ResponsePacket, RpcParam,
-    RpcResult, RpcReturn,
+    transform_response, try_deserialize_ok, Request, RequestPacket, ResponsePacket, RpcRecv,
+    RpcResult, RpcSend,
 };
 use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
 use core::panic;
@@ -20,7 +20,7 @@ use tower::Service;
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     Prepared {
         request: Option<Request<Params>>,
@@ -35,7 +35,7 @@ where
 
 impl<Params> Clone for CallState<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     fn clone(&self) -> Self {
         match self {
@@ -49,7 +49,7 @@ where
 
 impl<Params> fmt::Debug for CallState<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -62,7 +62,7 @@ where
 
 impl<Params> Future for CallState<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     type Output = TransportResult<Box<RawValue>>;
 
@@ -134,7 +134,7 @@ where
 #[derive(Clone)]
 pub struct RpcCall<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcParam,
+    Params: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     #[pin]
@@ -145,7 +145,7 @@ where
 
 impl<Params, Resp, Output, Map> core::fmt::Debug for RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
+    Params: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -155,7 +155,7 @@ where
 
 impl<Params, Resp> RpcCall<Params, Resp>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     #[doc(hidden)]
     pub fn new(req: Request<Params>, connection: impl IntoBoxTransport) -> Self {
@@ -172,7 +172,7 @@ where
 
 impl<Params, Resp, Output, Map> RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
+    Params: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     /// Map the response to a different type. This is usable for converting
@@ -257,7 +257,7 @@ where
     }
 
     /// Map the params of the request into a new type.
-    pub fn map_params<NewParams: RpcParam>(
+    pub fn map_params<NewParams: RpcSend>(
         self,
         map: impl Fn(Params) -> NewParams,
     ) -> RpcCall<NewParams, Resp, Output, Map> {
@@ -275,8 +275,8 @@ where
 
 impl<Params, Resp, Output, Map> RpcCall<&Params, Resp, Output, Map>
 where
-    Params: RpcParam + ToOwned,
-    Params::Owned: RpcParam,
+    Params: RpcSend + ToOwned,
+    Params::Owned: RpcSend,
     Map: FnOnce(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
@@ -300,8 +300,8 @@ where
 
 impl<'a, Params, Resp, Output, Map> RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam + 'a,
-    Resp: RpcReturn,
+    Params: RpcSend + 'a,
+    Resp: RpcRecv,
     Output: 'static,
     Map: FnOnce(Resp) -> Output + Send + 'a,
 {
@@ -313,8 +313,8 @@ where
 
 impl<Params, Resp, Output, Map> Future for RpcCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: FnOnce(Resp) -> Output,
 {
