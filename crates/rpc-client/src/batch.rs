@@ -1,7 +1,7 @@
 use crate::{client::RpcClientInner, ClientRef};
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcSend,
-    RpcRecv, SerializedRequest,
+    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcRecv,
+    RpcSend, SerializedRequest,
 };
 use alloy_primitives::map::HashMap;
 use alloy_transport::{
