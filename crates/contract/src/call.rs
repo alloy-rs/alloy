@@ -568,7 +568,7 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 mod tests {
     use super::*;
     use alloy_consensus::Transaction;
-    use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
+    use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, FixedBytes, B256};
     use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
@@ -698,7 +698,7 @@ mod tests {
             ),
         );
         // Box the future to assert its concrete output type.
-        let _future: Box<dyn Future<Output = Result<MyContract::doStuffReturn>> + Send> =
+        let _future: Box<dyn Future<Output = Result<(Address, FixedBytes<32>)>> + Send> =
             Box::new(async move { call_builder.call().await });
     }
 
@@ -736,20 +736,17 @@ mod tests {
 
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
-        let result: MyContract::myStateReturn = my_state_builder.call().await.unwrap();
-        assert!(result.myState);
+        let my_state = my_state_builder.call().await.unwrap();
+        assert!(my_state);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
         assert_eq!(
             do_stuff_builder.calldata()[..],
             MyContract::doStuffCall { a: U256::from(0x69), b: true }.abi_encode(),
         );
-        let result: MyContract::doStuffReturn = do_stuff_builder.call().await.unwrap();
-        assert_eq!(result.c, address!("0000000000000000000000000000000000000069"));
-        assert_eq!(
-            result.d,
-            b256!("0000000000000000000000000000000000000000000000000000000000000001"),
-        );
+        let (c, d) = do_stuff_builder.call().await.unwrap();
+        assert_eq!(c, address!("0000000000000000000000000000000000000069"));
+        assert_eq!(d, b256!("0000000000000000000000000000000000000000000000000000000000000001"),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
