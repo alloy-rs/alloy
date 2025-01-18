@@ -1,4 +1,4 @@
-use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_rpc_client::{RpcCall, Waiter};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -24,8 +24,8 @@ use tokio::sync::oneshot;
 #[pin_project(project = ProviderCallProj)]
 pub enum ProviderCall<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// An underlying call to an RPC server.
@@ -40,8 +40,8 @@ where
 
 impl<Params, Resp, Output, Map> ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Instantiate a new [`ProviderCall`] from the output.
@@ -156,9 +156,9 @@ where
 
 impl<Params, Resp, Output, Map> ProviderCall<&Params, Resp, Output, Map>
 where
-    Params: RpcParam + ToOwned,
-    Params::Owned: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend + ToOwned,
+    Params::Owned: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
@@ -176,8 +176,8 @@ where
 
 impl<Params, Resp> std::fmt::Debug for ProviderCall<Params, Resp>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -192,8 +192,8 @@ where
 impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
     for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     fn from(call: RpcCall<Params, Resp, Output, Map>) -> Self {
@@ -203,8 +203,8 @@ where
 
 impl<Params, Resp> From<Waiter<Resp>> for ProviderCall<Params, Resp, Resp, fn(Resp) -> Resp>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn from(waiter: Waiter<Resp>) -> Self {
         Self::Waiter(waiter)
@@ -214,8 +214,8 @@ where
 impl<Params, Resp, Output, Map> From<Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>>
     for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
@@ -226,8 +226,8 @@ where
 impl<Params, Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>>
     for ProviderCall<Params, Resp>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn from(rx: oneshot::Receiver<TransportResult<Box<RawValue>>>) -> Self {
         Waiter::from(rx).into()
@@ -236,8 +236,8 @@ where
 
 impl<Params, Resp, Output, Map> Future for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {

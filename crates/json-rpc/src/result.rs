@@ -1,4 +1,4 @@
-use crate::{Response, ResponsePayload, RpcError, RpcReturn};
+use crate::{Response, ResponsePayload, RpcError, RpcRecv};
 use serde_json::value::RawValue;
 use std::borrow::Borrow;
 
@@ -24,7 +24,7 @@ pub type BorrowedRpcResult<'a, E> = RpcResult<&'a RawValue, E, &'a RawValue>;
 /// [`Id`]: crate::Id
 pub fn transform_response<T, E, ErrResp>(response: Response<T, ErrResp>) -> RpcResult<T, E, ErrResp>
 where
-    ErrResp: RpcReturn,
+    ErrResp: RpcRecv,
 {
     match response {
         Response { payload: ResponsePayload::Failure(err_resp), .. } => {
@@ -41,7 +41,7 @@ pub fn transform_result<T, E, ErrResp>(
     response: Result<Response<T, ErrResp>, E>,
 ) -> Result<T, RpcError<E, ErrResp>>
 where
-    ErrResp: RpcReturn,
+    ErrResp: RpcRecv,
 {
     match response {
         Ok(resp) => transform_response(resp),
@@ -55,8 +55,8 @@ pub fn try_deserialize_ok<J, T, E, ErrResp>(
 ) -> RpcResult<T, E, ErrResp>
 where
     J: Borrow<RawValue>,
-    T: RpcReturn,
-    ErrResp: RpcReturn,
+    T: RpcRecv,
+    ErrResp: RpcRecv,
 {
     let json = result?;
     let json = json.borrow().get();

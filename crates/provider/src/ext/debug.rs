@@ -1,6 +1,6 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
-use alloy_json_rpc::RpcReturn;
+use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
@@ -72,7 +72,7 @@ pub trait DebugApi<N>: Send + Sync {
 
     /// Reruns the transaction specified by the hash and returns the trace in a specified format.
     ///
-    /// This method allows for the trace to be returned as a type that implements `RpcReturn` and
+    /// This method allows for the trace to be returned as a type that implements `RpcRecv` and
     /// `serde::de::DeserializeOwned`.
     ///
     /// [GethDebugTracingOptions] can be used to specify the trace options.
@@ -86,7 +86,7 @@ pub trait DebugApi<N>: Send + Sync {
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<R>
     where
-        R: RpcReturn + serde::de::DeserializeOwned;
+        R: RpcRecv + serde::de::DeserializeOwned;
 
     /// Reruns the transaction specified by the hash and returns the trace as a JSON object.
     ///
@@ -122,7 +122,7 @@ pub trait DebugApi<N>: Send + Sync {
 
     /// Reruns the transaction specified by the hash and returns the trace in a specified format.
     ///
-    /// This method allows for the trace to be returned as a type that implements `RpcReturn` and
+    /// This method allows for the trace to be returned as a type that implements `RpcRecv` and
     /// `serde::de::DeserializeOwned`.
     ///
     /// [GethDebugTracingOptions] can be used to specify the trace options.
@@ -137,7 +137,7 @@ pub trait DebugApi<N>: Send + Sync {
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
     where
-        R: RpcReturn + serde::de::DeserializeOwned;
+        R: RpcRecv + serde::de::DeserializeOwned;
 
     /// Reruns the transaction specified by the hash and returns the trace as a JSON object.
     ///
@@ -309,7 +309,7 @@ where
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<R>
     where
-        R: RpcReturn,
+        R: RpcRecv,
     {
         self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
@@ -337,7 +337,7 @@ where
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
     where
-        R: RpcReturn,
+        R: RpcRecv,
     {
         self.client().request("debug_traceCall", (tx, block, trace_options)).await
     }

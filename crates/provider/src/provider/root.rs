@@ -90,7 +90,7 @@ impl<N: Network> RootProvider<N> {
 
     /// Gets the subscription corresponding to the given RPC subscription ID.
     #[cfg(feature = "pubsub")]
-    pub async fn get_subscription<R: alloy_json_rpc::RpcReturn>(
+    pub async fn get_subscription<R: alloy_json_rpc::RpcRecv>(
         &self,
         id: alloy_primitives::B256,
     ) -> alloy_transport::TransportResult<Subscription<R>> {

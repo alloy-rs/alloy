@@ -10,7 +10,7 @@ use crate::{
 };
 use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
-use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
 use alloy_primitives::{
@@ -501,7 +501,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// The return value depends on what stream `id` corresponds to.
     /// See [`FilterChanges`] for all possible return values.
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    async fn get_filter_changes<R: RpcReturn>(&self, id: U256) -> TransportResult<Vec<R>>
+    async fn get_filter_changes<R: RpcRecv>(&self, id: U256) -> TransportResult<Vec<R>>
     where
         Self: Sized,
     {
@@ -951,8 +951,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
     where
-        P: RpcParam,
-        R: RpcReturn,
+        P: RpcSend,
+        R: RpcRecv,
         Self: Sized,
     {
         self.root().pubsub_frontend()?;
@@ -1017,8 +1017,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
-        P: RpcParam,
-        R: RpcReturn,
+        P: RpcSend,
+        R: RpcRecv,
         Self: Sized,
     {
         self.client().request(method, &params).await
@@ -1106,7 +1106,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, time::Duration};
+    use std::{io::Read, str::FromStr, time::Duration};
 
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
@@ -1866,5 +1866,31 @@ mod tests {
 
         let err = provider.send_transaction(tx).await.unwrap_err().to_string();
         assert!(err.contains("missing properties: [(\"NonceManager\", [\"from\"])]"));
+    }
+
+    #[tokio::test]
+    async fn capture_anvil_logs() {
+        let mut anvil = Anvil::new().spawn();
+
+        let provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest::default()
+            .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .value(U256::from(100));
+
+        let _ = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+
+        anvil.child_mut().kill().unwrap();
+
+        let mut output = String::new();
+        anvil.child_mut().stdout.take().unwrap().read_to_string(&mut output).unwrap();
+
+        assert_eq!(anvil.chain_id(), 31337);
+        assert_eq!(anvil.addresses().len(), 10);
+        assert_eq!(anvil.keys().len(), 10);
+
+        assert!(output.contains("eth_sendTransaction"));
+        assert!(output.contains("Block Number: 1"))
     }
 }

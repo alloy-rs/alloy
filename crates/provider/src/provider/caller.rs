@@ -1,6 +1,6 @@
 use super::EthCallParams;
 use crate::ProviderCall;
-use alloy_json_rpc::RpcReturn;
+use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_rpc_client::WeakClient;
 use alloy_transport::{TransportErrorKind, TransportResult};
@@ -9,7 +9,7 @@ use alloy_transport::{TransportErrorKind, TransportResult};
 pub trait Caller<N, Resp>: Send + Sync
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
 {
     /// Method that needs to be implemented to convert to a `ProviderCall`.
     ///
@@ -30,7 +30,7 @@ where
 impl<N, Resp> Caller<N, Resp> for WeakClient
 where
     N: Network,
-    Resp: RpcReturn,
+    Resp: RpcRecv,
 {
     fn call(
         &self,
@@ -47,7 +47,7 @@ where
     }
 }
 
-fn provider_rpc_call<N: Network, Resp: RpcReturn>(
+fn provider_rpc_call<N: Network, Resp: RpcRecv>(
     client: &WeakClient,
     method: &'static str,
     params: EthCallParams<'_, N>,
