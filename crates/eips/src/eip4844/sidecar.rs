@@ -17,7 +17,7 @@ pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
 /// A Blob hash
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct IndexedBlobHash {
     /// The index of the blob
     pub index: u64,
@@ -30,7 +30,7 @@ pub struct IndexedBlobHash {
 /// This type encodes and decodes the fields without an rlp header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
@@ -104,7 +104,7 @@ impl IntoIterator for BlobTransactionSidecar {
 /// A single blob sidecar.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobTransactionSidecarItem {
     /// The index of this item within the [BlobTransactionSidecar].
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]

@@ -13,7 +13,7 @@ pub const GWEI_TO_WEI: u64 = 1_000_000_000;
 /// Withdrawal represents a validator withdrawal from the consensus layer.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Withdrawal {
     /// Monotonically increasing identifier issued by consensus layer.
@@ -56,7 +56,7 @@ impl Withdrawal {
     RlpDecodableWrapper,
 )]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct Withdrawals(pub Vec<Withdrawal>);
 
 impl Withdrawals {

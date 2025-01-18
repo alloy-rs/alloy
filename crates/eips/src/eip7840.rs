@@ -7,7 +7,7 @@ const IS_DEFAULT_BLOB_FEE: fn(&u128) -> bool = |&x| x == eip4844::BLOB_TX_MIN_BL
 
 /// Configuration for the blob-related calculations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobParams {
     /// Target blob count for the block.
     #[cfg_attr(feature = "serde", serde(rename = "target"))]

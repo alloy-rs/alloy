@@ -18,7 +18,7 @@ pub const EMPTY_REQUESTS_HASH: B256 =
 /// each element is the `request_type` and the remaining bytes are the `request_data`.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Deref, DerefMut, From, IntoIterator)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub struct Requests(Vec<Bytes>);
 
 impl Requests {
@@ -118,7 +118,7 @@ impl Requests {
 /// when the exact contents of the requests are unnecessary, and only a consistent hash value is
 /// needed to simulate the presence of requests without holding actual data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
 pub enum RequestsOrHash {
     /// Stores a list of requests, allowing for dynamic requests hash calculation.
     Requests(Requests),
