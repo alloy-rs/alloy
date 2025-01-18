@@ -1,5 +1,5 @@
 use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
-use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
+use alloy_json_rpc::{Id, Request, RpcRecv, RpcSend};
 use alloy_transport::{BoxTransport, IntoBoxTransport};
 use alloy_transport_http::Http;
 use std::{
@@ -101,8 +101,8 @@ impl RpcClient {
         params: Params,
     ) -> PollerBuilder<Params, Resp>
     where
-        Params: RpcParam + 'static,
-        Resp: RpcReturn + Clone,
+        Params: RpcSend + 'static,
+        Resp: RpcRecv + Clone,
     {
         PollerBuilder::new(self.get_weak(), method, params)
     }
@@ -230,7 +230,7 @@ impl RpcClientInner {
     ///
     /// To send a request, use [`RpcClientInner::request`] and await the returned [`RpcCall`].
     #[inline]
-    pub fn make_request<Params: RpcParam>(
+    pub fn make_request<Params: RpcSend>(
         &self,
         method: impl Into<Cow<'static, str>>,
         params: Params,
@@ -278,7 +278,7 @@ impl RpcClientInner {
     /// This means that if a serializer error occurs, it will not be caught until the call is
     /// awaited.
     #[doc(alias = "prepare")]
-    pub fn request<Params: RpcParam, Resp: RpcReturn>(
+    pub fn request<Params: RpcSend, Resp: RpcRecv>(
         &self,
         method: impl Into<Cow<'static, str>>,
         params: Params,
@@ -290,7 +290,7 @@ impl RpcClientInner {
     /// Prepares an [`RpcCall`] with no parameters.
     ///
     /// See [`request`](Self::request) for more details.
-    pub fn request_noparams<Resp: RpcReturn>(
+    pub fn request_noparams<Resp: RpcRecv>(
         &self,
         method: impl Into<Cow<'static, str>>,
     ) -> RpcCall<NoParams, Resp> {

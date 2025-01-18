@@ -1,6 +1,6 @@
 use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcObject, RpcParam};
+use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
 use alloy_network::Network;
 use alloy_primitives::{
     keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
@@ -377,13 +377,13 @@ where
 }
 
 /// Internal type to handle different types of requests and generating their param hashes.
-struct RequestType<Params: RpcParam> {
+struct RequestType<Params: RpcSend> {
     method: &'static str,
     params: Params,
     block_id: Option<BlockId>,
 }
 
-impl<Params: RpcParam> RequestType<Params> {
+impl<Params: RpcSend> RequestType<Params> {
     const fn new(method: &'static str, params: Params) -> Self {
         Self { method, params, block_id: None }
     }
@@ -505,12 +505,14 @@ impl SharedCache {
     }
 }
 
-/// Attempts to fetch the response from the cache by using the hash of the request params.
+/// Attempts to fetch the response from the cache by using the hash of the
+/// request params.
 ///
-/// In case of a cache miss, fetches from the RPC and saves the response to the cache.
+/// In case of a cache miss, fetches from the RPC and saves the response to the
+/// cache.
 ///
 /// This helps overriding [`Provider`] methods that return [`TransportResult<T>`].
-async fn cache_get_or_fetch<Params: RpcParam, Resp: RpcObject>(
+async fn cache_get_or_fetch<Params: RpcSend, Resp: RpcObject>(
     cache: &SharedCache,
     req: RequestType<Params>,
     fetch_fn: impl std::future::Future<Output = TransportResult<Option<Resp>>>,

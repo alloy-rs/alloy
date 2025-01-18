@@ -76,7 +76,7 @@
 #[macro_use]
 extern crate tracing;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 
 mod common;
@@ -105,33 +105,62 @@ pub use result::{
     transform_response, transform_result, try_deserialize_ok, BorrowedRpcResult, RpcResult,
 };
 
-/// An object that can be used as a JSON-RPC parameter.
+/// An object that can be sent over RPC.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is
-/// used to indicate that a type can be used as a JSON-RPC parameter.
-pub trait RpcParam: Serialize + Clone + Debug + Send + Sync + Unpin {}
+/// used to indicate that a type can be sent in the body of a JSON-RPC message.
+pub trait RpcSend: Serialize + Clone + Debug + Send + Sync + Unpin {}
 
-impl<T> RpcParam for T where T: Serialize + Clone + Debug + Send + Sync + Unpin {}
+impl<T> RpcSend for T where T: Serialize + Clone + Debug + Send + Sync + Unpin {}
 
-/// An object that can be used as a JSON-RPC return value.
+/// An object that can be received over RPC.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is
-/// used to indicate that a type can be used as a JSON-RPC return value.
+/// used to indicate that a type can be received in the body of a JSON-RPC
+/// message.
 ///
 /// # Note
 ///
-/// We add the `'static` lifetime bound to indicate that the type can't borrow.
-/// This is a simplification that makes it easier to use the types in client
-/// code. It is not suitable for use in server code.
-pub trait RpcReturn: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
+/// We add the `'static` lifetime to the supertraits to indicate that the type
+/// can't borrow. This is a simplification that makes it easier to use the
+/// types in client code. Servers may prefer borrowing, using the [`RpcBorrow`]
+/// trait.
+pub trait RpcRecv: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
-impl<T> RpcReturn for T where T: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
+impl<T> RpcRecv for T where T: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
-/// An object that can be used as a JSON-RPC parameter and return value.
+/// An object that can be received over RPC, borrowing from the the
+/// deserialization context.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is
-/// used to indicate that a type can be used as both a JSON-RPC parameter and
-/// return value.
-pub trait RpcObject: RpcParam + RpcReturn {}
+/// used to indicate that a type can be borrowed from the body of a wholly or
+/// partially serialized JSON-RPC message.
+pub trait RpcBorrow<'de>: Deserialize<'de> + Debug + Send + Sync + Unpin {}
 
-impl<T> RpcObject for T where T: RpcParam + RpcReturn {}
+impl<'de, T> RpcBorrow<'de> for T where T: Deserialize<'de> + Debug + Send + Sync + Unpin {}
+
+/// An object that can be both sent and received over RPC.
+///
+/// This marker trait is blanket-implemented for every qualifying type. It is
+/// used to indicate that a type can be both sent and received in the body of a
+/// JSON-RPC message.
+///
+/// # Note
+///
+/// We add the `'static` lifetime to the supertraits to indicate that the type
+/// can't borrow. This is a simplification that makes it easier to use the
+/// types in client code. Servers may prefer borrowing, using the
+/// [`BorrowedRpcObject`] trait.
+pub trait RpcObject: RpcSend + RpcRecv {}
+
+impl<T> RpcObject for T where T: RpcSend + RpcRecv {}
+
+/// An object that can be both sent and received over RPC, borrowing from the
+/// the deserialization context.
+///
+/// This marker trait is blanket-implemented for every qualifying type. It is
+/// used to indicate that a type can be both sent and received in the body of a
+/// JSON-RPC message, and can borrow from the deserialization context.
+pub trait BorrowedRpcObject<'de>: RpcBorrow<'de> + RpcSend {}
+
+impl<'de, T> BorrowedRpcObject<'de> for T where T: RpcBorrow<'de> + RpcSend {}

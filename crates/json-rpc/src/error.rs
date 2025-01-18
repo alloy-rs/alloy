@@ -1,4 +1,4 @@
-use crate::{ErrorPayload, RpcReturn};
+use crate::{ErrorPayload, RpcRecv};
 use serde_json::value::RawValue;
 
 /// An RPC error.
@@ -55,7 +55,7 @@ pub enum RpcError<E, ErrResp = Box<RawValue>> {
 
 impl<E, ErrResp> RpcError<E, ErrResp>
 where
-    ErrResp: RpcReturn,
+    ErrResp: RpcRecv,
 {
     /// Instantiate a new `ErrorResp` from an error response.
     pub const fn err_resp(err: ErrorPayload<ErrResp>) -> Self {
