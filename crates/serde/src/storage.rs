@@ -73,12 +73,8 @@ impl FromStr for JsonStorageKey {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let is_prefixed = s.starts_with("0x");
-
-        if s.len() > 66 {
+        if s.len() > 64 && !(s.len() == 66 && s.starts_with("0x")) {
             return Err(ParseError::BaseConvertError(BaseConvertError::Overflow));
-        } else if !is_prefixed {
-            return Err(ParseError::InvalidDigit(s.chars().next().unwrap()));
         }
 
         if let Ok(hash) = B256::from_str(s) {
@@ -255,14 +251,6 @@ mod tests {
         let result = JsonStorageKey::from_str(&long_hex_str);
 
         assert!(matches!(result, Err(ParseError::BaseConvertError(BaseConvertError::Overflow))));
-    }
-
-    #[test]
-    fn test_from_str_without_prefix() {
-        let no_prefix_str = "1234567890abcdef";
-        let result = JsonStorageKey::from_str(no_prefix_str);
-
-        assert!(matches!(result, Err(ParseError::InvalidDigit('1'))));
     }
 
     #[test]
