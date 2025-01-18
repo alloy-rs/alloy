@@ -38,6 +38,7 @@ mod tests {
     use core::str::FromStr;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_serde_consolidation_request() {
         // Sample JSON input representing a consolidation request
         let json_data = r#"{
