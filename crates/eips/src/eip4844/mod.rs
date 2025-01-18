@@ -14,15 +14,20 @@ pub mod builder;
 pub mod utils;
 
 mod engine;
+use core::hash::Hash;
+
+use alloy_rlp::{RlpDecodable, RlpEncodable};
+use arbitrary::{Arbitrary, Unstructured};
 pub use engine::*;
 
 /// Contains sidecar related types
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;
+
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256};
 
 use crate::eip7840;
 
@@ -86,9 +91,146 @@ pub const BYTES_PER_COMMITMENT: usize = 48;
 
 /// How many bytes are in a proof
 pub const BYTES_PER_PROOF: usize = 48;
+/// A fixed-size container for binary data, designed to hold exactly 131,072 bytes.
+#[derive(Clone, Debug, RlpEncodable, RlpDecodable, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+pub struct Blob {
+    inner: Bytes,
+}
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> Arbitrary<'a> for Blob {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let data: [u8; BYTES_PER_BLOB] = u.arbitrary()?;
+        Ok(Self { inner: Bytes::from(data.to_vec()) })
+    }
+}
+impl Default for Blob {
+    fn default() -> Self {
+        let default_bytes = Bytes::from(vec![0u8; BYTES_PER_BLOB]);
+        Self { inner: default_bytes }
+    }
+}
 
-/// A Blob serialized as 0x-prefixed hex string
-pub type Blob = FixedBytes<BYTES_PER_BLOB>;
+impl From<[u8; BYTES_PER_BLOB]> for Blob {
+    fn from(array: [u8; BYTES_PER_BLOB]) -> Self {
+        Self { inner: Bytes::from(array.to_vec()) }
+    }
+}
+#[cfg(feature = "serde")]
+impl serde::Serialize for Blob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if self.inner.len() != BYTES_PER_BLOB {
+            return Err(serde::ser::Error::custom(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                self.inner.len()
+            )));
+        }
+        serializer.serialize_bytes(&self.inner)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Blob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+        if data.len() != BYTES_PER_BLOB {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                data.len()
+            )));
+        }
+        Ok(Self { inner: Bytes::from(data) })
+    }
+}
+
+impl Blob {
+    /// Creates a new `Blob` from `data` if it is exactly 131,072 bytes.
+    pub fn new(data: Bytes) -> Result<Self, String> {
+        if data.len() != BYTES_PER_BLOB {
+            return Err(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                data.len()
+            ));
+        }
+        Ok(Self { inner: data })
+    }
+
+    /// Creates a new `Blob` filled with the same byte, repeated 131,072 times.
+    pub fn repeat_byte(byte: u8) -> Result<Self, String> {
+        let data = vec![byte; BYTES_PER_BLOB];
+        Self::new(Bytes::from(data))
+    }
+
+    /// Returns an immutable reference to the underlying `Bytes`.
+    pub const fn as_bytes(&self) -> &Bytes {
+        &self.inner
+    }
+
+    /// Returns a copy of the underlying bytes (as a `Vec<u8>`).
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.inner.to_vec()
+    }
+
+    /// Overwrite this Blob with the provided bytes.
+    pub fn update_bytes(&mut self, new_data: Vec<u8>) -> Result<(), String> {
+        if new_data.len() != BYTES_PER_BLOB {
+            return Err(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                new_data.len()
+            ));
+        }
+        self.inner = Bytes::from(new_data);
+        Ok(())
+    }
+
+    /// Returns the number of bytes in this blob .
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Returns true if this blob is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Returns the data as a standard slice.
+    pub fn as_slice(&self) -> &[u8] {
+        &self.inner
+    }
+}
+/// Converts a `Vec<u8>`  into a `Blob`.
+impl TryFrom<Vec<u8>> for Blob {
+    type Error = String;
+
+    fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from(data.as_slice())
+    }
+}
+/// Converts a slice (`&[u8]`) into a `Blob`.
+impl TryFrom<&[u8]> for Blob {
+    type Error = String;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        if data.len() != BYTES_PER_BLOB {
+            return Err(format!(
+                "Invalid blob length: expected {}, got {}",
+                BYTES_PER_BLOB,
+                data.len()
+            ));
+        }
+        Ok(Self { inner: Bytes::copy_from_slice(data) })
+    }
+}
 
 /// Helper function to deserialize boxed blobs.
 #[cfg(feature = "serde")]
