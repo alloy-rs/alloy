@@ -75,7 +75,7 @@ pub struct TxEip1559 {
 impl TxEip1559 {
     /// Get the transaction type
     #[doc(alias = "transaction_type")]
-    pub(crate) const fn tx_type() -> TxType {
+    pub const fn tx_type() -> TxType {
         TxType::Eip1559
     }
 
