@@ -1467,8 +1467,12 @@ mod tests {
     }
     #[test]
     fn can_parse_blockid_tags() {
-        let tags =
-            [("latest", BlockNumberOrTag::Latest), ("finalized", BlockNumberOrTag::Finalized), ("safe", BlockNumberOrTag::Safe), ("pending", BlockNumberOrTag::Pending)];
+        let tags = [
+            ("latest", BlockNumberOrTag::Latest),
+            ("finalized", BlockNumberOrTag::Finalized),
+            ("safe", BlockNumberOrTag::Safe),
+            ("pending", BlockNumberOrTag::Pending),
+        ];
         for (value, tag) in tags {
             let num = serde_json::json!({ "blockNumber": value });
             let id = serde_json::from_value::<BlockId>(num);
@@ -1487,7 +1491,13 @@ mod tests {
     /// Serde tests
     #[test]
     fn serde_blockid_tags() {
-        let block_ids = [BlockNumberOrTag::Latest, BlockNumberOrTag::Finalized, BlockNumberOrTag::Safe, BlockNumberOrTag::Pending].map(BlockId::from);
+        let block_ids = [
+            BlockNumberOrTag::Latest,
+            BlockNumberOrTag::Finalized,
+            BlockNumberOrTag::Safe,
+            BlockNumberOrTag::Pending,
+        ]
+        .map(BlockId::from);
         for block_id in &block_ids {
             let serialized = serde_json::to_string(&block_id).unwrap();
             let deserialized: BlockId = serde_json::from_str(&serialized).unwrap();
