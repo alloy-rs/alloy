@@ -13,6 +13,7 @@ changed or not.
 
 ## Steps
 
+- [ ] Update the version number in the [README](./README.md#installation) to the new version.
 - [ ] Make sure you're on the `main` branch.
 - [ ] (optional) Dry run `cargo-release`: `cargo release <version>`
 - [ ] Run `cargo-release`: `PUBLISH_GRACE_SLEEP=10 cargo release --execute [--no-verify] <version>`
