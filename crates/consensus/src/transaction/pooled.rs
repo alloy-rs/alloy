@@ -518,6 +518,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, hex};
     use bytes::Bytes;
+    use std::path::PathBuf;
 
     #[test]
     fn invalid_legacy_pooled_decoding_input_too_short() {
@@ -591,5 +592,25 @@ mod tests {
         // we can also decode_enveloped
         let res = PooledTransaction::decode_2718(&mut &data[..]);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn decode_encode_raw_4844_rlp() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let tx = PooledTransaction::decode_2718(&mut raw.as_ref())
+                .map_err(|err| {
+                    panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+                })
+                .unwrap();
+            // We want to test only EIP-4844 transactions
+            assert!(tx.is_eip4844());
+            let encoded = tx.encoded_2718();
+            assert_eq!(encoded.as_slice(), &raw[..], "{:?}", entry.path());
+        }
     }
 }
