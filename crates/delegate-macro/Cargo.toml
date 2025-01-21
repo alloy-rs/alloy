@@ -1,0 +1,31 @@
+[package]
+name = "alloy-delegate-macro"
+description = "Delegate macro generator"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[lib]
+proc-macro = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+proc-macro-error2.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["extra-traits"] }
