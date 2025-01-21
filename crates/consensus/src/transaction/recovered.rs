@@ -71,13 +71,12 @@ impl<T> Recovered<T> {
 }
 
 impl<T> Recovered<&T> {
-
     /// Maps a `Recovered<&T>` to a `Recovered<T>` by cloning the transaction.
     pub fn cloned(self) -> Recovered<T>
     where
         T: Clone,
     {
-       let Self { tx, signer } = self;
+        let Self { tx, signer } = self;
         Recovered::new_unchecked(tx.clone(), signer)
     }
 }
