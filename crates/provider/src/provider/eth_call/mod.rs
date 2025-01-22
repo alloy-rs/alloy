@@ -352,9 +352,8 @@ mod test {
     use super::*;
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::{Ethereum, TransactionBuilder};
-    use alloy_primitives::{address, U256};
-    use alloy_rpc_types_eth::{state::StateOverride, TransactionRequest};
-
+    use alloy_primitives::{address, hex, U256};
+    use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, TransactionRequest};
     #[test]
     fn test_serialize_eth_call_params() {
         let alice = address!("0000000000000000000000000000000000000001");
@@ -417,5 +416,40 @@ mod test {
             serde_json::to_string(&params).unwrap(),
             r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1"]"#
         );
+    }
+
+    #[test]
+    fn test_serialize_eth_call_many_params() {
+        let tx1 = TransactionRequest::default()
+            .with_to(address!("6b175474e89094c44da98b954eedeac495271d0f"))
+            .with_gas_limit(1000000)
+            .with_gas_price(2023155498)
+            .with_input(hex!("a9059cbb000000000000000000000000bc0E63965946815d105E7591407704e6e1964E590000000000000000000000000000000000000000000000000000000005f5e100"));
+        let tx2 = TransactionRequest::default()
+            .with_to(address!("833589fcd6edb6e08f4c7c32d4f71b54bda02913"))
+            .with_gas_price(2023155498)
+            .with_input(hex!(
+                "70a08231000000000000000000000000bc0E63965946815d105E7591407704e6e1964E59"
+            ));
+
+        let transactions = vec![tx1, tx2];
+
+        let block_override =
+            BlockOverrides { number: Some(U256::from(12279785)), ..Default::default() };
+
+        let bundle = vec![Bundle { transactions, block_override: Some(block_override) }];
+
+        let context = StateContext {
+            block_number: Some(BlockId::number(12279785)),
+            transaction_index: Some(1.into()),
+        };
+
+        // Expected: [[(transactions, block overrides)], context]
+        let params: EthCallParams<'_, Ethereum> =
+            EthCallParams::call_many(&bundle).with_context(context);
+
+        let expected = r#"[[{"transactions":[{"to":"0x6b175474e89094c44da98b954eedeac495271d0f","gasPrice":"0x7896e72a","gas":"0xf4240","input":"0xa9059cbb000000000000000000000000bc0e63965946815d105e7591407704e6e1964e590000000000000000000000000000000000000000000000000000000005f5e100"},{"to":"0x833589fcd6edb6e08f4c7c32d4f71b54bda02913","gasPrice":"0x7896e72a","input":"0x70a08231000000000000000000000000bc0e63965946815d105e7591407704e6e1964e59"}],"blockOverride":{"number":"0xbb5fe9"}}],{"blockNumber":"0xbb5fe9","transactionIndex":1}]"#;
+
+        similar_asserts::assert_eq!(serde_json::to_string(&params).unwrap(), expected);
     }
 }
