@@ -294,37 +294,29 @@ where
 
 impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let len = if self.overrides().is_some() { 3 } else { 2 };
+
+        let mut seq = serializer.serialize_seq(Some(len))?;
         if self.is_call() {
-            let len = if self.overrides().is_some() { 3 } else { 2 };
-
-            let mut seq = serializer.serialize_seq(Some(len))?;
             seq.serialize_element(&self.data())?;
-
-            if let Some(overrides) = self.overrides() {
-                seq.serialize_element(&self.block().unwrap_or_default())?;
-                seq.serialize_element(overrides)?;
-            } else if let Some(block) = self.block() {
-                seq.serialize_element(&block)?;
-            }
-
-            seq.end()
         } else {
-            let len = if self.overrides().is_some() { 3 } else { 2 };
-
-            let mut seq = serializer.serialize_seq(Some(len))?;
-
             seq.serialize_element(&self.bundles())?;
-
-            if let Some(context) = self.context() {
-                seq.serialize_element(context)?;
-            }
-
-            if let Some(overrides) = self.overrides() {
-                seq.serialize_element(overrides)?;
-            }
-
-            seq.end()
         }
+
+        if self.context().is_some() && !self.is_call() {
+            seq.serialize_element(&self.context().unwrap())?;
+        }
+
+        if let Some(overrides) = self.overrides() {
+            if self.is_call() {
+                seq.serialize_element(&self.block().unwrap_or_default())?;
+            }
+            seq.serialize_element(overrides)?;
+        } else if self.block().is_some() && self.is_call() {
+            seq.serialize_element(&self.block().unwrap())?;
+        }
+
+        seq.end()
     }
 }
 
