@@ -1,7 +1,7 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
-use alloy_rpc_types_eth::state::StateOverride;
+use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, StateContext, TransactionIndex};
 use alloy_transport::{TransportError, TransportResult};
 use futures::FutureExt;
 use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
@@ -271,8 +271,28 @@ where
     }
 
     /// Set the block to use for this call.
+    ///
+    /// In case of `"eth_callMany"` requests, this sets the block in the [`StateContext`].
     pub fn block(mut self, block: BlockId) -> Self {
         self.params = self.params.with_block(block);
+        self
+    }
+
+    /// Set the [`TransactionIndex`] in the [`StateContext`] for an `eth_callMany` request.
+    pub fn transaction_index(mut self, transaction_index: TransactionIndex) -> Self {
+        self.params = self.params.with_transaction_index(transaction_index);
+        self
+    }
+
+    /// Set the block overrides for an `eth_callMany` request.
+    pub fn block_overrides(mut self, block_overrides: BlockOverrides) -> Self {
+        self.params = self.params.with_block_overrides(block_overrides);
+        self
+    }
+
+    /// Set the state context for an `eth_callMany` request.
+    pub fn context(mut self, state_context: StateContext) -> Self {
+        self.params = self.params.with_context(state_context);
         self
     }
 }
