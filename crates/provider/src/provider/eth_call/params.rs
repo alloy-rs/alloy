@@ -4,7 +4,6 @@ use alloy_rpc_types_eth::{
     state::StateOverride, BlockOverrides, Bundle, StateContext, TransactionIndex, TransactionInput,
     TransactionRequest,
 };
-use serde::ser::SerializeSeq;
 use std::borrow::Cow;
 
 /// The parameters for an `"eth_call"` RPC request.
@@ -122,12 +121,18 @@ where
     pub fn bundle(&self) -> Option<Bundle> {
         self.as_call_many_params().map(|p| p.bundle())
     }
+
     /// Returns the block.
-    pub const fn block(&self) -> Option<BlockId> {
+    pub fn block(&self) -> Option<BlockId> {
         match self {
             Self::Call(params) => params.block(),
-            Self::CallMany(_params) => todo!(),
+            Self::CallMany(params) => params.context().and_then(|c| c.block_number),
         }
+    }
+
+    /// Returns a reference to the [`StateContext`].
+    pub fn context(&self) -> Option<&StateContext> {
+        self.as_call_many_params().and_then(|p| p.context())
     }
 
     /// Clones the tx data and overrides into owned data.
@@ -160,24 +165,6 @@ where
     /// `false` indicates a `"eth_callMany"` request.
     pub fn is_call(&self) -> bool {
         matches!(self, Self::Call(_))
-    }
-}
-
-impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if self.overrides().is_some() { 3 } else { 2 };
-
-        let mut seq = serializer.serialize_seq(Some(len))?;
-        seq.serialize_element(&self.data())?;
-
-        if let Some(overrides) = self.overrides() {
-            seq.serialize_element(&self.block().unwrap_or_default())?;
-            seq.serialize_element(overrides)?;
-        } else if let Some(block) = self.block() {
-            seq.serialize_element(&block)?;
-        }
-
-        seq.end()
     }
 }
 

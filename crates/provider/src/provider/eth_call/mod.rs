@@ -1,12 +1,12 @@
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, StateContext, TransactionIndex};
 use alloy_transport::{TransportError, TransportResult};
 use futures::FutureExt;
+use serde::ser::SerializeSeq;
 use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
-
-use crate::ProviderCall;
 
 mod params;
 pub use params::{CallManyParams, CallParams, EthCallParams};
@@ -316,6 +316,42 @@ where
                 method: self.method,
                 map: self.map,
             },
+        }
+    }
+}
+
+impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if self.is_call() {
+            let len = if self.overrides().is_some() { 3 } else { 2 };
+
+            let mut seq = serializer.serialize_seq(Some(len))?;
+            seq.serialize_element(&self.data())?;
+
+            if let Some(overrides) = self.overrides() {
+                seq.serialize_element(&self.block().unwrap_or_default())?;
+                seq.serialize_element(overrides)?;
+            } else if let Some(block) = self.block() {
+                seq.serialize_element(&block)?;
+            }
+
+            seq.end()
+        } else {
+            let len = if self.overrides().is_some() { 3 } else { 2 };
+
+            let mut seq = serializer.serialize_seq(Some(len))?;
+
+            seq.serialize_element(&self.bundle())?;
+
+            if let Some(context) = self.context() {
+                seq.serialize_element(context)?;
+            }
+
+            if let Some(overrides) = self.overrides() {
+                seq.serialize_element(overrides)?;
+            }
+
+            seq.end()
         }
     }
 }
