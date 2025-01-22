@@ -26,7 +26,7 @@ where
     /// Instantiates a new `EthCallParams` with the given transactions.
     ///
     /// This is used for `"eth_callMany"` requests.
-    pub fn call_many(bundle: &'req Vec<Bundle>) -> Self {
+    pub const fn call_many(bundle: &'req Vec<Bundle>) -> Self {
         Self::CallMany(CallManyParams::new(bundle))
     }
 
