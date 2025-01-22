@@ -271,46 +271,6 @@ impl TxEnvelope {
         }
     }
 
-    /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
-    pub const fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
-        match self {
-            Self::Legacy(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
-    /// Returns the [`TxEip2930`] variant if the transaction is an EIP-2930 transaction.
-    pub const fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
-        match self {
-            Self::Eip2930(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
-    /// Returns the [`TxEip1559`] variant if the transaction is an EIP-1559 transaction.
-    pub const fn as_eip1559(&self) -> Option<&Signed<TxEip1559>> {
-        match self {
-            Self::Eip1559(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
-    /// Returns the [`TxEip4844Variant`] variant if the transaction is an EIP-4844 transaction.
-    pub const fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
-        match self {
-            Self::Eip4844(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
-    /// Returns the [`TxEip7702`] variant if the transaction is an EIP-7702 transaction.
-    pub const fn as_eip7702(&self) -> Option<&Signed<TxEip7702>> {
-        match self {
-            Self::Eip7702(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
     pub fn recover_signer(
