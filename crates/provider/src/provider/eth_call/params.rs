@@ -1,7 +1,7 @@
 use alloy_eips::BlockId;
-use alloy_network::Network;
+use alloy_network::{Network, TransactionBuilder};
 use alloy_rpc_types_eth::{
-    state::StateOverride, BlockOverrides, Bundle, StateContext, TransactionIndex,
+    state::StateOverride, BlockOverrides, Bundle, StateContext, TransactionIndex, TransactionInput,
     TransactionRequest,
 };
 use serde::ser::SerializeSeq;
@@ -13,7 +13,7 @@ pub enum EthCallParams<'req, N: Network> {
     /// Parameters used for `"eth_call"` and `"eth_estimateGas"` RPC requests.
     Call(CallParams<'req, N>),
     /// Parameters used for `"eth_callMany"` RPC requests.
-    CallMany(CallManyParams),
+    CallMany(CallManyParams<'req, N>),
 }
 
 impl<'req, N> EthCallParams<'req, N>
@@ -30,8 +30,8 @@ where
     /// Instantiates a new `EthCallParams` with the given transactions.
     ///
     /// This is used for `"eth_callMany"` requests.
-    pub fn call_many(bundle: Vec<TransactionRequest>) -> Self {
-        Self::CallMany(CallManyParams::new(bundle.into()))
+    pub fn call_many(bundle: &'req Vec<N::TransactionRequest>) -> Self {
+        Self::CallMany(CallManyParams::new(bundle))
     }
 
     /// Sets the block to use for this call.
@@ -119,7 +119,7 @@ where
     }
 
     /// Returns a reference to the bundle if this is a `"eth_callMany"` request.
-    pub fn bundle(&self) -> Option<&Bundle> {
+    pub fn bundle(&self) -> Option<Bundle> {
         self.as_call_many_params().map(|p| p.bundle())
     }
     /// Returns the block.
@@ -134,7 +134,7 @@ where
     pub fn into_owned(self) -> EthCallParams<'static, N> {
         match self {
             Self::Call(params) => EthCallParams::Call(params.into_owned()),
-            Self::CallMany(params) => EthCallParams::CallMany(params.clone()),
+            Self::CallMany(params) => EthCallParams::CallMany(params.into_owned()),
         }
     }
 
@@ -148,7 +148,7 @@ where
     }
 
     /// Returns a reference to the call many parameters if this is a `"eth_callMany"` request.
-    pub fn as_call_many_params(&self) -> Option<&CallManyParams> {
+    pub fn as_call_many_params(&self) -> Option<&CallManyParams<'req, N>> {
         match self {
             Self::CallMany(params) => Some(params),
             _ => None,
@@ -230,19 +230,32 @@ where
 
 /// The parameters for an `"eth_callMany"` RPC request.
 #[derive(Clone, Debug)]
-pub struct CallManyParams {
+pub struct CallManyParams<'req, N: Network> {
     /// The bundle of transactions to execute.
-    bundle: Bundle,
+    transactions: Cow<'req, Vec<N::TransactionRequest>>, /* TODO: Use `Bundle` instead of
+                                                          * `Vec<TransactionRequest>` after
+                                                          * making `Bundle` generic over
+                                                          * `Network`. */
+    /// The block override for the call.
+    block_override: Option<BlockOverrides>,
     /// The state context for the call.
     context: Option<StateContext>,
     /// State overrides for the call.
     overrides: Option<StateOverride>,
 }
 
-impl CallManyParams {
+impl<'req, N> CallManyParams<'req, N>
+where
+    N: Network,
+{
     /// Instantiates a new `CallManyParams` with the given bundle.
-    pub const fn new(bundle: Bundle) -> Self {
-        Self { bundle, context: None, overrides: None }
+    pub const fn new(bundle: &'req Vec<N::TransactionRequest>) -> Self {
+        Self {
+            transactions: Cow::Borrowed(bundle),
+            block_override: None,
+            context: None,
+            overrides: None,
+        }
     }
 
     /// Sets the block in [`StateContext`] to use for this call.
@@ -271,13 +284,31 @@ impl CallManyParams {
 
     /// Sets the [`BlockOverrides`] for the [`Bundle`].
     pub fn with_block_overrides(mut self, block_override: BlockOverrides) -> Self {
-        self.bundle.block_override = Some(block_override);
+        self.block_override = Some(block_override);
         self
     }
 
     /// Returns a reference to the bundle.
-    pub fn bundle(&self) -> &Bundle {
-        &self.bundle
+    pub fn bundle(&self) -> Bundle {
+        let txs = &self.transactions;
+
+        Bundle {
+            transactions: txs
+                .iter()
+                .map(|tx| TransactionRequest {
+                    from: tx.from(),
+                    to: tx.kind(),
+                    input: TransactionInput::maybe_input(tx.input().cloned()),
+                    value: tx.value(),
+                    gas: tx.gas_limit(),
+                    gas_price: tx.gas_price(),
+                    max_fee_per_gas: tx.max_fee_per_gas(),
+                    max_priority_fee_per_gas: tx.max_priority_fee_per_gas(),
+                    ..Default::default()
+                })
+                .collect(),
+            block_override: self.block_override.clone(),
+        }
     }
 
     /// Returns a reference to the state context if set.
@@ -288,5 +319,15 @@ impl CallManyParams {
     /// Returns a reference to the state overrides if set.
     pub fn overrides(&self) -> Option<&StateOverride> {
         self.overrides.as_ref()
+    }
+
+    /// Clones the tx data and overrides into owned data.
+    pub fn into_owned(self) -> CallManyParams<'static, N> {
+        CallManyParams {
+            transactions: Cow::Owned(self.transactions.into_owned()),
+            block_override: self.block_override,
+            context: self.context,
+            overrides: self.overrides,
+        }
     }
 }
