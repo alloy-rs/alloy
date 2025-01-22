@@ -63,6 +63,36 @@ pub struct Transaction<T = TxEnvelope> {
     pub from: Address,
 }
 
+impl<T> Transaction<T> {
+    /// Applies the given closure to the inner transaction type.
+    pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
+            self;
+        Transaction {
+            inner: f(inner),
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            from,
+        }
+    }
+
+    /// Applies the given fallible closure to the inner transactions.
+    pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
+            self;
+        Ok(Transaction {
+            inner: f(inner)?,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            from,
+        })
+    }
+}
+
 impl<T> AsRef<T> for Transaction<T> {
     fn as_ref(&self) -> &T {
         &self.inner

@@ -61,12 +61,12 @@ impl<T> Recovered<T> {
         Self { tx, signer }
     }
 
-    /// Applies the given closure to the inner transactions.
+    /// Applies the given closure to the inner transaction type.
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.tx), self.signer)
     }
 
-    /// Applies the given fallible closure to the inner transactions.
+    /// Applies the given fallible closure to the inner transaction type.
     pub fn try_map_transaction<Tx, E>(
         self,
         f: impl FnOnce(T) -> Result<Tx, E>,
