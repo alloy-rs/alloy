@@ -282,7 +282,7 @@ where
     }
 
     /// Set the state context for an `eth_callMany` request.
-    pub fn context(mut self, state_context: StateContext) -> Self {
+    pub fn context(mut self, state_context: &'req StateContext) -> Self {
         self.params = self.params.with_context(state_context);
         self
     }
@@ -446,7 +446,7 @@ mod test {
 
         // Expected: [[(transactions, block overrides)], context]
         let params: EthCallParams<'_, Ethereum> =
-            EthCallParams::call_many(&bundle).with_context(context);
+            EthCallParams::call_many(&bundle).with_context(&context);
 
         let expected = r#"[[{"transactions":[{"to":"0x6b175474e89094c44da98b954eedeac495271d0f","gasPrice":"0x7896e72a","gas":"0xf4240","input":"0xa9059cbb000000000000000000000000bc0e63965946815d105e7591407704e6e1964e590000000000000000000000000000000000000000000000000000000005f5e100"},{"to":"0x833589fcd6edb6e08f4c7c32d4f71b54bda02913","gasPrice":"0x7896e72a","input":"0x70a08231000000000000000000000000bc0e63965946815d105e7591407704e6e1964e59"}],"blockOverride":{"number":"0xbb5fe9"}}],{"blockNumber":"0xbb5fe9","transactionIndex":1}]"#;
 

@@ -68,7 +68,7 @@ where
                 Self::Call(params)
             }
             Self::CallMany(mut params) => {
-                params.overrides = Some(overrides.clone());
+                params.overrides = Some(Cow::Borrowed(overrides));
                 Self::CallMany(params)
             }
         }
@@ -78,11 +78,11 @@ where
     ///
     /// This is only applicable for `"eth_callMany"` requests, and will be ignored for
     /// `"eth_call"`/`"eth_estimateGas"` requests.
-    pub fn with_context(self, context: StateContext) -> Self {
+    pub fn with_context(self, context: &'req StateContext) -> Self {
         match self {
             Self::Call(params) => Self::Call(params),
             Self::CallMany(mut params) => {
-                params.context = Some(context);
+                params.context = Some(*context);
                 Self::CallMany(params)
             }
         }
@@ -214,7 +214,7 @@ pub struct CallManyParams<'req> {
     /// The state context for the call.
     context: Option<StateContext>,
     /// State overrides for the call.
-    overrides: Option<StateOverride>,
+    overrides: Option<Cow<'req, StateOverride>>,
 }
 
 impl<'req> CallManyParams<'req> {
@@ -242,8 +242,8 @@ impl<'req> CallManyParams<'req> {
     }
 
     /// Sets the state overrides for the call.
-    pub fn with_overrides(mut self, overrides: StateOverride) -> Self {
-        self.overrides = Some(overrides);
+    pub fn with_overrides(mut self, overrides: &'req StateOverride) -> Self {
+        self.overrides = Some(Cow::Borrowed(overrides));
         self
     }
 
@@ -259,7 +259,7 @@ impl<'req> CallManyParams<'req> {
 
     /// Returns a reference to the state overrides if set.
     pub fn overrides(&self) -> Option<&StateOverride> {
-        self.overrides.as_ref()
+        self.overrides.as_deref()
     }
 
     /// Clones the tx data and overrides into owned data.
@@ -267,7 +267,7 @@ impl<'req> CallManyParams<'req> {
         CallManyParams {
             bundles: Cow::Owned(self.bundles.into_owned()),
             context: self.context,
-            overrides: self.overrides,
+            overrides: self.overrides.map(|o| Cow::Owned(o.into_owned())),
         }
     }
 }

@@ -1868,7 +1868,7 @@ mod tests {
             transaction_index: Some(1.into()),
         };
 
-        let results = provider.call_many(&bundles).context(context).await.unwrap();
+        let results = provider.call_many(&bundles).context(&context).await.unwrap();
 
         let tx1_res = EthCallResponse {
             value: Some(
@@ -1887,7 +1887,7 @@ mod tests {
             Bundle { transactions: vec![tx2], block_override: Some(block_override.clone()) },
         ];
 
-        let results = provider.call_many(&bundles).context(context).await.unwrap();
+        let results = provider.call_many(&bundles).context(&context).await.unwrap();
 
         let expected = vec![vec![tx1_res.clone()], vec![tx2_res.clone()]];
 
