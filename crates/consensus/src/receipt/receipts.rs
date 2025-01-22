@@ -147,8 +147,17 @@ impl<T> From<ReceiptWithBloom<Self>> for Receipt<T> {
     }
 }
 
-/// Receipt containing result of transaction execution.
-#[derive(Clone, Debug, PartialEq, Eq, Default, From, IntoIterator)]
+/// A collection of receipts organized as a two-dimensional vector.
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+    derive_more::IntoIterator,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts<T> {
     /// A two-dimensional vector of [`Receipt`] instances.
@@ -197,6 +206,12 @@ impl<T: Encodable> Encodable for Receipts<T> {
 impl<T: Decodable> Decodable for Receipts<T> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self { receipt_vec: Decodable::decode(buf)? })
+    }
+}
+
+impl<T> Default for Receipts<T> {
+    fn default() -> Self {
+        Self { receipt_vec: Default::default() }
     }
 }
 

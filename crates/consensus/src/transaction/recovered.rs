@@ -48,6 +48,11 @@ impl<T> Recovered<T> {
         (self.tx, self.signer)
     }
 
+    /// Converts from `&Recovered<T>` to `Recovered<&T>`.
+    pub const fn as_recovered_ref(&self) -> Recovered<&T> {
+        Recovered { tx: &self.tx, signer: self.signer() }
+    }
+
     /// Create [`Recovered`] from the given transaction and [`Address`] of the signer.
     ///
     /// Note: This does not check if the signer is the actual signer of the transaction.
@@ -56,17 +61,28 @@ impl<T> Recovered<T> {
         Self { tx, signer }
     }
 
-    /// Applies the given closure to the inner transactions.
+    /// Applies the given closure to the inner transaction type.
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.tx), self.signer)
     }
 
-    /// Applies the given fallible closure to the inner transactions.
+    /// Applies the given fallible closure to the inner transaction type.
     pub fn try_map_transaction<Tx, E>(
         self,
         f: impl FnOnce(T) -> Result<Tx, E>,
     ) -> Result<Recovered<Tx>, E> {
         Ok(Recovered::new_unchecked(f(self.tx)?, self.signer))
+    }
+}
+
+impl<T> Recovered<&T> {
+    /// Maps a `Recovered<&T>` to a `Recovered<T>` by cloning the transaction.
+    pub fn cloned(self) -> Recovered<T>
+    where
+        T: Clone,
+    {
+        let Self { tx, signer } = self;
+        Recovered::new_unchecked(tx.clone(), signer)
     }
 }
 

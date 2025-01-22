@@ -1,5 +1,5 @@
 use crate::WeakClient;
-use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
 use futures::{Stream, StreamExt};
 use serde::Serialize;
@@ -81,8 +81,8 @@ pub struct PollerBuilder<Params, Resp> {
 
 impl<Params, Resp> PollerBuilder<Params, Resp>
 where
-    Params: RpcParam + 'static,
-    Resp: RpcReturn + Clone,
+    Params: RpcSend + 'static,
+    Resp: RpcRecv + Clone,
 {
     /// Create a new poller task.
     pub fn new(client: WeakClient, method: impl Into<Cow<'static, str>>, params: Params) -> Self {
@@ -248,7 +248,7 @@ impl<Resp> DerefMut for PollChannel<Resp> {
 
 impl<Resp> PollChannel<Resp>
 where
-    Resp: RpcReturn + Clone,
+    Resp: RpcRecv + Clone,
 {
     /// Resubscribe to the poller task.
     pub fn resubscribe(&self) -> Self {

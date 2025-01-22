@@ -280,7 +280,7 @@ serde = [
     "alloy-consensus?/serde",
     "dep:alloy-serde",
 ]
-ssz = ["alloy-rpc-types?/ssz"]
+ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",
