@@ -153,8 +153,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
-    /// Executes a list of bundles (a bundle is a collection of transactions requests) against the
-    /// provided state context and overrides without publishing a transaction.
+    /// Executes a list of bundles (a bundle is a collection of transactions requests).
+    ///
+    /// These bundles are executed against provided the state context and overrides.
     #[doc(alias = "eth_callMany")]
     fn call_many<'req>(
         &self,
