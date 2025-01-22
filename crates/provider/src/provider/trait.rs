@@ -156,7 +156,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Execute a list of transactions requests with a state context and against provided block and
     /// state overrides, without publishing a transaction.
     #[doc(alias = "eth_call_many")]
-    fn call_many<'req>(&self, bundles: &'req Vec<Bundle>) -> EthCall<'req, N, EthCallResponse> {
+    fn call_many<'req>(
+        &self,
+        bundles: &'req Vec<Bundle>,
+    ) -> EthCall<'req, N, Vec<Vec<EthCallResponse>>> {
         EthCall::call_many(self.weak_client(), bundles)
     }
 
@@ -1833,6 +1836,62 @@ mod tests {
 
         let result = provider.call(&req).block(0.into()).await.unwrap();
         assert_eq!(result.to_string(), "0x");
+    }
+
+    #[tokio::test]
+    async fn call_many_mainnet() {
+        use alloy_rpc_types_eth::{BlockOverrides, StateContext};
+
+        let url = "https://docs-demo.quiknode.pro/";
+        let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
+        let tx1 = TransactionRequest::default()
+            .with_to(address!("6b175474e89094c44da98b954eedeac495271d0f"))
+            .with_gas_limit(1000000)
+            .with_gas_price(2023155498)
+            .with_input(hex!("a9059cbb000000000000000000000000bc0E63965946815d105E7591407704e6e1964E590000000000000000000000000000000000000000000000000000000005f5e100"));
+        let tx2 = TransactionRequest::default()
+            .with_to(address!("833589fcd6edb6e08f4c7c32d4f71b54bda02913"))
+            .with_gas_price(2023155498)
+            .with_input(hex!(
+                "70a08231000000000000000000000000bc0E63965946815d105E7591407704e6e1964E59"
+            ));
+
+        let transactions = vec![tx1.clone(), tx2.clone()];
+
+        let block_override =
+            BlockOverrides { number: Some(U256::from(12279785)), ..Default::default() };
+
+        let bundles = vec![Bundle { transactions, block_override: Some(block_override.clone()) }];
+
+        let context = StateContext {
+            block_number: Some(BlockId::number(12279785)),
+            transaction_index: Some(1.into()),
+        };
+
+        let results = provider.call_many(&bundles).context(context).await.unwrap();
+
+        let tx1_res = EthCallResponse {
+            value: Some(
+                hex!("0000000000000000000000000000000000000000000000000000000000000001").into(),
+            ),
+            error: None,
+        };
+        let tx2_res = EthCallResponse { value: Some(Bytes::new()), error: None };
+        let expected = vec![vec![tx1_res.clone(), tx2_res.clone()]];
+
+        assert_eq!(results, expected);
+
+        // Two bundles
+        let bundles = vec![
+            Bundle { transactions: vec![tx1], block_override: Some(block_override.clone()) },
+            Bundle { transactions: vec![tx2], block_override: Some(block_override.clone()) },
+        ];
+
+        let results = provider.call_many(&bundles).context(context).await.unwrap();
+
+        let expected = vec![vec![tx1_res.clone()], vec![tx2_res.clone()]];
+
+        assert_eq!(results, expected);
     }
 
     #[tokio::test]
