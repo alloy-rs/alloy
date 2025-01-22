@@ -130,10 +130,12 @@ where
     }
 }
 
-/// A builder for an `"eth_call"` request. This type is returned by the
-/// [`Provider::call`] method.
+/// A builder for `"eth_call"`, `"eth_estimateGas"` and `"eth_callMany"` request. This type is
+/// returned by [`Provider::call`], [`Provider::estimate_gas`] and [`Provider::call_many`] method.
 ///
 /// [`Provider::call`]: crate::Provider::call
+/// [`Provider::estimate_gas`]: crate::Provider::estimate_gas
+/// [`Provider::call_many`]: crate::Provider::call_many
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone)]
 pub struct EthCall<'req, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
