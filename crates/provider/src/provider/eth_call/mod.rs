@@ -90,26 +90,7 @@ where
             unreachable!("bad state")
         };
 
-        let fut = if params.is_call() {
-            if method.ne("eth_call") && method.ne("eth_estimateGas") {
-                return Poll::Ready(Err(TransportError::local_usage_str(&format!(
-                    "bad method: {method} - params provided for `eth_call`/`eth_estimateGas`"
-                ))));
-            }
-            if method.eq("eth_call") {
-                caller.call(params)
-            } else {
-                caller.estimate_gas(params)
-            }
-        } else {
-            if method.eq("eth_callMany") {
-                caller.call_many(params)
-            } else {
-                return Poll::Ready(Err(TransportError::local_usage_str(&format!(
-                    "bad method: {method} - params provided for `eth_callMany`"
-                ))));
-            }
-        }?;
+        let fut = handle_eth_call(caller, params, method)?;
 
         self.inner = EthCallFutInner::Running { map, fut };
 
@@ -344,6 +325,29 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
 
             seq.end()
         }
+    }
+}
+
+/// Helper function to handle different types of Ethereum RPC calls based on parameters and method.
+fn handle_eth_call<N, Resp>(
+    caller: Arc<dyn Caller<N, Resp>>,
+    params: EthCallParams<'_, N>,
+    method: &'static str,
+) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>>
+where
+    N: Network,
+    Resp: RpcRecv,
+{
+    match (params.is_call(), method) {
+        (true, "eth_call") => caller.call(params),
+        (true, "eth_estimateGas") => caller.estimate_gas(params),
+        (true, _) => Err(TransportError::local_usage_str(&format!(
+            "params provided for `eth_call`/`eth_estimateGas` but {method} specified"
+        ))),
+        (false, "eth_callMany") => caller.call_many(params),
+        (false, _) => Err(TransportError::local_usage_str(&format!(
+            "params provided for `eth_callMany` but {method} specified"
+        ))),
     }
 }
 

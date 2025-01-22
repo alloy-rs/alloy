@@ -129,7 +129,7 @@ where
 
     /// Returns a reference to the call parameters if this is a `"eth_call"`/`eth_estimateGas`
     /// request.
-    pub fn as_call_params(&self) -> Option<&CallParams<'req, N>> {
+    pub const fn as_call_params(&self) -> Option<&CallParams<'req, N>> {
         match self {
             Self::Call(params) => Some(params),
             _ => None,
@@ -137,7 +137,7 @@ where
     }
 
     /// Returns a reference to the call many parameters if this is a `"eth_callMany"` request.
-    pub fn as_call_many_params(&self) -> Option<&CallManyParams<'req>> {
+    pub const fn as_call_many_params(&self) -> Option<&CallManyParams<'req>> {
         match self {
             Self::CallMany(params) => Some(params),
             _ => None,
@@ -147,7 +147,7 @@ where
     /// Returns `true` if this is a `"eth_call"`/`"eth_estimateGas"` request.
     ///
     /// `false` indicates a `"eth_callMany"` request.
-    pub fn is_call(&self) -> bool {
+    pub const fn is_call(&self) -> bool {
         matches!(self, Self::Call(_))
     }
 }
@@ -225,13 +225,15 @@ impl<'req> CallManyParams<'req> {
 
     /// Sets the block in [`StateContext`] to use for this call.
     pub fn with_block(mut self, block: BlockId) -> Self {
-        self.context.get_or_insert_default().block_number = Some(block);
+        let context = self.context.unwrap_or_default();
+        self.context = Some(StateContext { block_number: Some(block), ..context });
         self
     }
 
     /// Sets the [`TransactionIndex`] in the [`StateContext`] for the call.
     pub fn with_transaction_index(mut self, tx_index: TransactionIndex) -> Self {
-        self.context.get_or_insert_default().transaction_index = Some(tx_index);
+        let context = self.context.unwrap_or_default();
+        self.context = Some(StateContext { transaction_index: Some(tx_index), ..context });
         self
     }
 
@@ -253,7 +255,7 @@ impl<'req> CallManyParams<'req> {
     }
 
     /// Returns a reference to the state context if set.
-    pub fn context(&self) -> Option<&StateContext> {
+    pub const fn context(&self) -> Option<&StateContext> {
         self.context.as_ref()
     }
 
