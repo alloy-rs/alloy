@@ -176,7 +176,7 @@ where
     ) -> Self {
         Self {
             caller: Arc::new(caller),
-            params: EthCallParams::new(data),
+            params: EthCallParams::call(data),
             method,
             map: std::convert::identity,
             _pd: PhantomData,
@@ -292,7 +292,7 @@ mod test {
         let overrides = StateOverride::default();
 
         // Expected: [data]
-        let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data);
+        let params: EthCallParams<'_, Ethereum> = EthCallParams::call(&data);
 
         assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), None);
@@ -304,7 +304,7 @@ mod test {
 
         // Expected: [data, block, overrides]
         let params: EthCallParams<'_, Ethereum> =
-            EthCallParams::new(&data).with_block(block).with_overrides(&overrides);
+            EthCallParams::call(&data).with_block(block).with_overrides(&overrides);
 
         assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), Some(block));
@@ -316,7 +316,7 @@ mod test {
 
         // Expected: [data, (default), overrides]
         let params: EthCallParams<'_, Ethereum> =
-            EthCallParams::new(&data).with_overrides(&overrides);
+            EthCallParams::call(&data).with_overrides(&overrides);
 
         assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), None);
@@ -327,7 +327,7 @@ mod test {
         );
 
         // Expected: [data, block]
-        let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data).with_block(block);
+        let params: EthCallParams<'_, Ethereum> = EthCallParams::call(&data).with_block(block);
 
         assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), Some(block));

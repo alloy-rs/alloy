@@ -2,6 +2,7 @@ use alloy_eips::BlockId;
 use alloy_network::Network;
 use alloy_rpc_types_eth::{
     state::StateOverride, BlockOverrides, Bundle, StateContext, TransactionIndex,
+    TransactionRequest,
 };
 use serde::ser::SerializeSeq;
 use std::borrow::Cow;
@@ -20,8 +21,17 @@ where
     N: Network,
 {
     /// Instantiates a new `EthCallParams` with the given data (transaction).
-    pub const fn new(data: &'req N::TransactionRequest) -> Self {
+    ///
+    /// This is used for `"eth_call"` and `"eth_estimateGas"` requests.
+    pub const fn call(data: &'req N::TransactionRequest) -> Self {
         Self::Call(CallParams { data: Cow::Borrowed(data), block: None, overrides: None })
+    }
+
+    /// Instantiates a new `EthCallParams` with the given transactions.
+    ///
+    /// This is used for `"eth_callMany"` requests.
+    pub fn call_many(bundle: Vec<TransactionRequest>) -> Self {
+        Self::CallMany(CallManyParams::new(bundle.into()))
     }
 
     /// Sets the block to use for this call.
