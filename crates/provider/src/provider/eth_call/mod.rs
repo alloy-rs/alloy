@@ -4,12 +4,12 @@ use alloy_network::Network;
 use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
-use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
+use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
 
 use crate::ProviderCall;
 
 mod params;
-pub use params::EthCallParams;
+pub use params::{CallParams, EthCallParams};
 
 mod caller;
 pub use caller::Caller;
@@ -232,13 +232,13 @@ where
 
     /// Set the state overrides for this call.
     pub fn overrides(mut self, overrides: &'req StateOverride) -> Self {
-        self.params.overrides = Some(Cow::Borrowed(overrides));
+        self.params = self.params.with_overrides(overrides);
         self
     }
 
     /// Set the block to use for this call.
-    pub const fn block(mut self, block: BlockId) -> Self {
-        self.params.block = Some(block);
+    pub fn block(mut self, block: BlockId) -> Self {
+        self.params = self.params.with_block(block);
         self
     }
 }
