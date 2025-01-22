@@ -25,6 +25,12 @@ where
         &self,
         params: EthCallParams<'_, N>,
     ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>>;
+
+    /// Method that needs to be implemented for using "eth_callMany".
+    fn call_many(
+        &self,
+        params: EthCallParams<'_, N>,
+    ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>>;
 }
 
 impl<N, Resp> Caller<N, Resp> for WeakClient
@@ -44,6 +50,13 @@ where
         params: EthCallParams<'_, N>,
     ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
         provider_rpc_call(self, "eth_estimateGas", params)
+    }
+
+    fn call_many(
+        &self,
+        params: EthCallParams<'_, N>,
+    ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
+        provider_rpc_call(self, "eth_callMany", params)
     }
 }
 

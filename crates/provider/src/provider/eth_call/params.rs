@@ -154,6 +154,13 @@ where
             _ => None,
         }
     }
+
+    /// Returns `true` if this is a `"eth_call"`/`"eth_estimateGas"` request.
+    ///
+    /// `false` indicates a `"eth_callMany"` request.
+    pub fn is_call(&self) -> bool {
+        matches!(self, Self::Call(_))
+    }
 }
 
 impl<N: Network> serde::Serialize for EthCallParams<'_, N> {

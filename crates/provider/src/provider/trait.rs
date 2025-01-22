@@ -20,8 +20,8 @@ use alloy_primitives::{
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
-    FilterChanges, Index, Log, SyncStatus,
+    AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, EthCallResponse,
+    FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -151,6 +151,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
+    }
+
+    /// Execute a list of transactions requests with a state context and against provided block and
+    /// state overrides, without publishing a transaction.
+    #[doc(alias = "eth_call_many")]
+    fn call_many<'req>(
+        &self,
+        transactions: &'req Vec<N::TransactionRequest>,
+    ) -> EthCall<'req, N, EthCallResponse> {
+        EthCall::call_many(self.weak_client(), transactions)
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.

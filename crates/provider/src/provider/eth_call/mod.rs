@@ -2,7 +2,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_rpc_types_eth::state::StateOverride;
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportError, TransportResult};
 use futures::FutureExt;
 use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
 
@@ -90,8 +90,26 @@ where
             unreachable!("bad state")
         };
 
-        let fut =
-            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
+        let fut = if params.is_call() {
+            if method.ne("eth_call") && method.ne("eth_estimateGas") {
+                return Poll::Ready(Err(TransportError::local_usage_str(&format!(
+                    "bad method: {method} - params provided for `eth_call`/`eth_estimateGas`"
+                ))));
+            }
+            if method.eq("eth_call") {
+                caller.call(params)
+            } else {
+                caller.estimate_gas(params)
+            }
+        } else {
+            if method.eq("eth_callMany") {
+                caller.call_many(params)
+            } else {
+                return Poll::Ready(Err(TransportError::local_usage_str(&format!(
+                    "bad method: {method} - params provided for `eth_callMany`"
+                ))));
+            }
+        }?;
 
         self.inner = EthCallFutInner::Running { map, fut };
 
@@ -183,17 +201,33 @@ where
         }
     }
 
-    /// Create a new [`EthCall`] with method set to `"eth_call"`.
+    /// Create a new [`EthCall`] with method set to `"eth_call"` with params set to [`CallParams`].
     pub fn call(caller: impl Caller<N, Resp> + 'static, data: &'req N::TransactionRequest) -> Self {
         Self::new(caller, "eth_call", data)
     }
 
-    /// Create a new [`EthCall`] with method set to `"eth_estimateGas"`.
+    /// Create a new [`EthCall`] with method set to `"eth_estimateGas"` with params set to
+    /// [`CallParams`].
     pub fn gas_estimate(
         caller: impl Caller<N, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self::new(caller, "eth_estimateGas", data)
+    }
+
+    /// Create a new [`EthCall`] with method set to `"eth_callMany"` with params set to
+    /// [`CallManyParams`].
+    pub fn call_many(
+        caller: impl Caller<N, Resp> + 'static,
+        transactions: &'req Vec<N::TransactionRequest>,
+    ) -> Self {
+        Self {
+            caller: Arc::new(caller),
+            params: EthCallParams::call_many(transactions),
+            method: "eth_callMany",
+            map: std::convert::identity,
+            _pd: PhantomData,
+        }
     }
 }
 
