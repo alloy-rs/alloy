@@ -2,7 +2,7 @@ use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
-use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, StateContext, TransactionIndex};
+use alloy_rpc_types_eth::{state::StateOverride, Bundle, StateContext, TransactionIndex};
 use alloy_transport::{TransportError, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
@@ -217,13 +217,10 @@ where
 
     /// Create a new [`EthCall`] with method set to `"eth_callMany"` with params set to
     /// [`CallManyParams`].
-    pub fn call_many(
-        caller: impl Caller<N, Resp> + 'static,
-        transactions: &'req Vec<N::TransactionRequest>,
-    ) -> Self {
+    pub fn call_many(caller: impl Caller<N, Resp> + 'static, bundles: &'req Vec<Bundle>) -> Self {
         Self {
             caller: Arc::new(caller),
-            params: EthCallParams::call_many(transactions),
+            params: EthCallParams::call_many(bundles),
             method: "eth_callMany",
             map: std::convert::identity,
             _pd: PhantomData,
@@ -284,12 +281,6 @@ where
         self
     }
 
-    /// Set the block overrides for an `eth_callMany` request.
-    pub fn block_overrides(mut self, block_overrides: BlockOverrides) -> Self {
-        self.params = self.params.with_block_overrides(block_overrides);
-        self
-    }
-
     /// Set the state context for an `eth_callMany` request.
     pub fn context(mut self, state_context: StateContext) -> Self {
         self.params = self.params.with_context(state_context);
@@ -341,7 +332,7 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
 
             let mut seq = serializer.serialize_seq(Some(len))?;
 
-            seq.serialize_element(&self.bundle())?;
+            seq.serialize_element(&self.bundles())?;
 
             if let Some(context) = self.context() {
                 seq.serialize_element(context)?;
