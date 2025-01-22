@@ -96,6 +96,7 @@ arbitrary = [
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
+    "alloy-eip2124/arbitrary",
     "alloy-eip2930/arbitrary",
     "alloy-eip7702/arbitrary",
     "alloy-eip7702/k256",
