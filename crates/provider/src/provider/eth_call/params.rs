@@ -25,7 +25,7 @@ where
     ///
     /// This is used for `"eth_call"` and `"eth_estimateGas"` requests.
     pub const fn call(data: &'req N::TransactionRequest) -> Self {
-        Self::Call(CallParams { data: Cow::Borrowed(data), block: None, overrides: None })
+        Self::Call(CallParams::new(data))
     }
 
     /// Instantiates a new `EthCallParams` with the given transactions.
