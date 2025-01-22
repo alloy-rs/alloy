@@ -284,7 +284,7 @@ impl Anvil {
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stdout = child.stdout.take().ok_or(NodeError::NoStderr)?;
+        let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
@@ -333,6 +333,8 @@ impl Anvil {
                 };
             }
         }
+
+        child.stdout = Some(reader.into_inner());
 
         Ok(AnvilInstance {
             child,
