@@ -3,7 +3,12 @@ use alloy_network::Network;
 use alloy_rpc_types_eth::{state::StateOverride, Bundle, StateContext, TransactionIndex};
 use std::borrow::Cow;
 
-/// The parameters for an `"eth_call"` RPC request.
+/// The enum with variants representing the parameters for `"eth_call"`, `"eth_estimateGas"`, and
+/// `"eth_callMany"` RPC requests.
+///
+/// [`EthCallParams::Call`] is used for `"eth_call"` and `"eth_estimateGas"` requests.
+///
+/// [`EthCallParams::CallMany`] is used for `"eth_callMany"` requests.
 #[derive(Clone, Debug)]
 pub enum EthCallParams<'req, N: Network> {
     /// Parameters used for `"eth_call"` and `"eth_estimateGas"` RPC requests.
