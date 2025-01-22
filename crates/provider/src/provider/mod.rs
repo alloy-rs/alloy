@@ -1,5 +1,5 @@
 mod eth_call;
-pub use eth_call::{CallParams, EthCall, EthCallParams};
+pub use eth_call::{CallManyParams, CallParams, EthCall, EthCallParams};
 
 mod prov_call;
 pub use prov_call::ProviderCall;

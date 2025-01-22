@@ -1,14 +1,18 @@
 use alloy_eips::BlockId;
 use alloy_network::Network;
-use alloy_rpc_types_eth::state::StateOverride;
+use alloy_rpc_types_eth::{
+    state::StateOverride, BlockOverrides, Bundle, StateContext, TransactionIndex,
+};
 use serde::ser::SerializeSeq;
 use std::borrow::Cow;
 
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
 pub enum EthCallParams<'req, N: Network> {
-    /// Parameters used for "eth_call" and "eth_estimateGas" RPC requests.
+    /// Parameters used for `"eth_call"` and `"eth_estimateGas"` RPC requests.
     Call(CallParams<'req, N>),
+    /// Parameters used for `"eth_callMany"` RPC requests.
+    CallMany(CallManyParams),
 }
 
 impl<'req, N> EthCallParams<'req, N>
@@ -21,11 +25,31 @@ where
     }
 
     /// Sets the block to use for this call.
+    ///
+    /// In case of `"eth_callMany"` requests, this sets the block in the [`StateContext`].
     pub fn with_block(self, block: BlockId) -> Self {
         match self {
             Self::Call(mut params) => {
                 params.block = Some(block);
                 Self::Call(params)
+            }
+            Self::CallMany(mut params) => {
+                params = params.with_block(block);
+                Self::CallMany(params)
+            }
+        }
+    }
+
+    /// Sets the [`TransactionIndex`] in the [`StateContext`] for the call.
+    ///
+    /// This is only applicable for `"eth_callMany"` requests, and will be ignored for
+    /// `"eth_call"`/`"eth_estimateGas"` requests.
+    pub fn with_transaction_index(self, tx_index: TransactionIndex) -> Self {
+        match self {
+            Self::Call(params) => Self::Call(params),
+            Self::CallMany(mut params) => {
+                params = params.with_transaction_index(tx_index);
+                Self::CallMany(params)
             }
         }
     }
@@ -37,6 +61,37 @@ where
                 params.overrides = Some(Cow::Borrowed(overrides));
                 Self::Call(params)
             }
+            Self::CallMany(mut params) => {
+                params.overrides = Some(overrides.clone());
+                Self::CallMany(params)
+            }
+        }
+    }
+
+    /// Set the [`BlockOverrides`] for the [`Bundle`] in case of `"eth_callMany"` requests.
+    ///
+    /// This will be ignored for `"eth_call"`/`"eth_estimateGas"` requests.
+    pub fn with_block_overrides(self, block_override: BlockOverrides) -> Self {
+        match self {
+            Self::Call(params) => Self::Call(params),
+            Self::CallMany(mut params) => {
+                params = params.with_block_overrides(block_override);
+                Self::CallMany(params)
+            }
+        }
+    }
+
+    /// Sets the state context for the call.
+    ///
+    /// This is only applicable for `"eth_callMany"` requests, and will be ignored for
+    /// `"eth_call"`/`"eth_estimateGas"` requests.
+    pub fn with_context(self, context: StateContext) -> Self {
+        match self {
+            Self::Call(params) => Self::Call(params),
+            Self::CallMany(mut params) => {
+                params.context = Some(context);
+                Self::CallMany(params)
+            }
         }
     }
 
@@ -44,20 +99,24 @@ where
     pub fn overrides(&self) -> Option<&StateOverride> {
         match self {
             Self::Call(params) => params.overrides(),
+            Self::CallMany(params) => params.overrides(),
         }
     }
 
-    /// Returns a reference to the transaction data.
-    pub fn data(&self) -> &N::TransactionRequest {
-        match self {
-            Self::Call(params) => params.data(),
-        }
+    /// Returns a reference to the transaction data if this is a `"eth_call"`/`eth_estimateGas`.
+    pub fn data(&self) -> Option<&N::TransactionRequest> {
+        self.as_call_params().map(|p| p.data())
     }
 
+    /// Returns a reference to the bundle if this is a `"eth_callMany"` request.
+    pub fn bundle(&self) -> Option<&Bundle> {
+        self.as_call_many_params().map(|p| p.bundle())
+    }
     /// Returns the block.
     pub const fn block(&self) -> Option<BlockId> {
         match self {
             Self::Call(params) => params.block(),
+            Self::CallMany(_params) => todo!(),
         }
     }
 
@@ -65,6 +124,24 @@ where
     pub fn into_owned(self) -> EthCallParams<'static, N> {
         match self {
             Self::Call(params) => EthCallParams::Call(params.into_owned()),
+            Self::CallMany(params) => EthCallParams::CallMany(params.clone()),
+        }
+    }
+
+    /// Returns a reference to the call parameters if this is a `"eth_call"`/`eth_estimateGas`
+    /// request.
+    pub fn as_call_params(&self) -> Option<&CallParams<'req, N>> {
+        match self {
+            Self::Call(params) => Some(params),
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the call many parameters if this is a `"eth_callMany"` request.
+    pub fn as_call_many_params(&self) -> Option<&CallManyParams> {
+        match self {
+            Self::CallMany(params) => Some(params),
+            _ => None,
         }
     }
 }
@@ -87,7 +164,7 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
     }
 }
 
-/// The parameters for an `"eth_call"` RPC request.
+/// The parameters for an `"eth_call"` and `"eth_estimateGas"` RPC request.
 #[derive(Clone, Debug)]
 pub struct CallParams<'req, N: Network> {
     data: Cow<'req, N::TransactionRequest>,
@@ -138,5 +215,68 @@ where
             block: self.block,
             overrides: self.overrides.map(|o| Cow::Owned(o.into_owned())),
         }
+    }
+}
+
+/// The parameters for an `"eth_callMany"` RPC request.
+#[derive(Clone, Debug)]
+pub struct CallManyParams {
+    /// The bundle of transactions to execute.
+    bundle: Bundle,
+    /// The state context for the call.
+    context: Option<StateContext>,
+    /// State overrides for the call.
+    overrides: Option<StateOverride>,
+}
+
+impl CallManyParams {
+    /// Instantiates a new `CallManyParams` with the given bundle.
+    pub const fn new(bundle: Bundle) -> Self {
+        Self { bundle, context: None, overrides: None }
+    }
+
+    /// Sets the block in [`StateContext`] to use for this call.
+    pub fn with_block(mut self, block: BlockId) -> Self {
+        self.context.get_or_insert_default().block_number = Some(block);
+        self
+    }
+
+    /// Sets the [`TransactionIndex`] in the [`StateContext`] for the call.
+    pub fn with_transaction_index(mut self, tx_index: TransactionIndex) -> Self {
+        self.context.get_or_insert_default().transaction_index = Some(tx_index);
+        self
+    }
+
+    /// Sets the state context for the call.
+    pub const fn with_context(mut self, context: StateContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// Sets the state overrides for the call.
+    pub fn with_overrides(mut self, overrides: StateOverride) -> Self {
+        self.overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the [`BlockOverrides`] for the [`Bundle`].
+    pub fn with_block_overrides(mut self, block_override: BlockOverrides) -> Self {
+        self.bundle.block_override = Some(block_override);
+        self
+    }
+
+    /// Returns a reference to the bundle.
+    pub fn bundle(&self) -> &Bundle {
+        &self.bundle
+    }
+
+    /// Returns a reference to the state context if set.
+    pub fn context(&self) -> Option<&StateContext> {
+        self.context.as_ref()
+    }
+
+    /// Returns a reference to the state overrides if set.
+    pub fn overrides(&self) -> Option<&StateOverride> {
+        self.overrides.as_ref()
     }
 }

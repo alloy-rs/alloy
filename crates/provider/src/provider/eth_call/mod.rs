@@ -9,7 +9,7 @@ use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
 use crate::ProviderCall;
 
 mod params;
-pub use params::{CallParams, EthCallParams};
+pub use params::{CallManyParams, CallParams, EthCallParams};
 
 mod caller;
 pub use caller::Caller;
@@ -294,7 +294,7 @@ mod test {
         // Expected: [data]
         let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data);
 
-        assert_eq!(params.data(), &data);
+        assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), None);
         assert_eq!(params.overrides(), None);
         assert_eq!(
@@ -306,7 +306,7 @@ mod test {
         let params: EthCallParams<'_, Ethereum> =
             EthCallParams::new(&data).with_block(block).with_overrides(&overrides);
 
-        assert_eq!(params.data(), &data);
+        assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), Some(block));
         assert_eq!(params.overrides(), Some(&overrides));
         assert_eq!(
@@ -318,7 +318,7 @@ mod test {
         let params: EthCallParams<'_, Ethereum> =
             EthCallParams::new(&data).with_overrides(&overrides);
 
-        assert_eq!(params.data(), &data);
+        assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), None);
         assert_eq!(params.overrides(), Some(&overrides));
         assert_eq!(
@@ -329,7 +329,7 @@ mod test {
         // Expected: [data, block]
         let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data).with_block(block);
 
-        assert_eq!(params.data(), &data);
+        assert_eq!(params.data().unwrap(), &data);
         assert_eq!(params.block(), Some(block));
         assert_eq!(params.overrides(), None);
         assert_eq!(
