@@ -9,7 +9,10 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Pol
 use crate::ProviderCall;
 
 mod params;
-pub use params::EthCallParams;
+pub use params::{EthCallManyParams, EthCallParams};
+
+mod call_many;
+pub use call_many::EthCallMany;
 
 mod caller;
 pub use caller::Caller;

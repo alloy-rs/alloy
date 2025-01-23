@@ -1,5 +1,5 @@
 mod eth_call;
-pub use eth_call::{EthCall, EthCallParams};
+pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
 mod prov_call;
 pub use prov_call::ProviderCall;
@@ -18,5 +18,3 @@ pub use wallet::WalletProvider;
 
 mod with_block;
 pub use with_block::{ParamsWithBlock, RpcWithBlock};
-
-pub use eth_call::Caller;

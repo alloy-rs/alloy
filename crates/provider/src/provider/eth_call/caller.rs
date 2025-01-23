@@ -1,4 +1,4 @@
-use super::EthCallParams;
+use super::{EthCallManyParams, EthCallParams};
 use crate::ProviderCall;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
@@ -25,6 +25,12 @@ where
         &self,
         params: EthCallParams<'_, N>,
     ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>>;
+
+    /// Method that needs to be implemented for `"eth_callMany"` RPC requests.
+    fn call_many(
+        &self,
+        params: EthCallManyParams<'_>,
+    ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, Resp>>;
 }
 
 impl<N, Resp> Caller<N, Resp> for WeakClient
@@ -44,6 +50,17 @@ where
         params: EthCallParams<'_, N>,
     ) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
         provider_rpc_call(self, "eth_estimateGas", params)
+    }
+
+    fn call_many(
+        &self,
+        params: EthCallManyParams<'_>,
+    ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, Resp>> {
+        let client = self.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
+
+        let rpc_call = client.request("eth_callMany", params.into_owned());
+
+        Ok(ProviderCall::RpcCall(rpc_call))
     }
 }
 

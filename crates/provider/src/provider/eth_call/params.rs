@@ -1,6 +1,6 @@
 use alloy_eips::BlockId;
 use alloy_network::Network;
-use alloy_rpc_types_eth::state::StateOverride;
+use alloy_rpc_types_eth::{state::StateOverride, Bundle, StateContext, TransactionIndex};
 use serde::ser::SerializeSeq;
 use std::borrow::Cow;
 
@@ -73,5 +73,72 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
         }
 
         seq.end()
+    }
+}
+
+/// The builder type for an `"eth_callMany"` RPC request.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct EthCallManyParams<'req> {
+    bundles: Cow<'req, Vec<Bundle>>,
+    context: Option<StateContext>,
+    overrides: Option<Cow<'req, StateOverride>>,
+}
+
+impl<'req> EthCallManyParams<'req> {
+    /// Instantiates a new `EthCallManyParams` with the given bundles.
+    pub const fn new(bundles: &'req Vec<Bundle>) -> Self {
+        Self { bundles: Cow::Borrowed(bundles), context: None, overrides: None }
+    }
+
+    /// Sets the block in the [`StateContext`] for this call.
+    pub fn with_block(mut self, block: BlockId) -> Self {
+        let mut context = self.context.unwrap_or_default();
+        context.block_number = Some(block);
+        self.context = Some(context);
+        self
+    }
+
+    /// Sets the transaction index in the [`StateContext`] for this call.
+    pub fn with_transaction_index(mut self, tx_index: TransactionIndex) -> Self {
+        let mut context = self.context.unwrap_or_default();
+        context.transaction_index = Some(tx_index);
+        self.context = Some(context);
+        self
+    }
+
+    /// Sets the state context for this call.
+    pub fn with_context(mut self, context: StateContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// Sets the state overrides for this call.
+    pub fn with_overrides(mut self, overrides: &'req StateOverride) -> Self {
+        self.overrides = Some(Cow::Borrowed(overrides));
+        self
+    }
+
+    /// Returns a reference to the state context if set.
+    pub fn context(&self) -> Option<&StateContext> {
+        self.context.as_ref()
+    }
+
+    /// Returns a reference to the bundles.
+    pub fn bundles(&self) -> &[Bundle] {
+        &self.bundles
+    }
+
+    /// Returns a reference to the state overrides if set.
+    pub fn overrides(&self) -> Option<&StateOverride> {
+        self.overrides.as_deref()
+    }
+
+    /// Clones the bundles, context, and overrides into owned data.
+    pub fn into_owned(self) -> EthCallManyParams<'static> {
+        EthCallManyParams {
+            bundles: Cow::Owned(self.bundles.into_owned()),
+            context: self.context.clone(),
+            overrides: self.overrides.map(|o| Cow::Owned(o.into_owned())),
+        }
     }
 }
