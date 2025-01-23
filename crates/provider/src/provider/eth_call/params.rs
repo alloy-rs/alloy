@@ -107,7 +107,7 @@ impl<'req> EthCallManyParams<'req> {
     }
 
     /// Sets the state context for this call.
-    pub fn with_context(mut self, context: StateContext) -> Self {
+    pub const fn with_context(mut self, context: StateContext) -> Self {
         self.context = Some(context);
         self
     }
@@ -119,7 +119,7 @@ impl<'req> EthCallManyParams<'req> {
     }
 
     /// Returns a reference to the state context if set.
-    pub fn context(&self) -> Option<&StateContext> {
+    pub const fn context(&self) -> Option<&StateContext> {
         self.context.as_ref()
     }
 
@@ -137,7 +137,7 @@ impl<'req> EthCallManyParams<'req> {
     pub fn into_owned(self) -> EthCallManyParams<'static> {
         EthCallManyParams {
             bundles: Cow::Owned(self.bundles.into_owned()),
-            context: self.context.clone(),
+            context: self.context,
             overrides: self.overrides.map(|o| Cow::Owned(o.into_owned())),
         }
     }

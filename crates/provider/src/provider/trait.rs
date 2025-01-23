@@ -158,8 +158,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Execute a list of [`Bundle`] against the provided [`StateContext`] and [`StateOverride`],
     /// without publishing a transaction.
     ///
-    /// This function returns [`EthCallMany`] which is used to execute the call, and also set the
-    /// [`StateContext`] and [`StateOverride`].
+    /// This function returns [`EthCallMany`] builder which is used to execute the call, and also
+    /// set the [`StateContext`] and [`StateOverride`].
+    ///
+    /// [`StateContext`]: alloy_rpc_types_eth::StateContext
+    /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     #[doc(alias = "eth_callMany")]
     fn call_many<'req>(
         &self,
