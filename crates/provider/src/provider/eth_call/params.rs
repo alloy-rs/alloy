@@ -77,7 +77,7 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
 }
 
 /// The builder type for an `"eth_callMany"` RPC request.
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug)]
 pub struct EthCallManyParams<'req> {
     bundles: Cow<'req, Vec<Bundle>>,
     context: Option<StateContext>,
@@ -140,5 +140,24 @@ impl<'req> EthCallManyParams<'req> {
             context: self.context.clone(),
             overrides: self.overrides.map(|o| Cow::Owned(o.into_owned())),
         }
+    }
+}
+
+impl serde::Serialize for EthCallManyParams<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let len = if self.overrides().is_some() { 3 } else { 2 };
+
+        let mut seq = serializer.serialize_seq(Some(len))?;
+        seq.serialize_element(&self.bundles())?;
+
+        if let Some(context) = self.context() {
+            seq.serialize_element(context)?;
+        }
+
+        if let Some(overrides) = self.overrides() {
+            seq.serialize_element(overrides)?;
+        }
+
+        seq.end()
     }
 }

@@ -20,12 +20,14 @@ use alloy_primitives::{
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
-    FilterChanges, Index, Log, SyncStatus,
+    AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
+    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
+
+use super::EthCallMany;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -151,6 +153,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
+    }
+
+    /// Execute a list of [`Bundle`] against the provided [`StateContext`] and [`StateOverride`],
+    /// without publishing a transaction.
+    ///
+    /// This function returns [`EthCallMany`] which is used to execute the call, and also set the
+    /// [`StateContext`] and [`StateOverride`].
+    #[doc(alias = "eth_callMany")]
+    fn call_many<'req>(
+        &self,
+        bundles: &'req Vec<Bundle>,
+    ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
+        EthCallMany::new(self.weak_client(), bundles)
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.
@@ -1826,6 +1841,62 @@ mod tests {
 
         let result = provider.call(&req).block(0.into()).await.unwrap();
         assert_eq!(result.to_string(), "0x");
+    }
+
+    #[tokio::test]
+    async fn call_many_mainnet() {
+        use alloy_rpc_types_eth::{BlockOverrides, StateContext};
+
+        let url = "https://docs-demo.quiknode.pro/";
+        let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
+        let tx1 = TransactionRequest::default()
+            .with_to(address!("6b175474e89094c44da98b954eedeac495271d0f"))
+            .with_gas_limit(1000000)
+            .with_gas_price(2023155498)
+            .with_input(hex!("a9059cbb000000000000000000000000bc0E63965946815d105E7591407704e6e1964E590000000000000000000000000000000000000000000000000000000005f5e100"));
+        let tx2 = TransactionRequest::default()
+            .with_to(address!("833589fcd6edb6e08f4c7c32d4f71b54bda02913"))
+            .with_gas_price(2023155498)
+            .with_input(hex!(
+                "70a08231000000000000000000000000bc0E63965946815d105E7591407704e6e1964E59"
+            ));
+
+        let transactions = vec![tx1.clone(), tx2.clone()];
+
+        let block_override =
+            BlockOverrides { number: Some(U256::from(12279785)), ..Default::default() };
+
+        let bundles = vec![Bundle { transactions, block_override: Some(block_override.clone()) }];
+
+        let context = StateContext {
+            block_number: Some(BlockId::number(12279785)),
+            transaction_index: Some(1.into()),
+        };
+
+        let results = provider.call_many(&bundles).context(&context).await.unwrap();
+
+        let tx1_res = EthCallResponse {
+            value: Some(
+                hex!("0000000000000000000000000000000000000000000000000000000000000001").into(),
+            ),
+            error: None,
+        };
+        let tx2_res = EthCallResponse { value: Some(Bytes::new()), error: None };
+        let expected = vec![vec![tx1_res.clone(), tx2_res.clone()]];
+
+        assert_eq!(results, expected);
+
+        // Two bundles
+        let bundles = vec![
+            Bundle { transactions: vec![tx1], block_override: Some(block_override.clone()) },
+            Bundle { transactions: vec![tx2], block_override: Some(block_override.clone()) },
+        ];
+
+        let results = provider.call_many(&bundles).context(&context).await.unwrap();
+
+        let expected = vec![vec![tx1_res.clone()], vec![tx2_res.clone()]];
+
+        assert_eq!(results, expected);
     }
 
     #[tokio::test]
