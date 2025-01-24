@@ -95,6 +95,12 @@ where
         self.params = self.params.with_overrides(overrides);
         self
     }
+
+    /// Extend the bundles for the call.
+    pub fn extend_bundles(mut self, bundles: &'req Vec<Bundle>) -> Self {
+        self.params.bundles_mut().extend_from_slice(bundles);
+        self
+    }
 }
 
 impl<'req, N, Resp, Output, Map> std::future::IntoFuture for EthCallMany<'req, N, Resp, Output, Map>

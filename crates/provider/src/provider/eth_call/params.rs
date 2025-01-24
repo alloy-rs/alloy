@@ -76,7 +76,7 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
     }
 }
 
-/// The builder type for an `"eth_callMany"` RPC request.
+/// The parameters for an `"eth_callMany"` RPC request.
 #[derive(Clone, Debug)]
 pub struct EthCallManyParams<'req> {
     bundles: Cow<'req, Vec<Bundle>>,
@@ -126,6 +126,11 @@ impl<'req> EthCallManyParams<'req> {
     /// Returns a reference to the bundles.
     pub fn bundles(&self) -> &[Bundle] {
         &self.bundles
+    }
+
+    /// Returns a mutable reference to the bundles.
+    pub fn bundles_mut(&mut self) -> &mut Vec<Bundle> {
+        Cow::to_mut(&mut self.bundles)
     }
 
     /// Returns a reference to the state overrides if set.

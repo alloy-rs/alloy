@@ -1891,14 +1891,26 @@ mod tests {
 
         // Two bundles
         let bundles = vec![
-            Bundle { transactions: vec![tx1], block_override: Some(block_override.clone()) },
-            Bundle { transactions: vec![tx2], block_override: Some(block_override.clone()) },
+            Bundle {
+                transactions: vec![tx1.clone()],
+                block_override: Some(block_override.clone()),
+            },
+            Bundle {
+                transactions: vec![tx2.clone()],
+                block_override: Some(block_override.clone()),
+            },
         ];
 
         let results = provider.call_many(&bundles).context(&context).await.unwrap();
-
         let expected = vec![vec![tx1_res.clone()], vec![tx2_res.clone()]];
+        assert_eq!(results, expected);
 
+        // Two bundles by extending existing.
+        let b1 =
+            vec![Bundle { transactions: vec![tx1], block_override: Some(block_override.clone()) }];
+        let b2 = vec![Bundle { transactions: vec![tx2], block_override: Some(block_override) }];
+
+        let results = provider.call_many(&b1).context(&context).extend_bundles(&b2).await.unwrap();
         assert_eq!(results, expected);
     }
 
