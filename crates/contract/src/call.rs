@@ -7,11 +7,7 @@ use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
-use std::{
-    future::{Future, IntoFuture},
-    marker::PhantomData,
-    pin::Pin,
-};
+use std::{self, marker::PhantomData};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -522,36 +518,6 @@ impl<T, P: Clone, D, N: Network> CallBuilder<T, &P, D, N> {
     }
 }
 
-/// [`CallBuilder`] can be turned into a [`Future`] automatically with `.await`.
-///
-/// Defaults to calling [`CallBuilder::call`].
-///
-/// # Note
-///
-/// This requires `Self: 'static` due to a current limitation in the Rust type system, namely that
-/// the associated future type, the returned future, must be a concrete type (`Box<dyn Future ...>`)
-/// and cannot be an opaque type (`impl Future ...`) because `impl Trait` in this position is not
-/// stable yet. See [rust-lang/rust#63063](https://github.com/rust-lang/rust/issues/63063).
-impl<T, P, D, N> IntoFuture for CallBuilder<T, P, D, N>
-where
-    T: Send + Sync,
-    P: Provider<N>,
-    D: CallDecoder + Send + Sync + Unpin,
-    N: Network,
-    Self: 'static,
-{
-    type Output = Result<D::CallOutput>;
-    #[cfg(target_arch = "wasm32")]
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output>>>;
-    #[cfg(not(target_arch = "wasm32"))]
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send>>;
-
-    #[inline]
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(async move { self.call().await })
-    }
-}
-
 impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, N> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -572,6 +538,7 @@ mod tests {
     use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
+    use futures::Future;
 
     #[test]
     fn empty_constructor() {
