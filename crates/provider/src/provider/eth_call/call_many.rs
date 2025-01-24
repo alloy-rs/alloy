@@ -97,7 +97,7 @@ where
     }
 
     /// Extend the bundles for the call.
-    pub fn extend_bundles(mut self, bundles: &'req Vec<Bundle>) -> Self {
+    pub fn extend_bundles(mut self, bundles: &'req [Bundle]) -> Self {
         self.params.bundles_mut().extend_from_slice(bundles);
         self
     }
