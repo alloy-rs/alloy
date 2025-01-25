@@ -460,9 +460,6 @@ mod tests {
                     write.write_all(b"\n").await?;
                     write.flush().await?;
 
-                    // Add small random delay to test concurrency
-                    tokio::time::sleep(Duration::from_millis(fastrand::u64(10..50))).await;
-
                     // Read response
                     if let Some(response) = reader.next().await {
                         responses.push(response);
