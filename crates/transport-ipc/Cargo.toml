@@ -38,10 +38,11 @@ serde.workspace = true
 bytes = "1.5.0"
 interprocess = { version = "2", features = ["tokio"] }
 tempfile = { workspace = true, optional = true }
+parking_lot = { workspace = true, default-features = false, optional = true }
 
 [dev-dependencies]
 tokio-test.workspace = true
 
 [features]
 default = []
-mock = ["dep:tempfile"]
+mock = ["dep:tempfile", "dep:parking_lot"]
