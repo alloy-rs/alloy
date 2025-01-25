@@ -401,6 +401,7 @@ mod test {
     #[test]
     fn custom_error_decoding() {
         sol!(
+            #[sol(rpc = false)]
             library Errors {
                 error SomeCustomError(uint256 a);
             }

@@ -77,7 +77,13 @@ std = [
 ]
 
 # essential features that enable basic network interactions out of the box.
-essentials = ["contract", "provider-http", "rpc-types", "signer-local"]
+essentials = [
+    "contract",
+    "provider-http",
+    "rpc-types",
+    "signer-local",
+    "alloy-core/rpc", # Enables rpc codegen in the sol! macro
+]
 
 # full
 full = [
