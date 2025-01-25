@@ -4,11 +4,10 @@
 
 use alloy_json_rpc::Response;
 use serde::Serialize;
-use serde_json::Value;
-use std::{collections::VecDeque, sync::Arc};
+use serde_json::{json, Value};
+use std::{collections::VecDeque, path::PathBuf, sync::Arc};
 use tempfile::NamedTempFile;
 use tokio::{
-    fs,
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixListener,
     sync::{oneshot, Mutex},
@@ -125,11 +124,7 @@ impl MockIpcServer {
     pub fn new() -> Self {
         let temp_file = Arc::new(NamedTempFile::new().expect("Failed to create temp file"));
         let path = temp_file.path();
-
-        // Clean up any existing socket file at this path
-        if path.exists() {
-            let _ = fs::remove_file(path);
-        }
+        debug!(?path, "Created new mock IPC server");
 
         Self {
             replies: Arc::new(Mutex::new(VecDeque::new())),
@@ -238,13 +233,22 @@ impl MockIpcServer {
     /// Start the mock IPC server.
     /// Returns a handle that can be used to control the server.
     /// The server will run until shutdown is triggered via the handle.
-    pub async fn spawn(self) -> eyre::Result<MockIpcHandle> {
+    pub async fn spawn(self) -> Result<MockIpcHandle, std::io::Error> {
         let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
         *self.shutdown.lock().await = Some(shutdown_tx);
         let handle = self.handle();
 
         let socket_path = self.temp_file.path().to_owned();
-        let listener = UnixListener::bind(&socket_path)?;
+        let listener = match UnixListener::bind(&socket_path) {
+            Ok(l) => l,
+            Err(e) => {
+                error!(?e, "Failed to bind Unix socket");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Failed to bind Unix socket",
+                ));
+            }
+        };
 
         let task_handle = handle.clone();
 
