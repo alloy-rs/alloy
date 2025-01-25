@@ -35,4 +35,9 @@ rand.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-consensus/std",
+	"alloy-eips/std",
+	"alloy-serde/std"
+]
