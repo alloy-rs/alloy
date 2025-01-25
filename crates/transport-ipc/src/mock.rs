@@ -52,14 +52,19 @@
 
 use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
 
-use futures::StreamExt;
+use futures::stream::{FuturesUnordered, StreamExt};
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{json, Value};
 use tempfile::NamedTempFile;
-use tokio::{io::AsyncWriteExt, sync::oneshot};
+use tokio::{
+    io::AsyncWriteExt,
+    sync::{mpsc, oneshot},
+};
 
 use alloy_json_rpc::Response;
+
+use crate::ReadJsonStream;
 
 /// Represents the shared state between the IPC server and its handles.
 /// This state includes:
@@ -217,41 +222,86 @@ impl MockIpcServer {
         stream: tokio::net::UnixStream,
         inner: Arc<Inner>,
     ) -> std::io::Result<()> {
-        use crate::ReadJsonStream;
-
         let (read, mut writer) = stream.into_split();
         let mut reader = ReadJsonStream::new(read);
 
+        // Channel for sending responses back to the writer
+        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(32);
+
+        // Collection of in-flight request handlers
+        let mut request_handlers = FuturesUnordered::new();
+
         debug!("Starting connection handler loop");
-        while let Some(request) = reader.next().await {
-            if let Ok(request) = serde_json::from_value::<Value>(request) {
-                debug!(
-                    id = ?request.get("id"),
-                    method = ?request.get("method"),
-                    "Received JSON-RPC request"
-                );
+        loop {
+            tokio::select! {
+                // Handle incoming requests
+                maybe_request = reader.next() => {
+                    match maybe_request {
+                        Some(request) => {
+                            if let Ok(request) = serde_json::from_value::<Value>(request) {
+                                debug!(
+                                    id = ?request.get("id"),
+                                    method = ?request.get("method"),
+                                    "Received JSON-RPC request"
+                                );
 
-                // Get the next queued response or generate an error
-                let response = if let Some(response) = inner.replies.lock().pop_front() {
-                    trace!(response_len = response.len(), "Using queued response");
-                    response
-                } else {
-                    warn!("No queued response available for request");
-                    serde_json::to_vec(&json!({
-                        "jsonrpc": "2.0",
-                        "id": request.get("id"),
-                        "error": {
-                            "code": -32603,
-                            "message": "No response queued"
+                                // Clone what we need for the task
+                                let inner = inner.clone();
+                                let tx = tx.clone();
+
+                                // Spawn a new task to handle this request
+                                request_handlers.push(tokio::spawn(async move {
+                                    // Get the next queued response or generate an error
+                                    let response = inner.replies.lock().pop_front().map_or_else(|| {
+                                        warn!("No queued response available for request");
+                                        serde_json::to_vec(&json!({
+                                            "jsonrpc": "2.0",
+                                            "id": request.get("id"),
+                                            "error": {
+                                                "code": -32603,
+                                                "message": "No response queued"
+                                            }
+                                        })).expect("JSON serialization cannot fail")
+                                    }, |response| {
+                                        trace!(response_len = response.len(), "Using queued response");
+                                        response
+                                    });
+
+                                    // Send response back to writer
+                                    if tx.send(response).await.is_err() {
+                                        warn!("Failed to send response - connection likely closed");
+                                    }
+                                }));
+                            }
                         }
-                    }))?
-                };
+                        None => {
+                            debug!("Reader stream ended");
+                            break;
+                        }
+                    }
+                }
 
-                // Send the response
-                writer.write_all(&response).await?;
-                writer.write_all(b"\n").await?;
-                writer.flush().await?;
-                debug!("Response sent successfully");
+                // Clean up completed request handlers
+                Some(result) = request_handlers.next() => {
+                    if let Err(e) = result {
+                        error!(?e, "Request handler task failed");
+                    }
+                }
+
+                // Write responses
+                Some(response) = rx.recv() => {
+                    writer.write_all(&response).await?;
+                    writer.write_all(b"\n").await?;
+                    writer.flush().await?;
+                    debug!("Response sent successfully");
+                }
+            }
+        }
+
+        // Wait for all in-flight request handlers to complete
+        while let Some(result) = request_handlers.next().await {
+            if let Err(e) = result {
+                error!(?e, "Request handler task failed during shutdown");
             }
         }
 
@@ -322,7 +372,7 @@ impl MockIpcServer {
 
 #[cfg(test)]
 mod tests {
-    use tokio::net::UnixStream;
+    use tokio::{net::UnixStream, task::JoinSet, time::Duration};
 
     use super::*;
 
@@ -355,6 +405,90 @@ mod tests {
         let mut reader = crate::ReadJsonStream::new(stream);
         let response: Value = reader.next().await.unwrap();
         assert_eq!(response["result"], "0x123");
+
+        handle.shutdown();
+        Ok(())
+    }
+
+    /// Test concurrent request handling:
+    /// 1. Multiple simultaneous client connections
+    /// 2. Multiple requests per connection
+    /// 3. Verify responses are received correctly
+    /// 4. Verify response ordering within each connection
+    #[tokio::test]
+    async fn test_concurrent_requests() -> std::io::Result<()> {
+        let server = MockIpcServer::new();
+        let path = server.path();
+        let handle = server.spawn().await?;
+
+        // Queue multiple responses
+        for i in 0..10 {
+            handle
+                .add_reply(json!({
+                    "jsonrpc": "2.0",
+                    "id": i,
+                    "result": format!("0x{:x}", i * 100)
+                }))
+                .unwrap();
+        }
+
+        // Create multiple client connections
+        let mut tasks = JoinSet::new();
+
+        // Spawn 3 concurrent clients
+        for client_id in 0..3 {
+            let path = path.clone();
+            tasks.spawn(async move {
+                // Connect to server and split stream
+                let stream = UnixStream::connect(path).await?;
+                let (read, mut write) = stream.into_split();
+                let mut reader = crate::ReadJsonStream::new(read);
+                let mut responses = Vec::new();
+
+                // Send multiple requests with slight delays to test interleaving
+                for i in 0..3 {
+                    let request_id = client_id * 3 + i;
+                    let request = json!({
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "method": "eth_getBalance",
+                        "params": [format!("0x{:x}", request_id)]
+                    });
+
+                    // Write request
+                    write.write_all(&serde_json::to_vec(&request)?).await?;
+                    write.write_all(b"\n").await?;
+                    write.flush().await?;
+
+                    // Add small random delay to test concurrency
+                    tokio::time::sleep(Duration::from_millis(fastrand::u64(10..50))).await;
+
+                    // Read response
+                    if let Some(response) = reader.next().await {
+                        responses.push(response);
+                    }
+                }
+
+                Ok::<Vec<Value>, std::io::Error>(responses)
+            });
+        }
+
+        // Collect and verify all responses
+        let mut all_responses = Vec::new();
+        while let Some(result) = tasks.join_next().await {
+            let responses = result.unwrap()?;
+            all_responses.extend(responses);
+        }
+
+        // Verify we got all expected responses
+        assert_eq!(all_responses.len(), 9); // 3 clients * 3 requests each
+
+        // Verify responses are correct
+        for response in all_responses {
+            let id = response["id"].as_u64().unwrap();
+            let expected = format!("0x{:x}", id * 100);
+            assert_eq!(response["result"], expected);
+        }
 
         handle.shutdown();
         Ok(())

@@ -38,7 +38,8 @@ serde.workspace = true
 bytes = "1.5.0"
 interprocess = { version = "2", features = ["tokio"] }
 tempfile = { workspace = true, optional = true }
-parking_lot = { workspace = true, default-features = false, optional = true }
+parking_lot = { workspace = true, optional = true }
+fastrand = "2.3.0"
 
 [dev-dependencies]
 tokio-test.workspace = true
