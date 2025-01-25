@@ -51,6 +51,11 @@ impl<T> Log<T> {
     pub const fn data(&self) -> &T {
         &self.inner.data
     }
+
+    /// Consumes the type and returns the wrapped [`alloy_primitives::Log`]
+    pub fn into_inner(self) -> alloy_primitives::Log<T> {
+        self.inner
+    }
 }
 
 impl Log<LogData> {
@@ -148,6 +153,12 @@ impl<T> AsRef<T> for Log<T> {
 impl<T> AsMut<T> for Log<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.inner.data
+    }
+}
+
+impl<L> From<Log<L>> for alloy_primitives::Log<L> {
+    fn from(value: Log<L>) -> Self {
+        value.into_inner()
     }
 }
 

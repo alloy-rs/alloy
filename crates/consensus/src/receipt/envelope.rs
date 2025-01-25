@@ -52,6 +52,40 @@ pub enum ReceiptEnvelope<T = Log> {
 }
 
 impl<T> ReceiptEnvelope<T> {
+
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> ReceiptEnvelope<U> {
+        match self {
+            Self::Legacy(r) => {
+                ReceiptEnvelope::Legacy(r.map_logs(f))
+            }
+            Self::Eip2930(r) => {
+                ReceiptEnvelope::Eip2930(r.map_logs(f))
+            }
+            Self::Eip1559(r) => {
+                ReceiptEnvelope::Eip1559(r.map_logs(f))
+            }
+            Self::Eip4844(r) => {
+                ReceiptEnvelope::Eip4844(r.map_logs(f))
+            }
+            Self::Eip7702(r) => {
+                ReceiptEnvelope::Eip7702(r.map_logs(f))
+            }
+        }
+    }
+
+    /// Converts a [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the primitives [`Log`]
+    /// type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> ReceiptEnvelope<Log> where T: Into<Log> {
+        self.map_logs(Into::into)
+    }
+
+
     /// Return the [`TxType`] of the inner receipt.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {

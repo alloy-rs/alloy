@@ -27,6 +27,16 @@ pub struct Receipt<T = Log> {
     pub logs: Vec<T>,
 }
 
+impl<T> Receipt<T> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type
+    pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> Receipt<U> {
+        let Self { status, cumulative_gas_used, logs } = self;
+        Receipt { status, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
+    }
+}
+
 impl<T> Receipt<T>
 where
     T: AsRef<Log>,
@@ -41,6 +51,20 @@ where
     /// type.
     pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom: self.bloom_slow(), receipt: self }
+    }
+}
+
+impl<T> Receipt<T>
+where
+    T: Into<Log>,
+{
+    /// Converts a [`Receipt`] with a custom log type into a [`Receipt`] with the primitives [`Log`]
+    /// type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> Receipt<Log> {
+        self.map_logs(Into::into)
     }
 }
 
@@ -275,6 +299,15 @@ where
 }
 
 impl<R> ReceiptWithBloom<R> {
+
+    /// Converts the receipt type by applying the given closure to it.
+    ///
+    /// Returns the type with the new receipt type.
+    pub fn map_receipt<U>(self, f: impl FnOnce(R) -> U) -> ReceiptWithBloom<U> {
+        let Self { receipt, logs_bloom } = self;
+        ReceiptWithBloom { receipt: f(receipt), logs_bloom }
+    }
+
     /// Create new [ReceiptWithBloom]
     pub const fn new(receipt: R, logs_bloom: Bloom) -> Self {
         Self { receipt, logs_bloom }
@@ -284,6 +317,27 @@ impl<R> ReceiptWithBloom<R> {
     pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
     }
+}
+
+impl<L> ReceiptWithBloom<Receipt<L>>  {
+
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> ReceiptWithBloom<Receipt<U>> {
+        let Self { receipt, logs_bloom } = self;
+        ReceiptWithBloom { receipt: receipt.map_logs(f), logs_bloom }
+    }
+
+    /// Converts a [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the primitives [`Log`]
+    /// type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) ->ReceiptWithBloom<Receipt<Log>> where L: Into<Log> {
+        self.map_logs(Into::into)
+    }
+
 }
 
 impl<R: RlpEncodableReceipt> Encodable for ReceiptWithBloom<R> {
