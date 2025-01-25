@@ -327,7 +327,7 @@ impl<L> ReceiptWithBloom<Receipt<L>> {
         ReceiptWithBloom { receipt: receipt.map_logs(f), logs_bloom }
     }
 
-    /// Converts a [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the
+    /// Converts a [`ReceiptWithBloom`] with a custom log type into a [`ReceiptWithBloom`] with the
     /// primitives [`Log`] type by converting the logs.
     ///
     /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
