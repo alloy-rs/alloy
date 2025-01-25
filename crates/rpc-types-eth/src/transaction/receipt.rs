@@ -136,14 +136,18 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
     ///
     /// Returns the receipt with the new log type.
     pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> TransactionReceipt<ReceiptEnvelope<U>> {
-        self.map_inner(|inner| {
-            inner.map_logs(f)
-        })
+        self.map_inner(|inner| inner.map_logs(f))
     }
 
-    /// Converts the transaction receipt's [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the primitives [`alloy_primitives::Log`]
-    /// type by converting the logs.
-    pub fn into_primitives_receipt(self) -> TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>> where L: Into<alloy_primitives::Log> {
+    /// Converts the transaction receipt's [`ReceiptEnvelope`] with a custom log type into a
+    /// [`ReceiptEnvelope`] with the primitives [`alloy_primitives::Log`] type by converting the
+    /// logs.
+    pub fn into_primitives_receipt(
+        self,
+    ) -> TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>>
+    where
+        L: Into<alloy_primitives::Log>,
+    {
         self.map_logs(Into::into)
     }
 }

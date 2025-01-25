@@ -299,7 +299,6 @@ where
 }
 
 impl<R> ReceiptWithBloom<R> {
-
     /// Converts the receipt type by applying the given closure to it.
     ///
     /// Returns the type with the new receipt type.
@@ -319,8 +318,7 @@ impl<R> ReceiptWithBloom<R> {
     }
 }
 
-impl<L> ReceiptWithBloom<Receipt<L>>  {
-
+impl<L> ReceiptWithBloom<Receipt<L>> {
     /// Converts the receipt's log type by applying a function to each log.
     ///
     /// Returns the receipt with the new log type.
@@ -329,15 +327,17 @@ impl<L> ReceiptWithBloom<Receipt<L>>  {
         ReceiptWithBloom { receipt: receipt.map_logs(f), logs_bloom }
     }
 
-    /// Converts a [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the primitives [`Log`]
-    /// type by converting the logs.
+    /// Converts a [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the
+    /// primitives [`Log`] type by converting the logs.
     ///
     /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
     /// type.
-    pub fn into_primitives_receipt(self) ->ReceiptWithBloom<Receipt<Log>> where L: Into<Log> {
+    pub fn into_primitives_receipt(self) -> ReceiptWithBloom<Receipt<Log>>
+    where
+        L: Into<Log>,
+    {
         self.map_logs(Into::into)
     }
-
 }
 
 impl<R: RlpEncodableReceipt> Encodable for ReceiptWithBloom<R> {
