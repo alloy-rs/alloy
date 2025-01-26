@@ -11,11 +11,11 @@ use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U2
 use alloy_rlp::Encodable;
 use core::ops::{Deref, DerefMut};
 
-use alloy_eips::eip7840::BlobParams;
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
+use alloy_eips::{eip7840::BlobParams, Encodable2718};
 
 /// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -142,6 +142,16 @@ impl<T, H> Block<T, H> {
             transactions: self.transactions.try_map(f)?,
             withdrawals: self.withdrawals,
         })
+    }
+
+    /// Calculate the transaction root for the full transactions in this block type.
+    ///
+    /// Returns `None` if the `transactions` is not the [`BlockTransactions::Full`] variant.
+    pub fn calculate_transactions_root(&self) -> Option<B256>
+    where
+        T: Encodable2718,
+    {
+        self.transactions.calculate_transactions_root()
     }
 }
 

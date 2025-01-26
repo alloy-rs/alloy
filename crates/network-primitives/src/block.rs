@@ -1,10 +1,10 @@
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
-use alloc::{vec, vec::Vec};
-use core::slice;
-
 use crate::TransactionResponse;
+use alloc::{vec, vec::Vec};
+use alloy_eips::Encodable2718;
+use core::slice;
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
@@ -81,6 +81,16 @@ impl<T> BlockTransactions<T> {
             Self::Full(txs) => Some(txs),
             _ => None,
         }
+    }
+
+    /// Calculate the transaction root for the full transactions.
+    ///
+    /// Returns `None` if this is not the [`BlockTransactions::Full`] variant
+    pub fn calculate_transactions_root(&self) -> Option<B256>
+    where
+        T: Encodable2718,
+    {
+        self.as_transactions().map(alloy_consensus::proofs::calculate_transaction_root)
     }
 
     /// Returns true if the enum variant is used for an uncle response.
