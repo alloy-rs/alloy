@@ -16,7 +16,7 @@ pub type ConditionalOptions = TransactionConditional;
 /// transaction, enforced out-of-protocol by the sequencer.
 ///
 /// See also <https://github.com/ethereum-optimism/op-geth/blob/928070c7fc097362ed2d40a4f72889ba91544931/core/types/transaction_conditional.go#L74-L76>.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TransactionConditional {
@@ -71,6 +71,27 @@ pub struct TransactionConditional {
 }
 
 impl TransactionConditional {
+    /// Returns true if any configured block parameter (`timestamp_max`, `block_number_max`) are
+    /// exceeded by the given block parameter.
+    ///
+    /// E.g. the block parameter's timestamp is higher than the configured `block_number_max`
+    pub const fn has_exceeded_block_attributes(&self, block: &BlockConditionalAttributes) -> bool {
+        self.has_exceeded_block_number(block.number) || self.has_exceeded_timestamp(block.timestamp)
+    }
+
+    /// Returns true if the configured max block number is lower or equal to the given
+    /// `block_number`
+    pub const fn has_exceeded_block_number(&self, block_number: BlockNumber) -> bool {
+        let Some(max_num) = self.block_number_max else { return false };
+        block_number >= max_num
+    }
+
+    /// Returns true if the configured max timestamp is lower or equal to the given `timestamp`
+    pub const fn has_exceeded_timestamp(&self, timestamp: u64) -> bool {
+        let Some(max_timestamp) = self.timestamp_max else { return false };
+        timestamp >= max_timestamp
+    }
+
     /// Returns `true` if the transaction matches the given block attributes.
     pub const fn matches_block_attributes(&self, block: &BlockConditionalAttributes) -> bool {
         self.matches_block_number(block.number) && self.matches_timestamp(block.timestamp)
@@ -140,7 +161,7 @@ impl TransactionConditional {
 /// the user prefers their transaction to only be included in a block if the account's storage root
 /// matches. If the storage slots are set, then the user prefers their transaction to only be
 /// included if the particular storage slot values from state match.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum AccountStorage {
