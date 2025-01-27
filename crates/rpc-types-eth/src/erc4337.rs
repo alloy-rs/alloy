@@ -87,7 +87,7 @@ impl TransactionConditional {
     }
 
     /// Returns true if the configured max timestamp is lower or equal to the given `timestamp`
-    pub const fn has_exceeded_timestamp(&self, timestamp: BlockNumber) -> bool {
+    pub const fn has_exceeded_timestamp(&self, timestamp: u64) -> bool {
         let Some(max_timestamp) = self.timestamp_max else { return false };
         timestamp >= max_timestamp
     }
