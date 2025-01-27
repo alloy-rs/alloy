@@ -335,16 +335,25 @@ impl Header {
         Sealed::new_unchecked(self, hash)
     }
 
+    /// True if the shanghai hardfork is active.
+    ///
+    /// This function checks that the withdrawals root field is present.
+    pub const fn shanghai_active(&self) -> bool {
+        self.withdrawals_root.is_some()
+    }
+
     /// True if the Cancun hardfork is active.
+    ///
+    /// This function checks that the blob gas used field is present.
     pub const fn cancun_active(&self) -> bool {
         self.blob_gas_used.is_some()
     }
 
     /// True if the Prague hardfork is active.
     ///
-    /// This function checks that the withdrawals root is present.
+    /// This function checks that the requests hash is present.
     pub const fn prague_active(&self) -> bool {
-        self.withdrawals_root.is_some()
+        self.requests_hash.is_some()
     }
 }
 
