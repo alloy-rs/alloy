@@ -42,7 +42,8 @@ similar-asserts.workspace = true
 
 [features]
 ssz = [
-    "dep:ethereum_ssz",
-    "dep:ethereum_ssz_derive",
-    "alloy-rpc-types-engine/ssz",
+	"dep:ethereum_ssz",
+	"dep:ethereum_ssz_derive",
+	"alloy-rpc-types-engine/ssz",
+	"alloy-eips/ssz"
 ]

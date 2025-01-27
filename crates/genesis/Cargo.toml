@@ -36,4 +36,10 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-serde/std", "serde/std", "alloy-trie/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-serde/std",
+	"serde/std",
+	"alloy-trie/std",
+	"alloy-eips/std"
+]

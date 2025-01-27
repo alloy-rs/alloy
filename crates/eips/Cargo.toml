@@ -70,11 +70,12 @@ rand.workspace = true
 [features]
 default = ["std", "kzg-sidecar"]
 std = [
-    "alloy-primitives/std",
-    "alloy-rlp/std",
-    "serde?/std",
-    "c-kzg?/std",
-    "once_cell?/std",
+	"alloy-primitives/std",
+	"alloy-rlp/std",
+	"serde?/std",
+	"c-kzg?/std",
+	"once_cell?/std",
+	"alloy-serde?/std"
 ]
 serde = [
     "dep:alloy-serde",
