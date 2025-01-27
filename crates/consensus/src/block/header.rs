@@ -334,6 +334,18 @@ impl Header {
     pub const fn seal(self, hash: B256) -> Sealed<Self> {
         Sealed::new_unchecked(self, hash)
     }
+
+    /// True if the Cancun hardfork is active.
+    pub const fn cancun_active(&self) -> bool {
+        self.blob_gas_used.is_some()
+    }
+
+    /// True if the Prague hardfork is active.
+    ///
+    /// This function checks that the withdrawals root is present.
+    pub const fn prague_active(&self) -> bool {
+        self.withdrawals_root.is_some()
+    }
 }
 
 impl Encodable for Header {
