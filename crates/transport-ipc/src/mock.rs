@@ -66,34 +66,6 @@ use alloy_json_rpc::Response;
 
 use crate::ReadJsonStream;
 
-/// Represents the shared state between the IPC server and its handles.
-/// This state includes:
-/// - A queue of pre-configured responses
-/// - A shutdown signal channel
-/// - A temporary file used for the Unix domain socket
-#[derive(Debug)]
-struct Inner {
-    /// Queue of responses to be sent to clients
-    replies: Mutex<VecDeque<Vec<u8>>>,
-    /// Channel for triggering server shutdown
-    shutdown: Mutex<Option<oneshot::Sender<()>>>,
-    /// Temporary file backing the Unix domain socket
-    temp_file: NamedTempFile,
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        // Ensure socket file cleanup on drop
-        // This is important for preventing resource leaks and socket file conflicts
-        if let Ok(path) = self.temp_file.path().canonicalize() {
-            if path.exists() {
-                debug!(?path, "Cleaning up socket file on drop");
-                let _ = fs::remove_file(&path);
-            }
-        }
-    }
-}
-
 /// A handle to control a running mock IPC server.
 ///
 /// This handle can be used to:
@@ -337,7 +309,7 @@ impl MockIpcServer {
             )
         })?;
 
-        let inner = self.inner.clone();
+        let inner = self.inner;
 
         // Spawn the main server task
         tokio::spawn(async move {
@@ -370,9 +342,37 @@ impl MockIpcServer {
     }
 }
 
+/// Represents the shared state between the IPC server and its handles.
+/// This state includes:
+/// - A queue of pre-configured responses
+/// - A shutdown signal channel
+/// - A temporary file used for the Unix domain socket
+#[derive(Debug)]
+struct Inner {
+    /// Queue of responses to be sent to clients
+    replies: Mutex<VecDeque<Vec<u8>>>,
+    /// Channel for triggering server shutdown
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    /// Temporary file backing the Unix domain socket
+    temp_file: NamedTempFile,
+}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // Ensure socket file cleanup on drop
+        // This is important for preventing resource leaks and socket file conflicts
+        if let Ok(path) = self.temp_file.path().canonicalize() {
+            if path.exists() {
+                debug!(?path, "Cleaning up socket file on drop");
+                let _ = fs::remove_file(&path);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use tokio::{net::UnixStream, task::JoinSet, time::Duration};
+    use tokio::{net::UnixStream, task::JoinSet};
 
     use super::*;
 
