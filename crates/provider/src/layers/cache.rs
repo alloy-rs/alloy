@@ -9,10 +9,10 @@ use alloy_rpc_types_eth::{
     BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
 };
 use alloy_transport::{TransportErrorKind, TransportResult};
+use lru::LruCache;
 use parking_lot::RwLock;
-use schnellru::{ByLength, LruMap};
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
 
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
@@ -430,28 +430,30 @@ struct FsCacheEntry {
     /// Serialized response to the request from which the hash was computed.
     value: String,
 }
+
 /// Shareable cache.
 #[derive(Debug, Clone)]
 pub struct SharedCache {
-    inner: Arc<RwLock<LruMap<B256, String>>>,
-    max_items: u32,
+    inner: Arc<RwLock<LruCache<B256, String, alloy_primitives::map::FbBuildHasher<32>>>>,
+    max_items: NonZero<usize>,
 }
 
 impl SharedCache {
     /// Instantiate a new shared cache.
     pub fn new(max_items: u32) -> Self {
-        let inner = Arc::new(RwLock::new(LruMap::new(ByLength::new(max_items))));
+        let max_items = NonZero::new(max_items as usize).unwrap_or(NonZero::<usize>::MIN);
+        let inner = Arc::new(RwLock::new(LruCache::with_hasher(max_items, Default::default())));
         Self { inner, max_items }
     }
 
     /// Maximum number of items that can be stored in the cache.
     pub const fn max_items(&self) -> u32 {
-        self.max_items
+        self.max_items.get() as u32
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
     pub fn put(&self, key: B256, value: String) -> TransportResult<bool> {
-        Ok(self.inner.write().insert(key, value))
+        Ok(self.inner.write().put(key, value).is_some())
     }
 
     /// Gets a value from the cache, if it exists.
@@ -498,7 +500,7 @@ impl SharedCache {
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
         let mut cache = self.inner.write();
         for entry in entries {
-            cache.insert(entry.key, entry.value);
+            cache.put(entry.key, entry.value);
         }
 
         Ok(())
