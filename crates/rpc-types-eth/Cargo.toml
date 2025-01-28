@@ -62,14 +62,22 @@ assert_matches.workspace = true
 
 [features]
 default = ["std", "serde"]
-std = ["alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-consensus/std",
+	"alloy-eips/std",
+	"alloy-consensus-any/std",
+	"alloy-network-primitives/std",
+	"alloy-serde?/std"
+]
 serde = [
-    "dep:serde",
-    "dep:serde_json",
-    "dep:alloy-serde",
-    "alloy-primitives/serde",
-    "alloy-consensus/serde",
-    "alloy-eips/serde",
+	"dep:serde",
+	"dep:serde_json",
+	"dep:alloy-serde",
+	"alloy-primitives/serde",
+	"alloy-consensus/serde",
+	"alloy-eips/serde",
+	"alloy-consensus-any/serde"
 ]
 arbitrary = [
     "std",

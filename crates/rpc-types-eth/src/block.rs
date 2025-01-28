@@ -11,11 +11,11 @@ use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U2
 use alloy_rlp::Encodable;
 use core::ops::{Deref, DerefMut};
 
-use alloy_eips::eip7840::BlobParams;
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
+use alloy_eips::{eip7840::BlobParams, Encodable2718};
 
 /// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -143,6 +143,16 @@ impl<T, H> Block<T, H> {
             withdrawals: self.withdrawals,
         })
     }
+
+    /// Calculate the transaction root for the full transactions in this block type.
+    ///
+    /// Returns `None` if the `transactions` is not the [`BlockTransactions::Full`] variant.
+    pub fn calculate_transactions_root(&self) -> Option<B256>
+    where
+        T: Encodable2718,
+    {
+        self.transactions.calculate_transactions_root()
+    }
 }
 
 impl<T: TransactionResponse, H> Block<T, H> {
@@ -246,6 +256,11 @@ impl<H> Header<H> {
     pub fn from_sealed(header: Sealed<H>) -> Self {
         let (inner, hash) = header.into_parts();
         Self { hash, inner, total_difficulty: None, size: None }
+    }
+
+    /// Consumes the type and returns the [`Sealed`] header.
+    pub fn into_sealed(self) -> Sealed<H> {
+        Sealed::new_unchecked(self.inner, self.hash)
     }
 
     /// Consumes the type and returns the wrapped consensus header.
@@ -420,6 +435,12 @@ impl From<Header> for alloy_consensus::Header {
     }
 }
 
+impl<H> From<Header<H>> for Sealed<H> {
+    fn from(value: Header<H>) -> Self {
+        value.into_sealed()
+    }
+}
+
 /// Error that can occur when converting other types to blocks
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
@@ -541,12 +562,11 @@ pub struct BadBlock {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use alloy_primitives::{hex, keccak256, Bloom, B64};
     use arbitrary::Arbitrary;
     use rand::Rng;
     use similar_asserts::assert_eq;
-
-    use super::*;
 
     #[test]
     fn arbitrary_header() {
