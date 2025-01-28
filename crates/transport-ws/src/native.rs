@@ -109,7 +109,7 @@ impl WsBackend<TungsteniteStream> {
 
     /// Send a message to the server.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
-        self.socket.send(Message::Text(msg.get().to_owned())).await
+        self.socket.send(Message::Text(msg.get().to_owned().into())).await
     }
 
     /// Spawn a new backend task.
@@ -155,7 +155,7 @@ impl WsBackend<TungsteniteStream> {
                     _ = &mut keepalive => {
                         // Reset the keepalive timer.
                         keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
-                        if let Err(err) = self.socket.send(Message::Ping(vec![])).await {
+                        if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
                             errored = true;
                             break

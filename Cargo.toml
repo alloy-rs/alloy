@@ -25,7 +25,7 @@ all = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
-missing-const-for-fn = "warn"
+missing-const-for-fn = "allow" # TODO: https://github.com/rust-lang/rust-clippy/issues/14020
 use-self = "warn"
 option-if-let-else = "warn"
 redundant-clone = "warn"
@@ -115,7 +115,7 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ] }
 tokio-test = "0.4"
-tokio-tungstenite = "0.24"
+tokio-tungstenite = "0.26"
 tower = { version = "0.5", features = ["util"] }
 
 # tracing
@@ -138,15 +138,14 @@ cfg-if = "1"
 derive_more = { version = "1.0.0", default-features = false }
 home = "0.5"
 http = "1.1.0"
-itertools = { version = "0.13", default-features = false }
+itertools = { version = ">=0.13, <=0.14", default-features = false }
 jsonwebtoken = "9.3.0"
-lru = "0.12"
+lru = "0.13"
 once_cell = { version = "1.19", default-features = false }
 parking_lot = "0.12.3"
 pin-project = "1.1"
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false }
-schnellru = "0.2.3"
 semver = "1.0"
 strum = { version = "0.26", default-features = false }
 thiserror = { version = "2.0", default-features = false }
