@@ -15,6 +15,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
+use alloy_consensus::transaction::Recovered;
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -184,6 +185,12 @@ impl TransactionRequest {
             sidecar: None,
             authorization_list,
         }
+    }
+
+    /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
+    pub fn from_recovered_transaction<T: TransactionTrait>(tx: Recovered<T>) -> Self {
+        let (tx, from) = tx.into_parts();
+        Self::from_transaction(tx).from(from)
     }
 
     /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
