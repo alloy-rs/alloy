@@ -2,7 +2,10 @@
 
 use crate::{eip4844, eip7691};
 
+// helpers for serde
+#[cfg(feature = "serde")]
 const DEFAULT_BLOB_FEE_GETTER: fn() -> u128 = || eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
+#[cfg(feature = "serde")]
 const IS_DEFAULT_BLOB_FEE: fn(&u128) -> bool = |&x| x == eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 
 /// Configuration for the blob-related calculations.
