@@ -643,7 +643,7 @@ pub trait BlockHeader {
     /// [`BlobParams`] argument.
     ///
     /// Returns `None` if the `blob_params` are `None`.
-    fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u128> {
+    fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
         self.next_block_excess_blob_gas(blob_params?)
     }
 
