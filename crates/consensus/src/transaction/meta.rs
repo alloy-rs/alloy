@@ -39,12 +39,12 @@ pub struct TransactionInfo {
     /// Number of the block.
     pub block_number: Option<u64>,
     /// Base fee of the block.
-    pub base_fee: Option<u128>,
+    pub base_fee: Option<u64>,
 }
 
 impl TransactionInfo {
     /// Returns a new [`TransactionInfo`] with the provided base fee.
-    pub const fn with_base_fee(mut self, base_fee: u128) -> Self {
+    pub const fn with_base_fee(mut self, base_fee: u64) -> Self {
         self.base_fee = Some(base_fee);
         self
     }
