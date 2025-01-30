@@ -1,4 +1,6 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    utils, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
 use alloy_network::Network;
@@ -340,7 +342,29 @@ where
         RpcWithBlock::new_provider(move |block_id| {
             let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
 
-            cache_rpc_call_with_block!(cache, client, req)
+            let client = client
+                .upgrade()
+                .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
+            let cache = cache.clone();
+            ProviderCall::BoxedFuture(Box::pin(async move {
+                let client = client?;
+
+                let result = client
+                    .request(req.method(), req.params())
+                    .map_resp(utils::convert_u64 as fn(U64) -> u64)
+                    .map_params(|params| ParamsWithBlock {
+                        params,
+                        block_id: req.block_id.unwrap_or(BlockId::latest()),
+                    });
+
+                let res = result.await?;
+                // Insert into cache.
+                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+                let hash = req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+
+                Ok(res)
+            }))
         })
     }
 
