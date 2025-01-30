@@ -75,27 +75,12 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
     type Future = TransportFut<'static>;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl Service<RequestPacket> for &Http<reqwest::Client> {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         // `reqwest` always returns `Ok(())`.
         task::Poll::Ready(Ok(()))
     }
 
+    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
         let span = debug_span!("ReqwestTransport", url = %this.url);
