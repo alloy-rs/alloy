@@ -1,7 +1,6 @@
 use alloy_provider::{IpcConnect, Provider, ProviderBuilder};
 use alloy_rpc_client::RpcClient;
 use alloy_transport::layers::RetryBackoffLayer;
-use tracing_subscriber::EnvFilter;
 
 struct ProviderConfig {
     ipc: String,

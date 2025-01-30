@@ -77,8 +77,8 @@ impl RpcClient {
     ///
     /// The `layer` fn is intended to be [`tower::ServiceBuilder::service`] that layers the
     /// transport services. The `main_transport` is expected to the type that actually emits the
-    /// request object: [`PubSubFrontend`]. This exists so that we can intercept the
-    /// [`PubSubFrontend`] which we need for [`RpcClientInner::pubsub_frontend`].
+    /// request object: `PubSubFrontend`. This exists so that we can intercept the
+    /// `PubSubFrontend` which we need for [`RpcClientInner::pubsub_frontend`].
     /// This workaround exists because due to how [`tower::ServiceBuilder::service`] collapses into
     /// a [`BoxTransport`] we wouldn't be obtain the [`MaybePubsub`] by downcasting the layered
     /// `transport`.
@@ -220,7 +220,7 @@ impl RpcClientInner {
     }
 
     /// Create a new [`RpcClient`] with the given transport and an optional handle to the
-    /// [`PubSubFrontend`].
+    /// `PubSubFrontend`.
     pub(crate) fn new_maybe_pubsub(
         t: impl IntoBoxTransport,
         is_local: bool,
