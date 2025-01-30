@@ -155,33 +155,12 @@ where
     type Future = TransportFut<'static>;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl<B, S> Service<RequestPacket> for &Http<HyperClient<B, S>>
-where
-    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
-    S::Future: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
-{
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         // `hyper` always returns `Ok(())`.
         task::Poll::Ready(Ok(()))
     }
 
+    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
         let span = debug_span!("HyperTransport", url = %this.url);
