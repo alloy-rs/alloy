@@ -93,7 +93,6 @@ impl RpcClient {
             let t = main_transport.clone().into_box_transport();
             let maybe_pubsub = t.as_any().downcast_ref::<alloy_pubsub::PubSubFrontend>().cloned();
             Self::new_maybe_pubsub(layer(main_transport), is_local, maybe_pubsub)
-
         }
 
         #[cfg(not(feature = "pubsub"))]
@@ -171,7 +170,6 @@ impl Deref for RpcClient {
         &self.0
     }
 }
-
 
 /// A JSON-RPC client.
 ///
