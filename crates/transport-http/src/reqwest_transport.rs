@@ -54,7 +54,7 @@ impl Http<Client> {
         debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
         trace!(body = %String::from_utf8_lossy(&body), "response body");
 
-        if status != reqwest::StatusCode::OK {
+        if !status.is_success() {
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
                 String::from_utf8_lossy(&body).into_owned(),
