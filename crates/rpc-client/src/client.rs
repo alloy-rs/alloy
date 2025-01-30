@@ -96,7 +96,7 @@ impl RpcClient {
         }
 
         #[cfg(not(feature = "pubsub"))]
-        Self::new_maybe_pubsub(layer(main_transport), is_local, None)
+        Self::new(layer(main_transport), is_local)
     }
 
     /// Creates a new [`RpcClient`] with the given inner client.
