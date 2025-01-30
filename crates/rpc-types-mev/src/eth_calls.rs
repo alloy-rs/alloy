@@ -314,6 +314,9 @@ pub struct PrivateTransactionRequest {
 /// Additional preferences for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct PrivateTransactionPreferences {
+    /// Indicates whether the transaction should be processed in fast mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fast: Option<bool>,
     /// Requirements for the bundle to be included in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validity: Option<Validity>,
@@ -325,7 +328,7 @@ pub struct PrivateTransactionPreferences {
 impl PrivateTransactionPreferences {
     /// Returns true if the preferences are empty.
     pub const fn is_empty(&self) -> bool {
-        self.validity.is_none() && self.privacy.is_none()
+        self.fast.is_none() && self.validity.is_none() && self.privacy.is_none()
     }
 }
 
