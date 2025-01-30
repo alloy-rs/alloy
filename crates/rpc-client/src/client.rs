@@ -189,10 +189,10 @@ pub struct RpcClientInner {
     pub(crate) transport: BoxTransport,
     /// Stores a handle to the PubSub service if pubsub.
     ///
-    /// We store this _transport_ because if built through the
-    /// [`ClientBuilder`](crate::ClientBuilder) with an additional layer the actual transport can
-    /// be an arbitrary type and we would be unable to obtain the `PubSubFrontend` by downcasting
-    /// the `transport`. For example `RetryTransport<PubSubFrontend>`.
+    /// We store this _transport_ because if built through the [`ClientBuilder`] with an additional
+    /// layer the actual transport can be an arbitrary type and we would be unable to obtain the
+    /// `PubSubFrontend` by downcasting the `transport`. For example
+    /// `RetryTransport<PubSubFrontend>`.
     #[allow(unused)]
     pub(crate) pubsub: MaybePubsub,
     /// `true` if the transport is local.
