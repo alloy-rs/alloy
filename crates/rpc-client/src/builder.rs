@@ -36,7 +36,8 @@ impl<L> ClientBuilder<L> {
     /// Create a new [`RpcClient`] with the given transport and the configured
     /// layers.
     ///
-    /// This collapses the
+    /// This collapses the [`tower::ServiceBuilder`] with the given transport via
+    /// [`tower::ServiceBuilder::service`].
     pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient
     where
         L: Layer<T>,
