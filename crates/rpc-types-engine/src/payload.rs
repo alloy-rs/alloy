@@ -6,8 +6,8 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{
-    constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, Bytes48, Header, Transaction,
-    EMPTY_OMMER_ROOT_HASH,
+    constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header,
+    Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
@@ -16,7 +16,7 @@ use alloy_eips::{
     eip7685::Requests,
     BlockNumHash,
 };
-use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -73,7 +73,11 @@ impl ExecutionPayloadFieldV2 {
     /// If the block body contains withdrawals this returns [`ExecutionPayloadFieldV2::V2`].
     ///
     /// Note: This re-calculates the block hash.
-    pub fn from_block_slow<T: Encodable2718>(block: &Block<T>) -> Self {
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
         Self::from_block_unchecked(block.hash_slow(), block)
     }
 
@@ -85,7 +89,11 @@ impl ExecutionPayloadFieldV2 {
     ///  - [`ExecutionPayloadV2::from_block_unchecked`].
     ///
     /// If the block body contains withdrawals this returns [`ExecutionPayloadFieldV2::V2`].
-    pub fn from_block_unchecked<T: Encodable2718>(block_hash: B256, block: &Block<T>) -> Self {
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
         if block.body.withdrawals.is_some() {
             Self::V2(ExecutionPayloadV2::from_block_unchecked(block_hash, block))
         } else {
@@ -330,27 +338,35 @@ impl ExecutionPayloadV1 {
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].
     ///
     /// Note: This re-calculates the block hash.
-    pub fn from_block_slow<T: Encodable2718>(block: &Block<T>) -> Self {
-        Self::from_block_unchecked(block.hash_slow(), block)
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked(block.header.hash_slow(), block)
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`] using the given block hash.
-    pub fn from_block_unchecked<T: Encodable2718>(block_hash: B256, block: &Block<T>) -> Self {
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
         let transactions =
             block.body.transactions().map(|tx| tx.encoded_2718().into()).collect::<Vec<_>>();
         Self {
-            parent_hash: block.parent_hash,
-            fee_recipient: block.beneficiary,
-            state_root: block.state_root,
-            receipts_root: block.receipts_root,
-            logs_bloom: block.logs_bloom,
-            prev_randao: block.mix_hash,
-            block_number: block.number,
-            gas_limit: block.gas_limit,
-            gas_used: block.gas_used,
-            timestamp: block.timestamp,
-            base_fee_per_gas: U256::from(block.base_fee_per_gas.unwrap_or_default()),
-            extra_data: block.header.extra_data.clone(),
+            parent_hash: block.parent_hash(),
+            fee_recipient: block.beneficiary(),
+            state_root: block.state_root(),
+            receipts_root: block.receipts_root(),
+            logs_bloom: block.logs_bloom(),
+            prev_randao: block.mix_hash().unwrap_or_default(),
+            block_number: block.number(),
+            gas_limit: block.gas_limit(),
+            gas_used: block.gas_used(),
+            timestamp: block.timestamp(),
+            base_fee_per_gas: U256::from(block.base_fee_per_gas().unwrap_or_default()),
+            extra_data: block.header.extra_data().clone(),
             block_hash,
             transactions,
         }
@@ -389,8 +405,12 @@ impl ExecutionPayloadV2 {
     /// If the block does not have any withdrawals, an empty vector is used.
     ///
     /// Note: This re-calculates the block hash.
-    pub fn from_block_slow<T: Encodable2718>(block: &Block<T>) -> Self {
-        Self::from_block_unchecked(block.hash_slow(), block)
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked(block.header.hash_slow(), block)
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV2`] using the given block hash.
@@ -398,7 +418,11 @@ impl ExecutionPayloadV2 {
     /// See also [`ExecutionPayloadV1::from_block_unchecked`].
     ///
     /// If the block does not have any withdrawals, an empty vector is used.
-    pub fn from_block_unchecked<T: Encodable2718>(block_hash: B256, block: &Block<T>) -> Self {
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
         Self {
             withdrawals: block
                 .body
@@ -571,17 +595,25 @@ impl ExecutionPayloadV3 {
     /// See also [`ExecutionPayloadV2::from_block_unchecked`].
     ///
     /// Note: This re-calculates the block hash.
-    pub fn from_block_slow<T: Encodable2718>(block: &Block<T>) -> Self {
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
         Self::from_block_unchecked(block.hash_slow(), block)
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV3`] using the given block hash.
     ///
     /// See also [`ExecutionPayloadV2::from_block_unchecked`].
-    pub fn from_block_unchecked<T: Encodable2718>(block_hash: B256, block: &Block<T>) -> Self {
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
         Self {
-            blob_gas_used: block.blob_gas_used.unwrap_or_default(),
-            excess_blob_gas: block.excess_blob_gas.unwrap_or_default(),
+            blob_gas_used: block.blob_gas_used().unwrap_or_default(),
+            excess_blob_gas: block.excess_blob_gas().unwrap_or_default(),
             payload_inner: ExecutionPayloadV2::from_block_unchecked(block_hash, block),
         }
     }
@@ -806,9 +838,10 @@ impl ExecutionPayload {
     /// See also [`ExecutionPayloadSidecar::from_block`].
     ///
     /// Note: This re-calculates the block hash.
-    pub fn from_block_slow<T>(block: &Block<T>) -> (Self, ExecutionPayloadSidecar)
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> (Self, ExecutionPayloadSidecar)
     where
         T: Encodable2718 + Transaction,
+        H: BlockHeader + Sealable,
     {
         Self::from_block_unchecked(block.hash_slow(), block)
     }
@@ -818,16 +851,17 @@ impl ExecutionPayload {
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
     /// See also [`ExecutionPayloadSidecar::from_block`].
-    pub fn from_block_unchecked<T>(
+    pub fn from_block_unchecked<T, H>(
         block_hash: B256,
-        block: &Block<T>,
+        block: &Block<T, H>,
     ) -> (Self, ExecutionPayloadSidecar)
     where
         T: Encodable2718 + Transaction,
+        H: BlockHeader,
     {
         let sidecar = ExecutionPayloadSidecar::from_block(block);
 
-        let execution_payload = if block.header.parent_beacon_block_root.is_some() {
+        let execution_payload = if block.header.parent_beacon_block_root().is_some() {
             // block with parent beacon block root: V3
             Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
         } else if block.body.withdrawals.is_some() {
