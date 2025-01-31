@@ -264,7 +264,7 @@ impl Anvil {
 
     /// Keep the handle to anvil's stdout in order to read from it.
     ///
-    /// Caution: if the stdout handle is unused, this can end up blocking.
+    /// Caution: if the stdout handle isn't used, this can end up blocking.
     pub const fn keep_stdout(mut self) -> Self {
         self.keep_stdout = true;
         self
