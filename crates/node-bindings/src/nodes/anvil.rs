@@ -257,6 +257,10 @@ impl Anvil {
     pub fn try_spawn(self) -> Result<AnvilInstance, NodeError> {
         let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
+
+        // disable nightly warning
+        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "");
+
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
 
