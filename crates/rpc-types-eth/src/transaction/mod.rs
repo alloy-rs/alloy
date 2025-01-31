@@ -14,8 +14,7 @@ pub use alloy_eips::{
     eip7702::Authorization,
 };
 
-mod common;
-pub use common::TransactionInfo;
+pub use alloy_consensus::transaction::TransactionInfo;
 
 mod error;
 pub use error::ConversionError;
@@ -64,6 +63,36 @@ pub struct Transaction<T = TxEnvelope> {
     pub from: Address,
 }
 
+impl<T> Transaction<T> {
+    /// Applies the given closure to the inner transaction type.
+    pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
+            self;
+        Transaction {
+            inner: f(inner),
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            from,
+        }
+    }
+
+    /// Applies the given fallible closure to the inner transactions.
+    pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
+            self;
+        Ok(Transaction {
+            inner: f(inner)?,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            from,
+        })
+    }
+}
+
 impl<T> AsRef<T> for Transaction<T> {
     fn as_ref(&self) -> &T {
         &self.inner
@@ -82,6 +111,26 @@ where
 
 impl<T> Transaction<T>
 where
+    T: TransactionTrait + Encodable2718,
+{
+    /// Returns the [`TransactionInfo`] for this transaction.
+    ///
+    /// This contains various metadata about the transaction and block context if available.
+    pub fn info(&self) -> TransactionInfo {
+        TransactionInfo {
+            hash: Some(self.tx_hash()),
+            index: self.transaction_index,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            // We don't know the base fee of the block when we're constructing this from
+            // `Transaction`
+            base_fee: None,
+        }
+    }
+}
+
+impl<T> Transaction<T>
+where
     T: Into<TransactionRequest>,
 {
     /// Converts [Transaction] into [TransactionRequest].
@@ -90,6 +139,15 @@ where
     /// populated as it is not part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
         self.inner.into()
+    }
+}
+
+impl<T> From<&Transaction<T>> for TransactionInfo
+where
+    T: TransactionTrait + Encodable2718,
+{
+    fn from(tx: &Transaction<T>) -> Self {
+        tx.info()
     }
 }
 

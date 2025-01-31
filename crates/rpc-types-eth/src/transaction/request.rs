@@ -15,6 +15,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
+use alloy_consensus::transaction::Recovered;
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -184,6 +185,12 @@ impl TransactionRequest {
             sidecar: None,
             authorization_list,
         }
+    }
+
+    /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
+    pub fn from_recovered_transaction<T: TransactionTrait>(tx: Recovered<T>) -> Self {
+        let (tx, from) = tx.into_parts();
+        Self::from_transaction(tx).from(from)
     }
 
     /// Initializes the [`TransactionRequest`] with the provided transaction and sender.
@@ -992,7 +999,6 @@ impl From<TxEnvelope> for TransactionRequest {
                     tx.strip_signature().into()
                 }
             }
-            _ => Default::default(),
         }
     }
 }
@@ -1099,14 +1105,11 @@ impl From<Option<Bytes>> for TransactionInput {
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, derive_more::Display)]
-#[display("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[derive(Debug, Default, thiserror::Error)]
+#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
 #[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
-
-#[cfg(feature = "std")]
-impl std::error::Error for TransactionInputError {}
 
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]

@@ -14,7 +14,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::RpcObject;
+use crate::RpcSend;
 
 const INTERNAL_ERROR: Cow<'static, str> = Cow::Borrowed("Internal error");
 
@@ -68,7 +68,7 @@ impl<E> ErrorPayload<E> {
     /// and additional data.
     pub const fn internal_error_with_obj(data: E) -> Self
     where
-        E: RpcObject,
+        E: RpcSend,
     {
         Self { code: -32603, message: INTERNAL_ERROR, data: Some(data) }
     }
@@ -76,7 +76,7 @@ impl<E> ErrorPayload<E> {
     /// Create a new error payload for an internal error with a custom message
     pub const fn internal_error_with_message_and_obj(message: Cow<'static, str>, data: E) -> Self
     where
-        E: RpcObject,
+        E: RpcSend,
     {
         Self { code: -32603, message, data: Some(data) }
     }
@@ -129,7 +129,7 @@ impl<E> ErrorPayload<E> {
 
 impl<T> From<T> for ErrorPayload<T>
 where
-    T: std::error::Error + RpcObject,
+    T: std::error::Error + RpcSend,
 {
     fn from(value: T) -> Self {
         Self { code: -32603, message: INTERNAL_ERROR, data: Some(value) }
@@ -138,7 +138,7 @@ where
 
 impl<E> ErrorPayload<E>
 where
-    E: RpcObject,
+    E: RpcSend,
 {
     /// Serialize the inner data into a [`RawValue`].
     pub fn serialize_payload(&self) -> serde_json::Result<ErrorPayload> {

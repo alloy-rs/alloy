@@ -1,7 +1,8 @@
 use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
-use alloy_primitives::{Address, Bytes, Log, TxHash, U256};
+use alloy_primitives::{Bytes, Log, TxHash, U256};
+use alloy_rpc_types_eth::BlockOverrides;
 use serde::{Deserialize, Serialize};
 
 /// A bundle of transactions to send to the matchmaker.
@@ -111,21 +112,9 @@ pub struct SimBundleOverrides {
     /// Specify other params to override the default values.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_block: Option<BlockId>,
-    /// Block number used for simulation, defaults to parentBlock.number + 1
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub block_number: Option<u64>,
-    /// Coinbase used for simulation, defaults to parentBlock.coinbase
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coinbase: Option<Address>,
-    /// Timestamp used for simulation, defaults to parentBlock.timestamp + 12
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<u64>,
-    /// Gas limit used for simulation, defaults to parentBlock.gasLimit
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
-    pub gas_limit: Option<u64>,
-    /// Base fee used for simulation, defaults to parentBlock.baseFeePerGas
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
-    pub base_fee: Option<u64>,
+    /// Overrides for block environment values.
+    #[serde(flatten)]
+    pub block_overrides: BlockOverrides,
     /// Timeout in seconds, defaults to 5
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,

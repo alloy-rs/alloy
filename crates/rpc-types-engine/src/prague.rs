@@ -11,14 +11,12 @@ use alloy_primitives::B256;
 pub struct PraguePayloadFields {
     /// EIP-7685 requests.
     pub requests: RequestsOrHash,
-    /// EIP-7742 target number of blobs in the block.
-    pub target_blobs_per_block: u64,
 }
 
 impl PraguePayloadFields {
     /// Returns a new [`PraguePayloadFields`] instance.
-    pub fn new(requests: impl Into<RequestsOrHash>, target_blobs_per_block: u64) -> Self {
-        Self { requests: requests.into(), target_blobs_per_block }
+    pub fn new(requests: impl Into<RequestsOrHash>) -> Self {
+        Self { requests: requests.into() }
     }
 }
 
@@ -43,11 +41,6 @@ impl MaybePraguePayloadFields {
     /// Returns the requests, if any.
     pub fn requests(&self) -> Option<&Requests> {
         self.fields.as_ref().and_then(|fields| fields.requests.requests())
-    }
-
-    /// Returns the target blobs per block, if any.
-    pub fn target_blobs_per_block(&self) -> Option<u64> {
-        self.fields.as_ref().map(|fields| fields.target_blobs_per_block)
     }
 
     /// Calculates or retrieves the requests hash.

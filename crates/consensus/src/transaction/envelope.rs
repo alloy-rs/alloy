@@ -1,13 +1,14 @@
 use crate::{
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaTx, Typed2718,
+        RlpEcdsaTx,
     },
     Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
+    Typed2718,
 };
 use alloy_primitives::{
     Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
@@ -160,7 +161,6 @@ impl Typed2718 for TxType {
 )]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[doc(alias = "TransactionEnvelope")]
-#[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     Legacy(Signed<TxLegacy>),
@@ -295,7 +295,7 @@ impl TxEnvelope {
         }
     }
 
-    /// Returns the [`TxEip4844`] variant if the transaction is an EIP-4844 transaction.
+    /// Returns the [`TxEip4844Variant`] variant if the transaction is an EIP-4844 transaction.
     pub const fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
         match self {
             Self::Eip4844(tx) => Some(tx),
@@ -416,16 +416,6 @@ impl Decodable2718 for TxEnvelope {
 }
 
 impl Encodable2718 for TxEnvelope {
-    fn type_flag(&self) -> Option<u8> {
-        match self {
-            Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930.into()),
-            Self::Eip1559(_) => Some(TxType::Eip1559.into()),
-            Self::Eip4844(_) => Some(TxType::Eip4844.into()),
-            Self::Eip7702(_) => Some(TxType::Eip7702.into()),
-        }
-    }
-
     fn encode_2718_len(&self) -> usize {
         self.eip2718_encoded_length()
     }
@@ -673,15 +663,49 @@ mod serde_from {
     use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy};
 
     #[derive(Debug, serde::Deserialize)]
-    #[serde(untagged)]
+    pub(crate) struct UntaggedLegacy {
+        #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
+        pub _ty: Option<()>,
+        #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
+        pub tx: Signed<TxLegacy>,
+    }
+
+    #[derive(Debug)]
     pub(crate) enum MaybeTaggedTxEnvelope {
         Tagged(TaggedTxEnvelope),
-        Untagged {
-            #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
-            _ty: Option<()>,
-            #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
-            tx: Signed<TxLegacy>,
-        },
+        Untagged(UntaggedLegacy),
+    }
+
+    // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`]
+    // attempt. Note: This use private serde API
+    impl<'de> serde::Deserialize<'de> for MaybeTaggedTxEnvelope {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let content = serde::__private::de::Content::deserialize(deserializer)?;
+            let deserializer =
+                serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
+
+            let tagged_res =
+                TaggedTxEnvelope::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Tagged);
+
+            if tagged_res.is_ok() {
+                // return tagged if successful
+                return tagged_res;
+            }
+
+            // proceed with untagged legacy
+            if let Ok(val) =
+                UntaggedLegacy::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Untagged)
+            {
+                return Ok(val);
+            }
+
+            // return the original error, which is more useful than the untagged error
+            //  > "data did not match any variant of untagged enum MaybeTaggedTxEnvelope"
+            tagged_res
+        }
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -703,7 +727,7 @@ mod serde_from {
         fn from(value: MaybeTaggedTxEnvelope) -> Self {
             match value {
                 MaybeTaggedTxEnvelope::Tagged(tagged) => tagged.into(),
-                MaybeTaggedTxEnvelope::Untagged { tx, .. } => Self::Legacy(tx),
+                MaybeTaggedTxEnvelope::Untagged(UntaggedLegacy { tx, .. }) => Self::Legacy(tx),
             }
         }
     }
@@ -730,6 +754,58 @@ mod serde_from {
                 TxEnvelope::Eip7702(signed) => Self::Eip7702(signed),
             }
         }
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x7",
+      "hash": "0x2cb125e083d6d2631e3752bd2b3d757bf31bf02bfe21de0ffa46fbb118d28b19",
+      "from": "0x03e5badf3bb1ade1a8f33f94536c827b6531948d",
+      "to": "0x3267e72dc8780a1512fa69da7759ec66f30350e3",
+      "input": "0x62e4c545000000000000000000000000464c8ec100f2f42fb4e42e07e203da2324f9fc6700000000000000000000000003e5badf3bb1ade1a8f33f94536c827b6531948d000000000000000000000000a064bfb5c7e81426647dc20a0d854da1538559dc00000000000000000000000000000000000000000000000000c6f3b40b6c0000",
+      "nonce": "0x2a8",
+      "value": "0x0",
+      "gas": "0x28afd",
+      "gasPrice": "0x23ec5dbc2",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1546d71",
+      "r": "0x809b9f0a1777e376cd1ee5d2f551035643755edf26ea65b7a00c822a24504962",
+      "s": "0x6a57bb8e21fe85c7e092868ee976fef71edca974d8c452fcf303f9180c764f64"
+    }"#;
+
+        let _ = serde_json::from_str::<MaybeTaggedTxEnvelope>(rpc_tx).unwrap();
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx_legacy_chain_id() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x8",
+      "hash": "0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6",
+      "from": "0x8b87f0a788cc14b4f0f374da59920f5017ff05de",
+      "to": "0xcb33aa5b38d79e3d9fa8b10aff38aa201399a7e3",
+      "input": "0xaf7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce80000000000000000000000000000000000000000000000000000000000000064",
+      "nonce": "0x2",
+      "value": "0x0",
+      "gas": "0x2dc6c0",
+      "gasPrice": "0x18ef61d0a",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1c",
+      "r": "0x5e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664",
+      "s": "0x2353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4"
+    }"#;
+
+        let _ = serde_json::from_str::<TaggedTxEnvelope>(rpc_tx).unwrap();
     }
 }
 
@@ -1089,7 +1165,7 @@ mod tests {
                 storage_keys: vec![B256::left_padding_from(&[9])],
             }]),
             authorization_list: vec![(Authorization {
-                chain_id: 1,
+                chain_id: U256::from(1),
                 address: Address::left_padding_from(&[10]),
                 nonce: 1u64,
             })
@@ -1261,7 +1337,7 @@ mod tests {
                 storage_keys: vec![B256::random()],
             }]),
             authorization_list: vec![(Authorization {
-                chain_id: 1,
+                chain_id: U256::from(1),
                 address: Address::left_padding_from(&[1]),
                 nonce: 1u64,
             })
@@ -1481,5 +1557,13 @@ mod tests {
         assert_eq!(eip1559_tx.tx_type(), TxType::Eip1559);
         assert_eq!(eip4844_tx.tx_type(), TxType::Eip4844);
         assert_eq!(eip7702_tx.tx_type(), TxType::Eip7702);
+    }
+
+    // <https://sepolia.etherscan.io/getRawTx?tx=0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6>
+    #[test]
+    fn decode_raw_legacy() {
+        let raw = hex!("f8aa0285018ef61d0a832dc6c094cb33aa5b38d79e3d9fa8b10aff38aa201399a7e380b844af7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce800000000000000000000000000000000000000000000000000000000000000641ca05e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664a02353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4");
+        let tx = TxEnvelope::decode_2718(&mut raw.as_ref()).unwrap();
+        assert!(tx.chain_id().is_none());
     }
 }

@@ -1,7 +1,13 @@
 use core::fmt;
 
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
+use alloy_eips::{
+    eip2718::{
+        Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, EIP1559_TX_TYPE_ID,
+        EIP2930_TX_TYPE_ID, EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID, LEGACY_TX_TYPE_ID,
+    },
+    Typed2718,
+};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 
@@ -18,7 +24,6 @@ use alloy_rlp::{BufMut, Decodable, Encodable};
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
-#[non_exhaustive]
 #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
@@ -47,6 +52,31 @@ pub enum ReceiptEnvelope<T = Log> {
 }
 
 impl<T> ReceiptEnvelope<T> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> ReceiptEnvelope<U> {
+        match self {
+            Self::Legacy(r) => ReceiptEnvelope::Legacy(r.map_logs(f)),
+            Self::Eip2930(r) => ReceiptEnvelope::Eip2930(r.map_logs(f)),
+            Self::Eip1559(r) => ReceiptEnvelope::Eip1559(r.map_logs(f)),
+            Self::Eip4844(r) => ReceiptEnvelope::Eip4844(r.map_logs(f)),
+            Self::Eip7702(r) => ReceiptEnvelope::Eip7702(r.map_logs(f)),
+        }
+    }
+
+    /// Converts a [`ReceiptEnvelope`] with a custom log type into a [`ReceiptEnvelope`] with the
+    /// primitives [`Log`] type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> ReceiptEnvelope<Log>
+    where
+        T: Into<Log>,
+    {
+        self.map_logs(Into::into)
+    }
+
     /// Return the [`TxType`] of the inner receipt.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
@@ -70,7 +100,7 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub fn cumulative_gas_used(&self) -> u128 {
+    pub fn cumulative_gas_used(&self) -> u64 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 
@@ -133,7 +163,7 @@ where
     }
 
     /// Returns the cumulative gas used at this receipt.
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 
@@ -176,17 +206,19 @@ impl Decodable for ReceiptEnvelope {
     }
 }
 
-impl Encodable2718 for ReceiptEnvelope {
-    fn type_flag(&self) -> Option<u8> {
+impl Typed2718 for ReceiptEnvelope {
+    fn ty(&self) -> u8 {
         match self {
-            Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
-            Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
-            Self::Eip7702(_) => Some(TxType::Eip7702 as u8),
+            Self::Legacy(_) => LEGACY_TX_TYPE_ID,
+            Self::Eip2930(_) => EIP2930_TX_TYPE_ID,
+            Self::Eip1559(_) => EIP1559_TX_TYPE_ID,
+            Self::Eip4844(_) => EIP4844_TX_TYPE_ID,
+            Self::Eip7702(_) => EIP7702_TX_TYPE_ID,
         }
     }
+}
 
+impl Encodable2718 for ReceiptEnvelope {
     fn encode_2718_len(&self) -> usize {
         self.inner_length() + !self.is_legacy() as usize
     }

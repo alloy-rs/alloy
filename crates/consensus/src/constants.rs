@@ -1,6 +1,10 @@
 //! Ethereum protocol-related constants
 use alloy_primitives::{b256, B256};
 
+pub use alloy_eips::eip2718::{
+    EIP1559_TX_TYPE_ID, EIP2930_TX_TYPE_ID, EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID,
+    LEGACY_TX_TYPE_ID,
+};
 pub use alloy_trie::{EMPTY_ROOT_HASH, KECCAK_EMPTY};
 
 /// The first four bytes of the call data for a function call specifies the function to be called.
@@ -61,19 +65,3 @@ pub const EMPTY_TRANSACTIONS: B256 = EMPTY_ROOT_HASH;
 
 /// Withdrawals root of empty withdrawals set.
 pub const EMPTY_WITHDRAWALS: B256 = EMPTY_ROOT_HASH;
-
-/// Identifier for legacy transaction, however a legacy tx is technically not
-/// typed.
-pub const LEGACY_TX_TYPE_ID: u8 = 0;
-
-/// Identifier for an EIP2930 transaction.
-pub const EIP2930_TX_TYPE_ID: u8 = 1;
-
-/// Identifier for an EIP1559 transaction.
-pub const EIP1559_TX_TYPE_ID: u8 = 2;
-
-/// Identifier for an EIP4844 transaction.
-pub const EIP4844_TX_TYPE_ID: u8 = 3;
-
-/// Identifier for an EIP7702 transaction.
-pub const EIP7702_TX_TYPE_ID: u8 = 4;

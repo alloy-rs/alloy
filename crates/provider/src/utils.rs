@@ -2,6 +2,11 @@
 
 use alloy_primitives::{U128, U64};
 
+use crate::{
+    fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
+    Identity,
+};
+
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
 /// Multiplier for the current base fee to estimate max base fee for the next block.
@@ -65,6 +70,13 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
+
+/// Helper type representing the joined recommended fillers i.e [`GasFiller`],
+/// [`BlobGasFiller`], [`NonceFiller`], and [`ChainIdFiller`].
+pub type JoinedRecommendedFillers = JoinFill<
+    Identity,
+    JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+>;
 
 #[cfg(test)]
 mod tests {

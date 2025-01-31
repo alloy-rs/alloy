@@ -4,7 +4,7 @@ use crate::{
     Provider, ProviderLayer,
 };
 use alloy_network::Network;
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 use futures::try_join;
 
 /// A layer that can fill in a [`TransactionRequest`] with additional information by joining two
@@ -13,7 +13,7 @@ use futures::try_join;
 /// This struct is itself a [`TxFiller`], and can be nested to compose any number of fill layers.
 ///
 /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct JoinFill<L, R> {
     left: L,
     right: R,
@@ -45,14 +45,13 @@ impl<L, R> JoinFill<L, R> {
 
 impl<L, R> JoinFill<L, R> {
     /// Get a request for the left filler, if the left filler is ready.
-    async fn prepare_left<P, T, N>(
+    async fn prepare_left<P, N>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
     ) -> TransportResult<Option<L::Fillable>>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N>,
         L: TxFiller<N>,
         N: Network,
     {
@@ -64,14 +63,13 @@ impl<L, R> JoinFill<L, R> {
     }
 
     /// Get a prepare for the right filler, if the right filler is ready.
-    async fn prepare_right<P, T, N>(
+    async fn prepare_right<P, N>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
     ) -> TransportResult<Option<R::Fillable>>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N>,
         R: TxFiller<N>,
         N: Network,
     {
@@ -100,14 +98,13 @@ where
         self.right.fill_sync(tx);
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N>,
     {
         try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
     }
@@ -127,15 +124,14 @@ where
     }
 }
 
-impl<L, R, P, T, N> ProviderLayer<P, T, N> for JoinFill<L, R>
+impl<L, R, P, N> ProviderLayer<P, N> for JoinFill<L, R>
 where
     L: TxFiller<N>,
     R: TxFiller<N>,
-    P: Provider<T, N>,
-    T: alloy_transport::Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
-    type Provider = FillProvider<Self, P, T, N>;
+    type Provider = FillProvider<Self, P, N>;
     fn layer(&self, inner: P) -> Self::Provider {
         FillProvider::new(inner, self.clone())
     }

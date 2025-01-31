@@ -54,7 +54,7 @@ impl<T: Eq + Hash> Hash for FilterSet<T> {
 
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
-        Self(src.into_iter().map(Into::into).collect())
+        Self(src.into_iter().collect())
     }
 }
 
@@ -153,10 +153,10 @@ impl From<U256> for Topic {
 }
 
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
-#[derive(Debug, PartialEq, Eq, derive_more::Display)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum FilterBlockError {
     /// Error indicating that the `from_block` is greater than the `to_block`.
-    #[display("`from_block` ({from}) is greater than `to_block` ({to})")]
+    #[error("`from_block` ({from}) is greater than `to_block` ({to})")]
     FromBlockGreaterThanToBlock {
         /// The starting block number, which is greater than `to`.
         from: u64,
@@ -164,8 +164,6 @@ pub enum FilterBlockError {
         to: u64,
     },
 }
-
-impl core::error::Error for FilterBlockError {}
 
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

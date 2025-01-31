@@ -10,6 +10,9 @@ pub const ETHEREUM_BLOCK_GAS_LIMIT_30M: u64 = 30_000_000;
 /// The default Ethereum block gas limit: 36M
 pub const ETHEREUM_BLOCK_GAS_LIMIT_36M: u64 = 36_000_000;
 
+/// The bound divisor of the gas limit, used in update calculations.
+pub const GAS_LIMIT_BOUND_DIVISOR: u64 = 1024;
+
 /// The minimum tx fee below which the txpool will reject the transaction.
 ///
 /// Configured to `7` WEI which is the lowest possible value of base fee under mainnet EIP-1559

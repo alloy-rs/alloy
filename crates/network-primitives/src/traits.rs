@@ -1,9 +1,7 @@
+use crate::BlockTransactions;
 use alloy_consensus::{BlockHeader, Transaction};
-use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
-
-use crate::BlockTransactions;
 
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
@@ -33,13 +31,13 @@ pub trait ReceiptResponse {
     fn transaction_index(&self) -> Option<u64>;
 
     /// Gas used by this transaction alone.
-    fn gas_used(&self) -> u128;
+    fn gas_used(&self) -> u64;
 
     /// Effective gas price.
     fn effective_gas_price(&self) -> u128;
 
     /// Blob gas used by the eip-4844 transaction.
-    fn blob_gas_used(&self) -> Option<u128>;
+    fn blob_gas_used(&self) -> Option<u64>;
 
     /// Blob gas price paid by the eip-4844 transaction.
     fn blob_gas_price(&self) -> Option<u128>;
@@ -50,11 +48,8 @@ pub trait ReceiptResponse {
     /// Address of the receiver.
     fn to(&self) -> Option<Address>;
 
-    /// EIP-7702 Authorization list.
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
-
     /// Returns the cumulative gas used at this receipt.
-    fn cumulative_gas_used(&self) -> u128;
+    fn cumulative_gas_used(&self) -> u64;
 
     /// The post-transaction state root (pre Byzantium)
     ///
@@ -181,7 +176,7 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
         self.inner.transaction_index()
     }
 
-    fn gas_used(&self) -> u128 {
+    fn gas_used(&self) -> u64 {
         self.inner.gas_used()
     }
 
@@ -189,7 +184,7 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
         self.inner.effective_gas_price()
     }
 
-    fn blob_gas_used(&self) -> Option<u128> {
+    fn blob_gas_used(&self) -> Option<u64> {
         self.inner.blob_gas_used()
     }
 
@@ -205,11 +200,7 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
         self.inner.to()
     }
 
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.inner.authorization_list()
-    }
-
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.inner.cumulative_gas_used()
     }
 

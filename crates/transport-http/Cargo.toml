@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -33,6 +37,7 @@ tracing = { workspace = true, optional = true }
 http-body-util = { workspace = true, optional = true }
 hyper = { workspace = true, default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["full"], optional = true }
+hyper-tls = { workspace = true, optional = true }
 
 # auth layer
 alloy-rpc-types-engine = { workspace = true, optional = true }
@@ -56,6 +61,7 @@ hyper = [
     "dep:tower",
     "dep:tracing",
 ]
+hyper-tls = ["hyper", "dep:hyper-tls"]
 jwt-auth = [
     "hyper",
     "dep:alloy-rpc-types-engine",

@@ -1,5 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
+use crate::NodeError;
 use alloy_primitives::{hex, Address, ChainId};
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
@@ -13,7 +14,9 @@ use std::{
 };
 use url::Url;
 
-use crate::NodeError;
+/// anvil's default ipc path
+pub const DEFAULT_IPC_ENDPOINT: &str =
+    if cfg!(unix) { "/tmp/anvil.ipc" } else { r"\\.\pipe\anvil.ipc" };
 
 /// How long we will wait for anvil to indicate that it is ready.
 const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
@@ -26,6 +29,7 @@ pub struct AnvilInstance {
     child: Child,
     private_keys: Vec<K256SecretKey>,
     addresses: Vec<Address>,
+    ipc_path: Option<String>,
     port: u16,
     chain_id: Option<ChainId>,
 }
@@ -71,6 +75,11 @@ impl AnvilInstance {
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
         format!("ws://localhost:{}", self.port)
+    }
+
+    /// Returns the IPC path
+    pub fn ipc_path(&self) -> &str {
+        self.ipc_path.as_deref().unwrap_or(DEFAULT_IPC_ENDPOINT)
     }
 
     /// Returns the HTTP endpoint url of this instance
@@ -122,6 +131,7 @@ pub struct Anvil {
     block_time: Option<f64>,
     chain_id: Option<ChainId>,
     mnemonic: Option<String>,
+    ipc_path: Option<String>,
     fork: Option<String>,
     fork_block_number: Option<u64>,
     args: Vec<OsString>,
@@ -177,7 +187,15 @@ impl Anvil {
         self
     }
 
+    /// Sets the path for the the ipc server
+    pub fn ipc_path(mut self, path: impl Into<String>) -> Self {
+        self.ipc_path = Some(path.into());
+        self
+    }
+
     /// Sets the chain_id the `anvil` instance will use.
+    ///
+    /// By default [`DEFAULT_IPC_ENDPOINT`] will be used.
     pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
@@ -257,6 +275,10 @@ impl Anvil {
     pub fn try_spawn(self) -> Result<AnvilInstance, NodeError> {
         let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
+
+        // disable nightly warning
+        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "");
+
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
 
@@ -280,11 +302,15 @@ impl Anvil {
             cmd.arg("--fork-block-number").arg(fork_block_number.to_string());
         }
 
+        if let Some(ipc_path) = &self.ipc_path {
+            cmd.arg("--ipc").arg(ipc_path);
+        }
+
         cmd.args(self.args);
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stdout = child.stdout.take().ok_or(NodeError::NoStderr)?;
+        let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
@@ -334,10 +360,13 @@ impl Anvil {
             }
         }
 
+        child.stdout = Some(reader.into_inner());
+
         Ok(AnvilInstance {
             child,
             private_keys,
             addresses,
+            ipc_path: self.ipc_path,
             port,
             chain_id: self.chain_id.or(chain_id),
         })

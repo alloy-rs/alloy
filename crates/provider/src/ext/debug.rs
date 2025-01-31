@@ -1,6 +1,6 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
-use alloy_json_rpc::RpcReturn;
+use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
@@ -11,12 +11,12 @@ use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
     TraceResult,
 };
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait DebugApi<N, T>: Send + Sync {
+pub trait DebugApi<N>: Send + Sync {
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
 
@@ -72,7 +72,7 @@ pub trait DebugApi<N, T>: Send + Sync {
 
     /// Reruns the transaction specified by the hash and returns the trace in a specified format.
     ///
-    /// This method allows for the trace to be returned as a type that implements `RpcReturn` and
+    /// This method allows for the trace to be returned as a type that implements `RpcRecv` and
     /// `serde::de::DeserializeOwned`.
     ///
     /// [GethDebugTracingOptions] can be used to specify the trace options.
@@ -86,7 +86,7 @@ pub trait DebugApi<N, T>: Send + Sync {
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<R>
     where
-        R: RpcReturn + serde::de::DeserializeOwned;
+        R: RpcRecv + serde::de::DeserializeOwned;
 
     /// Reruns the transaction specified by the hash and returns the trace as a JSON object.
     ///
@@ -122,7 +122,7 @@ pub trait DebugApi<N, T>: Send + Sync {
 
     /// Reruns the transaction specified by the hash and returns the trace in a specified format.
     ///
-    /// This method allows for the trace to be returned as a type that implements `RpcReturn` and
+    /// This method allows for the trace to be returned as a type that implements `RpcRecv` and
     /// `serde::de::DeserializeOwned`.
     ///
     /// [GethDebugTracingOptions] can be used to specify the trace options.
@@ -137,7 +137,7 @@ pub trait DebugApi<N, T>: Send + Sync {
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
     where
-        R: RpcReturn + serde::de::DeserializeOwned;
+        R: RpcRecv + serde::de::DeserializeOwned;
 
     /// Reruns the transaction specified by the hash and returns the trace as a JSON object.
     ///
@@ -253,41 +253,13 @@ pub trait DebugApi<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> DebugApi<N, T> for P
+impl<N, P> DebugApi<N> for P
 where
     N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider<N>,
 {
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawHeader", (block,)).await
-    }
-
-    async fn debug_trace_transaction_as<R>(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<R>
-    where
-        R: RpcReturn,
-    {
-        self.client().request("debug_traceTransaction", (hash, trace_options)).await
-    }
-
-    async fn debug_trace_transaction_js(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<serde_json::Value> {
-        self.debug_trace_transaction_as::<serde_json::Value>(hash, trace_options).await
-    }
-
-    async fn debug_trace_transaction_call(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<CallFrame> {
-        self.debug_trace_transaction_as::<CallFrame>(hash, trace_options).await
     }
 
     async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes> {
@@ -331,6 +303,63 @@ where
         self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
 
+    async fn debug_trace_transaction_as<R>(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<R>
+    where
+        R: RpcRecv,
+    {
+        self.client().request("debug_traceTransaction", (hash, trace_options)).await
+    }
+
+    async fn debug_trace_transaction_js(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<serde_json::Value> {
+        self.debug_trace_transaction_as::<serde_json::Value>(hash, trace_options).await
+    }
+
+    async fn debug_trace_transaction_call(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<CallFrame> {
+        self.debug_trace_transaction_as::<CallFrame>(hash, trace_options).await
+    }
+
+    async fn debug_trace_call_as<R>(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<R>
+    where
+        R: RpcRecv,
+    {
+        self.client().request("debug_traceCall", (tx, block, trace_options)).await
+    }
+
+    async fn debug_trace_call_js(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<serde_json::Value> {
+        self.debug_trace_call_as::<serde_json::Value>(tx, block, trace_options).await
+    }
+
+    async fn debug_trace_call_callframe(
+        &self,
+        tx: TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<CallFrame> {
+        self.debug_trace_call_as::<CallFrame>(tx, block, trace_options).await
+    }
+
     async fn debug_trace_block_by_hash(
         &self,
         block: B256,
@@ -354,36 +383,6 @@ where
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
         self.client().request("debug_traceCall", (tx, block, trace_options)).await
-    }
-
-    async fn debug_trace_call_as<R>(
-        &self,
-        tx: TransactionRequest,
-        block: BlockId,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<R>
-    where
-        R: RpcReturn,
-    {
-        self.client().request("debug_traceCall", (tx, block, trace_options)).await
-    }
-
-    async fn debug_trace_call_js(
-        &self,
-        tx: TransactionRequest,
-        block: BlockId,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<serde_json::Value> {
-        self.debug_trace_call_as::<serde_json::Value>(tx, block, trace_options).await
-    }
-
-    async fn debug_trace_call_callframe(
-        &self,
-        tx: TransactionRequest,
-        block: BlockId,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<CallFrame> {
-        self.debug_trace_call_as::<CallFrame>(tx, block, trace_options).await
     }
 
     async fn debug_trace_call_many(
@@ -414,7 +413,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_transaction() {
         async_ci_only(|| async move {
-            let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+            let provider = ProviderBuilder::new().on_anvil_with_wallet();
             let from = provider.default_signer_address();
 
             let gas_price = provider.get_gas_price().await.unwrap();
@@ -538,13 +537,12 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     async fn debug_trace_call_many() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider =
-                    ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
                 let tx1 = TransactionRequest::default()
                     .with_from(address!("0000000000000000000000000000000000000123"))

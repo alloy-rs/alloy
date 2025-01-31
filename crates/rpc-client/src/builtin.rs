@@ -1,5 +1,5 @@
 use alloy_json_rpc::RpcError;
-use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
+use alloy_transport::{BoxTransport, TransportConnect, TransportError, TransportErrorKind};
 use std::str::FromStr;
 
 #[cfg(any(feature = "ws", feature = "ipc"))]
@@ -20,7 +20,7 @@ pub enum BuiltInConnectionString {
     Ipc(std::path::PathBuf),
 }
 
-impl BoxTransportConnect for BuiltInConnectionString {
+impl TransportConnect for BuiltInConnectionString {
     fn is_local(&self) -> bool {
         match self {
             #[cfg(any(feature = "reqwest", feature = "hyper"))]
@@ -39,10 +39,8 @@ impl BoxTransportConnect for BuiltInConnectionString {
         }
     }
 
-    fn get_boxed_transport<'a: 'b, 'b>(
-        &'a self,
-    ) -> alloy_transport::Pbf<'b, BoxTransport, TransportError> {
-        Box::pin(self.connect_boxed())
+    async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
+        self.connect_boxed().await
     }
 }
 
@@ -252,7 +250,8 @@ mod test {
     }
 
     #[test]
-    #[cfg(all(feature = "ipc", not(windows)))]
+    #[cfg(feature = "ipc")]
+    #[cfg_attr(windows, ignore)]
     fn test_parsing_ipc() {
         use alloy_node_bindings::Anvil;
 

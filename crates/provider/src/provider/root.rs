@@ -5,33 +5,30 @@ use crate::{
 };
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, ClientRef, RpcClient, WeakClient};
-use alloy_transport::{BoxTransport, BoxTransportConnect, Transport, TransportError};
+use alloy_transport::{TransportConnect, TransportError};
 use std::{
     fmt,
     marker::PhantomData,
     sync::{Arc, OnceLock},
 };
 
-#[cfg(feature = "reqwest")]
-use alloy_transport_http::Http;
-
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
-pub struct RootProvider<T, N: Network = Ethereum> {
+pub struct RootProvider<N: Network = Ethereum> {
     /// The inner state of the root provider.
-    pub(crate) inner: Arc<RootProviderInner<T, N>>,
+    pub(crate) inner: Arc<RootProviderInner<N>>,
 }
 
-impl<T, N: Network> Clone for RootProvider<T, N> {
+impl<N: Network> Clone for RootProvider<N> {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone() }
     }
 }
 
-impl<T: fmt::Debug, N: Network> fmt::Debug for RootProvider<T, N> {
+impl<N: Network> fmt::Debug for RootProvider<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RootProvider").field("client", &self.inner.client).finish_non_exhaustive()
     }
@@ -43,50 +40,57 @@ pub fn builder<N: Network>() -> ProviderBuilder<Identity, Identity, N> {
     ProviderBuilder::default()
 }
 
-#[cfg(feature = "reqwest")]
-impl<N: Network> RootProvider<Http<reqwest::Client>, N> {
+impl<N: Network> RootProvider<N> {
     /// Creates a new HTTP root provider from the given URL.
+    #[cfg(feature = "reqwest")]
     pub fn new_http(url: url::Url) -> Self {
         Self::new(RpcClient::new_http(url))
     }
-}
 
-impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     /// Creates a new root provider from the given RPC client.
-    pub fn new(client: RpcClient<T>) -> Self {
+    pub fn new(client: RpcClient) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
     }
-}
 
-impl<N: Network> RootProvider<BoxTransport, N> {
-    /// Connects to a boxed transport with the given connector.
-    pub async fn connect_boxed<C: BoxTransportConnect>(conn: C) -> Result<Self, TransportError> {
-        let client = ClientBuilder::default().connect_boxed(conn).await?;
-        Ok(Self::new(client))
+    /// Creates a new root provider from the provided string.
+    ///
+    /// See [`BuiltInConnectionString`] for more information.
+    pub async fn connect(s: &str) -> Result<Self, TransportError> {
+        Self::connect_with(s.parse::<BuiltInConnectionString>()?).await
     }
 
     /// Creates a new root provider from the provided connection details.
+    #[deprecated(since = "0.9.0", note = "use `connect` instead")]
     pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
-        let conn: BuiltInConnectionString = s.parse()?;
+        Self::connect(s).await
+    }
 
-        let client = ClientBuilder::default().connect_boxed(conn).await?;
-        Ok(Self::new(client))
+    /// Connects to a transport with the given connector.
+    pub async fn connect_with<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
+        ClientBuilder::default().connect_with(conn).await.map(Self::new)
+    }
+
+    /// Connects to a boxed transport with the given connector.
+    #[deprecated(
+        since = "0.9.0",
+        note = "`RootProvider` is now always boxed, use `connect_with` instead"
+    )]
+    pub async fn connect_boxed<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
+        Self::connect_with(conn).await
     }
 }
 
-impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
+impl<N: Network> RootProvider<N> {
     /// Boxes the inner client.
-    ///
-    /// This will create a new provider if this instance is not the only reference to the inner
-    /// client.
-    pub fn boxed(self) -> RootProvider<BoxTransport, N> {
-        let inner = Arc::unwrap_or_clone(self.inner);
-        RootProvider { inner: Arc::new(inner.boxed()) }
+    #[deprecated(since = "0.9.0", note = "`RootProvider` is now always boxed")]
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn boxed(self) -> Self {
+        self
     }
 
     /// Gets the subscription corresponding to the given RPC subscription ID.
     #[cfg(feature = "pubsub")]
-    pub async fn get_subscription<R: alloy_json_rpc::RpcReturn>(
+    pub async fn get_subscription<R: alloy_json_rpc::RpcRecv>(
         &self,
         id: alloy_primitives::B256,
     ) -> alloy_transport::TransportResult<Subscription<R>> {
@@ -110,7 +114,7 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     #[inline]
     pub(crate) fn get_heart(&self) -> &HeartbeatHandle<N> {
         self.inner.heart.get_or_init(|| {
-            let new_blocks = NewBlocks::<T, N>::new(self.inner.weak_client());
+            let new_blocks = NewBlocks::<N>::new(self.inner.weak_client());
             let stream = new_blocks.into_stream();
             Heartbeat::new(Box::pin(stream)).spawn()
         })
@@ -119,34 +123,28 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
-pub(crate) struct RootProviderInner<T, N: Network = Ethereum> {
-    client: RpcClient<T>,
+pub(crate) struct RootProviderInner<N: Network = Ethereum> {
+    client: RpcClient,
     heart: OnceLock<HeartbeatHandle<N>>,
     _network: PhantomData<N>,
 }
 
-impl<T, N: Network> Clone for RootProviderInner<T, N> {
+impl<N: Network> Clone for RootProviderInner<N> {
     fn clone(&self) -> Self {
         Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
     }
 }
 
-impl<T: Transport + Clone, N: Network> RootProviderInner<T, N> {
-    pub(crate) fn new(client: RpcClient<T>) -> Self {
+impl<N: Network> RootProviderInner<N> {
+    pub(crate) fn new(client: RpcClient) -> Self {
         Self { client, heart: Default::default(), _network: PhantomData }
     }
 
-    pub(crate) fn weak_client(&self) -> WeakClient<T> {
+    pub(crate) fn weak_client(&self) -> WeakClient {
         self.client.get_weak()
     }
 
-    pub(crate) fn client_ref(&self) -> ClientRef<'_, T> {
+    pub(crate) fn client_ref(&self) -> ClientRef<'_> {
         self.client.get_ref()
-    }
-}
-
-impl<T: Transport + Clone, N: Network> RootProviderInner<T, N> {
-    fn boxed(self) -> RootProviderInner<BoxTransport, N> {
-        RootProviderInner { client: self.client.boxed(), heart: self.heart, _network: PhantomData }
     }
 }

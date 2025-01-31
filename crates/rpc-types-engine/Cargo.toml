@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -46,8 +50,19 @@ jsonwebtoken = { workspace = true, optional = true }
 
 [features]
 default = ["jwt", "std", "serde"]
-std = ["alloy-consensus/std", "derive_more/std", "strum/std"]
-serde = ["dep:serde", "dep:alloy-serde"]
+std = [
+	"alloy-consensus/std",
+	"derive_more/std",
+	"strum/std",
+	"alloy-eips/std",
+	"alloy-serde?/std"
+]
+serde = [
+	"dep:serde",
+	"dep:alloy-serde",
+	"alloy-consensus/serde",
+	"alloy-eips/serde"
+]
 jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]

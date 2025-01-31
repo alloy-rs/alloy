@@ -1,18 +1,18 @@
 use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcObject, RpcParam};
+use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
 use alloy_network::Network;
 use alloy_primitives::{
-    keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
+    keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256,
 };
 use alloy_rpc_types_eth::{
     BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
 };
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{TransportErrorKind, TransportResult};
+use lru::LruCache;
 use parking_lot::RwLock;
-use schnellru::{ByLength, LruMap};
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
 
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
@@ -45,13 +45,12 @@ impl CacheLayer {
     }
 }
 
-impl<P, T, N> ProviderLayer<P, T, N> for CacheLayer
+impl<P, N> ProviderLayer<P, N> for CacheLayer
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
-    type Provider = CacheProvider<P, T, N>;
+    type Provider = CacheProvider<P, N>;
 
     fn layer(&self, inner: P) -> Self::Provider {
         CacheProvider::new(inner, self.cache())
@@ -66,19 +65,18 @@ where
 /// to the provider interface, allowing users to save the cache to disk and load it
 /// from there on demand.
 #[derive(Debug, Clone)]
-pub struct CacheProvider<P, T, N> {
+pub struct CacheProvider<P, N> {
     /// Inner provider.
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
     cache: SharedCache,
     /// Phantom data
-    _pd: PhantomData<(T, N)>,
+    _pd: PhantomData<N>,
 }
 
-impl<P, T, N> CacheProvider<P, T, N>
+impl<P, N> CacheProvider<P, N>
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     /// Instantiate a new cache provider.
@@ -142,30 +140,14 @@ macro_rules! cache_rpc_call_with_block {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<P, T, N> Provider<T, N> for CacheProvider<P, T, N>
+impl<P, N> Provider<N> for CacheProvider<P, N>
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     #[inline(always)]
-    fn root(&self) -> &RootProvider<T, N> {
+    fn root(&self) -> &RootProvider<N> {
         self.inner.root()
-    }
-
-    async fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let req = RequestType::new("eth_getBlockByNumber", (number, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
     }
 
     async fn get_block_by_hash(
@@ -183,10 +165,25 @@ where
         cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_hash(hash, kind)).await
     }
 
+    async fn get_block_by_number(
+        &self,
+        number: BlockNumberOrTag,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<N::BlockResponse>> {
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
+
+        let req = RequestType::new("eth_getBlockByNumber", (number, full));
+
+        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
+    }
+
     fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> ProviderCall<T, (BlockId,), Option<Vec<N::ReceiptResponse>>> {
+    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,));
 
         let redirect =
@@ -223,48 +220,11 @@ where
         }))
     }
 
-    fn get_proof(
-        &self,
-        address: Address,
-        keys: Vec<StorageKey>,
-    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
-        let client = self.inner.weak_client();
-        let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req =
-                RequestType::new("eth_getProof", (address, keys.clone())).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
-        })
-    }
-
-    fn get_storage_at(
-        &self,
-        address: Address,
-        key: U256,
-    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
-        let client = self.inner.weak_client();
-        let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::new("eth_getStorageAt", (address, key)).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
-        })
-    }
-
-    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
             let req = RequestType::new("eth_getCode", address).with_block_id(block_id);
-            cache_rpc_call_with_block!(cache, client, req)
-        })
-    }
-
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
-        let client = self.inner.weak_client();
-        let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
-
             cache_rpc_call_with_block!(cache, client, req)
         })
     }
@@ -290,10 +250,37 @@ where
         Ok(result)
     }
 
+    fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+    ) -> RpcWithBlock<(Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req =
+                RequestType::new("eth_getProof", (address, keys.clone())).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, client, req)
+        })
+    }
+
+    fn get_storage_at(
+        &self,
+        address: Address,
+        key: U256,
+    ) -> RpcWithBlock<(Address, U256), StorageValue> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getStorageAt", (address, key)).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, client, req)
+        })
+    }
+
     fn get_transaction_by_hash(
         &self,
         hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<N::TransactionResponse>> {
+    ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
         let req = RequestType::new("eth_getTransactionByHash", (hash,));
 
         let params_hash = req.params_hash().ok();
@@ -319,10 +306,7 @@ where
         }))
     }
 
-    fn get_raw_transaction_by_hash(
-        &self,
-        hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<Bytes>> {
+    fn get_raw_transaction_by_hash(&self, hash: TxHash) -> ProviderCall<(TxHash,), Option<Bytes>> {
         let req = RequestType::new("eth_getRawTransactionByHash", (hash,));
 
         let params_hash = req.params_hash().ok();
@@ -353,7 +337,7 @@ where
     fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> ProviderCall<T, (TxHash,), Option<N::ReceiptResponse>> {
+    ) -> ProviderCall<(TxHash,), Option<N::ReceiptResponse>> {
         let req = RequestType::new("eth_getTransactionReceipt", (hash,));
 
         let params_hash = req.params_hash().ok();
@@ -383,13 +367,13 @@ where
 }
 
 /// Internal type to handle different types of requests and generating their param hashes.
-struct RequestType<Params: RpcParam> {
+struct RequestType<Params: RpcSend> {
     method: &'static str,
     params: Params,
     block_id: Option<BlockId>,
 }
 
-impl<Params: RpcParam> RequestType<Params> {
+impl<Params: RpcSend> RequestType<Params> {
     const fn new(method: &'static str, params: Params) -> Self {
         Self { method, params, block_id: None }
     }
@@ -420,10 +404,10 @@ impl<Params: RpcParam> RequestType<Params> {
     /// "pending".
     const fn has_block_tag(&self) -> bool {
         if let Some(block_id) = self.block_id {
-            match block_id {
-                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
-                _ => return true,
-            }
+            return !matches!(
+                block_id,
+                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
+            );
         }
         false
     }
@@ -436,28 +420,30 @@ struct FsCacheEntry {
     /// Serialized response to the request from which the hash was computed.
     value: String,
 }
+
 /// Shareable cache.
 #[derive(Debug, Clone)]
 pub struct SharedCache {
-    inner: Arc<RwLock<LruMap<B256, String>>>,
-    max_items: u32,
+    inner: Arc<RwLock<LruCache<B256, String, alloy_primitives::map::FbBuildHasher<32>>>>,
+    max_items: NonZero<usize>,
 }
 
 impl SharedCache {
     /// Instantiate a new shared cache.
     pub fn new(max_items: u32) -> Self {
-        let inner = Arc::new(RwLock::new(LruMap::new(ByLength::new(max_items))));
+        let max_items = NonZero::new(max_items as usize).unwrap_or(NonZero::<usize>::MIN);
+        let inner = Arc::new(RwLock::new(LruCache::with_hasher(max_items, Default::default())));
         Self { inner, max_items }
     }
 
     /// Maximum number of items that can be stored in the cache.
     pub const fn max_items(&self) -> u32 {
-        self.max_items
+        self.max_items.get() as u32
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
     pub fn put(&self, key: B256, value: String) -> TransportResult<bool> {
-        Ok(self.inner.write().insert(key, value))
+        Ok(self.inner.write().put(key, value).is_some())
     }
 
     /// Gets a value from the cache, if it exists.
@@ -504,19 +490,21 @@ impl SharedCache {
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
         let mut cache = self.inner.write();
         for entry in entries {
-            cache.insert(entry.key, entry.value);
+            cache.put(entry.key, entry.value);
         }
 
         Ok(())
     }
 }
 
-/// Attempts to fetch the response from the cache by using the hash of the request params.
+/// Attempts to fetch the response from the cache by using the hash of the
+/// request params.
 ///
-/// In case of a cache miss, fetches from the RPC and saves the response to the cache.
+/// In case of a cache miss, fetches from the RPC and saves the response to the
+/// cache.
 ///
 /// This helps overriding [`Provider`] methods that return [`TransportResult<T>`].
-async fn cache_get_or_fetch<Params: RpcParam, Resp: RpcObject>(
+async fn cache_get_or_fetch<Params: RpcSend, Resp: RpcObject>(
     cache: &SharedCache,
     req: RequestType<Params>,
     fetch_fn: impl std::future::Future<Output = TransportResult<Option<Resp>>>,
@@ -662,7 +650,10 @@ mod tests {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer)
+                .on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-tx.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -730,8 +721,7 @@ mod tests {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
-            let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::default().with_gas_estimation().layer(cache_layer).on_anvil_with_wallet();
 
             let path = dir.join("rpc-cache-code.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -740,7 +730,7 @@ mod tests {
                 // solc v0.8.26; solc Counter.sol --via-ir --optimize --bin
                 "6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033"
             ).unwrap();
-            let tx = TransactionRequest::default().with_deploy_code(bytecode);
+            let tx = TransactionRequest::default().with_nonce(0).with_deploy_code(bytecode).with_chain_id(31337);
 
             let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 

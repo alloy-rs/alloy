@@ -1,7 +1,7 @@
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
-use alloy_transport::{RpcError, Transport};
+use alloy_transport::RpcError;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
@@ -20,8 +20,8 @@ const MAX_RETRIES: usize = 3;
 const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
 /// Streams new blocks from the client.
-pub(crate) struct NewBlocks<T, N: Network = Ethereum> {
-    client: WeakClient<T>,
+pub(crate) struct NewBlocks<N: Network = Ethereum> {
+    client: WeakClient,
     /// The next block to yield.
     /// [`NO_BLOCK_NUMBER`] indicates that it will be updated on the first poll.
     /// Only used by the polling task.
@@ -31,8 +31,8 @@ pub(crate) struct NewBlocks<T, N: Network = Ethereum> {
     _phantom: PhantomData<N>,
 }
 
-impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
-    pub(crate) fn new(client: WeakClient<T>) -> Self {
+impl<N: Network> NewBlocks<N> {
+    pub(crate) fn new(client: WeakClient) -> Self {
         Self {
             client,
             next_yield: NO_BLOCK_NUMBER,
@@ -99,7 +99,7 @@ impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
     fn into_poll_stream(mut self) -> impl Stream<Item = N::BlockResponse> + 'static {
         stream! {
         // Spawned lazily on the first `poll`.
-        let poll_task_builder: PollerBuilder<T, NoParams, U64> =
+        let poll_task_builder: PollerBuilder<NoParams, U64> =
             PollerBuilder::new(self.client.clone(), "eth_blockNumber", []);
         let mut poll_task = poll_task_builder.spawn().into_stream_raw();
         'task: loop {
@@ -182,7 +182,6 @@ mod tests {
     use super::*;
     use crate::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::U256;
     use std::{future::Future, time::Duration};
 
     async fn timeout<T: Future>(future: T) -> T::Output {
@@ -208,14 +207,14 @@ mod tests {
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
         let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
 
-        let new_blocks = NewBlocks::<_, Ethereum>::new(provider.weak_client()).with_next_yield(1);
+        let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
         let mut stream = Box::pin(new_blocks.into_stream());
         if ws {
             let _ = try_timeout(stream.next()).await; // Subscribe to newHeads.
         }
 
         // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(U256::from(1)), None).await.unwrap();
+        provider.anvil_mine(Some(1), None).await.unwrap();
 
         let block = timeout(stream.next()).await.expect("Block wasn't fetched");
         assert_eq!(block.header.number, 1);
@@ -239,14 +238,14 @@ mod tests {
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
         let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
 
-        let new_blocks = NewBlocks::<_, Ethereum>::new(provider.weak_client()).with_next_yield(1);
+        let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
         let mut stream = Box::pin(new_blocks.into_stream());
         if ws {
             let _ = try_timeout(stream.next()).await; // Subscribe to newHeads.
         }
 
         // We will also use provider to manipulate anvil instance via RPC.
-        provider.anvil_mine(Some(U256::from(BLOCKS_TO_MINE)), None).await.unwrap();
+        provider.anvil_mine(Some(BLOCKS_TO_MINE as u64), None).await.unwrap();
 
         let blocks = timeout(stream.take(BLOCKS_TO_MINE).collect::<Vec<_>>()).await;
         assert_eq!(blocks.len(), BLOCKS_TO_MINE);

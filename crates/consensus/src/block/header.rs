@@ -1,11 +1,12 @@
-use crate::constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
+use crate::{
+    constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
+    Block, BlockBody,
+};
 use alloc::vec::Vec;
 use alloy_eips::{
-    calc_blob_gasprice,
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip1898::BlockWithParent,
-    eip4844::{self},
-    eip7742,
+    eip7840::BlobParams,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
 };
@@ -127,18 +128,6 @@ pub struct Header {
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
-    /// The target number of blobs in the block, introduced in [EIP-7742].
-    ///
-    /// [EIP-7742]: https://eips.ethereum.org/EIPS/eip-7742
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            with = "alloy_serde::quantity::opt",
-            skip_serializing_if = "Option::is_none"
-        )
-    )]
-    pub target_blobs_per_block: Option<u64>,
 }
 
 impl AsRef<Self> for Header {
@@ -171,7 +160,6 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            target_blobs_per_block: None,
         }
     }
 }
@@ -183,6 +171,11 @@ impl Sealable for Header {
 }
 
 impl Header {
+    /// Create a [`Block`] from the body and its header.
+    pub const fn into_block<T>(self, body: BlockBody<T>) -> Block<T> {
+        body.into_block(self)
+    }
+
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
     ///
     /// Use [`Header::seal_slow`] and unlock if you need the hash to be persistent.
@@ -205,8 +198,8 @@ impl Header {
     /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None
-    pub fn blob_fee(&self) -> Option<u128> {
-        self.excess_blob_gas.map(calc_blob_gasprice)
+    pub fn blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.excess_blob_gas?))
     }
 
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
@@ -214,8 +207,8 @@ impl Header {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [Self::next_block_excess_blob_gas]
-    pub fn next_block_blob_fee(&self) -> Option<u128> {
-        Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas()?))
+    pub fn next_block_blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.next_block_excess_blob_gas(blob_params)?))
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
@@ -233,24 +226,9 @@ impl Header {
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
-    /// If [`Self::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for calculating
-    /// the excess blob gas, otherwise uses EIP-4844 formula.
-    ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
-        let excess_blob_gas = self.excess_blob_gas?;
-        let blob_gas_used = self.blob_gas_used?;
-
-        Some(self.target_blobs_per_block.map_or_else(
-            || eip4844::calc_excess_blob_gas(excess_blob_gas, blob_gas_used),
-            |target_blobs_per_block| {
-                eip7742::calc_excess_blob_gas(
-                    excess_blob_gas,
-                    blob_gas_used,
-                    target_blobs_per_block,
-                )
-            },
-        ))
+    pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
+        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 
     /// Calculate a heuristic for the in-memory size of the [Header].
@@ -325,10 +303,6 @@ impl Header {
             length += requests_hash.length();
         }
 
-        if let Some(target_blobs_per_block) = self.target_blobs_per_block {
-            length += target_blobs_per_block.length();
-        }
-
         length
     }
 
@@ -359,6 +333,27 @@ impl Header {
     #[inline]
     pub const fn seal(self, hash: B256) -> Sealed<Self> {
         Sealed::new_unchecked(self, hash)
+    }
+
+    /// True if the shanghai hardfork is active.
+    ///
+    /// This function checks that the withdrawals root field is present.
+    pub const fn shanghai_active(&self) -> bool {
+        self.withdrawals_root.is_some()
+    }
+
+    /// True if the Cancun hardfork is active.
+    ///
+    /// This function checks that the blob gas used field is present.
+    pub const fn cancun_active(&self) -> bool {
+        self.blob_gas_used.is_some()
+    }
+
+    /// True if the Prague hardfork is active.
+    ///
+    /// This function checks that the requests hash is present.
+    pub const fn prague_active(&self) -> bool {
+        self.requests_hash.is_some()
     }
 }
 
@@ -407,10 +402,6 @@ impl Encodable for Header {
         if let Some(ref requests_hash) = self.requests_hash {
             requests_hash.encode(out);
         }
-
-        if let Some(ref target_blobs_per_block) = self.target_blobs_per_block {
-            target_blobs_per_block.encode(out);
-        }
     }
 
     fn length(&self) -> usize {
@@ -450,7 +441,6 @@ impl Decodable for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            target_blobs_per_block: None,
         };
         if started_len - buf.len() < rlp_head.payload_length {
             this.base_fee_per_gas = Some(u64::decode(buf)?);
@@ -478,11 +468,6 @@ impl Decodable for Header {
         // Decode requests hash.
         if started_len - buf.len() < rlp_head.payload_length {
             this.requests_hash = Some(B256::decode(buf)?);
-        }
-
-        // Decode target blob count.
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.target_blobs_per_block = Some(u64::decode(buf)?);
         }
 
         let consumed = started_len - buf.len();
@@ -561,7 +546,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             parent_beacon_block_root: u.arbitrary()?,
             requests_hash: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
-            target_blobs_per_block: u.arbitrary()?,
         };
 
         Ok(generate_valid_header(
@@ -637,40 +621,30 @@ pub trait BlockHeader {
     /// Retrieves the requests hash of the block, if available
     fn requests_hash(&self) -> Option<B256>;
 
-    /// Retrieves the target blob count of the block, if available
-    fn target_blobs_per_block(&self) -> Option<u64>;
-
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
 
     /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None
-    fn blob_fee(&self) -> Option<u128> {
-        self.excess_blob_gas().map(calc_blob_gasprice)
+    fn blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.excess_blob_gas()?))
     }
 
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
-    /// If [`BlockHeader::target_blobs_per_block`] is [`Some`], uses EIP-7742 formula for
-    /// calculating the excess blob gas, otherwise uses EIP-4844 formula.
-    ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    fn next_block_excess_blob_gas(&self) -> Option<u64> {
-        let excess_blob_gas = self.excess_blob_gas()?;
-        let blob_gas_used = self.blob_gas_used()?;
+    fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
+        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
+    }
 
-        Some(self.target_blobs_per_block().map_or_else(
-            || eip4844::calc_excess_blob_gas(excess_blob_gas, blob_gas_used),
-            |target_blobs_per_block| {
-                eip7742::calc_excess_blob_gas(
-                    excess_blob_gas,
-                    blob_gas_used,
-                    target_blobs_per_block,
-                )
-            },
-        ))
+    /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional
+    /// [`BlobParams`] argument.
+    ///
+    /// Returns `None` if the `blob_params` are `None`.
+    fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
+        self.next_block_excess_blob_gas(blob_params?)
     }
 
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
@@ -678,8 +652,16 @@ pub trait BlockHeader {
     /// Returns `None` if `excess_blob_gas` is None.
     ///
     /// See also [BlockHeader::next_block_excess_blob_gas]
-    fn next_block_blob_fee(&self) -> Option<u128> {
-        Some(eip4844::calc_blob_gasprice(self.next_block_excess_blob_gas()?))
+    fn next_block_blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.next_block_excess_blob_gas(blob_params)?))
+    }
+
+    /// Convenience function for [`Self::next_block_blob_fee`] with an optional [`BlobParams`]
+    /// argument.
+    ///
+    /// Returns `None` if the `blob_params` are `None`.
+    fn maybe_next_block_blob_fee(&self, blob_params: Option<BlobParams>) -> Option<u128> {
+        self.next_block_blob_fee(blob_params?)
     }
 
     /// Calculate base fee for next block according to the EIP-1559 spec.
@@ -821,10 +803,6 @@ impl BlockHeader for Header {
         self.requests_hash
     }
 
-    fn target_blobs_per_block(&self) -> Option<u64> {
-        self.target_blobs_per_block
-    }
-
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
@@ -884,10 +862,6 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.timestamp()
     }
 
-    fn extra_data(&self) -> &Bytes {
-        self.inner.extra_data()
-    }
-
     fn mix_hash(&self) -> Option<B256> {
         self.inner.mix_hash()
     }
@@ -916,8 +890,8 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.requests_hash()
     }
 
-    fn target_blobs_per_block(&self) -> Option<u64> {
-        self.inner.target_blobs_per_block()
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
     }
 
     fn is_empty(&self) -> bool {
@@ -976,8 +950,6 @@ pub(crate) mod serde_bincode_compat {
         parent_beacon_block_root: Option<B256>,
         #[serde(default)]
         requests_hash: Option<B256>,
-        #[serde(default)]
-        target_blobs_per_block: Option<u64>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -1005,7 +977,6 @@ pub(crate) mod serde_bincode_compat {
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
                 extra_data: Cow::Borrowed(&value.extra_data),
-                target_blobs_per_block: value.target_blobs_per_block,
             }
         }
     }
@@ -1034,7 +1005,6 @@ pub(crate) mod serde_bincode_compat {
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
                 extra_data: value.extra_data.into_owned(),
-                target_blobs_per_block: value.target_blobs_per_block,
             }
         }
     }

@@ -1,7 +1,5 @@
 use crate::Log;
-use alloc::vec::Vec;
 use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
-use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 
@@ -15,7 +13,7 @@ use alloy_primitives::{Address, BlockHash, TxHash, B256};
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
-    /// The receipt envelope, which contains the consensus receipt data..
+    /// The receipt envelope, which contains the consensus receipt data.
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: T,
     /// Transaction Hash.
@@ -33,7 +31,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_used: u128,
+    pub gas_used: u64,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
     /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
     /// that's actually paid by users can only be determined post-execution
@@ -50,7 +48,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
             default
         )
     )]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// The price paid by the eip-4844 transaction per blob gas.
     #[cfg_attr(
         feature = "serde",
@@ -67,10 +65,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub to: Option<Address>,
     /// Contract address created, or None if not a deployment.
     pub contract_address: Option<Address>,
-    /// The authorization list is a list of tuples that store the address to code which the signer
-    /// desires to execute in the context of their EOA.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
 impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
@@ -88,7 +82,6 @@ impl TransactionReceipt {
             | ReceiptEnvelope::Eip4844(receipt)
             | ReceiptEnvelope::Eip7702(receipt)
             | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status.coerce_status(),
-            _ => false,
         }
     }
 
@@ -129,8 +122,33 @@ impl<T> TransactionReceipt<T> {
             from: self.from,
             to: self.to,
             contract_address: self.contract_address,
-            authorization_list: self.authorization_list,
         }
+    }
+
+    /// Consumes the type and returns the wrapped receipt.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> TransactionReceipt<ReceiptEnvelope<U>> {
+        self.map_inner(|inner| inner.map_logs(f))
+    }
+
+    /// Converts the transaction receipt's [`ReceiptEnvelope`] with a custom log type into a
+    /// [`ReceiptEnvelope`] with the primitives [`alloy_primitives::Log`] type by converting the
+    /// logs.
+    pub fn into_primitives_receipt(
+        self,
+    ) -> TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>>
+    where
+        L: Into<alloy_primitives::Log>,
+    {
+        self.map_logs(Into::into)
     }
 }
 
@@ -159,7 +177,7 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.transaction_index
     }
 
-    fn gas_used(&self) -> u128 {
+    fn gas_used(&self) -> u64 {
         self.gas_used
     }
 
@@ -167,7 +185,7 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.effective_gas_price
     }
 
-    fn blob_gas_used(&self) -> Option<u128> {
+    fn blob_gas_used(&self) -> Option<u64> {
         self.blob_gas_used
     }
 
@@ -183,16 +201,18 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
         self.to
     }
 
-    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
-        self.authorization_list.as_deref()
-    }
-
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.inner.cumulative_gas_used()
     }
 
     fn state_root(&self) -> Option<B256> {
         self.inner.status_or_post_state().as_post_state()
+    }
+}
+
+impl From<TransactionReceipt> for TransactionReceipt<ReceiptEnvelope<alloy_primitives::Log>> {
+    fn from(value: TransactionReceipt) -> Self {
+        value.into_primitives_receipt()
     }
 }
 
@@ -227,7 +247,7 @@ mod test {
         );
 
         const EXPECTED_BLOOM: Bloom = bloom!("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000200000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000800000000000000000000000000000000004000000000000000000800000000100000020000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000010000000000000000000000000000");
-        const EXPECTED_CGU: u128 = 0xa42aec;
+        const EXPECTED_CGU: u64 = 0xa42aec;
 
         assert!(matches!(
             receipt.inner,

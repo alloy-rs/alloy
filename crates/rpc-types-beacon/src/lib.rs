@@ -24,6 +24,9 @@ pub mod payload;
 /// Types and functions related to the relay mechanism.
 pub mod relay;
 
+/// Types and functions related to execution requests.
+pub mod requests;
+
 /// Types and functions related to the sidecar.
 pub mod sidecar;
 

@@ -1,5 +1,8 @@
 use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
+use alloy_eips::{
+    eip2718::{Decodable2718, Eip2718Result, Encodable2718},
+    Typed2718,
+};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
@@ -76,7 +79,7 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub const fn cumulative_gas_used(&self) -> u128 {
+    pub const fn cumulative_gas_used(&self) -> u64 {
         self.inner.receipt.cumulative_gas_used
     }
 
@@ -104,7 +107,7 @@ where
         self.bloom()
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.cumulative_gas_used()
     }
 
@@ -113,14 +116,13 @@ where
     }
 }
 
-impl Encodable2718 for AnyReceiptEnvelope {
-    fn type_flag(&self) -> Option<u8> {
-        match self.r#type {
-            0 => None,
-            ty => Some(ty),
-        }
+impl Typed2718 for AnyReceiptEnvelope {
+    fn ty(&self) -> u8 {
+        self.r#type
     }
+}
 
+impl Encodable2718 for AnyReceiptEnvelope {
     fn encode_2718_len(&self) -> usize {
         self.inner.length() + !self.is_legacy() as usize
     }

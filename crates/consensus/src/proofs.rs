@@ -5,12 +5,12 @@ use alloc::vec::Vec;
 use alloy_eips::{eip2718::Encodable2718, eip4895::Withdrawal};
 use alloy_primitives::{keccak256, B256};
 use alloy_rlp::Encodable;
-use alloy_trie::root::{ordered_trie_root, ordered_trie_root_with_encoder};
 
 #[doc(inline)]
 pub use alloy_trie::root::{
-    state_root, state_root_ref_unhashed, state_root_unhashed, state_root_unsorted, storage_root,
-    storage_root_unhashed, storage_root_unsorted,
+    ordered_trie_root, ordered_trie_root_with_encoder, state_root, state_root_ref_unhashed,
+    state_root_unhashed, state_root_unsorted, storage_root, storage_root_unhashed,
+    storage_root_unsorted,
 };
 
 /// Calculate a transaction root.
@@ -99,6 +99,10 @@ mod tests {
     }
 
     impl Eip2718EncodableReceipt for TypedReceipt {
+        fn eip2718_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
+            self.receipt.rlp_encoded_length_with_bloom(bloom) + (!self.ty.is_legacy()) as usize
+        }
+
         fn eip2718_encode_with_bloom(
             &self,
             bloom: &alloy_primitives::Bloom,
@@ -108,10 +112,6 @@ mod tests {
                 out.put_u8(self.ty.ty());
             }
             self.receipt.rlp_encode_with_bloom(bloom, out);
-        }
-
-        fn eip2718_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
-            self.receipt.rlp_encoded_length_with_bloom(bloom) + (!self.ty.is_legacy()) as usize
         }
     }
 

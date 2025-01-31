@@ -90,6 +90,7 @@ jobs:
       - name: cargo hack
         run: |
           cargo hack build --workspace --ignore-unknown-features --features ws --target wasm32-unknown-unknown \
+            --exclude alloy \
             --exclude alloy-contract \
             --exclude alloy-network \
             --exclude alloy-node-bindings \
@@ -183,7 +184,7 @@ jobs:
       - name: Build documentation
         run: cargo doc --workspace --all-features --no-deps --document-private-items
         env:
-          RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition -Zunstable-options
+          RUSTDOCFLAGS: --cfg docsrs -D warnings -Zunstable-options --show-type-layout --generate-link-to-definition
 
   fmt:
     runs-on: ubuntu-latest
@@ -194,6 +195,18 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all --check
+
+  # Check crates correctly propagate features
+  feature-propagation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: run zepter
+        run: |
+          cargo install zepter -f --locked
+          zepter --version
+          time zepter run check
 
   deny:
     uses: ithacaxyz/ci/.github/workflows/deny.yml@main

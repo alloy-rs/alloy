@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -61,7 +65,7 @@ alloy-transport-ws = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "alloy-core/default"]
+default = ["std", "reqwest", "alloy-core/default", "essentials"]
 
 # std
 std = [
@@ -72,19 +76,19 @@ std = [
     "alloy-consensus?/std",
 ]
 
+# essential features that enable basic network interactions out of the box.
+essentials = ["contract", "provider-http", "rpc-types", "signer-local"]
+
 # full
 full = [
     "consensus",
-    "contract",
     "eips",
+    "essentials",
     "k256",
     "kzg",
     "network",
-    "provider-http",
     "provider-ws",
     "provider-ipc",
-    "rpc-types",
-    "signer-local",
 ]
 
 # configuration
@@ -276,7 +280,7 @@ serde = [
     "alloy-consensus?/serde",
     "dep:alloy-serde",
 ]
-ssz = ["alloy-rpc-types?/ssz"]
+ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",

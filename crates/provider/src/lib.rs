@@ -6,21 +6,25 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+// For features.
+#[cfg(any(feature = "reqwest", feature = "hyper"))]
+use alloy_transport_http as _;
+
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a
 /// reqwest client.
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(any(test, feature = "reqwest"))]
-pub type ReqwestProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::Http<reqwest::Client>, N>;
+#[deprecated(since = "0.9.0", note = "use `RootProvider` instead")]
+pub type ReqwestProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a hyper
 /// client.
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(feature = "hyper")]
-pub type HyperProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::HyperTransport, N>;
+#[deprecated(since = "0.9.0", note = "use `RootProvider` instead")]
+pub type HyperProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 #[macro_use]
 extern crate tracing;
@@ -44,8 +48,9 @@ pub mod layers;
 
 mod provider;
 pub use provider::{
-    builder, Caller, EthCall, EthCallParams, FilterPollerBuilder, ParamsWithBlock, Provider,
-    ProviderCall, RootProvider, RpcWithBlock, SendableTx, WalletProvider,
+    builder, Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams, FilterPollerBuilder,
+    ParamsWithBlock, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    WalletProvider,
 };
 
 pub mod utils;

@@ -11,7 +11,7 @@ pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 mod status;
 pub use status::Eip658Value;
 
-use crate::Typed2718;
+use alloy_eips::Typed2718;
 
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
@@ -71,7 +71,7 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     }
 
     /// Returns the cumulative gas used in the block after this transaction was executed.
-    fn cumulative_gas_used(&self) -> u128;
+    fn cumulative_gas_used(&self) -> u64;
 
     /// Returns the logs emitted by this transaction.
     fn logs(&self) -> &[Self::Log];
@@ -123,7 +123,7 @@ mod tests {
         let receipt =
             ReceiptEnvelope::Legacy(ReceiptWithBloom {
                 receipt: Receipt {
-                    cumulative_gas_used: 0x1u128,
+                    cumulative_gas_used: 0x1,
                     logs: vec![Log {
                         address: address!("0000000000000000000000000000000000000011"),
                         data: LogData::new_unchecked(
@@ -155,7 +155,7 @@ mod tests {
         let expected =
             ReceiptWithBloom {
                 receipt: Receipt {
-                    cumulative_gas_used: 0x1u128,
+                    cumulative_gas_used: 0x1,
                     logs: vec![Log {
                         address: address!("0000000000000000000000000000000000000011"),
                         data: LogData::new_unchecked(

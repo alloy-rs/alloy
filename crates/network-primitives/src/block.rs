@@ -1,10 +1,10 @@
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
-use alloc::{vec, vec::Vec};
-use core::slice;
-
 use crate::TransactionResponse;
+use alloc::{vec, vec::Vec};
+use alloy_eips::Encodable2718;
+use core::slice;
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
@@ -46,6 +46,33 @@ impl<T> BlockTransactions<T> {
         matches!(self, Self::Full(_))
     }
 
+    /// Converts the transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> BlockTransactions<U> {
+        match self {
+            Self::Full(txs) => BlockTransactions::Full(txs.into_iter().map(f).collect()),
+            Self::Hashes(hashes) => BlockTransactions::Hashes(hashes),
+            Self::Uncle => BlockTransactions::Uncle,
+        }
+    }
+
+    /// Converts the transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<BlockTransactions<U>, E> {
+        match self {
+            Self::Full(txs) => {
+                Ok(BlockTransactions::Full(txs.into_iter().map(f).collect::<Result<_, _>>()?))
+            }
+            Self::Hashes(hashes) => Ok(BlockTransactions::Hashes(hashes)),
+            Self::Uncle => Ok(BlockTransactions::Uncle),
+        }
+    }
+
     /// Fallibly cast to a slice of transactions.
     ///
     /// Returns `None` if the enum variant is not `Full`.
@@ -54,6 +81,16 @@ impl<T> BlockTransactions<T> {
             Self::Full(txs) => Some(txs),
             _ => None,
         }
+    }
+
+    /// Calculate the transaction root for the full transactions.
+    ///
+    /// Returns `None` if this is not the [`BlockTransactions::Full`] variant
+    pub fn calculate_transactions_root(&self) -> Option<B256>
+    where
+        T: Encodable2718,
+    {
+        self.as_transactions().map(alloy_consensus::proofs::calculate_transaction_root)
     }
 
     /// Returns true if the enum variant is used for an uncle response.
@@ -76,6 +113,16 @@ impl<T> BlockTransactions<T> {
         match self {
             Self::Full(txs) => txs.into_iter(),
             _ => vec::IntoIter::default(),
+        }
+    }
+
+    /// Consumes the type and returns the transactions as a vector.
+    ///
+    /// Note: if this is an uncle or hashes, this will return an empty vector.
+    pub fn into_transactions_vec(self) -> Vec<T> {
+        match self {
+            Self::Full(txs) => txs,
+            _ => vec![],
         }
     }
 
@@ -103,6 +150,11 @@ impl<T> BlockTransactions<T> {
 }
 
 impl<T: TransactionResponse> BlockTransactions<T> {
+    /// Creates a new [`BlockTransactions::Hashes`] variant from the given iterator of transactions.
+    pub fn new_hashes(txs: impl IntoIterator<Item = impl AsRef<T>>) -> Self {
+        Self::Hashes(txs.into_iter().map(|tx| tx.as_ref().tx_hash()).collect())
+    }
+
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn convert_to_hashes(&mut self) {

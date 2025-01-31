@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -31,4 +35,9 @@ rand.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-consensus/std",
+	"alloy-eips/std",
+	"alloy-serde/std"
+]

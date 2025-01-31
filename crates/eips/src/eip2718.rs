@@ -10,6 +10,22 @@ use core::fmt;
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
 const TX_TYPE_BYTE_MAX: u8 = 0x7f;
 
+/// Identifier for legacy transaction, however a legacy tx is technically not
+/// typed.
+pub const LEGACY_TX_TYPE_ID: u8 = 0;
+
+/// Identifier for an EIP2930 transaction.
+pub const EIP2930_TX_TYPE_ID: u8 = 1;
+
+/// Identifier for an EIP1559 transaction.
+pub const EIP1559_TX_TYPE_ID: u8 = 2;
+
+/// Identifier for an EIP4844 transaction.
+pub const EIP4844_TX_TYPE_ID: u8 = 3;
+
+/// Identifier for an EIP7702 transaction.
+pub const EIP7702_TX_TYPE_ID: u8 = 4;
+
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
@@ -49,15 +65,7 @@ impl From<Eip2718Error> for alloy_rlp::Error {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Eip2718Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::RlpError(err) => Some(err),
-            Self::UnexpectedType(_) => None,
-        }
-    }
-}
+impl core::error::Error for Eip2718Error {}
 
 /// Decoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
 /// or a receipt with a type flag.
@@ -170,16 +178,16 @@ pub trait Decodable2718: Sized {
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub trait Encodable2718: Sized + Send + Sync {
+pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     /// Return the type flag (if any).
     ///
     /// This should return `None` for the default (legacy) variant of the
     /// envelope.
-    fn type_flag(&self) -> Option<u8>;
-
-    /// True if the envelope is the legacy variant.
-    fn is_legacy(&self) -> bool {
-        matches!(self.type_flag(), None | Some(0))
+    fn type_flag(&self) -> Option<u8> {
+        match self.ty() {
+            LEGACY_TX_TYPE_ID => None,
+            ty => Some(ty),
+        }
     }
 
     /// The length of the 2718 encoded envelope. This is the length of the type
@@ -256,3 +264,48 @@ pub trait Encodable2718: Sized + Send + Sync {
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Eip2718Envelope: Decodable2718 + Encodable2718 {}
 impl<T> Eip2718Envelope for T where T: Decodable2718 + Encodable2718 {}
+
+/// A trait that helps to determine the type of the transaction.
+#[auto_impl::auto_impl(&)]
+pub trait Typed2718 {
+    /// Returns the EIP-2718 type flag.
+    fn ty(&self) -> u8;
+
+    /// Returns true if the type matches the given type.
+    fn is_type(&self, ty: u8) -> bool {
+        self.ty() == ty
+    }
+
+    /// Returns true if the type is a legacy transaction.
+    fn is_legacy(&self) -> bool {
+        self.ty() == LEGACY_TX_TYPE_ID
+    }
+
+    /// Returns true if the type is an EIP-2930 transaction.
+    fn is_eip2930(&self) -> bool {
+        self.ty() == EIP2930_TX_TYPE_ID
+    }
+
+    /// Returns true if the type is an EIP-1559 transaction.
+    fn is_eip1559(&self) -> bool {
+        self.ty() == EIP1559_TX_TYPE_ID
+    }
+
+    /// Returns true if the type is an EIP-4844 transaction.
+    fn is_eip4844(&self) -> bool {
+        self.ty() == EIP4844_TX_TYPE_ID
+    }
+
+    /// Returns true if the type is an EIP-7702 transaction.
+    fn is_eip7702(&self) -> bool {
+        self.ty() == EIP7702_TX_TYPE_ID
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: Typed2718> Typed2718 for alloy_serde::WithOtherFields<T> {
+    #[inline]
+    fn ty(&self) -> u8 {
+        self.inner.ty()
+    }
+}

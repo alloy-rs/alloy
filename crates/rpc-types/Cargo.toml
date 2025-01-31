@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -25,8 +29,12 @@ alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
 alloy-rpc-types-debug = { workspace = true, optional = true }
-alloy-rpc-types-engine = { workspace = true, optional = true, features = ["serde"] }
-alloy-rpc-types-eth = { workspace = true, optional = true, features = ["serde"] }
+alloy-rpc-types-engine = { workspace = true, optional = true, features = [
+    "serde",
+] }
+alloy-rpc-types-eth = { workspace = true, optional = true, features = [
+    "serde",
+] }
 alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }

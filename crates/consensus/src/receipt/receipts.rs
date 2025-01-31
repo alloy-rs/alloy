@@ -2,7 +2,7 @@ use crate::receipt::{
     Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
 use alloc::{vec, vec::Vec};
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
@@ -22,9 +22,19 @@ pub struct Receipt<T = Log> {
     pub status: Eip658Value,
     /// Gas used
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub cumulative_gas_used: u128,
+    pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<T>,
+}
+
+impl<T> Receipt<T> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type
+    pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> Receipt<U> {
+        let Self { status, cumulative_gas_used, logs } = self;
+        Receipt { status, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
+    }
 }
 
 impl<T> Receipt<T>
@@ -41,6 +51,20 @@ where
     /// type.
     pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom: self.bloom_slow(), receipt: self }
+    }
+}
+
+impl<T> Receipt<T>
+where
+    T: Into<Log>,
+{
+    /// Converts a [`Receipt`] with a custom log type into a [`Receipt`] with the primitives [`Log`]
+    /// type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> Receipt<Log> {
+        self.map_logs(Into::into)
     }
 }
 
@@ -62,7 +86,7 @@ where
         self.bloom_slow()
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.cumulative_gas_used
     }
 
@@ -147,8 +171,17 @@ impl<T> From<ReceiptWithBloom<Self>> for Receipt<T> {
     }
 }
 
-/// Receipt containing result of transaction execution.
-#[derive(Clone, Debug, PartialEq, Eq, Default, From, IntoIterator)]
+/// A collection of receipts organized as a two-dimensional vector.
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+    derive_more::IntoIterator,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts<T> {
     /// A two-dimensional vector of [`Receipt`] instances.
@@ -200,6 +233,12 @@ impl<T: Decodable> Decodable for Receipts<T> {
     }
 }
 
+impl<T> Default for Receipts<T> {
+    fn default() -> Self {
+        Self { receipt_vec: Default::default() }
+    }
+}
+
 /// [`Receipt`] with calculated bloom filter.
 ///
 /// This convenience type allows us to lazily calculate the bloom filter for a
@@ -240,7 +279,7 @@ where
         Some(self.logs_bloom)
     }
 
-    fn cumulative_gas_used(&self) -> u128 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.receipt.cumulative_gas_used()
     }
 
@@ -260,6 +299,14 @@ where
 }
 
 impl<R> ReceiptWithBloom<R> {
+    /// Converts the receipt type by applying the given closure to it.
+    ///
+    /// Returns the type with the new receipt type.
+    pub fn map_receipt<U>(self, f: impl FnOnce(R) -> U) -> ReceiptWithBloom<U> {
+        let Self { receipt, logs_bloom } = self;
+        ReceiptWithBloom { receipt: f(receipt), logs_bloom }
+    }
+
     /// Create new [ReceiptWithBloom]
     pub const fn new(receipt: R, logs_bloom: Bloom) -> Self {
         Self { receipt, logs_bloom }
@@ -268,6 +315,28 @@ impl<R> ReceiptWithBloom<R> {
     /// Consume the structure, returning the receipt and the bloom filter
     pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
+    }
+}
+
+impl<L> ReceiptWithBloom<Receipt<L>> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> ReceiptWithBloom<Receipt<U>> {
+        let Self { receipt, logs_bloom } = self;
+        ReceiptWithBloom { receipt: receipt.map_logs(f), logs_bloom }
+    }
+
+    /// Converts a [`ReceiptWithBloom`] with a custom log type into a [`ReceiptWithBloom`] with the
+    /// primitives [`Log`] type by converting the logs.
+    ///
+    /// This is useful if log types that embed the primitives log type, e.g. the log receipt rpc
+    /// type.
+    pub fn into_primitives_receipt(self) -> ReceiptWithBloom<Receipt<Log>>
+    where
+        L: Into<Log>,
+    {
+        self.map_logs(Into::into)
     }
 }
 
@@ -287,14 +356,16 @@ impl<R: RlpDecodableReceipt> Decodable for ReceiptWithBloom<R> {
     }
 }
 
+impl<R: Typed2718> Typed2718 for ReceiptWithBloom<R> {
+    fn ty(&self) -> u8 {
+        self.receipt.ty()
+    }
+}
+
 impl<R> Encodable2718 for ReceiptWithBloom<R>
 where
     R: Eip2718EncodableReceipt + Send + Sync,
 {
-    fn type_flag(&self) -> Option<u8> {
-        (!self.receipt.is_legacy()).then_some(self.receipt.ty())
-    }
-
     fn encode_2718_len(&self) -> usize {
         self.receipt.eip2718_encoded_length_with_bloom(&self.logs_bloom)
     }

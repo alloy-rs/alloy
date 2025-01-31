@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -27,7 +31,7 @@ alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "map"] }
 
 itertools.workspace = true
-derive_more = { workspace = true, features = ["display"] }
+thiserror.workspace = true
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -58,14 +62,22 @@ assert_matches.workspace = true
 
 [features]
 default = ["std", "serde"]
-std = ["alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-consensus/std",
+	"alloy-eips/std",
+	"alloy-consensus-any/std",
+	"alloy-network-primitives/std",
+	"alloy-serde?/std"
+]
 serde = [
-    "dep:serde",
-    "dep:serde_json",
-    "dep:alloy-serde",
-    "alloy-primitives/serde",
-    "alloy-consensus/serde",
-    "alloy-eips/serde",
+	"dep:serde",
+	"dep:serde_json",
+	"dep:alloy-serde",
+	"alloy-primitives/serde",
+	"alloy-consensus/serde",
+	"alloy-eips/serde",
+	"alloy-consensus-any/serde"
 ]
 arbitrary = [
     "std",

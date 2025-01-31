@@ -12,7 +12,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -22,7 +26,6 @@ workspace = true
 alloy-eips = { workspace = true, features = ["serde"] }
 alloy-rpc-types-engine = { workspace = true, features = ["serde"] }
 alloy-primitives.workspace = true
-alloy-serde.workspace = true
 
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
@@ -39,7 +42,8 @@ similar-asserts.workspace = true
 
 [features]
 ssz = [
-    "dep:ethereum_ssz",
-    "dep:ethereum_ssz_derive",
-    "alloy-rpc-types-engine/ssz",
+	"dep:ethereum_ssz",
+	"dep:ethereum_ssz_derive",
+	"alloy-rpc-types-engine/ssz",
+	"alloy-eips/ssz"
 ]

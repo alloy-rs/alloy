@@ -1,7 +1,7 @@
 //! Types for the `txpool` namespace: <https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool>
 
 use alloy_primitives::{Address, U256};
-use alloy_rpc_types_eth::Transaction;
+use alloy_rpc_types_eth::{Transaction, TransactionTrait};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -16,9 +16,27 @@ pub struct TxpoolInspectSummary {
     /// Transferred value
     pub value: U256,
     /// Gas amount
-    pub gas: u128,
+    pub gas: u64,
     /// Gas Price
     pub gas_price: u128,
+}
+
+impl TxpoolInspectSummary {
+    /// Extracts the [`TxpoolInspectSummary`] from a transaction.
+    pub fn from_tx<T: TransactionTrait>(tx: T) -> Self {
+        Self {
+            to: tx.to(),
+            value: tx.value(),
+            gas: tx.gas_limit(),
+            gas_price: tx.max_fee_per_gas(),
+        }
+    }
+}
+
+impl<T: TransactionTrait> From<T> for TxpoolInspectSummary {
+    fn from(value: T) -> Self {
+        Self::from_tx(value)
+    }
 }
 
 /// Visitor struct for TxpoolInspectSummary.
@@ -60,7 +78,7 @@ impl Visitor<'_> for TxpoolInspectSummaryVisitor {
             }
         };
         let value = U256::from_str(value_split[0]).map_err(de::Error::custom)?;
-        let gas = u128::from_str(gas_split[0]).map_err(de::Error::custom)?;
+        let gas = u64::from_str(gas_split[0]).map_err(de::Error::custom)?;
         let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
 
         Ok(TxpoolInspectSummary { to, value, gas, gas_price })
@@ -423,7 +441,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("000000000000000000000000000000000000007E").unwrap()),
                 value: U256::from(0u128),
-                gas: 100187u128,
+                gas: 100187,
                 gas_price: 20000000000u128,
             },
         );
@@ -437,7 +455,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65792u128,
+                gas: 65792,
                 gas_price: 2000000000u128,
             },
         );
@@ -446,7 +464,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65792u128,
+                gas: 65792,
                 gas_price: 2000000000u128,
             },
         );
@@ -455,7 +473,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65780u128,
+                gas: 65780,
                 gas_price: 2000000000u128,
             },
         );
@@ -464,7 +482,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65780u128,
+                gas: 65780,
                 gas_price: 2000000000u128,
             },
         );
@@ -478,7 +496,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: None,
                 value: U256::from(0u128),
-                gas: 612412u128,
+                gas: 612412,
                 gas_price: 6000000000u128,
             },
         );
@@ -493,7 +511,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("3479BE69e07E838D9738a301Bb0c89e8EA2Bef4a").unwrap()),
                 value: U256::from(1000000000000000u128),
-                gas: 21000u128,
+                gas: 21000,
                 gas_price: 10000000000u128,
             },
         );
@@ -502,7 +520,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(1000000000000000u128),
-                gas: 21000u128,
+                gas: 21000,
                 gas_price: 10000000000u128,
             },
         );
@@ -516,7 +534,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(10000000000000000u128),
-                gas: 21000u128,
+                gas: 21000,
                 gas_price: 10000000000u128,
             },
         );

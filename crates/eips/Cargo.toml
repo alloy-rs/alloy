@@ -13,13 +13,18 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
 
 [dependencies]
 # eips
+alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
 
@@ -49,6 +54,8 @@ ethereum_ssz = { workspace = true, optional = true }
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 
+# misc
+auto_impl.workspace = true
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -62,10 +69,22 @@ rand.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]
-std = ["alloy-primitives/std", "alloy-rlp/std",
-"serde?/std", "c-kzg?/std", "once_cell?/std"]
-serde = ["dep:alloy-serde", "dep:serde", "alloy-primitives/serde",
-"c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde"]
+std = [
+	"alloy-primitives/std",
+	"alloy-rlp/std",
+	"serde?/std",
+	"c-kzg?/std",
+	"once_cell?/std",
+	"alloy-serde?/std"
+]
+serde = [
+    "dep:alloy-serde",
+    "dep:serde",
+    "alloy-primitives/serde",
+    "c-kzg?/serde",
+    "alloy-eip2930/serde",
+    "alloy-eip7702/serde",
+]
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
 kzg = ["kzg-sidecar", "sha2", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
@@ -78,6 +97,7 @@ arbitrary = [
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
+    "alloy-eip2124/arbitrary",
     "alloy-eip2930/arbitrary",
     "alloy-eip7702/arbitrary",
     "alloy-eip7702/k256",

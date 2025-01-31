@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+  "-Zunstable-options",
+  "--generate-link-to-definition",
+  "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -36,11 +40,16 @@ arbitrary = { workspace = true, features = ["derive"] }
 
 [features]
 default = ["std"]
-std = ["alloy-eips/std"]
+std = [
+	"alloy-eips/std",
+	"alloy-consensus/std",
+	"alloy-serde?/std"
+]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = [
-  "dep:serde",
-  "alloy-primitives/serde",
-  "dep:alloy-serde",
-  "alloy-eips/serde",
+	"dep:serde",
+	"alloy-primitives/serde",
+	"dep:alloy-serde",
+	"alloy-eips/serde",
+	"alloy-consensus/serde"
 ]

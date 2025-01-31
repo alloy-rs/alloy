@@ -1,7 +1,7 @@
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkWallet, TransactionBuilder};
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 use super::{FillerControlFlow, TxFiller};
 
@@ -76,14 +76,13 @@ where
         }
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         _provider: &P,
         _tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N>,
     {
         Ok(())
     }

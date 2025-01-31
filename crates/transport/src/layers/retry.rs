@@ -25,23 +25,42 @@ use tokio::time::sleep;
 ///
 /// TransportError: crate::error::TransportError
 #[derive(Debug, Clone)]
-pub struct RetryBackoffLayer {
+pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The initial backoff in milliseconds
     initial_backoff: u64,
     /// The number of compute units per second for this provider
     compute_units_per_second: u64,
+    /// The [RetryPolicy] to use. Defaults to [RateLimitRetryPolicy]
+    policy: P,
 }
 
 impl RetryBackoffLayer {
-    /// Creates a new retry layer with the given parameters.
+    /// Creates a new retry layer with the given parameters and the default [RateLimitRetryPolicy].
     pub const fn new(
         max_rate_limit_retries: u32,
         initial_backoff: u64,
         compute_units_per_second: u64,
     ) -> Self {
-        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second }
+        Self {
+            max_rate_limit_retries,
+            initial_backoff,
+            compute_units_per_second,
+            policy: RateLimitRetryPolicy,
+        }
+    }
+}
+
+impl<P: RetryPolicy> RetryBackoffLayer<P> {
+    /// Creates a new retry layer with the given parameters and [RetryPolicy].
+    pub const fn new_with_policy(
+        max_rate_limit_retries: u32,
+        initial_backoff: u64,
+        compute_units_per_second: u64,
+        policy: P,
+    ) -> Self {
+        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second, policy }
     }
 }
 
@@ -72,13 +91,13 @@ impl RetryPolicy for RateLimitRetryPolicy {
     }
 }
 
-impl<S> Layer<S> for RetryBackoffLayer {
-    type Service = RetryBackoffService<S>;
+impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
+    type Service = RetryBackoffService<S, P>;
 
     fn layer(&self, inner: S) -> Self::Service {
         RetryBackoffService {
             inner,
-            policy: RateLimitRetryPolicy,
+            policy: self.policy.clone(),
             max_rate_limit_retries: self.max_rate_limit_retries,
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
@@ -90,11 +109,11 @@ impl<S> Layer<S> for RetryBackoffLayer {
 /// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
 #[derive(Debug, Clone)]
-pub struct RetryBackoffService<S> {
+pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
     inner: S,
-    /// The retry policy
-    policy: RateLimitRetryPolicy,
+    /// The [RetryPolicy] to use.
+    policy: P,
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The initial backoff in milliseconds
@@ -105,18 +124,19 @@ pub struct RetryBackoffService<S> {
     requests_enqueued: Arc<AtomicU32>,
 }
 
-impl<S> RetryBackoffService<S> {
+impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
     const fn initial_backoff(&self) -> Duration {
         Duration::from_millis(self.initial_backoff)
     }
 }
 
-impl<S> Service<RequestPacket> for RetryBackoffService<S>
+impl<S, P> Service<RequestPacket> for RetryBackoffService<S, P>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + 'static
         + Clone,
+    P: RetryPolicy + Clone + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;

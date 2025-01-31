@@ -1,4 +1,4 @@
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{bytes, Address, B256};
 use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
@@ -26,18 +26,35 @@ impl<T> Recovered<T> {
     }
 
     /// Returns a reference to the transaction.
+    #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
         &self.tx
     }
 
     /// Transform back to the transaction.
+    #[doc(alias = "into_transaction")]
     pub fn into_tx(self) -> T {
         self.tx
     }
 
+    /// Clone the inner transaction.
+    #[doc(alias = "clone_transaction")]
+    pub fn clone_tx(&self) -> T
+    where
+        T: Clone,
+    {
+        self.tx.clone()
+    }
+
     /// Dissolve Self to its component
+    #[doc(alias = "split")]
     pub fn into_parts(self) -> (T, Address) {
         (self.tx, self.signer)
+    }
+
+    /// Converts from `&Recovered<T>` to `Recovered<&T>`.
+    pub const fn as_recovered_ref(&self) -> Recovered<&T> {
+        Recovered { tx: &self.tx, signer: self.signer() }
     }
 
     /// Create [`Recovered`] from the given transaction and [`Address`] of the signer.
@@ -48,9 +65,28 @@ impl<T> Recovered<T> {
         Self { tx, signer }
     }
 
-    /// Applies the given closure to the inner transactions.
+    /// Applies the given closure to the inner transaction type.
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.tx), self.signer)
+    }
+
+    /// Applies the given fallible closure to the inner transaction type.
+    pub fn try_map_transaction<Tx, E>(
+        self,
+        f: impl FnOnce(T) -> Result<Tx, E>,
+    ) -> Result<Recovered<Tx>, E> {
+        Ok(Recovered::new_unchecked(f(self.tx)?, self.signer))
+    }
+}
+
+impl<T> Recovered<&T> {
+    /// Maps a `Recovered<&T>` to a `Recovered<T>` by cloning the transaction.
+    pub fn cloned(self) -> Recovered<T>
+    where
+        T: Clone,
+    {
+        let Self { tx, signer } = self;
+        Recovered::new_unchecked(tx.clone(), signer)
     }
 }
 
@@ -75,11 +111,13 @@ impl<T: Decodable + SignerRecoverable> Decodable for Recovered<T> {
     }
 }
 
-impl<T: Encodable2718> Encodable2718 for Recovered<T> {
-    fn type_flag(&self) -> Option<u8> {
-        self.tx.type_flag()
+impl<T: Typed2718> Typed2718 for Recovered<T> {
+    fn ty(&self) -> u8 {
+        self.tx.ty()
     }
+}
 
+impl<T: Encodable2718> Encodable2718 for Recovered<T> {
     fn encode_2718_len(&self) -> usize {
         self.tx.encode_2718_len()
     }

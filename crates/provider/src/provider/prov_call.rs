@@ -1,6 +1,6 @@
-use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_rpc_client::{RpcCall, Waiter};
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 use futures::FutureExt;
 use pin_project::pin_project;
 use serde_json::value::RawValue;
@@ -22,15 +22,14 @@ use tokio::sync::oneshot;
 ///
 /// [`Provider`]: crate::Provider
 #[pin_project(project = ProviderCallProj)]
-pub enum ProviderCall<Conn, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub enum ProviderCall<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// An underlying call to an RPC server.
-    RpcCall(RpcCall<Conn, Params, Resp, Output, Map>),
+    RpcCall(RpcCall<Params, Resp, Output, Map>),
     /// A waiter for a batched call to a remote RPC server.
     Waiter(Waiter<Resp, Output, Map>),
     /// A boxed future.
@@ -39,11 +38,10 @@ where
     Ready(Option<TransportResult<Output>>),
 }
 
-impl<Conn, Params, Resp, Output, Map> ProviderCall<Conn, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> ProviderCall<Params, Resp, Output, Map>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Instantiate a new [`ProviderCall`] from the output.
@@ -57,7 +55,7 @@ where
     }
 
     /// Fallible cast to [`RpcCall`]
-    pub const fn as_rpc_call(&self) -> Option<&RpcCall<Conn, Params, Resp, Output, Map>> {
+    pub const fn as_rpc_call(&self) -> Option<&RpcCall<Params, Resp, Output, Map>> {
         match self {
             Self::RpcCall(call) => Some(call),
             _ => None,
@@ -65,7 +63,7 @@ where
     }
 
     /// Fallible cast to mutable [`RpcCall`]
-    pub fn as_mut_rpc_call(&mut self) -> Option<&mut RpcCall<Conn, Params, Resp, Output, Map>> {
+    pub fn as_mut_rpc_call(&mut self) -> Option<&mut RpcCall<Params, Resp, Output, Map>> {
         match self {
             Self::RpcCall(call) => Some(call),
             _ => None,
@@ -144,7 +142,7 @@ where
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
-    ) -> Result<ProviderCall<Conn, Params, Resp, NewOutput, NewMap>, Self>
+    ) -> Result<ProviderCall<Params, Resp, NewOutput, NewMap>, Self>
     where
         NewMap: Fn(Resp) -> NewOutput + Clone,
     {
@@ -156,12 +154,11 @@ where
     }
 }
 
-impl<Conn, Params, Resp, Output, Map> ProviderCall<Conn, &Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> ProviderCall<&Params, Resp, Output, Map>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam + ToOwned,
-    Params::Owned: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend + ToOwned,
+    Params::Owned: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
@@ -169,7 +166,7 @@ where
     /// # Panics
     ///
     /// Panics if called after the request has been polled.
-    pub fn into_owned_params(self) -> ProviderCall<Conn, Params::Owned, Resp, Output, Map> {
+    pub fn into_owned_params(self) -> ProviderCall<Params::Owned, Resp, Output, Map> {
         match self {
             Self::RpcCall(call) => ProviderCall::RpcCall(call.into_owned_params()),
             _ => panic!(),
@@ -177,11 +174,10 @@ where
     }
 }
 
-impl<Conn, Params, Resp> std::fmt::Debug for ProviderCall<Conn, Params, Resp>
+impl<Params, Resp> std::fmt::Debug for ProviderCall<Params, Resp>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -193,38 +189,33 @@ where
     }
 }
 
-impl<Conn, Params, Resp, Output, Map> From<RpcCall<Conn, Params, Resp, Output, Map>>
-    for ProviderCall<Conn, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
+    for ProviderCall<Params, Resp, Output, Map>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
-    fn from(call: RpcCall<Conn, Params, Resp, Output, Map>) -> Self {
+    fn from(call: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self::RpcCall(call)
     }
 }
 
-impl<Conn, Params, Resp> From<Waiter<Resp>>
-    for ProviderCall<Conn, Params, Resp, Resp, fn(Resp) -> Resp>
+impl<Params, Resp> From<Waiter<Resp>> for ProviderCall<Params, Resp, Resp, fn(Resp) -> Resp>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn from(waiter: Waiter<Resp>) -> Self {
         Self::Waiter(waiter)
     }
 }
 
-impl<Conn, Params, Resp, Output, Map>
-    From<Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>>
-    for ProviderCall<Conn, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> From<Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>>
+    for ProviderCall<Params, Resp, Output, Map>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
@@ -232,23 +223,21 @@ where
     }
 }
 
-impl<Conn, Params, Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>>
-    for ProviderCall<Conn, Params, Resp>
+impl<Params, Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>>
+    for ProviderCall<Params, Resp>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     fn from(rx: oneshot::Receiver<TransportResult<Box<RawValue>>>) -> Self {
         Waiter::from(rx).into()
     }
 }
 
-impl<Conn, Params, Resp, Output, Map> Future for ProviderCall<Conn, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> Future for ProviderCall<Params, Resp, Output, Map>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {

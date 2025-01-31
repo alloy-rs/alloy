@@ -1,5 +1,5 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType, Typed2718};
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
@@ -75,7 +75,7 @@ pub struct TxEip1559 {
 impl TxEip1559 {
     /// Get the transaction type
     #[doc(alias = "transaction_type")]
-    pub(crate) const fn tx_type() -> TxType {
+    pub const fn tx_type() -> TxType {
         TxType::Eip1559
     }
 

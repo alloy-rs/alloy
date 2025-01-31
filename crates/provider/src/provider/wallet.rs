@@ -4,7 +4,6 @@ use crate::{
 };
 use alloy_network::{Ethereum, Network, NetworkWallet};
 use alloy_primitives::Address;
-use alloy_transport::Transport;
 
 /// Trait for Providers, Fill stacks, etc, which contain [`NetworkWallet`].
 pub trait WalletProvider<N: Network = Ethereum> {
@@ -71,11 +70,10 @@ where
     }
 }
 
-impl<F, P, T, N> WalletProvider<N> for FillProvider<F, P, T, N>
+impl<F, P, N> WalletProvider<N> for FillProvider<F, P, N>
 where
     F: TxFiller<N> + WalletProvider<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     type Wallet = F::Wallet;
@@ -99,14 +97,14 @@ mod test {
 
     #[test]
     fn basic_usage() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().disable_recommended_fillers().on_anvil_with_wallet();
 
         assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }
 
     #[test]
     fn bubbles_through_fillers() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }

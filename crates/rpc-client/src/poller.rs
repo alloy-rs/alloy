@@ -1,6 +1,6 @@
 use crate::WeakClient;
-use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_transport::{utils::Spawnable, Transport};
+use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
+use alloy_transport::utils::Spawnable;
 use futures::{Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
@@ -45,13 +45,13 @@ const MAX_RETRIES: usize = 3;
 /// Poll `eth_blockNumber` every 5 seconds:
 ///
 /// ```no_run
-/// # async fn example<T: alloy_transport::Transport + Clone>(client: alloy_rpc_client::RpcClient<T>) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example(client: alloy_rpc_client::RpcClient) -> Result<(), Box<dyn std::error::Error>> {
 /// use alloy_primitives::U64;
 /// use alloy_rpc_client::PollerBuilder;
 /// use futures_util::StreamExt;
 ///
-/// let poller: PollerBuilder<_, (), U64> = client
-///     .prepare_static_poller("eth_blockNumber", ())
+/// let poller: PollerBuilder<alloy_rpc_client::NoParams, U64> = client
+///     .prepare_static_poller("eth_blockNumber", [])
 ///     .with_poll_interval(std::time::Duration::from_secs(5));
 /// let mut stream = poller.into_stream();
 /// while let Some(block_number) = stream.next().await {
@@ -63,9 +63,9 @@ const MAX_RETRIES: usize = 3;
 // TODO: make this be able to be spawned on the current thread instead of forcing a task.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
-pub struct PollerBuilder<Conn, Params, Resp> {
+pub struct PollerBuilder<Params, Resp> {
     /// The client to poll with.
-    client: WeakClient<Conn>,
+    client: WeakClient,
 
     /// Request Method
     method: Cow<'static, str>,
@@ -79,18 +79,13 @@ pub struct PollerBuilder<Conn, Params, Resp> {
     _pd: PhantomData<fn() -> Resp>,
 }
 
-impl<Conn, Params, Resp> PollerBuilder<Conn, Params, Resp>
+impl<Params, Resp> PollerBuilder<Params, Resp>
 where
-    Conn: Transport + Clone,
-    Params: RpcParam + 'static,
-    Resp: RpcReturn + Clone,
+    Params: RpcSend + 'static,
+    Resp: RpcRecv + Clone,
 {
     /// Create a new poller task.
-    pub fn new(
-        client: WeakClient<Conn>,
-        method: impl Into<Cow<'static, str>>,
-        params: Params,
-    ) -> Self {
+    pub fn new(client: WeakClient, method: impl Into<Cow<'static, str>>, params: Params) -> Self {
         let poll_interval =
             client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.poll_interval());
         Self {
@@ -253,7 +248,7 @@ impl<Resp> DerefMut for PollChannel<Resp> {
 
 impl<Resp> PollChannel<Resp>
 where
-    Resp: RpcReturn + Clone,
+    Resp: RpcRecv + Clone,
 {
     /// Resubscribe to the poller task.
     pub fn resubscribe(&self) -> Self {

@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -39,8 +43,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-alloy-signer-local.workspace = true
-tokio.workspace = true
 
 [features]
 k256 = ["alloy-primitives/k256", "alloy-consensus/k256"]

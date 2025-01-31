@@ -1,4 +1,4 @@
-use crate::{common::Id, RpcObject, RpcParam};
+use crate::{common::Id, RpcBorrow, RpcSend};
 use alloy_primitives::{keccak256, B256};
 use serde::{
     de::{DeserializeOwned, MapAccess},
@@ -105,7 +105,7 @@ pub type PartiallySerializedRequest = Request<Box<RawValue>>;
 
 impl<Params> Request<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     /// Serialize the request parameters as a boxed [`RawValue`].
     ///
@@ -126,7 +126,7 @@ where
 impl<Params> Request<&Params>
 where
     Params: ToOwned,
-    Params::Owned: RpcParam,
+    Params::Owned: RpcSend,
 {
     /// Clone the request, including the request parameters.
     pub fn into_owned_params(self) -> Request<Params::Owned> {
@@ -164,7 +164,7 @@ where
 // `jsonrpc` field
 impl<Params> Serialize for Request<Params>
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -188,7 +188,7 @@ where
 
 impl<'de, Params> Deserialize<'de> for Request<Params>
 where
-    Params: RpcObject,
+    Params: RpcBorrow<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -197,7 +197,7 @@ where
         struct Visitor<Params>(PhantomData<Params>);
         impl<'de, Params> serde::de::Visitor<'de> for Visitor<Params>
         where
-            Params: RpcObject,
+            Params: RpcBorrow<'de>,
         {
             type Value = Request<Params>;
 
@@ -297,7 +297,7 @@ pub struct SerializedRequest {
 
 impl<Params> std::convert::TryFrom<Request<Params>> for SerializedRequest
 where
-    Params: RpcParam,
+    Params: RpcSend,
 {
     type Error = serde_json::Error;
 
@@ -390,6 +390,7 @@ impl Serialize for SerializedRequest {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::RpcObject;
 
     fn test_inner<T: RpcObject + PartialEq>(t: T) {
         let ser = serde_json::to_string(&t).unwrap();
