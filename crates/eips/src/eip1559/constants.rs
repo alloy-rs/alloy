@@ -1,7 +1,14 @@
 use alloy_primitives::U256;
 
-/// The default Ethereum block gas limit.
-pub const ETHEREUM_BLOCK_GAS_LIMIT: u64 = 36_000_000;
+/// The default Ethereum block gas limit: 30M
+#[deprecated(note = "use ETHEREUM_BLOCK_GAS_LIMIT_30M instead")]
+pub const ETHEREUM_BLOCK_GAS_LIMIT: u64 = 30_000_000;
+
+/// The default Ethereum block gas limit: 30M
+pub const ETHEREUM_BLOCK_GAS_LIMIT_30M: u64 = 30_000_000;
+
+/// The default Ethereum block gas limit: 30M
+pub const ETHEREUM_BLOCK_GAS_LIMIT_36M: u64 = 30_000_000;
 
 /// The minimum tx fee below which the txpool will reject the transaction.
 ///
