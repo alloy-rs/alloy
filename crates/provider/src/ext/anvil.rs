@@ -141,6 +141,9 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Reorg the chain
     async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()>;
 
+    /// Rollback the chain  
+    async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()>;
+
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
         &self,
@@ -308,6 +311,10 @@ where
 
     async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()> {
         self.client().request("anvil_reorg", options).await
+    }
+
+    async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()> {
+        self.client().request("anvil_rollback", (depth,)).await
     }
 
     async fn eth_send_unsigned_transaction(
@@ -970,6 +977,31 @@ mod tests {
 
         assert_eq!(reorged_block.header.number, new_block.header.number);
         assert_ne!(reorged_block.header.hash, new_block.header.hash);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_anvil_rollback() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        // Mine two blocks
+        provider.anvil_mine(Some(2), None).await.unwrap();
+
+        let target_height = provider
+            .get_block_by_number(1.into(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
+
+        provider.anvil_rollback(Some(1)).await.unwrap();
+
+        let new_head = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(target_height, new_head);
     }
 
     #[tokio::test]
