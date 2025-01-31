@@ -5,11 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0](https://github.com/alloy-rs/alloy/releases/tag/v0.10.0) - 2025-01-06
+## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Documentation
 
 - Enable some useful rustdoc features on docs.rs ([#1890](https://github.com/alloy-rs/alloy/issues/1890))
+
+### Features
+
+- Add calc tx root fn for rpc types ([#1950](https://github.com/alloy-rs/alloy/issues/1950))
+- Rm 7702 auth items from receipt response ([#1897](https://github.com/alloy-rs/alloy/issues/1897))
+
+### Miscellaneous Tasks
+
+- Release 0.10.0
+
+### Other
+
+- Add zepter and propagate features ([#1951](https://github.com/alloy-rs/alloy/issues/1951))
 
 ## [0.9.2](https://github.com/alloy-rs/alloy/releases/tag/v0.9.2) - 2025-01-03
 

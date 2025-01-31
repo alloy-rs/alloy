@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0](https://github.com/alloy-rs/alloy/releases/tag/v0.10.0) - 2025-01-06
+## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Documentation
 
@@ -13,9 +13,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Add blockbody ommers generic ([#1964](https://github.com/alloy-rs/alloy/issues/1964))
+- Introduce maybe helpers for blob calc ([#1962](https://github.com/alloy-rs/alloy/issues/1962))
+- Add some doc aliases for recovered ([#1961](https://github.com/alloy-rs/alloy/issues/1961))
+- Couple convenience methods ([#1955](https://github.com/alloy-rs/alloy/issues/1955))
+- Add map fns to rpc transaction type ([#1936](https://github.com/alloy-rs/alloy/issues/1936))
+- Add Recovered::cloned ([#1932](https://github.com/alloy-rs/alloy/issues/1932))
+- Add more derives for `Receipts` ([#1930](https://github.com/alloy-rs/alloy/issues/1930))
+- [consensus] Make fn tx_type() public ([#1926](https://github.com/alloy-rs/alloy/issues/1926))
+- Add rlp length helper ([#1906](https://github.com/alloy-rs/alloy/issues/1906))
 - Remove T: Transport from public APIs ([#1859](https://github.com/alloy-rs/alloy/issues/1859))
 - Add RecoveredTx::try_map_transaction ([#1885](https://github.com/alloy-rs/alloy/issues/1885))
 - Add missing helper fns ([#1880](https://github.com/alloy-rs/alloy/issues/1880))
+
+### Miscellaneous Tasks
+
+- Use u64 for base fee in tx info ([#1963](https://github.com/alloy-rs/alloy/issues/1963))
+- Dont enable serde in tests ([#1966](https://github.com/alloy-rs/alloy/issues/1966))
+- Add receipt conversion fns ([#1949](https://github.com/alloy-rs/alloy/issues/1949))
+- Add as_recovered_ref ([#1933](https://github.com/alloy-rs/alloy/issues/1933))
+- [eips] Add super trait `Typed2718` to `Encodable2718` ([#1913](https://github.com/alloy-rs/alloy/issues/1913))
+- [consensus] Replace magic numbers for tx type with constants ([#1911](https://github.com/alloy-rs/alloy/issues/1911))
+- Release 0.10.0
+
+### Other
+
+- Add zepter and propagate features ([#1951](https://github.com/alloy-rs/alloy/issues/1951))
+
+### Testing
+
+- Migrate 4844 rlp tests ([#1928](https://github.com/alloy-rs/alloy/issues/1928))
 
 ## [0.9.2](https://github.com/alloy-rs/alloy/releases/tag/v0.9.2) - 2025-01-03
 

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0](https://github.com/alloy-rs/alloy/releases/tag/v0.10.0) - 2025-01-06
+## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Documentation
 
@@ -13,14 +13,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Unify `BlobParams` and `BlobScheduleItem` ([#1919](https://github.com/alloy-rs/alloy/issues/1919))
+- Reexport eip2124 ([#1900](https://github.com/alloy-rs/alloy/issues/1900))
 - Add match_versioned_hashes ([#1882](https://github.com/alloy-rs/alloy/issues/1882))
 
 ### Miscellaneous Tasks
 
+- Update system contract addresses for devnet 6 ([#1975](https://github.com/alloy-rs/alloy/issues/1975))
+- Feature gate serde ([#1967](https://github.com/alloy-rs/alloy/issues/1967))
+- Forward arbitrary feature ([#1941](https://github.com/alloy-rs/alloy/issues/1941))
+- [eips] Add super trait `Typed2718` to `Encodable2718` ([#1913](https://github.com/alloy-rs/alloy/issues/1913))
+- Release 0.10.0
 - Improve FromStr for `BlockNumberOrTag` to be case-insensitive ([#1891](https://github.com/alloy-rs/alloy/issues/1891))
 - Shift std::error impls to core ([#1888](https://github.com/alloy-rs/alloy/issues/1888))
 - Use core::error for blob validation error ([#1887](https://github.com/alloy-rs/alloy/issues/1887))
 - Use safe get api  ([#1886](https://github.com/alloy-rs/alloy/issues/1886))
+
+### Other
+
+- Add zepter and propagate features ([#1951](https://github.com/alloy-rs/alloy/issues/1951))
+
+### Testing
+
+- Require serde features for tests ([#1924](https://github.com/alloy-rs/alloy/issues/1924))
+- Migrate eip1898 tests ([#1922](https://github.com/alloy-rs/alloy/issues/1922))
 
 ## [0.9.2](https://github.com/alloy-rs/alloy/releases/tag/v0.9.2) - 2025-01-03
 

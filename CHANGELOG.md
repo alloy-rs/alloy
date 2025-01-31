@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0](https://github.com/alloy-rs/alloy/releases/tag/v0.10.0) - 2025-01-06
+## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
+
+### Bug Fixes
+
+- Store pubsubfrontend clone in rpcinner ([#1977](https://github.com/alloy-rs/alloy/issues/1977))
+- Map txcount resp ([#1968](https://github.com/alloy-rs/alloy/issues/1968))
+- [`contract`] Rm IntoFuture for CallBuilder ([#1945](https://github.com/alloy-rs/alloy/issues/1945))
+- Propagate ssz features ([#1934](https://github.com/alloy-rs/alloy/issues/1934))
+- Version number of installation is out of date ([#1927](https://github.com/alloy-rs/alloy/issues/1927))
+- [`node-bindings`] Reset `child.stdout` in `AnvilInstance` ([#1920](https://github.com/alloy-rs/alloy/issues/1920))
+- [`transport`] Use `HttpsConnector` in `HyperTransport` ([#1899](https://github.com/alloy-rs/alloy/issues/1899))
+
+### Dependencies
+
+- [deps] Breaking bumps ([#1957](https://github.com/alloy-rs/alloy/issues/1957))
 
 ### Documentation
 
@@ -13,6 +27,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Add avil ipc-path arg ([#1978](https://github.com/alloy-rs/alloy/issues/1978))
+- Use StatusCode::is_success instead of just OK ([#1974](https://github.com/alloy-rs/alloy/issues/1974))
+- Add blockbody ommers generic ([#1964](https://github.com/alloy-rs/alloy/issues/1964))
+- Introduce maybe helpers for blob calc ([#1962](https://github.com/alloy-rs/alloy/issues/1962))
+- Add some doc aliases for recovered ([#1961](https://github.com/alloy-rs/alloy/issues/1961))
+- Add TxRequest::from_recovered_transaction helper ([#1960](https://github.com/alloy-rs/alloy/issues/1960))
+- Add into sealed for rpc header ([#1956](https://github.com/alloy-rs/alloy/issues/1956))
+- Couple convenience methods ([#1955](https://github.com/alloy-rs/alloy/issues/1955))
+- Add helpers for tx conditional ([#1953](https://github.com/alloy-rs/alloy/issues/1953))
+- Add calc tx root fn for rpc types ([#1950](https://github.com/alloy-rs/alloy/issues/1950))
+- [`provider`] `eth_callMany` builder ([#1944](https://github.com/alloy-rs/alloy/issues/1944))
+- Add map fns to rpc transaction type ([#1936](https://github.com/alloy-rs/alloy/issues/1936))
+- Add deserde check for JsonStorageKey ([#1915](https://github.com/alloy-rs/alloy/issues/1915))
+- Add Recovered::cloned ([#1932](https://github.com/alloy-rs/alloy/issues/1932))
+- Add more derives for `Receipts` ([#1930](https://github.com/alloy-rs/alloy/issues/1930))
+- [consensus] Make fn tx_type() public ([#1926](https://github.com/alloy-rs/alloy/issues/1926))
+- Unify `BlobParams` and `BlobScheduleItem` ([#1919](https://github.com/alloy-rs/alloy/issues/1919))
+- [`meta`] Add `essentials` to default features ([#1904](https://github.com/alloy-rs/alloy/issues/1904))
+- Make ReadJsonStream generic to allow reuse ([#1914](https://github.com/alloy-rs/alloy/issues/1914))
+- Add missing conversion for ExecutionPayloadFieldV2 ([#1908](https://github.com/alloy-rs/alloy/issues/1908))
+- Add rlp length helper ([#1906](https://github.com/alloy-rs/alloy/issues/1906))
+- [`provider`] Instantiate recommended fillers by default ([#1901](https://github.com/alloy-rs/alloy/issues/1901))
+- Add helper to forkchoice state ([#1903](https://github.com/alloy-rs/alloy/issues/1903))
+- Reexport eip2124 ([#1900](https://github.com/alloy-rs/alloy/issues/1900))
+- [contract] Improve 'no data' error message ([#1898](https://github.com/alloy-rs/alloy/issues/1898))
+- Rm 7702 auth items from receipt response ([#1897](https://github.com/alloy-rs/alloy/issues/1897))
 - Remove T: Transport from public APIs ([#1859](https://github.com/alloy-rs/alloy/issues/1859))
 - Add match_versioned_hashes ([#1882](https://github.com/alloy-rs/alloy/issues/1882))
 - Add RecoveredTx::try_map_transaction ([#1885](https://github.com/alloy-rs/alloy/issues/1885))
@@ -22,18 +62,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Disable anvil nightly warning ([#1979](https://github.com/alloy-rs/alloy/issues/1979))
+- Remove Service impls for &T ([#1973](https://github.com/alloy-rs/alloy/issues/1973))
+- Update system contract addresses for devnet 6 ([#1975](https://github.com/alloy-rs/alloy/issues/1975))
+- Rm passthrough txcount request ([#1970](https://github.com/alloy-rs/alloy/issues/1970))
+- Use u64 for base fee in tx info ([#1963](https://github.com/alloy-rs/alloy/issues/1963))
+- Feature gate serde ([#1967](https://github.com/alloy-rs/alloy/issues/1967))
+- Dont enable serde in tests ([#1966](https://github.com/alloy-rs/alloy/issues/1966))
+- Add receipt conversion fns ([#1949](https://github.com/alloy-rs/alloy/issues/1949))
+- Forward arbitrary feature ([#1941](https://github.com/alloy-rs/alloy/issues/1941))
+- Add as_recovered_ref ([#1933](https://github.com/alloy-rs/alloy/issues/1933))
+- [eips] Add super trait `Typed2718` to `Encodable2718` ([#1913](https://github.com/alloy-rs/alloy/issues/1913))
+- [consensus] Replace magic numbers for tx type with constants ([#1911](https://github.com/alloy-rs/alloy/issues/1911))
+- Release 0.10.0
 - Improve FromStr for `BlockNumberOrTag` to be case-insensitive ([#1891](https://github.com/alloy-rs/alloy/issues/1891))
 - Shift std::error impls to core ([#1888](https://github.com/alloy-rs/alloy/issues/1888))
 - Use core::error for blob validation error ([#1887](https://github.com/alloy-rs/alloy/issues/1887))
 - Use safe get api  ([#1886](https://github.com/alloy-rs/alloy/issues/1886))
 - Add storage_slots helper ([#1884](https://github.com/alloy-rs/alloy/issues/1884))
 
+### Other
+
+- Added anvil_rollback to anvil API provider ([#1971](https://github.com/alloy-rs/alloy/issues/1971))
+- Added fast option into PrivateTransactionPreferences ([#1969](https://github.com/alloy-rs/alloy/issues/1969))
+- Add zepter and propagate features ([#1951](https://github.com/alloy-rs/alloy/issues/1951))
+- [Feature] Keep Anvil in Provider have same types as the rest of the project ([#1876](https://github.com/alloy-rs/alloy/issues/1876))
+
 ### Refactor
 
+- Change json-rpc trait names, relax bounds ([#1921](https://github.com/alloy-rs/alloy/issues/1921))
 - Use the params struct in more places ([#1892](https://github.com/alloy-rs/alloy/issues/1892))
+
+### Styling
+
+- Reuse `BlockOverrides` in `SimBundleOverrides` ([#1917](https://github.com/alloy-rs/alloy/issues/1917))
 
 ### Testing
 
+- Migrate 4844 rlp tests ([#1928](https://github.com/alloy-rs/alloy/issues/1928))
+- Require serde features for tests ([#1924](https://github.com/alloy-rs/alloy/issues/1924))
+- Migrate eip1898 tests ([#1922](https://github.com/alloy-rs/alloy/issues/1922))
 - Fix warnings on windows ([#1895](https://github.com/alloy-rs/alloy/issues/1895))
 - Add parity test ([#1889](https://github.com/alloy-rs/alloy/issues/1889))
 

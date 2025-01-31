@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0](https://github.com/alloy-rs/alloy/releases/tag/v0.10.0) - 2025-01-06
+## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
+
+### Bug Fixes
+
+- Store pubsubfrontend clone in rpcinner ([#1977](https://github.com/alloy-rs/alloy/issues/1977))
+- Map txcount resp ([#1968](https://github.com/alloy-rs/alloy/issues/1968))
+- [`node-bindings`] Reset `child.stdout` in `AnvilInstance` ([#1920](https://github.com/alloy-rs/alloy/issues/1920))
+- [`transport`] Use `HttpsConnector` in `HyperTransport` ([#1899](https://github.com/alloy-rs/alloy/issues/1899))
+
+### Dependencies
+
+- [deps] Breaking bumps ([#1957](https://github.com/alloy-rs/alloy/issues/1957))
 
 ### Documentation
 
@@ -13,10 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- [`provider`] `eth_callMany` builder ([#1944](https://github.com/alloy-rs/alloy/issues/1944))
+- [`provider`] Instantiate recommended fillers by default ([#1901](https://github.com/alloy-rs/alloy/issues/1901))
 - Remove T: Transport from public APIs ([#1859](https://github.com/alloy-rs/alloy/issues/1859))
+
+### Miscellaneous Tasks
+
+- Rm passthrough txcount request ([#1970](https://github.com/alloy-rs/alloy/issues/1970))
+- Release 0.10.0
+
+### Other
+
+- Added anvil_rollback to anvil API provider ([#1971](https://github.com/alloy-rs/alloy/issues/1971))
+- [Feature] Keep Anvil in Provider have same types as the rest of the project ([#1876](https://github.com/alloy-rs/alloy/issues/1876))
 
 ### Refactor
 
+- Change json-rpc trait names, relax bounds ([#1921](https://github.com/alloy-rs/alloy/issues/1921))
 - Use the params struct in more places ([#1892](https://github.com/alloy-rs/alloy/issues/1892))
 
 ### Testing
