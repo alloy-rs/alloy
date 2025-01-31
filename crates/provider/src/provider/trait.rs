@@ -1956,7 +1956,7 @@ mod tests {
 
     #[tokio::test]
     async fn capture_anvil_logs() {
-        let mut anvil = Anvil::new().spawn();
+        let mut anvil = Anvil::new().keep_stdout().spawn();
 
         let provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
 
