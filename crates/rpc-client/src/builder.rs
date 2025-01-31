@@ -35,13 +35,16 @@ impl<L> ClientBuilder<L> {
 
     /// Create a new [`RpcClient`] with the given transport and the configured
     /// layers.
+    ///
+    /// This collapses the [`tower::ServiceBuilder`] with the given transport via
+    /// [`tower::ServiceBuilder::service`].
     pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient
     where
         L: Layer<T>,
         T: IntoBoxTransport,
         L::Service: IntoBoxTransport,
     {
-        RpcClient::new(self.builder.service(transport), is_local)
+        RpcClient::new_layered(is_local, transport, move |t| self.builder.service(t))
     }
 
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
@@ -86,7 +89,7 @@ impl<L> ClientBuilder<L> {
     }
 
     /// Connect a WS transport, producing an [`RpcClient`] with the provided
-    /// connection
+    /// connection.
     #[cfg(feature = "ws")]
     pub async fn ws(self, ws_connect: alloy_transport_ws::WsConnect) -> TransportResult<RpcClient>
     where
