@@ -94,9 +94,7 @@ where
 
 impl Service<RequestPacket> for BoxTransport {
     type Response = ResponsePacket;
-
     type Error = TransportError;
-
     type Future = TransportFut<'static>;
 
     #[inline]

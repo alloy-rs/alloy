@@ -109,22 +109,6 @@ impl tower::Service<RequestPacket> for PubSubFrontend {
     type Future = TransportFut<'static>;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl tower::Service<RequestPacket> for &PubSubFrontend {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let result =
             if self.tx.is_closed() { Err(TransportErrorKind::backend_gone()) } else { Ok(()) };

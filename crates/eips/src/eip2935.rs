@@ -5,7 +5,7 @@
 use alloy_primitives::{address, bytes, Address, Bytes};
 
 /// The address for the EIP-2935 history storage contract.
-pub const HISTORY_STORAGE_ADDRESS: Address = address!("0F792be4B0c0cb4DAE440Ef133E90C0eCD48CCCC");
+pub const HISTORY_STORAGE_ADDRESS: Address = address!("0000F90827F1C53a10cb7A02335B175320002935");
 
 /// The code for the EIP-2935 history storage contract.
 pub static HISTORY_STORAGE_CODE: Bytes = bytes!("3373fffffffffffffffffffffffffffffffffffffffe14604657602036036042575f35600143038111604257611fff81430311604257611fff9006545f5260205ff35b5f5ffd5b5f35611fff60014303065500");

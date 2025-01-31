@@ -20,18 +20,18 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 ///
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::Deref)]
-#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Block<T, H = Header> {
     /// Block header.
     #[deref]
     pub header: H,
     /// Block body.
-    pub body: BlockBody<T>,
+    pub body: BlockBody<T, H>,
 }
 
 impl<T, H> Block<T, H> {
     /// Creates a new block with the given header and body.
-    pub const fn new(header: H, body: BlockBody<T>) -> Self {
+    pub const fn new(header: H, body: BlockBody<T, H>) -> Self {
         Self { header, body }
     }
 
@@ -46,18 +46,21 @@ impl<T, H> Block<T, H> {
     }
 
     /// Consumes the block and returns the body.
-    pub fn into_body(self) -> BlockBody<T> {
+    pub fn into_body(self) -> BlockBody<T, H> {
         self.body
     }
 
     /// Converts the block's header type by applying a function to it.
-    pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
-        Block { header: f(self.header), body: self.body }
+    pub fn map_header<U>(self, mut f: impl FnMut(H) -> U) -> Block<T, U> {
+        Block { header: f(self.header), body: self.body.map_ommers(f) }
     }
 
     /// Converts the block's header type by applying a fallible function to it.
-    pub fn try_map_header<U, E>(self, f: impl FnOnce(H) -> Result<U, E>) -> Result<Block<T, U>, E> {
-        Ok(Block { header: f(self.header)?, body: self.body })
+    pub fn try_map_header<U, E>(
+        self,
+        mut f: impl FnMut(H) -> Result<U, E>,
+    ) -> Result<Block<T, U>, E> {
+        Ok(Block { header: f(self.header)?, body: self.body.try_map_ommers(f)? })
     }
 
     /// Converts the block's transaction type by applying a function to each transaction.
@@ -97,7 +100,7 @@ impl<T, H> Block<T, H> {
     }
 
     /// Returns the RLP encoded length of the block's header and body.
-    pub fn rlp_length_for(header: &H, body: &BlockBody<T>) -> usize
+    pub fn rlp_length_for(header: &H, body: &BlockBody<T, H>) -> usize
     where
         H: Encodable,
         T: Encodable,
@@ -121,7 +124,7 @@ where
     }
 }
 
-impl<T, H> From<Block<T, H>> for BlockBody<T> {
+impl<T, H> From<Block<T, H>> for BlockBody<T, H> {
     fn from(block: Block<T, H>) -> Self {
         block.into_body()
     }
@@ -142,24 +145,24 @@ where
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
-#[cfg_attr(any(test, feature = "serde"), derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[rlp(trailing)]
-pub struct BlockBody<T> {
+pub struct BlockBody<T, H = Header> {
     /// Transactions in this block.
     pub transactions: Vec<T>,
     /// Ommers/uncles header.
-    pub ommers: Vec<Header>,
+    pub ommers: Vec<H>,
     /// Block withdrawals.
     pub withdrawals: Option<Withdrawals>,
 }
 
-impl<T> Default for BlockBody<T> {
+impl<T, H> Default for BlockBody<T, H> {
     fn default() -> Self {
         Self { transactions: Vec::new(), ommers: Vec::new(), withdrawals: None }
     }
 }
 
-impl<T> BlockBody<T> {
+impl<T, H> BlockBody<T, H> {
     /// Returns an iterator over all transactions.
     #[inline]
     pub fn transactions(&self) -> impl Iterator<Item = &T> + '_ {
@@ -167,14 +170,15 @@ impl<T> BlockBody<T> {
     }
 
     /// Create a [`Block`] from the body and its header.
-    pub const fn into_block(self, header: Header) -> Block<T> {
+    pub const fn into_block(self, header: H) -> Block<T, H> {
         Block { header, body: self }
     }
-}
 
-impl<T> BlockBody<T> {
     /// Calculate the ommers root for the block body.
-    pub fn calculate_ommers_root(&self) -> B256 {
+    pub fn calculate_ommers_root(&self) -> B256
+    where
+        H: Encodable,
+    {
         crate::proofs::calculate_ommers_root(&self.ommers)
     }
 
@@ -183,9 +187,30 @@ impl<T> BlockBody<T> {
     pub fn calculate_withdrawals_root(&self) -> Option<B256> {
         self.withdrawals.as_ref().map(|w| crate::proofs::calculate_withdrawals_root(w))
     }
+
+    /// Converts the body's ommers type by applying a function to it.
+    pub fn map_ommers<U>(self, f: impl FnMut(H) -> U) -> BlockBody<T, U> {
+        BlockBody {
+            transactions: self.transactions,
+            ommers: self.ommers.into_iter().map(f).collect(),
+            withdrawals: self.withdrawals,
+        }
+    }
+
+    /// Converts the body's ommers type by applying a fallible function to it.
+    pub fn try_map_ommers<U, E>(
+        self,
+        f: impl FnMut(H) -> Result<U, E>,
+    ) -> Result<BlockBody<T, U>, E> {
+        Ok(BlockBody {
+            transactions: self.transactions,
+            ommers: self.ommers.into_iter().map(f).collect::<Result<Vec<_>, _>>()?,
+            withdrawals: self.withdrawals,
+        })
+    }
 }
 
-impl<T: Transaction> BlockBody<T> {
+impl<T: Transaction, H> BlockBody<T, H> {
     /// Returns an iterator over all blob versioned hashes from the block body.
     #[inline]
     pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
@@ -193,7 +218,7 @@ impl<T: Transaction> BlockBody<T> {
     }
 }
 
-impl<T: Typed2718> BlockBody<T> {
+impl<T: Typed2718, H> BlockBody<T, H> {
     /// Returns whether or not the block body contains any blob transactions.
     #[inline]
     pub fn has_eip4844_transactions(&self) -> bool {
@@ -223,7 +248,7 @@ mod block_rlp {
     struct Helper<T, H> {
         header: H,
         transactions: Vec<T>,
-        ommers: Vec<Header>,
+        ommers: Vec<H>,
         withdrawals: Option<Withdrawals>,
     }
 
@@ -232,7 +257,7 @@ mod block_rlp {
     pub(crate) struct HelperRef<'a, T, H> {
         pub(crate) header: &'a H,
         pub(crate) transactions: &'a Vec<T>,
-        pub(crate) ommers: &'a Vec<Header>,
+        pub(crate) ommers: &'a Vec<H>,
         pub(crate) withdrawals: Option<&'a Withdrawals>,
     }
 
@@ -264,9 +289,10 @@ mod block_rlp {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for BlockBody<T>
+impl<'a, T, H> arbitrary::Arbitrary<'a> for BlockBody<T, H>
 where
     T: arbitrary::Arbitrary<'a>,
+    H: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // first generate up to 100 txs
@@ -277,7 +303,7 @@ where
 
         // then generate up to 2 ommers
         let ommers = (0..u.int_in_range(0..=1)?)
-            .map(|_| Header::arbitrary(u))
+            .map(|_| H::arbitrary(u))
             .collect::<arbitrary::Result<Vec<_>>>()?;
 
         Ok(Self { transactions, ommers, withdrawals: u.arbitrary()? })

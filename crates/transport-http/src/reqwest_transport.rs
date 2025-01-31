@@ -54,7 +54,7 @@ impl Http<Client> {
         debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
         trace!(body = %String::from_utf8_lossy(&body), "response body");
 
-        if status != reqwest::StatusCode::OK {
+        if !status.is_success() {
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
                 String::from_utf8_lossy(&body).into_owned(),
@@ -75,27 +75,12 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
     type Future = TransportFut<'static>;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        (&*self).poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        (&*self).call(req)
-    }
-}
-
-impl Service<RequestPacket> for &Http<reqwest::Client> {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         // `reqwest` always returns `Ok(())`.
         task::Poll::Ready(Ok(()))
     }
 
+    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
         let span = debug_span!("ReqwestTransport", url = %this.url);

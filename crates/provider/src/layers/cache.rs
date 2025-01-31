@@ -3,7 +3,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
 use alloy_network::Network;
 use alloy_primitives::{
-    keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
+    keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256,
 };
 use alloy_rpc_types_eth::{
     BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
@@ -332,16 +332,6 @@ where
 
             Ok(result)
         }))
-    }
-
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<Address, U64, u64> {
-        let client = self.inner.weak_client();
-        let cache = self.cache.clone();
-        RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
-
-            cache_rpc_call_with_block!(cache, client, req)
-        })
     }
 
     fn get_transaction_receipt(

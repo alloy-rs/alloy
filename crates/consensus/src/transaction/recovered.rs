@@ -26,16 +26,19 @@ impl<T> Recovered<T> {
     }
 
     /// Returns a reference to the transaction.
+    #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
         &self.tx
     }
 
     /// Transform back to the transaction.
+    #[doc(alias = "into_transaction")]
     pub fn into_tx(self) -> T {
         self.tx
     }
 
     /// Clone the inner transaction.
+    #[doc(alias = "clone_transaction")]
     pub fn clone_tx(&self) -> T
     where
         T: Clone,
@@ -44,6 +47,7 @@ impl<T> Recovered<T> {
     }
 
     /// Dissolve Self to its component
+    #[doc(alias = "split")]
     pub fn into_parts(self) -> (T, Address) {
         (self.tx, self.signer)
     }
