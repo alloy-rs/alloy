@@ -68,9 +68,19 @@ impl ExecutionPayloadSidecar {
         self.cancun.as_ref()
     }
 
+    /// Consumes the type and returns the [`CancunPayloadFields`]
+    pub fn into_cancun(self) -> Option<CancunPayloadFields> {
+        self.cancun.into_inner()
+    }
+
     /// Returns a reference to the [`PraguePayloadFields`].
     pub const fn prague(&self) -> Option<&PraguePayloadFields> {
         self.prague.as_ref()
+    }
+
+    /// Consumes the type and returns the [`PraguePayloadFields`].
+    pub fn into_prague(self) -> Option<PraguePayloadFields> {
+        self.prague.into_inner()
     }
 
     /// Returns the parent beacon block root, if any.
