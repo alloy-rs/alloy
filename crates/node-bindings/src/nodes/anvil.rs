@@ -136,6 +136,7 @@ pub struct Anvil {
     fork_block_number: Option<u64>,
     args: Vec<OsString>,
     timeout: Option<u64>,
+    keep_stdout: bool,
 }
 
 impl Anvil {
@@ -261,6 +262,14 @@ impl Anvil {
         self
     }
 
+    /// Keep the handle to anvil's stdout in order to read from it.
+    ///
+    /// Caution: if the stdout handle isn't used, this can end up blocking.
+    pub const fn keep_stdout(mut self) -> Self {
+        self.keep_stdout = true;
+        self
+    }
+
     /// Consumes the builder and spawns `anvil`.
     ///
     /// # Panics
@@ -360,7 +369,10 @@ impl Anvil {
             }
         }
 
-        child.stdout = Some(reader.into_inner());
+        if self.keep_stdout {
+            // re-attach the stdout handle if requested
+            child.stdout = Some(reader.into_inner());
+        }
 
         Ok(AnvilInstance {
             child,

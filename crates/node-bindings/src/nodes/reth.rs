@@ -162,6 +162,7 @@ pub struct Reth {
     chain_or_path: Option<String>,
     genesis: Option<Genesis>,
     args: Vec<OsString>,
+    keep_stdout: bool,
 }
 
 impl Reth {
@@ -187,6 +188,7 @@ impl Reth {
             chain_or_path: None,
             genesis: None,
             args: Vec::new(),
+            keep_stdout: false,
         }
     }
 
@@ -306,6 +308,14 @@ impl Reth {
     /// This is destructive and will overwrite any existing data in the data directory.
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
+        self
+    }
+
+    /// Keep the handle to reth's stdout in order to read from it.
+    ///
+    /// Caution: if the stdout handle isn't used, this can end up blocking.
+    pub const fn keep_stdout(mut self) -> Self {
+        self.keep_stdout = true;
         self
     }
 
@@ -510,7 +520,10 @@ impl Reth {
             }
         }
 
-        child.stdout = Some(reader.into_inner());
+        if self.keep_stdout {
+            // re-attach the stdout handle if requested
+            child.stdout = Some(reader.into_inner());
+        }
 
         Ok(RethInstance {
             pid: child,
