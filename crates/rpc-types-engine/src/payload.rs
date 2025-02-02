@@ -751,7 +751,7 @@ impl ssz::Encode for ExecutionPayloadV3 {
 }
 
 /// This includes all bundled blob related data of an executed payload.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BlobsBundleV1 {
@@ -778,6 +778,14 @@ impl BlobsBundleV1 {
             },
         );
         Self { commitments, proofs, blobs }
+    }
+
+    /// Returns a new empty blobs bundle.
+    ///
+    /// This is useful for the opstack engine API that expects an empty bundle as part of the
+    /// payload for API compatibility reasons.
+    pub fn empty() -> Self {
+        Self::default()
     }
 
     /// Take `len` blob data from the bundle.
