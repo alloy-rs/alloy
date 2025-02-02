@@ -34,18 +34,10 @@ use super::EthCallMany;
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 
-// todo: adjust docs
-// todo: reorder
-/// Provider is parameterized with a network and a transport. The default
-/// transport is type-erased, but you can do `Provider<Http, N>`.
+/// Provider is parameterized with a network. The default
+/// transport is type-erased, but you can do `Provider<N>`.
 ///
 /// # Subscriptions
-///
-/// **IMPORTANT:** this is currently only available when `T` is
-/// `PubSubFrontend` or `BoxedClient` over `PubSubFrontend` due to an internal
-/// limitation. This means that layering transports will always disable
-/// subscription support. See
-/// [issue #296](https://github.com/alloy-rs/alloy/issues/296).
 ///
 /// The provider supports `pubsub` subscriptions to new block headers and
 /// pending transactions. This is only available on `pubsub` clients, such as
