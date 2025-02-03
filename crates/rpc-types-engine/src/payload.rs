@@ -1088,12 +1088,23 @@ pub struct ExecutionPayloadBodyV1 {
 }
 
 impl ExecutionPayloadBodyV1 {
+    /// Creates an [`ExecutionPayloadBodyV1`] from the given withdrawals and transactions
+    pub fn new<'a, T>(
+        withdrawals: Option<Withdrawals>,
+        transactions: impl IntoIterator<Item = &'a T>,
+    ) -> Self
+    where
+        T: Encodable2718 + 'a,
+    {
+        Self {
+            transactions: transactions.into_iter().map(|tx| tx.encoded_2718().into()).collect(),
+            withdrawals: withdrawals.map(Withdrawals::into_inner),
+        }
+    }
+
     /// Converts a [`alloy_consensus::Block`] into an execution payload body.
     pub fn from_block<T: Encodable2718, H>(block: Block<T, H>) -> Self {
-        Self {
-            transactions: block.body.transactions().map(|tx| tx.encoded_2718().into()).collect(),
-            withdrawals: block.body.withdrawals.map(Withdrawals::into_inner),
-        }
+        Self::new(block.body.withdrawals.clone(), block.body.transactions())
     }
 }
 
