@@ -56,8 +56,8 @@ impl<N: Network> SendableTx<N> {
     /// Returns a [`SendableTxErr`] with the request object otherwise.
     pub fn try_into_envelope(self) -> Result<N::TxEnvelope, SendableTxErr<N::TransactionRequest>> {
         match self {
-            SendableTx::Builder(req) => Err(SendableTxErr::new(req)),
-            SendableTx::Envelope(env) => Ok(env),
+            Self::Builder(req) => Err(SendableTxErr::new(req)),
+            Self::Envelope(env) => Ok(env),
         }
     }
 
@@ -66,8 +66,8 @@ impl<N: Network> SendableTx<N> {
     /// Returns a [`SendableTxErr`] with the request object otherwise.
     pub fn try_into_request(self) -> Result<N::TransactionRequest, SendableTxErr<N::TxEnvelope>> {
         match self {
-            SendableTx::Builder(req) => Ok(req),
-            SendableTx::Envelope(env) => Err(SendableTxErr::new(env)),
+            Self::Builder(req) => Ok(req),
+            Self::Envelope(env) => Err(SendableTxErr::new(env)),
         }
     }
 }
