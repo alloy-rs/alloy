@@ -97,7 +97,7 @@ impl AnvilInstance {
         Url::parse(&self.ws_endpoint()).unwrap()
     }
 
-    /// Returns the [`EthereumWallet`] of this instance consisting of the anvil private keys
+    /// Returns the [`EthereumWallet`] of this instance generated from anvil dev accounts.
     pub fn wallet(&self) -> Option<EthereumWallet> {
         self.wallet.clone()
     }
