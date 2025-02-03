@@ -89,6 +89,11 @@ full = [
     "network",
     "provider-ws",
     "provider-ipc",
+    "provider-trace-api",
+    "provider-txpool-api",
+    "provider-debug-api",
+    "provider-anvil-api",
+    "pubsub",
 ]
 
 # configuration
