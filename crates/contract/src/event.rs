@@ -320,7 +320,7 @@ mod tests {
         // let from = address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
 
@@ -427,7 +427,7 @@ mod tests {
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
             .address(*contract.address())
             .event_signature(MyContract::MyEvent::SIGNATURE_HASH);
         let all = event.query().await.unwrap();

@@ -579,8 +579,7 @@ mod tests {
 
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     #[allow(clippy::type_complexity)]
-    fn build_call_builder() -> CallBuilder<(), impl Provider, PhantomData<MyContract::doStuffCall>>
-    {
+    fn build_call_builder() -> CallBuilder<impl Provider, PhantomData<MyContract::doStuffCall>> {
         let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
