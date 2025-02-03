@@ -34,8 +34,7 @@ use super::EthCallMany;
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 
-/// Provider is parameterized with a network. The default
-/// transport is type-erased, but you can do `Provider<N>`.
+/// Ethereum JSON-RPC interface.
 ///
 /// # Subscriptions
 ///
