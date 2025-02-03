@@ -1,7 +1,10 @@
 //! Utilities for launching an Anvil instance.
 
 use crate::NodeError;
+use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
+use alloy_signer::Signer;
+use alloy_signer_local::LocalSigner;
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     ffi::OsString,
@@ -29,6 +32,7 @@ pub struct AnvilInstance {
     child: Child,
     private_keys: Vec<K256SecretKey>,
     addresses: Vec<Address>,
+    wallet: Option<EthereumWallet>,
     ipc_path: Option<String>,
     port: u16,
     chain_id: Option<ChainId>,
@@ -91,6 +95,11 @@ impl AnvilInstance {
     /// Returns the Websocket endpoint url of this instance
     pub fn ws_endpoint_url(&self) -> Url {
         Url::parse(&self.ws_endpoint()).unwrap()
+    }
+
+    /// Returns the [`EthereumWallet`] of this instance consisting of the anvil private keys
+    pub fn wallet(&self) -> Option<EthereumWallet> {
+        self.wallet.clone()
     }
 }
 
@@ -328,6 +337,7 @@ impl Anvil {
         let mut addresses = Vec::new();
         let mut is_private_key = false;
         let mut chain_id = None;
+        let mut wallet = None;
         loop {
             if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
                 <= Instant::now()
@@ -367,6 +377,27 @@ impl Anvil {
                     chain_id = Some(chain);
                 };
             }
+
+            if !private_keys.is_empty() {
+                let (default, remaining) = private_keys.split_first().unwrap();
+                let pks = remaining
+                    .iter()
+                    .map(|key| {
+                        let mut signer = LocalSigner::from(key.clone());
+                        signer.set_chain_id(chain_id);
+                        signer
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut default_signer = LocalSigner::from(default.clone());
+                default_signer.set_chain_id(chain_id);
+                let mut w = EthereumWallet::new(default_signer);
+
+                for pk in pks {
+                    w.register_signer(pk);
+                }
+                wallet = Some(w);
+            }
         }
 
         if self.keep_stdout {
@@ -378,6 +409,7 @@ impl Anvil {
             child,
             private_keys,
             addresses,
+            wallet,
             ipc_path: self.ipc_path,
             port,
             chain_id: self.chain_id.or(chain_id),
