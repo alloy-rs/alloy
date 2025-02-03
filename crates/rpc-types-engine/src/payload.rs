@@ -1095,14 +1095,14 @@ impl ExecutionPayloadBodyV1 {
     }
 
     /// Converts a [`alloy_consensus::Block`] into an execution payload body.
-    pub fn from_block<T: Encodable2718, H>(block: &Block<T, H>) -> Self {
+    pub fn from_block<T: Encodable2718, H>(block: Block<T, H>) -> Self {
         Self::new(block.body.withdrawals.clone(), block.body.transactions())
     }
 }
 
 impl<T: Encodable2718, H> From<Block<T, H>> for ExecutionPayloadBodyV1 {
     fn from(value: Block<T, H>) -> Self {
-        Self::from_block(&value)
+        Self::from_block(value)
     }
 }
 
