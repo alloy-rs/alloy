@@ -252,20 +252,15 @@ fn compute_unit_offset_in_secs(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_compute_units_per_second() {
-        let offset = compute_unit_offset_in_secs(
-            17, 10, 0,0
-        );
+        let offset = compute_unit_offset_in_secs(17, 10, 0, 0);
         assert_eq!(offset, 0);
-        let offset = compute_unit_offset_in_secs(
-            17, 10, 2,2
-        );
+        let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
         assert_eq!(offset, 2);
     }
 }
