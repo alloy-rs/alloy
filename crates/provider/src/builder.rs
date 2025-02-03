@@ -447,22 +447,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
     {
-        use alloy_signer::Signer;
-
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
-        let default_keys = anvil_layer.instance().keys().to_vec();
-        let (default_key, remaining_keys) =
-            default_keys.split_first().ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
-
-        let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone())
-            .with_chain_id(Some(anvil_layer.instance().chain_id()));
-        let mut wallet = alloy_network::EthereumWallet::from(default_signer);
-
-        for key in remaining_keys {
-            wallet.register_signer(alloy_signer_local::LocalSigner::from(key.clone()))
-        }
+        let wallet = anvil_layer
+            .instance()
+            .wallet()
+            .ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
 
         let rpc_client = ClientBuilder::default().http(url);
 

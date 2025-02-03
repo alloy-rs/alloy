@@ -29,8 +29,6 @@ alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-network-primitives.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
-alloy-signer-local = { workspace = true, optional = true }
-alloy-signer = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
@@ -116,13 +114,7 @@ reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
 reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
 admin-api = ["dep:alloy-rpc-types-admin"]
 anvil-api = ["dep:alloy-rpc-types-anvil"]
-anvil-node = [
-    "anvil-api",
-    "reqwest",
-    "dep:alloy-node-bindings",
-    "dep:alloy-signer-local",
-    "dep:alloy-signer",
-]
+anvil-node = ["anvil-api", "reqwest", "dep:alloy-node-bindings"]
 debug-api = ["dep:alloy-rpc-types-trace", "dep:alloy-rpc-types-debug"]
 erc4337-api = []
 engine-api = ["dep:alloy-rpc-types-engine"]
