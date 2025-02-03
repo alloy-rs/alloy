@@ -214,7 +214,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 ///
 /// [`ProviderBuilder::filler`]: crate::ProviderBuilder::filler
 #[derive(Clone, Debug)]
-pub struct FillProvider<F, P, N>
+pub struct FillProvider<F, P, N = Ethereum>
 where
     F: TxFiller<N>,
     P: Provider<N>,
