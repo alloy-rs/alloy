@@ -484,7 +484,7 @@ mod tests {
                 .unwrap();
 
             let contract = MyContract::new(*contract.address(), &provider);
-            let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
+            let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
                 .address(*contract.address())
                 .event_signature(MyContract::MyEvent::SIGNATURE_HASH);
 

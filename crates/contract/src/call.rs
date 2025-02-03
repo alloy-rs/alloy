@@ -70,13 +70,13 @@ pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 /// // Through `contract.<function_name>(args...)`
 /// let a = U256::ZERO;
 /// let b = true;
-/// let builder: SolCallBuilder<_, _, MyContract::doStuffCall, _> = contract.doStuff(a, b);
+/// let builder: SolCallBuilder<_, MyContract::doStuffCall, _> = contract.doStuff(a, b);
 /// let MyContract::doStuffReturn { c: _, d: _ } = builder.call().await?;
 ///
 /// // Through `contract.call_builder(&<FunctionCall { args... }>)`:
 /// // (note that this is discouraged because it's inherently less type-safe)
 /// let call = MyContract::doStuffCall { a, b };
-/// let builder: SolCallBuilder<_, _, MyContract::doStuffCall, _> = contract.call_builder(&call);
+/// let builder: SolCallBuilder<_, MyContract::doStuffCall, _> = contract.call_builder(&call);
 /// let MyContract::doStuffReturn { c: _, d: _ } = builder.call().await?;
 /// # Ok(())
 /// # }
@@ -102,13 +102,13 @@ pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 /// let contract: ContractInstance<_, _> = interface.connect(address, &provider);
 ///
 /// // Build and call the function:
-/// let call_builder: DynCallBuilder<(), _, _> = contract.function("doStuff", &[U256::ZERO.into(), true.into()])?;
+/// let call_builder: DynCallBuilder<_, _> = contract.function("doStuff", &[U256::ZERO.into(), true.into()])?;
 /// let result: Vec<DynSolValue> = call_builder.call().await?;
 ///
 /// // You can also decode the output manually. Get the raw bytes:
 /// let raw_result: Bytes = call_builder.call_raw().await?;
 /// // Or, equivalently:
-/// let raw_builder: RawCallBuilder<(), _, _> = call_builder.clone().clear_decoder();
+/// let raw_builder: RawCallBuilder<_, _> = call_builder.clone().clear_decoder();
 /// let raw_result: Bytes = raw_builder.call().await?;
 /// // Decode the raw bytes:
 /// let decoded_result: Vec<DynSolValue> = call_builder.decode_output(raw_result, false)?;
