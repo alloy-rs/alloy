@@ -244,10 +244,23 @@ fn compute_unit_offset_in_secs(
     current_queued_requests: u64,
     ahead_in_queue: u64,
 ) -> u64 {
-    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost);
+    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost).max(1);
     if current_queued_requests > request_capacity_per_second {
         current_queued_requests.min(ahead_in_queue).saturating_div(request_capacity_per_second)
     } else {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_units_per_second() {
+        let offset = compute_unit_offset_in_secs(17, 10, 0, 0);
+        assert_eq!(offset, 0);
+        let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
+        assert_eq!(offset, 2);
     }
 }
