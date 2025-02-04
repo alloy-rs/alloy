@@ -18,7 +18,6 @@ use alloy_eips::{
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
-use serde::{Deserialize, Serialize};
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -1300,7 +1299,8 @@ impl core::fmt::Display for PayloadStatusEnum {
 
 /// Struct aggregating [`ExecutionPayload`] and [`ExecutionPayloadSidecar`] and encapsulating
 /// complete payload supplied for execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExecutionData {
     /// Execution payload.
     pub payload: ExecutionPayload,
