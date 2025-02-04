@@ -20,17 +20,7 @@ use wasmtimer::tokio::sleep;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::time::sleep;
 
-/// The default average cost of a request in compute units (CU). The cost of
-/// requests are usually weighted and can vary from 10 CU to several 100 CU,
-/// cheaper requests are more common some example alchemy
-/// weights:
-/// - `eth_getStorageAt`: 17
-/// - `eth_getBlockByNumber`: 16
-/// - `eth_newFilter`: 20
-///
-/// (coming from forking mode) assuming here that storage request will be the
-/// driver for Rate limits we choose `17` as the average cost
-/// of any request
+/// The default average cost of a request in compute units (CU).
 const DEFAULT_AVG_COST: u64 = 17u64;
 
 /// A Transport Layer that is responsible for retrying requests based on the
@@ -67,8 +57,18 @@ impl RetryBackoffLayer {
         }
     }
 
-    /// Set the average cost of a request
-    pub fn with_avg_cost(mut self, avg_cost: u64) {
+    /// Set the average cost of a request. Defaults to `17` CU
+    /// The cost of requests are usually weighted and can vary from 10 CU to several 100 CU,
+    /// cheaper requests are more common some example alchemy
+    /// weights:
+    /// - `eth_getStorageAt`: 17
+    /// - `eth_getBlockByNumber`: 16
+    /// - `eth_newFilter`: 20
+    ///
+    /// (coming from forking mode) assuming here that storage request will be the
+    /// driver for Rate limits we choose `17` as the average cost
+    /// of any request
+    pub fn with_avg_unit_cost(mut self, avg_cost: u64) {
         self.avg_cost = avg_cost;
     }
 }
