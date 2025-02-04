@@ -50,4 +50,41 @@ impl<N: Network> SendableTx<N> {
             _ => None,
         }
     }
+
+    /// Returns the envelope if this variant is an [`SendableTx::Envelope`].
+    ///
+    /// Returns a [`SendableTxErr`] with the request object otherwise.
+    pub fn try_into_envelope(self) -> Result<N::TxEnvelope, SendableTxErr<N::TransactionRequest>> {
+        match self {
+            Self::Builder(req) => Err(SendableTxErr::new(req)),
+            Self::Envelope(env) => Ok(env),
+        }
+    }
+
+    /// Returns the envelope if this variant is an [`SendableTx::Builder`].
+    ///
+    /// Returns a [`SendableTxErr`] with the request object otherwise.
+    pub fn try_into_request(self) -> Result<N::TransactionRequest, SendableTxErr<N::TxEnvelope>> {
+        match self {
+            Self::Builder(req) => Ok(req),
+            Self::Envelope(env) => Err(SendableTxErr::new(env)),
+        }
+    }
+}
+
+/// Error when converting a [`SendableTx`].
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("Unexpected variant: {0:?}")]
+pub struct SendableTxErr<T>(pub T);
+
+impl<T> SendableTxErr<T> {
+    /// Create a new error.
+    pub const fn new(inner: T) -> Self {
+        Self(inner)
+    }
+
+    /// Unwrap the error and return the original value.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
 }
