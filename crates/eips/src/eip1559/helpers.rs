@@ -1,5 +1,19 @@
 use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 
+/// Return type of EIP1155 gas fee estimator.
+///
+/// Contains EIP-1559 fields
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Eip1559Estimation {
+    /// The base fee per gas.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub max_fee_per_gas: u128,
+    /// The max priority fee per gas.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub max_priority_fee_per_gas: u128,
+}
+
 /// Calculate the base fee for the next block based on the EIP-1559 specification.
 ///
 /// This function calculates the base fee for the next block according to the rules defined in the
