@@ -63,4 +63,6 @@ pub enum MulticallError {
     ValueTx,
     #[error("could not decode")]
     DecodeError(alloy_sol_types::Error),
+    #[error("no return data")]
+    NoReturnData,
 }

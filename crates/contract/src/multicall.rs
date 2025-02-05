@@ -7,103 +7,6 @@ use alloy_provider::Provider;
 use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{sol, SolCall};
 
-/// No-op identity call.
-#[derive(Debug)]
-pub struct Identity;
-
-sol! {
-    function identity() public;
-}
-
-impl Iterator for Identity {
-    type Item = Call3;
-    fn next(&mut self) -> Option<Self::Item> {
-        None
-    }
-}
-
-/// A call that should be mapped into the relevant aggregate, aggregate3, aggregate3Value input
-/// structs.
-#[derive(Debug, Clone, Default)]
-pub struct CallInfo<C: SolCall> {
-    target: Address,
-    allow_failure: bool,
-    value: Option<U256>,
-    call: C,
-}
-
-impl<C: SolCall> CallInfo<C> {
-    /// Create a new [`CallInfo`] instance.
-    pub fn new(target: Address, call: C) -> Self {
-        Self { target, call, allow_failure: false, value: None }
-    }
-
-    /// ABI-decode the return data.
-    pub fn decode(&self, data: &[u8]) -> ContractResult<C::Return> {
-        C::abi_decode_returns(data, true)
-            .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
-    }
-}
-
-/// A stack of calls
-#[derive(Debug)]
-pub struct Stack<L: SolCall, R> {
-    left: CallInfo<L>,
-    right: R,
-    /// Used as a flag to return the left call while iterating.
-    empty: bool,
-}
-
-impl<L, R> Stack<L, R>
-where
-    L: SolCall,
-{
-    /// Create a new stack
-    pub fn new(left: CallInfo<L>, right: R) -> Self {
-        Self { left, right, empty: false }
-    }
-
-    /// Get the left call
-    pub fn left(&self) -> &CallInfo<L> {
-        &self.left
-    }
-
-    /// Get the right calls
-    pub fn right(&self) -> &R {
-        &self.right
-    }
-
-    /// Check if the stack contains an identity call
-    pub fn contains_identity(&self) -> bool {
-        std::mem::size_of::<R>() == 0
-    }
-}
-
-impl<'a, L, R> Iterator for Stack<L, R>
-where
-    L: SolCall,
-    R: Iterator<Item = Call3>,
-{
-    type Item = Call3;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(call) = self.right.next() {
-            // First get all items from right
-            Some(call)
-        } else if !self.empty {
-            // Then return left call (only once)
-            self.empty = true;
-            Some(Call3 {
-                target: self.left.target,
-                allowFailure: false,
-                callData: self.left.call.abi_encode().into(),
-            })
-        } else {
-            None
-        }
-    }
-}
-
 /// A multicall builder
 #[derive(Debug)]
 pub struct MulticallBuilder<T, P: Provider<N>, N: Network> {
@@ -150,7 +53,7 @@ sol! {
 
 impl<T, P, N> MulticallBuilder<T, P, N>
 where
-    T: Iterator<Item = Call3>,
+    T: Iterator<Item = Call3> + DecodeReturns,
     P: Provider<N>,
     N: Network,
 {
@@ -161,7 +64,7 @@ where
     }
 
     /// Call the aggregate function
-    pub async fn call_aggregate(self) -> ContractResult<(U256, Vec<Bytes>)> {
+    pub async fn call_aggregate(self) -> ContractResult<(U256, T::Returns)> {
         let calls = &self
             .calls
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
@@ -175,9 +78,122 @@ where
 
         let res = self.provider.call(&tx).await.map_err(|e| Error::TransportError(e))?;
 
-        let output = aggregateCall::abi_decode_returns(&res, true)?;
+        let mut output = aggregateCall::abi_decode_returns(&res, true)?;
 
-        Ok((output.blockNumber, output.returnData))
+        // Reverse the order of the return data to maintain the stack order consistency.
+        output.returnData.reverse();
+
+        Ok((output.blockNumber, T::decode_returns(&output.returnData)?))
+    }
+}
+
+/// A call that should be mapped into the relevant aggregate, aggregate3, aggregate3Value input
+/// structs.
+#[derive(Debug, Clone, Default)]
+pub struct CallInfo<C: SolCall> {
+    target: Address,
+    allow_failure: bool,
+    value: Option<U256>,
+    call: C,
+}
+
+impl<C: SolCall> CallInfo<C> {
+    /// Create a new [`CallInfo`] instance.
+    pub fn new(target: Address, call: C) -> Self {
+        Self { target, call, allow_failure: false, value: None }
+    }
+
+    /// ABI-decode the return data.
+    pub fn decode(&self, data: &[u8]) -> ContractResult<C::Return> {
+        C::abi_decode_returns(data, true)
+            .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
+    }
+}
+
+/// Trait for decoding return values from a sequence of calls
+pub trait DecodeReturns {
+    /// Decoded Return Tuple
+    type Returns;
+
+    /// Decode the return values
+    fn decode_returns(data: &[Bytes]) -> ContractResult<Self::Returns>;
+}
+
+impl DecodeReturns for Identity {
+    type Returns = ();
+    fn decode_returns(_data: &[Bytes]) -> ContractResult<Self::Returns> {
+        Ok(())
+    }
+}
+
+// Decode the stack recursively.
+impl<L: SolCall, R: DecodeReturns> DecodeReturns for Stack<L, R> {
+    type Returns = (R::Returns, L::Return); // Maintain call order.
+    fn decode_returns(data: &[Bytes]) -> ContractResult<Self::Returns> {
+        let (first, rest) =
+            data.split_first().ok_or(Error::MulticallError(MulticallError::NoReturnData))?;
+
+        // Recursively decode the rest of the stack.
+        Ok((R::decode_returns(rest)?, L::abi_decode_returns(first, true)?))
+    }
+}
+
+/// A stack of calls
+#[derive(Debug)]
+pub struct Stack<L: SolCall, R> {
+    left: CallInfo<L>,
+    right: R,
+    /// Used as a flag to return the left call while iterating.
+    empty: bool,
+}
+
+impl<L, R> Stack<L, R>
+where
+    L: SolCall,
+{
+    /// Create a new stack
+    pub fn new(left: CallInfo<L>, right: R) -> Self {
+        Self { left, right, empty: false }
+    }
+}
+
+impl<'a, L, R> Iterator for Stack<L, R>
+where
+    L: SolCall,
+    R: Iterator<Item = Call3>,
+{
+    type Item = Call3;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(call) = self.right.next() {
+            // First get all items from right
+            Some(call)
+        } else if !self.empty {
+            // Then return left call (only once)
+            self.empty = true;
+            Some(Call3 {
+                target: self.left.target,
+                allowFailure: false,
+                callData: self.left.call.abi_encode().into(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// No-op identity call.
+#[derive(Debug)]
+pub struct Identity;
+
+sol! {
+    function identity() public;
+}
+
+impl Iterator for Identity {
+    type Item = Call3;
+    fn next(&mut self) -> Option<Self::Item> {
+        None
     }
 }
 
@@ -204,6 +220,12 @@ mod tests {
             ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
         let multicall = MulticallBuilder::new(provider).add(left, weth).add(right, weth);
 
-        let (block_number, return_data) = multicall.call_aggregate().await.unwrap();
+        // TODO: Pretty ugly, flatten return stack tuple
+        let (block_number, (((), total_supply), balance)) =
+            multicall.call_aggregate().await.unwrap();
+
+        println!("block_number: {:?}", block_number);
+        println!("balance: {:?}", balance.balance);
+        println!("total_supply: {:?}", total_supply.totalSupply);
     }
 }
