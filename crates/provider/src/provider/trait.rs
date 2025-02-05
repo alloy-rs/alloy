@@ -27,7 +27,7 @@ use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
-use super::EthCallMany;
+use super::{EthCallMany, WrappedProvider};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -89,6 +89,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[inline]
     fn weak_client(&self) -> WeakClient {
         self.root().weak_client()
+    }
+
+    /// Returns a provider wrapped in Arc [`WrappedProvider`]
+    fn wrapped(&self) -> WrappedProvider<'_, N>
+    where
+        Self: Sized + 'static,
+    {
+        WrappedProvider::new(self)
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
