@@ -200,6 +200,16 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
             self.fill(fillable, tx).await
         }
     }
+
+    /// Prepares transaction request with necessary fillers required for eth_call operations
+    fn prepare_call(
+        &self,
+        tx: &mut N::TransactionRequest,
+    ) -> impl_future!(<Output = TransportResult<()>>) {
+        let _ = tx;
+        // This is a no-op by default
+        futures::future::ready(Ok(()))
+    }
 }
 
 /// A [`Provider`] that applies one or more [`TxFiller`]s.
