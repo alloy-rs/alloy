@@ -79,6 +79,14 @@ impl<T, H> Block<T, H> {
         Self { header, uncles: vec![], transactions, withdrawals: None }
     }
 
+    /// Apply a function to the block, returning the modified block.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
     /// Sets the transactions for the block.
     pub fn with_transactions(mut self, transactions: BlockTransactions<T>) -> Self {
         self.transactions = transactions;
