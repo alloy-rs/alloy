@@ -278,6 +278,15 @@ where
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
     }
+
+    /// Prepares a transaction request for eth_call operations using the configured fillers
+    pub async fn prepare_call(
+        &self,
+        mut tx: N::TransactionRequest,
+    ) -> TransportResult<N::TransactionRequest> {
+        self.filler.prepare_call(&mut tx).await?;
+        Ok(tx)
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
