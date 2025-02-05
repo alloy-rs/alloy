@@ -13,7 +13,7 @@ mod eth_call;
 pub use eth_call::{CallDecoder, EthCall};
 
 mod error;
-pub use error::*;
+pub use error::{Error, MulticallError, Result};
 
 mod event;
 pub use event::{Event, EventPoller};
