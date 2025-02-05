@@ -166,19 +166,37 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// `None`.
     fn blob_versioned_hashes(&self) -> Option<&[B256]>;
 
+    /// Returns the number of blobs of this transaction.
+    ///
+    /// This is convenience function for `len(blob_versioned_hashes)`.
+    ///
+    /// Returns `None` for non-eip4844 transactions.
+    fn blob_count(&self) -> Option<u64> {
+        self.blob_versioned_hashes().map(|h| h.len() as u64)
+    }
+
     /// Returns the total gas for all blobs in this transaction.
     ///
     /// Returns `None` for non-eip4844 transactions.
     #[inline]
     fn blob_gas_used(&self) -> Option<u64> {
         // SAFETY: we don't expect u64::MAX / DATA_GAS_PER_BLOB hashes in a single transaction
-        self.blob_versioned_hashes().map(|blobs| blobs.len() as u64 * DATA_GAS_PER_BLOB)
+        self.blob_count().map(|blobs| blobs * DATA_GAS_PER_BLOB)
     }
 
     /// Returns the [`SignedAuthorization`] list of the transaction.
     ///
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
+
+    /// Returns the number of blobs of [`SignedAuthorization`] in this transactions
+    ///
+    /// This is convenience function for `len(authorization_list)`.
+    ///
+    /// Returns `None` for non-eip7702 transactions.
+    fn authorization_count(&self) -> Option<u64> {
+        self.authorization_list().map(|auths| auths.len() as u64)
+    }
 }
 
 /// A signable transaction.
