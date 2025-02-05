@@ -188,6 +188,15 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     ///
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
+
+    /// Returns the number of blobs of [`SignedAuthorization`] in this transactions
+    ///
+    /// This is convenience function for `len(authorization_list)`.
+    ///
+    /// Returns `None` for non-eip7702 transactions.
+    fn authorization_count(&self) -> Option<u64> {
+        self.authorization_list().map(|auths| auths.len() as u64)
+    }
 }
 
 /// A signable transaction.
