@@ -159,11 +159,3 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
 tower-http = "0.6.1"
-
-
-[patch.crates-io]
-alloy-core = { git = "https://github.com/alloy-rs/core", branch = "yash/multicall3" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", branch = "yash/multicall3" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", branch = "yash/multicall3" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", branch = "yash/multicall3" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", branch = "yash/multicall3" }

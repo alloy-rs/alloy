@@ -4,7 +4,6 @@ use crate::{Error, MulticallError, Result as ContractResult};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, Bytes, U256};
 use alloy_provider::Provider;
-use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
 use alloy_sol_types::{sol, SolCall};
 
 /// A multicall builder
