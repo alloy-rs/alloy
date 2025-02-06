@@ -1,5 +1,5 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::Selector;
+use alloy_primitives::{Bytes, Selector};
 use alloy_provider::PendingTransactionError;
 use alloy_transport::TransportError;
 use thiserror::Error;
@@ -69,4 +69,7 @@ pub enum MulticallError {
     /// No return data was found.
     #[error("no return data")]
     NoReturnData,
+    /// Call failed.
+    #[error("call failed when success was assured, this occurs when try_into_success is called on a failed call")]
+    CallFailed(Bytes),
 }

@@ -8,6 +8,7 @@ use alloy_sol_types::SolCall;
 
 mod bindings;
 pub use bindings::IMulticall3::{aggregateCall, Call, Call3};
+use bindings::IMulticall3::{tryAggregateCall, tryAggregateReturn};
 
 mod inner_types;
 pub use inner_types::CallInfo;
@@ -54,12 +55,13 @@ where
         let call = CallInfo::new(target, call);
 
         self.calls.push(Box::new(call));
-        // let stack = Stack::new(CallInfo::new(target, call), self.calls);
         MulticallBuilder { calls: self.calls, provider: self.provider, _pd: Default::default() }
     }
 
-    /// Call the aggregate function
-    pub async fn call_aggregate(self) -> ContractResult<(U256, T::Returns)> {
+    /// Call the `aggregate` function
+    ///
+    /// Requires that all calls succeed.
+    pub async fn call_aggregate(self) -> ContractResult<(U256, T::SuccessReturns)> {
         let calls = &self.calls.into_iter().map(|c| c.to_call()).collect::<Vec<_>>();
 
         let call = aggregateCall { calls: calls.to_vec() }.abi_encode();
@@ -71,8 +73,25 @@ where
         let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
 
         let output = aggregateCall::abi_decode_returns(&res, true)?;
-
         Ok((output.blockNumber, T::decode_returns(&output.returnData)?))
+    }
+
+    /// Call the `tryAggregate` function
+    ///
+    /// Adds flexibility for calls to fail
+    pub async fn call_try_aggregate(self, require_success: bool) -> ContractResult<T::Returns> {
+        let calls = &self.calls.into_iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() }
+            .abi_encode();
+        let tx = N::TransactionRequest::default()
+            .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
+            .with_input(Bytes::from_iter(call));
+
+        let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
+        let output = tryAggregateCall::abi_decode_returns(&res, true)?;
+        let tryAggregateReturn { returnData } = output;
+
+        T::decode_return_results(&returnData)
     }
 }
 
@@ -86,6 +105,17 @@ mod tests {
         interface ERC20 {
             function totalSupply() external view returns (uint256 totalSupply);
             function balanceOf(address owner) external view returns (uint256 balance);
+        }
+    }
+
+    sol! {
+        #[sol(rpc)]
+        contract DummyThatFails {
+            function fail() external {
+                revert("fail");
+            }
+
+            function success() external {}
         }
     }
     #[tokio::test]
@@ -113,5 +143,23 @@ mod tests {
 
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
+    }
+
+    #[tokio::test]
+    async fn test_try_aggregate() {
+        let left = ERC20::totalSupplyCall {};
+        let right =
+            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let provider =
+            ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+        let multicall = MulticallBuilder::new(provider)
+            .add(left.clone(), weth)
+            .add(right.clone(), weth)
+            .add(left.clone(), weth)
+            .add(right, weth);
+
+        let (_t1, _b1, _t2, _b2) = multicall.call_try_aggregate(true).await.unwrap();
     }
 }

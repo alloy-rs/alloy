@@ -1,3 +1,4 @@
+use super::bindings::IMulticall3::Result as MulticallResult;
 use crate::{Error, MulticallError, Result};
 use alloy_primitives::Bytes;
 use alloy_sol_types::SolCall;
@@ -18,11 +19,18 @@ pub trait TuplePush<T> {
 /// A trait for tuples of SolCalls that can be decoded
 #[doc(hidden)]
 pub trait CallTuple: Sealed {
-    /// The flattened return type
+    /// The flattened result return type of the tuple
     type Returns;
 
+    type SuccessReturns;
+
     /// Decode the returns from a sequence of bytes
-    fn decode_returns(data: &[Bytes]) -> Result<Self::Returns>;
+    ///
+    /// To be used for calls where success is ensured i.e `allow_failure` for all calls is false.
+    fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns>;
+
+    /// Converts Returns to SuccessReturns if all results are Ok
+    fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns>;
 }
 
 // Empty tuple implementation
@@ -35,9 +43,24 @@ impl<T: SolCall> TuplePush<T> for () {
 impl CallTuple for () {
     type Returns = ();
 
-    fn decode_returns(_: &[Bytes]) -> Result<Self::Returns> {
+    type SuccessReturns = ();
+
+    fn decode_returns(_: &[Bytes]) -> Result<Self::SuccessReturns> {
         Ok(())
     }
+
+    fn decode_return_results(_results: &[MulticallResult]) -> Result<Self::Returns> {
+        Ok(())
+    }
+}
+
+/// A struct to representing a failure in a multicall
+#[derive(Debug, Clone)]
+pub struct Failure {
+    /// The index-position of the call that failed
+    pub idx: usize,
+    /// The return data of the call that failed
+    pub return_data: Bytes,
 }
 
 // Macro to implement for tuples of different sizes
@@ -53,15 +76,30 @@ macro_rules! impl_tuple {
         // Implement decoding for the tuple
         impl<$($ty: SolCall,)+> CallTuple for ($($ty,)+) {
             // The Returns associated type is a tuple of each SolCall's Return type
-            type Returns = ($($ty::Return,)+);
+            type Returns = ($(Result<$ty::Return, Failure>,)+);
 
-            fn decode_returns(data: &[Bytes]) -> Result<Self::Returns> {
+            type SuccessReturns = ($($ty::Return,)+);
+
+            fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns> {
                 if data.len() != count!($($ty),+) {
                     return Err(Error::MulticallError(MulticallError::NoReturnData));
                 }
 
                 // Decode each return value in order
                 Ok(($($ty::abi_decode_returns(&data[$idx], true)?,)+))
+            }
+
+            fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns> {
+                if results.len() != count!($($ty),+) {
+                    return Err(Error::MulticallError(MulticallError::NoReturnData));
+                }
+
+                Ok(($(
+                    match &results[$idx].success {
+                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData, true)?),
+                        false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
+                    },
+                )+))
             }
         }
     };
