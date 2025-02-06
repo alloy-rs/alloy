@@ -1,5 +1,4 @@
 //! Transaction types.
-
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
@@ -54,8 +53,12 @@ pub mod serde_bincode_compat {
     pub use super::{
         eip1559::serde_bincode_compat::*, eip2930::serde_bincode_compat::*,
         eip7702::serde_bincode_compat::*, legacy::serde_bincode_compat::*,
+        seismic::serde_bincode_compat::*,
     };
 }
+
+mod seismic;
+pub use seismic::{EncryptionPublicKey, TxSeismic};
 
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
@@ -174,6 +177,18 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     ///
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
+
+    /// For Seismic transactions, the encryption public key
+    #[inline]
+    fn encryption_pubkey(&self) -> Option<&EncryptionPublicKey> {
+        None
+    }
+
+    /// For Seismic transactions, the EIP712 version
+    #[inline]
+    fn message_version(&self) -> Option<u8> {
+        None
+    }
 }
 
 /// A signable transaction.
@@ -337,6 +352,11 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    #[inline]
+    fn encryption_pubkey(&self) -> Option<&EncryptionPublicKey> {
+        self.inner.encryption_pubkey()
     }
 }
 

@@ -6,6 +6,8 @@ use crate::{
     Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718,
 };
 
+use super::TxSeismic;
+
 /// The TypedTransaction enum represents all Ethereum transaction request types.
 ///
 /// Its variants correspond to specific allowed transactions:
@@ -40,6 +42,9 @@ pub enum TypedTransaction {
     /// EIP-7702 transaction
     #[cfg_attr(feature = "serde", serde(rename = "0x04", alias = "0x4"))]
     Eip7702(TxEip7702),
+    /// Seismic transaction
+    #[cfg_attr(feature = "serde", serde(rename = "0x4A", alias = "0x4A"))]
+    Seismic(TxSeismic),
 }
 
 impl From<TxLegacy> for TypedTransaction {
@@ -84,10 +89,17 @@ impl From<TxEip7702> for TypedTransaction {
     }
 }
 
+impl From<TxSeismic> for TypedTransaction {
+    fn from(tx: TxSeismic) -> Self {
+        Self::Seismic(tx)
+    }
+}
+
 impl From<TxEnvelope> for TypedTransaction {
     fn from(envelope: TxEnvelope) -> Self {
         match envelope {
             TxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
+            TxEnvelope::Seismic(tx) => Self::Seismic(tx.strip_signature()),
             TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
             TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
             TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
@@ -102,6 +114,7 @@ impl TypedTransaction {
     pub const fn tx_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,
+            Self::Seismic(_) => TxType::Seismic,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
@@ -140,6 +153,14 @@ impl TypedTransaction {
             _ => None,
         }
     }
+
+    /// Return the inner seismic transaction if it exists.
+    pub const fn seismic(&self) -> Option<&TxSeismic> {
+        match self {
+            Self::Seismic(tx) => Some(tx),
+            _ => None,
+        }
+    }
 }
 
 impl Transaction for TypedTransaction {
@@ -147,6 +168,7 @@ impl Transaction for TypedTransaction {
     fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Legacy(tx) => tx.chain_id(),
+            Self::Seismic(tx) => tx.chain_id(),
             Self::Eip2930(tx) => tx.chain_id(),
             Self::Eip1559(tx) => tx.chain_id(),
             Self::Eip4844(tx) => tx.chain_id(),
@@ -158,6 +180,7 @@ impl Transaction for TypedTransaction {
     fn nonce(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.nonce(),
+            Self::Seismic(tx) => tx.nonce(),
             Self::Eip2930(tx) => tx.nonce(),
             Self::Eip1559(tx) => tx.nonce(),
             Self::Eip4844(tx) => tx.nonce(),
@@ -169,6 +192,7 @@ impl Transaction for TypedTransaction {
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.gas_limit(),
+            Self::Seismic(tx) => tx.gas_limit(),
             Self::Eip2930(tx) => tx.gas_limit(),
             Self::Eip1559(tx) => tx.gas_limit(),
             Self::Eip4844(tx) => tx.gas_limit(),
@@ -180,6 +204,7 @@ impl Transaction for TypedTransaction {
     fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.gas_price(),
+            Self::Seismic(tx) => tx.gas_price(),
             Self::Eip2930(tx) => tx.gas_price(),
             Self::Eip1559(tx) => tx.gas_price(),
             Self::Eip4844(tx) => tx.gas_price(),
@@ -191,6 +216,7 @@ impl Transaction for TypedTransaction {
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.max_fee_per_gas(),
+            Self::Seismic(tx) => tx.max_fee_per_gas(),
             Self::Eip2930(tx) => tx.max_fee_per_gas(),
             Self::Eip1559(tx) => tx.max_fee_per_gas(),
             Self::Eip4844(tx) => tx.max_fee_per_gas(),
@@ -202,6 +228,7 @@ impl Transaction for TypedTransaction {
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.max_priority_fee_per_gas(),
+            Self::Seismic(tx) => tx.max_priority_fee_per_gas(),
             Self::Eip2930(tx) => tx.max_priority_fee_per_gas(),
             Self::Eip1559(tx) => tx.max_priority_fee_per_gas(),
             Self::Eip4844(tx) => tx.max_priority_fee_per_gas(),
@@ -213,6 +240,7 @@ impl Transaction for TypedTransaction {
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.max_fee_per_blob_gas(),
+            Self::Seismic(tx) => tx.max_fee_per_blob_gas(),
             Self::Eip2930(tx) => tx.max_fee_per_blob_gas(),
             Self::Eip1559(tx) => tx.max_fee_per_blob_gas(),
             Self::Eip4844(tx) => tx.max_fee_per_blob_gas(),
@@ -224,6 +252,7 @@ impl Transaction for TypedTransaction {
     fn priority_fee_or_price(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.priority_fee_or_price(),
+            Self::Seismic(tx) => tx.priority_fee_or_price(),
             Self::Eip2930(tx) => tx.priority_fee_or_price(),
             Self::Eip1559(tx) => tx.priority_fee_or_price(),
             Self::Eip4844(tx) => tx.priority_fee_or_price(),
@@ -234,6 +263,7 @@ impl Transaction for TypedTransaction {
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match self {
             Self::Legacy(tx) => tx.effective_gas_price(base_fee),
+            Self::Seismic(tx) => tx.effective_gas_price(base_fee),
             Self::Eip2930(tx) => tx.effective_gas_price(base_fee),
             Self::Eip1559(tx) => tx.effective_gas_price(base_fee),
             Self::Eip4844(tx) => tx.effective_gas_price(base_fee),
@@ -245,6 +275,7 @@ impl Transaction for TypedTransaction {
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.is_dynamic_fee(),
+            Self::Seismic(tx) => tx.is_dynamic_fee(),
             Self::Eip2930(tx) => tx.is_dynamic_fee(),
             Self::Eip1559(tx) => tx.is_dynamic_fee(),
             Self::Eip4844(tx) => tx.is_dynamic_fee(),
@@ -256,6 +287,7 @@ impl Transaction for TypedTransaction {
     fn kind(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.kind(),
+            Self::Seismic(tx) => tx.kind(),
             Self::Eip2930(tx) => tx.kind(),
             Self::Eip1559(tx) => tx.kind(),
             Self::Eip4844(tx) => tx.kind(),
@@ -267,6 +299,7 @@ impl Transaction for TypedTransaction {
     fn is_create(&self) -> bool {
         match self {
             Self::Legacy(tx) => tx.is_create(),
+            Self::Seismic(tx) => tx.is_create(),
             Self::Eip2930(tx) => tx.is_create(),
             Self::Eip1559(tx) => tx.is_create(),
             Self::Eip4844(tx) => tx.is_create(),
@@ -278,6 +311,7 @@ impl Transaction for TypedTransaction {
     fn value(&self) -> U256 {
         match self {
             Self::Legacy(tx) => tx.value(),
+            Self::Seismic(tx) => tx.value(),
             Self::Eip2930(tx) => tx.value(),
             Self::Eip1559(tx) => tx.value(),
             Self::Eip4844(tx) => tx.value(),
@@ -289,6 +323,7 @@ impl Transaction for TypedTransaction {
     fn input(&self) -> &Bytes {
         match self {
             Self::Legacy(tx) => tx.input(),
+            Self::Seismic(tx) => tx.input(),
             Self::Eip2930(tx) => tx.input(),
             Self::Eip1559(tx) => tx.input(),
             Self::Eip4844(tx) => tx.input(),
@@ -300,6 +335,7 @@ impl Transaction for TypedTransaction {
     fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Legacy(tx) => tx.access_list(),
+            Self::Seismic(tx) => tx.access_list(),
             Self::Eip2930(tx) => tx.access_list(),
             Self::Eip1559(tx) => tx.access_list(),
             Self::Eip4844(tx) => tx.access_list(),
@@ -311,6 +347,7 @@ impl Transaction for TypedTransaction {
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Legacy(tx) => tx.blob_versioned_hashes(),
+            Self::Seismic(tx) => tx.blob_versioned_hashes(),
             Self::Eip2930(tx) => tx.blob_versioned_hashes(),
             Self::Eip1559(tx) => tx.blob_versioned_hashes(),
             Self::Eip4844(tx) => tx.blob_versioned_hashes(),
@@ -322,10 +359,27 @@ impl Transaction for TypedTransaction {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Legacy(tx) => tx.authorization_list(),
+            Self::Seismic(tx) => tx.authorization_list(),
             Self::Eip2930(tx) => tx.authorization_list(),
             Self::Eip1559(tx) => tx.authorization_list(),
             Self::Eip4844(tx) => tx.authorization_list(),
             Self::Eip7702(tx) => tx.authorization_list(),
+        }
+    }
+
+    #[inline]
+    fn encryption_pubkey(&self) -> Option<&crate::transaction::EncryptionPublicKey> {
+        match self {
+            Self::Seismic(tx) => tx.encryption_pubkey(),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn message_version(&self) -> Option<u8> {
+        match self {
+            Self::Seismic(tx) => tx.message_version(),
+            _ => None,
         }
     }
 }
@@ -334,6 +388,7 @@ impl Typed2718 for TypedTransaction {
     fn ty(&self) -> u8 {
         match self {
             Self::Legacy(tx) => tx.ty(),
+            Self::Seismic(tx) => tx.ty(),
             Self::Eip2930(tx) => tx.ty(),
             Self::Eip1559(tx) => tx.ty(),
             Self::Eip4844(tx) => tx.ty(),
@@ -369,7 +424,10 @@ mod serde_from {
     //!
     //! We serialize via [`TaggedTypedTransaction`] and deserialize via
     //! [`MaybeTaggedTypedTransaction`].
-    use crate::{TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxLegacy, TypedTransaction};
+    use crate::{
+        transaction::TxSeismic, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxLegacy,
+        TypedTransaction,
+    };
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(untagged)]
@@ -401,6 +459,9 @@ mod serde_from {
         /// EIP-7702 transaction
         #[serde(rename = "0x04", alias = "0x4")]
         Eip7702(TxEip7702),
+        /// EIP-7702 transaction
+        #[serde(rename = "0x4A", alias = "0x4A")]
+        Seismic(TxSeismic),
     }
 
     impl From<MaybeTaggedTypedTransaction> for TypedTransaction {
@@ -416,6 +477,7 @@ mod serde_from {
         fn from(value: TaggedTypedTransaction) -> Self {
             match value {
                 TaggedTypedTransaction::Legacy(signed) => Self::Legacy(signed),
+                TaggedTypedTransaction::Seismic(signed) => Self::Seismic(signed),
                 TaggedTypedTransaction::Eip2930(signed) => Self::Eip2930(signed),
                 TaggedTypedTransaction::Eip1559(signed) => Self::Eip1559(signed),
                 TaggedTypedTransaction::Eip4844(signed) => Self::Eip4844(signed),
@@ -428,6 +490,7 @@ mod serde_from {
         fn from(value: TypedTransaction) -> Self {
             match value {
                 TypedTransaction::Legacy(signed) => Self::Legacy(signed),
+                TypedTransaction::Seismic(signed) => Self::Seismic(signed),
                 TypedTransaction::Eip2930(signed) => Self::Eip2930(signed),
                 TypedTransaction::Eip1559(signed) => Self::Eip1559(signed),
                 TypedTransaction::Eip4844(signed) => Self::Eip4844(signed),

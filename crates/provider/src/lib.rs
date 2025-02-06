@@ -41,6 +41,7 @@ pub use heart::{
 };
 
 pub mod layers;
+pub use layers::seismic::*;
 
 mod provider;
 pub use provider::{

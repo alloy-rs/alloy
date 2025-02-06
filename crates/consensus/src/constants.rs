@@ -77,3 +77,6 @@ pub const EIP4844_TX_TYPE_ID: u8 = 3;
 
 /// Identifier for an EIP7702 transaction.
 pub const EIP7702_TX_TYPE_ID: u8 = 4;
+
+/// Identifier for an seismic transaction.
+pub const SEISMIC_TX_TYPE_ID: u8 = 74;

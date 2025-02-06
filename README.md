@@ -1,5 +1,7 @@
 # Alloy
 
+Seismic's fork of Alloy
+
 Alloy connects applications to blockchains.
 
 Alloy is a rewrite of [`ethers-rs`] from the ground up, with exciting new

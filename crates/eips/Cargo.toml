@@ -26,6 +26,8 @@ alloy-eip7702.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 
+alloy-dyn-abi = { workspace = true}
+
 # serde
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

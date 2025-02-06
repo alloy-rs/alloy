@@ -14,8 +14,8 @@ use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
 use alloy_primitives::{
-    hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
-    U256, U64,
+    hex, Address, BlockHash, BlockNumber, Bytes, FixedBytes, StorageKey, StorageValue, TxHash,
+    B256, U128, U256, U64,
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
@@ -153,6 +153,21 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
+    }
+
+    /// Simulate a seismic transaction signed or unsigned
+    async fn seismic_call(&self, tx: SendableTx<N>) -> TransportResult<Bytes> {
+        match tx {
+            SendableTx::Builder(tx) => {
+                let output = self.client().request("eth_call", (tx,)).await?;
+                Ok(output)
+            }
+            SendableTx::Envelope(tx) => {
+                let encoded_tx = tx.encoded_2718();
+                let output = self.client().request("eth_call", (encoded_tx,)).await?;
+                Ok(output)
+            }
+        }
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.
@@ -1063,6 +1078,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[inline]
     fn transaction_request(&self) -> N::TransactionRequest {
         Default::default()
+    }
+
+    /// Get the tee public key.
+    #[inline]
+    fn get_tee_pubkey(&self) -> ProviderCall<T, NoParams, FixedBytes<33>> {
+        self.client().request_noparams("seismic_getTeePublicKey").into()
     }
 }
 

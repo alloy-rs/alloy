@@ -24,6 +24,7 @@ alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-trie = { workspace = true, features = ["ethereum"] }
 alloy-serde = { workspace = true, optional = true }
+alloy-dyn-abi = { workspace = true, features = ["eip712"]}
 
 # k256
 k256 = { workspace = true, features = ["ecdsa"], optional = true }
@@ -38,7 +39,7 @@ rand = { workspace = true, optional = true }
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_with = { workspace = true, optional = true }
-
+serde_json.workspace = true
 # misc
 derive_more = { workspace = true, features = [
     "from",
@@ -48,10 +49,12 @@ derive_more = { workspace = true, features = [
 ], default-features = false }
 auto_impl.workspace = true
 
+
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-signer.workspace = true
+alloy-signer-local.workspace = true
 
 arbitrary = { workspace = true, features = ["derive"] }
 bincode = "1.3"
