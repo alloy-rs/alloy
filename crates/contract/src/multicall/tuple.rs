@@ -5,6 +5,7 @@ use alloy_sol_types::SolCall;
 
 /// Sealed trait to prevent external implementations
 mod private {
+    #[allow(unnameable_types)]
     pub trait Sealed {}
 }
 use private::Sealed;

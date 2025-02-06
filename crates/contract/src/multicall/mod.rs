@@ -22,7 +22,8 @@ use inner_types::CallInfoTrait;
 mod tuple;
 pub use tuple::{CallTuple, Failure, TuplePush};
 
-const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
+/// Default address for the Multicall3 contract on most chains. See: https://www.multicall3.com/deployments.
+pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
 
 /// A multicall builder
 #[derive(Debug)]
@@ -189,7 +190,7 @@ where
         }
 
         if let Some(overrides) = &self.state_override {
-            eth_call = eth_call.overrides(&overrides);
+            eth_call = eth_call.overrides(overrides);
         }
 
         let res = eth_call.await.map_err(Error::TransportError)?;
@@ -414,7 +415,8 @@ mod tests {
             ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
 
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL).fork_block_number(21787144));
+        let provider = ProviderBuilder::new()
+            .on_anvil_with_config(|a| a.fork(FORK_URL).fork_block_number(21787144));
         let multicall = MulticallBuilder::new(provider)
             .add(ts_call.clone(), weth)
             .add(balance_call.clone(), weth)
