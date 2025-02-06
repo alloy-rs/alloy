@@ -380,6 +380,7 @@ impl ExecutionPayloadV1 {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for ExecutionPayloadV1 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1646,12 +1647,15 @@ mod tests {
     fn serde_execution_payload_exact_version_v3() {
         let response_v3 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"}"#;
 
+        let result_v3: ExecutionPayloadV3 = serde_json::from_str(response_v3).unwrap();
+        assert_eq!(serde_json::to_string(&result_v3).unwrap(), response_v3);
+
         let result_v2: Result<ExecutionPayloadV2, serde_json::Error> =
-            serde_json::from_str(&response_v3);
+            serde_json::from_str(response_v3);
         assert!(result_v2.is_err());
 
         let result_v1: Result<ExecutionPayloadV1, serde_json::Error> =
-            serde_json::from_str(&response_v3);
+            serde_json::from_str(response_v3);
         assert!(result_v1.is_err());
     }
 
@@ -1660,9 +1664,33 @@ mod tests {
     fn serde_execution_payload_exact_version_v2() {
         let response_v2 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[]}"#;
 
+        let result_v3: Result<ExecutionPayloadV3, serde_json::Error> =
+            serde_json::from_str(response_v2);
+        assert!(result_v3.is_err());
+
+        let result_v2: ExecutionPayloadV2 = serde_json::from_str(response_v2).unwrap();
+        assert_eq!(serde_json::to_string(&result_v2).unwrap(), response_v2);
+
         let result_v1: Result<ExecutionPayloadV1, serde_json::Error> =
-            serde_json::from_str(&response_v2);
+            serde_json::from_str(response_v2);
         assert!(result_v1.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_execution_payload_exact_version_v1() {
+        let response_v1 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[]}"#;
+
+        let result_v3: Result<ExecutionPayloadV3, serde_json::Error> =
+            serde_json::from_str(response_v1);
+        assert!(result_v3.is_err());
+
+        let result_v2: Result<ExecutionPayloadV2, serde_json::Error> =
+            serde_json::from_str(response_v1);
+        assert!(result_v2.is_err());
+
+        let result_v1: ExecutionPayloadV1 = serde_json::from_str(response_v1).unwrap();
+        assert_eq!(serde_json::to_string(&result_v1).unwrap(), response_v1);
     }
 
     #[test]
