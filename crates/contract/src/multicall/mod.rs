@@ -10,45 +10,57 @@ mod bindings;
 pub use bindings::IMulticall3::{aggregateCall, Call, Call3};
 
 mod inner_types;
-pub use inner_types::{CallInfo, DecodeReturns, Identity, Stack};
+pub use inner_types::CallInfo;
+use inner_types::CallInfoTrait;
+use tuple::{CallTuple, TuplePush};
+
+mod tuple;
 
 /// A multicall builder
 #[derive(Debug)]
-pub struct MulticallBuilder<T, P: Provider<N>, N: Network> {
-    calls: T,
+pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
+    calls: Vec<Box<dyn CallInfoTrait>>,
     provider: P,
-    _pd: std::marker::PhantomData<N>,
+    _pd: std::marker::PhantomData<(T, N)>,
 }
 
-impl<P, N> MulticallBuilder<Identity, P, N>
+impl<P, N> MulticallBuilder<(), P, N>
 where
     P: Provider<N>,
     N: Network,
 {
     /// Create a new multicall builder
     pub fn new(provider: P) -> Self {
-        Self { calls: Identity, provider, _pd: Default::default() }
+        Self { calls: Vec::new(), provider, _pd: Default::default() }
     }
 }
 
 impl<T, P, N> MulticallBuilder<T, P, N>
 where
-    T: Iterator<Item = Call3> + DecodeReturns,
+    T: CallTuple,
     P: Provider<N>,
     N: Network,
 {
     /// Add a call to the stack
-    pub fn add<C: SolCall>(self, call: C, target: Address) -> MulticallBuilder<Stack<C, T>, P, N> {
-        let stack = Stack::new(CallInfo::new(target, call), self.calls);
-        MulticallBuilder { calls: stack, provider: self.provider, _pd: Default::default() }
+    pub fn add<C: SolCall + 'static>(
+        mut self,
+        call: C,
+        target: Address,
+    ) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<C>,
+        <T as TuplePush<C>>::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(target, call);
+
+        self.calls.push(Box::new(call));
+        // let stack = Stack::new(CallInfo::new(target, call), self.calls);
+        MulticallBuilder { calls: self.calls, provider: self.provider, _pd: Default::default() }
     }
 
     /// Call the aggregate function
     pub async fn call_aggregate(self) -> ContractResult<(U256, T::Returns)> {
-        let calls = &self
-            .calls
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
+        let calls = &self.calls.into_iter().map(|c| c.to_call()).collect::<Vec<_>>();
 
         let call = aggregateCall { calls: calls.to_vec() }.abi_encode();
 
@@ -58,10 +70,7 @@ where
 
         let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
 
-        let mut output = aggregateCall::abi_decode_returns(&res, true)?;
-
-        // Reverse the order of the return data to maintain the stack order consistency.
-        output.returnData.reverse();
+        let output = aggregateCall::abi_decode_returns(&res, true)?;
 
         Ok((output.blockNumber, T::decode_returns(&output.returnData)?))
     }
@@ -80,7 +89,7 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn test_stack() {
+    async fn test_aggregate() {
         let left = ERC20::totalSupplyCall {};
         let right =
             ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
@@ -88,14 +97,21 @@ mod tests {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
         let provider =
             ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
-        let multicall = MulticallBuilder::new(provider).add(left, weth).add(right, weth);
+        let multicall = MulticallBuilder::new(provider)
+            .add(left.clone(), weth)
+            .add(right.clone(), weth)
+            .add(left.clone(), weth)
+            .add(right, weth);
 
-        // TODO: Pretty ugly, flatten return stack tuple
-        let (block_number, (((), total_supply), balance)) =
-            multicall.call_aggregate().await.unwrap();
+        let (block_num, (t1, b1, t2, b2)) = multicall.call_aggregate().await.unwrap();
 
-        println!("block_number: {:?}", block_number);
-        println!("balance: {:?}", balance.balance);
-        println!("total_supply: {:?}", total_supply.totalSupply);
+        println!("block_num: {:?}", block_num);
+        println!("total_supply1: {:?}", t1);
+        println!("balance: {:?}", b1);
+        println!("total_supply2: {:?}", t2);
+        println!("balance: {:?}", b2);
+
+        assert_eq!(t1, t2);
+        assert_eq!(b1, b2);
     }
 }

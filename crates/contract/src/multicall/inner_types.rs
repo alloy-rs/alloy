@@ -1,11 +1,46 @@
-use super::bindings::IMulticall3::Call3;
+use std::fmt::Debug;
+
+use super::bindings::IMulticall3::{Call, Call3, Call3Value};
 use crate::{Error, MulticallError, Result};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, U256};
 use alloy_sol_types::SolCall;
+
+/// A trait for converting CallInfo into relevant call types.
+pub trait CallInfoTrait: std::fmt::Debug {
+    /// Converts the [`CallInfo`] into a [`Call`] struct for `aggregateCall`
+    fn to_call(&self) -> Call;
+    /// Converts the [`CallInfo`] into a [`Call3`] struct for `aggregate3Call`
+    fn to_call3(&self) -> Call3;
+    /// Converts the [`CallInfo`] into a [`Call3Value`] struct for `aggregate3Call`
+    fn to_call3_value(&self) -> Call3Value;
+}
+
+impl<C: SolCall> CallInfoTrait for CallInfo<C> {
+    fn to_call(&self) -> Call {
+        Call { target: self.target, callData: self.call.abi_encode().into() }
+    }
+
+    fn to_call3(&self) -> Call3 {
+        Call3 {
+            target: self.target,
+            allowFailure: self.allow_failure,
+            callData: self.call.abi_encode().into(),
+        }
+    }
+
+    fn to_call3_value(&self) -> Call3Value {
+        Call3Value {
+            target: self.target,
+            allowFailure: self.allow_failure,
+            callData: self.call.abi_encode().into(),
+            value: self.value.unwrap_or_default(),
+        }
+    }
+}
 
 /// A call that should be mapped into the relevant aggregate, aggregate3, aggregate3Value input
 /// structs.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct CallInfo<C: SolCall> {
     /// The target address of the call.
     target: Address,
@@ -17,6 +52,16 @@ pub struct CallInfo<C: SolCall> {
     /// The call implementing `SolCall`. Used to abi encode the inputs and decode the
     /// outputs.
     call: C,
+}
+
+impl<C: SolCall> Debug for CallInfo<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CallInfo")
+            .field("target", &self.target)
+            .field("allow_failure", &self.allow_failure)
+            .field("value", &self.value)
+            .finish()
+    }
 }
 
 impl<C: SolCall> CallInfo<C> {
@@ -51,88 +96,5 @@ impl<C: SolCall> CallInfo<C> {
     pub fn decode(&self, data: &[u8]) -> Result<C::Return> {
         C::abi_decode_returns(data, true)
             .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
-    }
-}
-
-/// Trait for decoding return values from a sequence of calls
-pub trait DecodeReturns {
-    /// Decoded Return Tuple
-    type Returns;
-
-    /// Decode the return values
-    fn decode_returns(data: &[Bytes]) -> Result<Self::Returns>;
-}
-
-impl DecodeReturns for Identity {
-    type Returns = ();
-    fn decode_returns(_data: &[Bytes]) -> Result<Self::Returns> {
-        Ok(())
-    }
-}
-
-// Decode the stack recursively.
-impl<L: SolCall, R: DecodeReturns> DecodeReturns for Stack<L, R> {
-    type Returns = (R::Returns, L::Return); // Maintain call order.
-    fn decode_returns(data: &[Bytes]) -> Result<Self::Returns> {
-        let (first, rest) =
-            data.split_first().ok_or(Error::MulticallError(MulticallError::NoReturnData))?;
-
-        // Recursively decode the rest of the stack.
-        Ok((R::decode_returns(rest)?, L::abi_decode_returns(first, true)?))
-    }
-}
-
-/// A stack of calls
-#[derive(Debug)]
-pub struct Stack<L: SolCall, R> {
-    left: CallInfo<L>,
-    right: R,
-    /// Used as a flag to return the left call while iterating.
-    empty: bool,
-}
-
-impl<L, R> Stack<L, R>
-where
-    L: SolCall,
-{
-    /// Create a new stack
-    pub fn new(left: CallInfo<L>, right: R) -> Self {
-        Self { left, right, empty: false }
-    }
-}
-
-impl<'a, L, R> Iterator for Stack<L, R>
-where
-    L: SolCall,
-    R: Iterator<Item = Call3>,
-{
-    type Item = Call3;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(call) = self.right.next() {
-            // First get all items from right
-            Some(call)
-        } else if !self.empty {
-            // Then return left call (only once)
-            self.empty = true;
-            Some(Call3 {
-                target: self.left.target,
-                allowFailure: false,
-                callData: self.left.call.abi_encode().into(),
-            })
-        } else {
-            None
-        }
-    }
-}
-
-/// No-op identity call.
-#[derive(Debug)]
-pub struct Identity;
-
-impl Iterator for Identity {
-    type Item = Call3;
-    fn next(&mut self) -> Option<Self::Item> {
-        None
     }
 }
