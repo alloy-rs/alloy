@@ -57,12 +57,16 @@ impl Error {
     }
 }
 
+/// Multicall errors.
 #[derive(Debug, Error)]
 pub enum MulticallError {
+    /// Encountered when an `aggregate/aggregate3` batch contains a transaction with a value.
     #[error("batch contains a tx with a value, try using .send() instead")]
     ValueTx,
+    /// Error decoding return data.
     #[error("could not decode")]
     DecodeError(alloy_sol_types::Error),
+    /// No return data was found.
     #[error("no return data")]
     NoReturnData,
 }
