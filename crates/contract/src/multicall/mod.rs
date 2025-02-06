@@ -22,7 +22,7 @@ use inner_types::CallInfoTrait;
 mod tuple;
 pub use tuple::{CallTuple, Failure, TuplePush};
 
-/// Default address for the Multicall3 contract on most chains. See: https://www.multicall3.com/deployments.
+/// Default address for the Multicall3 contract on most chains. See: <https://www.multicall3.com/deployments>
 pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
 
 /// A multicall builder
