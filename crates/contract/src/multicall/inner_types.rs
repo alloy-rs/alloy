@@ -66,7 +66,7 @@ impl<C: SolCall> Debug for CallInfo<C> {
 
 impl<C: SolCall> CallInfo<C> {
     /// Create a new [`CallInfo`] instance.
-    pub fn new(target: Address, call: C) -> Self {
+    pub fn new(call: C, target: Address) -> Self {
         Self { target, call, allow_failure: false, value: None }
     }
 

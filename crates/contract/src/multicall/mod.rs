@@ -22,7 +22,7 @@ use inner_types::CallInfoTrait;
 mod tuple;
 pub use tuple::{CallTuple, Failure, TuplePush};
 
-/// Default address for the Multicall3 contract on most chains. See: <https://www.multicall3.com/deployments>
+/// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
 
 /// A multicall builder
@@ -40,7 +40,7 @@ pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     /// contract.
     ///
     /// If none, resolved to the default address for most chains: [`MULTICALL3_ADDRESS`].
-    address: Option<Address>,
+    address: Address,
     _pd: std::marker::PhantomData<(T, N)>,
 }
 
@@ -49,7 +49,7 @@ where
     P: Provider<N>,
     N: Network,
 {
-    /// Create a new multicall builder
+    /// Instantiate a new [`MulticallBuilder`]
     pub fn new(provider: P) -> Self {
         Self {
             calls: Vec::new(),
@@ -57,7 +57,7 @@ where
             _pd: Default::default(),
             block: None,
             state_override: None,
-            address: None,
+            address: MULTICALL3_ADDRESS,
         }
     }
 
@@ -65,17 +65,17 @@ where
     ///
     /// Default is [`MULTICALL3_ADDRESS`].
     pub fn address(mut self, address: Address) -> Self {
-        self.address = Some(address);
+        self.address = address;
         self
     }
 
-    /// Set the block to make the call at.
+    /// Sets the block to be used for the call.
     pub fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }
 
-    /// Set the state overrides for this call.
+    /// Set the state overrides for the call.
     pub fn overrides(mut self, state_override: StateOverride) -> Self {
         self.state_override = Some(state_override);
         self
@@ -88,7 +88,9 @@ where
     P: Provider<N>,
     N: Network,
 {
-    /// Add a call to the stack
+    /// Appends a [`SolCall`] to the stack.
+    ///
+    /// `target` is the address of the contract to call.
     pub fn add<C: SolCall + 'static>(
         mut self,
         call: C,
@@ -98,7 +100,7 @@ where
         T: TuplePush<C>,
         <T as TuplePush<C>>::Pushed: CallTuple,
     {
-        let call = CallInfo::new(target, call);
+        let call = CallInfo::new(call, target);
 
         self.calls.push(Box::new(call));
         MulticallBuilder {
@@ -176,7 +178,7 @@ where
     ) -> ContractResult<M::Return> {
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
-            .with_to(self.address.unwrap_or(MULTICALL3_ADDRESS))
+            .with_to(self.address)
             .with_input(Bytes::from_iter(call));
 
         if let Some(value) = value {
@@ -207,7 +209,7 @@ where
         T::Pushed: CallTuple,
     {
         let call =
-            CallInfo::new(MULTICALL3_ADDRESS, getBlockHashCall { blockNumber: U256::from(number) });
+            CallInfo::new(getBlockHashCall { blockNumber: U256::from(number) }, self.address);
         self.add_call(call)
     }
 
@@ -217,7 +219,7 @@ where
         T: TuplePush<getCurrentBlockCoinbaseCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockCoinbaseCall {});
+        let call = CallInfo::new(getCurrentBlockCoinbaseCall {}, self.address);
         self.add_call(call)
     }
 
@@ -227,7 +229,7 @@ where
         T: TuplePush<getBlockNumberCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getBlockNumberCall {});
+        let call = CallInfo::new(getBlockNumberCall {}, self.address);
         self.add_call(call)
     }
 
@@ -237,7 +239,7 @@ where
         T: TuplePush<getCurrentBlockDifficultyCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockDifficultyCall {});
+        let call = CallInfo::new(getCurrentBlockDifficultyCall {}, self.address);
         self.add_call(call)
     }
 
@@ -247,7 +249,7 @@ where
         T: TuplePush<getCurrentBlockGasLimitCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockGasLimitCall {});
+        let call = CallInfo::new(getCurrentBlockGasLimitCall {}, self.address);
         self.add_call(call)
     }
 
@@ -257,7 +259,7 @@ where
         T: TuplePush<getCurrentBlockTimestampCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockTimestampCall {});
+        let call = CallInfo::new(getCurrentBlockTimestampCall {}, self.address);
         self.add_call(call)
     }
 
@@ -267,7 +269,7 @@ where
         T: TuplePush<getChainIdCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getChainIdCall {});
+        let call = CallInfo::new(getChainIdCall {}, self.address);
         self.add_call(call)
     }
 
@@ -277,7 +279,7 @@ where
         T: TuplePush<getBasefeeCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getBasefeeCall {});
+        let call = CallInfo::new(getBasefeeCall {}, self.address);
         self.add_call(call)
     }
 
@@ -287,7 +289,7 @@ where
         T: TuplePush<getEthBalanceCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getEthBalanceCall { addr: address });
+        let call = CallInfo::new(getEthBalanceCall { addr: address }, self.address);
         self.add_call(call)
     }
 
@@ -297,7 +299,7 @@ where
         T: TuplePush<getLastBlockHashCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(MULTICALL3_ADDRESS, getLastBlockHashCall {});
+        let call = CallInfo::new(getLastBlockHashCall {}, self.address);
         self.add_call(call)
     }
 }
