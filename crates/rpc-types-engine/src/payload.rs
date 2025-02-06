@@ -17,10 +17,10 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
-use core::{
-    fmt,
-    iter::{FromIterator, IntoIterator},
-};
+#[cfg(feature = "serde")]
+use core::fmt;
+use core::iter::{FromIterator, IntoIterator};
+#[cfg(feature = "serde")]
 use serde::{
     de::{self, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer,
@@ -399,8 +399,8 @@ impl<'de> Deserialize<'de> for ExecutionPayloadV1 {
             where
                 A: MapAccess<'de>,
             {
-                #[derive(Deserialize)]
-                #[serde(field_identifier, rename_all = "camelCase")]
+                #[cfg_attr(feature = "serde", derive(Deserialize))]
+                #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
                 enum Fields {
                     ParentHash,
                     FeeRecipient,
