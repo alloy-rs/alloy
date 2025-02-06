@@ -136,7 +136,7 @@ where
     /// Call the `aggregate` function
     ///
     /// Requires that all calls succeed.
-    pub async fn call_aggregate(&self) -> ContractResult<(U256, T::SuccessReturns)> {
+    pub async fn aggregate(&self) -> ContractResult<(U256, T::SuccessReturns)> {
         let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = aggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
@@ -146,7 +146,7 @@ where
     /// Call the `tryAggregate` function
     ///
     /// Adds flexibility for calls to fail
-    pub async fn call_try_aggregate(&self, require_success: bool) -> ContractResult<T::Returns> {
+    pub async fn try_aggregate(&self, require_success: bool) -> ContractResult<T::Returns> {
         let calls = &self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
@@ -155,7 +155,7 @@ where
     }
 
     /// Call the `aggregate3` function
-    pub async fn call_aggregate3(&self) -> ContractResult<T::Returns> {
+    pub async fn aggregate3(&self) -> ContractResult<T::Returns> {
         let calls = self.calls.iter().map(|c| c.to_call3()).collect::<Vec<_>>();
         let call = aggregate3Call { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
@@ -163,7 +163,7 @@ where
     }
 
     /// Call the `aggregate3Value` function
-    pub async fn call_aggregate3_value(&self) -> ContractResult<T::Returns> {
+    pub async fn aggregate3_value(&self) -> ContractResult<T::Returns> {
         let calls = self.calls.iter().map(|c| c.to_call3_value()).collect::<Vec<_>>();
         let total_value = calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
         let call = aggregate3ValueCall { calls: calls.to_vec() };
@@ -199,8 +199,6 @@ where
         M::abi_decode_returns(&res, true)
             .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
     }
-
-    // Utility functions
 
     /// Add a call to get the block hash from a block number
     pub fn add_get_block_hash(self, number: BlockNumber) -> MulticallBuilder<T::Pushed, P, N>
@@ -354,7 +352,7 @@ mod tests {
             .add(ts_call.clone(), weth)
             .add(balance_call, weth);
 
-        let (_block_num, (t1, b1, t2, b2)) = multicall.call_aggregate().await.unwrap();
+        let (_block_num, (t1, b1, t2, b2)) = multicall.aggregate().await.unwrap();
 
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
@@ -374,7 +372,7 @@ mod tests {
             .add(ts_call.clone(), weth)
             .add(balance_call, weth);
 
-        let (_t1, _b1, _t2, _b2) = multicall.call_try_aggregate(true).await.unwrap();
+        let (_t1, _b1, _t2, _b2) = multicall.try_aggregate(true).await.unwrap();
     }
 
     #[tokio::test]
@@ -396,11 +394,11 @@ mod tests {
             .add(balance_call, weth)
             .add(failCall {}, *dummy_addr); // Failing call that will revert the multicall.
 
-        let err = multicall.call_try_aggregate(true).await.unwrap_err();
+        let err = multicall.try_aggregate(true).await.unwrap_err();
 
         assert!(err.to_string().contains("revert: Multicall3: call failed"));
 
-        let (t1, b1, t2, b2, failure) = multicall.call_try_aggregate(false).await.unwrap();
+        let (t1, b1, t2, b2, failure) = multicall.try_aggregate(false).await.unwrap();
 
         assert!(t1.is_ok());
         assert!(b1.is_ok());
@@ -426,7 +424,7 @@ mod tests {
             .add(balance_call, weth)
             .add_get_block_hash(21787144);
 
-        let (_block_num, (t1, b1, t2, b2, block_hash)) = multicall.call_aggregate().await.unwrap();
+        let (_block_num, (t1, b1, t2, b2, block_hash)) = multicall.aggregate().await.unwrap();
 
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
