@@ -306,6 +306,7 @@ where
     /// ```ignore
     /// sol! {
     ///     function aggregate3(Call3[] calldata calls) external payable returns (Result[] memory returnData);
+    /// }
     /// ```
     ///
     /// ## Returns
