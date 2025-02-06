@@ -4,6 +4,7 @@ use crate::{Error, MulticallError, Result as ContractResult};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, U256};
 use alloy_provider::Provider;
+use alloy_rpc_types_eth::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 
 mod bindings;
@@ -28,6 +29,8 @@ const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a1739
 pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     calls: Vec<Box<dyn CallInfoTrait>>,
     provider: P,
+    block: Option<BlockId>,
+    state_override: Option<StateOverride>,
     _pd: std::marker::PhantomData<(T, N)>,
 }
 
@@ -38,7 +41,25 @@ where
 {
     /// Create a new multicall builder
     pub fn new(provider: P) -> Self {
-        Self { calls: Vec::new(), provider, _pd: Default::default() }
+        Self {
+            calls: Vec::new(),
+            provider,
+            _pd: Default::default(),
+            block: None,
+            state_override: None,
+        }
+    }
+
+    /// Set the block to make the call at.
+    pub fn block(mut self, block: BlockId) -> Self {
+        self.block = Some(block);
+        self
+    }
+
+    /// Set the state overrides for this call.
+    pub fn overrides(mut self, state_override: StateOverride) -> Self {
+        self.state_override = Some(state_override);
+        self
     }
 }
 
@@ -61,7 +82,13 @@ where
         let call = CallInfo::new(target, call);
 
         self.calls.push(Box::new(call));
-        MulticallBuilder { calls: self.calls, provider: self.provider, _pd: Default::default() }
+        MulticallBuilder {
+            calls: self.calls,
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            _pd: Default::default(),
+        }
     }
 
     /// Add [`CallInfo`] to the stack
@@ -74,7 +101,13 @@ where
         <T as TuplePush<C>>::Pushed: CallTuple,
     {
         self.calls.push(Box::new(call));
-        MulticallBuilder { calls: self.calls, provider: self.provider, _pd: Default::default() }
+        MulticallBuilder {
+            calls: self.calls,
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            _pd: Default::default(),
+        }
     }
 
     /// Call the `aggregate` function
@@ -129,7 +162,17 @@ where
             tx.set_value(value);
         }
 
-        let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
+        let mut eth_call = self.provider.call(&tx);
+
+        if let Some(block) = self.block {
+            eth_call = eth_call.block(block);
+        }
+
+        if let Some(overrides) = &self.state_override {
+            eth_call = eth_call.overrides(&overrides);
+        }
+
+        let res = eth_call.await.map_err(Error::TransportError)?;
         M::abi_decode_returns(&res, true)
             .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
     }
