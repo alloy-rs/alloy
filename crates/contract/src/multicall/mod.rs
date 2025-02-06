@@ -56,7 +56,7 @@ where
             .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
             .with_input(Bytes::from_iter(call));
 
-        let res = self.provider.call(&tx).await.map_err(|e| Error::TransportError(e))?;
+        let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
 
         let mut output = aggregateCall::abi_decode_returns(&res, true)?;
 

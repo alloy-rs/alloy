@@ -2,7 +2,7 @@ use alloy_sol_types::sol;
 sol! {
     /// [`Multicall3`](https://github.com/mds1/multicall) bindings.
     #[allow(missing_docs)]
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     interface IMulticall3 {
         struct Call {
             address target;
