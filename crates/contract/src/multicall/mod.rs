@@ -165,28 +165,23 @@ mod tests {
     async fn deploy_dummy(provider: impl Provider) -> DummyThatFailsInstance<(), impl Provider> {
         DummyThatFails::deploy(provider).await.unwrap()
     }
+
+    const FORK_URL: &str = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
     #[tokio::test]
     async fn test_aggregate() {
-        let left = ERC20::totalSupplyCall {};
-        let right =
+        let ts_call = ERC20::totalSupplyCall {};
+        let balance_call =
             ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
 
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider =
-            ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
         let multicall = MulticallBuilder::new(provider)
-            .add(left.clone(), weth)
-            .add(right.clone(), weth)
-            .add(left.clone(), weth)
-            .add(right, weth);
+            .add(ts_call.clone(), weth)
+            .add(balance_call.clone(), weth)
+            .add(ts_call.clone(), weth)
+            .add(balance_call, weth);
 
-        let (block_num, (t1, b1, t2, b2)) = multicall.call_aggregate().await.unwrap();
-
-        println!("block_num: {:?}", block_num);
-        println!("total_supply1: {:?}", t1);
-        println!("balance: {:?}", b1);
-        println!("total_supply2: {:?}", t2);
-        println!("balance: {:?}", b2);
+        let (_block_num, (t1, b1, t2, b2)) = multicall.call_aggregate().await.unwrap();
 
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
@@ -194,40 +189,38 @@ mod tests {
 
     #[tokio::test]
     async fn test_try_aggregate_pass() {
-        let left = ERC20::totalSupplyCall {};
-        let right =
+        let ts_call = ERC20::totalSupplyCall {};
+        let balance_call =
             ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
 
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider =
-            ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
         let multicall = MulticallBuilder::new(provider)
-            .add(left.clone(), weth)
-            .add(right.clone(), weth)
-            .add(left.clone(), weth)
-            .add(right, weth);
+            .add(ts_call.clone(), weth)
+            .add(balance_call.clone(), weth)
+            .add(ts_call.clone(), weth)
+            .add(balance_call, weth);
 
         let (_t1, _b1, _t2, _b2) = multicall.call_try_aggregate(true).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_try_aggregate_fail() {
-        let left = ERC20::totalSupplyCall {};
-        let right =
+        let ts_call = ERC20::totalSupplyCall {};
+        let balance_call =
             ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
 
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new()
-            .on_anvil_with_wallet_and_config(|a| a.fork("https://eth.merkle.io"))
-            .unwrap();
+        let provider =
+            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
 
         let dummy = deploy_dummy(provider.clone()).await;
         let dummy_addr = dummy.address();
         let multicall = MulticallBuilder::new(provider)
-            .add(left.clone(), weth)
-            .add(right.clone(), weth)
-            .add(left.clone(), weth)
-            .add(right, weth)
+            .add(ts_call.clone(), weth)
+            .add(balance_call.clone(), weth)
+            .add(ts_call.clone(), weth)
+            .add(balance_call, weth)
             .add(failCall {}, *dummy_addr); // Failing call that will revert the multicall.
 
         let err = multicall.call_try_aggregate(true).await.unwrap_err();
