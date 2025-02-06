@@ -5,6 +5,7 @@ use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 /// Contains EIP-1559 fields
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Eip1559Estimation {
     /// The base fee per gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
