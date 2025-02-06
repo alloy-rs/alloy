@@ -11,6 +11,7 @@ use bindings::IMulticall3::{aggregate3Call, tryAggregateCall, tryAggregateReturn
 pub use bindings::IMulticall3::{aggregateCall, Call, Call3};
 
 mod inner_types;
+use crate::MulticallError;
 pub use inner_types::CallInfo;
 use inner_types::CallInfoTrait;
 use tuple::{CallTuple, TuplePush};
@@ -61,18 +62,10 @@ where
     /// Call the `aggregate` function
     ///
     /// Requires that all calls succeed.
-    pub async fn call_aggregate(self) -> ContractResult<(U256, T::SuccessReturns)> {
-        let calls = &self.calls.into_iter().map(|c| c.to_call()).collect::<Vec<_>>();
-
-        let call = aggregateCall { calls: calls.to_vec() }.abi_encode();
-
-        let tx = N::TransactionRequest::default()
-            .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
-            .with_input(Bytes::from_iter(call));
-
-        let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
-
-        let output = aggregateCall::abi_decode_returns(&res, true)?;
+    pub async fn call_aggregate(&self) -> ContractResult<(U256, T::SuccessReturns)> {
+        let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let call = aggregateCall { calls: calls.to_vec() };
+        let output = self.build_and_call(call).await?;
         Ok((output.blockNumber, T::decode_returns(&output.returnData)?))
     }
 
@@ -80,31 +73,30 @@ where
     ///
     /// Adds flexibility for calls to fail
     pub async fn call_try_aggregate(self, require_success: bool) -> ContractResult<T::Returns> {
-        let calls = &self.calls.into_iter().map(|c| c.to_call()).collect::<Vec<_>>();
-        let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() }
-            .abi_encode();
-        let tx = N::TransactionRequest::default()
-            .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
-            .with_input(Bytes::from_iter(call));
-
-        let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
-        let output = tryAggregateCall::abi_decode_returns(&res, true)?;
+        let calls = &self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
+        let output = self.build_and_call(call).await?;
         let tryAggregateReturn { returnData } = output;
-
         T::decode_return_results(&returnData)
     }
 
     /// Call the `aggregate3` function
     pub async fn call_aggregate3(self) -> ContractResult<T::Returns> {
-        let calls = &self.calls.into_iter().map(|c| c.to_call3()).collect::<Vec<_>>();
-        let call = aggregate3Call { calls: calls.to_vec() }.abi_encode();
+        let calls = self.calls.iter().map(|c| c.to_call3()).collect::<Vec<_>>();
+        let call = aggregate3Call { calls: calls.to_vec() };
+        let output = self.build_and_call(call).await?;
+        T::decode_return_results(&output.returnData)
+    }
+
+    async fn build_and_call<M: SolCall>(&self, call_type: M) -> ContractResult<M::Return> {
+        let call = call_type.abi_encode();
         let tx = N::TransactionRequest::default()
             .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
             .with_input(Bytes::from_iter(call));
 
         let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
-        let output = aggregate3Call::abi_decode_returns(&res, true)?;
-        T::decode_return_results(&output.returnData)
+        M::abi_decode_returns(&res, true)
+            .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
     }
 }
 
