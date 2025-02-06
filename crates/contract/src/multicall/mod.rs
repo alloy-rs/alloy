@@ -2,15 +2,17 @@
 
 use crate::{Error, MulticallError, Result as ContractResult};
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::{address, Address, Bytes, U256};
+use alloy_primitives::{address, Address, BlockNumber, Bytes, U256};
 use alloy_provider::Provider;
 use alloy_sol_types::SolCall;
 
 mod bindings;
-use bindings::IMulticall3::{
-    aggregate3Call, aggregate3ValueCall, tryAggregateCall, tryAggregateReturn,
+use crate::multicall::bindings::IMulticall3::{
+    aggregate3Call, aggregate3ValueCall, aggregateCall, getBasefeeCall, getBlockHashCall,
+    getBlockNumberCall, getChainIdCall, getCurrentBlockCoinbaseCall, getCurrentBlockDifficultyCall,
+    getCurrentBlockGasLimitCall, getCurrentBlockTimestampCall, getEthBalanceCall,
+    getLastBlockHashCall, tryAggregateCall, tryAggregateReturn,
 };
-pub use bindings::IMulticall3::{aggregateCall, Call, Call3};
 
 mod inner_types;
 pub use inner_types::CallInfo;
@@ -18,6 +20,8 @@ use inner_types::CallInfoTrait;
 
 mod tuple;
 pub use tuple::{CallTuple, Failure, TuplePush};
+
+const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
 
 /// A multicall builder
 #[derive(Debug)]
@@ -118,7 +122,7 @@ where
     ) -> ContractResult<M::Return> {
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
-            .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
+            .with_to(MULTICALL3_ADDRESS)
             .with_input(Bytes::from_iter(call));
 
         if let Some(value) = value {
@@ -129,6 +133,109 @@ where
         M::abi_decode_returns(&res, true)
             .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
     }
+
+    // Utility functions
+
+    /// Add a call to get the block hash from a block number
+    pub fn add_get_block_hash(self, number: BlockNumber) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getBlockHashCall>,
+        T::Pushed: CallTuple,
+    {
+        let call =
+            CallInfo::new(MULTICALL3_ADDRESS, getBlockHashCall { blockNumber: U256::from(number) });
+        self.add_call(call)
+    }
+
+    /// Add a call to get the coinbase of the current block
+    pub fn add_get_current_block_coinbase(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getCurrentBlockCoinbaseCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockCoinbaseCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the current block number
+    pub fn add_get_block_number(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getBlockNumberCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getBlockNumberCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the current block difficulty
+    pub fn add_get_current_block_difficulty(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getCurrentBlockDifficultyCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockDifficultyCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the current block gas limit
+    pub fn add_get_current_block_gas_limit(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getCurrentBlockGasLimitCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockGasLimitCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the current block timestamp
+    pub fn add_get_current_block_timestamp(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getCurrentBlockTimestampCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getCurrentBlockTimestampCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the chain id
+    pub fn add_get_chain_id(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getChainIdCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getChainIdCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the base fee
+    pub fn add_get_base_fee(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getBasefeeCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getBasefeeCall {});
+        self.add_call(call)
+    }
+
+    /// Add a call to get the eth balance of an address
+    pub fn add_get_eth_balance(self, address: Address) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getEthBalanceCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getEthBalanceCall { addr: address });
+        self.add_call(call)
+    }
+
+    /// Add a call to get the last block hash
+    pub fn add_get_last_block_hash(self) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        T: TuplePush<getLastBlockHashCall>,
+        T::Pushed: CallTuple,
+    {
+        let call = CallInfo::new(MULTICALL3_ADDRESS, getLastBlockHashCall {});
+        self.add_call(call)
+    }
 }
 
 #[cfg(test)]
@@ -136,6 +243,7 @@ mod tests {
     use crate::multicall::tuple::Failure;
 
     use super::*;
+    use alloy_primitives::b256;
     use alloy_provider::ProviderBuilder;
     use alloy_sol_types::sol;
     use DummyThatFails::{failCall, DummyThatFailsInstance};
@@ -234,5 +342,30 @@ mod tests {
         assert!(b2.is_ok());
         let err = failure.unwrap_err();
         assert!(matches!(err, Failure { idx: 4, return_data: _ }));
+    }
+
+    #[tokio::test]
+    async fn test_util() {
+        let ts_call = ERC20::totalSupplyCall {};
+        let balance_call =
+            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let multicall = MulticallBuilder::new(provider)
+            .add(ts_call.clone(), weth)
+            .add(balance_call.clone(), weth)
+            .add(ts_call.clone(), weth)
+            .add(balance_call, weth)
+            .add_get_block_hash(21787144);
+
+        let (_block_num, (t1, b1, t2, b2, block_hash)) = multicall.call_aggregate().await.unwrap();
+
+        assert_eq!(t1, t2);
+        assert_eq!(b1, b2);
+        assert_eq!(
+            block_hash.blockHash,
+            b256!("31be03d4fb9a280d1699f1004f340573cd6d717dae79095d382e876415cb26ba")
+        );
     }
 }
