@@ -1481,6 +1481,33 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    fn serde_faulty_roundtrip_payload_input_v3() {
+        // The deserialization behavior of ExecutionPayload structs is faulty.
+        // They should not be implicitly deserializable to an earlier version,
+        // as this breaks round-trip behavior
+        let response_v3 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"}"#;
+
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(response_v3).unwrap();
+        assert_ne!(response_v3, serde_json::to_string(&payload_v2).unwrap());
+
+        let payload_v1: ExecutionPayloadV1 = serde_json::from_str(response_v3).unwrap();
+        assert_ne!(response_v3, serde_json::to_string(&payload_v1).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_faulty_roundtrip_payload_input_v2() {
+        // The deserialization behavior of ExecutionPayload structs is faulty.
+        // They should not be implicitly deserializable to an earlier version,
+        // as this breaks round-trip behavior
+        let response_v2 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[]}"#;
+
+        let payload: ExecutionPayloadV1 = serde_json::from_str(response_v2).unwrap();
+        assert_ne!(response_v2, serde_json::to_string(&payload).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     fn serde_deserialize_execution_payload_input_v2() {
         let response = r#"
 {
