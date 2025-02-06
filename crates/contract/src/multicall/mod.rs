@@ -1,6 +1,6 @@
 //! A Multicall Builder
 
-use crate::{Error, Result as ContractResult};
+use crate::{Error, MulticallError, Result as ContractResult};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, Bytes, U256};
 use alloy_provider::Provider;
@@ -13,12 +13,11 @@ use bindings::IMulticall3::{
 pub use bindings::IMulticall3::{aggregateCall, Call, Call3};
 
 mod inner_types;
-use crate::MulticallError;
 pub use inner_types::CallInfo;
 use inner_types::CallInfoTrait;
-use tuple::{CallTuple, TuplePush};
 
 mod tuple;
+pub use tuple::{CallTuple, Failure, TuplePush};
 
 /// A multicall builder
 #[derive(Debug)]
