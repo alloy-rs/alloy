@@ -303,13 +303,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::multicall::tuple::Failure;
-
     use super::*;
+    use crate::multicall::tuple::Failure;
     use alloy_primitives::b256;
     use alloy_provider::ProviderBuilder;
     use alloy_sol_types::sol;
     use DummyThatFails::{failCall, DummyThatFailsInstance};
+
     sol! {
         #[derive(Debug, PartialEq)]
         interface ERC20 {
@@ -414,7 +414,7 @@ mod tests {
             ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
 
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL).fork_block_number(21787144));
         let multicall = MulticallBuilder::new(provider)
             .add(ts_call.clone(), weth)
             .add(balance_call.clone(), weth)
