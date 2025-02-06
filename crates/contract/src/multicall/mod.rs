@@ -7,8 +7,8 @@ use alloy_provider::Provider;
 use alloy_sol_types::SolCall;
 
 mod bindings;
+use bindings::IMulticall3::{aggregate3Call, tryAggregateCall, tryAggregateReturn};
 pub use bindings::IMulticall3::{aggregateCall, Call, Call3};
-use bindings::IMulticall3::{tryAggregateCall, tryAggregateReturn};
 
 mod inner_types;
 pub use inner_types::CallInfo;
@@ -92,6 +92,19 @@ where
         let tryAggregateReturn { returnData } = output;
 
         T::decode_return_results(&returnData)
+    }
+
+    /// Call the `aggregate3` function
+    pub async fn call_aggregate3(self) -> ContractResult<T::Returns> {
+        let calls = &self.calls.into_iter().map(|c| c.to_call3()).collect::<Vec<_>>();
+        let call = aggregate3Call { calls: calls.to_vec() }.abi_encode();
+        let tx = N::TransactionRequest::default()
+            .with_to(address!("cA11bde05977b3631167028862bE2a173976CA11"))
+            .with_input(Bytes::from_iter(call));
+
+        let res = self.provider.call(&tx).await.map_err(Error::TransportError)?;
+        let output = aggregate3Call::abi_decode_returns(&res, true)?;
+        T::decode_return_results(&output.returnData)
     }
 }
 
