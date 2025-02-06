@@ -1,13 +1,14 @@
 //! A Multicall Builder
 
-use crate::{Error, MulticallError, Result as ContractResult};
+use crate::{Error, MulticallError, Result};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types_eth::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 
-mod bindings;
+/// Multicall bindings
+pub mod bindings;
 use crate::multicall::bindings::IMulticall3::{
     aggregate3Call, aggregate3ValueCall, aggregateCall, getBasefeeCall, getBlockHashCall,
     getBlockNumberCall, getChainIdCall, getCurrentBlockCoinbaseCall, getCurrentBlockDifficultyCall,
@@ -16,8 +17,7 @@ use crate::multicall::bindings::IMulticall3::{
 };
 
 mod inner_types;
-pub use inner_types::CallInfo;
-use inner_types::CallInfoTrait;
+pub use inner_types::{CallInfo, CallInfoTrait};
 
 mod tuple;
 pub use tuple::{CallTuple, Failure, TuplePush};
@@ -25,21 +25,59 @@ pub use tuple::{CallTuple, Failure, TuplePush};
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
 
-/// A multicall builder
+/// A Multicall3 builder
+///
+/// This builder implements a simple API interface to build and execute multicalls using the
+/// [`IMultiCall3`](crate::multicall::bindings::IMulticall3) contract which is available on 270+
+/// chains.
+///
+/// ## Example
+///
+/// ```ignore
+/// use alloy_contract::MulticallBuilder;
+/// use alloy_primitives::address;
+/// use alloy_provider::ProviderBuilder;
+/// use alloy_sol_types::sol;
+///
+/// sol! {
+///    #[derive(Debug, PartialEq)]
+///    interface ERC20 {
+///        function totalSupply() external view returns (uint256 totalSupply);
+///        function balanceOf(address owner) external view returns (uint256 balance);
+///    }
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let ts_call = ERC20::totalSupplyCall {};
+///     let balance_call =
+///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+///
+///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+///     let provider =
+///         ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+///
+///     let multicall = MulticallBuilder::new(provider).add(ts_call, weth).add(balance_call, weth);
+///
+///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
+///
+///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
+/// }
+/// ```
 #[derive(Debug)]
 pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
-    /// Batch of calls to make
+    /// Batched calls
     calls: Vec<Box<dyn CallInfoTrait>>,
     /// The provider to use
     provider: P,
-    /// The block to make the call at
+    /// The [`BlockId`] to use for the call
     block: Option<BlockId>,
-    /// The state overrides for this call
+    /// The [`StateOverride`] for the call
     state_override: Option<StateOverride>,
     /// This is the address of the [`IMulticall3`](crate::multicall::bindings::IMulticall3)
     /// contract.
     ///
-    /// If none, resolved to the default address for most chains: [`MULTICALL3_ADDRESS`].
+    /// By default it is set to [`MULTICALL3_ADDRESS`].
     address: Address,
     _pd: std::marker::PhantomData<(T, N)>,
 }
@@ -113,7 +151,7 @@ where
         }
     }
 
-    /// Add [`CallInfo`] to the stack
+    /// Appends a [`CallInfo`] to the stack.
     pub fn add_call<C: SolCall + 'static>(
         mut self,
         call: CallInfo<C>,
@@ -133,10 +171,58 @@ where
         }
     }
 
-    /// Call the `aggregate` function
+    /// Calls the `aggregate` function
     ///
-    /// Requires that all calls succeed.
-    pub async fn aggregate(&self) -> ContractResult<(U256, T::SuccessReturns)> {
+    /// Requires that all calls succeed, else reverts.
+    ///
+    /// ## Solidity Function Signature
+    ///
+    /// ```ignore
+    /// sol! {
+    ///     function aggregate(Call[] memory calls) external returns (uint256 blockNumber, bytes[] memory returnData);
+    /// }
+    /// ```
+    ///
+    /// ## Returns
+    ///
+    /// - (`blockNumber`, `returnData`):
+    /// - `blockNumber`: The block number of the call
+    /// - `returnData`: A tuple of the decoded return values for the calls
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// use alloy_contract::MulticallBuilder;
+    /// use alloy_primitives::address;
+    /// use alloy_provider::ProviderBuilder;
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///    #[derive(Debug, PartialEq)]
+    ///    interface ERC20 {
+    ///        function totalSupply() external view returns (uint256 totalSupply);
+    ///        function balanceOf(address owner) external view returns (uint256 balance);
+    ///    }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let ts_call = ERC20::totalSupplyCall {};
+    ///     let balance_call =
+    ///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+    ///
+    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///     let provider =
+    ///         ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+    ///
+    ///     let multicall = MulticallBuilder::new(provider).add(ts_call, weth).add(balance_call, weth);
+    ///
+    ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
+    ///
+    ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
+    /// }
+    /// ```
+    pub async fn aggregate(&self) -> Result<(U256, T::SuccessReturns)> {
         let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = aggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
@@ -145,8 +231,59 @@ where
 
     /// Call the `tryAggregate` function
     ///
-    /// Adds flexibility for calls to fail
-    pub async fn try_aggregate(&self, require_success: bool) -> ContractResult<T::Returns> {
+    /// Allows for calls to fail by setting `require_success` to false.
+    ///
+    /// ## Solidity Function Signature
+    ///
+    /// ```ignore
+    /// sol! {
+    ///     function tryAggregate(bool requireSuccess, Call[] calldata calls) external payable returns (Result[] memory returnData);
+    /// }
+    /// ```
+    ///
+    /// ## Returns
+    ///
+    /// - A tuple of the decoded return values for the calls.
+    /// - Each return value is wrapped in a [`Result`] struct.
+    /// - The [`Result::Ok`] variant contains the decoded return value.
+    /// - The [`Result::Err`] variant contains [`Failure`] struct which holds the index(-position)
+    ///   of the call and the returned data as [`Bytes`].
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// use alloy_contract::MulticallBuilder;
+    /// use alloy_primitives::address;
+    /// use alloy_provider::ProviderBuilder;
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///   #[derive(Debug, PartialEq)]
+    ///  interface ERC20 {
+    ///     function totalSupply() external view returns (uint256 totalSupply);
+    ///     function balanceOf(address owner) external view returns (uint256 balance);
+    ///  }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///    let ts_call = ERC20::totalSupplyCall {};
+    ///    let balance_call = ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+    ///
+    ///    let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///
+    ///    let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+    ///
+    ///    let multicall = MulticallBuilder::new(provider).add(ts_call, weth).add(balance_call, weth);
+    ///
+    ///    let (total_supply, balance) = multicall.try_aggregate(true).await.unwrap();
+    ///     
+    ///    // Unwrap Result<totalSupplyReturn, Failure>
+    ///    let total_supply = total_supply.unwrap();
+    ///    // Unwrap Result<balanceOfReturn, Failure>
+    ///    let balance = balance.unwrap();
+    /// }
+    pub async fn try_aggregate(&self, require_success: bool) -> Result<T::Returns> {
         let calls = &self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
@@ -155,7 +292,30 @@ where
     }
 
     /// Call the `aggregate3` function
-    pub async fn aggregate3(&self) -> ContractResult<T::Returns> {
+    ///
+    /// Doesn't require that all calls succeed, reverts only if a call with `allowFailure` set to
+    /// false, fails.
+    ///
+    /// By default, `.add(call: C, target: Address)` sets `allow_failure` to false.
+    ///
+    /// You can add a call that allows failure by using `.add_call(call: CallInfo)`, and setting
+    /// `allow_failure` to true in [`CallInfo`].
+    ///
+    /// ## Solidity Function Signature
+    ///
+    /// ```ignore
+    /// sol! {
+    ///     function aggregate3(Call3[] calldata calls) external payable returns (Result[] memory returnData);
+    /// ```
+    ///
+    /// ## Returns
+    ///
+    /// - A tuple of the decoded return values for the calls.
+    /// - Each return value is wrapped in a [`Result`] struct.
+    /// - The [`Result::Ok`] variant contains the decoded return value.
+    /// - The [`Result::Err`] variant contains [`Failure`] struct which holds the index(-position)
+    ///   of the call and the returned data as [`Bytes`].
+    pub async fn aggregate3(&self) -> Result<T::Returns> {
         let calls = self.calls.iter().map(|c| c.to_call3()).collect::<Vec<_>>();
         let call = aggregate3Call { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
@@ -163,7 +323,7 @@ where
     }
 
     /// Call the `aggregate3Value` function
-    pub async fn aggregate3_value(&self) -> ContractResult<T::Returns> {
+    pub async fn aggregate3_value(&self) -> Result<T::Returns> {
         let calls = self.calls.iter().map(|c| c.to_call3_value()).collect::<Vec<_>>();
         let total_value = calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
         let call = aggregate3ValueCall { calls: calls.to_vec() };
@@ -175,7 +335,7 @@ where
         &self,
         call_type: M,
         value: Option<U256>,
-    ) -> ContractResult<M::Return> {
+    ) -> Result<M::Return> {
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
             .with_to(self.address)
@@ -373,6 +533,41 @@ mod tests {
             .add(balance_call, weth);
 
         let (_t1, _b1, _t2, _b2) = multicall.try_aggregate(true).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn aggregate3() {
+        let ts_call = ERC20::totalSupplyCall {};
+        let balance_call =
+            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+
+        let provider =
+            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+
+        let dummy = deploy_dummy(provider.clone()).await;
+        let dummy_addr = dummy.address();
+        let multicall = MulticallBuilder::new(provider.clone())
+            .add(ts_call.clone(), weth)
+            .add(balance_call.clone(), weth)
+            .add(failCall {}, *dummy_addr); // Failing call that will revert the multicall.
+
+        let err = multicall.aggregate3().await.unwrap_err();
+
+        assert!(err.to_string().contains("revert: Multicall3: call failed"));
+
+        let failing_call = CallInfo::new(failCall {}, *dummy_addr).allow_failure(true);
+        let multicall = MulticallBuilder::new(provider)
+            .add(ts_call, weth)
+            .add(balance_call, weth)
+            .add_call(failing_call);
+        let (t1, b1, failure) = multicall.aggregate3().await.unwrap();
+
+        assert!(t1.is_ok());
+        assert!(b1.is_ok());
+        let err = failure.unwrap_err();
+        assert!(matches!(err, Failure { idx: 2, return_data: _ }));
     }
 
     #[tokio::test]

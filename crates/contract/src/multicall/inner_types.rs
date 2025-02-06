@@ -6,7 +6,7 @@ use alloy_primitives::{Address, U256};
 use alloy_sol_types::SolCall;
 
 /// A trait for converting CallInfo into relevant call types.
-pub(super) trait CallInfoTrait: std::fmt::Debug {
+pub trait CallInfoTrait: std::fmt::Debug {
     /// Converts the [`CallInfo`] into a [`Call`] struct for `aggregateCall`
     fn to_call(&self) -> Call;
     /// Converts the [`CallInfo`] into a [`Call3`] struct for `aggregate3Call`
@@ -38,8 +38,8 @@ impl<C: SolCall> CallInfoTrait for CallInfo<C> {
     }
 }
 
-/// A call that should be mapped into the relevant aggregate, aggregate3, aggregate3Value input
-/// structs.
+/// A call that is  mapped into aggregate, aggregate3, aggregate3Value call structs via the
+/// [`CallInfoTrait`] trait.
 #[derive(Clone, Default)]
 pub struct CallInfo<C: SolCall> {
     /// The target address of the call.
