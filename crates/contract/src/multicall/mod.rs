@@ -27,10 +27,19 @@ const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a1739
 /// A multicall builder
 #[derive(Debug)]
 pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
+    /// Batch of calls to make
     calls: Vec<Box<dyn CallInfoTrait>>,
+    /// The provider to use
     provider: P,
+    /// The block to make the call at
     block: Option<BlockId>,
+    /// The state overrides for this call
     state_override: Option<StateOverride>,
+    /// This is the address of the [`IMulticall3`](crate::multicall::bindings::IMulticall3)
+    /// contract.
+    ///
+    /// If none, resolved to the default address for most chains: [`MULTICALL3_ADDRESS`].
+    address: Option<Address>,
     _pd: std::marker::PhantomData<(T, N)>,
 }
 
@@ -47,7 +56,16 @@ where
             _pd: Default::default(),
             block: None,
             state_override: None,
+            address: None,
         }
+    }
+
+    /// Set the address of the multicall3 contract
+    ///
+    /// Default is [`MULTICALL3_ADDRESS`].
+    pub fn address(mut self, address: Address) -> Self {
+        self.address = Some(address);
+        self
     }
 
     /// Set the block to make the call at.
@@ -87,6 +105,7 @@ where
             provider: self.provider,
             block: self.block,
             state_override: self.state_override,
+            address: self.address,
             _pd: Default::default(),
         }
     }
@@ -106,6 +125,7 @@ where
             provider: self.provider,
             block: self.block,
             state_override: self.state_override,
+            address: self.address,
             _pd: Default::default(),
         }
     }
@@ -155,7 +175,7 @@ where
     ) -> ContractResult<M::Return> {
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
-            .with_to(MULTICALL3_ADDRESS)
+            .with_to(self.address.unwrap_or(MULTICALL3_ADDRESS))
             .with_input(Bytes::from_iter(call));
 
         if let Some(value) = value {
