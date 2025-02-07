@@ -58,7 +58,7 @@ impl Validity {
     pub fn with_refund_cfg(mut self, refund_cfg: Option<Vec<RefundConfig>>) -> Self {
         self.refund_config = refund_cfg;
         self
-    } 
+    }
 }
 
 /// Preferences on what data should be shared about the bundle and its transactions
@@ -74,8 +74,8 @@ pub struct Privacy {
     pub builders: Option<Vec<String>>,
 }
 
-impl Privacy {    
-    /// Sets hints 
+impl Privacy {
+    /// Sets hints
     pub fn with_hints(mut self, hints: Option<PrivacyHint>) -> Self {
         self.hints = hints;
         self
@@ -85,7 +85,7 @@ impl Privacy {
     pub fn with_builders(mut self, builders: Option<Vec<String>>) -> Self {
         self.builders = builders;
         self
-    } 
+    }
 }
 
 /// Hints on what data should be shared about the bundle and its transactions

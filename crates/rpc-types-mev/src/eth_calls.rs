@@ -313,7 +313,7 @@ pub struct PrivateTransactionRequest {
 
 impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
     fn from(envelope: T) -> Self {
-        PrivateTransactionRequest {
+        Self {
             tx: Bytes::from(envelope.encoded_2718()),
             max_block_number: Option::None,
             preferences: PrivateTransactionPreferences {
