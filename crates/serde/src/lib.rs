@@ -15,9 +15,6 @@ use alloc::format;
 use alloy_primitives::{hex, B256};
 use serde::Serializer;
 
-mod bool;
-pub use self::bool::*;
-
 pub mod displayfromstr;
 
 mod optional;
@@ -33,7 +30,6 @@ pub mod ttd;
 pub use ttd::*;
 
 mod other;
-
 pub use other::{OtherFields, WithOtherFields};
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.
