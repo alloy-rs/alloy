@@ -211,7 +211,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     ///
-    /// Receives an optional [Eip1559Estimator] that can be used to modify
+    /// Receives an [Eip1559Estimator] that can be used to modify
     /// how to estimate these fees.
     async fn estimate_eip1559_fees_with(
         &self,
