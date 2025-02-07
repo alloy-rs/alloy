@@ -177,7 +177,7 @@ where
     ///
     /// ## Solidity Function Signature
     ///
-    /// ```no_run
+    /// ```ignore
     /// sol! {
     ///     function aggregate(Call[] memory calls) external returns (uint256 blockNumber, bytes[] memory returnData);
     /// }
@@ -233,7 +233,7 @@ where
     ///
     /// ## Solidity Function Signature
     ///
-    /// ```no_run
+    /// ```ignore
     /// sol! {
     ///     function tryAggregate(bool requireSuccess, Call[] calldata calls) external payable returns (Result[] memory returnData);
     /// }

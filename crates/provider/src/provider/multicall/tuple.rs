@@ -35,23 +35,36 @@ pub trait CallTuple: Sealed {
     /// For example,
     ///
     /// ```no_run
-    /// let success_call = successCall {}; // SolCall
-    /// let failure_call = failureCall {}; // SolCall
-    ///
-    /// let allow_failure_call = CallInfo::new(failure_call, target).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
-    ///
-    /// let multicall = provider.multicall(success_call, target).add_call(allow_failure_call);
-    ///
-    /// let (success_result, failure_result) = multicall.aggregate3().await.unwrap();
-    ///
-    /// match success_result {
-    ///     Ok(success) => { println!("Success: {:?}", success) },
-    ///     Err(failure) => { /* handle failure */ },
+    /// use alloy_sol_types::sol;
+    /// use alloy_primitives::Address;
+    /// use alloy_provider::{CallInfo, Provider, ProviderBuilder, ext::MulticallApi, Result, Failure};
+    /// sol! {
+    ///     #[derive(Debug)]
+    ///     function success() external;
+    ///     function failure() external;
     /// }
     ///
-    /// match failure_result {
-    ///    Ok(success) => { /* handle success */ },
-    ///    Err(failure) => { assert!(matches!(failure, Failure { idx: 1, return_data: _ })) },
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let success_call = successCall {};
+    ///     let failure_call = failureCall {};
+    ///     let target = Address::random();
+    ///     let allow_failure_call = CallInfo::new(failure_call, target).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
+    ///     
+    ///     let provider = ProviderBuilder::new().on_builtin("https://..").await.unwrap();    
+    ///     let multicall = provider.multicall(success_call, target).add_call(allow_failure_call);
+    ///
+    ///
+    ///     let (success_result, failure_result) = multicall.aggregate3().await.unwrap();
+    ///     match success_result {
+    ///       Ok(success) => { println!("Success: {:?}", success) },
+    ///       Err(failure) => { /* handle failure */ },
+    ///     }
+    ///
+    ///     match failure_result {
+    ///       Ok(success) => { /* handle success */ },
+    ///       Err(failure) => { assert!(matches!(failure, Failure { idx: 1, return_data: _ })) },
+    ///     }
     /// }
     /// ```
     type Returns;
