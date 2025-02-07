@@ -22,7 +22,6 @@ pub trait TuplePush<T> {
 
 /// A trait for tuples of SolCalls that can be decoded
 #[doc(hidden)]
-#[allow(unnameable_types)]
 pub trait CallTuple: Sealed {
     /// The flattened result return type of the tuple
     type Returns;

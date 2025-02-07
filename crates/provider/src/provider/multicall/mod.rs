@@ -19,7 +19,8 @@ mod inner_types;
 pub use inner_types::{CallInfo, CallInfoTrait, Failure, MulticallError, Result};
 
 mod tuple;
-use tuple::{CallTuple, TuplePush};
+pub use tuple::CallTuple;
+use tuple::TuplePush;
 
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
@@ -97,7 +98,14 @@ where
             address: MULTICALL3_ADDRESS,
         }
     }
+}
 
+impl<T, P, N> MulticallBuilder<T, P, N>
+where
+    T: CallTuple,
+    P: Provider<N>,
+    N: Network,
+{
     /// Set the address of the multicall3 contract
     ///
     /// Default is [`MULTICALL3_ADDRESS`].
@@ -117,14 +125,7 @@ where
         self.state_override = Some(state_override);
         self
     }
-}
 
-impl<T, P, N> MulticallBuilder<T, P, N>
-where
-    T: CallTuple,
-    P: Provider<N>,
-    N: Network,
-{
     /// Appends a [`SolCall`] to the stack.
     ///
     /// `target` is the address of the contract to call.
@@ -377,7 +378,7 @@ where
             tx.set_value(value);
         }
 
-        let mut eth_call = self.provider.call(&tx);
+        let mut eth_call = self.provider.root().call(&tx);
 
         if let Some(block) = self.block {
             eth_call = eth_call.block(block);
@@ -532,6 +533,18 @@ mod tests {
     }
 
     const FORK_URL: &str = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+
+    #[tokio::test]
+    async fn test_single() {
+        let ts_call = ERC20::totalSupplyCall {};
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let multicall = MulticallBuilder::new(provider).add(ts_call, weth);
+
+        let (_block_num, (_total_supply,)) = multicall.aggregate().await.unwrap();
+    }
+
     #[tokio::test]
     async fn test_aggregate() {
         let ts_call = ERC20::totalSupplyCall {};
