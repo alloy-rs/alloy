@@ -79,6 +79,9 @@ pub trait CallTuple: Sealed {
 
     /// Converts Returns to SuccessReturns if all results are Ok
     fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns>;
+
+    /// Converts Returns to SuccessReturns if all results are Ok
+    fn try_into_success(results: Self::Returns) -> Result<Self::SuccessReturns>;
 }
 
 // Empty tuple implementation
@@ -98,6 +101,10 @@ impl CallTuple for () {
     }
 
     fn decode_return_results(_results: &[MulticallResult]) -> Result<Self::Returns> {
+        Ok(())
+    }
+
+    fn try_into_success(_: Self::Returns) -> Result<Self::SuccessReturns> {
         Ok(())
     }
 }
@@ -137,6 +144,15 @@ macro_rules! impl_tuple {
                     match &results[$idx].success {
                         true => Ok($ty::abi_decode_returns(&results[$idx].returnData, true).map_err(MulticallError::DecodeError)?),
                         false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
+                    },
+                )+))
+            }
+
+            fn try_into_success(results: Self::Returns) -> Result<Self::SuccessReturns> {
+                Ok(($(
+                    match results.$idx {
+                        Ok(value) => value,
+                        Err(failure) => return Err(MulticallError::CallFailed(failure.return_data)),
                     },
                 )+))
             }

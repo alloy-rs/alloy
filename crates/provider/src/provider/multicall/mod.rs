@@ -2,9 +2,13 @@
 
 use crate::Provider;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::{address, Address, BlockNumber, Bytes, U256};
+use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
+use bindings::IMulticall3::{
+    blockAndAggregateCall, blockAndAggregateReturn, tryBlockAndAggregateCall,
+    tryBlockAndAggregateReturn,
+};
 
 /// Multicall bindings
 pub mod bindings;
@@ -353,6 +357,29 @@ where
         let call = aggregate3ValueCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, Some(total_value)).await?;
         T::decode_return_results(&output.returnData)
+    }
+
+    /// Call the `blockAndAggregate` function
+    pub async fn block_and_aggregate(&self) -> Result<(U256, B256, T::SuccessReturns)> {
+        let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let call = blockAndAggregateCall { calls: calls.to_vec() };
+        let output = self.build_and_call(call, None).await?;
+        let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
+        let result = T::decode_return_results(&returnData)?;
+        Ok((blockNumber, blockHash, T::try_into_success(result)?))
+    }
+
+    /// Call the `tryBlockAndAggregate` function
+    pub async fn try_block_and_aggregate(
+        &self,
+        require_success: bool,
+    ) -> Result<(U256, B256, T::Returns)> {
+        let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let call =
+            tryBlockAndAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
+        let output = self.build_and_call(call, None).await?;
+        let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
+        Ok((blockNumber, blockHash, T::decode_return_results(&returnData)?))
     }
 
     /// Helper fn to build a tx and call the multicall contract
