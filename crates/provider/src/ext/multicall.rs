@@ -7,7 +7,7 @@ use alloy_sol_types::SolCall;
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait MulticallApi<N: Network = Ethereum>: Provider<N> + Send + Sync + Sized {
-    /// Multicall
+    /// Initalizes a new [`MulticallBuilder`] with the given call and target.
     fn multicall<C: SolCall + 'static>(
         &self,
         call: C,
@@ -20,6 +20,43 @@ where
     N: Network,
     P: Provider<N>,
 {
+    /// Execute a multicall by leveraging the [`MulticallBuilder`].
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use alloy_primitives::address;
+    /// use alloy_provider::ProviderBuilder;
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///    #[derive(Debug, PartialEq)]
+    ///   interface ERC20 {
+    ///      function totalSupply() external view returns (uint256 totalSupply);
+    ///     function balanceOf(address owner) external view returns (uint256 balance);
+    ///   }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     const FORK_URL: &str = "https://eth.merkle.io/";
+    ///     let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+    ///
+    ///     let ts_call = ERC20::totalSupplyCall {};
+    ///     let balance_call =
+    ///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+    ///
+    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///
+    ///     let call = provider.multicall(ts_call, weth).add(balance_call, weth);
+    ///
+    ///     let (block_num, (total_supply, balance)) = call.aggregate().await.unwrap();
+    ///
+    ///     println!("Current Block Number: {}", block_num);
+    ///     println!("Total Supply: {:?}", total_supply);
+    ///     println!("Balance: {:?}", balance);
+    /// }
+    /// ```
     fn multicall<C: SolCall + 'static>(
         &self,
         call: C,
