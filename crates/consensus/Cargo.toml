@@ -51,6 +51,7 @@ derive_more = { workspace = true, features = [
     "into_iterator",
 ], default-features = false }
 auto_impl.workspace = true
+once_cell = { workspace = true, features = ["critical-section"]}
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }
