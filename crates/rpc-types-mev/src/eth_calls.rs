@@ -314,12 +314,12 @@ pub struct PrivateTransactionRequest {
 impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
     fn from(envelope: T) -> Self {
         Self {
-            tx: Bytes::from(envelope.encoded_2718()),
-            max_block_number: Option::None,
+            tx: envelope.encoded_2718().into(),
+            max_block_number: None,
             preferences: PrivateTransactionPreferences {
-                fast: Option::None,
-                validity: Option::None,
-                privacy: Option::None,
+                fast: None,
+                validity: None,
+                privacy: None,
             },
         }
     }
