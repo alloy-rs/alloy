@@ -1,10 +1,10 @@
+use super::{EthCallMany, FilterPollerBuilder};
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, EstimatorFunction},
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
-
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{
@@ -18,12 +18,12 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
-
 use std::{borrow::Cow, sync::Arc};
 
-use super::{EthCallMany, FilterPollerBuilder};
-
-/// A wrapper struct around a type erased [`Provider`]
+/// A wrapper struct around a type erased [`Provider`].
+///
+/// This type will delegate all functions to the wrapped provider, with the exception of non
+/// object-safe functions (e.g. [`Provider::subscribe`]) which use the default trait implementation.
 #[derive(Clone)]
 pub struct WrappedProvider<N = Ethereum>(Arc<dyn Provider<N> + 'static>);
 
@@ -374,16 +374,6 @@ impl<N: Network> Provider<N> for WrappedProvider<N> {
         filter: &Filter,
     ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
         self.0.subscribe_logs(filter).await
-    }
-
-    #[cfg(feature = "pubsub")]
-    async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
-    where
-        P: alloy_json_rpc::RpcSend,
-        R: alloy_json_rpc::RpcRecv,
-        Self: Sized,
-    {
-        self.0.subscribe(params).await
     }
 
     #[cfg(feature = "pubsub")]
