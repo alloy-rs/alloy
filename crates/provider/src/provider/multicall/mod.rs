@@ -76,7 +76,7 @@ pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     block: Option<BlockId>,
     /// The [`StateOverride`] for the call
     state_override: Option<StateOverride>,
-    /// This is the address of the [`IMulticall3`](crate::multicall::bindings::IMulticall3)
+    /// This is the address of the [`IMulticall3`](crate::bindings::IMulticall3)
     /// contract.
     ///
     /// By default it is set to [`MULTICALL3_ADDRESS`].
