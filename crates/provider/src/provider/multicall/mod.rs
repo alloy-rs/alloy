@@ -37,10 +37,9 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 ///
 /// ## Example
 ///
-/// ```ignore
-/// use alloy_contract::MulticallBuilder;
+/// ```no_run
 /// use alloy_primitives::address;
-/// use alloy_provider::ProviderBuilder;
+/// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
 /// use alloy_sol_types::sol;
 ///
 /// sol! {
@@ -58,10 +57,9 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 ///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
 ///
 ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-///     let provider =
-///         ProviderBuilder::new().on_anvil_with_config(|a| a.fork("https://eth.merkle.io"));
+///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
 ///
-///     let multicall = MulticallBuilder::new(provider).add(ts_call, weth).add(balance_call, weth);
+///     let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
 ///
 ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
 ///
@@ -197,7 +195,7 @@ where
     ///
     /// ```no_run
     /// use alloy_primitives::address;
-    /// use alloy_provider::{ext::MulticallApi, MulticallBuilder, ProviderBuilder};
+    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
@@ -217,7 +215,7 @@ where
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
     ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
     ///
-    ///     let multicall = provider.multicall(ts_call, weth).add(balance_call, weth);
+    ///     let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
     ///
     ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
     ///
@@ -255,7 +253,7 @@ where
     ///
     /// ```no_run
     /// use alloy_primitives::address;
-    /// use alloy_provider::{ext::MulticallApi, MulticallBuilder, ProviderBuilder};
+    /// use alloy_provider::{Provider, MulticallBuilder, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
@@ -275,7 +273,7 @@ where
     ///
     ///    let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
     ///
-    ///    let multicall = provider.multicall(ts_call, weth).add(balance_call, weth);
+    ///    let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
     ///
     ///    let (total_supply, balance) = multicall.try_aggregate(true).await.unwrap();
     ///     

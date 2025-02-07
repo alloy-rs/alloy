@@ -37,7 +37,7 @@ pub trait CallTuple: Sealed {
     /// ```no_run
     /// use alloy_sol_types::sol;
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{CallInfo, Provider, ProviderBuilder, ext::MulticallApi, Result, Failure};
+    /// use alloy_provider::{CallInfo, Provider, ProviderBuilder, Result, Failure};
     /// sol! {
     ///     #[derive(Debug)]
     ///     function success() external;
@@ -52,8 +52,7 @@ pub trait CallTuple: Sealed {
     ///     let allow_failure_call = CallInfo::new(failure_call, target).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
     ///     
     ///     let provider = ProviderBuilder::new().on_builtin("https://..").await.unwrap();    
-    ///     let multicall = provider.multicall(success_call, target).add_call(allow_failure_call);
-    ///
+    ///     let multicall = provider.multicall().add(success_call, target).add_call(allow_failure_call);
     ///
     ///     let (success_result, failure_result) = multicall.aggregate3().await.unwrap();
     ///     match success_result {
