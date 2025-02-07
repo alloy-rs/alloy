@@ -311,6 +311,34 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
+impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+    fn from(envelope: T) -> Self {
+        PrivateTransactionRequest {
+            tx: Bytes::from(envelope.encoded_2718()),
+            max_block_number: Option::None,
+            preferences: PrivateTransactionPreferences {
+                fast: Option::None,
+                validity: Option::None,
+                privacy: Option::None,
+            },
+        }
+    }
+}
+
+impl PrivateTransactionRequest {
+    /// Sets private tx's max block number.
+    pub const fn max_block_number(mut self, num: Option<u64>) -> Self {
+        self.max_block_number = num;
+        self
+    }
+
+    /// Sets private tx's preferences.
+    pub fn with_preferences(mut self, preferences: PrivateTransactionPreferences) -> Self {
+        self.preferences = preferences;
+        self
+    }
+}
+
 /// Additional preferences for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct PrivateTransactionPreferences {
@@ -329,6 +357,24 @@ impl PrivateTransactionPreferences {
     /// Returns true if the preferences are empty.
     pub const fn is_empty(&self) -> bool {
         self.fast.is_none() && self.validity.is_none() && self.privacy.is_none()
+    }
+
+    /// Sets mode of tx execution
+    pub const fn with_fast_mode(mut self, fast: Option<bool>) -> Self {
+        self.fast = fast;
+        self
+    }
+
+    /// Sets tx's validity
+    pub fn with_validity(mut self, validity: Option<Validity>) -> Self {
+        self.validity = validity;
+        self
+    }
+
+    /// Sets tx's privacy
+    pub fn with_privacy(mut self, privacy: Option<Privacy>) -> Self {
+        self.privacy = privacy;
+        self
     }
 }
 
