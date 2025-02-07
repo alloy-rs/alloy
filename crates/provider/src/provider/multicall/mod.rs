@@ -514,6 +514,23 @@ where
         let call = CallInfo::new(getLastBlockHashCall {}, self.address);
         self.add_call(call)
     }
+
+    /// Clear the calls from the builder
+    pub fn clear(self) -> MulticallBuilder<Empty, P, N> {
+        MulticallBuilder {
+            calls: Vec::new(),
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            address: self.address,
+            _pd: Default::default(),
+        }
+    }
+
+    /// Get the number of calls in the builder
+    pub fn len(&self) -> usize {
+        self.calls.len()
+    }
 }
 
 #[cfg(test)]
@@ -745,5 +762,19 @@ mod tests {
         assert_eq!(c1.unwrap().counter, U256::ZERO);
         assert!(inc.is_err_and(|failure| matches!(failure, Failure { idx: 1, return_data: _ })));
         assert_eq!(c2.unwrap().counter, U256::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_clear() {
+        let ts_call = ERC20::totalSupplyCall {};
+        let balance_call =
+            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+
+        let provider = ProviderBuilder::new().on_anvil();
+        let multicall = MulticallBuilder::new(provider).add(ts_call, weth).add(balance_call, weth);
+        assert_eq!(multicall.len(), 2);
+        let multicall = multicall.clear();
+        assert_eq!(multicall.len(), 0);
     }
 }
