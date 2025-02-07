@@ -231,7 +231,7 @@ pub struct ExecutionPayloadEnvelopeV4 {
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadV1 {
     /// The parent hash of the block.
@@ -380,161 +380,6 @@ impl ExecutionPayloadV1 {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for ExecutionPayloadV1 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ExecutionPayloadV1Visitor;
-
-        impl<'de> Visitor<'de> for ExecutionPayloadV1Visitor {
-            type Value = ExecutionPayloadV1;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a valid ExecutionPayloadV1 object")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                #[cfg_attr(feature = "serde", derive(Deserialize))]
-                #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
-                enum Fields {
-                    ParentHash,
-                    FeeRecipient,
-                    StateRoot,
-                    ReceiptsRoot,
-                    LogsBloom,
-                    PrevRandao,
-                    BlockNumber,
-                    GasLimit,
-                    GasUsed,
-                    Timestamp,
-                    ExtraData,
-                    BaseFeePerGas,
-                    BlockHash,
-                    Transactions,
-                    // catch unknown fields
-                    #[serde(other)]
-                    Unknown,
-                }
-
-                let mut parent_hash = None;
-                let mut fee_recipient = None;
-                let mut state_root = None;
-                let mut receipts_root = None;
-                let mut logs_bloom = None;
-                let mut prev_randao = None;
-                let mut block_number = None;
-                let mut gas_limit = None;
-                let mut gas_used = None;
-                let mut timestamp = None;
-                let mut extra_data = None;
-                let mut base_fee_per_gas = None;
-                let mut block_hash = None;
-                let mut transactions = None;
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Fields::ParentHash => parent_hash = Some(map.next_value()?),
-                        Fields::FeeRecipient => fee_recipient = Some(map.next_value()?),
-                        Fields::StateRoot => state_root = Some(map.next_value()?),
-                        Fields::ReceiptsRoot => receipts_root = Some(map.next_value()?),
-                        Fields::LogsBloom => logs_bloom = Some(map.next_value()?),
-                        Fields::PrevRandao => prev_randao = Some(map.next_value()?),
-                        Fields::BlockNumber => {
-                            let raw = map.next_value::<&str>()?;
-                            block_number =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
-                        }
-                        Fields::GasLimit => {
-                            let raw = map.next_value::<&str>()?;
-                            gas_limit =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
-                        }
-                        Fields::GasUsed => {
-                            let raw = map.next_value::<String>()?;
-                            gas_used =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
-                        }
-                        Fields::Timestamp => {
-                            let raw = map.next_value::<String>()?;
-                            timestamp =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
-                        }
-                        Fields::ExtraData => extra_data = Some(map.next_value()?),
-                        Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
-                        Fields::BlockHash => block_hash = Some(map.next_value()?),
-                        Fields::Transactions => transactions = Some(map.next_value()?),
-                        Fields::Unknown => {
-                            return Err(de::Error::custom("Unexpected field in ExecutionPayloadV1"))
-                        }
-                    }
-                }
-
-                let parent_hash =
-                    parent_hash.ok_or_else(|| de::Error::missing_field("parentHash"))?;
-                let fee_recipient =
-                    fee_recipient.ok_or_else(|| de::Error::missing_field("feeRecipient"))?;
-                let state_root = state_root.ok_or_else(|| de::Error::missing_field("stateRoot"))?;
-                let receipts_root =
-                    receipts_root.ok_or_else(|| de::Error::missing_field("receiptsRoot"))?;
-                let logs_bloom = logs_bloom.ok_or_else(|| de::Error::missing_field("logsBloom"))?;
-                let prev_randao =
-                    prev_randao.ok_or_else(|| de::Error::missing_field("prevRandao"))?;
-                let block_number =
-                    block_number.ok_or_else(|| de::Error::missing_field("blockNumber"))?;
-                let gas_limit = gas_limit.ok_or_else(|| de::Error::missing_field("gasLimit"))?;
-                let gas_used = gas_used.ok_or_else(|| de::Error::missing_field("gasUesd"))?;
-                let timestamp = timestamp.ok_or_else(|| de::Error::missing_field("timestamp"))?;
-                let extra_data = extra_data.ok_or_else(|| de::Error::missing_field("extraData"))?;
-                let base_fee_per_gas =
-                    base_fee_per_gas.ok_or_else(|| de::Error::missing_field("baseFeePerGas"))?;
-                let block_hash = block_hash.ok_or_else(|| de::Error::missing_field("blockHash"))?;
-                let transactions =
-                    transactions.ok_or_else(|| de::Error::missing_field("transactions"))?;
-
-                Ok(ExecutionPayloadV1 {
-                    parent_hash,
-                    fee_recipient,
-                    state_root,
-                    receipts_root,
-                    logs_bloom,
-                    prev_randao,
-                    block_number,
-                    gas_limit,
-                    gas_used,
-                    timestamp,
-                    extra_data,
-                    base_fee_per_gas,
-                    block_hash,
-                    transactions,
-                })
-            }
-        }
-
-        const FIELDS: &[&str] = &[
-            "parentHash",
-            "feeRecipient",
-            "stateRoot",
-            "receiptsRoot",
-            "logsBloom",
-            "prevRandao",
-            "blockNumber",
-            "gasLimit",
-            "gasUsed",
-            "timestamp",
-            "extraData",
-            "baseFeePerGas",
-            "blockHash",
-            "transactions",
-        ];
-        deserializer.deserialize_struct("ExecutionPayloadV1", FIELDS, ExecutionPayloadV1Visitor)
-    }
-}
-
 impl<T: Decodable2718> TryFrom<ExecutionPayloadV1> for Block<T> {
     type Error = PayloadError;
 
@@ -549,7 +394,6 @@ impl<T: Decodable2718> TryFrom<ExecutionPayloadV1> for Block<T> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct ExecutionPayloadV2 {
     /// Inner V1 payload
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -1215,24 +1059,220 @@ impl<T: Decodable2718> TryFrom<ExecutionPayload> for Block<T> {
 }
 
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
+//#[cfg(feature = "serde")]
+//impl<'de> serde::Deserialize<'de> for ExecutionPayload {
+//    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//    where
+//        D: serde::Deserializer<'de>,
+//    {
+//        #[derive(serde::Deserialize)]
+//        #[serde(untagged)]
+//        enum ExecutionPayloadDesc {
+//            V3(ExecutionPayloadV3),
+//            V2(ExecutionPayloadV2),
+//            V1(ExecutionPayloadV1),
+//        }
+//        match ExecutionPayloadDesc::deserialize(deserializer)? {
+//            ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
+//            ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
+//            ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
+//        }
+//    }
+//}
+
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for ExecutionPayload {
+impl<'de> Deserialize<'de> for ExecutionPayload {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
-        #[serde(untagged)]
-        enum ExecutionPayloadDesc {
-            V3(ExecutionPayloadV3),
-            V2(ExecutionPayloadV2),
-            V1(ExecutionPayloadV1),
+        struct ExecutionPayloadVisitor;
+
+        impl<'de> Visitor<'de> for ExecutionPayloadVisitor {
+            type Value = ExecutionPayload;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a valid ExecutionPayload object")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                // this currently rejects unknown fields
+                #[cfg_attr(feature = "serde", derive(Deserialize))]
+                #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
+                enum Fields {
+                    ParentHash,
+                    FeeRecipient,
+                    StateRoot,
+                    ReceiptsRoot,
+                    LogsBloom,
+                    PrevRandao,
+                    BlockNumber,
+                    GasLimit,
+                    GasUsed,
+                    Timestamp,
+                    ExtraData,
+                    BaseFeePerGas,
+                    BlockHash,
+                    Transactions,
+                    // V2
+                    Withdrawals,
+                    // V3
+                    BlobGasUsed,
+                    ExcessBlobGas,
+                }
+
+                let mut parent_hash = None;
+                let mut fee_recipient = None;
+                let mut state_root = None;
+                let mut receipts_root = None;
+                let mut logs_bloom = None;
+                let mut prev_randao = None;
+                let mut block_number = None;
+                let mut gas_limit = None;
+                let mut gas_used = None;
+                let mut timestamp = None;
+                let mut extra_data = None;
+                let mut base_fee_per_gas = None;
+                let mut block_hash = None;
+                let mut transactions = None;
+                let mut withdrawals = None;
+                let mut blob_gas_used = None;
+                let mut excess_blob_gas = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Fields::ParentHash => parent_hash = Some(map.next_value()?),
+                        Fields::FeeRecipient => fee_recipient = Some(map.next_value()?),
+                        Fields::StateRoot => state_root = Some(map.next_value()?),
+                        Fields::ReceiptsRoot => receipts_root = Some(map.next_value()?),
+                        Fields::LogsBloom => logs_bloom = Some(map.next_value()?),
+                        Fields::PrevRandao => prev_randao = Some(map.next_value()?),
+                        Fields::BlockNumber => {
+                            let raw = map.next_value::<&str>()?;
+                            block_number =
+                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                        }
+                        Fields::GasLimit => {
+                            let raw = map.next_value::<&str>()?;
+                            gas_limit =
+                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                        }
+                        Fields::GasUsed => {
+                            let raw = map.next_value::<String>()?;
+                            gas_used =
+                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                        }
+                        Fields::Timestamp => {
+                            let raw = map.next_value::<String>()?;
+                            timestamp =
+                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                        }
+                        Fields::ExtraData => extra_data = Some(map.next_value()?),
+                        Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
+                        Fields::BlockHash => block_hash = Some(map.next_value()?),
+                        Fields::Transactions => transactions = Some(map.next_value()?),
+                        Fields::Withdrawals => withdrawals = Some(map.next_value()?),
+                        Fields::BlobGasUsed => {
+                            let raw = map.next_value::<String>()?;
+                            blob_gas_used =
+                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                        }
+                        Fields::ExcessBlobGas => {
+                            let raw = map.next_value::<String>()?;
+                            excess_blob_gas =
+                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                        }
+                    }
+                }
+
+                let parent_hash =
+                    parent_hash.ok_or_else(|| de::Error::missing_field("parentHash"))?;
+                let fee_recipient =
+                    fee_recipient.ok_or_else(|| de::Error::missing_field("feeRecipient"))?;
+                let state_root = state_root.ok_or_else(|| de::Error::missing_field("stateRoot"))?;
+                let receipts_root =
+                    receipts_root.ok_or_else(|| de::Error::missing_field("receiptsRoot"))?;
+                let logs_bloom = logs_bloom.ok_or_else(|| de::Error::missing_field("logsBloom"))?;
+                let prev_randao =
+                    prev_randao.ok_or_else(|| de::Error::missing_field("prevRandao"))?;
+                let block_number =
+                    block_number.ok_or_else(|| de::Error::missing_field("blockNumber"))?;
+                let gas_limit = gas_limit.ok_or_else(|| de::Error::missing_field("gasLimit"))?;
+                let gas_used = gas_used.ok_or_else(|| de::Error::missing_field("gasUesd"))?;
+                let timestamp = timestamp.ok_or_else(|| de::Error::missing_field("timestamp"))?;
+                let extra_data = extra_data.ok_or_else(|| de::Error::missing_field("extraData"))?;
+                let base_fee_per_gas =
+                    base_fee_per_gas.ok_or_else(|| de::Error::missing_field("baseFeePerGas"))?;
+                let block_hash = block_hash.ok_or_else(|| de::Error::missing_field("blockHash"))?;
+                let transactions =
+                    transactions.ok_or_else(|| de::Error::missing_field("transactions"))?;
+
+                let v1 = ExecutionPayloadV1 {
+                    parent_hash,
+                    fee_recipient,
+                    state_root,
+                    receipts_root,
+                    logs_bloom,
+                    prev_randao,
+                    block_number,
+                    gas_limit,
+                    gas_used,
+                    timestamp,
+                    extra_data,
+                    base_fee_per_gas,
+                    block_hash,
+                    transactions,
+                };
+
+                if let Some(withdrawals) = withdrawals {
+                    if let (Some(blob_gas_used), Some(excess_blob_gas)) =
+                        (blob_gas_used, excess_blob_gas)
+                    {
+                        return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
+                            payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
+                            blob_gas_used,
+                            excess_blob_gas,
+                        }));
+                    }
+
+                    // reject incomplete V3 payloads even if they could construct a valid V2
+                    if blob_gas_used.is_some() || excess_blob_gas.is_some() {
+                        return Err(de::Error::custom("invalid enum variant"));
+                    }
+
+                    return Ok(ExecutionPayload::V2(ExecutionPayloadV2 {
+                        payload_inner: v1,
+                        withdrawals,
+                    }));
+                }
+
+                Ok(ExecutionPayload::V1(v1))
+            }
         }
-        match ExecutionPayloadDesc::deserialize(deserializer)? {
-            ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
-            ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
-            ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
-        }
+
+        const FIELDS: &[&str] = &[
+            "parentHash",
+            "feeRecipient",
+            "stateRoot",
+            "receiptsRoot",
+            "logsBloom",
+            "prevRandao",
+            "blockNumber",
+            "gasLimit",
+            "gasUsed",
+            "timestamp",
+            "extraData",
+            "baseFeePerGas",
+            "blockHash",
+            "transactions",
+            "withdrawals",
+            "blobGasUsed",
+            "excessBlobGas",
+        ];
+        deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
     }
 }
 
@@ -1644,53 +1684,59 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_execution_payload_exact_version_v3() {
+    fn serde_payload_input_enum_v3() {
         let response_v3 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"}"#;
 
-        let result_v3: ExecutionPayloadV3 = serde_json::from_str(response_v3).unwrap();
-        assert_eq!(serde_json::to_string(&result_v3).unwrap(), response_v3);
-
-        let result_v2: Result<ExecutionPayloadV2, serde_json::Error> =
-            serde_json::from_str(response_v3);
-        assert!(result_v2.is_err());
-
-        let result_v1: Result<ExecutionPayloadV1, serde_json::Error> =
-            serde_json::from_str(response_v3);
-        assert!(result_v1.is_err());
+        let payload: ExecutionPayload = serde_json::from_str(response_v3).unwrap();
+        assert!(payload.as_v3().is_some());
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_execution_payload_exact_version_v2() {
+    fn serde_payload_input_enum_v2() {
         let response_v2 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[]}"#;
 
-        let result_v3: Result<ExecutionPayloadV3, serde_json::Error> =
-            serde_json::from_str(response_v2);
-        assert!(result_v3.is_err());
-
-        let result_v2: ExecutionPayloadV2 = serde_json::from_str(response_v2).unwrap();
-        assert_eq!(serde_json::to_string(&result_v2).unwrap(), response_v2);
-
-        let result_v1: Result<ExecutionPayloadV1, serde_json::Error> =
-            serde_json::from_str(response_v2);
-        assert!(result_v1.is_err());
+        let payload: ExecutionPayload = serde_json::from_str(response_v2).unwrap();
+        assert!(payload.as_v3().is_none());
+        assert!(payload.as_v2().is_some());
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_execution_payload_exact_version_v1() {
-        let response_v1 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[]}"#;
+    fn serde_payload_input_enum_faulty() {
+        // incomplete V3 payload should be rejected even if it has all V2 fields
+        let response_faulty = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[], "blobGasUsed": "0x0"}"#;
 
-        let result_v3: Result<ExecutionPayloadV3, serde_json::Error> =
-            serde_json::from_str(response_v1);
-        assert!(result_v3.is_err());
+        let payload: Result<ExecutionPayload, serde_json::Error> =
+            serde_json::from_str(response_faulty);
+        assert!(payload.is_err());
+    }
 
-        let result_v2: Result<ExecutionPayloadV2, serde_json::Error> =
-            serde_json::from_str(response_v1);
-        assert!(result_v2.is_err());
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_faulty_roundtrip_payload_input_v3() {
+        // The deserialization behavior of ExecutionPayload structs is faulty.
+        // They should not be implicitly deserializable to an earlier version,
+        // as this breaks round-trip behavior
+        let response_v3 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"}"#;
 
-        let result_v1: ExecutionPayloadV1 = serde_json::from_str(response_v1).unwrap();
-        assert_eq!(serde_json::to_string(&result_v1).unwrap(), response_v1);
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(response_v3).unwrap();
+        assert_ne!(response_v3, serde_json::to_string(&payload_v2).unwrap());
+
+        let payload_v1: ExecutionPayloadV1 = serde_json::from_str(response_v3).unwrap();
+        assert_ne!(response_v3, serde_json::to_string(&payload_v1).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_faulty_roundtrip_payload_input_v2() {
+        // The deserialization behavior of ExecutionPayload structs is faulty.
+        // They should not be implicitly deserializable to an earlier version,
+        // as this breaks round-trip behavior
+        let response_v2 = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[]}"#;
+
+        let payload: ExecutionPayloadV1 = serde_json::from_str(response_v2).unwrap();
+        assert_ne!(response_v2, serde_json::to_string(&payload).unwrap());
     }
 
     #[test]
