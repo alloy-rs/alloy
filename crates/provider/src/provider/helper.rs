@@ -52,6 +52,7 @@ impl<N: Network> Provider<N> for WrappedProvider<N> {
         self.0.weak_client()
     }
 
+    #[allow(clippy::use_self)]
     fn wrapped(self) -> WrappedProvider<N>
     where
         Self: Sized + 'static,
