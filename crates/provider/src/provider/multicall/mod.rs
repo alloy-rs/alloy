@@ -222,11 +222,11 @@ where
     ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
     /// }
     /// ```
-    pub async fn aggregate(&self) -> Result<(U256, T::SuccessReturns)> {
+    pub async fn aggregate(&self) -> Result<(u64, T::SuccessReturns)> {
         let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = aggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
-        Ok((output.blockNumber, T::decode_returns(&output.returnData)?))
+        Ok((output.blockNumber.to::<u64>(), T::decode_returns(&output.returnData)?))
     }
 
     /// Call the `tryAggregate` function
@@ -358,26 +358,26 @@ where
     }
 
     /// Call the `blockAndAggregate` function
-    pub async fn block_and_aggregate(&self) -> Result<(U256, B256, T::SuccessReturns)> {
+    pub async fn block_and_aggregate(&self) -> Result<(u64, B256, T::SuccessReturns)> {
         let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = blockAndAggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         let result = T::decode_return_results(&returnData)?;
-        Ok((blockNumber, blockHash, T::try_into_success(result)?))
+        Ok((blockNumber.to::<u64>(), blockHash, T::try_into_success(result)?))
     }
 
     /// Call the `tryBlockAndAggregate` function
     pub async fn try_block_and_aggregate(
         &self,
         require_success: bool,
-    ) -> Result<(U256, B256, T::Returns)> {
+    ) -> Result<(u64, B256, T::Returns)> {
         let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call =
             tryBlockAndAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
-        Ok((blockNumber, blockHash, T::decode_return_results(&returnData)?))
+        Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
     }
 
     /// Helper fn to build a tx and call the multicall contract
