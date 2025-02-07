@@ -32,7 +32,7 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 /// A Multicall3 builder
 ///
 /// This builder implements a simple API interface to build and execute multicalls using the
-/// [`IMultiCall3`](crate::multicall::bindings::IMulticall3) contract which is available on 270+
+/// [`IMultiCall3`](crate::bindings::IMulticall3) contract which is available on 270+
 /// chains.
 ///
 /// ## Example
