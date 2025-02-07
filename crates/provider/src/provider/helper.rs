@@ -5,7 +5,7 @@ use crate::{
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{
     Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
@@ -23,11 +23,12 @@ use std::{borrow::Cow, sync::Arc};
 
 use super::{EthCallMany, FilterPollerBuilder};
 
-/// A wrapper struct around Arc dyn provider
+/// A wrapper struct around a type erased [`Provider`]
 #[derive(Clone)]
-pub struct WrappedProvider<N>(Arc<dyn Provider<N> + 'static>);
+pub struct WrappedProvider<N = Ethereum>(Arc<dyn Provider<N> + 'static>);
 
 impl<N: Network> WrappedProvider<N> {
+    /// Creates a new [`WrappedProvider`] by erasing the type.
     pub fn new<P>(provider: P) -> Self
     where
         P: Provider<N> + 'static,
@@ -49,6 +50,13 @@ impl<N: Network> Provider<N> for WrappedProvider<N> {
 
     fn weak_client(&self) -> WeakClient {
         self.0.weak_client()
+    }
+
+    fn wrapped(self) -> WrappedProvider<N>
+    where
+        Self: Sized + 'static,
+    {
+        self
     }
 
     fn get_accounts(&self) -> ProviderCall<NoParams, Vec<Address>> {
@@ -371,8 +379,8 @@ impl<N: Network> Provider<N> for WrappedProvider<N> {
     #[cfg(feature = "pubsub")]
     async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
     where
-        P: RpcSend,
-        R: RpcRecv,
+        P: alloy_json_rpc::RpcSend,
+        R: alloy_json_rpc::RpcRecv,
         Self: Sized,
     {
         self.0.subscribe(params).await
@@ -421,12 +429,13 @@ impl<N> std::fmt::Debug for WrappedProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::Ethereum;
+    use crate::ProviderBuilder;
+    fn assert_provider<P: Provider + Clone + Unpin + 'static>(_: P) {}
 
-    // Compile-time trait assertion
     #[test]
-    fn assert_provider_traits() {
-        fn assert_provider<P: Provider + Clone + Unpin + 'static>() {}
-        assert_provider::<WrappedProvider<Ethereum>>();
+    fn test_erased_provider() {
+        let provider =
+            ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).wrapped();
+        assert_provider(provider);
     }
 }

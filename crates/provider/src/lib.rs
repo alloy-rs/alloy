@@ -50,7 +50,7 @@ mod provider;
 pub use provider::{
     builder, Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams, FilterPollerBuilder,
     ParamsWithBlock, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx, SendableTxErr,
-    WalletProvider,
+    WalletProvider, WrappedProvider,
 };
 
 pub mod utils;

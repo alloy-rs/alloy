@@ -91,12 +91,23 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().weak_client()
     }
 
-    /// Returns a provider wrapped in Arc [`super::WrappedProvider`]
-    fn wrapped(&self) -> WrappedProvider<N>
+    /// Returns a type erased provider wrapped in Arc [`super::WrappedProvider`].
+    ///
+    /// ```no_run
+    /// use alloy_provider::{Provider, ProviderBuilder, WrappedProvider};
+    /// # async fn f() {
+    /// let provider: WrappedProvider =
+    ///     ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).wrapped();
+    /// let block = provider.get_block_number().await.unwrap();
+    ///
+    /// # }
+    /// ```
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    fn wrapped(self) -> WrappedProvider<N>
     where
-        Self: Sized + Clone + 'static,
+        Self: Sized + 'static,
     {
-        WrappedProvider::new(self.clone())
+        WrappedProvider::new(self)
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
