@@ -246,8 +246,8 @@ where
     /// - A tuple of the decoded return values for the calls.
     /// - Each return value is wrapped in a [`Result`] struct.
     /// - The [`Result::Ok`] variant contains the decoded return value.
-    /// - The [`Result::Err`] variant contains [`Failure`] struct which holds the index(-position)
-    ///   of the call and the returned data as [`Bytes`].
+    /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
+    ///   index(-position) of the call and the returned data as [`Bytes`].
     ///
     /// ## Example
     ///
@@ -296,9 +296,9 @@ where
     /// Doesn't require that all calls succeed, reverts only if a call with `allowFailure` set to
     /// false, fails.
     ///
-    /// By default, `.add(call: C, target: Address)` sets `allow_failure` to false.
+    /// By default, adding a call via [`MulticallBuilder::add`] sets `allow_failure` to false.
     ///
-    /// You can add a call that allows failure by using `.add_call(call: CallInfo)`, and setting
+    /// You can add a call that allows failure by using [`MulticallBuilder::add_call`], and setting
     /// `allow_failure` to true in [`CallInfo`].
     ///
     /// ## Solidity Function Signature
@@ -314,8 +314,8 @@ where
     /// - A tuple of the decoded return values for the calls.
     /// - Each return value is wrapped in a [`Result`] struct.
     /// - The [`Result::Ok`] variant contains the decoded return value.
-    /// - The [`Result::Err`] variant contains [`Failure`] struct which holds the index(-position)
-    ///   of the call and the returned data as [`Bytes`].
+    /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
+    ///   index(-position) of the call and the returned data as [`Bytes`].
     pub async fn aggregate3(&self) -> Result<T::Returns> {
         let calls = self.calls.iter().map(|c| c.to_call3()).collect::<Vec<_>>();
         let call = aggregate3Call { calls: calls.to_vec() };
@@ -324,6 +324,32 @@ where
     }
 
     /// Call the `aggregate3Value` function
+    ///
+    /// Similar to `aggregate3` allows for calls to fail. Moreover, it allows for calling into
+    /// `payable` functions with the `value` parameter.
+    ///
+    /// One can set the `value` field in the [`CallInfo`] struct and use
+    /// [`MulticallBuilder::add_call`] to add it to the stack.
+    ///
+    /// It is important to note the `aggregate3Value` only succeeds when `msg.value` is _strictly_
+    /// equal to the sum of the values of all calls. Summing up the values of all calls and setting
+    /// it in the transaction request is handled internally by the builder.
+    ///
+    /// ## Solidity Function Signature
+    ///
+    /// ```ignore
+    /// sol! {
+    ///    function aggregate3Value(Call3Value[] calldata calls) external payable returns (Result[] memory returnData);
+    /// }
+    /// ```
+    ///
+    /// ## Returns
+    ///
+    /// - A tuple of the decoded return values for the calls.
+    /// - Each return value is wrapped in a [`Result`] struct.
+    /// - The [`Result::Ok`] variant contains the decoded return value.
+    /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
+    ///   index(-position) of the call and the returned data as [`Bytes`].
     pub async fn aggregate3_value(&self) -> Result<T::Returns> {
         let calls = self.calls.iter().map(|c| c.to_call3_value()).collect::<Vec<_>>();
         let total_value = calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
@@ -332,6 +358,12 @@ where
         T::decode_return_results(&output.returnData)
     }
 
+    /// Helper fn to build a tx and call the multicall contract
+    ///
+    /// ## Params
+    ///
+    /// - `call_type`: The [`SolCall`] being made.
+    /// - `value`: Total value to send with the call in case of `aggregate3Value` request.
     async fn build_and_call<M: SolCall>(
         &self,
         call_type: M,
@@ -471,6 +503,7 @@ mod tests {
     use alloy_provider::ProviderBuilder;
     use alloy_sol_types::sol;
     use DummyThatFails::{failCall, DummyThatFailsInstance};
+    use PayableCounter::{counterCall, incrementCall};
 
     sol! {
         #[derive(Debug, PartialEq)]
@@ -628,5 +661,56 @@ mod tests {
             block_hash.blockHash,
             b256!("31be03d4fb9a280d1699f1004f340573cd6d717dae79095d382e876415cb26ba")
         );
+    }
+
+    sol! {
+        // solc 0.8.25; solc PayableCounter.sol --optimize --bin
+        #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b5061012c8061001c5f395ff3fe6080604052600436106025575f3560e01c806361bc221a146029578063d09de08a14604d575b5f80fd5b3480156033575f80fd5b50603b5f5481565b60405190815260200160405180910390f35b60536055565b005b5f341160bc5760405162461bcd60e51b815260206004820152602c60248201527f50617961626c65436f756e7465723a2076616c7565206d75737420626520677260448201526b06561746572207468616e20360a41b606482015260840160405180910390fd5b60015f8082825460cb919060d2565b9091555050565b8082018082111560f057634e487b7160e01b5f52601160045260245ffd5b9291505056fea264697066735822122064d656316647d3dc48d7ef0466bd10bc87694802a673183058725926a5190a5564736f6c63430008190033")]
+        #[derive(Debug)]
+        contract PayableCounter {
+            uint256 public counter;
+
+            function increment() public payable {
+                require(msg.value > 0, "PayableCounter: value must be greater than 0");
+                counter += 1;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn aggregate3_value() {
+        let provider =
+            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+
+        let counter = PayableCounter::deploy(provider.clone()).await.unwrap();
+
+        let counter_addr = counter.address();
+
+        let increment_call = CallInfo::new(incrementCall {}, *counter_addr).value(U256::from(1));
+
+        let multicall = MulticallBuilder::new(provider.clone())
+            .add(counterCall {}, *counter_addr)
+            .add_call(increment_call)
+            .add(counterCall {}, *counter_addr);
+
+        let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
+
+        assert_eq!(c1.unwrap().counter, U256::ZERO);
+        assert!(inc.is_ok());
+        assert_eq!(c2.unwrap().counter, U256::from(1));
+
+        // Allow failure - due to no value being sent
+        let increment_call = CallInfo::new(incrementCall {}, *counter_addr).allow_failure(true);
+
+        let multicall = MulticallBuilder::new(provider)
+            .add(counterCall {}, *counter_addr)
+            .add_call(increment_call)
+            .add(counterCall {}, *counter_addr);
+
+        let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
+
+        assert_eq!(c1.unwrap().counter, U256::ZERO);
+        assert!(inc.is_err_and(|failure| matches!(failure, Failure { idx: 1, return_data: _ })));
+        assert_eq!(c2.unwrap().counter, U256::ZERO);
     }
 }
