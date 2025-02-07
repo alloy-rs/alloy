@@ -415,7 +415,7 @@ where
     }
 
     /// Add a call to get the block hash from a block number
-    pub fn add_get_block_hash(self, number: BlockNumber) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_block_hash(self, number: BlockNumber) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getBlockHashCall>,
         T::Pushed: CallTuple,
@@ -426,7 +426,7 @@ where
     }
 
     /// Add a call to get the coinbase of the current block
-    pub fn add_get_current_block_coinbase(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_current_block_coinbase(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getCurrentBlockCoinbaseCall>,
         T::Pushed: CallTuple,
@@ -436,7 +436,7 @@ where
     }
 
     /// Add a call to get the current block number
-    pub fn add_get_block_number(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_block_number(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getBlockNumberCall>,
         T::Pushed: CallTuple,
@@ -446,7 +446,7 @@ where
     }
 
     /// Add a call to get the current block difficulty
-    pub fn add_get_current_block_difficulty(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_current_block_difficulty(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getCurrentBlockDifficultyCall>,
         T::Pushed: CallTuple,
@@ -456,7 +456,7 @@ where
     }
 
     /// Add a call to get the current block gas limit
-    pub fn add_get_current_block_gas_limit(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_current_block_gas_limit(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getCurrentBlockGasLimitCall>,
         T::Pushed: CallTuple,
@@ -466,7 +466,7 @@ where
     }
 
     /// Add a call to get the current block timestamp
-    pub fn add_get_current_block_timestamp(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_current_block_timestamp(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getCurrentBlockTimestampCall>,
         T::Pushed: CallTuple,
@@ -476,7 +476,7 @@ where
     }
 
     /// Add a call to get the chain id
-    pub fn add_get_chain_id(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_chain_id(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getChainIdCall>,
         T::Pushed: CallTuple,
@@ -486,7 +486,7 @@ where
     }
 
     /// Add a call to get the base fee
-    pub fn add_get_base_fee(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_base_fee(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getBasefeeCall>,
         T::Pushed: CallTuple,
@@ -496,7 +496,7 @@ where
     }
 
     /// Add a call to get the eth balance of an address
-    pub fn add_get_eth_balance(self, address: Address) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_eth_balance(self, address: Address) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getEthBalanceCall>,
         T::Pushed: CallTuple,
@@ -506,7 +506,7 @@ where
     }
 
     /// Add a call to get the last block hash
-    pub fn add_get_last_block_hash(self) -> MulticallBuilder<T::Pushed, P, N>
+    pub fn get_last_block_hash(self) -> MulticallBuilder<T::Pushed, P, N>
     where
         T: TuplePush<getLastBlockHashCall>,
         T::Pushed: CallTuple,
@@ -684,7 +684,7 @@ mod tests {
             .add(balance_call.clone(), weth)
             .add(ts_call.clone(), weth)
             .add(balance_call, weth)
-            .add_get_block_hash(21787144);
+            .get_block_hash(21787144);
 
         let (_block_num, (t1, b1, t2, b2, block_hash)) = multicall.aggregate().await.unwrap();
 
