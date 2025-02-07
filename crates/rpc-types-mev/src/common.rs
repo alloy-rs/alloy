@@ -55,8 +55,8 @@ impl Validity {
     }
 
     /// Sets refund config
-    pub fn with_refund_cfg(mut self, refund_cfg: Option<Vec<RefundConfig>>) -> Self {
-        self.refund_config = refund_cfg;
+    pub fn with_refund_config(mut self, refund_config: Option<Vec<RefundConfig>>) -> Self {
+        self.refund_config = refund_config;
         self
     }
 }
