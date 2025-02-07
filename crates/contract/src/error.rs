@@ -1,5 +1,5 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::{Bytes, Selector};
+use alloy_primitives::Selector;
 use alloy_provider::PendingTransactionError;
 use alloy_transport::TransportError;
 use thiserror::Error;
@@ -34,9 +34,6 @@ pub enum Error {
     /// An error occured while waiting for a pending transaction.
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
-    /// An error occurred while using the multicall API.
-    #[error(transparent)]
-    MulticallError(#[from] MulticallError),
 }
 
 impl From<alloy_sol_types::Error> for Error {
@@ -55,21 +52,4 @@ impl Error {
         }
         Self::AbiError(error)
     }
-}
-
-/// Multicall errors.
-#[derive(Debug, Error)]
-pub enum MulticallError {
-    /// Encountered when an `aggregate/aggregate3` batch contains a transaction with a value.
-    #[error("batch contains a tx with a value, try using .send() instead")]
-    ValueTx,
-    /// Error decoding return data.
-    #[error("could not decode")]
-    DecodeError(alloy_sol_types::Error),
-    /// No return data was found.
-    #[error("no return data")]
-    NoReturnData,
-    /// Call failed.
-    #[error("call failed when success was assured, this occurs when try_into_success is called on a failed call")]
-    CallFailed(Bytes),
 }

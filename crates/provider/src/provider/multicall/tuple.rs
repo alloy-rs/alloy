@@ -1,5 +1,7 @@
-use super::bindings::IMulticall3::Result as MulticallResult;
-use crate::{Error, MulticallError, Result};
+use super::{
+    bindings::IMulticall3::Result as MulticallResult,
+    inner_types::{Failure, MulticallError, Result},
+};
 use alloy_primitives::Bytes;
 use alloy_sol_types::SolCall;
 
@@ -12,6 +14,7 @@ use private::Sealed;
 
 /// A trait for tuples that can have types pushed to them
 #[doc(hidden)]
+#[allow(unnameable_types)]
 pub trait TuplePush<T> {
     /// The resulting type after pushing T
     type Pushed;
@@ -19,6 +22,7 @@ pub trait TuplePush<T> {
 
 /// A trait for tuples of SolCalls that can be decoded
 #[doc(hidden)]
+#[allow(unnameable_types)]
 pub trait CallTuple: Sealed {
     /// The flattened result return type of the tuple
     type Returns;
@@ -55,15 +59,6 @@ impl CallTuple for () {
     }
 }
 
-/// A struct to representing a failure in a multicall
-#[derive(Debug, Clone)]
-pub struct Failure {
-    /// The index-position of the call that failed
-    pub idx: usize,
-    /// The return data of the call that failed
-    pub return_data: Bytes,
-}
-
 // Macro to implement for tuples of different sizes
 macro_rules! impl_tuple {
     ($($idx:tt => $ty:ident),+) => {
@@ -83,21 +78,21 @@ macro_rules! impl_tuple {
 
             fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns> {
                 if data.len() != count!($($ty),+) {
-                    return Err(Error::MulticallError(MulticallError::NoReturnData));
+                    return Err(MulticallError::NoReturnData);
                 }
 
                 // Decode each return value in order
-                Ok(($($ty::abi_decode_returns(&data[$idx], true)?,)+))
+                Ok(($($ty::abi_decode_returns(&data[$idx], true).map_err(MulticallError::DecodeError)?,)+))
             }
 
             fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns> {
                 if results.len() != count!($($ty),+) {
-                    return Err(Error::MulticallError(MulticallError::NoReturnData));
+                    return Err(MulticallError::NoReturnData);
                 }
 
                 Ok(($(
                     match &results[$idx].success {
-                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData, true)?),
+                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData, true).map_err(MulticallError::DecodeError)?),
                         false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
                     },
                 )+))

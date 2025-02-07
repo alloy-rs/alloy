@@ -1,9 +1,21 @@
 use std::fmt::Debug;
 
 use super::bindings::IMulticall3::{Call, Call3, Call3Value};
-use crate::{Error, MulticallError, Result};
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_sol_types::SolCall;
+use thiserror::Error;
+
+/// Result type for multicall operations.
+pub type Result<T, E = MulticallError> = core::result::Result<T, E>;
+
+/// A struct to representing a failure in a multicall
+#[derive(Debug, Clone)]
+pub struct Failure {
+    /// The index-position of the call that failed
+    pub idx: usize,
+    /// The return data of the call that failed
+    pub return_data: Bytes,
+}
 
 /// A trait for converting CallInfo into relevant call types.
 pub trait CallInfoTrait: std::fmt::Debug {
@@ -94,7 +106,26 @@ impl<C: SolCall> CallInfo<C> {
 
     /// ABI-decode the return data.
     pub fn decode(&self, data: &[u8]) -> Result<C::Return> {
-        C::abi_decode_returns(data, true)
-            .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
+        C::abi_decode_returns(data, true).map_err(MulticallError::DecodeError)
     }
+}
+
+/// Multicall errors.
+#[derive(Debug, Error)]
+pub enum MulticallError {
+    /// Encountered when an `aggregate/aggregate3` batch contains a transaction with a value.
+    #[error("batch contains a tx with a value, try using .send() instead")]
+    ValueTx,
+    /// Error decoding return data.
+    #[error("could not decode")]
+    DecodeError(alloy_sol_types::Error),
+    /// No return data was found.
+    #[error("no return data")]
+    NoReturnData,
+    /// Call failed.
+    #[error("call failed when success was assured, this occurs when try_into_success is called on a failed call")]
+    CallFailed(Bytes),
+    /// Encountered when a transport error occurs while calling a multicall batch.
+    #[error("Transport error: {0}")]
+    TransportError(#[from] alloy_transport::TransportError),
 }

@@ -1,15 +1,14 @@
 //! A Multicall Builder
 
-use crate::{Error, MulticallError, Result};
+use crate::Provider;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, U256};
-use alloy_provider::Provider;
 use alloy_rpc_types_eth::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 
 /// Multicall bindings
 pub mod bindings;
-use crate::multicall::bindings::IMulticall3::{
+use crate::provider::multicall::bindings::IMulticall3::{
     aggregate3Call, aggregate3ValueCall, aggregateCall, getBasefeeCall, getBlockHashCall,
     getBlockNumberCall, getChainIdCall, getCurrentBlockCoinbaseCall, getCurrentBlockDifficultyCall,
     getCurrentBlockGasLimitCall, getCurrentBlockTimestampCall, getEthBalanceCall,
@@ -17,10 +16,10 @@ use crate::multicall::bindings::IMulticall3::{
 };
 
 mod inner_types;
-pub use inner_types::{CallInfo, CallInfoTrait};
+pub use inner_types::{CallInfo, CallInfoTrait, Failure, MulticallError, Result};
 
 mod tuple;
-pub use tuple::{CallTuple, Failure, TuplePush};
+use tuple::{CallTuple, TuplePush};
 
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
@@ -388,9 +387,8 @@ where
             eth_call = eth_call.overrides(overrides);
         }
 
-        let res = eth_call.await.map_err(Error::TransportError)?;
-        M::abi_decode_returns(&res, true)
-            .map_err(|e| Error::MulticallError(MulticallError::DecodeError(e)))
+        let res = eth_call.await.map_err(MulticallError::TransportError)?;
+        M::abi_decode_returns(&res, true).map_err(MulticallError::DecodeError)
     }
 
     /// Add a call to get the block hash from a block number
@@ -498,11 +496,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::multicall::tuple::Failure;
+    use crate::{Failure, ProviderBuilder};
     use alloy_primitives::b256;
-    use alloy_provider::ProviderBuilder;
+    use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
-    use DummyThatFails::{failCall, DummyThatFailsInstance};
+    use DummyThatFails::failCall;
     use PayableCounter::{counterCall, incrementCall};
 
     sol! {
@@ -516,7 +514,7 @@ mod tests {
 
     sol! {
         // solc 0.8.25; solc DummyThatFails.sol --optimize --bin
-        #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b5060a780601a5f395ff3fe6080604052348015600e575f80fd5b50600436106030575f3560e01c80630b93381b146034578063a9cc4718146036575b5f80fd5b005b603460405162461bcd60e51b815260040160689060208082526004908201526319985a5b60e21b604082015260600190565b60405180910390fdfea2646970667358221220c90ee107375422bb3516f4f13cdd754387c374edb5d9815fb6aa5ca111a77cb264736f6c63430008190033")]
+        #[sol(bytecode = "6080604052348015600e575f80fd5b5060a780601a5f395ff3fe6080604052348015600e575f80fd5b50600436106030575f3560e01c80630b93381b146034578063a9cc4718146036575b5f80fd5b005b603460405162461bcd60e51b815260040160689060208082526004908201526319985a5b60e21b604082015260600190565b60405180910390fdfea2646970667358221220c90ee107375422bb3516f4f13cdd754387c374edb5d9815fb6aa5ca111a77cb264736f6c63430008190033")]
         #[derive(Debug)]
         contract DummyThatFails {
             function fail() external {
@@ -527,8 +525,10 @@ mod tests {
         }
     }
 
-    async fn deploy_dummy(provider: impl Provider) -> DummyThatFailsInstance<(), impl Provider> {
-        DummyThatFails::deploy(provider).await.unwrap()
+    async fn deploy_dummy(provider: impl crate::Provider) -> Address {
+        let tx = TransactionRequest::default().with_deploy_code(DummyThatFails::BYTECODE.clone());
+        let tx = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+        tx.contract_address.unwrap()
     }
 
     const FORK_URL: &str = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
@@ -580,18 +580,17 @@ mod tests {
         let provider =
             ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
 
-        let dummy = deploy_dummy(provider.clone()).await;
-        let dummy_addr = dummy.address();
+        let dummy_addr = deploy_dummy(provider.clone()).await;
         let multicall = MulticallBuilder::new(provider.clone())
             .add(ts_call.clone(), weth)
             .add(balance_call.clone(), weth)
-            .add(failCall {}, *dummy_addr); // Failing call that will revert the multicall.
+            .add(failCall {}, dummy_addr); // Failing call that will revert the multicall.
 
         let err = multicall.aggregate3().await.unwrap_err();
 
         assert!(err.to_string().contains("revert: Multicall3: call failed"));
 
-        let failing_call = CallInfo::new(failCall {}, *dummy_addr).allow_failure(true);
+        let failing_call = CallInfo::new(failCall {}, dummy_addr).allow_failure(true);
         let multicall = MulticallBuilder::new(provider)
             .add(ts_call, weth)
             .add(balance_call, weth)
@@ -614,14 +613,13 @@ mod tests {
         let provider =
             ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
 
-        let dummy = deploy_dummy(provider.clone()).await;
-        let dummy_addr = dummy.address();
+        let dummy_addr = deploy_dummy(provider.clone()).await;
         let multicall = MulticallBuilder::new(provider)
             .add(ts_call.clone(), weth)
             .add(balance_call.clone(), weth)
             .add(ts_call.clone(), weth)
             .add(balance_call, weth)
-            .add(failCall {}, *dummy_addr); // Failing call that will revert the multicall.
+            .add(failCall {}, dummy_addr); // Failing call that will revert the multicall.
 
         let err = multicall.try_aggregate(true).await.unwrap_err();
 
@@ -665,7 +663,7 @@ mod tests {
 
     sol! {
         // solc 0.8.25; solc PayableCounter.sol --optimize --bin
-        #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b5061012c8061001c5f395ff3fe6080604052600436106025575f3560e01c806361bc221a146029578063d09de08a14604d575b5f80fd5b3480156033575f80fd5b50603b5f5481565b60405190815260200160405180910390f35b60536055565b005b5f341160bc5760405162461bcd60e51b815260206004820152602c60248201527f50617961626c65436f756e7465723a2076616c7565206d75737420626520677260448201526b06561746572207468616e20360a41b606482015260840160405180910390fd5b60015f8082825460cb919060d2565b9091555050565b8082018082111560f057634e487b7160e01b5f52601160045260245ffd5b9291505056fea264697066735822122064d656316647d3dc48d7ef0466bd10bc87694802a673183058725926a5190a5564736f6c63430008190033")]
+        #[sol(bytecode = "6080604052348015600e575f80fd5b5061012c8061001c5f395ff3fe6080604052600436106025575f3560e01c806361bc221a146029578063d09de08a14604d575b5f80fd5b3480156033575f80fd5b50603b5f5481565b60405190815260200160405180910390f35b60536055565b005b5f341160bc5760405162461bcd60e51b815260206004820152602c60248201527f50617961626c65436f756e7465723a2076616c7565206d75737420626520677260448201526b06561746572207468616e20360a41b606482015260840160405180910390fd5b60015f8082825460cb919060d2565b9091555050565b8082018082111560f057634e487b7160e01b5f52601160045260245ffd5b9291505056fea264697066735822122064d656316647d3dc48d7ef0466bd10bc87694802a673183058725926a5190a5564736f6c63430008190033")]
         #[derive(Debug)]
         contract PayableCounter {
             uint256 public counter;
@@ -682,16 +680,16 @@ mod tests {
         let provider =
             ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
 
-        let counter = PayableCounter::deploy(provider.clone()).await.unwrap();
+        let tx = TransactionRequest::default().with_deploy_code(PayableCounter::BYTECODE.clone());
+        let tx = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+        let counter_addr = tx.contract_address.unwrap();
 
-        let counter_addr = counter.address();
-
-        let increment_call = CallInfo::new(incrementCall {}, *counter_addr).value(U256::from(1));
+        let increment_call = CallInfo::new(incrementCall {}, counter_addr).value(U256::from(1));
 
         let multicall = MulticallBuilder::new(provider.clone())
-            .add(counterCall {}, *counter_addr)
+            .add(counterCall {}, counter_addr)
             .add_call(increment_call)
-            .add(counterCall {}, *counter_addr);
+            .add(counterCall {}, counter_addr);
 
         let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
 
@@ -700,12 +698,12 @@ mod tests {
         assert_eq!(c2.unwrap().counter, U256::from(1));
 
         // Allow failure - due to no value being sent
-        let increment_call = CallInfo::new(incrementCall {}, *counter_addr).allow_failure(true);
+        let increment_call = CallInfo::new(incrementCall {}, counter_addr).allow_failure(true);
 
         let multicall = MulticallBuilder::new(provider)
-            .add(counterCall {}, *counter_addr)
+            .add(counterCall {}, counter_addr)
             .add_call(increment_call)
-            .add(counterCall {}, *counter_addr);
+            .add(counterCall {}, counter_addr);
 
         let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
 

@@ -13,7 +13,7 @@ mod eth_call;
 pub use eth_call::{CallDecoder, EthCall};
 
 mod error;
-pub use error::{Error, MulticallError, Result};
+pub use error::{Error, Result};
 
 mod event;
 pub use event::{Event, EventPoller};
@@ -29,9 +29,6 @@ pub use instance::*;
 
 mod call;
 pub use call::*;
-
-mod multicall;
-pub use multicall::*;
 
 // Not public API.
 // NOTE: please avoid changing the API of this module due to its use in the `sol!` macro.
