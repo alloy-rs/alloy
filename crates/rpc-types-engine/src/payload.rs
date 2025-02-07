@@ -18,8 +18,6 @@ use alloy_eips::{
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
-#[cfg(feature = "serde")]
-use serde::de::IntoDeserializer;
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -1073,6 +1071,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             where
                 A: serde::de::MapAccess<'de>,
             {
+                use serde::de::IntoDeserializer;
+
                 // this currently rejects unknown fields
                 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
                 #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
