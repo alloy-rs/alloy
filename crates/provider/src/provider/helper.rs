@@ -430,7 +430,7 @@ impl<N> std::fmt::Debug for WrappedProvider<N> {
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    fn assert_provider<P: Provider + Clone + Unpin + 'static>(_: P) {}
+    fn assert_provider<P: Provider + Sized + Clone + Unpin + 'static>(_: P) {}
 
     #[test]
     fn test_erased_provider() {
