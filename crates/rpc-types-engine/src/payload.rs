@@ -1058,28 +1058,7 @@ impl<T: Decodable2718> TryFrom<ExecutionPayload> for Block<T> {
     }
 }
 
-// Deserializes untagged ExecutionPayload by trying each variant in falling order
-//#[cfg(feature = "serde")]
-//impl<'de> serde::Deserialize<'de> for ExecutionPayload {
-//    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//    where
-//        D: serde::Deserializer<'de>,
-//    {
-//        #[derive(serde::Deserialize)]
-//        #[serde(untagged)]
-//        enum ExecutionPayloadDesc {
-//            V3(ExecutionPayloadV3),
-//            V2(ExecutionPayloadV2),
-//            V1(ExecutionPayloadV1),
-//        }
-//        match ExecutionPayloadDesc::deserialize(deserializer)? {
-//            ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
-//            ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
-//            ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
-//        }
-//    }
-//}
-
+// Deserializes untagged ExecutionPayload depending on the available fields
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for ExecutionPayload {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
