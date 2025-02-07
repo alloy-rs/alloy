@@ -23,9 +23,40 @@ pub trait TuplePush<T> {
 /// A trait for tuples of SolCalls that can be decoded
 #[doc(hidden)]
 pub trait CallTuple: Sealed {
-    /// The flattened result return type of the tuple
+    /// Flattened tuple consisting of the return values of each call.
+    ///
+    /// Each return value is wrapped in a [`Result`] in order to account for failures in calls when
+    /// others succeed.
+    ///
+    /// - [`Result::Ok`] contains the decoded return value of the call.
+    /// - [`Result::Err`] contains a [`Failure`] struct with the index of the call that failed and
+    ///   the raw bytes returned on failure.
+    ///
+    /// For example,
+    ///
+    /// ```no_run
+    /// let success_call = successCall {}; // SolCall
+    /// let failure_call = failureCall {}; // SolCall
+    ///
+    /// let allow_failure_call = CallInfo::new(failure_call, target).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
+    ///
+    /// let multicall = provider.multicall(success_call, target).add_call(allow_failure_call);
+    ///
+    /// let (success_result, failure_result) = multicall.aggregate3().await.unwrap();
+    ///
+    /// match success_result {
+    ///     Ok(success) => { println!("Success: {:?}", success) },
+    ///     Err(failure) => { /* handle failure */ },
+    /// }
+    ///
+    /// match failure_result {
+    ///    Ok(success) => { /* handle success */ },
+    ///    Err(failure) => { assert!(matches!(failure, Failure { idx: 1, return_data: _ })) },
+    /// }
+    /// ```
     type Returns;
 
+    /// Flattened tuple consisting of the decoded return values of each call.
     type SuccessReturns;
 
     /// Decode the returns from a sequence of bytes

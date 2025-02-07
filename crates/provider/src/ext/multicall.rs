@@ -68,9 +68,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::ProviderBuilder;
-
     use super::*;
+    use crate::ProviderBuilder;
     use alloy_primitives::address;
     use alloy_sol_types::sol;
 

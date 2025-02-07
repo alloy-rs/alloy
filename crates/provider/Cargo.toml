@@ -97,7 +97,7 @@ alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 ci_info.workspace = true
 
 [features]
-default = ["reqwest", "reqwest-default-tls"]
+default = ["reqwest", "reqwest-default-tls", "multicall-api"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
@@ -122,3 +122,4 @@ net-api = []
 trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
+multicall-api = []

@@ -45,7 +45,9 @@ mod erc4337;
 #[cfg(feature = "erc4337-api")]
 pub use erc4337::Erc4337Api;
 
+#[cfg(feature = "multicall-api")]
 mod multicall;
+#[cfg(feature = "multicall-api")]
 pub use multicall::*;
 
 #[cfg(test)]
