@@ -91,12 +91,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().weak_client()
     }
 
-    /// Returns a provider wrapped in Arc [`WrappedProvider`]
-    fn wrapped(&self) -> WrappedProvider<'_, N>
+    /// Returns a provider wrapped in Arc [`super::WrappedProvider`]
+    fn wrapped(&self) -> WrappedProvider<N>
     where
-        Self: Sized + 'static,
+        Self: Sized + Clone + 'static,
     {
-        WrappedProvider::new(self)
+        WrappedProvider::new(self.clone())
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
