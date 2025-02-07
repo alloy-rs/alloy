@@ -23,8 +23,8 @@ mod inner_types;
 pub use inner_types::{CallInfo, CallInfoTrait, Failure, MulticallError, Result};
 
 mod tuple;
-pub use tuple::CallTuple;
 use tuple::TuplePush;
+pub use tuple::{CallTuple, Empty};
 
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
@@ -84,7 +84,7 @@ pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     _pd: std::marker::PhantomData<(T, N)>,
 }
 
-impl<P, N> MulticallBuilder<(), P, N>
+impl<P, N> MulticallBuilder<Empty, P, N>
 where
     P: Provider<N>,
     N: Network,

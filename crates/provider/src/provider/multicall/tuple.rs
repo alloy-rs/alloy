@@ -83,26 +83,25 @@ pub trait CallTuple: Sealed {
     fn try_into_success(results: Self::Returns) -> Result<Self::SuccessReturns>;
 }
 
-// Empty tuple implementation
-impl Sealed for () {}
+/// Type indicating that the [`MulticallBuilder`](crate::MulticallBuilder) is empty.
+#[derive(Debug, Clone)]
+pub struct Empty;
 
-impl<T: SolCall> TuplePush<T> for () {
+impl Sealed for Empty {}
+
+impl<T: SolCall> TuplePush<T> for Empty {
     type Pushed = (T,);
 }
 
-impl CallTuple for () {
+impl CallTuple for Empty {
     type Returns = ();
-
     type SuccessReturns = ();
-
     fn decode_returns(_: &[Bytes]) -> Result<Self::SuccessReturns> {
         Ok(())
     }
-
     fn decode_return_results(_results: &[MulticallResult]) -> Result<Self::Returns> {
         Ok(())
     }
-
     fn try_into_success(_: Self::Returns) -> Result<Self::SuccessReturns> {
         Ok(())
     }

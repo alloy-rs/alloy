@@ -27,7 +27,7 @@ use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
-use super::{EthCallMany, MulticallBuilder};
+use super::{Empty, EthCallMany, MulticallBuilder};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -199,7 +199,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// }
     /// ```
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    fn multicall(&self) -> MulticallBuilder<(), &Self, N>
+    fn multicall(&self) -> MulticallBuilder<Empty, &Self, N>
     where
         Self: Sized,
     {
