@@ -2,9 +2,10 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
+use super::EthCallMany;
 use crate::{
     heart::PendingTransactionError,
-    utils::{self, Eip1559Estimation, EstimatorFunction},
+    utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
@@ -26,8 +27,6 @@ use alloy_rpc_types_eth::{
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
-
-use super::EthCallMany;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -212,11 +211,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     ///
-    /// Receives an optional [EstimatorFunction] that can be used to modify
+    /// Receives an optional [Eip1559Estimator] that can be used to modify
     /// how to estimate these fees.
-    async fn estimate_eip1559_fees(
+    async fn estimate_eip1559_fees_with(
         &self,
-        estimator: Option<EstimatorFunction>,
+        estimator: Eip1559Estimator,
     ) -> TransportResult<Eip1559Estimation> {
         let fee_history = self
             .get_fee_history(
@@ -243,10 +242,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             }
         };
 
-        Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
-            base_fee_per_gas,
-            &fee_history.reward.unwrap_or_default(),
-        ))
+        Ok(estimator.estimate(base_fee_per_gas, &fee_history.reward.unwrap_or_default()))
+    }
+
+    /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    ///
+    /// Uses the builtin estimator [`utils::eip1559_default_estimator`] function.
+    async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
+        self.estimate_eip1559_fees_with(Eip1559Estimator::default()).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -1115,8 +1118,6 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Read, str::FromStr, time::Duration};
-
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_consensus::Transaction;
@@ -1127,6 +1128,7 @@ mod tests {
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
+    use std::{io::Read, str::FromStr, time::Duration};
     // For layer transport tests
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
@@ -1969,5 +1971,20 @@ mod tests {
 
         assert!(output.contains("eth_sendTransaction"));
         assert!(output.contains("Block Number: 1"))
+    }
+
+    #[tokio::test]
+    async fn custom_estimator() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil();
+
+        let _ = provider
+            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_fee, _rewards| Eip1559Estimation {
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+            }))
+            .await;
     }
 }
