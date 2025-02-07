@@ -17,14 +17,9 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
-#[cfg(feature = "serde")]
-use core::fmt;
 use core::iter::{FromIterator, IntoIterator};
 #[cfg(feature = "serde")]
-use serde::{
-    de::{self, IntoDeserializer, MapAccess, Visitor},
-    Deserialize, Deserializer,
-};
+use serde::de::IntoDeserializer;
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -1060,26 +1055,26 @@ impl<T: Decodable2718> TryFrom<ExecutionPayload> for Block<T> {
 
 // Deserializes untagged ExecutionPayload depending on the available fields
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for ExecutionPayload {
+impl<'de> serde::Deserialize<'de> for ExecutionPayload {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         struct ExecutionPayloadVisitor;
 
-        impl<'de> Visitor<'de> for ExecutionPayloadVisitor {
+        impl<'de> serde::de::Visitor<'de> for ExecutionPayloadVisitor {
             type Value = ExecutionPayload;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 formatter.write_str("a valid ExecutionPayload object")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
-                A: MapAccess<'de>,
+                A: serde::de::MapAccess<'de>,
             {
                 // this currently rejects unknown fields
-                #[cfg_attr(feature = "serde", derive(Deserialize))]
+                #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
                 #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
                 enum Fields {
                     ParentHash,
@@ -1168,26 +1163,33 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
                 }
 
                 let parent_hash =
-                    parent_hash.ok_or_else(|| de::Error::missing_field("parentHash"))?;
+                    parent_hash.ok_or_else(|| serde::de::Error::missing_field("parentHash"))?;
                 let fee_recipient =
-                    fee_recipient.ok_or_else(|| de::Error::missing_field("feeRecipient"))?;
-                let state_root = state_root.ok_or_else(|| de::Error::missing_field("stateRoot"))?;
+                    fee_recipient.ok_or_else(|| serde::de::Error::missing_field("feeRecipient"))?;
+                let state_root =
+                    state_root.ok_or_else(|| serde::de::Error::missing_field("stateRoot"))?;
                 let receipts_root =
-                    receipts_root.ok_or_else(|| de::Error::missing_field("receiptsRoot"))?;
-                let logs_bloom = logs_bloom.ok_or_else(|| de::Error::missing_field("logsBloom"))?;
+                    receipts_root.ok_or_else(|| serde::de::Error::missing_field("receiptsRoot"))?;
+                let logs_bloom =
+                    logs_bloom.ok_or_else(|| serde::de::Error::missing_field("logsBloom"))?;
                 let prev_randao =
-                    prev_randao.ok_or_else(|| de::Error::missing_field("prevRandao"))?;
+                    prev_randao.ok_or_else(|| serde::de::Error::missing_field("prevRandao"))?;
                 let block_number =
-                    block_number.ok_or_else(|| de::Error::missing_field("blockNumber"))?;
-                let gas_limit = gas_limit.ok_or_else(|| de::Error::missing_field("gasLimit"))?;
-                let gas_used = gas_used.ok_or_else(|| de::Error::missing_field("gasUesd"))?;
-                let timestamp = timestamp.ok_or_else(|| de::Error::missing_field("timestamp"))?;
-                let extra_data = extra_data.ok_or_else(|| de::Error::missing_field("extraData"))?;
-                let base_fee_per_gas =
-                    base_fee_per_gas.ok_or_else(|| de::Error::missing_field("baseFeePerGas"))?;
-                let block_hash = block_hash.ok_or_else(|| de::Error::missing_field("blockHash"))?;
+                    block_number.ok_or_else(|| serde::de::Error::missing_field("blockNumber"))?;
+                let gas_limit =
+                    gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
+                let gas_used =
+                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUesd"))?;
+                let timestamp =
+                    timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
+                let extra_data =
+                    extra_data.ok_or_else(|| serde::de::Error::missing_field("extraData"))?;
+                let base_fee_per_gas = base_fee_per_gas
+                    .ok_or_else(|| serde::de::Error::missing_field("baseFeePerGas"))?;
+                let block_hash =
+                    block_hash.ok_or_else(|| serde::de::Error::missing_field("blockHash"))?;
                 let transactions =
-                    transactions.ok_or_else(|| de::Error::missing_field("transactions"))?;
+                    transactions.ok_or_else(|| serde::de::Error::missing_field("transactions"))?;
 
                 let v1 = ExecutionPayloadV1 {
                     parent_hash,
@@ -1219,7 +1221,7 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
 
                     // reject incomplete V3 payloads even if they could construct a valid V2
                     if blob_gas_used.is_some() || excess_blob_gas.is_some() {
-                        return Err(de::Error::custom("invalid enum variant"));
+                        return Err(serde::de::Error::custom("invalid enum variant"));
                     }
 
                     return Ok(ExecutionPayload::V2(ExecutionPayloadV2 {
