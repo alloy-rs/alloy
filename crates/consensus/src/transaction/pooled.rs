@@ -56,7 +56,7 @@ impl PooledTransaction {
     }
 
     /// Reference to transaction hash. Used to identify transaction.
-    pub const fn hash(&self) -> &TxHash {
+    pub fn hash(&self) -> &TxHash {
         match self {
             Self::Legacy(tx) => tx.hash(),
             Self::Eip2930(tx) => tx.hash(),

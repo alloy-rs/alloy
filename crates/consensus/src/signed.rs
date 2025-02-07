@@ -2,24 +2,27 @@ use crate::transaction::{RlpEcdsaTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
+use once_cell::sync::OnceCell;
 
 /// A transaction with a signature and hash seal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug)]
 pub struct Signed<T, Sig = Signature> {
-    #[cfg_attr(feature = "serde", serde(flatten))]
     #[doc(alias = "transaction")]
     tx: T,
-    #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    hash: B256,
+    hash: OnceCell<B256>,
 }
 
 impl<T, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
     pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
+        Self { tx, signature, hash: OnceCell::with_value(hash) }
+    }
+
+    /// Instantiate from a transaction and signature. Does not verify the signature.
+    pub const fn new_unhashed(tx: T, signature: Sig) -> Self {
+        Self { tx, signature, hash: OnceCell::new() }
     }
 
     /// Returns a reference to the transaction.
@@ -36,17 +39,6 @@ impl<T, Sig> Signed<T, Sig> {
     /// Returns a reference to the signature.
     pub const fn signature(&self) -> &Sig {
         &self.signature
-    }
-
-    /// Returns a reference to the transaction hash.
-    #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    pub const fn hash(&self) -> &B256 {
-        &self.hash
-    }
-
-    /// Splits the transaction into parts.
-    pub fn into_parts(self) -> (T, Sig, B256) {
-        (self.tx, self.signature, self.hash)
     }
 
     /// Returns the transaction without signature.
@@ -108,6 +100,18 @@ impl<T> Signed<T>
 where
     T: RlpEcdsaTx,
 {
+    /// Returns a reference to the transaction hash.
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
+    pub fn hash(&self) -> &B256 {
+        self.hash.get_or_init(|| self.tx.tx_hash(&self.signature))
+    }
+
+    /// Splits the transaction into parts.
+    pub fn into_parts(self) -> (T, Signature, B256) {
+        let hash = *self.hash();
+        (self.tx, self.signature, hash)
+    }
+
     /// Get the length of the transaction when RLP encoded.
     pub fn rlp_encoded_length(&self) -> usize {
         self.tx.rlp_encoded_length_with_signature(&self.signature)
@@ -174,6 +178,14 @@ where
     }
 }
 
+impl<T: RlpEcdsaTx + PartialEq> PartialEq for Signed<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash() == other.hash() && self.tx == other.tx && self.signature == other.signature
+    }
+}
+
+impl<T: RlpEcdsaTx + PartialEq> Eq for Signed<T> {}
+
 #[cfg(feature = "k256")]
 impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     /// Recover the signer of the transaction
@@ -207,5 +219,56 @@ impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary
         let signature: Signature = (recoverable_sig, recovery_id).into();
 
         Ok(tx.into_signed(signature))
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use crate::transaction::RlpEcdsaTx;
+    use alloc::borrow::Cow;
+    use alloy_primitives::B256;
+    use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    struct Signed<'a, T: Clone, Sig: Clone> {
+        #[serde(flatten)]
+        tx: Cow<'a, T>,
+        #[serde(flatten)]
+        signature: Cow<'a, Sig>,
+        hash: Cow<'a, B256>,
+    }
+
+    impl<T> Serialize for super::Signed<T>
+    where
+        T: Clone + RlpEcdsaTx + Serialize,
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Signed {
+                tx: Cow::Borrowed(&self.tx),
+                signature: Cow::Borrowed(&self.signature),
+                hash: Cow::Borrowed(self.hash()),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de, T, Sig> Deserialize<'de> for super::Signed<T, Sig>
+    where
+        T: Clone + DeserializeOwned,
+        Sig: Clone + DeserializeOwned,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Signed::<T, Sig>::deserialize(deserializer).map(|value| Self {
+                tx: value.tx.into_owned(),
+                signature: value.signature.into_owned(),
+                hash: value.hash.into_owned().into(),
+            })
+        }
     }
 }
