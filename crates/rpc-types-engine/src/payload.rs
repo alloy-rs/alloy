@@ -1208,29 +1208,30 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                     transactions,
                 };
 
-                if let Some(withdrawals) = withdrawals {
-                    if let (Some(blob_gas_used), Some(excess_blob_gas)) =
-                        (blob_gas_used, excess_blob_gas)
-                    {
-                        return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
-                            payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
-                            blob_gas_used,
-                            excess_blob_gas,
-                        }));
-                    }
+                let Some(withdrawals) = withdrawals else {
+                    return if blob_gas_used.is_none() && excess_blob_gas.is_none() {
+                        Ok(ExecutionPayload::V1(v1))
+                    } else {
+                        Err(serde::de::Error::custom("invalid enum variant"))
+                    };
+                };
 
-                    // reject incomplete V3 payloads even if they could construct a valid V2
-                    if blob_gas_used.is_some() || excess_blob_gas.is_some() {
-                        return Err(serde::de::Error::custom("invalid enum variant"));
-                    }
-
-                    return Ok(ExecutionPayload::V2(ExecutionPayloadV2 {
-                        payload_inner: v1,
-                        withdrawals,
+                if let (Some(blob_gas_used), Some(excess_blob_gas)) =
+                    (blob_gas_used, excess_blob_gas)
+                {
+                    return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
+                        payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
+                        blob_gas_used,
+                        excess_blob_gas,
                     }));
                 }
 
-                Ok(ExecutionPayload::V1(v1))
+                // reject incomplete V3 payloads even if they could construct a valid V2
+                if blob_gas_used.is_some() || excess_blob_gas.is_some() {
+                    return Err(serde::de::Error::custom("invalid enum variant"));
+                }
+
+                Ok(ExecutionPayload::V2(ExecutionPayloadV2 { payload_inner: v1, withdrawals }))
             }
         }
 
@@ -1692,9 +1693,20 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_payload_input_enum_faulty() {
+    fn serde_payload_input_enum_faulty_v2() {
         // incomplete V3 payload should be rejected even if it has all V2 fields
         let response_faulty = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[], "blobGasUsed": "0x0"}"#;
+
+        let payload: Result<ExecutionPayload, serde_json::Error> =
+            serde_json::from_str(response_faulty);
+        assert!(payload.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_input_enum_faulty_v1() {
+        // incomplete V3 payload should be rejected even if it has all V1 fields
+        let response_faulty = r#"{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"blobGasUsed": "0x0"}"#;
 
         let payload: Result<ExecutionPayload, serde_json::Error> =
             serde_json::from_str(response_faulty);
