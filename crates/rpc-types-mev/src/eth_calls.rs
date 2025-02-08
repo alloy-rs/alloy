@@ -316,7 +316,7 @@ impl PrivateTransactionRequest {
     /// Creates new object
     pub fn new(tx: Bytes) -> Self {
         Self {
-            tx: tx,
+            tx,
             max_block_number: None,
             preferences: PrivateTransactionPreferences {
                 fast: None,
@@ -341,7 +341,7 @@ impl PrivateTransactionRequest {
 
 impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
     fn from(envelope: T) -> Self {
-        PrivateTransactionRequest::new(envelope.encoded_2718().into())
+        Self::new(envelope.encoded_2718().into())
     }
 }
 
