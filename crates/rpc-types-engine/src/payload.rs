@@ -1670,6 +1670,10 @@ mod tests {
 
         let payload: ExecutionPayload = serde_json::from_str(response_v3).unwrap();
         assert!(payload.as_v3().is_some());
+        assert_eq!(serde_json::to_string(&payload).unwrap(), response_v3);
+
+        let payload_v3: ExecutionPayloadV3 = serde_json::from_str(response_v3).unwrap();
+        assert_eq!(payload.as_v3().unwrap(), &payload_v3);
     }
 
     #[test]
@@ -1680,6 +1684,10 @@ mod tests {
         let payload: ExecutionPayload = serde_json::from_str(response_v2).unwrap();
         assert!(payload.as_v3().is_none());
         assert!(payload.as_v2().is_some());
+        assert_eq!(serde_json::to_string(&payload).unwrap(), response_v2);
+
+        let payload_v2: ExecutionPayloadV2 = serde_json::from_str(response_v2).unwrap();
+        assert_eq!(payload.as_v2().unwrap(), &payload_v2);
     }
 
     #[test]
