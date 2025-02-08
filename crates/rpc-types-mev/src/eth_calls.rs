@@ -311,10 +311,12 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
-impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
-    fn from(envelope: T) -> Self {
+impl PrivateTransactionRequest {
+    
+    /// Creates new object
+    pub fn new(tx: Bytes) -> Self {
         Self {
-            tx: envelope.encoded_2718().into(),
+            tx: tx,
             max_block_number: None,
             preferences: PrivateTransactionPreferences {
                 fast: None,
@@ -323,9 +325,7 @@ impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
             },
         }
     }
-}
-
-impl PrivateTransactionRequest {
+    
     /// Sets private tx's max block number.
     pub const fn max_block_number(mut self, num: Option<u64>) -> Self {
         self.max_block_number = num;
@@ -336,6 +336,12 @@ impl PrivateTransactionRequest {
     pub fn with_preferences(mut self, preferences: PrivateTransactionPreferences) -> Self {
         self.preferences = preferences;
         self
+    }
+}
+
+impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+    fn from(envelope: T) -> Self {
+        PrivateTransactionRequest::new(envelope.encoded_2718().into())
     }
 }
 
