@@ -1,6 +1,7 @@
 use crate::{Network, TransactionBuilder};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::Address;
+use alloy_signer::{Signer, SignerSync};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 use futures_utils_wasm::impl_future;
@@ -118,3 +119,19 @@ pub trait TxSignerSync<Signature> {
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature>;
 }
+
+/// A unifying trait for asynchronous Ethereum signers that combine the functionalities of both
+/// [`Signer`] and [`TxSigner`].
+///
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn AnySigner>`) for types that combine
+/// both asynchronous Ethereum signing and transaction signing functionalities.
+pub trait AnySigner<S>: Signer<S> + TxSigner<S> {}
+impl<T, S> AnySigner<S> for T where T: Signer<S> + TxSigner<S> {}
+
+/// A unifying trait for synchronous Ethereum signers that implement both [`SignerSync`] and
+/// [`TxSignerSync`].
+///
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn AnySignerSync>`) for types that
+/// combine both synchronous Ethereum signing and transaction signing functionalities.
+pub trait AnySignerSync<S>: SignerSync<S> + TxSignerSync<S> {}
+impl<T, S> AnySignerSync<S> for T where T: SignerSync<S> + TxSignerSync<S> {}
