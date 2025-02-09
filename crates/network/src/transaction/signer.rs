@@ -123,15 +123,22 @@ pub trait TxSignerSync<Signature> {
 /// A unifying trait for asynchronous Ethereum signers that combine the functionalities of both
 /// [`Signer`] and [`TxSigner`].
 ///
-/// This trait enables dynamic dispatch (e.g., using `Box<dyn AnySigner>`) for types that combine
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn FullSigner>`) for types that combine
 /// both asynchronous Ethereum signing and transaction signing functionalities.
-pub trait AnySigner<S>: Signer<S> + TxSigner<S> {}
-impl<T, S> AnySigner<S> for T where T: Signer<S> + TxSigner<S> {}
+pub trait FullSigner<S>: Signer<S> + TxSigner<S> {}
+impl<T, S> FullSigner<S> for T where T: Signer<S> + TxSigner<S> {}
 
 /// A unifying trait for synchronous Ethereum signers that implement both [`SignerSync`] and
 /// [`TxSignerSync`].
 ///
-/// This trait enables dynamic dispatch (e.g., using `Box<dyn AnySignerSync>`) for types that
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn FullSignerSync>`) for types that
 /// combine both synchronous Ethereum signing and transaction signing functionalities.
-pub trait AnySignerSync<S>: SignerSync<S> + TxSignerSync<S> {}
-impl<T, S> AnySignerSync<S> for T where T: SignerSync<S> + TxSignerSync<S> {}
+pub trait FullSignerSync<S>: SignerSync<S> + TxSignerSync<S> {}
+impl<T, S> FullSignerSync<S> for T where T: SignerSync<S> + TxSignerSync<S> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct _ObjectSafe(Box<dyn FullSigner<()>>, Box<dyn FullSignerSync<()>>);
+}
