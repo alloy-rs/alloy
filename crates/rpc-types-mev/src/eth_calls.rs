@@ -327,8 +327,8 @@ impl PrivateTransactionRequest {
     }
     
     /// Sets private tx's max block number.
-    pub const fn max_block_number(mut self, num: Option<u64>) -> Self {
-        self.max_block_number = num;
+    pub const fn max_block_number(mut self, max_block_number: Option<u64>) -> Self {
+        self.max_block_number = max_block_number;
         self
     }
 
