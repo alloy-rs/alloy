@@ -14,8 +14,9 @@ use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702,
-    TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
+    BuildResult, FullSigner, FullSignerSync, NetworkWallet, TransactionBuilder,
+    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
