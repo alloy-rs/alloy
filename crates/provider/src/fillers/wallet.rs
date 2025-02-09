@@ -101,6 +101,13 @@ where
 
         Ok(SendableTx::Envelope(envelope))
     }
+
+    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+        if tx.from().is_none() {
+            tx.set_from(self.wallet.default_signer_address());
+        }
+        Ok(())
+    }
 }
 
 #[cfg(feature = "reqwest")]
