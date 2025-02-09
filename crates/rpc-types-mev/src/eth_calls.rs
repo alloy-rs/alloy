@@ -321,7 +321,7 @@ impl PrivateTransactionRequest {
                 fast: None,
                 validity: None,
                 privacy: None,
-            },
+            }
         }
     }
     
