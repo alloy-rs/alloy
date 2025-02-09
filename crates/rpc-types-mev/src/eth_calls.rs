@@ -311,8 +311,7 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
-impl PrivateTransactionRequest {
-    
+impl PrivateTransactionRequest {    
     /// Creates new object
     pub fn new(tx: Bytes) -> Self {
         Self {
@@ -327,8 +326,8 @@ impl PrivateTransactionRequest {
     }
     
     /// Sets private tx's max block number.
-    pub const fn max_block_number(mut self, max_block_number: Option<u64>) -> Self {
-        self.max_block_number = max_block_number;
+    pub const fn max_block_number(mut self, num: Option<u64>) -> Self {
+        self.max_block_number = num;
         self
     }
 
