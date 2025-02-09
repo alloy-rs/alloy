@@ -311,6 +311,43 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
+impl PrivateTransactionRequest {
+    /// Creates new [`PrivateTransactionRequest`] from the given encodable transaction.
+    pub fn new<T: Encodable2718>(tx: &T) -> Self {
+        Self {
+            tx: tx.encoded_2718().into(),
+            max_block_number: None,
+            preferences: Default::default(),
+        }
+    }
+
+    /// Apply a function to the request, returning the modified request.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
+    /// Sets private tx's max block number.
+    pub const fn max_block_number(mut self, num: u64) -> Self {
+        self.max_block_number = Some(num);
+        self
+    }
+
+    /// Sets private tx's preferences.
+    pub fn with_preferences(mut self, preferences: PrivateTransactionPreferences) -> Self {
+        self.preferences = preferences;
+        self
+    }
+}
+
+impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+    fn from(envelope: T) -> Self {
+        Self::new(&envelope)
+    }
+}
+
 /// Additional preferences for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct PrivateTransactionPreferences {
@@ -329,6 +366,29 @@ impl PrivateTransactionPreferences {
     /// Returns true if the preferences are empty.
     pub const fn is_empty(&self) -> bool {
         self.fast.is_none() && self.validity.is_none() && self.privacy.is_none()
+    }
+
+    /// Sets the `fast` option to true
+    pub fn into_fast(self) -> Self {
+        self.with_fast_mode(true)
+    }
+
+    /// Sets mode of tx execution
+    pub const fn with_fast_mode(mut self, fast: bool) -> Self {
+        self.fast = Some(fast);
+        self
+    }
+
+    /// Sets tx's validity
+    pub fn with_validity(mut self, validity: Validity) -> Self {
+        self.validity = Some(validity);
+        self
+    }
+
+    /// Sets tx's privacy
+    pub fn with_privacy(mut self, privacy: Privacy) -> Self {
+        self.privacy = Some(privacy);
+        self
     }
 }
 
