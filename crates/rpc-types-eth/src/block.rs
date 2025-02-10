@@ -2,7 +2,7 @@
 
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
+use alloy_consensus::{BlockBody, BlockHeader, Sealed, TxEnvelope};
 use alloy_eips::eip4895::Withdrawals;
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
@@ -59,6 +59,26 @@ impl<T, H> Block<T, H> {
     /// Creates a new empty block (without transactions).
     pub const fn empty(header: H) -> Self {
         Self::new(header, BlockTransactions::Full(vec![]))
+    }
+
+    /// Converts a [`alloy_consensus::Block`] to an rpc block.
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow(block: &alloy_consensus::Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked(block.hash_slow(), block)
+    }
+
+    /// Converts a [`alloy_consensus::Block`] to an rpc block.
+    pub fn from_block_unchecked(block_hash: B256, block: &alloy_consensus::Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
+        todo!()
     }
 
     /// Creates a new [`Block`] with the given header and transactions.
@@ -167,6 +187,81 @@ impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
+    }
+}
+
+/// A builder type for [`Block`]
+#[derive(Debug, Clone)]
+pub struct BlockBuilder<T, H> {
+    consensus: alloy_consensus::Block<T, H>,
+    hash: B256,
+    block_length: Option<U256>,
+}
+
+impl<T, H> BlockBuilder<T, H> {
+    /// Initializes the builder from an [`alloy_consensus::Block`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow(block: alloy_consensus::Block<T, H>) -> Self
+    where
+        H: Encodable + BlockHeader + Sealable,
+        T: Encodable,
+    {
+        Self::from_block_unchecked(block.hash_slow(), block)
+    }
+
+    /// Initializes the builder from an [`alloy_consensus::Block`].  
+    pub fn from_block_unchecked(hash: B256, consensus: alloy_consensus::Block<T, H>) -> Self
+    where
+        H: Encodable,
+        T: Encodable,
+    {
+        Self { block_length: Some(U256::from(consensus.length())), consensus, hash }
+    }
+
+    /// Converts the block's header type by applying a fallible function to it.
+    pub fn try_map_header<U, E>(
+        self,
+        f: impl FnMut(H) -> Result<U, E>,
+    ) -> Result<BlockBuilder<T, U>, E> {
+        Ok(BlockBuilder { consensus: self.consensus.try_map_header(f)?, hash: self.hash, block_length: self.block_length })
+    }
+
+    /// Converts the block's transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map_transactions<U>(self, f: impl FnMut(T) -> U) -> BlockBuilder<U, H> {
+        BlockBuilder { consensus: self.consensus.map_transactions(f), hash: self.hash, block_length: self.block_length}
+    }
+
+    /// Converts the block's transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map_transactions<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<BlockBuilder<U, H>, E> {
+        Ok( BlockBuilder { consensus: self.consensus.try_map_transactions(f)?, hash: self.hash, block_length: self.block_length})
+    }
+
+    /// Finalizes the builder into a Block with transaction hashes.
+    pub fn build_hashes(self) -> Block<T, Header<H>>
+    where H: BlockHeader + Sealable
+    {
+        todo!()
+    }
+    
+    /// Finalizes the builder into a Block with full transaction objects.
+    pub fn build_full(self) -> Block<T, Header<H>> 
+        where H: BlockHeader + Sealable
+    {
+        let Self { consensus: alloy_consensus::Block{header, body }, hash, block_length } = self;
+        
+        let withdrawals =
+            header.withdrawals_root().is_some().then(|| body.withdrawals().cloned()).flatten();
+        
+        
+        todo!()
     }
 }
 
