@@ -4,6 +4,7 @@ use alloy_primitives::{
 };
 use async_trait::async_trait;
 use auto_impl::auto_impl;
+use either::Either;
 
 #[cfg(feature = "eip712")]
 use alloy_dyn_abi::eip712::TypedData;
@@ -134,15 +135,11 @@ pub trait SignerSync<Sig = Signature> {
     fn chain_id_sync(&self) -> Option<ChainId>;
 }
 
-/// A signer that can be either of two types.
-#[derive(Debug)]
-pub enum EitherSigner<A, B> {
-    /// The first signer.
-    SignerA(A),
-    /// The second signer.
-    SignerB(B),
-}
+// Use Either type for signers
+type EitherSigner<A, B> = Either<A, B>;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[async_trait]
 impl<A, B, Sig> Signer<Sig> for EitherSigner<A, B>
 where
@@ -152,34 +149,33 @@ where
 {
     async fn sign_hash(&self, hash: &B256) -> Result<Sig> {
         match self {
-            Self::SignerA(signer) => signer.sign_hash(hash).await,
-            Self::SignerB(signer) => signer.sign_hash(hash).await,
+            Self::Left(signer) => signer.sign_hash(hash).await,
+            Self::Right(signer) => signer.sign_hash(hash).await,
         }
     }
 
     fn address(&self) -> Address {
         match self {
-            Self::SignerA(signer) => signer.address(),
-            Self::SignerB(signer) => signer.address(),
+            Self::Left(signer) => signer.address(),
+            Self::Right(signer) => signer.address(),
         }
     }
 
     fn chain_id(&self) -> Option<ChainId> {
         match self {
-            Self::SignerA(signer) => signer.chain_id(),
-            Self::SignerB(signer) => signer.chain_id(),
+            Self::Left(signer) => signer.chain_id(),
+            Self::Right(signer) => signer.chain_id(),
         }
     }
 
     fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         match self {
-            Self::SignerA(signer) => signer.set_chain_id(chain_id),
-            Self::SignerB(signer) => signer.set_chain_id(chain_id),
+            Self::Left(signer) => signer.set_chain_id(chain_id),
+            Self::Right(signer) => signer.set_chain_id(chain_id),
         }
     }
 }
 
-#[async_trait::async_trait]
 impl<A, B, Sig> SignerSync<Sig> for EitherSigner<A, B>
 where
     A: SignerSync<Sig>,
@@ -187,15 +183,15 @@ where
 {
     fn sign_hash_sync(&self, hash: &B256) -> Result<Sig> {
         match self {
-            Self::SignerA(signer) => signer.sign_hash_sync(hash),
-            Self::SignerB(signer) => signer.sign_hash_sync(hash),
+            Self::Left(signer) => signer.sign_hash_sync(hash),
+            Self::Right(signer) => signer.sign_hash_sync(hash),
         }
     }
 
     fn chain_id_sync(&self) -> Option<ChainId> {
         match self {
-            Self::SignerA(signer) => signer.chain_id_sync(),
-            Self::SignerB(signer) => signer.chain_id_sync(),
+            Self::Left(signer) => signer.chain_id_sync(),
+            Self::Right(signer) => signer.chain_id_sync(),
         }
     }
 }
