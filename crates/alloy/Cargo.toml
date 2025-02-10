@@ -203,7 +203,7 @@ json-rpc = ["rpc", "dep:alloy-json-rpc"]
 rpc-client = ["rpc", "transports", "transport-http", "dep:alloy-rpc-client"]
 rpc-client-ws = ["rpc-client", "transport-ws", "alloy-rpc-client?/ws"]
 rpc-client-ipc = ["rpc-client", "transport-ipc", "alloy-rpc-client?/ipc"]
-rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
+rpc-types = ["rpc", "serde", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-admin = [
     "rpc-types",
     "alloy-rpc-types?/admin",

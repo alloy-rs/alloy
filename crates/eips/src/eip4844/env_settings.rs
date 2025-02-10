@@ -1,7 +1,9 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use alloc::sync::Arc;
-use c_kzg::KzgSettings;
 use core::hash::{Hash, Hasher};
+
+// Re-export for convenience
+pub use c_kzg::KzgSettings;
 
 /// KZG settings.
 #[derive(Clone, Debug, Default, Eq)]

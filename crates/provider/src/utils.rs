@@ -1,11 +1,12 @@
 //! Provider-related utilities.
 
-use alloy_primitives::{U128, U64};
-
 use crate::{
     fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
     Identity,
 };
+use alloy_primitives::{U128, U64};
+
+pub use alloy_eips::eip1559::Eip1559Estimation;
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
@@ -18,15 +19,6 @@ pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 
 /// An estimator function for EIP1559 fees.
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
-
-/// Return type of EIP1155 gas fee estimator.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Eip1559Estimation {
-    /// The base fee per gas.
-    pub max_fee_per_gas: u128,
-    /// The max priority fee per gas.
-    pub max_priority_fee_per_gas: u128,
-}
 
 fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     let mut rewards =
