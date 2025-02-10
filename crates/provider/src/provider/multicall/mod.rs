@@ -20,7 +20,9 @@ use crate::provider::multicall::bindings::IMulticall3::{
 };
 
 mod inner_types;
-pub use inner_types::{CallInfoTrait, CallItem, Failure, MulticallError, MulticallItem, Result};
+pub use inner_types::{
+    CallInfoTrait, CallItem, CallItemBuilder, Failure, MulticallError, MulticallItem, Result,
+};
 
 mod tuple;
 use tuple::TuplePush;

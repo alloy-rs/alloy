@@ -29,6 +29,17 @@ pub trait MulticallItem {
     fn input(&self) -> Bytes;
 }
 
+/// Helper type to build a [`CallItem`]
+#[derive(Debug)]
+pub struct CallItemBuilder;
+
+impl CallItemBuilder {
+    /// Create a new [`CallItem`] instance.
+    pub fn new<Item: MulticallItem>(item: Item) -> CallItem<Item::Decoder> {
+        CallItem::new(item.target(), item.input())
+    }
+}
+
 /// A singular call type that is mapped into aggregate, aggregate3, aggregate3Value call structs via
 /// the [`CallInfoTrait`] trait.
 #[derive(Clone)]

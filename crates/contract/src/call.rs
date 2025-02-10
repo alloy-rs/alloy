@@ -547,11 +547,13 @@ mod tests {
     use super::*;
     use alloy_consensus::Transaction;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
-    use alloy_provider::{CallItem, Failure, Provider, ProviderBuilder, WalletProvider};
+    use alloy_provider::{
+        CallItem, CallItemBuilder, Failure, Provider, ProviderBuilder, WalletProvider,
+    };
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
     use futures::Future;
-    use DummyThatFails::{failCall, DummyThatFailsInstance};
+    use DummyThatFails::DummyThatFailsInstance;
 
     #[test]
     fn empty_constructor() {
@@ -893,8 +895,7 @@ mod tests {
 
         assert!(err.to_string().contains("revert: Multicall3: call failed"));
 
-        let failing_call =
-            CallItem::<failCall>::new(*dummy.address(), dummy.fail().input()).allow_failure(true);
+        let failing_call = CallItemBuilder::new(dummy.fail()).allow_failure(true);
         let multicall = provider
             .multicall()
             .add(erc20.totalSupply())
