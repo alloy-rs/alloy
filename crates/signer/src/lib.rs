@@ -10,7 +10,7 @@ mod error;
 pub use error::{Error, Result, UnsupportedSignerOperation};
 
 mod signer;
-pub use signer::{Signer, SignerSync};
+pub use signer::{EitherSigner, Signer, SignerSync};
 
 pub mod utils;
 

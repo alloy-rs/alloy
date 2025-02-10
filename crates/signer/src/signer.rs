@@ -134,6 +134,72 @@ pub trait SignerSync<Sig = Signature> {
     fn chain_id_sync(&self) -> Option<ChainId>;
 }
 
+/// A signer that can be either of two types.
+#[derive(Debug)]
+pub enum EitherSigner<A, B> {
+    /// The first signer.
+    SignerA(A),
+    /// The second signer.
+    SignerB(B),
+}
+
+#[async_trait]
+impl<A, B, Sig> Signer<Sig> for EitherSigner<A, B>
+where
+    A: Signer<Sig> + Send + Sync,
+    B: Signer<Sig> + Send + Sync,
+    Sig: Send,
+{
+    async fn sign_hash(&self, hash: &B256) -> Result<Sig> {
+        match self {
+            Self::SignerA(signer) => signer.sign_hash(hash).await,
+            Self::SignerB(signer) => signer.sign_hash(hash).await,
+        }
+    }
+
+    fn address(&self) -> Address {
+        match self {
+            Self::SignerA(signer) => signer.address(),
+            Self::SignerB(signer) => signer.address(),
+        }
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        match self {
+            Self::SignerA(signer) => signer.chain_id(),
+            Self::SignerB(signer) => signer.chain_id(),
+        }
+    }
+
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
+        match self {
+            Self::SignerA(signer) => signer.set_chain_id(chain_id),
+            Self::SignerB(signer) => signer.set_chain_id(chain_id),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<A, B, Sig> SignerSync<Sig> for EitherSigner<A, B>
+where
+    A: SignerSync<Sig>,
+    B: SignerSync<Sig>,
+{
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Sig> {
+        match self {
+            Self::SignerA(signer) => signer.sign_hash_sync(hash),
+            Self::SignerB(signer) => signer.sign_hash_sync(hash),
+        }
+    }
+
+    fn chain_id_sync(&self) -> Option<ChainId> {
+        match self {
+            Self::SignerA(signer) => signer.chain_id_sync(),
+            Self::SignerB(signer) => signer.chain_id_sync(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
