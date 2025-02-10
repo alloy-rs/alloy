@@ -70,6 +70,11 @@ where
     pub fn new(inner: P, _anvil: Arc<AnvilInstance>) -> Self {
         Self { inner, _anvil }
     }
+
+    /// Expose inner anvil instance.
+    pub fn anvil(&self) -> &Arc<AnvilInstance> {
+        &self._anvil
+    }
 }
 
 impl<P> Provider for AnvilProvider<P>
