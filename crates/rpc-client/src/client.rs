@@ -1,7 +1,6 @@
 use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcRecv, RpcSend};
 use alloy_transport::{BoxTransport, IntoBoxTransport};
-use alloy_transport_http::Http;
 use std::{
     borrow::Cow,
     ops::Deref,
@@ -54,7 +53,7 @@ impl RpcClient {
     /// Create a new [`RpcClient`] with an HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn new_http(url: reqwest::Url) -> Self {
-        let http = Http::new(url);
+        let http = alloy_transport_http::Http::new(url);
         let is_local = http.guess_local();
         Self::new(http, is_local)
     }
