@@ -48,10 +48,10 @@ pub mod layers;
 
 mod provider;
 pub use provider::{
-    bindings, builder, CallInfo, CallInfoTrait, CallTuple, Caller, Empty, EthCall, EthCallMany,
+    bindings, builder, CallInfoTrait, CallItem, CallTuple, Caller, Empty, EthCall, EthCallMany,
     EthCallManyParams, EthCallParams, Failure, FilterPollerBuilder, MulticallBuilder,
-    MulticallError, ParamsWithBlock, Provider, ProviderCall, Result, RootProvider, RpcWithBlock,
-    SendableTx, SendableTxErr, WalletProvider, MULTICALL3_ADDRESS,
+    MulticallError, MulticallItem, ParamsWithBlock, Provider, ProviderCall, Result, RootProvider,
+    RpcWithBlock, SendableTx, SendableTxErr, WalletProvider, MULTICALL3_ADDRESS,
 };
 
 pub mod utils;

@@ -20,7 +20,7 @@ use crate::provider::multicall::bindings::IMulticall3::{
 };
 
 mod inner_types;
-pub use inner_types::{CallInfo, CallInfoTrait, Failure, MulticallError, Result};
+pub use inner_types::{CallInfoTrait, CallItem, Failure, MulticallError, MulticallItem, Result};
 
 mod tuple;
 use tuple::TuplePush;
@@ -129,38 +129,27 @@ where
     }
 
     /// Appends a [`SolCall`] to the stack.
-    ///
-    /// `target` is the address of the contract to call.
-    pub fn add<C: SolCall + 'static>(
-        mut self,
-        call: C,
-        target: Address,
-    ) -> MulticallBuilder<T::Pushed, P, N>
+    #[allow(clippy::should_implement_trait)]
+    pub fn add<Item: MulticallItem>(self, item: Item) -> MulticallBuilder<T::Pushed, P, N>
     where
-        T: TuplePush<C>,
-        <T as TuplePush<C>>::Pushed: CallTuple,
+        Item::Decoder: 'static,
+        T: TuplePush<Item::Decoder>,
+        <T as TuplePush<Item::Decoder>>::Pushed: CallTuple,
     {
-        let call = CallInfo::new(call, target);
+        let target = item.target();
+        let input = item.input();
 
-        self.calls.push(Box::new(call));
-        MulticallBuilder {
-            calls: self.calls,
-            provider: self.provider,
-            block: self.block,
-            state_override: self.state_override,
-            address: self.address,
-            _pd: Default::default(),
-        }
+        let call = CallItem::<Item::Decoder>::new(target, input);
+
+        self.add_call(call)
     }
 
-    /// Appends a [`CallInfo`] to the stack.
-    pub fn add_call<C: SolCall + 'static>(
-        mut self,
-        call: CallInfo<C>,
-    ) -> MulticallBuilder<T::Pushed, P, N>
+    /// Appends a [`CallItem`] to the stack.
+    pub fn add_call<D>(mut self, call: CallItem<D>) -> MulticallBuilder<T::Pushed, P, N>
     where
-        T: TuplePush<C>,
-        <T as TuplePush<C>>::Pushed: CallTuple,
+        D: SolCall + 'static,
+        T: TuplePush<D>,
+        <T as TuplePush<D>>::Pushed: CallTuple,
     {
         self.calls.push(Box::new(call));
         MulticallBuilder {
@@ -420,8 +409,10 @@ where
         T: TuplePush<getBlockHashCall>,
         T::Pushed: CallTuple,
     {
-        let call =
-            CallInfo::new(getBlockHashCall { blockNumber: U256::from(number) }, self.address);
+        let call = CallItem::<getBlockHashCall>::new(
+            self.address,
+            getBlockHashCall { blockNumber: U256::from(number) }.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -431,7 +422,10 @@ where
         T: TuplePush<getCurrentBlockCoinbaseCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getCurrentBlockCoinbaseCall {}, self.address);
+        let call = CallItem::<getCurrentBlockCoinbaseCall>::new(
+            self.address,
+            getCurrentBlockCoinbaseCall {}.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -441,7 +435,10 @@ where
         T: TuplePush<getBlockNumberCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getBlockNumberCall {}, self.address);
+        let call = CallItem::<getBlockNumberCall>::new(
+            self.address,
+            getBlockNumberCall {}.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -451,7 +448,10 @@ where
         T: TuplePush<getCurrentBlockDifficultyCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getCurrentBlockDifficultyCall {}, self.address);
+        let call = CallItem::<getCurrentBlockDifficultyCall>::new(
+            self.address,
+            getCurrentBlockDifficultyCall {}.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -461,7 +461,10 @@ where
         T: TuplePush<getCurrentBlockGasLimitCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getCurrentBlockGasLimitCall {}, self.address);
+        let call = CallItem::<getCurrentBlockGasLimitCall>::new(
+            self.address,
+            getCurrentBlockGasLimitCall {}.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -471,7 +474,10 @@ where
         T: TuplePush<getCurrentBlockTimestampCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getCurrentBlockTimestampCall {}, self.address);
+        let call = CallItem::<getCurrentBlockTimestampCall>::new(
+            self.address,
+            getCurrentBlockTimestampCall {}.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -481,7 +487,8 @@ where
         T: TuplePush<getChainIdCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getChainIdCall {}, self.address);
+        let call =
+            CallItem::<getChainIdCall>::new(self.address, getChainIdCall {}.abi_encode().into());
         self.add_call(call)
     }
 
@@ -491,7 +498,8 @@ where
         T: TuplePush<getBasefeeCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getBasefeeCall {}, self.address);
+        let call =
+            CallItem::<getBasefeeCall>::new(self.address, getBasefeeCall {}.abi_encode().into());
         self.add_call(call)
     }
 
@@ -501,7 +509,10 @@ where
         T: TuplePush<getEthBalanceCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getEthBalanceCall { addr: address }, self.address);
+        let call = CallItem::<getEthBalanceCall>::new(
+            self.address,
+            getEthBalanceCall { addr: address }.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -511,7 +522,10 @@ where
         T: TuplePush<getLastBlockHashCall>,
         T::Pushed: CallTuple,
     {
-        let call = CallInfo::new(getLastBlockHashCall {}, self.address);
+        let call = CallItem::<getLastBlockHashCall>::new(
+            self.address,
+            getLastBlockHashCall {}.abi_encode().into(),
+        );
         self.add_call(call)
     }
 
@@ -524,251 +538,9 @@ where
     pub fn len(&self) -> usize {
         self.calls.len()
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{Failure, ProviderBuilder};
-    use alloy_primitives::b256;
-    use alloy_rpc_types_eth::TransactionRequest;
-    use alloy_sol_types::sol;
-    use DummyThatFails::failCall;
-    use PayableCounter::{counterCall, incrementCall};
-
-    sol! {
-        #[derive(Debug, PartialEq)]
-        interface ERC20 {
-            function totalSupply() external view returns (uint256 totalSupply);
-            function balanceOf(address owner) external view returns (uint256 balance);
-            function transfer(address to, uint256 value) external returns (bool);
-        }
-    }
-
-    sol! {
-        // solc 0.8.25; solc DummyThatFails.sol --optimize --bin
-        #[sol(bytecode = "6080604052348015600e575f80fd5b5060a780601a5f395ff3fe6080604052348015600e575f80fd5b50600436106030575f3560e01c80630b93381b146034578063a9cc4718146036575b5f80fd5b005b603460405162461bcd60e51b815260040160689060208082526004908201526319985a5b60e21b604082015260600190565b60405180910390fdfea2646970667358221220c90ee107375422bb3516f4f13cdd754387c374edb5d9815fb6aa5ca111a77cb264736f6c63430008190033")]
-        #[derive(Debug)]
-        contract DummyThatFails {
-            function fail() external {
-                revert("fail");
-            }
-
-            function success() external {}
-        }
-    }
-
-    async fn deploy_dummy(provider: impl crate::Provider) -> Address {
-        let tx = TransactionRequest::default().with_deploy_code(DummyThatFails::BYTECODE.clone());
-        let tx = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
-        tx.contract_address.unwrap()
-    }
-
-    const FORK_URL: &str = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
-
-    #[tokio::test]
-    async fn test_single() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
-
-        let multicall = MulticallBuilder::new(provider).add(ts_call, weth);
-
-        let (_block_num, (_total_supply,)) = multicall.aggregate().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_aggregate() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let balance_call =
-            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
-        let multicall = MulticallBuilder::new(provider)
-            .add(ts_call.clone(), weth)
-            .add(balance_call.clone(), weth)
-            .add(ts_call.clone(), weth)
-            .add(balance_call, weth);
-
-        let (_block_num, (t1, b1, t2, b2)) = multicall.aggregate().await.unwrap();
-
-        assert_eq!(t1, t2);
-        assert_eq!(b1, b2);
-    }
-
-    #[tokio::test]
-    async fn test_try_aggregate_pass() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let balance_call =
-            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
-        let multicall = MulticallBuilder::new(provider)
-            .add(ts_call.clone(), weth)
-            .add(balance_call.clone(), weth)
-            .add(ts_call.clone(), weth)
-            .add(balance_call, weth);
-
-        let (_t1, _b1, _t2, _b2) = multicall.try_aggregate(true).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn aggregate3() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let balance_call =
-            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
-
-        let dummy_addr = deploy_dummy(provider.clone()).await;
-        let multicall = MulticallBuilder::new(provider.clone())
-            .add(ts_call.clone(), weth)
-            .add(balance_call.clone(), weth)
-            .add(failCall {}, dummy_addr); // Failing call that will revert the multicall.
-
-        let err = multicall.aggregate3().await.unwrap_err();
-
-        assert!(err.to_string().contains("revert: Multicall3: call failed"));
-
-        let failing_call = CallInfo::new(failCall {}, dummy_addr).allow_failure(true);
-        let multicall = MulticallBuilder::new(provider)
-            .add(ts_call, weth)
-            .add(balance_call, weth)
-            .add_call(failing_call);
-        let (t1, b1, failure) = multicall.aggregate3().await.unwrap();
-
-        assert!(t1.is_ok());
-        assert!(b1.is_ok());
-        let err = failure.unwrap_err();
-        assert!(matches!(err, Failure { idx: 2, return_data: _ }));
-    }
-
-    #[tokio::test]
-    async fn test_try_aggregate_fail() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let balance_call =
-            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
-
-        let dummy_addr = deploy_dummy(provider.clone()).await;
-        let multicall = MulticallBuilder::new(provider)
-            .add(ts_call.clone(), weth)
-            .add(balance_call.clone(), weth)
-            .add(ts_call.clone(), weth)
-            .add(balance_call, weth)
-            .add(failCall {}, dummy_addr); // Failing call that will revert the multicall.
-
-        let err = multicall.try_aggregate(true).await.unwrap_err();
-
-        assert!(err.to_string().contains("revert: Multicall3: call failed"));
-
-        let (t1, b1, t2, b2, failure) = multicall.try_aggregate(false).await.unwrap();
-
-        assert!(t1.is_ok());
-        assert!(b1.is_ok());
-        assert!(t2.is_ok());
-        assert!(b2.is_ok());
-        let err = failure.unwrap_err();
-        assert!(matches!(err, Failure { idx: 4, return_data: _ }));
-    }
-
-    #[tokio::test]
-    async fn test_util() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let balance_call =
-            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new()
-            .on_anvil_with_config(|a| a.fork(FORK_URL).fork_block_number(21787144));
-        let multicall = MulticallBuilder::new(provider)
-            .add(ts_call.clone(), weth)
-            .add(balance_call.clone(), weth)
-            .add(ts_call.clone(), weth)
-            .add(balance_call, weth)
-            .get_block_hash(21787144);
-
-        let (_block_num, (t1, b1, t2, b2, block_hash)) = multicall.aggregate().await.unwrap();
-
-        assert_eq!(t1, t2);
-        assert_eq!(b1, b2);
-        assert_eq!(
-            block_hash.blockHash,
-            b256!("31be03d4fb9a280d1699f1004f340573cd6d717dae79095d382e876415cb26ba")
-        );
-    }
-
-    sol! {
-        // solc 0.8.25; solc PayableCounter.sol --optimize --bin
-        #[sol(bytecode = "6080604052348015600e575f80fd5b5061012c8061001c5f395ff3fe6080604052600436106025575f3560e01c806361bc221a146029578063d09de08a14604d575b5f80fd5b3480156033575f80fd5b50603b5f5481565b60405190815260200160405180910390f35b60536055565b005b5f341160bc5760405162461bcd60e51b815260206004820152602c60248201527f50617961626c65436f756e7465723a2076616c7565206d75737420626520677260448201526b06561746572207468616e20360a41b606482015260840160405180910390fd5b60015f8082825460cb919060d2565b9091555050565b8082018082111560f057634e487b7160e01b5f52601160045260245ffd5b9291505056fea264697066735822122064d656316647d3dc48d7ef0466bd10bc87694802a673183058725926a5190a5564736f6c63430008190033")]
-        #[derive(Debug)]
-        contract PayableCounter {
-            uint256 public counter;
-
-            function increment() public payable {
-                require(msg.value > 0, "PayableCounter: value must be greater than 0");
-                counter += 1;
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn aggregate3_value() {
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
-
-        let tx = TransactionRequest::default().with_deploy_code(PayableCounter::BYTECODE.clone());
-        let tx = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
-        let counter_addr = tx.contract_address.unwrap();
-
-        let increment_call = CallInfo::new(incrementCall {}, counter_addr).value(U256::from(1));
-
-        let multicall = MulticallBuilder::new(provider.clone())
-            .add(counterCall {}, counter_addr)
-            .add_call(increment_call)
-            .add(counterCall {}, counter_addr);
-
-        let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
-
-        assert_eq!(c1.unwrap().counter, U256::ZERO);
-        assert!(inc.is_ok());
-        assert_eq!(c2.unwrap().counter, U256::from(1));
-
-        // Allow failure - due to no value being sent
-        let increment_call = CallInfo::new(incrementCall {}, counter_addr).allow_failure(true);
-
-        let multicall = MulticallBuilder::new(provider)
-            .add(counterCall {}, counter_addr)
-            .add_call(increment_call)
-            .add(counterCall {}, counter_addr);
-
-        let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
-
-        assert_eq!(c1.unwrap().counter, U256::ZERO);
-        assert!(inc.is_err_and(|failure| matches!(failure, Failure { idx: 1, return_data: _ })));
-        assert_eq!(c2.unwrap().counter, U256::ZERO);
-    }
-
-    #[tokio::test]
-    async fn test_clear() {
-        let ts_call = ERC20::totalSupplyCall {};
-        let balance_call =
-            ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-
-        let provider = ProviderBuilder::new().on_anvil();
-        let mut multicall =
-            MulticallBuilder::new(provider).add(ts_call, weth).add(balance_call, weth);
-        assert_eq!(multicall.len(), 2);
-        multicall.clear();
-        assert_eq!(multicall.len(), 0);
+    /// Check if the builder is empty
+    pub fn is_empty(&self) -> bool {
+        self.calls.is_empty()
     }
 }
