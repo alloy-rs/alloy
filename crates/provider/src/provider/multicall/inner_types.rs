@@ -35,6 +35,7 @@ pub struct CallItemBuilder;
 
 impl CallItemBuilder {
     /// Create a new [`CallItem`] instance.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<Item: MulticallItem>(item: Item) -> CallItem<Item::Decoder> {
         CallItem::new(item.target(), item.input())
     }
@@ -53,7 +54,7 @@ pub struct CallItem<D: SolCall> {
 
 impl<D: SolCall> Debug for CallItem<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CallInfo")
+        f.debug_struct("CallItem")
             .field("target", &self.target)
             .field("allow_failure", &self.allow_failure)
             .field("value", &self.value)
@@ -102,13 +103,13 @@ impl<D: SolCall> CallInfoTrait for CallItem<D> {
         }
     }
 }
-/// A trait for converting CallInfo into relevant call types.
+/// A trait for converting CallItem into relevant call types.
 pub trait CallInfoTrait: std::fmt::Debug {
-    /// Converts the [`CallInfo`] into a [`Call`] struct for `aggregateCall`
+    /// Converts the [`CallItem`] into a [`Call`] struct for `aggregateCall`
     fn to_call(&self) -> Call;
-    /// Converts the [`CallInfo`] into a [`Call3`] struct for `aggregate3Call`
+    /// Converts the [`CallItem`] into a [`Call3`] struct for `aggregate3Call`
     fn to_call3(&self) -> Call3;
-    /// Converts the [`CallInfo`] into a [`Call3Value`] struct for `aggregate3Call`
+    /// Converts the [`CallItem`] into a [`Call3Value`] struct for `aggregate3Call`
     fn to_call3_value(&self) -> Call3Value;
 }
 

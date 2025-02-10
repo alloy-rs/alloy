@@ -291,7 +291,7 @@ where
     /// By default, adding a call via [`MulticallBuilder::add`] sets `allow_failure` to false.
     ///
     /// You can add a call that allows failure by using [`MulticallBuilder::add_call`], and setting
-    /// `allow_failure` to true in [`CallInfo`].
+    /// `allow_failure` to true in [`CallItem`].
     ///
     /// ## Solidity Function Signature
     ///
@@ -320,7 +320,7 @@ where
     /// Similar to `aggregate3` allows for calls to fail. Moreover, it allows for calling into
     /// `payable` functions with the `value` parameter.
     ///
-    /// One can set the `value` field in the [`CallInfo`] struct and use
+    /// One can set the `value` field in the [`CallItem`] struct and use
     /// [`MulticallBuilder::add_call`] to add it to the stack.
     ///
     /// It is important to note the `aggregate3Value` only succeeds when `msg.value` is _strictly_
