@@ -415,7 +415,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
 
 impl<N> std::fmt::Debug for DynProvider<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("WrappedProvider").field(&"<dyn Provider>").finish()
+        f.debug_tuple("DynProvider").field(&"<dyn Provider>").finish()
     }
 }
 
