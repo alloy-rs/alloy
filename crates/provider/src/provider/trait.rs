@@ -27,7 +27,7 @@ use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
-use super::{EthCallMany, WrappedProvider};
+use super::{DynProvider, EthCallMany};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -91,23 +91,23 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().weak_client()
     }
 
-    /// Returns a type erased provider wrapped in Arc [`super::WrappedProvider`].
+    /// Returns a type erased provider wrapped in Arc [`super::DynProvider`].
     ///
     /// ```no_run
-    /// use alloy_provider::{Provider, ProviderBuilder, WrappedProvider};
+    /// use alloy_provider::{DynProvider, Provider, ProviderBuilder};
     /// # async fn f() {
-    /// let provider: WrappedProvider =
-    ///     ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).wrapped();
+    /// let provider: DynProvider =
+    ///     ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).erased();
     /// let block = provider.get_block_number().await.unwrap();
     ///
     /// # }
     /// ```
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    fn wrapped(self) -> WrappedProvider<N>
+    fn erased(self) -> DynProvider<N>
     where
         Self: Sized + 'static,
     {
-        WrappedProvider::new(self)
+        DynProvider::new(self)
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local

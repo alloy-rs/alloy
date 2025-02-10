@@ -24,11 +24,13 @@ use std::{borrow::Cow, sync::Arc};
 ///
 /// This type will delegate all functions to the wrapped provider, with the exception of non
 /// object-safe functions (e.g. [`Provider::subscribe`]) which use the default trait implementation.
+///
+/// This is a convenience type for `Arc<dyn Provider<N> + 'static>`.
 #[derive(Clone)]
-pub struct WrappedProvider<N = Ethereum>(Arc<dyn Provider<N> + 'static>);
+pub struct DynProvider<N = Ethereum>(Arc<dyn Provider<N> + 'static>);
 
-impl<N: Network> WrappedProvider<N> {
-    /// Creates a new [`WrappedProvider`] by erasing the type.
+impl<N: Network> DynProvider<N> {
+    /// Creates a new [`DynProvider`] by erasing the type.
     pub fn new<P>(provider: P) -> Self
     where
         P: Provider<N> + 'static,
@@ -39,7 +41,7 @@ impl<N: Network> WrappedProvider<N> {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N: Network> Provider<N> for WrappedProvider<N> {
+impl<N: Network> Provider<N> for DynProvider<N> {
     fn root(&self) -> &RootProvider<N> {
         self.0.root()
     }
@@ -53,7 +55,7 @@ impl<N: Network> Provider<N> for WrappedProvider<N> {
     }
 
     #[allow(clippy::use_self)]
-    fn wrapped(self) -> WrappedProvider<N>
+    fn erased(self) -> DynProvider<N>
     where
         Self: Sized + 'static,
     {
@@ -411,7 +413,7 @@ impl<N: Network> Provider<N> for WrappedProvider<N> {
     }
 }
 
-impl<N> std::fmt::Debug for WrappedProvider<N> {
+impl<N> std::fmt::Debug for DynProvider<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("WrappedProvider").field(&"<dyn Provider>").finish()
     }
@@ -426,7 +428,7 @@ mod tests {
     #[test]
     fn test_erased_provider() {
         let provider =
-            ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).wrapped();
+            ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).erased();
         assert_provider(provider);
     }
 }

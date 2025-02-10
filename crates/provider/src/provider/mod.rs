@@ -19,5 +19,5 @@ pub use wallet::WalletProvider;
 mod with_block;
 pub use with_block::{ParamsWithBlock, RpcWithBlock};
 
-mod helper;
-pub use helper::WrappedProvider;
+mod erased;
+pub use erased::DynProvider;
