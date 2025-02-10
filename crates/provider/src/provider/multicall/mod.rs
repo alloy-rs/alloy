@@ -105,6 +105,25 @@ where
     }
 }
 
+impl<T, P, N> MulticallBuilder<T, &P, N>
+where
+    T: CallTuple,
+    P: Provider<N> + Clone,
+    N: Network,
+{
+    /// Clones the underlying provider and returns a new [`MulticallBuilder`].
+    pub fn with_cloned_provider(&self) -> MulticallBuilder<Empty, P, N> {
+        MulticallBuilder {
+            calls: Vec::new(),
+            provider: self.provider.clone(),
+            block: None,
+            state_override: None,
+            address: MULTICALL3_ADDRESS,
+            _pd: Default::default(),
+        }
+    }
+}
+
 impl<T, P, N> MulticallBuilder<T, P, N>
 where
     T: CallTuple,
