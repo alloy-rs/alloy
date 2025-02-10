@@ -151,29 +151,29 @@ where
 {
     async fn sign_hash(&self, hash: &B256) -> Result<Sig> {
         match self {
-            EitherSigner::SignerA(signer) => signer.sign_hash(hash).await,
-            EitherSigner::SignerB(signer) => signer.sign_hash(hash).await,
+            Self::SignerA(signer) => signer.sign_hash(hash).await,
+            Self::SignerB(signer) => signer.sign_hash(hash).await,
         }
     }
 
     fn address(&self) -> Address {
         match self {
-            EitherSigner::SignerA(signer) => signer.address(),
-            EitherSigner::SignerB(signer) => signer.address(),
+            Self::SignerA(signer) => signer.address(),
+            Self::SignerB(signer) => signer.address(),
         }
     }
 
     fn chain_id(&self) -> Option<ChainId> {
         match self {
-            EitherSigner::SignerA(signer) => signer.chain_id(),
-            EitherSigner::SignerB(signer) => signer.chain_id(),
+            Self::SignerA(signer) => signer.chain_id(),
+            Self::SignerB(signer) => signer.chain_id(),
         }
     }
 
     fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         match self {
-            EitherSigner::SignerA(signer) => signer.set_chain_id(chain_id),
-            EitherSigner::SignerB(signer) => signer.set_chain_id(chain_id),
+            Self::SignerA(signer) => signer.set_chain_id(chain_id),
+            Self::SignerB(signer) => signer.set_chain_id(chain_id),
         }
     }
 }
@@ -186,15 +186,15 @@ where
 {
     fn sign_hash_sync(&self, hash: &B256) -> Result<Sig> {
         match self {
-            EitherSigner::SignerA(signer) => signer.sign_hash_sync(hash),
-            EitherSigner::SignerB(signer) => signer.sign_hash_sync(hash),
+            Self::SignerA(signer) => signer.sign_hash_sync(hash),
+            Self::SignerB(signer) => signer.sign_hash_sync(hash),
         }
     }
 
     fn chain_id_sync(&self) -> Option<ChainId> {
         match self {
-            EitherSigner::SignerA(signer) => signer.chain_id_sync(),
-            EitherSigner::SignerB(signer) => signer.chain_id_sync(),
+            Self::SignerA(signer) => signer.chain_id_sync(),
+            Self::SignerB(signer) => signer.chain_id_sync(),
         }
     }
 }
