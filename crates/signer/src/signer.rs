@@ -148,6 +148,7 @@ impl<A, B, Sig> Signer<Sig> for EitherSigner<A, B>
 where
     A: Signer<Sig> + Send + Sync,
     B: Signer<Sig> + Send + Sync,
+    Sig: Send,
 {
     async fn sign_hash(&self, hash: &B256) -> Result<Sig> {
         match self {
