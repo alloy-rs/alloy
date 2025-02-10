@@ -57,7 +57,7 @@ where
 #[derive(Clone, Debug)]
 pub struct AnvilProvider<P> {
     inner: P,
-    _anvil: Arc<AnvilInstance>,
+    anvil: Arc<AnvilInstance>,
 }
 
 impl<P> AnvilProvider<P>
@@ -67,13 +67,13 @@ where
     /// Creates a new `AnvilProvider` with the given inner provider and anvil
     /// instance.
     #[allow(clippy::missing_const_for_fn)]
-    pub fn new(inner: P, _anvil: Arc<AnvilInstance>) -> Self {
-        Self { inner, _anvil }
+    pub fn new(inner: P, anvil: Arc<AnvilInstance>) -> Self {
+        Self { inner, anvil }
     }
 
     /// Expose inner anvil instance.
     pub fn anvil(&self) -> &Arc<AnvilInstance> {
-        &self._anvil
+        &self.anvil
     }
 }
 
