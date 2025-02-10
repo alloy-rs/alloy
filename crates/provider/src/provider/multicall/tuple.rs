@@ -34,25 +34,28 @@ pub trait CallTuple: Sealed {
     ///
     /// For example,
     ///
-    /// ```no_run
+    /// ```ignore
     /// use alloy_sol_types::sol;
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{CallInfo, Provider, ProviderBuilder, Result, Failure};
+    /// use alloy_provider::{CallItem, Provider, ProviderBuilder, Result, Failure};
+    /// use crate::SomeContract::failureCall;
     /// sol! {
     ///     #[derive(Debug)]
-    ///     function success() external;
-    ///     function failure() external;
+    ///     #[sol(rpc)]
+    ///     contract SomeContract {
+    ///       function success() external;
+    ///       function failure() external;
+    ///     }
     /// }
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let success_call = successCall {};
-    ///     let failure_call = failureCall {};
     ///     let target = Address::random();
-    ///     let allow_failure_call = CallInfo::new(failure_call, target).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
-    ///     
     ///     let provider = ProviderBuilder::new().on_builtin("https://..").await.unwrap();    
-    ///     let multicall = provider.multicall().add(success_call, target).add_call(allow_failure_call);
+    ///     let some_contract = SomeContract::new(target, &provider);
+    ///     let allow_failure_call = CallItem::<failureCall>::new(target, some_contract.failure().input()).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
+    ///
+    ///     let multicall = provider.multicall().add(some_contract.success()).add_call(allow_failure_call);
     ///
     ///     let (success_result, failure_result) = multicall.aggregate3().await.unwrap();
     ///     match success_result {

@@ -37,13 +37,14 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 ///
 /// ## Example
 ///
-/// ```no_run
+/// ```ignore
 /// use alloy_primitives::address;
 /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
 /// use alloy_sol_types::sol;
 ///
 /// sol! {
-///    #[derive(Debug, PartialEq)]
+///    #[sol(rpc)]
+///    #[derive(Debug, PartialEq)]   
 ///    interface ERC20 {
 ///        function totalSupply() external view returns (uint256 totalSupply);
 ///        function balanceOf(address owner) external view returns (uint256 balance);
@@ -52,14 +53,14 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let ts_call = ERC20::totalSupplyCall {};
-///     let balance_call =
-///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-///
 ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+///     let erc20 = ERC20::new(weth, &provider);
 ///
-///     let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
+///     let ts_call = erc20.totalSupply();
+///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
+///
+///     let multicall = provider.multicall().add(ts_call).add(balance_call);
 ///
 ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
 ///
@@ -182,12 +183,13 @@ where
     ///
     /// ## Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// use alloy_primitives::address;
     /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
+    ///    #[sol(rpc)]
     ///    #[derive(Debug, PartialEq)]
     ///    interface ERC20 {
     ///        function totalSupply() external view returns (uint256 totalSupply);
@@ -197,14 +199,14 @@ where
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let ts_call = ERC20::totalSupplyCall {};
-    ///     let balance_call =
-    ///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-    ///
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
     ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let erc20 = ERC20::new(weth, &provider);
     ///
-    ///     let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
+    ///     let ts_call = erc20.totalSupply();
+    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
+    ///
+    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
     ///
     ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
     ///
@@ -240,37 +242,37 @@ where
     ///
     /// ## Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// use alloy_primitives::address;
-    /// use alloy_provider::{Provider, MulticallBuilder, ProviderBuilder};
+    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
-    ///   #[derive(Debug, PartialEq)]
-    ///  interface ERC20 {
-    ///     function totalSupply() external view returns (uint256 totalSupply);
-    ///     function balanceOf(address owner) external view returns (uint256 balance);
-    ///  }
+    ///    #[sol(rpc)]
+    ///    #[derive(Debug, PartialEq)]
+    ///    interface ERC20 {
+    ///        function totalSupply() external view returns (uint256 totalSupply);
+    ///        function balanceOf(address owner) external view returns (uint256 balance);
+    ///    }
     /// }
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///    let ts_call = ERC20::totalSupplyCall {};
-    ///    let balance_call = ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
+    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let erc20 = ERC20::new(weth, &provider);
     ///
-    ///    let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///     let ts_call = erc20.totalSupply();
+    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
     ///
-    ///    let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
     ///
-    ///    let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
+    ///     let (total_supply, balance) = multicall.try_aggregate(true).await.unwrap();
     ///
-    ///    let (total_supply, balance) = multicall.try_aggregate(true).await.unwrap();
-    ///     
-    ///    // Unwrap Result<totalSupplyReturn, Failure>
-    ///    let total_supply = total_supply.unwrap();
-    ///    // Unwrap Result<balanceOfReturn, Failure>
-    ///    let balance = balance.unwrap();
+    ///     assert!(total_supply.is_ok());
+    ///     assert!(balance.is_ok());
     /// }
+    /// ```
     pub async fn try_aggregate(&self, require_success: bool) -> Result<T::Returns> {
         let calls = &self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };

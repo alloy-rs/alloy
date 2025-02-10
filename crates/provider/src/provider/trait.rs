@@ -169,12 +169,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ## Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// use alloy_primitives::address;
     /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
+    ///    #[sol(rpc)]
     ///    #[derive(Debug, PartialEq)]
     ///    interface ERC20 {
     ///        function totalSupply() external view returns (uint256 totalSupply);
@@ -184,14 +185,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let ts_call = ERC20::totalSupplyCall {};
-    ///     let balance_call =
-    ///         ERC20::balanceOfCall { owner: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045") };
-    ///
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
     ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let erc20 = ERC20::new(weth, &provider);
     ///
-    ///     let multicall = provider.multicall().add(ts_call, weth).add(balance_call, weth);
+    ///     let ts_call = erc20.totalSupply();
+    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
+    ///
+    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
     ///
     ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
     ///
