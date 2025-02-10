@@ -29,7 +29,7 @@ pub const EIP7702_TX_TYPE_ID: u8 = 4;
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[non_exhaustive] // NB: non-exhaustive allows us to add a Custom variant later
 pub enum Eip2718Error {
     /// Rlp error from [`alloy_rlp`].
