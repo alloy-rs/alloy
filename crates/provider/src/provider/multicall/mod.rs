@@ -105,7 +105,46 @@ where
         }
     }
 
-    /// Instantiate a new [`MulticallBuilder`] with a dynamic call
+    /// Instantiate a new [`MulticallBuilder`] that restricts the calls to a specific call type.
+    ///
+    /// Multicalls made using this builder return a vector of the decoded return values.
+    ///
+    /// An example would be trying to fetch multiple ERC20 balances of an address.
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// use alloy_primitives::address;
+    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///   #[sol(rpc)]
+    ///   #[derive(Debug, PartialEq)]
+    ///   interface ERC20 {
+    ///     function balanceOf(address owner) external view returns (uint256 balance);
+    ///   }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///    let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///    let usdc = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+    ///     
+    ///    let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///    let weth = ERC20::new(weth, &provider);
+    ///    let usdc = ERC20::new(usdc, &provider);
+    ///
+    ///    let owner = address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+    ///
+    ///    let erc20_balances = MulticallBuilder::new_dynamic(provider, weth.balanceOf(owner)).add_dynamic(usdc.balanceOf(owner));
+    ///
+    ///    let balances: Vec<ERC20::balanceOfReturn> = erc20_balances.aggregate().await.unwrap();
+    ///
+    ///    let weth_bal = balances[0];
+    ///    let usdc_bal = balances[1];
+    ///    println!("WETH Balance: {:?}, USDC Balance: {:?}", weth_bal, usdc_bal);
+    /// }
     pub fn new_dynamic<D: SolCall + 'static>(
         provider: P,
         item: impl MulticallItem<Decoder = D>,

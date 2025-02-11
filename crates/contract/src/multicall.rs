@@ -278,9 +278,13 @@ mod tests {
         let erc20 = ERC20::new(weth, &provider);
 
         let multicall = MulticallBuilder::new_dynamic(provider.clone(), erc20.totalSupply())
+            // .add(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))) - WON'T
+            // COMPILE
+            // .add_dynamic(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))) -
+            // WON'T COMPILE
             .add_dynamic(erc20.totalSupply());
 
-        let res = multicall.aggregate().await.unwrap();
+        let res: Vec<ERC20::totalSupplyReturn> = multicall.aggregate().await.unwrap();
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0], res[1]);
