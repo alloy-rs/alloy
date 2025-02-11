@@ -660,9 +660,18 @@ where
         self.add_call(call)
     }
 
-    /// Clear the calls from the builder
-    pub fn clear(&mut self) {
-        self.calls.clear();
+    /// Returns an [`Empty`] builder
+    ///
+    /// Retains previously set provider, address, block and state_override settings.
+    pub fn clear(self) -> MulticallBuilder<Empty, P, N> {
+        MulticallBuilder {
+            calls: Vec::new(),
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            address: self.address,
+            _pd: Default::default(),
+        }
     }
 
     /// Get the number of calls in the builder

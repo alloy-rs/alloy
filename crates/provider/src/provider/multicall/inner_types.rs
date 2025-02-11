@@ -11,8 +11,9 @@ use thiserror::Error;
 /// Result type for multicall operations.
 pub type Result<T, E = MulticallError> = core::result::Result<T, E>;
 
-/// A struct to representing a failure in a multicall
-#[derive(Debug, Clone)]
+/// A struct representing a failure in a multicall
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("Call failed at index {idx} with return data: {return_data:?}")]
 pub struct Failure {
     /// The index-position of the call that failed
     pub idx: usize,
