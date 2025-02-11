@@ -120,7 +120,7 @@ pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
 #[derive(Clone)]
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
 pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
-    request: N::TransactionRequest,
+    pub(crate) request: N::TransactionRequest,
     block: BlockId,
     state: Option<StateOverride>,
     /// The provider.
