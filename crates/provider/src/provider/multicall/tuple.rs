@@ -1,6 +1,6 @@
 use super::{
     bindings::IMulticall3::Result as MulticallResult,
-    inner_types::{Failure, MulticallError, Result},
+    inner_types::{Dynamic, Failure, MulticallError, Result},
 };
 use alloy_primitives::Bytes;
 use alloy_sol_types::SolCall;
@@ -109,6 +109,8 @@ impl CallTuple for Empty {
         Ok(())
     }
 }
+
+impl<D: SolCall> Sealed for Dynamic<D> {}
 
 // Macro to implement for tuples of different sizes
 macro_rules! impl_tuple {

@@ -1,6 +1,9 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use super::bindings::IMulticall3::{Call, Call3, Call3Value};
+use super::{
+    bindings::IMulticall3::{Call, Call3, Call3Value},
+    CallTuple,
+};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_sol_types::SolCall;
 use thiserror::Error;
@@ -111,6 +114,46 @@ pub trait CallInfoTrait: std::fmt::Debug {
     fn to_call3(&self) -> Call3;
     /// Converts the [`CallItem`] into a [`Call3Value`] struct for `aggregate3Call`
     fn to_call3_value(&self) -> Call3Value;
+}
+
+/// Marker for Dynamic Calls i.e where in SolCall type is locked to one specific type and multicall
+/// returns a Vec of the corresponding return type instead of a tuple.
+#[derive(Debug)]
+pub struct Dynamic<D: SolCall>(PhantomData<fn(D) -> D>);
+
+impl<D: SolCall> CallTuple for Dynamic<D> {
+    type Returns = Vec<Result<D::Return, Failure>>;
+    type SuccessReturns = Vec<D::Return>;
+
+    fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns> {
+        data.iter()
+            .map(|d| D::abi_decode_returns(d, true).map_err(MulticallError::DecodeError))
+            .collect()
+    }
+
+    fn decode_return_results(
+        results: &[super::bindings::IMulticall3::Result],
+    ) -> Result<Self::Returns> {
+        let mut ret = vec![];
+        for (idx, res) in results.iter().enumerate() {
+            if res.success {
+                ret.push(Ok(D::abi_decode_returns(&res.returnData, true)
+                    .map_err(MulticallError::DecodeError)?));
+            } else {
+                ret.push(Err(Failure { idx, return_data: res.returnData.clone() }));
+            }
+        }
+
+        Ok(ret)
+    }
+
+    fn try_into_success(results: Self::Returns) -> Result<Self::SuccessReturns> {
+        let mut ret = vec![];
+        for res in results {
+            ret.push(res.map_err(|e| MulticallError::CallFailed(e.return_data))?);
+        }
+        Ok(ret)
+    }
 }
 
 /// Multicall errors.

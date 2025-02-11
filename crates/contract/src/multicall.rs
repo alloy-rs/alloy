@@ -25,7 +25,9 @@ impl<T, P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder
 mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
-    use alloy_provider::{CallItem, CallItemBuilder, Failure, Provider, ProviderBuilder};
+    use alloy_provider::{
+        CallItem, CallItemBuilder, Failure, MulticallBuilder, Provider, ProviderBuilder,
+    };
     use alloy_sol_types::sol;
     use DummyThatFails::DummyThatFailsInstance;
 
@@ -266,5 +268,21 @@ mod tests {
         assert_eq!(multicall.len(), 2);
         multicall.clear();
         assert_eq!(multicall.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn add_dynamic() {
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let erc20 = ERC20::new(weth, &provider);
+
+        let multicall = MulticallBuilder::new_dynamic(provider.clone(), erc20.totalSupply())
+            .add_dynamic(erc20.totalSupply());
+
+        let (_block_num, res) = multicall.aggregate().await.unwrap();
+
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0], res[1]);
     }
 }

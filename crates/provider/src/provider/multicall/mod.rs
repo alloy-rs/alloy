@@ -21,7 +21,8 @@ use crate::provider::multicall::bindings::IMulticall3::{
 
 mod inner_types;
 pub use inner_types::{
-    CallInfoTrait, CallItem, CallItemBuilder, Failure, MulticallError, MulticallItem, Result,
+    CallInfoTrait, CallItem, CallItemBuilder, Dynamic, Failure, MulticallError, MulticallItem,
+    Result,
 };
 
 mod tuple;
@@ -102,6 +103,40 @@ where
             state_override: None,
             address: MULTICALL3_ADDRESS,
         }
+    }
+
+    /// Instantiate a new [`MulticallBuilder`] with a dynamic call
+    pub fn new_dynamic<D: SolCall + 'static>(
+        provider: P,
+        item: impl MulticallItem<Decoder = D>,
+    ) -> MulticallBuilder<Dynamic<D>, P, N> {
+        let builder = MulticallBuilder {
+            calls: Vec::new(),
+            provider,
+            block: None,
+            state_override: None,
+            address: MULTICALL3_ADDRESS,
+            _pd: Default::default(),
+        };
+
+        builder.add_dynamic(item)
+    }
+}
+
+impl<D: SolCall + 'static, P, N> MulticallBuilder<Dynamic<D>, P, N>
+where
+    P: Provider<N>,
+    N: Network,
+{
+    /// Add a dynamic call to the builder
+    pub fn add_dynamic(mut self, item: impl MulticallItem<Decoder = D>) -> Self {
+        let target = item.target();
+        let input = item.input();
+
+        let call = CallItem::<D>::new(target, input);
+
+        self.calls.push(Box::new(call));
+        self
     }
 }
 
