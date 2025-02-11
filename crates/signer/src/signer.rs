@@ -4,7 +4,7 @@ use alloy_primitives::{
 };
 use async_trait::async_trait;
 use auto_impl::auto_impl;
-use either::Either;
+pub use either::Either;
 
 #[cfg(feature = "eip712")]
 use alloy_dyn_abi::eip712::TypedData;
@@ -135,13 +135,10 @@ pub trait SignerSync<Sig = Signature> {
     fn chain_id_sync(&self) -> Option<ChainId>;
 }
 
-// Use Either type for signers
-type EitherSigner<A, B> = Either<A, B>;
-
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[async_trait]
-impl<A, B, Sig> Signer<Sig> for EitherSigner<A, B>
+impl<A, B, Sig> Signer<Sig> for Either<A, B>
 where
     A: Signer<Sig> + Send + Sync,
     B: Signer<Sig> + Send + Sync,
@@ -176,7 +173,7 @@ where
     }
 }
 
-impl<A, B, Sig> SignerSync<Sig> for EitherSigner<A, B>
+impl<A, B, Sig> SignerSync<Sig> for Either<A, B>
 where
     A: SignerSync<Sig>,
     B: SignerSync<Sig>,
