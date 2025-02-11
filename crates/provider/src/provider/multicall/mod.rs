@@ -534,7 +534,7 @@ where
         }
 
         let res = eth_call.await.map_err(MulticallError::TransportError)?;
-        M::abi_decode_returns(&res, true).map_err(MulticallError::DecodeError)
+        M::abi_decode_returns(&res, false).map_err(MulticallError::DecodeError)
     }
 
     /// Add a call to get the block hash from a block number

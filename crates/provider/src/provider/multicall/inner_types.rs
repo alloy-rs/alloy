@@ -127,7 +127,7 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
 
     fn decode_returns(data: &[Bytes]) -> Result<Self::SuccessReturns> {
         data.iter()
-            .map(|d| D::abi_decode_returns(d, true).map_err(MulticallError::DecodeError))
+            .map(|d| D::abi_decode_returns(d, false).map_err(MulticallError::DecodeError))
             .collect()
     }
 
@@ -137,7 +137,7 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
         let mut ret = vec![];
         for (idx, res) in results.iter().enumerate() {
             if res.success {
-                ret.push(Ok(D::abi_decode_returns(&res.returnData, true)
+                ret.push(Ok(D::abi_decode_returns(&res.returnData, false)
                     .map_err(MulticallError::DecodeError)?));
             } else {
                 ret.push(Err(Failure { idx, return_data: res.returnData.clone() }));
