@@ -156,7 +156,7 @@ where
     ///    println!("WETH Balance: {:?}, USDC Balance: {:?}", weth_bal, usdc_bal);
     /// }
     pub fn new_dynamic(provider: P) -> Self {
-        MulticallBuilder {
+        Self {
             calls: Vec::new(),
             provider,
             block: None,
