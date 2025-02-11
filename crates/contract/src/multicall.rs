@@ -261,12 +261,12 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let erc20 = ERC20::new(weth, &provider);
-        let mut multicall = provider
+        let multicall = provider
             .multicall()
             .add(erc20.totalSupply())
             .add(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
         assert_eq!(multicall.len(), 2);
-        multicall.clear();
+        let multicall = multicall.clear();
         assert_eq!(multicall.len(), 0);
     }
 
