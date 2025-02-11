@@ -53,6 +53,38 @@ pub struct AccountOverride {
     pub move_precompile_to: Option<Address>,
 }
 
+impl AccountOverride {
+    /// Configures the bytecode override
+    pub fn with_code(mut self, code: impl Into<Bytes>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    /// Configures the state overrides
+    pub fn with_state(mut self, state: impl IntoIterator<Item = (B256, B256)>) -> Self {
+        self.state = Some(state.into_iter().collect());
+        self
+    }
+
+    /// Configures the state diffs
+    pub fn with_state_diff(mut self, state_diff: impl IntoIterator<Item = (B256, B256)>) -> Self {
+        self.state_diff = Some(state_diff.into_iter().collect());
+        self
+    }
+
+    /// Configures the balance override
+    pub fn with_balance(mut self, balance: U256) -> Self {
+        self.balance = Some(balance);
+        self
+    }
+
+    /// Configures the nonce override
+    pub fn with_nonce(mut self, nonce: u64) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
+}
+
 /// Helper type that bundles various overrides for EVM Execution.
 ///
 /// By `Default`, no overrides are included.
