@@ -104,7 +104,13 @@ where
             address: MULTICALL3_ADDRESS,
         }
     }
+}
 
+impl<D: SolCall + 'static, P, N> MulticallBuilder<Dynamic<D>, P, N>
+where
+    P: Provider<N>,
+    N: Network,
+{
     /// Instantiate a new [`MulticallBuilder`] that restricts the calls to a specific call type.
     ///
     /// Multicalls made using this builder return a vector of the decoded return values.
@@ -137,36 +143,29 @@ where
     ///
     ///    let owner = address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
     ///
-    ///    let erc20_balances = MulticallBuilder::new_dynamic(provider, weth.balanceOf(owner)).add_dynamic(usdc.balanceOf(owner));
+    ///    let mut erc20_balances = MulticallBuilder::new_dynamic(provider);
+    ///
+    ///    for token in &[weth, usdc] {
+    ///        erc20_balances = erc20_balances.add_dynamic(token.balanceOf(owner));
+    ///    }
     ///
     ///    let balances: Vec<ERC20::balanceOfReturn> = erc20_balances.aggregate().await.unwrap();
     ///
-    ///    let weth_bal = balances[0];
-    ///    let usdc_bal = balances[1];
+    ///    let weth_bal = &balances[0];
+    ///    let usdc_bal = &balances[1];
     ///    println!("WETH Balance: {:?}, USDC Balance: {:?}", weth_bal, usdc_bal);
     /// }
-    pub fn new_dynamic<D: SolCall + 'static>(
-        provider: P,
-        item: impl MulticallItem<Decoder = D>,
-    ) -> MulticallBuilder<Dynamic<D>, P, N> {
-        let builder = MulticallBuilder {
+    pub fn new_dynamic(provider: P) -> Self {
+        MulticallBuilder {
             calls: Vec::new(),
             provider,
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
             _pd: Default::default(),
-        };
-
-        builder.add_dynamic(item)
+        }
     }
-}
 
-impl<D: SolCall + 'static, P, N> MulticallBuilder<Dynamic<D>, P, N>
-where
-    P: Provider<N>,
-    N: Network,
-{
     /// Add a dynamic call to the builder
     pub fn add_dynamic(mut self, item: impl MulticallItem<Decoder = D>) -> Self {
         let target = item.target();
@@ -179,8 +178,6 @@ where
     }
 
     /// Extend the builder with a sequence of calls
-    ///
-    /// Note: The MulticallBuilder has a call limit of 16.
     pub fn extend(
         mut self,
         items: impl IntoIterator<Item = impl MulticallItem<Decoder = D>>,

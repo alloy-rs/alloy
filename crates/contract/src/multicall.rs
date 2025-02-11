@@ -277,7 +277,8 @@ mod tests {
 
         let erc20 = ERC20::new(weth, &provider);
 
-        let multicall = MulticallBuilder::new_dynamic(provider.clone(), erc20.totalSupply())
+        let multicall = MulticallBuilder::new_dynamic(provider.clone())
+            .add_dynamic(erc20.totalSupply())
             // .add(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))) - WON'T
             // COMPILE
             // .add_dynamic(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))) -
@@ -289,5 +290,18 @@ mod tests {
 
         assert_eq!(res.len(), 4);
         assert_eq!(res[0], res[1]);
+    }
+
+    #[tokio::test]
+    async fn test_extend_dynamic() {
+        let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let erc20 = ERC20::new(weth, &provider);
+        let ts_calls = vec![erc20.totalSupply(); 18];
+        let multicall = MulticallBuilder::new_dynamic(provider.clone()).extend(ts_calls);
+
+        assert_eq!(multicall.len(), 18);
+        let res = multicall.aggregate().await.unwrap();
+        assert_eq!(res.len(), 18);
     }
 }
