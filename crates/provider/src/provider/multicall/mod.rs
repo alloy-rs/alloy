@@ -47,7 +47,7 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 ///
 /// sol! {
 ///    #[sol(rpc)]
-///    #[derive(Debug, PartialEq)]   
+///    #[derive(Debug, PartialEq)]
 ///    interface ERC20 {
 ///        function totalSupply() external view returns (uint256 totalSupply);
 ///        function balanceOf(address owner) external view returns (uint256 balance);
@@ -65,7 +65,7 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 ///
 ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
 ///
-///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
+///     let (total_supply, balance) = multicall.aggregate().await.unwrap();
 ///
 ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
 /// }
@@ -233,9 +233,10 @@ where
     ///
     /// ## Returns
     ///
-    /// - (`blockNumber`, `returnData`):
-    /// - `blockNumber`: The block number of the call
     /// - `returnData`: A tuple of the decoded return values for the calls
+    ///
+    /// One can obtain the block context such as block number and block hash by using the
+    /// [MulticallBuilder::block_and_aggregate] function.
     ///
     /// ## Example
     ///
@@ -264,16 +265,16 @@ where
     ///
     ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
     ///
-    ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
+    ///     let (total_supply, balance) = multicall.aggregate().await.unwrap();
     ///
     ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
     /// }
     /// ```
-    pub async fn aggregate(&self) -> Result<(u64, T::SuccessReturns)> {
+    pub async fn aggregate(&self) -> Result<T::SuccessReturns> {
         let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
         let call = aggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
-        Ok((output.blockNumber.to::<u64>(), T::decode_returns(&output.returnData)?))
+        T::decode_returns(&output.returnData)
     }
 
     /// Call the `tryAggregate` function

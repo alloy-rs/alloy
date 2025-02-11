@@ -70,7 +70,7 @@ mod tests {
         let erc20 = ERC20::new(weth, &provider);
         let multicall = provider.multicall().add(erc20.totalSupply());
 
-        let (_block_num, (_total_supply,)) = multicall.aggregate().await.unwrap();
+        let (_total_supply,) = multicall.aggregate().await.unwrap();
     }
 
     #[tokio::test]
@@ -87,7 +87,7 @@ mod tests {
             .add(erc20.totalSupply())
             .add(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
 
-        let (_block_num, (t1, b1, t2, b2)) = multicall.aggregate().await.unwrap();
+        let (t1, b1, t2, b2) = multicall.aggregate().await.unwrap();
 
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
@@ -186,7 +186,7 @@ mod tests {
             .add(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")))
             .get_block_hash(21787144);
 
-        let (_block_num, (t1, b1, t2, b2, block_hash)) = multicall.aggregate().await.unwrap();
+        let (t1, b1, t2, b2, block_hash) = multicall.aggregate().await.unwrap();
 
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
@@ -280,7 +280,7 @@ mod tests {
         let multicall = MulticallBuilder::new_dynamic(provider.clone(), erc20.totalSupply())
             .add_dynamic(erc20.totalSupply());
 
-        let (_block_num, res) = multicall.aggregate().await.unwrap();
+        let res = multicall.aggregate().await.unwrap();
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0], res[1]);
