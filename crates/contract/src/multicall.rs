@@ -282,11 +282,12 @@ mod tests {
             // COMPILE
             // .add_dynamic(erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))) -
             // WON'T COMPILE
-            .add_dynamic(erc20.totalSupply());
+            .add_dynamic(erc20.totalSupply())
+            .extend(vec![erc20.totalSupply(), erc20.totalSupply()]);
 
         let res: Vec<ERC20::totalSupplyReturn> = multicall.aggregate().await.unwrap();
 
-        assert_eq!(res.len(), 2);
+        assert_eq!(res.len(), 4);
         assert_eq!(res[0], res[1]);
     }
 }

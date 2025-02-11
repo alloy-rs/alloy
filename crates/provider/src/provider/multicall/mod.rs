@@ -7,7 +7,7 @@ use alloy_rpc_types_eth::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 use bindings::IMulticall3::{
     blockAndAggregateCall, blockAndAggregateReturn, tryBlockAndAggregateCall,
-    tryBlockAndAggregateReturn,
+    tryBlockAndAggregateReturn, Call, Call3, Call3Value,
 };
 
 /// Multicall bindings
@@ -73,7 +73,7 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 #[derive(Debug)]
 pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     /// Batched calls
-    calls: Vec<Box<dyn CallInfoTrait>>,
+    calls: Vec<Call3Value>,
     /// The provider to use
     provider: P,
     /// The [`BlockId`] to use for the call
@@ -174,7 +174,20 @@ where
 
         let call = CallItem::<D>::new(target, input);
 
-        self.calls.push(Box::new(call));
+        self.calls.push(call.to_call3_value());
+        self
+    }
+
+    /// Extend the builder with a sequence of calls
+    ///
+    /// Note: The MulticallBuilder has a call limit of 16.
+    pub fn extend(
+        mut self,
+        items: impl IntoIterator<Item = impl MulticallItem<Decoder = D>>,
+    ) -> Self {
+        for item in items {
+            self = self.add_dynamic(item);
+        }
         self
     }
 }
@@ -247,7 +260,7 @@ where
         T: TuplePush<D>,
         <T as TuplePush<D>>::Pushed: CallTuple,
     {
-        self.calls.push(Box::new(call));
+        self.calls.push(call.to_call3_value());
         MulticallBuilder {
             calls: self.calls,
             provider: self.provider,
@@ -310,7 +323,11 @@ where
     /// }
     /// ```
     pub async fn aggregate(&self) -> Result<T::SuccessReturns> {
-        let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let calls = self
+            .calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect::<Vec<_>>();
         let call = aggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
         T::decode_returns(&output.returnData)
@@ -370,7 +387,11 @@ where
     /// }
     /// ```
     pub async fn try_aggregate(&self, require_success: bool) -> Result<T::Returns> {
-        let calls = &self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let calls = &self
+            .calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect::<Vec<_>>();
         let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
         let tryAggregateReturn { returnData } = output;
@@ -403,7 +424,15 @@ where
     /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
     ///   index(-position) of the call and the returned data as [`Bytes`].
     pub async fn aggregate3(&self) -> Result<T::Returns> {
-        let calls = self.calls.iter().map(|c| c.to_call3()).collect::<Vec<_>>();
+        let calls = self
+            .calls
+            .iter()
+            .map(|c| Call3 {
+                target: c.target,
+                callData: c.callData.clone(),
+                allowFailure: c.allowFailure,
+            })
+            .collect::<Vec<_>>();
         let call = aggregate3Call { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
         T::decode_return_results(&output.returnData)
@@ -437,16 +466,19 @@ where
     /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
     ///   index(-position) of the call and the returned data as [`Bytes`].
     pub async fn aggregate3_value(&self) -> Result<T::Returns> {
-        let calls = self.calls.iter().map(|c| c.to_call3_value()).collect::<Vec<_>>();
-        let total_value = calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
-        let call = aggregate3ValueCall { calls: calls.to_vec() };
+        let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
+        let call = aggregate3ValueCall { calls: self.calls.to_vec() };
         let output = self.build_and_call(call, Some(total_value)).await?;
         T::decode_return_results(&output.returnData)
     }
 
     /// Call the `blockAndAggregate` function
     pub async fn block_and_aggregate(&self) -> Result<(u64, B256, T::SuccessReturns)> {
-        let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let calls = self
+            .calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect::<Vec<_>>();
         let call = blockAndAggregateCall { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
@@ -459,7 +491,11 @@ where
         &self,
         require_success: bool,
     ) -> Result<(u64, B256, T::Returns)> {
-        let calls = self.calls.iter().map(|c| c.to_call()).collect::<Vec<_>>();
+        let calls = self
+            .calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect::<Vec<_>>();
         let call =
             tryBlockAndAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
