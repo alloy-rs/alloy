@@ -27,7 +27,7 @@ use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
-use super::{DynProvider, EthCallMany};
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -179,6 +179,51 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         bundles: &'req Vec<Bundle>,
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         EthCallMany::new(self.weak_client(), bundles)
+    }
+
+    /// Execute a multicall by leveraging the [`MulticallBuilder`].
+    ///
+    /// This function returns a [`MulticallBuilder`] which is used to add multiple calls and execute
+    /// them.
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// use alloy_primitives::address;
+    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///    #[sol(rpc)]
+    ///    #[derive(Debug, PartialEq)]
+    ///    interface ERC20 {
+    ///        function totalSupply() external view returns (uint256 totalSupply);
+    ///        function balanceOf(address owner) external view returns (uint256 balance);
+    ///    }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let erc20 = ERC20::new(weth, &provider);
+    ///
+    ///     let ts_call = erc20.totalSupply();
+    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
+    ///
+    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
+    ///
+    ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
+    ///
+    ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
+    /// }
+    /// ```
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    fn multicall(&self) -> MulticallBuilder<Empty, &Self, N>
+    where
+        Self: Sized,
+    {
+        MulticallBuilder::new(self)
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.
