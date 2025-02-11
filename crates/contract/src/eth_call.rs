@@ -1,13 +1,15 @@
 use std::{future::IntoFuture, marker::PhantomData};
 
+use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt};
 use alloy_json_abi::Function;
 use alloy_network::Network;
-use alloy_primitives::Bytes;
-use alloy_rpc_types_eth::{state::StateOverride, BlockId};
+use alloy_primitives::{Address, Bytes};
+use alloy_rpc_types_eth::{
+    state::{AccountOverride, StateOverride},
+    BlockId,
+};
 use alloy_sol_types::SolCall;
-
-use crate::{Error, Result};
 
 /// Raw coder.
 const RAW_CODER: () = ();
@@ -73,6 +75,28 @@ where
     /// Set the state overrides for this call.
     pub fn overrides(mut self, overrides: &'req StateOverride) -> Self {
         self.inner = self.inner.overrides(overrides);
+        self
+    }
+
+    /// Appends a single [AccountOverride] to the state override.
+    ///
+    /// Creates a new [`StateOverride`] if none has been set yet.
+    pub fn account_override(
+        mut self,
+        address: Address,
+        account_overrides: AccountOverride,
+    ) -> Self {
+        self.inner = self.inner.account_override(address, account_overrides);
+        self
+    }
+    /// Extends the the given [AccountOverride] to the state override.
+    ///
+    /// Creates a new [`StateOverride`] if none has been set yet.
+    pub fn account_overrides(
+        mut self,
+        overrides: impl IntoIterator<Item = (Address, AccountOverride)>,
+    ) -> Self {
+        self.inner = self.inner.account_overrides(overrides);
         self
     }
 

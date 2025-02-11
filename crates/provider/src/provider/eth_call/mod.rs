@@ -1,12 +1,12 @@
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
-use alloy_rpc_types_eth::state::StateOverride;
+use alloy_primitives::Address;
+use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
 use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
-
-use crate::ProviderCall;
 
 mod params;
 pub use params::{EthCallManyParams, EthCallParams};
@@ -236,6 +236,30 @@ where
     /// Set the state overrides for this call.
     pub fn overrides(mut self, overrides: &'req StateOverride) -> Self {
         self.params.overrides = Some(Cow::Borrowed(overrides));
+        self
+    }
+
+    /// Appends a single [AccountOverride] to the state override.
+    ///
+    /// Creates a new [`StateOverride`] if none has been set yet.
+    pub fn account_override(mut self, address: Address, account_override: AccountOverride) -> Self {
+        let mut overrides = self.params.overrides.unwrap_or_default();
+        overrides.to_mut().insert(address, account_override);
+        self.params.overrides = Some(overrides);
+
+        self
+    }
+
+    /// Extends the the given [AccountOverride] to the state override.
+    ///
+    /// Creates a new [`StateOverride`] if none has been set yet.
+    pub fn account_overrides(
+        mut self,
+        overrides: impl IntoIterator<Item = (Address, AccountOverride)>,
+    ) -> Self {
+        for (addr, account_override) in overrides.into_iter() {
+            self = self.account_override(addr, account_override);
+        }
         self
     }
 
