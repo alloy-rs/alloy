@@ -135,7 +135,7 @@ where
         let pin = std::pin::pin!(&mut this.inner);
         match pin.poll(cx) {
             std::task::Poll::Ready(Ok(data)) => {
-                std::task::Poll::Ready(this.decoder.abi_decode_output(data, true))
+                std::task::Poll::Ready(this.decoder.abi_decode_output(data, false))
             }
             std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(e.into())),
             std::task::Poll::Pending => std::task::Poll::Pending,
