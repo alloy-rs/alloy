@@ -543,20 +543,17 @@ mod tests {
             let path = dir.join("rpc-cache-block.txt");
             shared_cache.load_cache(path.clone()).unwrap();
 
-            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block = provider.get_block(0.into()).full().await.unwrap(); // Received from RPC.
+            let block2 = provider.get_block(0.into()).full().await.unwrap(); // Received from cache.
             assert_eq!(block, block2);
 
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-            let latest_block =
-                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let latest_block = provider.get_block(BlockId::latest()).full().await.unwrap(); // Received from RPC.
             let latest_hash = latest_block.unwrap().header.hash;
 
-            let block3 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block4 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block3 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from RPC.
+            let block4 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from cache.
             assert_eq!(block3, block4);
 
             shared_cache.save_cache(path).unwrap();
@@ -578,20 +575,17 @@ mod tests {
             let path = dir.join("rpc-cache-block.txt");
             shared_cache.load_cache(path.clone()).unwrap();
 
-            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block = provider.get_block(0.into()).full().await.unwrap(); // Received from RPC.
+            let block2 = provider.get_block(0.into()).full().await.unwrap(); // Received from cache.
             assert_eq!(block, block2);
 
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-            let latest_block =
-                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let latest_block = provider.get_block(BlockId::latest()).full().await.unwrap(); // Received from RPC.
             let latest_hash = latest_block.unwrap().header.hash;
 
-            let block3 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block4 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block3 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from RPC.
+            let block4 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from cache.
             assert_eq!(block3, block4);
 
             shared_cache.save_cache(path).unwrap();
