@@ -15,13 +15,6 @@ use alloy_serde::WithOtherFields;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-/// A catch-all block type for handling blocks on multiple networks.
-pub type AnyRpcBlock =
-    WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
-
-/// A catch-all transaction type for handling transactions on multiple networks.
-pub type AnyRpcTransaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
-
 /// Types for a catch-all network.
 ///
 /// `AnyNetwork`'s associated types allow for many different types of
@@ -68,47 +61,104 @@ impl Network for AnyNetwork {
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = AnyRpcTransaction;
+    type TransactionResponse = WithOtherFields<Transaction<AnyTxEnvelope>>;
 
     type ReceiptResponse = AnyTransactionReceipt;
 
     type HeaderResponse = AnyRpcHeader;
 
-    type BlockResponse = AnyRpcBlock;
+    type BlockResponse =
+        WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
 }
 
 /// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AnyRpcBlockWrapper(pub AnyRpcBlock);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct AnyRpcBlock(
+    WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
+);
 
-impl Deref for AnyRpcBlockWrapper {
-    type Target = AnyRpcBlock;
+impl AnyRpcBlock {
+    /// Create a new [`AnyRpcBlock`].
+    pub fn new(
+        inner: WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
+    ) -> Self {
+        Self(inner)
+    }
+}
+
+impl AsRef<WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>>
+    for AnyRpcBlock
+{
+    fn as_ref(
+        &self,
+    ) -> &WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>> {
+        &self.0
+    }
+}
+
+impl Deref for AnyRpcBlock {
+    type Target = WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for AnyRpcBlockWrapper {
+impl DerefMut for AnyRpcBlock {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for AnyRpcBlock {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = WithOtherFields::<
+            Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>,
+        >::deserialize(deserializer)?;
+        Ok(Self(inner))
     }
 }
 
 /// A wrapper for [`AnyRpcTransaction`] that allows for handling unknown transaction types.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AnyRpcTransactionWrapper(pub AnyRpcTransaction);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct AnyRpcTransaction(WithOtherFields<Transaction<AnyTxEnvelope>>);
 
-impl Deref for AnyRpcTransactionWrapper {
-    type Target = AnyRpcTransaction;
+impl AnyRpcTransaction {
+    /// Create a new [`AnyRpcTransaction`].
+    pub fn new(inner: WithOtherFields<Transaction<AnyTxEnvelope>>) -> Self {
+        Self(inner)
+    }
+}
+
+impl AsRef<AnyTxEnvelope> for AnyRpcTransaction {
+    fn as_ref(&self) -> &AnyTxEnvelope {
+        &self.0.inner.inner
+    }
+}
+
+impl Deref for AnyRpcTransaction {
+    type Target = WithOtherFields<Transaction<AnyTxEnvelope>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for AnyRpcTransactionWrapper {
+impl DerefMut for AnyRpcTransaction {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for AnyRpcTransaction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = WithOtherFields::<Transaction<AnyTxEnvelope>>::deserialize(deserializer)?;
+        Ok(Self(inner))
     }
 }

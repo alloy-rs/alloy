@@ -22,11 +22,12 @@ pub use transaction::{
 mod ethereum;
 pub use ethereum::{Ethereum, EthereumWallet};
 
-mod any;
+/// Types for handling unknown network types.
+pub mod any;
 pub use any::{
-    AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcBlockWrapper, AnyRpcHeader,
-    AnyRpcTransaction, AnyRpcTransactionWrapper, AnyTransactionReceipt, AnyTxEnvelope, AnyTxType,
-    AnyTypedTransaction, UnknownTxEnvelope, UnknownTypedTransaction,
+    AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction,
+    AnyTransactionReceipt, AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope,
+    UnknownTypedTransaction,
 };
 
 pub use alloy_eips::eip2718;
