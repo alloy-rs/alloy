@@ -1,13 +1,13 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    EthGetBlock, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
+use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
 use alloy_primitives::{
     keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256,
 };
-use alloy_rpc_types_eth::{
-    BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
-};
+use alloy_rpc_types_eth::{BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
@@ -150,34 +150,62 @@ where
         self.inner.root()
     }
 
-    async fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
+    /// Attempts to fetch the response from the cache by using the hash of the
+    /// request params.
+    ///
+    /// In case of a cache miss, fetches from the RPC and saves the response to the
+    /// cache.
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N> {
+        let eth_get_block = self.inner.get_block_by_hash(hash);
 
-        let req = RequestType::new("eth_getBlockByHash", (hash, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_hash(hash, kind)).await
+        let method = "eth_getBlockByHash";
+        let cache_pre = self.cache.clone();
+        let cache_post = self.cache.clone();
+        eth_get_block
+            .with_pre_processing(Box::new(move |params| {
+                let full = bool::from(params.kind());
+                let key = RequestType::new(method, (hash, full)).params_hash()?;
+                cache_pre.get_deserialized(&key)
+            }))
+            .with_post_processing(Box::new(move |params, res| {
+                if let Ok(Some(ref data)) = res {
+                    let full = bool::from(params.kind());
+                    let key = RequestType::new(method, (hash, full)).params_hash()?;
+                    let json_str =
+                        serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
+                    let _ = cache_post.put(key, json_str)?;
+                }
+                res
+            }))
     }
 
-    async fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
+    /// Attempts to fetch the response from the cache by using the hash of the
+    /// request params.
+    ///
+    /// In case of a cache miss, fetches from the RPC and saves the response to the
+    /// cache.
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N> {
+        let eth_get_block = self.inner.get_block_by_number(number);
 
-        let req = RequestType::new("eth_getBlockByNumber", (number, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
+        let method = "eth_getBlockByNumber";
+        let cache_pre = self.cache.clone();
+        let cache_post = self.cache.clone();
+        eth_get_block
+            .with_pre_processing(Box::new(move |params| {
+                let full = bool::from(params.kind());
+                let key = RequestType::new(method, (number, full)).params_hash()?;
+                cache_pre.get_deserialized(&key)
+            }))
+            .with_post_processing(Box::new(move |params, res| {
+                if let Ok(Some(ref data)) = res {
+                    let full = bool::from(params.kind());
+                    let key = RequestType::new(method, (number, full)).params_hash()?;
+                    let json_str =
+                        serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
+                    let _ = cache_post.put(key, json_str)?;
+                }
+                res
+            }))
     }
 
     fn get_block_receipts(
@@ -495,32 +523,6 @@ impl SharedCache {
 
         Ok(())
     }
-}
-
-/// Attempts to fetch the response from the cache by using the hash of the
-/// request params.
-///
-/// In case of a cache miss, fetches from the RPC and saves the response to the
-/// cache.
-///
-/// This helps overriding [`Provider`] methods that return [`TransportResult<T>`].
-async fn cache_get_or_fetch<Params: RpcSend, Resp: RpcObject>(
-    cache: &SharedCache,
-    req: RequestType<Params>,
-    fetch_fn: impl std::future::Future<Output = TransportResult<Option<Resp>>>,
-) -> TransportResult<Option<Resp>> {
-    let hash = req.params_hash()?;
-    if let Some(cached) = cache.get_deserialized(&hash)? {
-        return Ok(Some(cached));
-    }
-
-    let result = fetch_fn.await?;
-    if let Some(ref data) = result {
-        let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
-        let _ = cache.put(hash, json_str)?;
-    }
-
-    Ok(result)
 }
 
 #[cfg(test)]
