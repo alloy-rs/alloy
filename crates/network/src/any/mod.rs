@@ -9,8 +9,9 @@ pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::Network;
+use alloy_network_primitives::BlockResponse;
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{Block, BlockTransactions, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -67,12 +68,11 @@ impl Network for AnyNetwork {
 
     type HeaderResponse = AnyRpcHeader;
 
-    type BlockResponse =
-        WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
+    type BlockResponse = AnyRpcBlock;
 }
 
 /// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AnyRpcBlock(
     WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
 );
@@ -83,6 +83,27 @@ impl AnyRpcBlock {
         inner: WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
     ) -> Self {
         Self(inner)
+    }
+}
+
+impl BlockResponse for AnyRpcBlock {
+    type Header = AnyRpcHeader;
+    type Transaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
+
+    fn header(&self) -> &Self::Header {
+        &self.0.inner.header
+    }
+
+    fn transactions(&self) -> &BlockTransactions<Self::Transaction> {
+        &self.0.inner.transactions
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        &mut self.0.inner.transactions
+    }
+
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        self.0.other_fields()
     }
 }
 
@@ -110,20 +131,8 @@ impl DerefMut for AnyRpcBlock {
     }
 }
 
-impl<'de> Deserialize<'de> for AnyRpcBlock {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = WithOtherFields::<
-            Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>,
-        >::deserialize(deserializer)?;
-        Ok(Self(inner))
-    }
-}
-
 /// A wrapper for [`AnyRpcTransaction`] that allows for handling unknown transaction types.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AnyRpcTransaction(WithOtherFields<Transaction<AnyTxEnvelope>>);
 
 impl AnyRpcTransaction {
@@ -150,15 +159,5 @@ impl Deref for AnyRpcTransaction {
 impl DerefMut for AnyRpcTransaction {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for AnyRpcTransaction {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let inner = WithOtherFields::<Transaction<AnyTxEnvelope>>::deserialize(deserializer)?;
-        Ok(Self(inner))
     }
 }
