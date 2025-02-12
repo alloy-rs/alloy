@@ -12,6 +12,8 @@ use crate::Network;
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
 use alloy_rpc_types_eth::{Block, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
+use serde::{Deserialize, Serialize};
+use std::ops::{Deref, DerefMut};
 
 /// A catch-all block type for handling blocks on multiple networks.
 pub type AnyRpcBlock =
@@ -73,4 +75,40 @@ impl Network for AnyNetwork {
     type HeaderResponse = AnyRpcHeader;
 
     type BlockResponse = AnyRpcBlock;
+}
+
+/// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnyRpcBlockWrapper(pub AnyRpcBlock);
+
+impl Deref for AnyRpcBlockWrapper {
+    type Target = AnyRpcBlock;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for AnyRpcBlockWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// A wrapper for [`AnyRpcTransaction`] that allows for handling unknown transaction types.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnyRpcTransactionWrapper(pub AnyRpcTransaction);
+
+impl Deref for AnyRpcTransactionWrapper {
+    type Target = AnyRpcTransaction;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for AnyRpcTransactionWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
