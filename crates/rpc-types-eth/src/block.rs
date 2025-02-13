@@ -3,10 +3,6 @@
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::{error::ValueError, BlockBody, BlockHeader, Sealed, TxEnvelope};
-pub use alloy_eips::{
-    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
-    BlockNumberOrTag, ForkBlock, RpcBlockHash,
-};
 use alloy_eips::{eip4895::Withdrawals, eip7840::BlobParams, Encodable2718};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
@@ -14,6 +10,11 @@ use alloy_network_primitives::{
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, Sealable, B256, B64, U256};
 use alloy_rlp::Encodable;
 use core::ops::{Deref, DerefMut};
+
+pub use alloy_eips::{
+    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
+    BlockNumberOrTag, ForkBlock, RpcBlockHash,
+};
 
 /// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
