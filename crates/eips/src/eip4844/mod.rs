@@ -123,6 +123,15 @@ impl HeapBlob {
         Self(Bytes::from(blob))
     }
 
+    /// Create a new heap blob from [`Bytes`].
+    pub fn from_bytes(bytes: Bytes) -> Result<Self, InvalidBlobLength> {
+        if bytes.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(bytes.len()));
+        }
+
+        Ok(Self(bytes))
+    }
+
     /// Generate a new heap blob with all bytes set to `byte`.
     pub fn repeat_byte(byte: u8) -> Self {
         Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
@@ -156,10 +165,6 @@ impl serde::Serialize for HeapBlob {
     where
         S: serde::Serializer,
     {
-        if self.inner().len() != BYTES_PER_BLOB {
-            return Err(serde::ser::Error::custom(InvalidBlobLength(self.inner().len())));
-        }
-
         self.inner().serialize(serializer)
     }
 }
@@ -179,10 +184,9 @@ impl<'de> serde::Deserialize<'de> for HeapBlob {
     where
         D: serde::de::Deserializer<'de>,
     {
-        // Deserialize the bytes
         let inner = <Bytes>::deserialize(deserializer)?;
 
-        Self::new(&inner).map_err(serde::de::Error::custom)
+        Self::from_bytes(inner).map_err(serde::de::Error::custom)
     }
 }
 
@@ -190,7 +194,7 @@ impl alloy_rlp::Decodable for HeapBlob {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let bytes = <Bytes>::decode(buf)?;
 
-        Self::new(&bytes).map_err(|_| alloy_rlp::Error::Custom("invalid blob length"))
+        Self::from_bytes(bytes).map_err(|_| alloy_rlp::Error::Custom("invalid blob length"))
     }
 }
 
