@@ -297,7 +297,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
-                self.get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Full)
+                self.get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
                     .await?
                     .ok_or(RpcError::NullResp)?
                     .header()
