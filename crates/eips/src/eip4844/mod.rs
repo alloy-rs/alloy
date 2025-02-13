@@ -135,7 +135,7 @@ impl HeapBlob {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the length of `blob` is `BYTES_PER_BLOB`.
+    /// The caller must ensure that the length of `blob` is [`BYTES_PER_BLOB`].
     pub unsafe fn new_unchecked(blob: Bytes) -> Self {
         Self(blob)
     }
