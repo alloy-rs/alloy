@@ -110,6 +110,8 @@ where
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     alloy_rlp::RlpEncodableWrapper,
     alloy_rlp::RlpDecodableWrapper,
@@ -140,7 +142,7 @@ impl HeapBlob {
 
     /// Generate a new heap blob with all bytes set to `byte`.
     pub fn repeat_byte(byte: u8) -> Self {
-        Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
+        unsafe { Self::new_unchecked(Bytes::from(vec![byte; BYTES_PER_BLOB])) }
     }
 
     /// Get the inner
@@ -339,5 +341,15 @@ mod tests {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_heap_blob() {
+        let blob = HeapBlob::repeat_byte(0x42);
+        let serialized = serde_json::to_string(&blob).unwrap();
+
+        let deserialized: HeapBlob = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(blob, deserialized);
     }
 }
