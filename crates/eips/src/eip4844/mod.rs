@@ -22,7 +22,7 @@ mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256};
 
 use crate::eip7840;
 
@@ -102,6 +102,84 @@ where
         Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?,
     );
     Ok(blob)
+}
+
+/// A heap allocated blob that serializes as 0x-prefixed hex string
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    alloy_rlp::RlpEncodableWrapper,
+    alloy_rlp::RlpDecodableWrapper,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "ssz", derive(ssz::Encode, ssz::Decode))]
+pub struct HeapBlob(Bytes);
+
+impl HeapBlob {
+    /// Create a new heap blob from a byte slice.
+    pub fn new(blob: &[u8]) -> Result<Self, InvalidBlobLength> {
+        if blob.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(blob.len()));
+        }
+
+        unsafe { Ok(Self::new_unchecked(Bytes::copy_from_slice(blob))) }
+    }
+
+    /// Create a new heap blob from a byte slice without checking the length.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the length of `blob` is `BYTES_PER_BLOB`.
+    pub unsafe fn new_unchecked(blob: Bytes) -> Self {
+        Self(blob)
+    }
+
+    /// Generate a new heap blob with all bytes set to `byte`.
+    pub fn repeat_byte(byte: u8) -> Self {
+        Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
+    }
+
+    /// Get the inner
+    pub fn inner(&self) -> &Bytes {
+        &self.0
+    }
+}
+
+impl Default for HeapBlob {
+    fn default() -> Self {
+        Self::repeat_byte(0)
+    }
+}
+
+/// Error indicating that the blob length is invalid.
+#[derive(Debug, Clone)]
+pub struct InvalidBlobLength(usize);
+impl core::fmt::Display for InvalidBlobLength {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Invalid blob length: {}, expected: {BYTES_PER_BLOB}", self.0)
+    }
+}
+impl core::error::Error for InvalidBlobLength {}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for HeapBlob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Deserialize the bytes
+        let inner = <Bytes>::deserialize(deserializer)?;
+
+        if inner.len() != BYTES_PER_BLOB {
+            return Err(serde::de::Error::custom(InvalidBlobLength(inner.len())));
+        }
+
+        unsafe { Ok(Self::new_unchecked(inner)) }
+    }
 }
 
 /// A commitment/proof serialized as 0x-prefixed hex string
