@@ -105,19 +105,7 @@ where
 }
 
 /// A heap allocated blob that serializes as 0x-prefixed hex string
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    alloy_rlp::RlpEncodableWrapper,
-    alloy_rlp::RlpDecodableWrapper,
-)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, alloy_rlp::RlpEncodableWrapper)]
 pub struct HeapBlob(Bytes);
 
 impl HeapBlob {
@@ -127,21 +115,17 @@ impl HeapBlob {
             return Err(InvalidBlobLength(blob.len()));
         }
 
-        unsafe { Ok(Self::new_unchecked(Bytes::copy_from_slice(blob))) }
+        Ok(Self(Bytes::copy_from_slice(blob)))
     }
 
-    /// Create a new heap blob from a byte slice without checking the length.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the length of `blob` is [`BYTES_PER_BLOB`].
-    pub unsafe fn new_unchecked(blob: Bytes) -> Self {
-        Self(blob)
+    /// Create a new heap blob from an array.
+    pub fn from_array(blob: [u8; BYTES_PER_BLOB]) -> Self {
+        Self(Bytes::from(blob))
     }
 
     /// Generate a new heap blob with all bytes set to `byte`.
     pub fn repeat_byte(byte: u8) -> Self {
-        unsafe { Self::new_unchecked(Bytes::from(vec![byte; BYTES_PER_BLOB])) }
+        Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
     }
 
     /// Get the inner
@@ -167,6 +151,29 @@ impl core::fmt::Display for InvalidBlobLength {
 impl core::error::Error for InvalidBlobLength {}
 
 #[cfg(feature = "serde")]
+impl serde::Serialize for HeapBlob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if self.inner().len() != BYTES_PER_BLOB {
+            return Err(serde::ser::Error::custom(InvalidBlobLength(self.inner().len())));
+        }
+
+        self.inner().serialize(serializer)
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for HeapBlob {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut blob = vec![0u8; BYTES_PER_BLOB];
+        u.fill_buffer(&mut blob)?;
+        Ok(Self(Bytes::from(blob)))
+    }
+}
+
+#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for HeapBlob {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -175,11 +182,15 @@ impl<'de> serde::Deserialize<'de> for HeapBlob {
         // Deserialize the bytes
         let inner = <Bytes>::deserialize(deserializer)?;
 
-        if inner.len() != BYTES_PER_BLOB {
-            return Err(serde::de::Error::custom(InvalidBlobLength(inner.len())));
-        }
+        Self::new(&inner).map_err(serde::de::Error::custom)
+    }
+}
 
-        unsafe { Ok(Self::new_unchecked(inner)) }
+impl alloy_rlp::Decodable for HeapBlob {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let bytes = <Bytes>::decode(buf)?;
+
+        Self::new(&bytes).map_err(|_| alloy_rlp::Error::Custom("invalid blob length"))
     }
 }
 
