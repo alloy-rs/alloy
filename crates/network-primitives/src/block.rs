@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::TransactionResponse;
 use alloc::{vec, vec::Vec};
+use alloy_consensus::error::ValueError;
 use alloy_eips::Encodable2718;
 use core::slice;
-use alloy_consensus::error::ValueError;
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
@@ -126,20 +126,15 @@ impl<T> BlockTransactions<T> {
             _ => vec![],
         }
     }
-    
+
     /// Attempts to unwrap the [`Self::Full`] variant.
-    /// 
+    ///
     /// Returns an error if the type is different variant.
     pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<Self>> {
-         match self {
+        match self {
             Self::Full(txs) => Ok(txs),
-            txs @ Self::Hashes(_) => {
-                Err(ValueError::new(txs, "Unexpected hashes variant"))
-            }
-            txs @ Self::Uncle => {
-                Err(ValueError::new(txs,  "Unexpected uncle variant"))
-               
-            }
+            txs @ Self::Hashes(_) => Err(ValueError::new(txs, "Unexpected hashes variant")),
+            txs @ Self::Uncle => Err(ValueError::new(txs, "Unexpected uncle variant")),
         }
     }
 
