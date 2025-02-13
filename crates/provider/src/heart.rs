@@ -22,10 +22,16 @@ use tokio::{
 };
 
 #[cfg(target_arch = "wasm32")]
-use wasmtimer::{std::Instant, tokio::sleep_until};
+use wasmtimer::{
+    std::Instant,
+    tokio::{interval, sleep_until},
+};
 
 #[cfg(not(target_arch = "wasm32"))]
-use {std::time::Instant, tokio::time::sleep_until};
+use {
+    std::time::Instant,
+    tokio::time::{interval, sleep_until},
+};
 
 /// Errors which may occur when watching a pending transaction.
 #[derive(Debug, thiserror::Error)]
@@ -215,7 +221,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
 
         // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
         // block the tx was mined in
-        let mut interval = tokio::time::interval(self.provider.client().poll_interval());
+        let mut interval = interval(self.provider.client().poll_interval());
 
         loop {
             let mut confirmed = false;
