@@ -65,6 +65,22 @@ impl<T> Recovered<T> {
         Self { tx, signer }
     }
 
+    /// Converts the transaction type to the given alternative that is `From<T>`
+    pub fn convert_transaction<Tx>(self) -> Recovered<Tx>
+    where
+        Tx: From<T>,
+    {
+        self.map_transaction(Tx::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<T>`
+    pub fn try_convert_transaction<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
+    where
+        Tx: TryFrom<T>,
+    {
+        self.try_map_transaction(Tx::try_from)
+    }
+
     /// Applies the given closure to the inner transaction type.
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.tx), self.signer)
