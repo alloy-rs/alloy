@@ -13,7 +13,7 @@ use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
-use alloy_network_primitives::{BlockResponse, ReceiptResponse};
+use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -297,8 +297,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
-                self.get_block_by_number(BlockNumberOrTag::Latest)
-                    .full()
+                self.get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Full)
                     .await?
                     .ok_or(RpcError::NullResp)?
                     .header()
@@ -351,18 +350,30 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by either its hash, tag, or number
-    fn get_block(&self, block: BlockId) -> EthGetBlock<N> {
-        EthGetBlock::by_block(self.weak_client(), block)
+    async fn get_block(
+        &self,
+        block: BlockId,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<N::BlockResponse>> {
+        EthGetBlock::<N>::by_block(self.weak_client(), block).with_kind(kind).await
     }
 
     /// Gets a block by its [BlockHash]
-    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N> {
-        EthGetBlock::by_hash(self.weak_client(), hash)
+    async fn get_block_by_hash(
+        &self,
+        hash: BlockHash,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<N::BlockResponse>> {
+        EthGetBlock::<N>::by_hash(self.weak_client(), hash).with_kind(kind).await
     }
 
     /// Gets a block by its [BlockNumberOrTag]
-    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N> {
-        EthGetBlock::by_number(self.weak_client(), number)
+    async fn get_block_by_number(
+        &self,
+        number: BlockNumberOrTag,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<N::BlockResponse>> {
+        EthGetBlock::<N>::by_number(self.weak_client(), number).with_kind(kind).await
     }
 
     /// Returns the number of transactions in a block from a block matching the given block hash.
@@ -1550,9 +1561,11 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         let hash = block.header.hash;
-        let block = provider.get_block_by_hash(hash).full().await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.hash, hash);
     }
 
@@ -1561,7 +1574,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         let hash = block.header.hash;
         let block: Block = provider
             .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
@@ -1575,7 +1589,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1584,7 +1599,8 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1716,7 +1732,11 @@ mod tests {
     #[tokio::test]
     async fn gets_block_transaction_count_by_hash() {
         let provider = ProviderBuilder::new().on_anvil();
-        let block = provider.get_block(BlockId::latest()).await.unwrap().unwrap();
+        let block = provider
+            .get_block(BlockId::latest(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
         let hash = block.header.hash;
         let tx_count = provider.get_block_transaction_count_by_hash(hash).await.unwrap();
         assert!(tx_count.is_some());
@@ -1927,7 +1947,11 @@ mod tests {
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let block = provider.get_block_by_number(0.into()).await.unwrap().unwrap();
+        let block = provider
+            .get_block_by_number(0.into(), BlockTransactionsKind::Hashes)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(block.transactions.is_hashes());
     }
 

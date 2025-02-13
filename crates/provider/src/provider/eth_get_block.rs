@@ -5,11 +5,9 @@ use alloy_primitives::BlockHash;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use futures::FutureExt;
-use std::{future::Future, task::Poll};
+use std::{future::Future, marker::PhantomData, task::Poll};
 
 type BlockResult<N> = TransportResult<Option<N>>;
-type PreProcessing<N> = Box<dyn Fn(&EthGetBlockParams) -> BlockResult<N> + Send>;
-type PostProcessing<N> = Box<dyn Fn(&EthGetBlockParams, BlockResult<N>) -> BlockResult<N> + Send>;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum BlockIdParam {
@@ -42,7 +40,7 @@ impl From<BlockId> for BlockIdParam {
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 #[allow(unnameable_types)]
 #[derive(Clone, Debug)]
-pub struct EthGetBlockParams {
+struct EthGetBlockParams {
     block: BlockIdParam,
     kind: BlockTransactionsKind,
 }
@@ -69,7 +67,7 @@ impl EthGetBlockParams {
     }
 
     /// Return the transaction kind
-    pub fn kind(&self) -> BlockTransactionsKind {
+    fn kind(&self) -> BlockTransactionsKind {
         self.kind
     }
 }
@@ -90,13 +88,10 @@ where
     N: Network,
 {
     Preparing {
-        pre_processing: Option<PreProcessing<N::BlockResponse>>,
-        post_processing: Option<PostProcessing<N::BlockResponse>>,
         client: WeakClient,
         params: EthGetBlockParams,
     },
     Running {
-        post_processing: Option<PostProcessing<N::BlockResponse>>,
         fut: RpcCall<(BlockIdParam, bool), Option<N::BlockResponse>>,
         params: EthGetBlockParams,
     },
@@ -113,12 +108,10 @@ where
                 .debug_struct("Preparing")
                 .field("client", &client)
                 .field("params", &params)
-                .finish_non_exhaustive(),
-            Self::Running { fut, params, .. } => f
-                .debug_struct("Runinng")
-                .field("fut", &fut)
-                .field("params", &params)
-                .finish_non_exhaustive(),
+                .finish(),
+            Self::Running { fut, params, .. } => {
+                f.debug_struct("Runinng").field("fut", &fut).field("params", &params).finish()
+            }
             Self::Polling => f.debug_tuple("Polling").finish(),
         }
     }
@@ -142,18 +135,11 @@ where
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<BlockResult<N::BlockResponse>> {
-        let EthGetBlockFutInner::Preparing { pre_processing, post_processing, client, params } =
+        let EthGetBlockFutInner::Preparing { client, params } =
             std::mem::replace(&mut self.inner, EthGetBlockFutInner::<N>::Polling)
         else {
             unreachable!("bad state")
         };
-
-        if let Some(pre_processing) = pre_processing {
-            match pre_processing(&params) {
-                Ok(None) => {} // empty result, continue
-                result => return Poll::Ready(result),
-            }
-        }
 
         let method = match params.block {
             BlockIdParam::Hash(_) => "eth_getBlockByHash",
@@ -167,7 +153,7 @@ where
             client.upgrade().ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
         let fut = client.request::<_, Option<N::BlockResponse>>(method, (params.block, full));
 
-        self.inner = EthGetBlockFutInner::<N>::Running { post_processing, fut, params };
+        self.inner = EthGetBlockFutInner::<N>::Running { fut, params };
 
         self.poll_running(cx)
     }
@@ -176,13 +162,11 @@ where
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<BlockResult<N::BlockResponse>> {
-        let EthGetBlockFutInner::Running { ref mut post_processing, ref mut fut, ref params } =
-            self.inner
-        else {
+        let EthGetBlockFutInner::Running { ref mut fut, ref params } = self.inner else {
             unreachable!("bad state")
         };
 
-        let res = fut.poll_unpin(cx).map(|block| {
+        fut.poll_unpin(cx).map(|block| {
             block.map(|block| {
                 block.map(|mut block| {
                     if params.kind() == BlockTransactionsKind::Hashes {
@@ -193,14 +177,7 @@ where
                     block
                 })
             })
-        });
-
-        if let Some(post_processing) = post_processing {
-            if let Poll::Ready(res) = res {
-                return Poll::Ready(post_processing(params, res));
-            }
-        }
-        res
+        })
     }
 }
 
@@ -237,8 +214,7 @@ where
 {
     client: WeakClient,
     params: EthGetBlockParams,
-    pre_processing: Option<PreProcessing<N::BlockResponse>>,
-    post_processing: Option<PostProcessing<N::BlockResponse>>,
+    _pd: PhantomData<N>,
 }
 
 impl<N> EthGetBlock<N>
@@ -247,32 +223,17 @@ where
 {
     /// Create a new [`EthGetBlockBy`] with method set to `"eth_getBlockBy{Hash, Number}"`.
     pub fn by_block(client: WeakClient, block: BlockId) -> Self {
-        Self {
-            client,
-            params: EthGetBlockParams::with_block(block),
-            pre_processing: None,
-            post_processing: None,
-        }
+        Self { client, params: EthGetBlockParams::with_block(block), _pd: PhantomData }
     }
 
     /// Create a new [`EthGetBlockBy`] with method set to `"eth_getBlockByHash"`.
     pub fn by_hash(client: WeakClient, block: BlockHash) -> Self {
-        Self {
-            client,
-            params: EthGetBlockParams::with_hash(block),
-            pre_processing: None,
-            post_processing: None,
-        }
+        Self { client, params: EthGetBlockParams::with_hash(block), _pd: PhantomData }
     }
 
     /// Create a new [`EthGetBlockBy`] with method set to `"eth_getBlockByNumber"`.
     pub fn by_number(client: WeakClient, block: BlockNumberOrTag) -> Self {
-        Self {
-            client,
-            params: EthGetBlockParams::with_number(block),
-            pre_processing: None,
-            post_processing: None,
-        }
+        Self { client, params: EthGetBlockParams::with_number(block), _pd: PhantomData }
     }
 
     /// Set the transaction kind
@@ -284,21 +245,6 @@ where
     /// Set the `full:bool` argument in RPC calls
     pub const fn full(mut self) -> Self {
         self.params.set_full();
-        self
-    }
-
-    /// Add a logic that should be performed before performing the RPC call
-    pub fn with_pre_processing(mut self, pre_processing: PreProcessing<N::BlockResponse>) -> Self {
-        self.pre_processing = Some(pre_processing);
-        self
-    }
-
-    /// Add a logic that should be performed on the result of the the RPC call
-    pub fn with_post_processing(
-        mut self,
-        post_processing: PostProcessing<N::BlockResponse>,
-    ) -> Self {
-        self.post_processing = Some(post_processing);
         self
     }
 }
@@ -313,12 +259,7 @@ where
 
     fn into_future(self) -> Self::IntoFuture {
         EthGetBlockFut {
-            inner: EthGetBlockFutInner::Preparing {
-                pre_processing: None,
-                post_processing: None,
-                client: self.client,
-                params: self.params,
-            },
+            inner: EthGetBlockFutInner::Preparing { client: self.client, params: self.params },
         }
     }
 }
@@ -331,6 +272,6 @@ where
         f.debug_struct("EthGetBlock")
             .field("client", &self.client)
             .field("params", &self.params)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
