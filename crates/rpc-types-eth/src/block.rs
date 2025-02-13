@@ -125,6 +125,24 @@ impl<T, H> Block<T, H> {
         })
     }
 
+    /// Converts the block's transaction type to the given alternative that is `From<T>`
+    pub fn convert_transactions<U>(self) -> Block<U, H>
+    where
+        U: From<T>,
+    {
+        self.map_transactions(U::from)
+    }
+
+    /// Converts the block's transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the block with the new transaction type if all conversions were successful.
+    pub fn try_convert_transactions<U>(self) -> Result<Block<U, H>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map_transactions(U::try_from)
+    }
+
     /// Converts the block's transaction type by applying a function to each transaction.
     ///
     /// Returns the block with the new transaction type.
@@ -139,7 +157,8 @@ impl<T, H> Block<T, H> {
 
     /// Converts the block's transaction type by applying a fallible function to each transaction.
     ///
-    /// Returns the block with the new transaction type if all transactions were successfully.
+    /// Returns the block with the new transaction type if all transactions were mapped
+    /// successfully.
     pub fn try_map_transactions<U, E>(
         self,
         f: impl FnMut(T) -> Result<U, E>,
