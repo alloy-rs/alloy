@@ -118,7 +118,6 @@ where
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "ssz", derive(ssz::Encode, ssz::Decode))]
 pub struct HeapBlob(Bytes);
 
 impl HeapBlob {
