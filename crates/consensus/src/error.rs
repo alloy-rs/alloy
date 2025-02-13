@@ -18,6 +18,19 @@ impl<T> ValueError<T> {
         Self { msg: msg.to_string(), value }
     }
 
+    /// Converts the value to the given alternative that is `From<T>`.
+    pub fn convert<U>(self) -> ValueError<U>
+    where
+        U: From<T>,
+    {
+        self.map(U::from)
+    }
+
+    /// Maps the error's value with the given closure.
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> ValueError<U> {
+        ValueError { msg: self.msg, value: f(self.value) }
+    }
+
     /// Consumes the type and returns the underlying value.
     pub fn into_value(self) -> T {
         self.value
