@@ -58,11 +58,11 @@ impl EthGetBlockParams {
         Self { block: BlockIdParam::Number(block), kind: BlockTransactionsKind::Hashes }
     }
 
-    const fn set_full(&mut self) {
+    fn set_full(&mut self) {
         self.kind = BlockTransactionsKind::Full;
     }
 
-    const fn set_kind(&mut self, kind: BlockTransactionsKind) {
+    fn set_kind(&mut self, kind: BlockTransactionsKind) {
         self.kind = kind;
     }
 
@@ -221,29 +221,29 @@ impl<N> EthGetBlock<N>
 where
     N: Network,
 {
-    /// Create a new [`EthGetBlockBy`] with method set to `"eth_getBlockBy{Hash, Number}"`.
+    /// Create a new [`EthGetBlock`] with method set to `"eth_getBlockBy{Hash, Number}"`.
     pub fn by_block(client: WeakClient, block: BlockId) -> Self {
         Self { client, params: EthGetBlockParams::with_block(block), _pd: PhantomData }
     }
 
-    /// Create a new [`EthGetBlockBy`] with method set to `"eth_getBlockByHash"`.
+    /// Create a new [`EthGetBlock`] with method set to `"eth_getBlockByHash"`.
     pub fn by_hash(client: WeakClient, block: BlockHash) -> Self {
         Self { client, params: EthGetBlockParams::with_hash(block), _pd: PhantomData }
     }
 
-    /// Create a new [`EthGetBlockBy`] with method set to `"eth_getBlockByNumber"`.
+    /// Create a new [`EthGetBlock`] with method set to `"eth_getBlockByNumber"`.
     pub fn by_number(client: WeakClient, block: BlockNumberOrTag) -> Self {
         Self { client, params: EthGetBlockParams::with_number(block), _pd: PhantomData }
     }
 
     /// Set the transaction kind
-    pub const fn with_kind(mut self, kind: BlockTransactionsKind) -> Self {
+    pub fn with_kind(mut self, kind: BlockTransactionsKind) -> Self {
         self.params.set_kind(kind);
         self
     }
 
     /// Set the `full:bool` argument in RPC calls
-    pub const fn full(mut self) -> Self {
+    pub fn full(mut self) -> Self {
         self.params.set_full();
         self
     }
