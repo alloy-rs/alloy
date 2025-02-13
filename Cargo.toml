@@ -35,7 +35,6 @@ alloy-consensus = { version = "0.11", path = "crates/consensus", default-feature
 alloy-consensus-any = { version = "0.11", path = "crates/consensus-any", default-features = false }
 alloy-contract = { version = "0.11", path = "crates/contract", default-features = false }
 alloy-eips = { version = "0.11", path = "crates/eips", default-features = false }
-alloy-eip7547 = { version = "0.11", path = "crates/eip7547", default-features = false }
 alloy-genesis = { version = "0.11", path = "crates/genesis", default-features = false }
 alloy-json-rpc = { version = "0.11", path = "crates/json-rpc", default-features = false }
 alloy-network = { version = "0.11", path = "crates/network", default-features = false }
@@ -66,7 +65,6 @@ alloy-transport = { version = "0.11", path = "crates/transport", default-feature
 alloy-transport-http = { version = "0.11", path = "crates/transport-http", default-features = false }
 alloy-transport-ipc = { version = "0.11", path = "crates/transport-ipc", default-features = false }
 alloy-transport-ws = { version = "0.11", path = "crates/transport-ws", default-features = false }
-alloy-eip5792 = { version = "0.11", path = "crates/eip5792", default-features = false }
 
 alloy-core = { version = "0.8.15", default-features = false }
 alloy-dyn-abi = { version = "0.8.15", default-features = false }
@@ -83,6 +81,8 @@ alloy-chains = { version = "0.1.18", default-features = false }
 alloy-eip2124 = { version = "0.1.0", default-features = false }
 alloy-eip2930 = { version = "0.1.0", default-features = false }
 alloy-eip7702 = { version = "0.5.0", default-features = false }
+alloy-eip7547 = { version = "0.11", default-features = false }
+alloy-eip5792 = { version = "0.11", default-features = false }
 
 # ethereum
 ethereum_ssz_derive = "0.8"
