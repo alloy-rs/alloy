@@ -6,10 +6,10 @@ pub use header::{BlockHeader, Header};
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
-use crate::Transaction;
+use crate::{transaction::SignerRecoverable, Transaction};
 use alloc::vec::Vec;
-use alloy_eips::{eip4895::Withdrawals, Typed2718};
-use alloy_primitives::B256;
+use alloy_eips::{eip4895::Withdrawals, Encodable2718, Typed2718};
+use alloy_primitives::{Address, Bytes, SignatureError, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -303,6 +303,182 @@ mod block_rlp {
             let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
+    }
+}
+
+/// Represents the structure of a block.
+pub trait BlockT<T: Transaction, H: BlockHeader> {
+    /// Returns reference to the block header.
+    fn header(&self) -> &H;
+    /// Consumes the block and returns the header.
+    fn into_header(self) -> H;
+    /// Returns reference to the block body.
+    fn body(&self) -> &BlockBody<T, H>;
+    /// Consumes the block and returns the body.
+    fn into_body(self) -> BlockBody<T, H>;
+}
+
+impl<T: Transaction, H: BlockHeader> BlockT<T, H> for Block<T, H> {
+    fn header(&self) -> &H {
+        &self.header
+    }
+
+    fn into_header(self) -> H {
+        self.header
+    }
+
+    fn body(&self) -> &BlockBody<T, H> {
+        &self.body
+    }
+
+    fn into_body(self) -> BlockBody<T, H> {
+        self.body
+    }
+}
+
+/// Represents the structure of a block body.
+pub trait BlockBodyT<T: Transaction + Encodable2718, H: BlockHeader + Encodable> {
+    /// Returns reference to transactions in the block.
+    fn transactions(&self) -> &[T];
+
+    /// Returns an iterator over the transactions in the block.
+    fn transactions_iter(&self) -> impl Iterator<Item = &T> {
+        self.transactions().iter()
+    }
+
+    /// Returns the number of the transactions in the block.
+    fn transaction_count(&self) -> usize {
+        self.transactions().len()
+    }
+
+    /// Consume the block body and return a [`Vec`] of transactions.
+    fn into_transactions(self) -> Vec<T>;
+
+    /// Returns `true` if the block body contains a transaction of the given type.
+    fn contains_transaction_type(&self, tx_type: u8) -> bool {
+        self.transactions_iter().any(|tx| tx.is_type(tx_type))
+    }
+
+    /// Calculate the transaction root for the block body.
+    fn calculate_tx_root(&self) -> B256 {
+        crate::proofs::calculate_transaction_root(self.transactions())
+    }
+
+    /// Returns block withdrawals if any.
+    fn withdrawals(&self) -> Option<&Withdrawals>;
+
+    /// Calculate the withdrawals root for the block body.
+    ///
+    /// Returns `None` if there are no withdrawals in the block.
+    fn calculate_withdrawals_root(&self) -> Option<B256> {
+        self.withdrawals()
+            .map(|withdrawals| crate::proofs::calculate_withdrawals_root(withdrawals.as_slice()))
+    }
+
+    /// Returns block ommers if any.
+    fn ommers(&self) -> Option<&[H]>;
+
+    /// Calculate the ommers root for the block body.
+    ///
+    /// Returns `None` if there are no ommers in the block.
+    fn calculate_ommers_root(&self) -> Option<B256> {
+        self.ommers().map(crate::proofs::calculate_ommers_root)
+    }
+
+    /// Calculates the total blob gas used by _all_ EIP-4844 transactions in the block.
+    fn blob_gas_used(&self) -> u64 {
+        self.transactions_iter().filter_map(|tx| tx.blob_gas_used()).sum()
+    }
+
+    /// Returns an iterator over all blob versioned hashes in the block body.
+    fn blob_versioned_hashes_iter<'a>(&'a self) -> impl Iterator<Item = &'a B256> + 'a
+    where
+        H: 'a,
+    {
+        self.transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+    }
+
+    /// Returns an iterator over the encoded 2718 transactions.
+    ///
+    /// This is also known as `raw transactions`.
+    ///
+    /// See also [`Encodable2718`].
+    #[doc(alias = "raw_transactions_iter")]
+    fn encoded_2718_transactions_iter<'a>(&'a self) -> impl Iterator<Item = Vec<u8>> + 'a
+    where
+        H: 'a,
+    {
+        self.transactions_iter().map(|tx| tx.encoded_2718())
+    }
+
+    /// Returns a vector of encoded 2718 transactions.
+    ///
+    /// This is also known as `raw transactions`.
+    ///
+    /// See also [`Encodable2718`].
+    #[doc(alias = "raw_transactions")]
+    fn encoded_2718_transactions(&self) -> Vec<Bytes> {
+        self.encoded_2718_transactions_iter().map(Into::into).collect()
+    }
+
+    /// Recover signer addresses for all transactions in the block body.
+    fn recover_signers(&self) -> Result<Vec<Address>, SignatureError>
+    where
+        T: SignerRecoverable,
+    {
+        self.transactions_iter().map(|tx| tx.recover_signer()).collect()
+    }
+
+    /// Recover signer addresses for all transactions in the block body.
+    ///
+    /// Returns an error if some transaction's signature is invalid.
+    fn try_recover_signers(&self) -> Result<Vec<Address>, SignatureError>
+    where
+        T: SignerRecoverable,
+    {
+        self.recover_signers()
+    }
+
+    /// Recover signer addresses for all transactions in the block body _without ensuring that the
+    /// signature has a low `s` value_.
+    ///
+    /// Returns `None`, if some transaction's signature is invalid.
+    fn recover_signers_unchecked(&self) -> Result<Vec<Address>, SignatureError>
+    where
+        T: SignerRecoverable,
+    {
+        self.transactions_iter().map(|tx| tx.recover_signer_unchecked()).collect()
+    }
+
+    /// Recover signer addresses for all transactions in the block body _without ensuring that the
+    /// signature has a low `s` value_.
+    ///
+    /// Returns an error if some transaction's signature is invalid.
+    fn try_recover_signers_unchecked(&self) -> Result<Vec<Address>, SignatureError>
+    where
+        T: SignerRecoverable,
+    {
+        self.recover_signers_unchecked()
+    }
+}
+
+impl<T: Transaction + Encodable2718, H: BlockHeader + Encodable> BlockBodyT<T, H>
+    for BlockBody<T, H>
+{
+    fn transactions(&self) -> &[T] {
+        &self.transactions
+    }
+
+    fn into_transactions(self) -> Vec<T> {
+        self.transactions
+    }
+
+    fn ommers(&self) -> Option<&[H]> {
+        Some(&self.ommers)
+    }
+
+    fn withdrawals(&self) -> Option<&Withdrawals> {
+        self.withdrawals.as_ref()
     }
 }
 
