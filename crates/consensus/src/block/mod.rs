@@ -306,72 +306,15 @@ mod block_rlp {
     }
 }
 
-/// Represents the structure of a block.
+/// Minimal block type.
 pub trait BlockT<T, H> {
-    /// Instantiates a new block with the given header and body.
-    fn new(header: H, body: BlockBody<T, H>) -> Self;
-    /// Returns reference to the block header.
-    fn header(&self) -> &H;
-    /// Consumes the block and returns the header.
-    fn into_header(self) -> H;
-    /// Returns reference to the block body.
-    fn body(&self) -> &BlockBody<T, H>;
-    /// Consumes the block and returns the body.
-    fn into_body(self) -> BlockBody<T, H>;
+    /// Returns reference to withdrawals in the block if present
+    fn withdrawals(&self) -> Option<&Withdrawals>;
 }
 
 impl<T, H> BlockT<T, H> for Block<T, H> {
-    fn new(header: H, body: BlockBody<T, H>) -> Self {
-        Self::new(header, body)
-    }
-
-    fn header(&self) -> &H {
-        &self.header
-    }
-
-    fn into_header(self) -> H {
-        self.header
-    }
-
-    fn body(&self) -> &BlockBody<T, H> {
-        &self.body
-    }
-
-    fn into_body(self) -> BlockBody<T, H> {
-        self.body
-    }
-}
-
-/// Represents the structure of a block body.
-pub trait BlockBodyT<T, H> {
-    /// Returns reference to transactions in the block.
-    fn transactions(&self) -> &[T];
-
-    /// Consume the block body and return a [`Vec`] of transactions.
-    fn into_transactions(self) -> Vec<T>;
-
-    /// Returns block withdrawals if any.
-    fn withdrawals(&self) -> Option<&Withdrawals>;
-
-    /// Returns block ommers if any.
-    fn ommers(&self) -> Option<&[H]>;
-}
-
-impl<T, H> BlockBodyT<T, H> for BlockBody<T, H> {
-    fn transactions(&self) -> &[T] {
-        &self.transactions
-    }
-
-    fn into_transactions(self) -> Vec<T> {
-        self.transactions
-    }
-
-    fn ommers(&self) -> Option<&[H]> {
-        Some(&self.ommers)
-    }
-
     fn withdrawals(&self) -> Option<&Withdrawals> {
-        self.withdrawals.as_ref()
+        self.body.withdrawals.as_ref()
     }
 }
 
