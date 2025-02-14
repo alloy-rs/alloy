@@ -2,8 +2,10 @@
 //! protocol.
 
 use crate::{
+    error::ValueError,
     transaction::{RlpEcdsaTx, TxEip1559, TxEip2930, TxEip4844, TxLegacy},
-    SignableTransaction, Signed, Transaction, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxType,
+    SignableTransaction, Signed, Transaction, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702,
+    TxEnvelope, TxType,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
@@ -239,6 +241,31 @@ impl From<Signed<TxEip4844WithSidecar>> for PooledTransaction {
     fn from(v: Signed<TxEip4844WithSidecar>) -> Self {
         let (tx, signature, hash) = v.into_parts();
         Self::Eip4844(Signed::new_unchecked(tx, signature, hash))
+    }
+}
+
+impl TryFrom<Signed<TxEip4844Variant>> for PooledTransaction {
+    type Error = ValueError<Signed<TxEip4844Variant>>;
+
+    fn try_from(value: Signed<TxEip4844Variant>) -> Result<Self, Self::Error> {
+        let (value, signature, hash) = value.into_parts();
+        match value {
+            tx @ TxEip4844Variant::TxEip4844(_) => Err(ValueError::new(
+                Signed::new_unchecked(tx, signature, hash),
+                "pooled transaction requires 4844 sidecar",
+            )),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+                Ok(Signed::new_unchecked(tx, signature, hash).into())
+            }
+        }
+    }
+}
+
+impl TryFrom<TxEnvelope> for PooledTransaction {
+    type Error = ValueError<TxEnvelope>;
+
+    fn try_from(value: TxEnvelope) -> Result<Self, Self::Error> {
+        value.try_into_pooled()
     }
 }
 
