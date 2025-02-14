@@ -3,6 +3,9 @@
 mod header;
 pub use header::{BlockHeader, Header};
 
+mod traits;
+pub use traits::BlockT;
+
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
@@ -303,18 +306,6 @@ mod block_rlp {
             let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
-    }
-}
-
-/// Minimal block type.
-pub trait BlockT<T, H> {
-    /// Returns reference to withdrawals in the block if present
-    fn withdrawals(&self) -> Option<&Withdrawals>;
-}
-
-impl<T, H> BlockT<T, H> for Block<T, H> {
-    fn withdrawals(&self) -> Option<&Withdrawals> {
-        self.body.withdrawals.as_ref()
     }
 }
 
