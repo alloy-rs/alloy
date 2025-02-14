@@ -1,6 +1,7 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::Selector;
+use alloy_primitives::{Bytes, Selector};
 use alloy_provider::PendingTransactionError;
+use alloy_sol_types::SolInterface;
 use alloy_transport::TransportError;
 use thiserror::Error;
 
@@ -51,5 +52,19 @@ impl Error {
             return Self::ZeroData(name.to_string(), error);
         }
         Self::AbiError(error)
+    }
+
+    /// Return the revert data in case the call reverted.
+    pub fn as_revert_data(&self) -> Option<Bytes> {
+        if let Self::TransportError(e) = self {
+            return e.as_error_resp().and_then(|e| e.as_revert_data());
+        }
+
+        None
+    }
+
+    /// Decode revert data into a typed [`SolError`](alloy_sol_types::SolError).
+    pub fn as_decoded_revert<E: SolInterface>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
     }
 }
