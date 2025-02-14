@@ -308,6 +308,8 @@ mod block_rlp {
 
 /// Represents the structure of a block.
 pub trait BlockT<T: Transaction, H: BlockHeader> {
+    /// Instantiates a new block with the given header and body.
+    fn new(header: H, body: BlockBody<T, H>) -> Self;
     /// Returns reference to the block header.
     fn header(&self) -> &H;
     /// Consumes the block and returns the header.
@@ -316,9 +318,36 @@ pub trait BlockT<T: Transaction, H: BlockHeader> {
     fn body(&self) -> &BlockBody<T, H>;
     /// Consumes the block and returns the body.
     fn into_body(self) -> BlockBody<T, H>;
+
+    /// Splits the block into references of its header and body.
+    fn split_ref(&self) -> (&H, &BlockBody<T, H>) {
+        (self.header(), self.body())
+    }
+
+    /// Returns the rlp length of the block.
+    fn rlp_length(&self) -> usize
+    where
+        T: Encodable,
+        H: Encodable,
+    {
+        Block::<T, H>::rlp_length_for(self.header(), self.body())
+    }
+
+    /// Expensive operation that recovers transaction signers.
+    fn recover_signers(&self) -> Result<Vec<Address>, SignatureError>
+    where
+        T: SignerRecoverable + Encodable2718,
+        H: Encodable,
+    {
+        self.body().recover_signers()
+    }
 }
 
 impl<T: Transaction, H: BlockHeader> BlockT<T, H> for Block<T, H> {
+    fn new(header: H, body: BlockBody<T, H>) -> Self {
+        Self::new(header, body)
+    }
+
     fn header(&self) -> &H {
         &self.header
     }
