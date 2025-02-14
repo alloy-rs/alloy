@@ -388,6 +388,16 @@ pub trait BlockBodyT<T: Transaction + Encodable2718, H: BlockHeader + Encodable>
         self.transactions_iter().any(|tx| tx.is_type(tx_type))
     }
 
+    /// Clones the transactions in the block.
+    ///
+    /// This is a convenience function for `transactions().to_vec()`
+    fn clone_transactions(&self) -> Vec<T>
+    where
+        T: Clone,
+    {
+        self.transactions().to_vec()
+    }
+
     /// Calculate the transaction root for the block body.
     fn calculate_tx_root(&self) -> B256 {
         crate::proofs::calculate_transaction_root(self.transactions())
