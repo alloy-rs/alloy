@@ -113,6 +113,57 @@ impl AccountOverride {
     pub fn set_move_precompile_to(&mut self, address: Address) {
         self.move_precompile_to = Some(address);
     }
+
+    /// Conditionally sets the bytecode override and returns self.
+    pub fn with_code_opt(mut self, code: Option<impl Into<Bytes>>) -> Self {
+        if let Some(code) = code {
+            self.code = Some(code.into());
+        }
+        self
+    }
+
+    /// Conditionally sets the state overrides and returns self.
+    pub fn with_state_opt(mut self, state: Option<impl IntoIterator<Item = (B256, B256)>>) -> Self {
+        if let Some(state) = state {
+            self.state = Some(state.into_iter().collect());
+        }
+        self
+    }
+
+    /// Conditionally sets the state diffs and returns self.
+    pub fn with_state_diff_opt(
+        mut self,
+        state_diff: Option<impl IntoIterator<Item = (B256, B256)>>,
+    ) -> Self {
+        if let Some(state_diff) = state_diff {
+            self.state_diff = Some(state_diff.into_iter().collect());
+        }
+        self
+    }
+
+    /// Conditionally sets the balance override and returns self.
+    pub fn with_balance_opt(mut self, balance: Option<U256>) -> Self {
+        if let Some(balance) = balance {
+            self.balance = Some(balance);
+        }
+        self
+    }
+
+    /// Conditionally sets the nonce override and returns self.
+    pub fn with_nonce_opt(mut self, nonce: Option<u64>) -> Self {
+        if let Some(nonce) = nonce {
+            self.nonce = Some(nonce);
+        }
+        self
+    }
+
+    /// Conditionally sets the move precompile address and returns self.
+    pub fn with_move_precompile_to_opt(mut self, address: Option<Address>) -> Self {
+        if let Some(address) = address {
+            self.move_precompile_to = Some(address);
+        }
+        self
+    }
 }
 
 /// Helper type that bundles various overrides for EVM Execution.
