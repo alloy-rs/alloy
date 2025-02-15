@@ -18,7 +18,7 @@ pub use alloy_trie::TrieAccount;
 pub use alloy_trie::TrieAccount as Account;
 
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, BlockT, Header};
+pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
