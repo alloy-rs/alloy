@@ -161,9 +161,9 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Returns the first 4bytes of the calldata for a function call.
     ///
     /// The selector specifies the function to be called.
-    fn function_selector(&self) -> Option<Selector> {
+    fn function_selector(&self) -> Option<&Selector> {
         if self.kind().is_call() {
-            self.input().get(..4).map(Selector::from_slice)
+            self.input().get(..4).and_then(|s| TryFrom::try_from(s).ok())
         } else {
             None
         }
