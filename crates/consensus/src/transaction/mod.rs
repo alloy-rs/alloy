@@ -3,7 +3,7 @@
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxKind, B256, U256};
 use core::{any, fmt};
 
 mod eip1559;
@@ -157,6 +157,17 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
 
     /// Get `data`.
     fn input(&self) -> &Bytes;
+
+    /// Returns the first 4bytes of the calldata for a function call.
+    ///
+    /// The selector specifies the function to be called.
+    fn function_selector(&self) -> Option<Selector> {
+        if self.kind().is_call() {
+            self.input().get(..4).map(Selector::from_slice)
+        } else {
+            None
+        }
+    }
 
     /// Returns the EIP-2930 `access_list` for the particular transaction type. Returns `None` for
     /// older transaction types.
