@@ -13,6 +13,7 @@ use alloy_network_primitives::BlockResponse;
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
 use alloy_rpc_types_eth::{Block, BlockTransactions, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
+use derive_more::From;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -72,7 +73,7 @@ impl Network for AnyNetwork {
 }
 
 /// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, From, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AnyRpcBlock(
     WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
 );
@@ -132,7 +133,7 @@ impl DerefMut for AnyRpcBlock {
 }
 
 /// A wrapper for [`AnyRpcTransaction`] that allows for handling unknown transaction types.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, From, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AnyRpcTransaction(WithOtherFields<Transaction<AnyTxEnvelope>>);
 
 impl AnyRpcTransaction {
