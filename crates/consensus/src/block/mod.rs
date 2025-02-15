@@ -3,6 +3,9 @@
 mod header;
 pub use header::{BlockHeader, Header};
 
+mod traits;
+pub use traits::EthBlock;
+
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
@@ -61,6 +64,24 @@ impl<T, H> Block<T, H> {
         mut f: impl FnMut(H) -> Result<U, E>,
     ) -> Result<Block<T, U>, E> {
         Ok(Block { header: f(self.header)?, body: self.body.try_map_ommers(f)? })
+    }
+
+    /// Converts the block's transaction type to the given alternative that is `From<T>`
+    pub fn convert_transactions<U>(self) -> Block<U, H>
+    where
+        U: From<T>,
+    {
+        self.map_transactions(U::from)
+    }
+
+    /// Converts the block's transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the block with the new transaction type if all conversions were successful.
+    pub fn try_convert_transactions<U>(self) -> Result<Block<U, H>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map_transactions(U::try_from)
     }
 
     /// Converts the block's transaction type by applying a function to each transaction.
@@ -307,5 +328,17 @@ where
             .collect::<arbitrary::Result<Vec<_>>>()?;
 
         Ok(Self { transactions, ommers, withdrawals: u.arbitrary()? })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Signed, TxEnvelope, TxLegacy};
+
+    #[test]
+    fn can_convert_block() {
+        let block: Block<Signed<TxLegacy>> = Block::default();
+        let _: Block<TxEnvelope> = block.convert_transactions();
     }
 }

@@ -1,7 +1,8 @@
 use crate::{
+    error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaTx,
+        PooledTransaction, RlpEcdsaTx,
     },
     Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
@@ -253,6 +254,20 @@ impl TxEnvelope {
     #[inline]
     pub const fn is_eip7702(&self) -> bool {
         matches!(self, Self::Eip7702(_))
+    }
+
+    /// Attempts to convert the envelope into the pooled variant.
+    ///
+    /// Returns an error if the envelope's variant is incompatible with the pooled format:
+    /// [`TxEip4844`] without the sidecar.
+    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+        match self {
+            Self::Legacy(tx) => Ok(tx.into()),
+            Self::Eip2930(tx) => Ok(tx.into()),
+            Self::Eip1559(tx) => Ok(tx.into()),
+            Self::Eip4844(tx) => PooledTransaction::try_from(tx).map_err(ValueError::convert),
+            Self::Eip7702(tx) => Ok(tx.into()),
+        }
     }
 
     /// Returns true if the transaction is replay protected.

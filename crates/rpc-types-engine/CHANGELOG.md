@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1](https://github.com/alloy-rs/alloy/releases/tag/v0.11.1) - 2025-02-12
+
+### Features
+
+- Test faulty roundtrip behavior of `ExecutionPayload` ([#2014](https://github.com/alloy-rs/alloy/issues/2014))
+- Add additional payloadbody conversion fn ([#1989](https://github.com/alloy-rs/alloy/issues/1989))
+- Add default for blobsbundle ([#1990](https://github.com/alloy-rs/alloy/issues/1990))
+- Add helpers to consume payloadfields ([#1984](https://github.com/alloy-rs/alloy/issues/1984))
+
+### Miscellaneous Tasks
+
+- Relax payload conversions with BlockHeader ([#1981](https://github.com/alloy-rs/alloy/issues/1981))
+
+### Other
+
+- Custom deserde impl ([#2017](https://github.com/alloy-rs/alloy/issues/2017))
+- Upstream ExecutionData from reth ([#2003](https://github.com/alloy-rs/alloy/issues/2003))
+
+### Testing
+
+- Add payload block conversion tests ([#1988](https://github.com/alloy-rs/alloy/issues/1988))
+
 ## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Documentation
@@ -20,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.11.0
 - Release 0.10.0
 - Shift std::error impls to core ([#1888](https://github.com/alloy-rs/alloy/issues/1888))
 

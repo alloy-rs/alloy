@@ -4,6 +4,7 @@ use alloy_primitives::{
 };
 use async_trait::async_trait;
 use auto_impl::auto_impl;
+pub use either::Either;
 
 #[cfg(feature = "eip712")]
 use alloy_dyn_abi::eip712::TypedData;
@@ -132,6 +133,64 @@ pub trait SignerSync<Sig = Signature> {
 
     /// Returns the signer's chain ID.
     fn chain_id_sync(&self) -> Option<ChainId>;
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
+impl<A, B, Sig> Signer<Sig> for Either<A, B>
+where
+    A: Signer<Sig> + Send + Sync,
+    B: Signer<Sig> + Send + Sync,
+    Sig: Send,
+{
+    async fn sign_hash(&self, hash: &B256) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_hash(hash).await,
+            Self::Right(signer) => signer.sign_hash(hash).await,
+        }
+    }
+
+    fn address(&self) -> Address {
+        match self {
+            Self::Left(signer) => signer.address(),
+            Self::Right(signer) => signer.address(),
+        }
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        match self {
+            Self::Left(signer) => signer.chain_id(),
+            Self::Right(signer) => signer.chain_id(),
+        }
+    }
+
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
+        match self {
+            Self::Left(signer) => signer.set_chain_id(chain_id),
+            Self::Right(signer) => signer.set_chain_id(chain_id),
+        }
+    }
+}
+
+impl<A, B, Sig> SignerSync<Sig> for Either<A, B>
+where
+    A: SignerSync<Sig>,
+    B: SignerSync<Sig>,
+{
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Sig> {
+        match self {
+            Self::Left(signer) => signer.sign_hash_sync(hash),
+            Self::Right(signer) => signer.sign_hash_sync(hash),
+        }
+    }
+
+    fn chain_id_sync(&self) -> Option<ChainId> {
+        match self {
+            Self::Left(signer) => signer.chain_id_sync(),
+            Self::Right(signer) => signer.chain_id_sync(),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -223,11 +223,27 @@ impl AnyTxEnvelope {
         }
     }
 
+    /// Returns the inner [`UnknownTxEnvelope`] if it is an unknown variant.
+    pub const fn as_unknown(&self) -> Option<&UnknownTxEnvelope> {
+        match self {
+            Self::Unknown(inner) => Some(inner),
+            Self::Ethereum(_) => None,
+        }
+    }
+
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     /// If the transaction is not an Ethereum transaction, it is returned as an error.
     pub fn try_into_envelope(self) -> Result<TxEnvelope, Self> {
         match self {
             Self::Ethereum(inner) => Ok(inner),
+            this => Err(this),
+        }
+    }
+    /// Returns the inner [`UnknownTxEnvelope`], if it is an unknown transaction.
+    /// If the transaction is not an unknown transaction, it is returned as an error.
+    pub fn try_into_unknown(self) -> Result<UnknownTxEnvelope, Self> {
+        match self {
+            Self::Unknown(inner) => Ok(inner),
             this => Err(this),
         }
     }

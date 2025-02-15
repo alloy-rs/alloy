@@ -307,6 +307,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         f(self)
     }
 
+    /// Apply a fallible function to the builder, returning the modified builder or an error.
+    fn try_apply<F, E>(self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self) -> Result<Self, E>,
+    {
+        f(self)
+    }
+
     /// True if the builder contains all necessary information to be submitted
     /// to the `eth_sendTransaction` endpoint.
     fn can_submit(&self) -> bool;

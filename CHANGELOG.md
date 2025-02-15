@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1](https://github.com/alloy-rs/alloy/releases/tag/v0.11.1) - 2025-02-12
+
+### Bug Fixes
+
+- Make `ChainLayer` network agnostic ([#2045](https://github.com/alloy-rs/alloy/issues/2045))
+- [`multicall`] Impl Error for `Failure` +  clear returns `Empty` builder. ([#2043](https://github.com/alloy-rs/alloy/issues/2043))
+- Don't validate when ABI decoding ([#2041](https://github.com/alloy-rs/alloy/issues/2041))
+- Overflow on CU offset ([#1998](https://github.com/alloy-rs/alloy/issues/1998))
+- [docs] Update outdated Provider doc comment ([#1991](https://github.com/alloy-rs/alloy/issues/1991))
+- Opt-in to keep stdout ([#1985](https://github.com/alloy-rs/alloy/issues/1985))
+
+### Documentation
+
+- Clean up top level docs ([#2028](https://github.com/alloy-rs/alloy/issues/2028))
+
+### Features
+
+- Add TxSigner support for Either ([#2036](https://github.com/alloy-rs/alloy/issues/2036))
+- [`provider`] Multicall ([#2010](https://github.com/alloy-rs/alloy/issues/2010))
+- Add try_get_deserialized ([#2042](https://github.com/alloy-rs/alloy/issues/2042))
+- Add helpers for account overrides ([#2040](https://github.com/alloy-rs/alloy/issues/2040))
+- Add builder style account override helpers ([#2039](https://github.com/alloy-rs/alloy/issues/2039))
+- [filler] Add prepare_call method ([#2011](https://github.com/alloy-rs/alloy/issues/2011))
+- [provider] DynProvider added as a helper on provider ([#2008](https://github.com/alloy-rs/alloy/issues/2008))
+- [provider] Expose inner `AnvilInstance` from `AnvilProvider` ([#2037](https://github.com/alloy-rs/alloy/issues/2037))
+- Add dynamic dispatch helper trait for (`Signer` +`TxSigner`) and (`SignerSync` + `TxSignerSync`) ([#2035](https://github.com/alloy-rs/alloy/issues/2035))
+- Builder fns for PrivateTransactionRequest and inner props ([#1954](https://github.com/alloy-rs/alloy/issues/1954)) ([#2023](https://github.com/alloy-rs/alloy/issues/2023))
+- Test faulty roundtrip behavior of `ExecutionPayload` ([#2014](https://github.com/alloy-rs/alloy/issues/2014))
+- Add helpers for the blob gas ([#2009](https://github.com/alloy-rs/alloy/issues/2009))
+- Add Block::apply ([#2006](https://github.com/alloy-rs/alloy/issues/2006))
+- Add auth count helper fn ([#2007](https://github.com/alloy-rs/alloy/issues/2007))
+- Add blob_count helper fn ([#2005](https://github.com/alloy-rs/alloy/issues/2005))
+- [transport] Made avg_cost to be configurable in retrybackoff ([#2002](https://github.com/alloy-rs/alloy/issues/2002))
+- Add helper fn to unwrap Sendable ([#2001](https://github.com/alloy-rs/alloy/issues/2001))
+- Add additional payloadbody conversion fn ([#1989](https://github.com/alloy-rs/alloy/issues/1989))
+- [`node-bindings`] Expose anvil wallet ([#1994](https://github.com/alloy-rs/alloy/issues/1994))
+- [`meta`] Enable pubsub,trace,txpool,debug,anvil apis via `full` ([#1992](https://github.com/alloy-rs/alloy/issues/1992))
+- Add default for blobsbundle ([#1990](https://github.com/alloy-rs/alloy/issues/1990))
+- Add helpers to consume payloadfields ([#1984](https://github.com/alloy-rs/alloy/issues/1984))
+
+### Miscellaneous Tasks
+
+- Re-export kzgsettings ([#2034](https://github.com/alloy-rs/alloy/issues/2034))
+- Silence unused warnings ([#2031](https://github.com/alloy-rs/alloy/issues/2031))
+- [serde] Remove quantity_bool ([#2026](https://github.com/alloy-rs/alloy/issues/2026))
+- Nicer error message when HTTP body is empty ([#2024](https://github.com/alloy-rs/alloy/issues/2024))
+- Camelcase serde ([#2018](https://github.com/alloy-rs/alloy/issues/2018))
+- Enable serde in tests ([#2013](https://github.com/alloy-rs/alloy/issues/2013))
+- Add serde support for Eip1559Estimation ([#2012](https://github.com/alloy-rs/alloy/issues/2012))
+- [provider] Default to `Ethereum` network in `FillProvider` ([#1995](https://github.com/alloy-rs/alloy/issues/1995))
+- Relax payload conversions with BlockHeader ([#1981](https://github.com/alloy-rs/alloy/issues/1981))
+- Update readme ([#1980](https://github.com/alloy-rs/alloy/issues/1980))
+
+### Other
+
+- Custom deserde impl ([#2017](https://github.com/alloy-rs/alloy/issues/2017))
+- Upstream ExecutionData from reth ([#2003](https://github.com/alloy-rs/alloy/issues/2003))
+- Increase default gas limit from 30M to 36M ([#1785](https://github.com/alloy-rs/alloy/issues/1785))
+
+### Testing
+
+- Add payload block conversion tests ([#1988](https://github.com/alloy-rs/alloy/issues/1988))
+
 ## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Bug Fixes
@@ -62,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.11.0
 - Disable anvil nightly warning ([#1979](https://github.com/alloy-rs/alloy/issues/1979))
 - Remove Service impls for &T ([#1973](https://github.com/alloy-rs/alloy/issues/1973))
 - Update system contract addresses for devnet 6 ([#1975](https://github.com/alloy-rs/alloy/issues/1975))

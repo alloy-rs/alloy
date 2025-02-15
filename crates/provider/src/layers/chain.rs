@@ -1,5 +1,5 @@
 use alloy_chains::NamedChain;
-use alloy_network::Ethereum;
+use alloy_network::Network;
 use std::time::Duration;
 
 use crate::{Provider, ProviderLayer};
@@ -24,9 +24,10 @@ impl From<NamedChain> for ChainLayer {
     }
 }
 
-impl<P> ProviderLayer<P, Ethereum> for ChainLayer
+impl<P, N> ProviderLayer<P, N> for ChainLayer
 where
-    P: Provider,
+    P: Provider<N>,
+    N: Network,
 {
     type Provider = P;
 

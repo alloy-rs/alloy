@@ -1,13 +1,15 @@
 use std::{future::IntoFuture, marker::PhantomData};
 
+use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt};
 use alloy_json_abi::Function;
 use alloy_network::Network;
-use alloy_primitives::Bytes;
-use alloy_rpc_types_eth::{state::StateOverride, BlockId};
+use alloy_primitives::{Address, Bytes};
+use alloy_rpc_types_eth::{
+    state::{AccountOverride, StateOverride},
+    BlockId,
+};
 use alloy_sol_types::SolCall;
-
-use crate::{Error, Result};
 
 /// Raw coder.
 const RAW_CODER: () = ();
@@ -76,6 +78,28 @@ where
         self
     }
 
+    /// Appends a single [AccountOverride] to the state override.
+    ///
+    /// Creates a new [`StateOverride`] if none has been set yet.
+    pub fn account_override(
+        mut self,
+        address: Address,
+        account_overrides: AccountOverride,
+    ) -> Self {
+        self.inner = self.inner.account_override(address, account_overrides);
+        self
+    }
+    /// Extends the the given [AccountOverride] to the state override.
+    ///
+    /// Creates a new [`StateOverride`] if none has been set yet.
+    pub fn account_overrides(
+        mut self,
+        overrides: impl IntoIterator<Item = (Address, AccountOverride)>,
+    ) -> Self {
+        self.inner = self.inner.account_overrides(overrides);
+        self
+    }
+
     /// Set the block to use for this call.
     pub fn block(mut self, block: BlockId) -> Self {
         self.inner = self.inner.block(block);
@@ -135,7 +159,7 @@ where
         let pin = std::pin::pin!(&mut this.inner);
         match pin.poll(cx) {
             std::task::Poll::Ready(Ok(data)) => {
-                std::task::Poll::Ready(this.decoder.abi_decode_output(data, true))
+                std::task::Poll::Ready(this.decoder.abi_decode_output(data, false))
             }
             std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(e.into())),
             std::task::Poll::Pending => std::task::Poll::Pending,
