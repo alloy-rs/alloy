@@ -116,6 +116,7 @@ impl WsBackend<TungsteniteStream> {
     pub fn spawn(mut self) {
         let fut = async move {
             let mut errored = false;
+            let mut expecting_pong = false;
             let keepalive = sleep(Duration::from_secs(KEEPALIVE));
             tokio::pin!(keepalive);
             loop {
@@ -153,6 +154,13 @@ impl WsBackend<TungsteniteStream> {
                     // Send a ping to the server, if no other messages have been
                     // sent in the last 10 seconds.
                     _ = &mut keepalive => {
+                        // Still expecting a pong from the previous ping,
+                        // meaning connection is errored.
+                        if expecting_pong {
+                            error!("WS server missed a pong");
+                            errored = true;
+                            break
+                        }
                         // Reset the keepalive timer.
                         keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
                         if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
@@ -160,10 +168,16 @@ impl WsBackend<TungsteniteStream> {
                             errored = true;
                             break
                         }
+                        // Expecting to receive a pong before the next
+                        // keepalive timer resolves.
+                        expecting_pong = true;
                     }
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
+                                if item.is_pong() {
+                                    expecting_pong = false;
+                                }
                                 errored = self.handle(item).is_err();
                                 if errored { break }
                             },
