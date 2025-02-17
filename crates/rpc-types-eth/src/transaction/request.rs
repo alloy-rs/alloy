@@ -669,7 +669,7 @@ impl TransactionRequest {
     /// Build a [`TypedTransaction`]
     ///
     /// When `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_. Which
-    /// is to say, that it is signable, and the signed versino can be sent to the network.
+    /// is to say, that it is signable, and the signed version can be sent to the network.
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
         let Some(tx_type) = self.buildable_type() else {
             return Err(self);
