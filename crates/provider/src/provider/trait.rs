@@ -1407,10 +1407,7 @@ mod tests {
     #[cfg(feature = "ws")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in [
-            "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F",
-            "wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754",
-        ] {
+        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
             let _ = ProviderBuilder::<_, _, Ethereum>::default().on_builtin(url).await.unwrap();
         }
     }
@@ -1889,7 +1886,7 @@ mod tests {
         use alloy_network::TransactionBuilder;
         use alloy_sol_types::SolValue;
 
-        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let url = "https://reth-ethereum.ithaca.xyz/rpc";
         let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
@@ -1972,7 +1969,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper-tls")]
     async fn hyper_https() {
-        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let url = "https://reth-ethereum.ithaca.xyz/rpc";
 
         // With the `hyper` feature enabled .on_builtin builds the provider based on
         // `HyperTransport`.
