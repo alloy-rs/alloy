@@ -17,6 +17,8 @@ use alloy_primitives::{
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
+use super::TypedTransaction;
+
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].
 ///
@@ -222,6 +224,34 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 impl From<Signed<TxEip7702>> for TxEnvelope {
     fn from(v: Signed<TxEip7702>) -> Self {
         Self::Eip7702(v)
+    }
+}
+
+impl From<Signed<TypedTransaction>> for TxEnvelope {
+    fn from(v: Signed<TypedTransaction>) -> Self {
+        let (tx, sig, hash) = v.into_parts();
+        match tx {
+            TypedTransaction::Legacy(tx_legacy) => {
+                let tx = Signed::new_unchecked(tx_legacy, sig, hash);
+                Self::Legacy(tx)
+            }
+            TypedTransaction::Eip2930(tx_eip2930) => {
+                let tx = Signed::new_unchecked(tx_eip2930, sig, hash);
+                Self::Eip2930(tx)
+            }
+            TypedTransaction::Eip1559(tx_eip1559) => {
+                let tx = Signed::new_unchecked(tx_eip1559, sig, hash);
+                Self::Eip1559(tx)
+            }
+            TypedTransaction::Eip4844(tx_eip4844_variant) => {
+                let tx = Signed::new_unchecked(tx_eip4844_variant, sig, hash);
+                Self::Eip4844(tx)
+            }
+            TypedTransaction::Eip7702(tx_eip7702) => {
+                let tx = Signed::new_unchecked(tx_eip7702, sig, hash);
+                Self::Eip7702(tx)
+            }
+        }
     }
 }
 
