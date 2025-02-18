@@ -1,7 +1,7 @@
 use alloy_dyn_abi::Error as AbiError;
 use alloy_primitives::{Bytes, Selector};
 use alloy_provider::PendingTransactionError;
-use alloy_sol_types::SolInterface;
+use alloy_sol_types::{SolError, SolInterface};
 use alloy_transport::TransportError;
 use thiserror::Error;
 
@@ -63,8 +63,16 @@ impl Error {
         None
     }
 
-    /// Decode revert data into a typed [`SolError`](alloy_sol_types::SolError).
-    pub fn as_decoded_revert<E: SolInterface>(&self) -> Option<E> {
+    /// Attempts to decode the revert data into one of the custom errors in [`SolInterface`].
+    pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
         self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
+    }
+
+    /// Decode the revert data into the specified typed
+    /// [`SolError`].
+    pub fn as_decoded_error<E: SolError>(&self) -> core::result::Result<E, alloy_sol_types::Error> {
+        let data =
+            self.as_revert_data().ok_or(alloy_sol_types::Error::custom("no revert data found"))?;
+        E::abi_decode(&data, false)
     }
 }

@@ -1,5 +1,5 @@
 use alloy_primitives::Bytes;
-use alloy_sol_types::SolInterface;
+use alloy_sol_types::{SolError, SolInterface};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -349,9 +349,17 @@ where
         }
     }
 
-    /// Extracts revert data and tries decoding it into given custom errors set.
-    pub fn as_decoded_error<E: SolInterface>(&self, validate: bool) -> Option<E> {
+    /// Extracts revert data and tries decoding it into given custom errors set present in the
+    /// [`SolInterface`].
+    pub fn as_decoded_interface_error<E: SolInterface>(&self, validate: bool) -> Option<E> {
         self.as_revert_data().and_then(|data| E::abi_decode(&data, validate).ok())
+    }
+
+    /// Extracts revert data and tries decoding it into custom [`SolError`].
+    pub fn as_decoded_error<E: SolError>(&self) -> Result<E, alloy_sol_types::Error> {
+        let data =
+            self.as_revert_data().ok_or(alloy_sol_types::Error::custom("revert data not found"))?;
+        E::abi_decode(&data, false)
     }
 }
 
@@ -401,6 +409,7 @@ mod test {
     #[test]
     fn custom_error_decoding() {
         sol!(
+            #[derive(Debug, PartialEq, Eq)]
             library Errors {
                 error SomeCustomError(uint256 a);
             }
@@ -410,8 +419,12 @@ mod test {
         let payload: ErrorPayload = serde_json::from_str(json).unwrap();
 
         let Errors::ErrorsErrors::SomeCustomError(value) =
-            payload.as_decoded_error::<Errors::ErrorsErrors>(false).unwrap();
+            payload.as_decoded_interface_error::<Errors::ErrorsErrors>(false).unwrap();
 
         assert_eq!(value.a, U256::from(1));
+
+        let decoded_err = payload.as_decoded_error::<Errors::SomeCustomError>().unwrap();
+
+        assert_eq!(decoded_err, Errors::SomeCustomError { a: U256::from(1) });
     }
 }
