@@ -356,10 +356,8 @@ where
     }
 
     /// Extracts revert data and tries decoding it into custom [`SolError`].
-    pub fn as_decoded_error<E: SolError>(&self) -> Result<E, alloy_sol_types::Error> {
-        let data =
-            self.as_revert_data().ok_or(alloy_sol_types::Error::custom("revert data not found"))?;
-        E::abi_decode(&data, false)
+    pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
     }
 }
 
