@@ -251,7 +251,8 @@ pub trait DebugApi<N>: Send + Sync {
     ) -> TransportResult<ExecutionWitness>;
 
     /// The `debug_codeByHash` method returns the code associated with a given hash at the specified
-    /// block. If no block is provided, it defaults to the latest block.
+    /// block. If no code is found, it returns None. If no block is provided, it defaults to the
+    /// latest block.
     ///
     /// # Note
     ///
@@ -260,7 +261,7 @@ pub trait DebugApi<N>: Send + Sync {
         &self,
         hash: B256,
         block: Option<BlockId>,
-    ) -> TransportResult<Bytes>;
+    ) -> TransportResult<Option<Bytes>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -417,7 +418,7 @@ where
         &self,
         hash: B256,
         block: Option<BlockId>,
-    ) -> TransportResult<Bytes> {
+    ) -> TransportResult<Option<Bytes>> {
         self.client().request("debug_codeByHash", (hash, block)).await
     }
 }
@@ -428,7 +429,7 @@ mod test {
     use crate::{ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
-    use alloy_primitives::{address, b256, U256};
+    use alloy_primitives::{address, U256};
 
     #[tokio::test]
     async fn test_debug_trace_transaction() {
@@ -608,6 +609,8 @@ mod test {
         .await;
     }
 
+    // TODO: Enable for next reth release > v1.2.0
+    /*
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn test_debug_code_by_hash() {
@@ -620,11 +623,12 @@ mod test {
                 let code = provider.debug_code_by_hash(
                     b256!("2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989"),
                     None
-                ).await.unwrap();
+                ).await.unwrap().unwrap();
                 assert_eq!(code,
                            Bytes::from_static(&hex!("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
                            e03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3")));
             }).await;
         }).await;
     }
+    */
 }
