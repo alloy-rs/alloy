@@ -68,8 +68,7 @@ impl Error {
         self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
     }
 
-    /// Decode the revert data into the specified typed
-    /// [`SolError`].
+    /// Decode the revert data into a custom [`SolError`] type.
     pub fn as_decoded_error<E: SolError>(&self) -> core::result::Result<E, alloy_sol_types::Error> {
         let data =
             self.as_revert_data().ok_or(alloy_sol_types::Error::custom("no revert data found"))?;
