@@ -19,15 +19,13 @@ use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use core::str::FromStr;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 use serde_alias::serde_alias;
-use serde_with::{serde_as, DefaultOnNull};
 
 /// The genesis block specification.
-#[serde_as]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Genesis {
     /// The fork configuration for this network.
-    #[serde_as(deserialize_as = "DefaultOnNull")]
+    #[serde(default)]
     pub config: ChainConfig,
     /// The genesis header nonce.
     #[serde(with = "alloy_serde::quantity")]
