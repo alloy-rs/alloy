@@ -2,8 +2,8 @@
 version = 2
 yanked = "warn"
 ignore = [
-    # https://rustsec.org/advisories/RUSTSEC-2024-0388 used by ssz, will be removed https://github.com/sigp/ethereum_ssz/pull/34
-    "RUSTSEC-2024-0388"
+    # proc-macro-error 1.0.4 unmaintained. Used by serde_alias. https://rustsec.org/advisories/RUSTSEC-2024-0370
+    "RUSTSEC-2024-0370",
 ]
 
 [bans]
@@ -24,7 +24,6 @@ allow = [
     "0BSD",
     "ISC",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
     "Unlicense",
     "MPL-2.0",
     "Zlib",

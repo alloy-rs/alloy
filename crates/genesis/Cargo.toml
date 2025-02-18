@@ -30,9 +30,12 @@ alloy-trie = { workspace = true, features = ["ethereum"] }
 
 # serde
 serde.workspace = true
+serde_alias.workspace = true
+serde_with.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+toml.workspace = true
 
 [features]
 default = ["std"]

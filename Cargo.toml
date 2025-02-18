@@ -129,6 +129,8 @@ serde = { version = "1.0", default-features = false, features = [
 ] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = { version = "3", default-features = false, features = ["macros"] }
+serde_alias = "0.0.2"
+toml = "0.8.20"
 
 # misc
 auto_impl = "1.2"

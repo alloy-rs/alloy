@@ -18,13 +18,16 @@ use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_op
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use core::str::FromStr;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
+use serde_alias::serde_alias;
+use serde_with::{serde_as, DefaultOnNull};
 
 /// The genesis block specification.
+#[serde_as]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Genesis {
     /// The fork configuration for this network.
-    #[serde(default)]
+    #[serde_as(deserialize_as = "DefaultOnNull")]
     pub config: ChainConfig,
     /// The genesis header nonce.
     #[serde(with = "alloy_serde::quantity")]
@@ -316,6 +319,7 @@ where
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/params/config.go#L326)
 /// for the source of each field.
+#[serde_alias(CamelCase, SnakeCase)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChainConfig {
@@ -664,6 +668,20 @@ mod tests {
     use alloy_trie::{root::storage_root_unhashed, TrieAccount};
     use core::str::FromStr;
     use serde_json::json;
+
+    #[test]
+    fn chain_config_toml() {
+        let s = r#"chain_id = 2"#;
+        let chain_config: ChainConfig = toml::from_str(s).unwrap();
+        assert_eq!(chain_config.chain_id, 2);
+    }
+
+    #[test]
+    fn chain_config_json() {
+        let s = r#"{ "chainId": 2 }"#;
+        let chain_config: ChainConfig = serde_json::from_str(s).unwrap();
+        assert_eq!(chain_config.chain_id, 2);
+    }
 
     #[test]
     fn genesis_defaults_config() {

@@ -23,8 +23,8 @@ specific Ethereum endpoints.
 Alloy maintains the following transports:
 
 - [alloy-transport-http]: JSON-RPC via HTTP.
-- [alloy-transport-ws]: JSON-RPC via Websocket, supports pubsub via
-    [alloy-pubsub].
+- [alloy-transport-ws]: JSON-RPC via Websocket, supports pubsub via.
+- [alloy-pubsub]: JSON-RPC publish-subscribe tower service.
 - [alloy-transport-ipc]: JSON-RPC via IPC, supports pubsub via [alloy-pubsub].
 
 [alloy-transport-http]: https://docs.rs/alloy_transport_http/
