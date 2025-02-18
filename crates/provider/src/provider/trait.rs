@@ -91,18 +91,20 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().weak_client()
     }
 
-    /// Returns a type erased provider wrapped in Arc [`super::DynProvider`].
+    /// Returns a type erased provider wrapped in Arc. See [`DynProvider`].
     ///
     /// ```no_run
     /// use alloy_provider::{DynProvider, Provider, ProviderBuilder};
-    /// # async fn f() {
-    /// let provider: DynProvider =
-    ///     ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).erased();
-    /// let block = provider.get_block_number().await.unwrap();
     ///
+    /// # async fn f() -> Result<(), Box<dyn std::error::Error>> {
+    /// let provider: DynProvider =
+    ///     ProviderBuilder::new().on_builtin("http://localhost:8080").await?.erased();
+    /// let block = provider.get_block_number().await?;
+    /// # Ok(())
     /// # }
     /// ```
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    #[doc(alias = "boxed")]
     fn erased(self) -> DynProvider<N>
     where
         Self: Sized + 'static,

@@ -27,14 +27,14 @@ use std::{borrow::Cow, sync::Arc};
 ///
 /// This is a convenience type for `Arc<dyn Provider<N> + 'static>`.
 #[derive(Clone)]
+#[doc(alias = "BoxProvider")]
 pub struct DynProvider<N = Ethereum>(Arc<dyn Provider<N> + 'static>);
 
 impl<N: Network> DynProvider<N> {
     /// Creates a new [`DynProvider`] by erasing the type.
-    pub fn new<P>(provider: P) -> Self
-    where
-        P: Provider<N> + 'static,
-    {
+    ///
+    /// This is the same as [`provider.erased()`](Provider::erased).
+    pub fn new<P: Provider<N> + 'static>(provider: P) -> Self {
         Self(Arc::new(provider))
     }
 }
@@ -54,8 +54,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.weak_client()
     }
 
-    #[allow(clippy::use_self)]
-    fn erased(self) -> DynProvider<N>
+    fn erased(self) -> Self
     where
         Self: Sized + 'static,
     {
