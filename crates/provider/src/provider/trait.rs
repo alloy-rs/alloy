@@ -1408,7 +1408,7 @@ mod tests {
     #[tokio::test]
     async fn websocket_tls_setup() {
         for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
-            let _ = ProviderBuilder::<_, _, Ethereum>::default().on_builtin(url).await.unwrap();
+            let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }
 
@@ -1971,9 +1971,9 @@ mod tests {
     async fn hyper_https() {
         let url = "https://reth-ethereum.ithaca.xyz/rpc";
 
-        // With the `hyper` feature enabled .on_builtin builds the provider based on
+        // With the `hyper` feature enabled .connect builds the provider based on
         // `HyperTransport`.
-        let provider = ProviderBuilder::new().on_builtin(url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(url).await.unwrap();
 
         let _num = provider.get_block_number().await.unwrap();
     }
