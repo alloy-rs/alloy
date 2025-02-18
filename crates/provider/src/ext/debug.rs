@@ -249,6 +249,18 @@ pub trait DebugApi<N>: Send + Sync {
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<ExecutionWitness>;
+
+    /// The `debug_codeByHash` method returns the code associated with a given hash at the specified
+    /// block. If no block is provided, it defaults to the latest block.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_code_by_hash(
+        &self,
+        hash: B256,
+        block: Option<BlockId>,
+    ) -> TransportResult<Bytes>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -400,6 +412,14 @@ where
     ) -> TransportResult<ExecutionWitness> {
         self.client().request("debug_executionWitness", block).await
     }
+
+    async fn debug_code_by_hash(
+        &self,
+        hash: B256,
+        block: Option<BlockId>,
+    ) -> TransportResult<Bytes> {
+        self.client().request("debug_codeByHash", (hash, block)).await
+    }
 }
 
 #[cfg(test)]
@@ -408,7 +428,7 @@ mod test {
     use crate::{ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
-    use alloy_primitives::{address, U256};
+    use alloy_primitives::{address, b256, U256};
 
     #[tokio::test]
     async fn test_debug_trace_transaction() {
@@ -586,5 +606,25 @@ mod test {
             .await;
         })
         .await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(windows, ignore)]
+    async fn test_debug_code_by_hash() {
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+                // Contract (mainnet): 0x4e59b44847b379578588920ca78fbf26c0b4956c
+                let code = provider.debug_code_by_hash(
+                    b256!("2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989"),
+                    None
+                ).await.unwrap();
+                assert_eq!(code,
+                           Bytes::from_static(&hex!("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+                           e03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3")));
+            }).await;
+        }).await;
     }
 }
