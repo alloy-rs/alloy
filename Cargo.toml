@@ -135,7 +135,7 @@ auto_impl = "1.2"
 base64 = "0.22"
 bimap = "0.6"
 cfg-if = "1"
-derive_more = { version = "1.0.0", default-features = false }
+derive_more = { version = "2", default-features = false }
 home = "0.5"
 http = "1.1.0"
 itertools = { version = ">=0.13, <=0.14", default-features = false }
@@ -147,7 +147,7 @@ pin-project = "1.1"
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false }
 semver = "1.0"
-strum = { version = "0.26", default-features = false }
+strum = { version = "0.27", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 url = "2.5"
 

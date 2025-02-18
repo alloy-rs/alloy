@@ -6,7 +6,6 @@ use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
-use derive_more::{From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
