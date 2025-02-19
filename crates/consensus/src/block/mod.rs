@@ -4,7 +4,7 @@ mod header;
 pub use header::{BlockHeader, Header};
 
 mod traits;
-pub use traits::EthBlock;
+pub use traits::{BlockBodyTrait, EthBlock};
 
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
@@ -240,18 +240,6 @@ impl<T: Transaction, H> BlockBody<T, H> {
 }
 
 impl<T: Typed2718, H> BlockBody<T, H> {
-    /// Returns whether or not the block body contains any blob transactions.
-    #[inline]
-    pub fn has_eip4844_transactions(&self) -> bool {
-        self.transactions.iter().any(|tx| tx.is_eip4844())
-    }
-
-    /// Returns whether or not the block body contains any EIP-7702 transactions.
-    #[inline]
-    pub fn has_eip7702_transactions(&self) -> bool {
-        self.transactions.iter().any(|tx| tx.is_eip7702())
-    }
-
     /// Returns an iterator over all blob transactions of the block.
     #[inline]
     pub fn eip4844_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
