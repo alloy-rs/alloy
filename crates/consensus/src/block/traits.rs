@@ -14,14 +14,14 @@ impl<T, H> EthBlock for Block<T, H> {
 }
 
 /// A trait for Ethereum block body utilities.
-pub trait BlockBodyTrait {
+pub trait EthBlockBody {
     /// Returns whether or not the block body contains any EIP-4844 transactions.
     fn has_eip4844_transactions(&self) -> bool;
     /// Returns whether or not the block body contains any EIP-7702 transactions.
     fn has_eip7702_transactions(&self) -> bool;
 }
 
-impl<T: alloy_eips::Typed2718, H> BlockBodyTrait for BlockBody<T, H> {
+impl<T: alloy_eips::Typed2718, H> EthBlockBody for BlockBody<T, H> {
     fn has_eip4844_transactions(&self) -> bool {
         self.transactions.iter().any(|tx| tx.is_eip4844())
     }
