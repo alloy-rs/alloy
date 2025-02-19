@@ -1,63 +1,56 @@
-use crate::RpcWithBlock;
-use alloy_json_rpc::{RpcParam, RpcReturn};
-use alloy_rpc_client::WeakClient;
+use crate::{ParamsWithBlock, ProviderCall, RpcWithBlock};
+use alloy_json_rpc::{RpcRecv, RpcSend};
+use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::{Transport, TransportResult};
 use std::{borrow::Cow, collections::HashSet, future::IntoFuture, ops::Deref};
 
 /// An wrapper for [`TraceRpcWithBlock`] that takes an optional [`TraceType`] parameter. By default
 /// this will use "trace".
-#[derive(Debug, Clone)]
-pub struct TraceRpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+#[derive(Debug)]
+pub struct TraceRpcWithBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output,
+    Params: RpcSend,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output + Clone,
 {
-    inner: RpcWithBlock<T, Params, Resp, Output, Map>,
+    inner: RpcWithBlock<Params, Resp, Output, Map>,
     trace_types: HashSet<TraceType>,
 }
 
-impl<T, Params, Resp, Output, Map> Deref for TraceRpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> Deref for TraceRpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output,
+    Params: RpcSend,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output + Clone,
 {
-    type Target = RpcWithBlock<T, Params, Resp, Output, Map>;
+    type Target = RpcWithBlock<Params, Resp, Output, Map>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<T, Params, Resp> TraceRpcWithBlock<T, Params, Resp>
+impl<Params, Resp> TraceRpcWithBlock<Params, Resp>
 where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
 {
     /// Create a new [`TraceRpcWithBlock`] instance.
-    pub fn new(
-        client: WeakClient<T>,
-        method: impl Into<Cow<'static, str>>,
-        params: Params,
-    ) -> Self {
-        Self {
-            inner: RpcWithBlock::new(client, method, params),
-            trace_types: vec![TraceType::Trace].into_iter().collect(),
-        }
+    pub fn new(client: WeakClient, method: impl Into<Cow<'static, str>>, params: Params) -> Self {
+        todo!()
+        // Self {
+        //     inner: RpcWithBlock::new_rpc(inner)
+        //     trace_types: vec![TraceType::Trace].into_iter().collect(),
+        // }
     }
 }
 
-impl<T, Params, Resp, Output, Map> TraceRpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> TraceRpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + 'static,
+    Params: RpcSend,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output + Clone + 'static,
 {
     /// Set the trace type.
     pub fn trace_type(mut self, trace_type: TraceType) -> Self {
@@ -92,19 +85,18 @@ where
     }
 }
 
-impl<T, Params, Resp, Output, Map> IntoFuture for TraceRpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> IntoFuture for TraceRpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output + 'static + Copy,
 {
     type Output = TransportResult<Output>;
-    type IntoFuture = RpcWithBlockFut<T, Params, Resp, Output, Map>;
+    type IntoFuture = ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
-        let inner: RpcWithBlock<T, Params, Resp, Output, Map> = self.into();
+        let inner: RpcWithBlock<Params, Resp, Output, Map> = self.into();
         inner.into_future()
     }
 }

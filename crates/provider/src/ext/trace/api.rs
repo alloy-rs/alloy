@@ -26,7 +26,7 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call(
+    fn trace_call<'a, 'b>(
         &self,
         request: &'a N::TransactionRequest,
         trace_type: &'b [TraceType],
@@ -40,7 +40,7 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call_many(
+    fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
     ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>>;
@@ -64,7 +64,11 @@ where
     ) -> TransportResult<LocalizedTransactionTrace>;
 
     /// Trace the given raw transaction.
-    fn trace_raw_transaction(&self, data: Vec<u8>) -> TraceRpcWithBlock<T, Vec<u8>, TraceResults>;
+    async fn trace_raw_transaction(
+        &self,
+        data: &[u8],
+        trace_type: &[TraceType],
+    ) -> TransportResult<TraceResults>;
 
     /// Traces matching given filter.
     async fn trace_filter(
@@ -87,7 +91,7 @@ where
     ) -> TransportResult<TraceResults>;
 
     /// Replays all transactions in the given block.
-    fn trace_replay_block_transactions(
+    async fn trace_replay_block_transactions(
         &self,
         block: BlockId,
         trace_types: &[TraceType],
@@ -101,7 +105,7 @@ where
     N: Network,
     P: Provider<N>,
 {
-    fn trace_call(
+    fn trace_call<'a, 'b>(
         &self,
         request: &'a <N as Network>::TransactionRequest,
         trace_types: &'b [TraceType],
@@ -109,7 +113,7 @@ where
         self.client().request("trace_call", (request, trace_types)).into()
     }
 
-    fn trace_call_many(
+    fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
     ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>> {
@@ -159,7 +163,7 @@ where
         self.client().request("trace_replayTransaction", (hash, trace_types)).await
     }
 
-    fn trace_replay_block_transactions(
+    async fn trace_replay_block_transactions(
         &self,
         block: BlockId,
         trace_types: &[TraceType],

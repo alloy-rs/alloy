@@ -7,6 +7,11 @@ use std::future::IntoFuture;
 
 use crate::ProviderCall;
 
+#[cfg(feature = "trace-api")]
+use crate::ext::TraceRpcWithBlock;
+#[cfg(feature = "trace-api")]
+use std::ops::Deref;
+
 /// Helper struct that houses the params along with the BlockId.
 #[derive(Debug, Clone)]
 pub struct ParamsWithBlock<Params: RpcSend> {
@@ -210,25 +215,15 @@ where
 }
 
 #[cfg(feature = "trace-api")]
-impl<T, Params, Resp, Output, Map> From<TraceRpcWithBlock<T, Params, Resp, Output, Map>>
-    for RpcWithBlock<T, Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> From<TraceRpcWithBlock<Params, Resp, Output, Map>>
+    for RpcWithBlock<Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
+    Params: RpcSend,
+    Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output + 'static + Copy,
 {
-    fn from(trace_rpc: TraceRpcWithBlock<T, Params, Resp, Output, Map>) -> Self {
-        let rpc = trace_rpc.deref();
-        Self {
-            client: rpc.client.clone(),
-            method: rpc.method.clone(),
-            params: rpc.params.clone(),
-            block_id: rpc.block_id,
-            trace_types: trace_rpc.get_trace_types().clone(),
-            map: rpc.map,
-            _pd: rpc._pd,
-        }
+    fn from(trace_rpc: TraceRpcWithBlock<Params, Resp, Output, Map>) -> Self {
+        todo!()
     }
 }
