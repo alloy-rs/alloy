@@ -35,9 +35,6 @@ pub enum PayloadError {
     /// cancun fields present in pre-cancun payload.
     #[display("cancun fields present in pre-cancun payload")]
     PreCancunWithCancunFields,
-    /// blob transactions missing in post-cancun payload.
-    #[display("blob transactions missing in post-cancun payload")]
-    PostCancunBlockWithoutBlobTransactions,
     /// blob gas used missing in post-cancun payload.
     #[display("blob gas used missing in post-cancun payload")]
     PostCancunBlockWithoutBlobGasUsed,
