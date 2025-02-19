@@ -4,7 +4,7 @@ use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
 
 /// Signed transaction with recovered signer.
-#[derive(Debug, Clone, PartialEq, Hash, Eq, AsRef, Deref)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, AsRef, Deref)]
 pub struct Recovered<T> {
     /// Signer of the transaction
     signer: Address,
