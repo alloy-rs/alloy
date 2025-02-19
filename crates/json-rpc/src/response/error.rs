@@ -351,8 +351,8 @@ where
 
     /// Extracts revert data and tries decoding it into given custom errors set present in the
     /// [`SolInterface`].
-    pub fn as_decoded_interface_error<E: SolInterface>(&self, validate: bool) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data, validate).ok())
+    pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
     }
 
     /// Extracts revert data and tries decoding it into custom [`SolError`].
@@ -417,7 +417,7 @@ mod test {
         let payload: ErrorPayload = serde_json::from_str(json).unwrap();
 
         let Errors::ErrorsErrors::SomeCustomError(value) =
-            payload.as_decoded_interface_error::<Errors::ErrorsErrors>(false).unwrap();
+            payload.as_decoded_interface_error::<Errors::ErrorsErrors>().unwrap();
 
         assert_eq!(value.a, U256::from(1));
 
