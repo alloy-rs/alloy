@@ -6,15 +6,16 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_consensus::TxReceipt;
+use alloy_consensus::{BlockHeader, TxReceipt};
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
+use alloy_network_primitives::HeaderResponse;
 use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilderError, TxSigner,
+    BuildResult, FullSigner, FullSignerSync, NetworkWallet, TransactionBuilder,
+    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
     TxSignerSync, UnbuiltTransactionError,
 };
 
@@ -22,67 +23,16 @@ mod ethereum;
 pub use ethereum::{Ethereum, EthereumWallet};
 
 mod any;
-pub use any::{AnyNetwork, AnyTxType};
+pub use any::{
+    AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction,
+    AnyTransactionReceipt, AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope,
+    UnknownTypedTransaction,
+};
 
 pub use alloy_eips::eip2718;
-
-/// A receipt response.
-///
-/// This is distinct from [`TxReceipt`], since this is for JSON-RPC receipts.
-///
-/// [`TxReceipt`]: alloy_consensus::TxReceipt
-pub trait ReceiptResponse {
-    /// Address of the created contract, or `None` if the transaction was not a deployment.
-    fn contract_address(&self) -> Option<Address>;
-
-    /// Status of the transaction.
-    ///
-    /// ## Note
-    ///
-    /// Caution must be taken when using this method for deep-historical
-    /// receipts, as it may not accurately reflect the status of the
-    /// transaction. The transaction status is not knowable from the receipt
-    /// for transactions before [EIP-658].
-    ///
-    /// This can be handled using [`TxReceipt::status_or_post_state`].
-    ///
-    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
-    fn status(&self) -> bool;
-
-    /// Hash of the block this transaction was included within.
-    fn block_hash(&self) -> Option<BlockHash>;
-
-    /// Number of the block this transaction was included within.
-    fn block_number(&self) -> Option<u64>;
-}
-
-/// Transaction Response
-///
-/// This is distinct from [`Transaction`], since this is a JSON-RPC response.
-///
-/// [`Transaction`]: alloy_consensus::Transaction
-pub trait TransactionResponse {
-    /// Hash of the transaction
-    #[doc(alias = "transaction_hash")]
-    fn tx_hash(&self) -> TxHash;
-
-    /// Sender of the transaction
-    fn from(&self) -> Address;
-
-    /// Recipient of the transaction
-    fn to(&self) -> Option<Address>;
-
-    /// Transferred value
-    fn value(&self) -> U256;
-
-    /// Gas limit
-    fn gas(&self) -> u128;
-
-    /// Input data
-    #[doc(alias = "calldata")]
-    fn input(&self) -> &Bytes;
-}
+pub use alloy_network_primitives::{
+    self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
+};
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
@@ -122,7 +72,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptEnvelope: Eip2718Envelope + TxReceipt;
 
     /// The network header type.
-    type Header;
+    type Header: BlockHeader;
 
     // -- JSON RPC types --
 
@@ -136,12 +86,16 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The JSON body of a transaction response.
     #[doc(alias = "TxResponse")]
-    type TransactionResponse: RpcObject + TransactionResponse;
+    type TransactionResponse: RpcObject + TransactionResponse + AsRef<Self::TxEnvelope>;
 
     /// The JSON body of a transaction receipt.
     #[doc(alias = "TransactionReceiptResponse", alias = "TxReceiptResponse")]
     type ReceiptResponse: RpcObject + ReceiptResponse;
 
     /// The JSON body of a header response.
-    type HeaderResponse: RpcObject;
+    type HeaderResponse: RpcObject + HeaderResponse + AsRef<Self::Header>;
+
+    /// The JSON body of a block response.
+    type BlockResponse: RpcObject
+        + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
 }

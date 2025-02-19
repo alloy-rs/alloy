@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -24,3 +28,6 @@ alloy-primitives = { workspace = true, features = ["serde", "std"] }
 
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+similar-asserts.workspace = true

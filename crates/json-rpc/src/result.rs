@@ -1,4 +1,4 @@
-use crate::{Response, ResponsePayload, RpcError, RpcReturn};
+use crate::{Response, ResponsePayload, RpcError, RpcRecv};
 use serde_json::value::RawValue;
 use std::borrow::Borrow;
 
@@ -22,11 +22,9 @@ pub type BorrowedRpcResult<'a, E> = RpcResult<&'a RawValue, E, &'a RawValue>;
 /// Transform a transport response into an [`RpcResult`], discarding the [`Id`].
 ///
 /// [`Id`]: crate::Id
-pub fn transform_response<T, E, ErrResp>(
-    response: Response<T, ErrResp>,
-) -> Result<T, RpcError<E, ErrResp>>
+pub fn transform_response<T, E, ErrResp>(response: Response<T, ErrResp>) -> RpcResult<T, E, ErrResp>
 where
-    ErrResp: RpcReturn,
+    ErrResp: RpcRecv,
 {
     match response {
         Response { payload: ResponsePayload::Failure(err_resp), .. } => {
@@ -43,7 +41,7 @@ pub fn transform_result<T, E, ErrResp>(
     response: Result<Response<T, ErrResp>, E>,
 ) -> Result<T, RpcError<E, ErrResp>>
 where
-    ErrResp: RpcReturn,
+    ErrResp: RpcRecv,
 {
     match response {
         Ok(resp) => transform_response(resp),
@@ -52,17 +50,17 @@ where
 }
 
 /// Attempt to deserialize the `Ok(_)` variant of an [`RpcResult`].
-pub fn try_deserialize_ok<'a, J, T, E, ErrResp>(
+pub fn try_deserialize_ok<J, T, E, ErrResp>(
     result: RpcResult<J, E, ErrResp>,
 ) -> RpcResult<T, E, ErrResp>
 where
-    J: Borrow<RawValue> + 'a,
-    T: RpcReturn,
-    ErrResp: RpcReturn,
+    J: Borrow<RawValue>,
+    T: RpcRecv,
+    ErrResp: RpcRecv,
 {
     let json = result?;
     let json = json.borrow().get();
-    trace!(ty=%std::any::type_name::<T>(), json, "deserializing response");
+    trace!(ty=%std::any::type_name::<T>(), %json, "deserializing response");
     serde_json::from_str(json)
         .inspect(|response| trace!(?response, "deserialized response"))
         .inspect_err(|err| trace!(?err, "failed to deserialize response"))

@@ -11,10 +11,13 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloc::{collections::BTreeMap, string::String};
+use alloy_eips::eip7840::BlobParams;
+use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
-use serde::{Deserialize, Serialize};
+use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
+use core::str::FromStr;
+use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 /// The genesis block specification.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,7 +36,7 @@ pub struct Genesis {
     pub extra_data: Bytes,
     /// The genesis header gas limit.
     #[serde(with = "alloy_serde::quantity")]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// The genesis header difficulty.
     pub difficulty: U256,
     /// The genesis header mix hash.
@@ -54,18 +57,18 @@ pub struct Genesis {
     pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub excess_blob_gas: Option<u128>,
+    pub excess_blob_gas: Option<u64>,
     /// The genesis header blob gas used
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
 }
 
 impl Genesis {
-    /// Creates a chain config for Clique using the given chain id.
-    /// and funds the given address with max coins.
+    /// Creates a chain config for Clique using the given chain id and funds the given address with
+    /// max coins.
     ///
     /// Enables all hard forks up to London at genesis.
     pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {
@@ -91,17 +94,10 @@ impl Genesis {
         };
 
         // fund account
-        let mut alloc = BTreeMap::default();
-        alloc.insert(
+        let alloc = BTreeMap::from([(
             signer_addr,
-            GenesisAccount {
-                balance: U256::MAX,
-                nonce: None,
-                code: None,
-                storage: None,
-                private_key: None,
-            },
-        );
+            GenesisAccount { balance: U256::MAX, ..Default::default() },
+        )]);
 
         // put signer address in the extra data, padded by the required amount of zeros
         // Clique issue: https://github.com/ethereum/EIPs/issues/225
@@ -144,7 +140,7 @@ impl Genesis {
     }
 
     /// Set the gas limit.
-    pub const fn with_gas_limit(mut self, gas_limit: u128) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = gas_limit;
         self
     }
@@ -174,13 +170,13 @@ impl Genesis {
     }
 
     /// Set the excess blob gas.
-    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u128>) -> Self {
+    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
         self.excess_blob_gas = excess_blob_gas;
         self
     }
 
     /// Set the blob gas used.
-    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u128>) -> Self {
+    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
         self
     }
@@ -216,7 +212,12 @@ pub struct GenesisAccount {
     )]
     pub storage: Option<BTreeMap<B256, B256>>,
     /// The account's private key. Should only be used for testing.
-    #[serde(rename = "secretKey", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "secretKey",
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_private_key"
+    )]
     pub private_key: Option<B256>,
 }
 
@@ -243,6 +244,64 @@ impl GenesisAccount {
     pub fn with_storage(mut self, storage: Option<BTreeMap<B256, B256>>) -> Self {
         self.storage = storage;
         self
+    }
+
+    /// Returns an iterator over the storage slots in (`B256`, `U256`) format.
+    pub fn storage_slots(&self) -> impl Iterator<Item = (B256, U256)> + '_ {
+        self.storage.as_ref().into_iter().flat_map(|storage| storage.iter()).map(|(key, value)| {
+            let value = U256::from_be_bytes(value.0);
+            (*key, value)
+        })
+    }
+
+    /// Convert the genesis account into the [`TrieAccount`] format.
+    pub fn into_trie_account(self) -> TrieAccount {
+        self.into()
+    }
+}
+
+impl From<GenesisAccount> for TrieAccount {
+    fn from(account: GenesisAccount) -> Self {
+        let storage_root = account
+            .storage
+            .map(|storage| {
+                alloy_trie::root::storage_root_unhashed(
+                    storage
+                        .into_iter()
+                        .filter(|(_, value)| !value.is_zero())
+                        .map(|(slot, value)| (slot, U256::from_be_bytes(*value))),
+                )
+            })
+            .unwrap_or(EMPTY_ROOT_HASH);
+
+        Self {
+            nonce: account.nonce.unwrap_or_default(),
+            balance: account.balance,
+            storage_root,
+            code_hash: account.code.map_or(KECCAK_EMPTY, keccak256),
+        }
+    }
+}
+
+/// Custom deserialization function for the private key.
+///
+/// This function allows the private key to be deserialized from a string or a `null` value.
+///
+/// We need a custom function here especially to handle the case where the private key is `0x` and
+/// should be deserialized as `None`.
+fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_str: Option<String> = Option::deserialize(deserializer)?;
+
+    if let Some(ref s) = opt_str {
+        if s == "0x" {
+            return Ok(None);
+        }
+        B256::from_str(s).map(Some).map_err(D::Error::custom)
+    } else {
+        Ok(None)
     }
 }
 
@@ -392,6 +451,13 @@ pub struct ChainConfig {
     )]
     pub prague_time: Option<u64>,
 
+    /// Osaka switch time (None = no fork, 0 = already on osaka).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub osaka_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -422,6 +488,12 @@ pub struct ChainConfig {
     /// The deposit contract address
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deposit_contract_address: Option<Address>,
+
+    /// The blob schedule for the chain, indexed by hardfork name.
+    ///
+    /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub blob_schedule: BTreeMap<String, BlobParams>,
 }
 
 impl ChainConfig {
@@ -506,12 +578,12 @@ impl ChainConfig {
 
     // Private function handling the comparison logic for block numbers
     fn is_active_at_block(&self, config_block: Option<u64>, block: u64) -> bool {
-        config_block.map_or(false, |cb| cb <= block)
+        config_block.is_some_and(|cb| cb <= block)
     }
 
     // Private function handling the comparison logic for timestamps
     fn is_active_at_timestamp(&self, config_timestamp: Option<u64>, timestamp: u64) -> bool {
-        config_timestamp.map_or(false, |cb| cb <= timestamp)
+        config_timestamp.is_some_and(|cb| cb <= timestamp)
     }
 }
 
@@ -539,6 +611,7 @@ impl Default for ChainConfig {
             shanghai_time: None,
             cancun_time: None,
             prague_time: None,
+            osaka_time: None,
             terminal_total_difficulty: None,
             terminal_total_difficulty_passed: false,
             ethash: None,
@@ -546,6 +619,7 @@ impl Default for ChainConfig {
             parlia: None,
             extra_fields: Default::default(),
             deposit_contract_address: None,
+            blob_schedule: Default::default(),
         }
     }
 }
@@ -567,6 +641,7 @@ pub struct CliqueConfig {
 }
 
 /// Consensus configuration for Parlia.
+///
 /// Parlia is the consensus engine for BNB Smart Chain.
 /// For the general introduction: <https://docs.bnbchain.org/docs/learn/consensus/>
 /// For the specification: <https://github.com/bnb-chain/bsc/blob/master/params/config.go#L558>
@@ -584,9 +659,11 @@ pub struct ParliaConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
-    use alloy_primitives::hex;
+    use alloc::{collections::BTreeMap, vec};
+    use alloy_primitives::{hex, Bytes};
+    use alloy_trie::{root::storage_root_unhashed, TrieAccount};
     use core::str::FromStr;
+    use serde_json::json;
 
     #[test]
     fn genesis_defaults_config() {
@@ -996,6 +1073,7 @@ mod tests {
         "shanghaiTime": 0,
         "cancunTime": 0,
         "pragueTime": 1,
+        "osakaTime": 2,
         "terminalTotalDifficulty": 0,
         "depositContractAddress": "0x0000000000000000000000000000000000000000",
         "terminalTotalDifficultyPassed": true
@@ -1032,6 +1110,7 @@ mod tests {
                 shanghai_time: Some(0),
                 cancun_time: Some(0),
                 prague_time: Some(1),
+                osaka_time: Some(2),
                 terminal_total_difficulty: Some(U256::ZERO),
                 terminal_total_difficulty_passed: true,
                 deposit_contract_address: Some(Address::ZERO),
@@ -1528,5 +1607,138 @@ mod tests {
         assert_eq!(actual_numeric_value, 7);
         let actual_object_value = genesis.config.extra_fields.get("object_field").unwrap();
         assert_eq!(actual_object_value, &serde_json::json!({"sub_field": "sub_value"}));
+    }
+
+    #[test]
+    fn deserialize_private_key_as_none_when_0x() {
+        // Test case where "secretKey" is "0x", expecting None
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": "0x"
+        });
+
+        let account: GenesisAccount = serde_json::from_value(json_data).unwrap();
+        assert_eq!(account.private_key, None);
+    }
+
+    #[test]
+    fn deserialize_private_key_with_valid_hex() {
+        // Test case where "secretKey" is a valid hex string
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+        });
+
+        let account: GenesisAccount = serde_json::from_value(json_data).unwrap();
+        let expected_key =
+            B256::from_str("123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
+                .unwrap();
+        assert_eq!(account.private_key, Some(expected_key));
+    }
+
+    #[test]
+    fn deserialize_private_key_as_none_when_null() {
+        // Test case where "secretKey" is null, expecting None
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": null
+        });
+
+        let account: GenesisAccount = serde_json::from_value(json_data).unwrap();
+        assert_eq!(account.private_key, None);
+    }
+
+    #[test]
+    fn deserialize_private_key_with_invalid_hex_fails() {
+        // Test case where "secretKey" is an invalid hex string, expecting an error
+        let json_data = json!({
+            "balance": "0x0",
+            "secretKey": "0xINVALIDHEX"
+        });
+
+        let result: Result<GenesisAccount, _> = serde_json::from_value(json_data);
+        assert!(result.is_err()); // The deserialization should fail due to invalid hex
+    }
+
+    #[test]
+    fn deserialize_private_key_with_empty_string_fails() {
+        // Test case where "secretKey" is an empty string, expecting an error
+        let json_data = json!({
+            "secretKey": ""
+        });
+
+        let result: Result<GenesisAccount, _> = serde_json::from_value(json_data);
+        assert!(result.is_err()); // The deserialization should fail due to an empty string
+    }
+
+    #[test]
+    fn test_from_genesis_account_with_default_values() {
+        let genesis_account = GenesisAccount::default();
+
+        // Convert the GenesisAccount to a TrieAccount
+        let trie_account: TrieAccount = genesis_account.into();
+
+        // Check the fields are properly set.
+        assert_eq!(trie_account.nonce, 0);
+        assert_eq!(trie_account.balance, U256::default());
+        assert_eq!(trie_account.storage_root, EMPTY_ROOT_HASH);
+        assert_eq!(trie_account.code_hash, KECCAK_EMPTY);
+
+        // Check that the default Account converts to the same TrieAccount
+        assert_eq!(TrieAccount::default(), trie_account);
+    }
+
+    #[test]
+    fn test_from_genesis_account_with_values() {
+        // Create a GenesisAccount with specific values
+        let mut storage = BTreeMap::new();
+        storage.insert(B256::from([0x01; 32]), B256::from([0x02; 32]));
+
+        let genesis_account = GenesisAccount {
+            nonce: Some(10),
+            balance: U256::from(1000),
+            code: Some(Bytes::from(vec![0x60, 0x61])),
+            storage: Some(storage),
+            private_key: None,
+        };
+
+        // Convert the GenesisAccount to a TrieAccount
+        let trie_account: TrieAccount = genesis_account.into();
+
+        let expected_storage_root = storage_root_unhashed(BTreeMap::from([(
+            B256::from([0x01; 32]),
+            U256::from_be_bytes(*B256::from([0x02; 32])),
+        )]));
+
+        // Check that the fields are properly set.
+        assert_eq!(trie_account.nonce, 10);
+        assert_eq!(trie_account.balance, U256::from(1000));
+        assert_eq!(trie_account.storage_root, expected_storage_root);
+        assert_eq!(trie_account.code_hash, keccak256([0x60, 0x61]));
+    }
+
+    #[test]
+    fn test_from_genesis_account_with_zeroed_storage_values() {
+        // Create a GenesisAccount with storage containing zero values
+        let storage = BTreeMap::from([(B256::from([0x01; 32]), B256::from([0x00; 32]))]);
+
+        let genesis_account = GenesisAccount {
+            nonce: Some(3),
+            balance: U256::from(300),
+            code: None,
+            storage: Some(storage),
+            private_key: None,
+        };
+
+        // Convert the GenesisAccount to a TrieAccount
+        let trie_account: TrieAccount = genesis_account.into();
+
+        // Check the fields are properly set.
+        assert_eq!(trie_account.nonce, 3);
+        assert_eq!(trie_account.balance, U256::from(300));
+        // Zero values in storage should result in EMPTY_ROOT_HASH
+        assert_eq!(trie_account.storage_root, EMPTY_ROOT_HASH);
+        // No code provided, so code hash should be KECCAK_EMPTY
+        assert_eq!(trie_account.code_hash, KECCAK_EMPTY);
     }
 }

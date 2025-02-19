@@ -16,6 +16,11 @@ pub enum Eip658Value {
 }
 
 impl Eip658Value {
+    /// Returns a successful transaction status.
+    pub const fn success() -> Self {
+        Self::Eip658(true)
+    }
+
     /// Returns true if the transaction was successful OR if the transaction
     /// is pre-[EIP-658].
     ///
@@ -75,62 +80,55 @@ impl Default for Eip658Value {
 }
 
 #[cfg(feature = "serde")]
-impl serde::Serialize for Eip658Value {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Eip658(status) => alloy_serde::quantity::serialize(status, serializer),
-            Self::PostState(state) => state.serialize(serializer),
+mod serde_eip658 {
+    //! Serde implementation for [`Eip658Value`]. Serializes [`Eip658Value::Eip658`] as `status`
+    //! key, and [`Eip658Value::PostState`] as `root` key.
+    //!
+    //! If both are present, prefers `status` key.
+    //!
+    //! Should be used with `#[serde(flatten)]`.
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[serde(untagged)]
+    enum SerdeHelper {
+        Eip658 {
+            #[serde(with = "alloy_serde::quantity")]
+            status: bool,
+        },
+        PostState {
+            root: B256,
+        },
+    }
+
+    impl Serialize for Eip658Value {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            match self {
+                Self::Eip658(status) => {
+                    SerdeHelper::Eip658 { status: *status }.serialize(serializer)
+                }
+                Self::PostState(state) => {
+                    SerdeHelper::PostState { root: *state }.serialize(serializer)
+                }
+            }
         }
     }
-}
 
-#[cfg(feature = "serde")]
-// NB: some visit methods partially or wholly copied from alloy-primitives
-impl<'de> serde::Deserialize<'de> for Eip658Value {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de;
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = Eip658Value;
-
-            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                formatter.write_str("a boolean or a 32-byte hash")
-            }
-
-            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
-                Ok(Eip658Value::Eip658(v))
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                match v {
-                    "0x" | "0x0" | "false" => Ok(Eip658Value::Eip658(false)),
-                    "0x1" | "true" => Ok(Eip658Value::Eip658(true)),
-                    _ => v.parse::<B256>().map(Eip658Value::PostState).map_err(de::Error::custom),
-                }
-            }
-
-            fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
-                B256::try_from(v).map(Eip658Value::PostState).map_err(de::Error::custom)
-            }
-
-            fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-                let len_error = |i| de::Error::invalid_length(i, &"exactly 32 bytes");
-                let mut bytes = [0u8; 32];
-
-                for (i, byte) in bytes.iter_mut().enumerate() {
-                    *byte = seq.next_element()?.ok_or_else(|| len_error(i))?;
-                }
-
-                if let Ok(Some(_)) = seq.next_element::<u8>() {
-                    return Err(len_error(33));
-                }
-
-                Ok(Eip658Value::PostState(bytes.into()))
+    impl<'de> Deserialize<'de> for Eip658Value {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let helper = SerdeHelper::deserialize(deserializer)?;
+            match helper {
+                SerdeHelper::Eip658 { status } => Ok(Self::Eip658(status)),
+                SerdeHelper::PostState { root } => Ok(Self::PostState(root)),
             }
         }
-
-        deserializer.deserialize_any(Visitor)
     }
 }
 
@@ -148,8 +146,8 @@ impl Encodable for Eip658Value {
 
     fn length(&self) -> usize {
         match self {
-            Self::Eip658(_) => 1,
-            Self::PostState(_) => 32,
+            Self::Eip658(inner) => inner.length(),
+            Self::PostState(inner) => inner.length(),
         }
     }
 }
@@ -199,15 +197,18 @@ mod test {
     fn serde_sanity() {
         let status: Eip658Value = true.into();
         let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(json, r#""0x1""#);
+        assert_eq!(json, r#"{"status":"0x1"}"#);
         assert_eq!(serde_json::from_str::<Eip658Value>(&json).unwrap(), status);
 
         let state: Eip658Value = false.into();
         let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, r#""0x0""#);
+        assert_eq!(json, r#"{"status":"0x0"}"#);
 
         let state: Eip658Value = B256::repeat_byte(1).into();
         let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, r#""0x0101010101010101010101010101010101010101010101010101010101010101""#);
+        assert_eq!(
+            json,
+            r#"{"root":"0x0101010101010101010101010101010101010101010101010101010101010101"}"#
+        );
     }
 }

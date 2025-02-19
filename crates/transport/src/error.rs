@@ -84,7 +84,9 @@ impl TransportErrorKind {
         match self {
             // Missing batch response errors can be retried.
             Self::MissingBatchResponse(_) => true,
-            Self::HttpError(http_err) => http_err.is_rate_limit_err(),
+            Self::HttpError(http_err) => {
+                http_err.is_rate_limit_err() || http_err.is_temporarily_unavailable()
+            }
             Self::Custom(err) => {
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
@@ -96,7 +98,10 @@ impl TransportErrorKind {
 
 /// Type for holding HTTP errors such as 429 rate limit error.
 #[derive(Debug, thiserror::Error)]
-#[error("HTTP error {status} with body: {body}")]
+#[error(
+    "HTTP error {status} with {}",
+    if body.is_empty() { "empty body".to_string() } else { format!("body: {body}") }
+)]
 pub struct HttpError {
     /// The HTTP status code.
     pub status: u16,
@@ -107,10 +112,13 @@ pub struct HttpError {
 impl HttpError {
     /// Checks the `status` to determine whether the request should be retried.
     pub const fn is_rate_limit_err(&self) -> bool {
-        if self.status == 429 {
-            return true;
-        }
-        false
+        self.status == 429
+    }
+
+    /// Checks the `status` to determine whether the service was temporarily unavailable and should
+    /// be retried.
+    pub const fn is_temporarily_unavailable(&self) -> bool {
+        self.status == 503
     }
 }
 
@@ -173,5 +181,17 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_retry_error() {
+        let err = "{\"code\":-32007,\"message\":\"100/second request limit reached - reduce calls per second or upgrade your account at quicknode.com\"}";
+        let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
+        assert!(TransportError::ErrorResp(err).is_retryable());
     }
 }

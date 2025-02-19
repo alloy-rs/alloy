@@ -11,20 +11,19 @@
 #[macro_use]
 extern crate alloc;
 
-// To ensure no unused imports, since signed auth list requires arbitrary _and_ k256 features, but
-// is only enabled using the `arbitrary` feature.
-#[cfg(all(not(feature = "k256"), feature = "arbitrary"))]
-use rand as _;
-
 pub mod eip1559;
 pub use eip1559::calc_next_block_base_fee;
 
 pub mod eip1898;
 pub use eip1898::{
-    BlockHashOrNumber, BlockId, BlockNumHash, BlockNumberOrTag, ForkBlock, RpcBlockHash,
+    BlockHashOrNumber, BlockId, BlockNumHash, BlockNumberOrTag, ForkBlock, HashOrNumber, NumHash,
+    RpcBlockHash,
 };
 
+pub mod eip2124;
+
 pub mod eip2718;
+pub use eip2718::{Decodable2718, Encodable2718, Typed2718};
 
 pub mod eip2930;
 
@@ -46,4 +45,8 @@ pub mod eip7251;
 
 pub mod eip7685;
 
+pub mod eip7691;
+
 pub mod eip7702;
+
+pub mod eip7840;

@@ -1,15 +1,15 @@
-use crate::{Network, NetworkWallet, TxSigner};
+use crate::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, Network, NetworkWallet, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use alloy_primitives::Address;
-use alloy_signer::Signature;
-use async_trait::async_trait;
-use std::{collections::BTreeMap, sync::Arc};
+use alloy_primitives::{map::AddressHashMap, Address, PrimitiveSignature as Signature};
+use std::sync::Arc;
+
+use super::Ethereum;
 
 /// A wallet capable of signing any transaction for the Ethereum network.
 #[derive(Clone, Default)]
 pub struct EthereumWallet {
     default: Address,
-    signers: BTreeMap<Address, Arc<dyn TxSigner<Signature> + Send + Sync>>,
+    signers: AddressHashMap<Arc<dyn TxSigner<Signature> + Send + Sync>>,
 }
 
 impl std::fmt::Debug for EthereumWallet {
@@ -95,8 +95,6 @@ impl EthereumWallet {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N> NetworkWallet<N> for EthereumWallet
 where
     N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
@@ -136,6 +134,38 @@ where
                 let sig = self.sign_transaction_inner(sender, &mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
+            TypedTransaction::Eip7702(mut t) => {
+                let sig = self.sign_transaction_inner(sender, &mut t).await?;
+                Ok(t.into_signed(sig).into())
+            }
+        }
+    }
+}
+
+impl NetworkWallet<AnyNetwork> for EthereumWallet {
+    fn default_signer_address(&self) -> Address {
+        self.default
+    }
+
+    fn has_signer_for(&self, address: &Address) -> bool {
+        self.signers.contains_key(address)
+    }
+
+    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
+        self.signers.keys().copied()
+    }
+
+    #[doc(alias = "sign_tx_from")]
+    async fn sign_transaction_from(
+        &self,
+        sender: Address,
+        tx: AnyTypedTransaction,
+    ) -> alloy_signer::Result<AnyTxEnvelope> {
+        match tx {
+            AnyTypedTransaction::Ethereum(t) => Ok(AnyTxEnvelope::Ethereum(
+                NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?,
+            )),
+            _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
         }
     }
 }

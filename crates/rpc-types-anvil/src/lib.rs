@@ -6,7 +6,8 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{BlockHash, ChainId, TxHash, B256, U256};
+use alloy_primitives::{BlockHash, Bytes, ChainId, TxHash, B256, U256};
+use alloy_rpc_types_eth::TransactionRequest;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
@@ -84,13 +85,16 @@ pub struct NodeInfo {
 #[serde(rename_all = "camelCase")]
 pub struct NodeEnvironment {
     /// Base fee of the current block
-    pub base_fee: U256,
+    #[serde(with = "alloy_serde::quantity")]
+    pub base_fee: u128,
     /// Chain id of the node.
     pub chain_id: ChainId,
     /// Configured block gas limit
-    pub gas_limit: U256,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_limit: u64,
     /// Configured gas price
-    pub gas_price: U256,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_price: u128,
 }
 
 /// The node's fork configuration.
@@ -164,9 +168,29 @@ impl Default for MineOptions {
     }
 }
 
+/// Represents the options used in `anvil_reorg`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReorgOptions {
+    /// The depth of the reorg
+    pub depth: u64,
+    /// List of transaction requests and blocks pairs to be mined into the new chain
+    pub tx_block_pairs: Vec<(TransactionData, u64)>,
+}
+
+/// Type representing txs in `ReorgOptions`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TransactionData {
+    /// Transaction request
+    JSON(TransactionRequest),
+    /// Raw transaction bytes
+    Raw(Bytes),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_serde_forking_deserialization() {

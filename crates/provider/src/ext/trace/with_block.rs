@@ -1,4 +1,4 @@
-use crate::{RpcWithBlock, RpcWithBlockFut};
+use crate::RpcWithBlock;
 use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_rpc_client::WeakClient;
 use alloy_rpc_types_trace::parity::TraceType;

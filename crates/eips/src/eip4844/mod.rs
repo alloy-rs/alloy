@@ -13,13 +13,18 @@ pub mod trusted_setup_points;
 pub mod builder;
 pub mod utils;
 
+mod engine;
+pub use engine::*;
+
 /// Contains sidecar related types
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256};
+
+use crate::eip7840;
 
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
 /// elements contained in a blob MUST be STRICTLY LESS than this value.
@@ -32,6 +37,9 @@ pub const BLS_MODULUS: U256 = U256::from_be_bytes(BLS_MODULUS_BYTES.0);
 
 /// Size a single field element in bytes.
 pub const FIELD_ELEMENT_BYTES: u64 = 32;
+
+/// Size a single field element in bytes.
+pub const FIELD_ELEMENT_BYTES_USIZE: usize = FIELD_ELEMENT_BYTES as usize;
 
 /// How many field elements are stored in a single data blob.
 pub const FIELD_ELEMENTS_PER_BLOB: u64 = 4096;
@@ -82,6 +90,114 @@ pub const BYTES_PER_PROOF: usize = 48;
 /// A Blob serialized as 0x-prefixed hex string
 pub type Blob = FixedBytes<BYTES_PER_BLOB>;
 
+/// Helper function to deserialize boxed blobs.
+#[cfg(feature = "serde")]
+pub fn deserialize_blob<'de, D>(deserializer: D) -> Result<alloc::boxed::Box<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let raw_blob = <alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let blob = alloc::boxed::Box::new(
+        Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?,
+    );
+    Ok(blob)
+}
+
+/// A heap allocated blob that serializes as 0x-prefixed hex string
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, alloy_rlp::RlpEncodableWrapper)]
+pub struct HeapBlob(Bytes);
+
+impl HeapBlob {
+    /// Create a new heap blob from a byte slice.
+    pub fn new(blob: &[u8]) -> Result<Self, InvalidBlobLength> {
+        if blob.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(blob.len()));
+        }
+
+        Ok(Self(Bytes::copy_from_slice(blob)))
+    }
+
+    /// Create a new heap blob from an array.
+    pub fn from_array(blob: [u8; BYTES_PER_BLOB]) -> Self {
+        Self(Bytes::from(blob))
+    }
+
+    /// Create a new heap blob from [`Bytes`].
+    pub fn from_bytes(bytes: Bytes) -> Result<Self, InvalidBlobLength> {
+        if bytes.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(bytes.len()));
+        }
+
+        Ok(Self(bytes))
+    }
+
+    /// Generate a new heap blob with all bytes set to `byte`.
+    pub fn repeat_byte(byte: u8) -> Self {
+        Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
+    }
+
+    /// Get the inner
+    pub fn inner(&self) -> &Bytes {
+        &self.0
+    }
+}
+
+impl Default for HeapBlob {
+    fn default() -> Self {
+        Self::repeat_byte(0)
+    }
+}
+
+/// Error indicating that the blob length is invalid.
+#[derive(Debug, Clone)]
+pub struct InvalidBlobLength(usize);
+impl core::fmt::Display for InvalidBlobLength {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Invalid blob length: {}, expected: {BYTES_PER_BLOB}", self.0)
+    }
+}
+impl core::error::Error for InvalidBlobLength {}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for HeapBlob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner().serialize(serializer)
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for HeapBlob {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut blob = vec![0u8; BYTES_PER_BLOB];
+        u.fill_buffer(&mut blob)?;
+        Ok(Self(Bytes::from(blob)))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for HeapBlob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let inner = <Bytes>::deserialize(deserializer)?;
+
+        Self::from_bytes(inner).map_err(serde::de::Error::custom)
+    }
+}
+
+impl alloy_rlp::Decodable for HeapBlob {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let bytes = <Bytes>::decode(buf)?;
+
+        Self::from_bytes(bytes).map_err(|_| alloy_rlp::Error::Custom("invalid blob length"))
+    }
+}
+
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
 
@@ -107,12 +223,9 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
-pub const fn calc_excess_blob_gas(
-    parent_excess_blob_gas: u128,
-    parent_blob_gas_used: u128,
-) -> u128 {
-    (parent_excess_blob_gas + parent_blob_gas_used)
-        .saturating_sub(TARGET_DATA_GAS_PER_BLOCK as u128)
+pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
+    eip7840::BlobParams::cancun()
+        .next_block_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used)
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -120,8 +233,8 @@ pub const fn calc_excess_blob_gas(
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub fn calc_blob_gasprice(excess_blob_gas: u128) -> u128 {
-    fake_exponential(BLOB_TX_MIN_BLOB_GASPRICE, excess_blob_gas, BLOB_GASPRICE_UPDATE_FRACTION)
+pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+    eip7840::BlobParams::cancun().calc_blob_fee(excess_blob_gas)
 }
 
 /// Approximates `factor * e ** (numerator / denominator)` using Taylor expansion.
@@ -135,8 +248,8 @@ pub fn calc_blob_gasprice(excess_blob_gas: u128) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
-    assert_ne!(denominator, 0, "attempt to divide by zero");
+pub const fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
+    assert!(denominator != 0, "attempt to divide by zero");
 
     let mut i = 1;
     let mut output = 0;
@@ -188,8 +301,8 @@ mod tests {
             ),
             (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1, 0),
         ] {
-            let actual = calc_excess_blob_gas(excess as u128, (blobs * DATA_GAS_PER_BLOB) as u128);
-            assert_eq!(actual, expected as u128, "test: {t:?}");
+            let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
+            assert_eq!(actual, expected, "test: {t:?}");
         }
     }
 
@@ -242,5 +355,15 @@ mod tests {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_heap_blob() {
+        let blob = HeapBlob::repeat_byte(0x42);
+        let serialized = serde_json::to_string(&blob).unwrap();
+
+        let deserialized: HeapBlob = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(blob, deserialized);
     }
 }

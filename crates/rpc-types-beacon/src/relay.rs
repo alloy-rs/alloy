@@ -2,10 +2,10 @@
 //!
 //! See also <https://flashbots.github.io/relay-specs/>
 
-use crate::{BlsPublicKey, BlsSignature};
+use crate::{requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
-    BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    BlobsBundleV1, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -53,8 +53,10 @@ pub struct ValidatorRegistrationMessage {
 }
 
 /// Represents public information about a block sent by a builder to the relay, or from the relay to
-/// the proposer. Depending on the context, value might represent the claimed value by a builder
-/// (not necessarily a value confirmed by the relay).
+/// the proposer.
+///
+/// Depending on the context, value might represent the claimed value by a builder (not necessarily
+/// a value confirmed by the relay).
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
@@ -94,6 +96,8 @@ pub struct SignedBidTrace {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Bellatrix).
+///
+/// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -108,6 +112,8 @@ pub struct SignedBidSubmissionV1 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Capella).
+///
+/// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/capella/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -122,6 +128,8 @@ pub struct SignedBidSubmissionV2 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Deneb).
+///
+/// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -137,15 +145,22 @@ pub struct SignedBidSubmissionV3 {
     pub signature: BlsSignature,
 }
 
-/// SubmitBlockRequest is the request from the builder to submit a block.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SubmitBlockRequest {
-    /// The BidTrace message associated with the block submission.
+/// Submission for the `/relay/v1/builder/blocks` endpoint (Electra).
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
+pub struct SignedBidSubmissionV4 {
+    /// The [`BidTrace`] message associated with the submission.
     pub message: BidTrace,
-    /// The execution payload for the block submission.
-    #[serde(with = "crate::payload::beacon_payload")]
-    pub execution_payload: ExecutionPayload,
-    /// The signature associated with the block submission.
+    /// The execution payload for the submission.
+    #[serde(with = "crate::payload::beacon_payload_v3")]
+    pub execution_payload: ExecutionPayloadV3,
+    /// The Electra block bundle for this bid.
+    pub blobs_bundle: BlobsBundleV1,
+    /// The Pectra execution requests for this bid.
+    pub execution_requests: ExecutionRequestsV4,
+    /// The signature associated with the submission.
     pub signature: BlsSignature,
 }
 
@@ -166,30 +181,62 @@ impl SubmitBlockRequestQuery {
     }
 }
 
-/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L132-L136>
+/// A Request to validate a [`SignedBidSubmissionV1`]
+///
+/// <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L132-L136>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequest {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV1,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
 }
 
-/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L204-L204>
+/// A Request to validate a [`SignedBidSubmissionV2`]
+///
+/// <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L204-L208>
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlockValidationRequestV2 {
-    /// The [SubmitBlockRequest] data to be validated.
+    /// The request to be validated.
     #[serde(flatten)]
-    pub request: SubmitBlockRequest,
+    pub request: SignedBidSubmissionV2,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
-    /// The withdrawals root for the validation request.
-    pub withdrawals_root: B256,
+}
+
+/// A Request to validate a [`SignedBidSubmissionV3`]
+///
+/// <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV3 {
+    /// The request to be validated.
+    #[serde(flatten)]
+    pub request: SignedBidSubmissionV3,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
+}
+
+/// A Request to validate a [`SignedBidSubmissionV4`]
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV4 {
+    /// The request to be validated.
+    #[serde(flatten)]
+    pub request: SignedBidSubmissionV4,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
 }
 
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
@@ -274,10 +321,10 @@ impl ProposerPayloadsDeliveredQuery {
     }
 }
 
-/// OrderBy : Sort results in either ascending or descending values.  * `-value` - descending value
-/// (highest value first)  * `value` - ascending value (lowest value first) Sort results in either
-/// ascending or descending values.  * `-value` - descending value (highest value first)  * `value`
-/// - ascending value (lowest value first)
+/// Sort results in either ascending or descending values.
+///
+/// - `-value` - descending value (highest value first)
+/// - `value` - ascending value (lowest value first)
 #[derive(
     Default, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize,
 )]
@@ -391,6 +438,7 @@ pub mod error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_validator() {
@@ -398,6 +446,7 @@ mod tests {
 
         let validators: Vec<Validator> = serde_json::from_str(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
+
         assert_eq!(json, serde_json::to_value(validators).unwrap());
     }
 
@@ -424,6 +473,15 @@ mod tests {
         let s = r#"{"message":{"slot":"1","parent_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","block_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","builder_pubkey":"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a", "proposer_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a","proposer_fee_recipient":"0xabcf8e0d4e9587369b2301d0790347320302cc09","gas_limit":"1","gas_used":"1","value":"1"},"execution_payload":{"parent_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","fee_recipient":"0xabcf8e0d4e9587369b2301d0790347320302cc09","state_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","receipts_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","logs_bloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prev_randao":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","block_number":"1","gas_limit":"1","gas_used":"1","timestamp":"1","extra_data":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","base_fee_per_gas":"1","block_hash":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2","transactions":["0x02f878831469668303f51d843b9ac9f9843b9aca0082520894c93269b73096998db66be0441e836d873535cb9c8894a19041886f000080c001a031cc29234036afbf9a1fb9476b463367cb1f957ac0b919b69bbc798436e604aaa018c4e9c3914eb27aadd0b91e10b18655739fcf8c1fc398763a9f1beecb8ddc86"],"withdrawals":[{"index":"1","validator_index":"1","address":"0xabcf8e0d4e9587369b2301d0790347320302cc09","amount":"32000000000"}], "blob_gas_used":"1","excess_blob_gas":"1"},"blobs_bundle":{"commitments":[],"proofs":[],"blobs":[]},"signature":"0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"}"#;
 
         let bid = serde_json::from_str::<SignedBidSubmissionV3>(s).unwrap();
+        let json: serde_json::Value = serde_json::from_str(s).unwrap();
+        assert_eq!(json, serde_json::to_value(bid).unwrap());
+    }
+
+    #[test]
+    fn electra_bid_submission() {
+        let s = include_str!("examples/relay_builder_block_validation_request_v4.json");
+
+        let bid = serde_json::from_str::<SignedBidSubmissionV4>(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
         assert_eq!(json, serde_json::to_value(bid).unwrap());
     }

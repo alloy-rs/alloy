@@ -1,6 +1,7 @@
 use crate::{Network, TransactionBuilder};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::Address;
+use alloy_signer::{Signer, SignerSync};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 use futures_utils_wasm::impl_future;
@@ -15,8 +16,6 @@ use futures_utils_wasm::impl_future;
 /// Network wallets are expected to contain one or more signing credentials,
 /// keyed by signing address. The default signer address should be used when
 /// no specific signer address is specified.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&, &mut, Box, Rc, Arc)]
 pub trait NetworkWallet<N: Network>: std::fmt::Debug + Send + Sync {
     /// Get the default signer address. This address should be used
@@ -33,11 +32,11 @@ pub trait NetworkWallet<N: Network>: std::fmt::Debug + Send + Sync {
     /// Asynchronously sign an unsigned transaction, with a specified
     /// credential.
     #[doc(alias = "sign_tx_from")]
-    async fn sign_transaction_from(
+    fn sign_transaction_from(
         &self,
         sender: Address,
         tx: N::UnsignedTx,
-    ) -> alloy_signer::Result<N::TxEnvelope>;
+    ) -> impl_future!(<Output = alloy_signer::Result<N::TxEnvelope>>);
 
     /// Asynchronously sign an unsigned transaction.
     #[doc(alias = "sign_tx")]
@@ -50,13 +49,15 @@ pub trait NetworkWallet<N: Network>: std::fmt::Debug + Send + Sync {
 
     /// Asynchronously sign a transaction request, using the sender specified
     /// in the `from` field.
-    async fn sign_request(
+    fn sign_request(
         &self,
         request: N::TransactionRequest,
-    ) -> alloy_signer::Result<N::TxEnvelope> {
-        let sender = request.from().unwrap_or_else(|| self.default_signer_address());
-        let tx = request.build_unsigned().map_err(alloy_signer::Error::other)?;
-        self.sign_transaction_from(sender, tx).await
+    ) -> impl_future!(<Output = alloy_signer::Result<N::TxEnvelope>>) {
+        async move {
+            let sender = request.from().unwrap_or_else(|| self.default_signer_address());
+            let tx = request.build_unsigned().map_err(alloy_signer::Error::other)?;
+            self.sign_transaction_from(sender, tx).await
+        }
     }
 }
 
@@ -117,4 +118,27 @@ pub trait TxSignerSync<Signature> {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature>;
+}
+
+/// A unifying trait for asynchronous Ethereum signers that combine the functionalities of both
+/// [`Signer`] and [`TxSigner`].
+///
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn FullSigner>`) for types that combine
+/// both asynchronous Ethereum signing and transaction signing functionalities.
+pub trait FullSigner<S>: Signer<S> + TxSigner<S> {}
+impl<T, S> FullSigner<S> for T where T: Signer<S> + TxSigner<S> {}
+
+/// A unifying trait for synchronous Ethereum signers that implement both [`SignerSync`] and
+/// [`TxSignerSync`].
+///
+/// This trait enables dynamic dispatch (e.g., using `Box<dyn FullSignerSync>`) for types that
+/// combine both synchronous Ethereum signing and transaction signing functionalities.
+pub trait FullSignerSync<S>: SignerSync<S> + TxSignerSync<S> {}
+impl<T, S> FullSignerSync<S> for T where T: SignerSync<S> + TxSignerSync<S> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct _ObjectSafe(Box<dyn FullSigner<()>>, Box<dyn FullSignerSync<()>>);
 }

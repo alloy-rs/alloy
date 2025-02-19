@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -29,10 +33,10 @@ serde_json.workspace = true
 tokio.workspace = true
 tokio-util = { workspace = true, features = ["io"] }
 tracing.workspace = true
+serde.workspace = true
 
 bytes = "1.5.0"
 interprocess = { version = "2", features = ["tokio"] }
-serde = { workspace = true, optional = true }
 tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -40,4 +44,4 @@ tokio-test.workspace = true
 
 [features]
 default = []
-mock = ["dep:serde", "dep:tempfile"]
+mock = ["dep:tempfile"]

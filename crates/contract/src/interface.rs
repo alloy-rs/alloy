@@ -1,14 +1,17 @@
 use crate::{ContractInstance, Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{Address, Selector};
-use std::collections::{BTreeMap, HashMap};
+use alloy_primitives::{
+    map::{FbHashMap, SelectorHashMap},
+    Address, FixedBytes, Selector,
+};
+use std::collections::BTreeMap;
 
 /// A smart contract interface.
 #[derive(Clone, Debug)]
 pub struct Interface {
     abi: JsonAbi,
-    functions: HashMap<Selector, (String, usize)>,
+    functions: SelectorHashMap<(String, usize)>,
 }
 
 // TODO: events/errors
@@ -116,24 +119,19 @@ impl Interface {
     }
 
     /// Create a [`ContractInstance`] from this ABI for a contract at the given address.
-    pub const fn connect<T, P, N>(
-        self,
-        address: Address,
-        provider: P,
-    ) -> ContractInstance<T, P, N> {
+    pub const fn connect<P, N>(self, address: Address, provider: P) -> ContractInstance<P, N> {
         ContractInstance::new(address, provider, self)
     }
 }
 
 /// Utility function for creating a mapping between a unique signature and a
 /// name-index pair for accessing contract ABI items.
-fn create_mapping<T, S, F>(
+fn create_mapping<const N: usize, T, F>(
     elements: &BTreeMap<String, Vec<T>>,
     signature: F,
-) -> HashMap<S, (String, usize)>
+) -> FbHashMap<N, (String, usize)>
 where
-    S: std::hash::Hash + Eq,
-    F: Fn(&T) -> S + Copy,
+    F: Fn(&T) -> FixedBytes<N> + Copy,
 {
     elements
         .iter()

@@ -13,10 +13,10 @@ mod wallet;
 pub use wallet::WalletFiller;
 
 mod nonce;
-pub use nonce::NonceFiller;
+pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
 
 mod gas;
-pub use gas::{GasFillable, GasFiller};
+pub use gas::{BlobGasFiller, GasFillable, GasFiller};
 
 mod join_fill;
 pub use join_fill::JoinFill;
@@ -27,8 +27,8 @@ use crate::{
     RootProvider,
 };
 use alloy_json_rpc::RpcError;
-use alloy_network::{Ethereum, Network};
-use alloy_transport::{Transport, TransportResult};
+use alloy_network::{AnyNetwork, Ethereum, Network};
+use alloy_transport::TransportResult;
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use std::marker::PhantomData;
@@ -148,7 +148,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 
     /// Returns `true` if the filler is should continue filling.
     fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
-        tx.as_builder().map(|tx| self.status(tx).is_ready()).unwrap_or_default()
+        tx.as_builder().is_some_and(|tx| self.status(tx).is_ready())
     }
 
     /// Returns `true` if the filler is ready to fill in the transaction request.
@@ -167,14 +167,11 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     fn fill_sync(&self, tx: &mut SendableTx<N>);
 
     /// Prepares fillable properties, potentially by making an RPC request.
-    fn prepare<P, T>(
+    fn prepare<P: Provider<N>>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
-    ) -> impl_future!(<Output = TransportResult<Self::Fillable>>)
-    where
-        P: Provider<T, N>,
-        T: Transport + Clone;
+    ) -> impl_future!(<Output = TransportResult<Self::Fillable>>);
 
     /// Fills in the transaction request with the fillable properties.
     fn fill(
@@ -184,14 +181,13 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
 
     /// Prepares and fills the transaction request with the fillable properties.
-    fn prepare_and_fill<P, T>(
+    fn prepare_and_fill<P>(
         &self,
         provider: &P,
         tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>)
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N>,
     {
         async move {
             if tx.is_envelope() {
@@ -203,6 +199,16 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 
             self.fill(fillable, tx).await
         }
+    }
+
+    /// Prepares transaction request with necessary fillers required for eth_call operations
+    fn prepare_call(
+        &self,
+        tx: &mut N::TransactionRequest,
+    ) -> impl_future!(<Output = TransportResult<()>>) {
+        let _ = tx;
+        // This is a no-op by default
+        futures::future::ready(Ok(()))
     }
 }
 
@@ -218,23 +224,21 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 ///
 /// [`ProviderBuilder::filler`]: crate::ProviderBuilder::filler
 #[derive(Clone, Debug)]
-pub struct FillProvider<F, P, T, N>
+pub struct FillProvider<F, P, N = Ethereum>
 where
     F: TxFiller<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     pub(crate) inner: P,
     pub(crate) filler: F,
-    _pd: PhantomData<fn() -> (T, N)>,
+    _pd: PhantomData<fn() -> N>,
 }
 
-impl<F, P, T, N> FillProvider<F, P, T, N>
+impl<F, P, N> FillProvider<F, P, N>
 where
     F: TxFiller<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
     /// Creates a new `FillProvider` with the given filler and inner provider.
@@ -246,7 +250,7 @@ where
     pub fn join_with<Other: TxFiller<N>>(
         self,
         other: Other,
-    ) -> FillProvider<JoinFill<F, Other>, P, T, N> {
+    ) -> FillProvider<JoinFill<F, Other>, P, N> {
         self.filler.join_with(other).layer(self.inner)
     }
 
@@ -274,25 +278,33 @@ where
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
     }
+
+    /// Prepares a transaction request for eth_call operations using the configured fillers
+    pub async fn prepare_call(
+        &self,
+        mut tx: N::TransactionRequest,
+    ) -> TransportResult<N::TransactionRequest> {
+        self.filler.prepare_call(&mut tx).await?;
+        Ok(tx)
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<F, P, T, N> Provider<T, N> for FillProvider<F, P, T, N>
+impl<F, P, N> Provider<N> for FillProvider<F, P, N>
 where
     F: TxFiller<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N>,
     N: Network,
 {
-    fn root(&self) -> &RootProvider<T, N> {
+    fn root(&self) -> &RootProvider<N> {
         self.inner.root()
     }
 
     async fn send_transaction_internal(
         &self,
         mut tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
@@ -306,5 +318,32 @@ where
 
         // Errors in tx building happen further down the stack.
         self.inner.send_transaction_internal(tx).await
+    }
+}
+
+/// A trait which may be used to configure default fillers for [Network] implementations.
+pub trait RecommendedFillers: Network {
+    /// Recommended fillers for this network.
+    type RecommendedFillers: TxFiller<Self>;
+
+    /// Returns the recommended filler for this provider.
+    fn recommended_fillers() -> Self::RecommendedFillers;
+}
+
+impl RecommendedFillers for Ethereum {
+    type RecommendedFillers =
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+
+    fn recommended_fillers() -> Self::RecommendedFillers {
+        Default::default()
+    }
+}
+
+impl RecommendedFillers for AnyNetwork {
+    type RecommendedFillers =
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+
+    fn recommended_fillers() -> Self::RecommendedFillers {
+        Default::default()
     }
 }

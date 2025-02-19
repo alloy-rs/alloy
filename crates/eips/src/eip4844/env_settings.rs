@@ -1,7 +1,9 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use alloc::sync::Arc;
-use c_kzg::KzgSettings;
 use core::hash::{Hash, Hasher};
+
+// Re-export for convenience
+pub use c_kzg::KzgSettings;
 
 /// KZG settings.
 #[derive(Clone, Debug, Default, Eq)]
@@ -62,5 +64,14 @@ impl EnvKzgSettings {
             }
             Self::Custom(settings) => settings,
         }
+    }
+
+    /// Load custom KZG settings from a trusted setup file.
+    #[cfg(feature = "std")]
+    pub fn load_from_trusted_setup_file(
+        trusted_setup_file: &std::path::Path,
+    ) -> Result<Self, c_kzg::Error> {
+        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file)?;
+        Ok(Self::Custom(Arc::new(settings)))
     }
 }

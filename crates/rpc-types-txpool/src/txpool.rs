@@ -1,7 +1,7 @@
 //! Types for the `txpool` namespace: <https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool>
 
 use alloy_primitives::{Address, U256};
-use alloy_rpc_types_eth::Transaction;
+use alloy_rpc_types_eth::{Transaction, TransactionTrait};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -16,9 +16,27 @@ pub struct TxpoolInspectSummary {
     /// Transferred value
     pub value: U256,
     /// Gas amount
-    pub gas: u128,
+    pub gas: u64,
     /// Gas Price
     pub gas_price: u128,
+}
+
+impl TxpoolInspectSummary {
+    /// Extracts the [`TxpoolInspectSummary`] from a transaction.
+    pub fn from_tx<T: TransactionTrait>(tx: T) -> Self {
+        Self {
+            to: tx.to(),
+            value: tx.value(),
+            gas: tx.gas_limit(),
+            gas_price: tx.max_fee_per_gas(),
+        }
+    }
+}
+
+impl<T: TransactionTrait> From<T> for TxpoolInspectSummary {
+    fn from(value: T) -> Self {
+        Self::from_tx(value)
+    }
 }
 
 /// Visitor struct for TxpoolInspectSummary.
@@ -26,7 +44,7 @@ struct TxpoolInspectSummaryVisitor;
 
 /// Walk through the deserializer to parse a txpool inspection summary into the
 /// `TxpoolInspectSummary` struct.
-impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
+impl Visitor<'_> for TxpoolInspectSummaryVisitor {
     type Value = TxpoolInspectSummary;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -54,15 +72,13 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
             return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
         }
         let to = match addr_split[0] {
-            "" => None,
-            "0x" => None,
-            "contract creation" => None,
+            "" | "0x" | "contract creation" => None,
             addr => {
                 Some(Address::from_str(addr.trim_start_matches("0x")).map_err(de::Error::custom)?)
             }
         };
         let value = U256::from_str(value_split[0]).map_err(de::Error::custom)?;
-        let gas = u128::from_str(gas_split[0]).map_err(de::Error::custom)?;
+        let gas = u64::from_str(gas_split[0]).map_err(de::Error::custom)?;
         let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
 
         Ok(TxpoolInspectSummary { to, value, gas, gas_price })
@@ -110,17 +126,23 @@ impl Serialize for TxpoolInspectSummary {
 /// as the ones that are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TxpoolContent {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TxpoolContent<T = Transaction> {
     /// pending tx
-    pub pending: BTreeMap<Address, BTreeMap<String, Transaction>>,
+    pub pending: BTreeMap<Address, BTreeMap<String, T>>,
     /// queued tx
-    pub queued: BTreeMap<Address, BTreeMap<String, Transaction>>,
+    pub queued: BTreeMap<Address, BTreeMap<String, T>>,
 }
 
-impl TxpoolContent {
+impl<T> Default for TxpoolContent<T> {
+    fn default() -> Self {
+        Self { pending: BTreeMap::new(), queued: BTreeMap::new() }
+    }
+}
+
+impl<T> TxpoolContent<T> {
     /// Removes the transactions from the given sender
-    pub fn remove_from(&mut self, sender: &Address) -> TxpoolContentFrom {
+    pub fn remove_from(&mut self, sender: &Address) -> TxpoolContentFrom<T> {
         TxpoolContentFrom {
             pending: self.pending.remove(sender).unwrap_or_default(),
             queued: self.queued.remove(sender).unwrap_or_default(),
@@ -133,12 +155,18 @@ impl TxpoolContent {
 /// Same as [TxpoolContent] but for a specific address.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TxpoolContentFrom {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TxpoolContentFrom<T = Transaction> {
     /// pending tx
-    pub pending: BTreeMap<String, Transaction>,
+    pub pending: BTreeMap<String, T>,
     /// queued tx
-    pub queued: BTreeMap<String, Transaction>,
+    pub queued: BTreeMap<String, T>,
+}
+
+impl<T> Default for TxpoolContentFrom<T> {
+    fn default() -> Self {
+        Self { pending: BTreeMap::new(), queued: BTreeMap::new() }
+    }
 }
 
 /// Transaction Pool Inspect
@@ -178,6 +206,7 @@ pub struct TxpoolStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_txpool_content() {
@@ -193,7 +222,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a",
         "gas": "0x2af9e",
-        "gasPrice": "0x218711a00",
         "maxFeePerGas": "0x218711a00",
         "maxPriorityFeePerGas": "0x3b9aca00",
         "hash": "0xfbc6fd04ba1c4114f06574263f04099b4fb2da72acc6f9709f0a3d2361308344",
@@ -203,9 +231,10 @@ mod tests {
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
+        "v": "0x0",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0xbb809ae71b03319ba2811ebd581c85665169143ffade86e07d2eb4cd03b544dc",
         "s": "0x65a2aa7e0e70356f765205a611d580de8e84fa79086f117fd9ab4765f5cf1339"
       }
@@ -225,7 +254,7 @@ mod tests {
         "value": "0x0",
         "type": "0x0",
         "chainId": "0x1",
-        "v": "0x26",
+        "v": "0x25",
         "r": "0xaf46b2c0f067f7d1d63ac19daa349c0e1eb83f019ee00542ffa7095e05352e92",
         "s": "0x21d6d24d58ec361379ffffe4cc17bec8ce2b9f5f9759a91afc9a54dfdfa519c2"
       }
@@ -236,7 +265,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x000fab888651fbceb55de230493562159ead0340",
         "gas": "0x12fed",
-        "gasPrice": "0x1a13b8600",
         "maxFeePerGas": "0x1a13b8600",
         "maxPriorityFeePerGas": "0x59682f00",
         "hash": "0xfae0cffdae6774abe11662a2cdbea019fce48fca87ba9ebf5e9e7c2454c01715",
@@ -246,9 +274,10 @@ mod tests {
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
+        "v": "0x0",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0x7b717e689d1bd045ee7afd79b97219f2e36bd22a6a14e07023902194bca96fbf",
         "s": "0x7b0ba462c98e7b0f95a53f047cf568ee0443839628dfe4ab294bfab88fa8e251"
       }
@@ -261,7 +290,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf",
         "gas": "0x33c3b",
-        "gasPrice": "0x218711a00",
         "maxFeePerGas": "0x218711a00",
         "maxPriorityFeePerGas": "0x77359400",
         "hash": "0x68959706857f7a58d752ede0a5118a5f55f4ae40801f31377e1af201944720b2",
@@ -271,9 +299,10 @@ mod tests {
         "transactionIndex": null,
         "value": "0x1f58a57c1794eb",
         "type": "0x2",
+        "v": "0x0",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0x77d149add2b1b84af9408af55661b05b21e2a436f9bfcaa844584905a0f8f1ac",
         "s": "0x358d79063d702f0c3fb46ad0f6ce5db61f5fdb0b20359c8da2e72a11988db283"
       }
@@ -284,7 +313,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7918",
-        "gasPrice": "0x12e531724e",
         "maxFeePerGas": "0x12e531724e",
         "maxPriorityFeePerGas": "0x59682f00",
         "hash": "0x35109918ab6129a4d69480514ebec0ea08dc4a4de032fec59003ea66718828c4",
@@ -294,9 +322,10 @@ mod tests {
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
+        "v": "0x0",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0x863ed0413a14f3f1695fd9728f1500a2b46e69d6f4c82408af15354cc5a667d6",
         "s": "0x2d503050aa1c9ecbb6df9957459c296f2f6190bc07aa09047d541233100b1c7a"
       },
@@ -305,7 +334,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7530",
-        "gasPrice": "0x1919617600",
         "maxFeePerGas": "0x1919617600",
         "maxPriorityFeePerGas": "0x5c7261c0",
         "hash": "0xa58e54464b2ca62a5e2d976604ed9a53b13f8823a170ee4c3ae0cd91cde2a6c5",
@@ -315,9 +343,10 @@ mod tests {
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
+        "v": "0x1",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x1",
+        "yParity": "0x1",
         "r": "0xb6a571191c4b5b667876295571c42c9411bbb4569eea1a6ad149572e4efc55a9",
         "s": "0x248a72dab9b24568dd9cbe289c205eaba1a6b58b32b5a96c48554945d3fd0d86"
       }
@@ -328,7 +357,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x02666081cfb787de3562efbbca5f0fe890e927f1",
         "gas": "0x16404",
-        "gasPrice": "0x4bad00695",
         "maxFeePerGas": "0x4bad00695",
         "maxPriorityFeePerGas": "0xa3e9ab80",
         "hash": "0xf627e59d7a59eb650f4c9df222858572601a566263809fdacbb755ac2277a4a7",
@@ -338,9 +366,10 @@ mod tests {
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
+        "v": "0x0",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x1",
+        "yParity": "0x0",
         "r": "0xcfc88f55fc0779d12705acba58719cd7d0ed5b0c1a7c3c3682b56397ca493dd5",
         "s": "0x7e7dc008058c543ebfdae67154c797639447db5e8006f8fc0585352d857c1b6c"
       }
@@ -412,7 +441,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("000000000000000000000000000000000000007E").unwrap()),
                 value: U256::from(0u128),
-                gas: 100187u128,
+                gas: 100187,
                 gas_price: 20000000000u128,
             },
         );
@@ -426,7 +455,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65792u128,
+                gas: 65792,
                 gas_price: 2000000000u128,
             },
         );
@@ -435,7 +464,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65792u128,
+                gas: 65792,
                 gas_price: 2000000000u128,
             },
         );
@@ -444,7 +473,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65780u128,
+                gas: 65780,
                 gas_price: 2000000000u128,
             },
         );
@@ -453,7 +482,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: 65780u128,
+                gas: 65780,
                 gas_price: 2000000000u128,
             },
         );
@@ -467,7 +496,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: None,
                 value: U256::from(0u128),
-                gas: 612412u128,
+                gas: 612412,
                 gas_price: 6000000000u128,
             },
         );
@@ -482,7 +511,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("3479BE69e07E838D9738a301Bb0c89e8EA2Bef4a").unwrap()),
                 value: U256::from(1000000000000000u128),
-                gas: 21000u128,
+                gas: 21000,
                 gas_price: 10000000000u128,
             },
         );
@@ -491,7 +520,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(1000000000000000u128),
-                gas: 21000u128,
+                gas: 21000,
                 gas_price: 10000000000u128,
             },
         );
@@ -505,7 +534,7 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(10000000000000000u128),
-                gas: 21000u128,
+                gas: 21000,
                 gas_price: 10000000000u128,
             },
         );

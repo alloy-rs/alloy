@@ -1,6 +1,12 @@
 //! Provider-related utilities.
 
+use crate::{
+    fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
+    Identity,
+};
 use alloy_primitives::{U128, U64};
+
+pub use alloy_eips::eip1559::Eip1559Estimation;
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
@@ -13,15 +19,6 @@ pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 
 /// An estimator function for EIP1559 fees.
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
-
-/// Return type of EIP1155 gas fee estimator.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Eip1559Estimation {
-    /// The base fee per gas.
-    pub max_fee_per_gas: u128,
-    /// The max priority fee per gas.
-    pub max_priority_fee_per_gas: u128,
-}
 
 fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     let mut rewards =
@@ -40,8 +37,10 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
 
-/// The default EIP-1559 fee estimator which is based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56)
-/// (constants for "medium" priority level are used)
+/// The default EIP-1559 fee estimator.
+///
+/// Based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56);
+/// constants for "medium" priority level are used.
 pub fn eip1559_default_estimator(
     base_fee_per_gas: u128,
     rewards: &[Vec<u128>],
@@ -63,6 +62,13 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
+
+/// Helper type representing the joined recommended fillers i.e [`GasFiller`],
+/// [`BlobGasFiller`], [`NonceFiller`], and [`ChainIdFiller`].
+pub type JoinedRecommendedFillers = JoinFill<
+    Identity,
+    JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+>;
 
 #[cfg(test)]
 mod tests {

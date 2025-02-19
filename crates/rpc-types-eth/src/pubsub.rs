@@ -1,28 +1,31 @@
 //! Ethereum types for pub-sub
 
-use crate::{Filter, Log, RichHeader, Transaction};
+use crate::{Filter, Header, Log, Transaction};
+use alloc::{boxed::Box, format};
 use alloy_primitives::B256;
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use alloy_serde::WithOtherFields;
 
 /// Subscription result.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(untagged)]
-pub enum SubscriptionResult {
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+pub enum SubscriptionResult<T = Transaction> {
     /// New block header.
-    Header(Box<RichHeader>),
+    Header(Box<WithOtherFields<Header>>),
     /// Log
     Log(Box<Log>),
     /// Transaction hash
     TransactionHash(B256),
     /// Full Transaction
-    FullTransaction(Box<Transaction>),
+    FullTransaction(Box<T>),
     /// SyncStatus
     SyncState(PubSubSyncStatus),
 }
 
 /// Response type for a SyncStatus subscription.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum PubSubSyncStatus {
     /// If not currently syncing, this should always be `false`.
     Simple(bool),
@@ -31,8 +34,9 @@ pub enum PubSubSyncStatus {
 }
 
 /// Sync status metadata.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
     pub syncing: bool,
@@ -41,14 +45,18 @@ pub struct SyncStatusMetadata {
     /// The current block.
     pub current_block: u64,
     /// The highest block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub highest_block: Option<u64>,
 }
 
-impl Serialize for SubscriptionResult {
+#[cfg(feature = "serde")]
+impl<T> serde::Serialize for SubscriptionResult<T>
+where
+    T: serde::Serialize,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match *self {
             Self::Header(ref header) => header.serialize(serializer),
@@ -61,9 +69,10 @@ impl Serialize for SubscriptionResult {
 }
 
 /// Subscription kind.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum SubscriptionKind {
     /// New block headers subscription.
     ///
@@ -121,10 +130,23 @@ impl Params {
     }
 }
 
-impl Serialize for Params {
+impl From<Filter> for Params {
+    fn from(filter: Filter) -> Self {
+        Self::Logs(Box::new(filter))
+    }
+}
+
+impl From<bool> for Params {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Params {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::None => (&[] as &[serde_json::Value]).serialize(serializer),
@@ -134,11 +156,14 @@ impl Serialize for Params {
     }
 }
 
-impl<'a> Deserialize<'a> for Params {
+#[cfg(feature = "serde")]
+impl<'a> serde::Deserialize<'a> for Params {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
+        use serde::de::Error;
+
         let v = serde_json::Value::deserialize(deserializer)?;
 
         if v.is_null() {
@@ -146,11 +171,11 @@ impl<'a> Deserialize<'a> for Params {
         }
 
         if let Some(val) = v.as_bool() {
-            return Ok(Self::Bool(val));
+            return Ok(val.into());
         }
 
-        serde_json::from_value(v)
-            .map(|f| Self::Logs(Box::new(f)))
+        serde_json::from_value::<Filter>(v)
+            .map(Into::into)
             .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
     }
 }
@@ -158,12 +183,94 @@ impl<'a> Deserialize<'a> for Params {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn params_serde() {
+        // Test deserialization of boolean parameter
         let s: Params = serde_json::from_str("true").unwrap();
         assert_eq!(s, Params::Bool(true));
+
+        // Test deserialization of null (None) parameter
         let s: Params = serde_json::from_str("null").unwrap();
         assert_eq!(s, Params::None);
+
+        // Test deserialization of log parameters
+        let filter = Filter::default();
+        let s: Params = serde_json::from_str(&serde_json::to_string(&filter).unwrap()).unwrap();
+        assert_eq!(s, Params::Logs(Box::new(filter)));
+    }
+
+    #[test]
+    fn params_is_bool() {
+        // Check if the `is_bool` method correctly identifies boolean parameters
+        let param = Params::Bool(true);
+        assert!(param.is_bool());
+
+        let param = Params::None;
+        assert!(!param.is_bool());
+
+        let param = Params::Logs(Box::default());
+        assert!(!param.is_bool());
+    }
+
+    #[test]
+    fn params_is_logs() {
+        // Check if the `is_logs` method correctly identifies log parameters
+        let param = Params::Logs(Box::default());
+        assert!(param.is_logs());
+
+        let param = Params::None;
+        assert!(!param.is_logs());
+
+        let param = Params::Bool(true);
+        assert!(!param.is_logs());
+    }
+
+    #[test]
+    fn params_from_filter() {
+        let filter = Filter::default();
+        let param: Params = filter.clone().into();
+        assert_eq!(param, Params::Logs(Box::new(filter)));
+    }
+
+    #[test]
+    fn params_from_bool() {
+        let param: Params = true.into();
+        assert_eq!(param, Params::Bool(true));
+
+        let param: Params = false.into();
+        assert_eq!(param, Params::Bool(false));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_none() {
+        let param = Params::None;
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, "[]");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_bool() {
+        let param = Params::Bool(true);
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, "true");
+
+        let param = Params::Bool(false);
+        let serialized = serde_json::to_string(&param).unwrap();
+        assert_eq!(serialized, "false");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn params_serialize_logs() {
+        let filter = Filter::default();
+        let param = Params::Logs(Box::new(filter.clone()));
+        let serialized = serde_json::to_string(&param).unwrap();
+        let expected = serde_json::to_string(&filter).unwrap();
+        assert_eq!(serialized, expected);
     }
 }

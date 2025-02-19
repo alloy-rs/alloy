@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_eth::{Block, Header, Rich, Transaction, TransactionReceipt, Withdrawal};
+use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawals};
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -21,6 +21,8 @@ pub enum OperationType {
     OpCreate = 2,
     /// Operation Create2
     OpCreate2 = 3,
+    /// Operation EofCreate
+    OpEofCreate = 4,
 }
 
 // Implement Serialize for OperationType
@@ -46,6 +48,7 @@ impl<'de> Deserialize<'de> for OperationType {
             1 => Ok(Self::OpSelfDestruct),
             2 => Ok(Self::OpCreate),
             3 => Ok(Self::OpCreate2),
+            4 => Ok(Self::OpEofCreate),
             other => Err(de::Error::invalid_value(
                 Unexpected::Unsigned(other as u64),
                 &"a valid OperationType",
@@ -102,17 +105,17 @@ pub struct InternalIssuance {
 /// Custom `Block` struct that includes transaction count for Otterscan responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OtsBlock {
+pub struct OtsBlock<T = Transaction, H = Header> {
     /// The block information.
     #[serde(flatten)]
-    pub block: Block,
+    pub block: Block<T, H>,
     /// The number of transactions in the block.
     #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
-impl From<Block> for OtsBlock {
-    fn from(block: Block) -> Self {
+impl<T, H> From<Block<T, H>> for OtsBlock<T, H> {
+    fn from(block: Block<T, H>) -> Self {
         Self { transaction_count: block.transactions.len(), block }
     }
 }
@@ -120,30 +123,26 @@ impl From<Block> for OtsBlock {
 /// Custom `Block` struct that without transactions for Otterscan responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OtsSlimBlock {
+pub struct OtsSlimBlock<H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
-    /// Integer the size of this block in bytes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub size: Option<U256>,
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub withdrawals: Option<Vec<Withdrawal>>,
+    pub withdrawals: Option<Withdrawals>,
     /// The number of transactions in the block.
     #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
-impl From<Block> for OtsSlimBlock {
-    fn from(block: Block) -> Self {
+impl<T, H> From<Block<T, H>> for OtsSlimBlock<H> {
+    fn from(block: Block<T, H>) -> Self {
         Self {
             header: block.header,
             uncles: block.uncles,
-            size: block.size,
             withdrawals: block.withdrawals,
             transaction_count: block.transactions.len(),
         }
@@ -153,29 +152,25 @@ impl From<Block> for OtsSlimBlock {
 /// Custom struct for otterscan `getBlockDetails` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BlockDetails {
+pub struct BlockDetails<H = Header> {
     /// The block information with transaction count.
-    pub block: OtsSlimBlock,
+    pub block: OtsSlimBlock<H>,
     /// The issuance information for the block.
     pub issuance: InternalIssuance,
     /// The total fees for the block.
     pub total_fees: U256,
 }
 
-impl From<Rich<Block>> for BlockDetails {
-    fn from(rich_block: Rich<Block>) -> Self {
-        Self {
-            block: rich_block.inner.into(),
-            issuance: Default::default(),
-            total_fees: U256::default(),
-        }
+impl<T, H> From<Block<T, H>> for BlockDetails<H> {
+    fn from(block: Block<T, H>) -> Self {
+        Self { block: block.into(), issuance: Default::default(), total_fees: U256::default() }
     }
 }
 
-impl BlockDetails {
+impl<H> BlockDetails<H> {
     /// Create a new `BlockDetails` struct.
-    pub fn new(rich_block: Rich<Block>, issuance: InternalIssuance, total_fees: U256) -> Self {
-        Self { block: rich_block.inner.into(), issuance, total_fees }
+    pub fn new<T>(block: Block<T, H>, issuance: InternalIssuance, total_fees: U256) -> Self {
+        Self { block: block.into(), issuance, total_fees }
     }
 }
 
@@ -208,7 +203,7 @@ pub struct OtsReceipt {
     /// The logs sent from contracts.
     ///
     /// Note: this is set to null.
-    pub logs: Option<Vec<alloy_primitives::Log>>,
+    pub logs: Option<Vec<Log>>,
     /// The bloom filter.
     ///
     /// Note: this is set to null.
@@ -220,9 +215,9 @@ pub struct OtsReceipt {
 
 /// Custom struct for otterscan `getBlockTransactions` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OtsBlockTransactions {
+pub struct OtsBlockTransactions<T = Transaction, H = Header> {
     /// The full block information with transaction count.
-    pub fullblock: OtsBlock,
+    pub fullblock: OtsBlock<T, H>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
 }
@@ -232,10 +227,10 @@ pub struct OtsBlockTransactions {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "TxWithReceipts")]
-pub struct TransactionsWithReceipts {
+pub struct TransactionsWithReceipts<T = Transaction> {
     /// The list of transactions.
     #[doc(alias = "transactions")]
-    pub txs: Vec<Transaction>,
+    pub txs: Vec<T>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
     /// Indicates if this is the first page of results.
@@ -256,6 +251,7 @@ pub struct ContractCreator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_otterscan_receipt() {
@@ -280,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn test_otterscan_interal_operation() {
+    fn test_otterscan_internal_operation() {
         let s = r#"{
           "type": 0,
           "from": "0xea593b730d745fb5fe01b6d20e6603915252c6bf",

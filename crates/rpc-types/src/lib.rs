@@ -6,6 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[doc(hidden)]
 pub use alloy_serde as serde_helpers;
 
 mod rpc;
@@ -19,6 +20,9 @@ pub use alloy_rpc_types_anvil as anvil;
 
 #[cfg(feature = "beacon")]
 pub use alloy_rpc_types_beacon as beacon;
+
+#[cfg(feature = "debug")]
+pub use alloy_rpc_types_debug as debug;
 
 #[cfg(feature = "engine")]
 pub use alloy_rpc_types_engine as engine;

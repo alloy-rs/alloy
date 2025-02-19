@@ -66,7 +66,18 @@ pub struct EthProtocolInfo {
     /// The eth network version.
     pub network: u64,
     /// The total difficulty of the host's blockchain.
-    pub difficulty: U256,
+    ///
+    /// NOTE: This is deprecated as total difficulty related fields are being removed from RPC,
+    /// since the merge has long passed.
+    ///
+    /// See changes to geth's `NodeInfo` structs:
+    /// * <https://github.com/ethereum/go-ethereum/pull/30744>
+    /// * <https://github.com/ethereum/go-ethereum/blob/314e18193eeca3e47b627408da47e33132d72aa8/eth/protocols/eth/handler.go#L119-L126>
+    #[deprecated(
+        since = "0.8.2",
+        note = "`difficulty` is being removed from `admin_nodeInfo`, see https://github.com/ethereum/go-ethereum/pull/30744"
+    )]
+    pub difficulty: Option<U256>,
     /// The Keccak hash of the host's genesis block.
     pub genesis: B256,
     /// The chain configuration for the host's fork rules.
@@ -213,7 +224,7 @@ pub struct PeerEvent {
     pub kind: PeerEventType,
     /// The peer's enode ID.
     pub peer: String,
-    /// An error ocurred on the peer.
+    /// An error occurred on the peer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// The protocol of the peer.
@@ -257,6 +268,7 @@ mod handshake {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn deserialize_peer_info() {

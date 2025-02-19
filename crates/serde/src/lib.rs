@@ -1,5 +1,3 @@
-//! Alloy serde helpers for primitive types.
-
 #![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
@@ -15,16 +13,10 @@ use alloc::format;
 use alloy_primitives::{hex, B256};
 use serde::Serializer;
 
-mod bool;
-pub use self::bool::*;
+pub mod displayfromstr;
 
 mod optional;
 pub use self::optional::*;
-
-#[cfg_attr(not(test), deprecated = "use `quantity::{self, opt, vec}` instead")]
-pub mod num;
-#[allow(deprecated)]
-pub use num::*;
 
 pub mod quantity;
 

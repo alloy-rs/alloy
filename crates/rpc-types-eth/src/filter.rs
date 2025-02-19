@@ -1,20 +1,18 @@
 use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
-use alloy_primitives::{keccak256, Address, BlockHash, Bloom, BloomInput, B256, U256, U64};
-use itertools::{EitherOrBoth::*, Itertools};
-use serde::{
-    de::{DeserializeOwned, MapAccess, Visitor},
-    ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
+use alloc::{string::String, vec::Vec};
+use alloy_primitives::{
+    keccak256,
+    map::{hash_set, HashSet},
+    Address, BlockHash, Bloom, BloomInput, B256, U256, U64,
 };
-use std::{
-    collections::{
-        hash_set::{IntoIter, Iter},
-        HashSet,
-    },
+use core::{
     hash::Hash,
-    ops::{Range, RangeFrom, RangeTo},
+    ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
-use thiserror::Error;
+use itertools::{
+    EitherOrBoth::{Both, Left, Right},
+    Itertools,
+};
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -35,18 +33,19 @@ impl BloomFilter {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
-/// FilterSet is a set of values that will be used to filter logs
+/// FilterSet is a set of values that will be used to filter logs.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        Self([src].into())
+        Self(core::iter::once(src).collect())
     }
 }
 
 impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         for value in &self.0 {
             value.hash(state);
         }
@@ -55,7 +54,7 @@ impl<T: Eq + Hash> Hash for FilterSet<T> {
 
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
-        Self(HashSet::from_iter(src.into_iter().map(Into::into)))
+        Self(src.into_iter().collect())
     }
 }
 
@@ -90,7 +89,7 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
 
 impl<T: Eq + Hash> IntoIterator for FilterSet<T> {
     type Item = T;
-    type IntoIter = IntoIter<T>;
+    type IntoIter = hash_set::IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -117,7 +116,7 @@ impl<T: Eq + Hash> FilterSet<T> {
 
     /// Returns an iterator over the underlying HashSet. Values are visited
     /// in an arbitrary order.
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> hash_set::Iter<'_, T> {
         self.0.iter()
     }
 }
@@ -154,7 +153,7 @@ impl From<U256> for Topic {
 }
 
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum FilterBlockError {
     /// Error indicating that the `from_block` is greater than the `to_block`.
     #[error("`from_block` ({from}) is greater than `to_block` ({to})")]
@@ -229,8 +228,8 @@ impl FilterBlockOption {
     pub fn ensure_valid_block_range(&self) -> Result<(), FilterBlockError> {
         // Check if from_block is greater than to_block
         if let (Some(from), Some(to)) = (
-            self.get_from_block().as_ref().and_then(|from| from.as_number()),
-            self.get_to_block().as_ref().and_then(|to| to.as_number()),
+            self.get_from_block().and_then(|from| from.as_number()),
+            self.get_to_block().and_then(|to| to.as_number()),
         ) {
             if from > to {
                 return Err(FilterBlockError::FromBlockGreaterThanToBlock { from, to });
@@ -277,16 +276,17 @@ impl From<u64> for FilterBlockOption {
     }
 }
 
-impl<T: Into<BlockNumberOrTag>> From<Range<T>> for FilterBlockOption {
-    fn from(r: Range<T>) -> Self {
-        let from_block = Some(r.start.into());
-        let to_block = Some(r.end.into());
+impl<T: Into<BlockNumberOrTag>> From<RangeInclusive<T>> for FilterBlockOption {
+    fn from(r: RangeInclusive<T>) -> Self {
+        let (start, end) = r.into_inner();
+        let from_block = Some(start.into());
+        let to_block = Some(end.into());
         Self::Range { from_block, to_block }
     }
 }
 
-impl<T: Into<BlockNumberOrTag>> From<RangeTo<T>> for FilterBlockOption {
-    fn from(r: RangeTo<T>) -> Self {
+impl<T: Into<BlockNumberOrTag>> From<RangeToInclusive<T>> for FilterBlockOption {
+    fn from(r: RangeToInclusive<T>) -> Self {
         let to_block = Some(r.end.into());
         Self::Range { from_block: Some(BlockNumberOrTag::Earliest), to_block }
     }
@@ -371,7 +371,7 @@ impl Filter {
     /// ```rust
     /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
-    /// let filter = Filter::new().select(0u64..100u64);
+    /// let filter = Filter::new().select(0u64..=100u64);
     /// # }
     /// ```
     ///
@@ -389,7 +389,7 @@ impl Filter {
     /// ```rust
     /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
-    /// let filter = Filter::new().select(..1337u64);
+    /// let filter = Filter::new().select(..=1337u64);
     /// # }
     /// ```
     #[must_use]
@@ -415,8 +415,8 @@ impl Filter {
     /// Return `true` if filter configured to match pending block.
     /// This means that both from_block and to_block are set to the pending tag.
     pub fn is_pending_block_filter(&self) -> bool {
-        self.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
-            && self.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending)
+        self.block_option.get_from_block().is_some_and(BlockNumberOrTag::is_pending)
+            && self.block_option.get_to_block().is_some_and(BlockNumberOrTag::is_pending)
     }
 
     /// Pins the block hash for the filter
@@ -540,11 +540,14 @@ impl Filter {
     }
 }
 
-impl Serialize for Filter {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Filter {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
+        use serde::ser::SerializeStruct;
+
         let mut s = serializer.serialize_struct("Filter", 5)?;
         match self.block_option {
             FilterBlockOption::Range { from_block, to_block } => {
@@ -579,26 +582,27 @@ impl Serialize for Filter {
     }
 }
 
-type RawAddressFilter = ValueOrArray<Option<Address>>;
-type RawTopicsFilter = Vec<Option<ValueOrArray<Option<B256>>>>;
-
-impl<'de> Deserialize<'de> for Filter {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Filter {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
+        type RawAddressFilter = ValueOrArray<Option<Address>>;
+        type RawTopicsFilter = Vec<Option<ValueOrArray<Option<B256>>>>;
+
         struct FilterVisitor;
 
-        impl<'de> Visitor<'de> for FilterVisitor {
+        impl<'de> serde::de::Visitor<'de> for FilterVisitor {
             type Value = Filter;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 formatter.write_str("Filter object")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
-                A: MapAccess<'de>,
+                A: serde::de::MapAccess<'de>,
             {
                 let mut from_block: Option<Option<BlockNumberOrTag>> = None;
                 let mut to_block: Option<Option<BlockNumberOrTag>> = None;
@@ -612,32 +616,17 @@ impl<'de> Deserialize<'de> for Filter {
                             if from_block.is_some() {
                                 return Err(serde::de::Error::duplicate_field("fromBlock"));
                             }
-                            if block_hash.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "fromBlock not allowed with blockHash",
-                                ));
-                            }
                             from_block = Some(map.next_value()?)
                         }
                         "toBlock" => {
                             if to_block.is_some() {
                                 return Err(serde::de::Error::duplicate_field("toBlock"));
                             }
-                            if block_hash.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "toBlock not allowed with blockHash",
-                                ));
-                            }
                             to_block = Some(map.next_value()?)
                         }
                         "blockHash" => {
                             if block_hash.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockHash"));
-                            }
-                            if from_block.is_some() || to_block.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "fromBlock,toBlock not allowed with blockHash",
-                                ));
                             }
                             block_hash = Some(map.next_value()?)
                         }
@@ -663,9 +652,20 @@ impl<'de> Deserialize<'de> for Filter {
                     }
                 }
 
-                let from_block = from_block.unwrap_or_default();
-                let to_block = to_block.unwrap_or_default();
-                let block_hash = block_hash.unwrap_or_default();
+                // conflict check between block_hash and from_block/to_block
+                let (block_hash, from_block, to_block) = if let Some(Some(hash)) = block_hash {
+                    if from_block.is_some_and(|inner| inner.is_some())
+                        || to_block.is_some_and(|inner| inner.is_some())
+                    {
+                        return Err(serde::de::Error::custom(
+                            "cannot specify both blockHash and fromBlock/toBlock, choose one or the other",
+                        ));
+                    }
+                    (Some(hash), None, None)
+                } else {
+                    (None, from_block.unwrap_or_default(), to_block.unwrap_or_default())
+                };
+
                 let address = address.flatten().map(|a| a.into()).unwrap_or_default();
                 let topics_vec = topics.flatten().unwrap_or_default();
 
@@ -753,13 +753,14 @@ impl From<Vec<B256>> for ValueOrArray<B256> {
     }
 }
 
-impl<T> Serialize for ValueOrArray<T>
+#[cfg(feature = "serde")]
+impl<T> serde::Serialize for ValueOrArray<T>
 where
-    T: Serialize,
+    T: serde::Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::Value(inner) => inner.serialize(serializer),
@@ -768,13 +769,14 @@ where
     }
 }
 
-impl<'a, T> Deserialize<'a> for ValueOrArray<T>
+#[cfg(feature = "serde")]
+impl<'a, T> serde::Deserialize<'a> for ValueOrArray<T>
 where
-    T: DeserializeOwned,
+    T: serde::de::DeserializeOwned,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
 
@@ -782,7 +784,7 @@ where
             return Ok(Self::Array(Vec::new()));
         }
 
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum Variadic<T> {
             Value(T),
@@ -831,7 +833,7 @@ impl FilteredParams {
         // for each filter, iterate through the list of filter blooms. for each set of filter
         // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
         // empty (no filters).
-        for filter in topic_filters.iter() {
+        for filter in topic_filters {
             if !filter.matches(bloom) {
                 return false;
             }
@@ -889,7 +891,7 @@ impl FilteredParams {
     /// This means that both from_block and to_block are set to the pending tag.
     /// It calls [`Filter::is_pending_block_filter`] undercover.
     pub fn is_pending_block_filter(&self) -> bool {
-        self.filter.as_ref().map_or(false, |f| f.is_pending_block_filter())
+        self.filter.as_ref().is_some_and(|f| f.is_pending_block_filter())
     }
 
     /// Returns `true` if the filter matches the given address.
@@ -928,11 +930,12 @@ impl FilteredParams {
 }
 
 /// Response of the `eth_getFilterChanges` RPC.
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(untagged)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum FilterChanges<T = Transaction> {
     /// Empty result.
-    #[serde(with = "empty_array")]
+    #[cfg_attr(feature = "serde", serde(with = "empty_array"))]
     #[default]
     Empty,
     /// New logs.
@@ -1010,6 +1013,7 @@ impl<T> FilterChanges<T> {
     }
 }
 
+#[cfg(feature = "serde")]
 mod empty_array {
     use serde::{Serialize, Serializer};
 
@@ -1021,12 +1025,16 @@ mod empty_array {
     }
 }
 
-impl<'de> Deserialize<'de> for FilterChanges {
+#[cfg(feature = "serde")]
+impl<'de, T> serde::Deserialize<'de> for FilterChanges<T>
+where
+    T: serde::Deserialize<'de>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum Changes<T = Transaction> {
             Hashes(Vec<B256>),
@@ -1063,9 +1071,10 @@ impl<'de> Deserialize<'de> for FilterChanges {
 }
 
 /// Owned equivalent of a `SubscriptionId`
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(untagged)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum FilterId {
     /// Numeric id
     Num(u64),
@@ -1119,13 +1128,14 @@ pub enum PendingTransactionFilterKind {
     Full,
 }
 
-impl Serialize for PendingTransactionFilterKind {
+#[cfg(feature = "serde")]
+impl serde::Serialize for PendingTransactionFilterKind {
     /// Serializes the `PendingTransactionFilterKind` into a boolean value:
     /// - `false` for `Hashes`
     /// - `true` for `Full`
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::Hashes => false.serialize(serializer),
@@ -1134,13 +1144,14 @@ impl Serialize for PendingTransactionFilterKind {
     }
 }
 
-impl<'a> Deserialize<'a> for PendingTransactionFilterKind {
+#[cfg(feature = "serde")]
+impl<'a> serde::Deserialize<'a> for PendingTransactionFilterKind {
     /// Deserializes a boolean value into `PendingTransactionFilterKind`:
     /// - `false` becomes `Hashes`
     /// - `true` becomes `Full`
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
         let val = Option::<bool>::deserialize(deserializer)?;
         match val {
@@ -1154,16 +1165,19 @@ impl<'a> Deserialize<'a> for PendingTransactionFilterKind {
 mod tests {
     use super::*;
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
+    #[cfg(feature = "serde")]
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_empty_filter_topics_list() {
         let s = r#"{"fromBlock": "0xfc359e", "toBlock": "0xfc359e", "topics": [["0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"], [], ["0x0000000000000000000000000c17e776cd218252adfca8d4e761d3fe757e9778"]]}"#;
         let filter = serde_json::from_str::<Filter>(s).unwrap();
-        similar_asserts::assert_eq!(
+        assert_eq!(
             filter.topics,
             [
                 "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
@@ -1206,11 +1220,12 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_block_hash() {
         let s =
             r#"{"blockHash":"0x58dc57ab582b282c143424bd01e8d923cddfdcda9455bad02a29522f6274a948"}"#;
         let filter = serde_json::from_str::<Filter>(s).unwrap();
-        similar_asserts::assert_eq!(
+        assert_eq!(
             filter.block_option,
             FilterBlockOption::AtBlockHash(
                 "0x58dc57ab582b282c143424bd01e8d923cddfdcda9455bad02a29522f6274a948"
@@ -1221,10 +1236,11 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_filter_topics_middle_wildcard() {
         let s = r#"{"fromBlock": "0xfc359e", "toBlock": "0xfc359e", "topics": [["0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"], [], [null, "0x0000000000000000000000000c17e776cd218252adfca8d4e761d3fe757e9778"]]}"#;
         let filter = serde_json::from_str::<Filter>(s).unwrap();
-        similar_asserts::assert_eq!(
+        assert_eq!(
             filter.topics,
             [
                 "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
@@ -1239,8 +1255,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_serde_value_or_array() {
-        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+        #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         struct Item {
             value: ValueOrArray<U256>,
         }
@@ -1257,6 +1274,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn filter_serialization_test() {
         let t1 = "0000000000000000000000009729a6fbefefc8f6005933898b13dc45c3a2c8b7"
             .parse::<B256>()
@@ -1496,6 +1514,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_convert_to_ethers_filter() {
         let json = json!(
                     {
@@ -1542,6 +1561,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_convert_to_ethers_filter_with_null_fields() {
         let json = json!(
                     {
@@ -1563,6 +1583,90 @@ mod tests {
                 address: Default::default(),
                 topics: Default::default(),
             }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_range_block() {
+        let json = json!(
+                    {
+          "fromBlock": null,
+          "toBlock": null,
+          "blockHash": "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee",
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::AtBlockHash(
+                "0xe903ebc49101d30b28d7256be411f81418bf6809ddbaefc40201b1b97f2e64ee"
+                    .parse()
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash() {
+        let json = json!(
+                    {
+          "fromBlock": "0x1",
+          "toBlock": "0x2",
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: Some(2u64.into()) }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash_and_null_from_block() {
+        let json = json!(
+                    {
+          "fromBlock": null,
+          "toBlock": "0x2",
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: None, to_block: Some(2u64.into()) }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_filter_with_null_block_hash_and_null_to_block() {
+        let json = json!(
+                    {
+          "fromBlock": "0x1",
+          "toBlock": null,
+          "blockHash": null,
+          "address": null,
+          "topics": null
+        }
+            );
+
+        let filter: Filter = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            filter.block_option,
+            FilterBlockOption::Range { from_block: Some(1u64.into()), to_block: None }
         );
     }
 

@@ -14,28 +14,80 @@ use std::{
 use tower::{Layer, Service};
 use tracing::trace;
 
+#[cfg(target_arch = "wasm32")]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::sleep;
+
+/// The default average cost of a request in compute units (CU).
+const DEFAULT_AVG_COST: u64 = 17u64;
+
 /// A Transport Layer that is responsible for retrying requests based on the
 /// error type. See [`TransportError`].
 ///
 /// TransportError: crate::error::TransportError
 #[derive(Debug, Clone)]
-pub struct RetryBackoffLayer {
+pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The initial backoff in milliseconds
     initial_backoff: u64,
     /// The number of compute units per second for this provider
     compute_units_per_second: u64,
+    /// The average cost of a request. Defaults to [DEFAULT_AVG_COST]
+    avg_cost: u64,
+    /// The [RetryPolicy] to use. Defaults to [RateLimitRetryPolicy]
+    policy: P,
 }
 
 impl RetryBackoffLayer {
-    /// Creates a new retry layer with the given parameters.
+    /// Creates a new retry layer with the given parameters and the default [RateLimitRetryPolicy].
     pub const fn new(
         max_rate_limit_retries: u32,
         initial_backoff: u64,
         compute_units_per_second: u64,
     ) -> Self {
-        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second }
+        Self {
+            max_rate_limit_retries,
+            initial_backoff,
+            compute_units_per_second,
+            avg_cost: DEFAULT_AVG_COST,
+            policy: RateLimitRetryPolicy,
+        }
+    }
+
+    /// Set the average cost of a request. Defaults to `17` CU
+    /// The cost of requests are usually weighted and can vary from 10 CU to several 100 CU,
+    /// cheaper requests are more common some example alchemy
+    /// weights:
+    /// - `eth_getStorageAt`: 17
+    /// - `eth_getBlockByNumber`: 16
+    /// - `eth_newFilter`: 20
+    ///
+    /// (coming from forking mode) assuming here that storage request will be the
+    /// driver for Rate limits we choose `17` as the average cost
+    /// of any request
+    pub fn with_avg_unit_cost(mut self, avg_cost: u64) {
+        self.avg_cost = avg_cost;
+    }
+}
+
+impl<P: RetryPolicy> RetryBackoffLayer<P> {
+    /// Creates a new retry layer with the given parameters and [RetryPolicy].
+    pub const fn new_with_policy(
+        max_rate_limit_retries: u32,
+        initial_backoff: u64,
+        compute_units_per_second: u64,
+        policy: P,
+    ) -> Self {
+        Self {
+            max_rate_limit_retries,
+            initial_backoff,
+            compute_units_per_second,
+            policy,
+            avg_cost: DEFAULT_AVG_COST,
+        }
     }
 }
 
@@ -66,17 +118,18 @@ impl RetryPolicy for RateLimitRetryPolicy {
     }
 }
 
-impl<S> Layer<S> for RetryBackoffLayer {
-    type Service = RetryBackoffService<S>;
+impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
+    type Service = RetryBackoffService<S, P>;
 
     fn layer(&self, inner: S) -> Self::Service {
         RetryBackoffService {
             inner,
-            policy: RateLimitRetryPolicy,
+            policy: self.policy.clone(),
             max_rate_limit_retries: self.max_rate_limit_retries,
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
             requests_enqueued: Arc::new(AtomicU32::new(0)),
+            avg_cost: self.avg_cost,
         }
     }
 }
@@ -84,11 +137,11 @@ impl<S> Layer<S> for RetryBackoffLayer {
 /// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
 #[derive(Debug, Clone)]
-pub struct RetryBackoffService<S> {
+pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
     inner: S,
-    /// The retry policy
-    policy: RateLimitRetryPolicy,
+    /// The [RetryPolicy] to use.
+    policy: P,
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
     /// The initial backoff in milliseconds
@@ -97,21 +150,23 @@ pub struct RetryBackoffService<S> {
     compute_units_per_second: u64,
     /// The number of requests currently enqueued
     requests_enqueued: Arc<AtomicU32>,
+    /// The average cost of a request.
+    avg_cost: u64,
 }
 
-impl<S> RetryBackoffService<S> {
+impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
     const fn initial_backoff(&self) -> Duration {
         Duration::from_millis(self.initial_backoff)
     }
 }
 
-impl<S> Service<RequestPacket> for RetryBackoffService<S>
+impl<S, P> Service<RequestPacket> for RetryBackoffService<S, P>
 where
-    S: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>
+    S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + 'static
         + Clone,
-    S::Future: Send + 'static,
+    P: RetryPolicy + Clone + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
@@ -164,19 +219,8 @@ where
                     let backoff_hint = this.policy.backoff_hint(&err);
                     let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
 
-                    // requests are usually weighted and can vary from 10 CU to several 100 CU,
-                    // cheaper requests are more common some example alchemy
-                    // weights:
-                    // - `eth_getStorageAt`: 17
-                    // - `eth_getBlockByNumber`: 16
-                    // - `eth_newFilter`: 20
-                    //
-                    // (coming from forking mode) assuming here that storage request will be the
-                    // driver for Rate limits we choose `17` as the average cost
-                    // of any request
-                    const AVG_COST: u64 = 17u64;
                     let seconds_to_wait_for_compute_budget = compute_unit_offset_in_secs(
-                        AVG_COST,
+                        this.avg_cost,
                         this.compute_units_per_second,
                         current_queued_reqs,
                         ahead_in_queue,
@@ -192,7 +236,7 @@ where
                         "(all in ms) backing off due to rate limit"
                     );
 
-                    tokio::time::sleep(total_backoff).await;
+                    sleep(total_backoff).await;
                 } else {
                     this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     return Err(err);
@@ -219,10 +263,23 @@ fn compute_unit_offset_in_secs(
     current_queued_requests: u64,
     ahead_in_queue: u64,
 ) -> u64 {
-    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost);
+    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost).max(1);
     if current_queued_requests > request_capacity_per_second {
         current_queued_requests.min(ahead_in_queue).saturating_div(request_capacity_per_second)
     } else {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_units_per_second() {
+        let offset = compute_unit_offset_in_secs(17, 10, 0, 0);
+        assert_eq!(offset, 0);
+        let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
+        assert_eq!(offset, 2);
     }
 }

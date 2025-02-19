@@ -47,6 +47,20 @@ pub struct Validity {
     pub refund_config: Option<Vec<RefundConfig>>,
 }
 
+impl Validity {
+    /// Sets refund
+    pub fn with_refund(mut self, refund: Option<Vec<Refund>>) -> Self {
+        self.refund = refund;
+        self
+    }
+
+    /// Sets refund config
+    pub fn with_refund_config(mut self, refund_config: Option<Vec<RefundConfig>>) -> Self {
+        self.refund_config = refund_config;
+        self
+    }
+}
+
 /// Preferences on what data should be shared about the bundle and its transactions
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +72,20 @@ pub struct Privacy {
     /// <https://github.com/flashbots/dowg/blob/main/builder-registrations.json>
     #[serde(skip_serializing_if = "Option::is_none")]
     pub builders: Option<Vec<String>>,
+}
+
+impl Privacy {
+    /// Sets hints
+    pub fn with_hints(mut self, hints: Option<PrivacyHint>) -> Self {
+        self.hints = hints;
+        self
+    }
+
+    /// Sets builders
+    pub fn with_builders(mut self, builders: Option<Vec<String>>) -> Self {
+        self.builders = builders;
+        self
+    }
 }
 
 /// Hints on what data should be shared about the bundle and its transactions
@@ -217,8 +245,9 @@ impl<'de> Deserialize<'de> for PrivacyHint {
     }
 }
 
-/// Specifies the minimum percent of a given bundle's earnings to redistribute
-/// for it to be included in a builder's block.
+/// Specifies the minimum percent of a given bundle's earnings to redistribute for it to be included
+/// in a builder's block.
+///
 /// Related endpoint: `mev_sendBundle`, `mev_simBundle`, `eth_sendPrivateTransaction`,
 /// `eth_sendPrivateRawTransaction`
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

@@ -1,20 +1,25 @@
-use alloy_primitives::{Bloom, Log};
-
-mod any;
-pub use any::AnyReceiptEnvelope;
+use alloy_primitives::Bloom;
+use alloy_rlp::BufMut;
+use core::fmt;
 
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
 mod receipts;
-pub use receipts::{Receipt, ReceiptWithBloom};
+pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 
 mod status;
 pub use status::Eip658Value;
 
+use alloy_eips::Typed2718;
+
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
-pub trait TxReceipt<T = Log> {
+#[auto_impl::auto_impl(&, Arc)]
+pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
+    /// The associated log type.
+    type Log;
+
     /// Returns the status or post state of the transaction.
     ///
     /// ## Note
@@ -23,7 +28,7 @@ pub trait TxReceipt<T = Log> {
     /// is pre-[EIP-658].
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    fn status_or_post_state(&self) -> &Eip658Value;
+    fn status_or_post_state(&self) -> Eip658Value;
 
     /// Returns true if the transaction was successful OR if the transaction is
     /// pre-[EIP-658]. Results for transactions before [EIP-658] are not
@@ -51,18 +56,62 @@ pub trait TxReceipt<T = Log> {
         None
     }
 
+    /// Returns [`ReceiptWithBloom`] with the computed bloom filter [`Self::bloom`] and a reference
+    /// to the receipt.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn with_bloom_ref(&self) -> ReceiptWithBloom<&Self> {
+        ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
+    }
+
+    /// Consumes the type and converts it into [`ReceiptWithBloom`] with the computed bloom filter
+    /// [`Self::bloom`] and the receipt.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn into_with_bloom(self) -> ReceiptWithBloom<Self> {
+        ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
+    }
+
     /// Returns the cumulative gas used in the block after this transaction was executed.
-    fn cumulative_gas_used(&self) -> u128;
+    fn cumulative_gas_used(&self) -> u64;
 
     /// Returns the logs emitted by this transaction.
-    fn logs(&self) -> &[T];
+    fn logs(&self) -> &[Self::Log];
+}
+
+/// Receipt type that knows how to encode itself with a [`Bloom`] value.
+#[auto_impl::auto_impl(&)]
+pub trait RlpEncodableReceipt {
+    /// Returns the length of the receipt payload with the provided bloom filter.
+    fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize;
+
+    /// RLP encodes the receipt with the provided bloom filter.
+    fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
+}
+
+/// Receipt type that knows how to decode itself with a [`Bloom`] value.
+pub trait RlpDecodableReceipt: Sized {
+    /// RLP decodes receipt and [`Bloom`] into [`ReceiptWithBloom`] instance.
+    fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>>;
+}
+
+/// Receipt type that knows its EIP-2718 encoding.
+///
+/// Main consumer of this trait is [`ReceiptWithBloom`]. It is expected that [`RlpEncodableReceipt`]
+/// implementation for this type produces network encoding whcih is used by [`alloy_rlp::Encodable`]
+/// implementation for [`ReceiptWithBloom`].
+#[auto_impl::auto_impl(&)]
+pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {
+    /// EIP-2718 encoded length with the provided bloom filter.
+    fn eip2718_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize;
+
+    /// EIP-2718 encodes the receipt with the provided bloom filter.
+    fn eip2718_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloy_eips::eip2718::Encodable2718;
-    use alloy_primitives::{address, b256, bytes, hex, LogData};
+    use alloy_primitives::{address, b256, bytes, hex, Log, LogData};
     use alloy_rlp::{Decodable, Encodable};
 
     // Test vector from: https://eips.ethereum.org/EIPS/eip-2481
@@ -74,7 +123,7 @@ mod tests {
         let receipt =
             ReceiptEnvelope::Legacy(ReceiptWithBloom {
                 receipt: Receipt {
-                    cumulative_gas_used: 0x1u128,
+                    cumulative_gas_used: 0x1,
                     logs: vec![Log {
                         address: address!("0000000000000000000000000000000000000011"),
                         data: LogData::new_unchecked(
@@ -106,7 +155,7 @@ mod tests {
         let expected =
             ReceiptWithBloom {
                 receipt: Receipt {
-                    cumulative_gas_used: 0x1u128,
+                    cumulative_gas_used: 0x1,
                     logs: vec![Log {
                         address: address!("0000000000000000000000000000000000000011"),
                         data: LogData::new_unchecked(
@@ -154,13 +203,30 @@ mod tests {
         }
         .with_bloom();
 
-        let mut data = vec![];
+        let len = receipt.length();
+        let mut data = Vec::with_capacity(receipt.length());
 
         receipt.encode(&mut data);
+        assert_eq!(data.len(), len);
         let decoded = ReceiptWithBloom::decode(&mut &data[..]).unwrap();
 
         // receipt.clone().to_compact(&mut data);
         // let (decoded, _) = Receipt::from_compact(&data[..], data.len());
         assert_eq!(decoded, receipt);
+    }
+
+    #[test]
+    fn can_encode_by_reference() {
+        let receipt: Receipt =
+            Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![] };
+
+        let encoded_ref = alloy_rlp::encode(&ReceiptWithBloom {
+            receipt: &receipt,
+            logs_bloom: receipt.bloom_slow(),
+        });
+        let encoded =
+            alloy_rlp::encode(&ReceiptWithBloom { logs_bloom: receipt.bloom_slow(), receipt });
+
+        assert_eq!(encoded, encoded_ref);
     }
 }

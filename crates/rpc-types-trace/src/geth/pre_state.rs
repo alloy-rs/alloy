@@ -211,6 +211,12 @@ pub struct PreStateConfig {
     /// storage necessary to execute the transaction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff_mode: Option<bool>,
+    /// If `disableCode` is set to true, the response frame will not include code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_code: Option<bool>,
+    /// If `disableStorage` is set to true, the response frame will not include storage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_storage: Option<bool>,
 }
 
 impl PreStateConfig {
@@ -225,12 +231,25 @@ impl PreStateConfig {
     pub fn is_default_mode(&self) -> bool {
         !self.is_diff_mode()
     }
+
+    /// Returns true if code is enabled.
+    #[inline]
+    pub fn code_enabled(&self) -> bool {
+        !self.disable_code.unwrap_or_default()
+    }
+
+    /// Returns true if storage is enabled.
+    #[inline]
+    pub fn storage_enabled(&self) -> bool {
+        !self.disable_storage.unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::geth::*;
+    use similar_asserts::assert_eq;
 
     // See <https://github.com/ethereum/go-ethereum/tree/master/eth/tracers/internal/tracetest/testdata>
     const DEFAULT: &str = include_str!("../../test_data/pre_state_tracer/default.json");
@@ -244,7 +263,9 @@ mod tests {
         opts.tracing_options.tracer =
             Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer));
         opts.tracing_options.tracer_config =
-            serde_json::to_value(PreStateConfig { diff_mode: Some(true) }).unwrap().into();
+            serde_json::to_value(PreStateConfig { diff_mode: Some(true), ..Default::default() })
+                .unwrap()
+                .into();
 
         assert_eq!(
             serde_json::to_string(&opts).unwrap(),
@@ -269,9 +290,26 @@ mod tests {
 
     #[test]
     fn test_is_diff_mode() {
-        assert!(PreStateConfig { diff_mode: Some(true) }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: Some(false) }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: None }.is_diff_mode());
+        assert!(PreStateConfig { diff_mode: Some(true), ..Default::default() }.is_diff_mode());
+        assert!(!PreStateConfig { diff_mode: Some(false), ..Default::default() }.is_diff_mode());
+        assert!(!PreStateConfig { diff_mode: None, ..Default::default() }.is_diff_mode());
+    }
+
+    #[test]
+    fn test_disable_code() {
+        assert!(PreStateConfig { ..Default::default() }.code_enabled());
+        assert!(PreStateConfig { disable_code: Some(false), ..Default::default() }.code_enabled());
+        assert!(!PreStateConfig { disable_code: Some(true), ..Default::default() }.code_enabled());
+    }
+    #[test]
+    fn test_disable_storage() {
+        assert!(PreStateConfig { ..Default::default() }.storage_enabled());
+        assert!(
+            PreStateConfig { disable_storage: Some(false), ..Default::default() }.storage_enabled()
+        );
+        assert!(
+            !PreStateConfig { disable_storage: Some(true), ..Default::default() }.storage_enabled()
+        );
     }
 
     #[test]

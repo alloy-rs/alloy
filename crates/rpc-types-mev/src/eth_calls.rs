@@ -1,7 +1,8 @@
 use crate::{u256_numeric_string, Privacy, Validity};
 
-use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};
+use alloy_primitives::{keccak256, Address, Bytes, Keccak256, B256, U256};
+use alloy_rpc_types_eth::TransactionIndex;
 use serde::{Deserialize, Serialize};
 
 /// Bundle of transactions for `eth_callBundle`
@@ -18,9 +19,18 @@ pub struct EthCallBundle {
     pub block_number: u64,
     /// Either a hex encoded number or a block tag for which state to base this simulation on
     pub state_block_number: BlockNumberOrTag,
+    /// Inclusive number of tx to replay in block. -1 means replay all
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction_index: Option<TransactionIndex>,
+    /// the coinbase to use for this bundle simulation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coinbase: Option<Address>,
     /// the timestamp to use for this bundle simulation, in seconds since the unix epoch
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
+    /// the timeout to apply to execution of this bundle, in milliseconds
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u64>,
     /// gas limit of the block to use for this simulation
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<u64>,
@@ -32,7 +42,111 @@ pub struct EthCallBundle {
     pub base_fee: Option<u128>,
 }
 
+impl EthCallBundle {
+    /// Creates a new bundle from the given [`Encodable2718`] transactions.
+    pub fn from_2718<I, T>(txs: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Encodable2718,
+    {
+        Self::from_raw_txs(txs.into_iter().map(|tx| tx.encoded_2718()))
+    }
+
+    /// Creates a new bundle with the given transactions.
+    pub fn from_raw_txs<I, T>(txs: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Bytes>,
+    {
+        Self { txs: txs.into_iter().map(Into::into).collect(), ..Default::default() }
+    }
+
+    /// Adds an [`Encodable2718`] transaction to the bundle.
+    pub fn append_2718_tx(self, tx: impl Encodable2718) -> Self {
+        self.append_raw_tx(tx.encoded_2718())
+    }
+
+    /// Adds an EIP-2718 envelope to the bundle.
+    pub fn append_raw_tx(mut self, tx: impl Into<Bytes>) -> Self {
+        self.txs.push(tx.into());
+        self
+    }
+
+    /// Adds multiple [`Encodable2718`] transactions to the bundle.
+    pub fn extend_2718_txs<I, T>(self, tx: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Encodable2718,
+    {
+        self.extend_raw_txs(tx.into_iter().map(|tx| tx.encoded_2718()))
+    }
+
+    /// Adds multiple calls to the block.
+    pub fn extend_raw_txs<I, T>(mut self, txs: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Bytes>,
+    {
+        self.txs.extend(txs.into_iter().map(Into::into));
+        self
+    }
+
+    /// Sets the block number for the bundle.
+    pub const fn with_block_number(mut self, block_number: u64) -> Self {
+        self.block_number = block_number;
+        self
+    }
+
+    /// Sets the state block number for the bundle.
+    pub fn with_state_block_number(
+        mut self,
+        state_block_number: impl Into<BlockNumberOrTag>,
+    ) -> Self {
+        self.state_block_number = state_block_number.into();
+        self
+    }
+
+    /// Sets the coinbase for the bundle.
+    pub const fn with_coinbase(mut self, coinbase: Address) -> Self {
+        self.coinbase = Some(coinbase);
+        self
+    }
+
+    /// Sets the timestamp for the bundle.
+    pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+
+    /// Sets the timeout for the bundle.
+    pub const fn with_timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    /// Sets the gas limit for the bundle.
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+        self.gas_limit = Some(gas_limit);
+        self
+    }
+
+    /// Sets the difficulty for the bundle.
+    pub const fn with_difficulty(mut self, difficulty: U256) -> Self {
+        self.difficulty = Some(difficulty);
+        self
+    }
+
+    /// Sets the base fee for the bundle.
+    pub const fn with_base_fee(mut self, base_fee: u128) -> Self {
+        self.base_fee = Some(base_fee);
+        self
+    }
+}
+
 /// Response for `eth_callBundle`
+///
+/// <https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#eth_callbundle>
+/// <https://github.com/flashbots/mev-geth/blob/fddf97beec5877483f879a77b7dea2e58a58d653/internal/ethapi/api.go#L2212-L2220>
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EthCallBundleResponse {
@@ -53,10 +167,8 @@ pub struct EthCallBundleResponse {
     /// Results of individual transactions within the bundle
     pub results: Vec<EthCallBundleTransactionResult>,
     /// The block number used as a base for this simulation
-    #[serde(with = "alloy_serde::quantity")]
     pub state_block_number: u64,
     /// The total gas used by all transactions in the bundle
-    #[serde(with = "alloy_serde::quantity")]
     pub total_gas_used: u64,
 }
 
@@ -79,7 +191,6 @@ pub struct EthCallBundleTransactionResult {
     #[serde(with = "u256_numeric_string")]
     pub gas_price: U256,
     /// The amount of gas used by the transaction
-    #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The address to which the transaction is sent (optional)
     pub to_address: Option<Address>,
@@ -138,6 +249,37 @@ pub struct EthSendBundle {
     pub replacement_uuid: Option<String>,
 }
 
+impl EthSendBundle {
+    /// Returns the bundle hash.
+    ///
+    /// This is the keccak256 hash of the transaction hashes of the
+    /// transactions in the bundle.
+    ///
+    /// ## Note
+    ///
+    /// Logic for calculating the bundle hash is as follows:
+    /// - Calculate the hash of each transaction in the bundle
+    /// - Concatenate the hashes, in bundle order
+    /// - Calculate the keccak256 hash of the concatenated hashes
+    ///
+    /// See the [flashbots impl].
+    ///
+    /// This function will not verify transaction correctness. If the bundle
+    /// `txs` contains invalid transactions, the bundle hash will still be
+    /// calculated.
+    ///
+    /// [flashbots impl]: https://github.com/flashbots/mev-geth/blob/fddf97beec5877483f879a77b7dea2e58a58d653/internal/ethapi/api.go#L2067
+    pub fn bundle_hash(&self) -> B256 {
+        let mut hasher = Keccak256::default();
+        for tx in &self.txs {
+            // NB: the txs must contain envelopes, so the tx_hash is just the
+            // keccak256 hash of the envelope. no need to deserialize the tx
+            hasher.update(keccak256(tx));
+        }
+        hasher.finalize()
+    }
+}
+
 /// Response from the matchmaker after sending a bundle.
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -169,9 +311,49 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
+impl PrivateTransactionRequest {
+    /// Creates new [`PrivateTransactionRequest`] from the given encodable transaction.
+    pub fn new<T: Encodable2718>(tx: &T) -> Self {
+        Self {
+            tx: tx.encoded_2718().into(),
+            max_block_number: None,
+            preferences: Default::default(),
+        }
+    }
+
+    /// Apply a function to the request, returning the modified request.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
+    /// Sets private tx's max block number.
+    pub const fn max_block_number(mut self, num: u64) -> Self {
+        self.max_block_number = Some(num);
+        self
+    }
+
+    /// Sets private tx's preferences.
+    pub fn with_preferences(mut self, preferences: PrivateTransactionPreferences) -> Self {
+        self.preferences = preferences;
+        self
+    }
+}
+
+impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+    fn from(envelope: T) -> Self {
+        Self::new(&envelope)
+    }
+}
+
 /// Additional preferences for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct PrivateTransactionPreferences {
+    /// Indicates whether the transaction should be processed in fast mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fast: Option<bool>,
     /// Requirements for the bundle to be included in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validity: Option<Validity>,
@@ -183,7 +365,30 @@ pub struct PrivateTransactionPreferences {
 impl PrivateTransactionPreferences {
     /// Returns true if the preferences are empty.
     pub const fn is_empty(&self) -> bool {
-        self.validity.is_none() && self.privacy.is_none()
+        self.fast.is_none() && self.validity.is_none() && self.privacy.is_none()
+    }
+
+    /// Sets the `fast` option to true
+    pub fn into_fast(self) -> Self {
+        self.with_fast_mode(true)
+    }
+
+    /// Sets mode of tx execution
+    pub const fn with_fast_mode(mut self, fast: bool) -> Self {
+        self.fast = Some(fast);
+        self
+    }
+
+    /// Sets tx's validity
+    pub fn with_validity(mut self, validity: Validity) -> Self {
+        self.validity = Some(validity);
+        self
+    }
+
+    /// Sets tx's privacy
+    pub fn with_privacy(mut self, privacy: Privacy) -> Self {
+        self.privacy = Some(privacy);
+        self
     }
 }
 
@@ -202,22 +407,22 @@ mod tests {
   {
     "coinbaseDiff": "10000000000063000",
     "ethSentToCoinbase": "10000000000000000",
-    "fromAddress": "0x02A727155aeF8609c9f7F2179b2a1f560B39F5A0",
+    "fromAddress": "0x02a727155aef8609c9f7f2179b2a1f560b39f5a0",
     "gasFees": "63000",
     "gasPrice": "476190476193",
     "gasUsed": 21000,
-    "toAddress": "0x73625f59CAdc5009Cb458B751b3E7b6b48C06f2C",
+    "toAddress": "0x73625f59cadc5009cb458b751b3e7b6b48c06f2c",
     "txHash": "0x669b4704a7d993a946cdd6e2f95233f308ce0c4649d2e04944e8299efcaa098a",
     "value": "0x"
   },
   {
     "coinbaseDiff": "10000000000063000",
     "ethSentToCoinbase": "10000000000000000",
-    "fromAddress": "0x02A727155aeF8609c9f7F2179b2a1f560B39F5A0",
+    "fromAddress": "0x02a727155aef8609c9f7f2179b2a1f560b39f5a0",
     "gasFees": "63000",
     "gasPrice": "476190476193",
     "gasUsed": 21000,
-    "toAddress": "0x73625f59CAdc5009Cb458B751b3E7b6b48C06f2C",
+    "toAddress": "0x73625f59cadc5009cb458b751b3e7b6b48c06f2c",
     "txHash": "0xa839ee83465657cac01adc1d50d96c1b586ed498120a84a64749c0034b4f19fa",
     "value": "0x"
   }
@@ -226,6 +431,8 @@ mod tests {
 "totalGasUsed": 42000
 }"#;
 
-        let _call = serde_json::from_str::<EthCallBundleResponse>(s).unwrap();
+        let response = serde_json::from_str::<EthCallBundleResponse>(s).unwrap();
+        let json: serde_json::Value = serde_json::from_str(s).unwrap();
+        similar_asserts::assert_eq!(json, serde_json::to_value(response).unwrap());
     }
 }

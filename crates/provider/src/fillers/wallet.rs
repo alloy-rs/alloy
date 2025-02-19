@@ -1,7 +1,7 @@
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkWallet, TransactionBuilder};
-use alloy_transport::{Transport, TransportResult};
+use alloy_transport::TransportResult;
 
 use super::{FillerControlFlow, TxFiller};
 
@@ -76,14 +76,13 @@ where
         }
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         _provider: &P,
         _tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N>,
     {
         Ok(())
     }
@@ -101,6 +100,13 @@ where
         let envelope = builder.build(&self.wallet).await.map_err(RpcError::local_usage)?;
 
         Ok(SendableTx::Envelope(envelope))
+    }
+
+    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+        if tx.from().is_none() {
+            tx.set_from(self.wallet.default_signer_address());
+        }
+        Ok(())
     }
 }
 
@@ -128,7 +134,7 @@ mod tests {
         let node_hash = *builder.tx_hash();
         assert_eq!(
             node_hash,
-            b256!("eb56033eab0279c6e9b685a5ec55ea0ff8d06056b62b7f36974898d4fbb57e64")
+            b256!("4b56f1a6bdceb76d1b843e978c70ab88e38aa19f1a67be851b10ce4eec65b7d4")
         );
 
         let pending = builder.register().await.unwrap();

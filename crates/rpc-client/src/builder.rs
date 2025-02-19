@@ -1,7 +1,5 @@
-use crate::RpcClient;
-use alloy_transport::{
-    BoxTransport, BoxTransportConnect, Transport, TransportConnect, TransportResult,
-};
+use crate::{BuiltInConnectionString, RpcClient};
+use alloy_transport::{BoxTransport, IntoBoxTransport, TransportConnect, TransportResult};
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
@@ -37,22 +35,25 @@ impl<L> ClientBuilder<L> {
 
     /// Create a new [`RpcClient`] with the given transport and the configured
     /// layers.
-    pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
+    ///
+    /// This collapses the [`tower::ServiceBuilder`] with the given transport via
+    /// [`tower::ServiceBuilder::service`].
+    pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient
     where
         L: Layer<T>,
-        T: Transport,
-        L::Service: Transport,
+        T: IntoBoxTransport,
+        L::Service: IntoBoxTransport,
     {
-        RpcClient::new(self.builder.service(transport), is_local)
+        RpcClient::new_layered(is_local, transport, move |t| self.builder.service(t))
     }
 
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
     /// HTTP transport.
     #[cfg(feature = "reqwest")]
-    pub fn http(self, url: url::Url) -> RpcClient<L::Service>
+    pub fn http(self, url: url::Url) -> RpcClient
     where
         L: Layer<alloy_transport_http::Http<reqwest::Client>>,
-        L::Service: Transport,
+        L::Service: IntoBoxTransport,
     {
         let transport = alloy_transport_http::Http::new(url);
         let is_local = transport.guess_local();
@@ -62,14 +63,12 @@ impl<L> ClientBuilder<L> {
 
     /// Convenience function to create a new [`RpcClient`] with a `hyper` HTTP transport.
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-    pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
+    pub fn hyper_http(self, url: url::Url) -> RpcClient
     where
-        L: Layer<alloy_transport_http::Http<alloy_transport_http::HyperClient>>,
-        L::Service: Transport,
+        L: Layer<alloy_transport_http::HyperTransport>,
+        L::Service: IntoBoxTransport,
     {
-        let executor = hyper_util::rt::TokioExecutor::new();
-        let client = hyper_util::client::legacy::Client::builder(executor).build_http();
-        let transport = alloy_transport_http::Http::with_client(client, url);
+        let transport = alloy_transport_http::HyperTransport::new_hyper(url);
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
@@ -78,11 +77,11 @@ impl<L> ClientBuilder<L> {
     /// Connect a pubsub transport, producing an [`RpcClient`] with the provided
     /// connection.
     #[cfg(feature = "pubsub")]
-    pub async fn pubsub<C>(self, pubsub_connect: C) -> TransportResult<RpcClient<L::Service>>
+    pub async fn pubsub<C>(self, pubsub_connect: C) -> TransportResult<RpcClient>
     where
         C: alloy_pubsub::PubSubConnect,
         L: Layer<alloy_pubsub::PubSubFrontend>,
-        L::Service: Transport,
+        L::Service: IntoBoxTransport,
     {
         let is_local = pubsub_connect.is_local();
         let transport = pubsub_connect.into_service().await?;
@@ -90,15 +89,12 @@ impl<L> ClientBuilder<L> {
     }
 
     /// Connect a WS transport, producing an [`RpcClient`] with the provided
-    /// connection
+    /// connection.
     #[cfg(feature = "ws")]
-    pub async fn ws(
-        self,
-        ws_connect: alloy_transport_ws::WsConnect,
-    ) -> TransportResult<RpcClient<L::Service>>
+    pub async fn ws(self, ws_connect: alloy_transport_ws::WsConnect) -> TransportResult<RpcClient>
     where
         L: Layer<alloy_pubsub::PubSubFrontend>,
-        L::Service: Transport,
+        L::Service: IntoBoxTransport,
     {
         self.pubsub(ws_connect).await
     }
@@ -109,22 +105,32 @@ impl<L> ClientBuilder<L> {
     pub async fn ipc<T>(
         self,
         ipc_connect: alloy_transport_ipc::IpcConnect<T>,
-    ) -> TransportResult<RpcClient<L::Service>>
+    ) -> TransportResult<RpcClient>
     where
         alloy_transport_ipc::IpcConnect<T>: alloy_pubsub::PubSubConnect,
         L: Layer<alloy_pubsub::PubSubFrontend>,
-        L::Service: Transport,
+        L::Service: IntoBoxTransport,
     {
         self.pubsub(ipc_connect).await
     }
 
-    /// Connect a transport, producing an [`RpcClient`] with the provided
-    /// connection.
-    pub async fn connect<C>(self, connect: C) -> TransportResult<RpcClient<L::Service>>
+    /// Connect a transport specified by the given string, producing an [`RpcClient`].
+    ///
+    /// See [`BuiltInConnectionString`] for more information.
+    pub async fn connect(self, s: &str) -> TransportResult<RpcClient>
+    where
+        L: Layer<BoxTransport>,
+        L::Service: IntoBoxTransport,
+    {
+        self.connect_with(s.parse::<BuiltInConnectionString>()?).await
+    }
+
+    /// Connect a transport, producing an [`RpcClient`].
+    pub async fn connect_with<C>(self, connect: C) -> TransportResult<RpcClient>
     where
         C: TransportConnect,
-        L: Layer<C::Transport>,
-        L::Service: Transport,
+        L: Layer<BoxTransport>,
+        L::Service: IntoBoxTransport,
     {
         let transport = connect.get_transport().await?;
         Ok(self.transport(transport, connect.is_local()))
@@ -132,13 +138,16 @@ impl<L> ClientBuilder<L> {
 
     /// Connect a transport, producing an [`RpcClient`] with a [`BoxTransport`]
     /// connection.
-    pub async fn connect_boxed<C>(self, connect: C) -> TransportResult<RpcClient<L::Service>>
+    #[deprecated(
+        since = "0.9.0",
+        note = "RpcClient is now always boxed, use `connect_with` instead"
+    )]
+    pub async fn connect_boxed<C>(self, connect: C) -> TransportResult<RpcClient>
     where
-        C: BoxTransportConnect,
+        C: TransportConnect,
         L: Layer<BoxTransport>,
-        L::Service: Transport,
+        L::Service: IntoBoxTransport,
     {
-        let transport = connect.get_boxed_transport().await?;
-        Ok(self.transport(transport, connect.is_local()))
+        self.connect_with(connect).await
     }
 }

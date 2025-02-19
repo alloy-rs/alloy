@@ -10,11 +10,11 @@ mod error;
 pub use error::{Error, Result, UnsupportedSignerOperation};
 
 mod signer;
-pub use signer::{Signer, SignerSync};
+pub use signer::{Either, Signer, SignerSync};
 
 pub mod utils;
 
-pub use alloy_primitives::Signature;
+pub use alloy_primitives::PrimitiveSignature as Signature;
 pub use k256;
 
 /// Utility to get and set the chain ID on a transaction and the resulting signature within a
@@ -37,14 +37,6 @@ macro_rules! sign_transaction_with_chain_id {
             }
         }
 
-        let mut sig = $sign.map_err(alloy_signer::Error::other)?;
-
-        if $tx.use_eip155() {
-            if let Some(chain_id) = $signer.chain_id().or_else(|| $tx.chain_id()) {
-                sig = sig.with_chain_id(chain_id);
-            }
-        }
-
-        Ok(sig)
+        $sign.map_err(alloy_signer::Error::other)
     }};
 }

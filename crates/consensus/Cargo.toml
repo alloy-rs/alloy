@@ -13,49 +13,72 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
 
 [dependencies]
+alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
-alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
+alloy-trie = { workspace = true, features = ["ethereum"] }
 alloy-serde = { workspace = true, optional = true }
+
+# k256
+k256 = { workspace = true, features = ["ecdsa"], optional = true }
 
 # kzg
 c-kzg = { workspace = true, features = ["serde"], optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
+rand = { workspace = true, optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
+
+# misc
+derive_more = { workspace = true, features = [
+    "from",
+    "deref",
+    "deref_mut",
+    "into_iterator",
+], default-features = false }
+auto_impl.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-eips = { workspace = true, features = ["arbitrary"] }
-alloy-signer.workspace = true
+alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
+bincode = "1.3"
 k256.workspace = true
-tokio = { workspace = true, features = ["macros"] }
+rand.workspace = true
 serde_json.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
 [features]
 default = ["std"]
-std = ["alloy-eips/std", "c-kzg?/std"]
-k256 = ["alloy-primitives/k256", "alloy-eips/k256"]
-kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
-arbitrary = [
-    "std",
-    "dep:arbitrary",
-    "alloy-eips/arbitrary",
+std = [
+	"alloy-eips/std",
+	"c-kzg?/std",
+	"alloy-serde?/std"
 ]
+k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
+kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
+arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = [
     "dep:serde",
     "alloy-primitives/serde",
     "dep:alloy-serde",
     "alloy-eips/serde",
+    "alloy-trie/serde",
 ]
+serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]

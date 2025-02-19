@@ -6,21 +6,25 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+// For features.
+#[cfg(any(feature = "reqwest", feature = "hyper"))]
+use alloy_transport_http as _;
+
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a
 /// reqwest client.
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(any(test, feature = "reqwest"))]
-pub type ReqwestProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::Http<reqwest::Client>, N>;
+#[deprecated(since = "0.9.0", note = "use `RootProvider` instead")]
+pub type ReqwestProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a hyper
 /// client.
 ///
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(feature = "hyper")]
-pub type HyperProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::Http<alloy_transport_http::HyperClient>, N>;
+#[deprecated(since = "0.9.0", note = "use `RootProvider` instead")]
+pub type HyperProvider<N = alloy_network::Ethereum> = crate::RootProvider<N>;
 
 #[macro_use]
 extern crate tracing;
@@ -28,20 +32,27 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
+mod blocks;
+
 pub mod ext;
 
 pub mod fillers;
-pub mod layers;
-
-mod chain;
 
 mod heart;
-pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
+pub use heart::{
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    PendingTransactionError, WatchTxError,
+};
+
+pub mod layers;
 
 mod provider;
 pub use provider::{
-    builder, EthCall, FilterPollerBuilder, Provider, RootProvider, RpcWithBlock, RpcWithBlockFut,
-    SendableTx, WalletProvider,
+    bindings, builder, CallInfoTrait, CallItem, CallItemBuilder, CallTuple, Caller, DynProvider,
+    Dynamic, Empty, EthCall, EthCallMany, EthCallManyParams, EthCallParams, Failure,
+    FilterPollerBuilder, MulticallBuilder, MulticallError, MulticallItem, ParamsWithBlock,
+    Provider, ProviderCall, Result, RootProvider, RpcWithBlock, SendableTx, SendableTxErr,
+    WalletProvider, MULTICALL3_ADDRESS,
 };
 
 pub mod utils;

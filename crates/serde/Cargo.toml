@@ -13,18 +13,22 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-primitives = { workspace = true, features = ["serde", "map"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["alloc"] }
 
 # arbitrary
-arbitrary = { version = "1.3", features = ["derive"], optional = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -36,12 +40,9 @@ alloy-primitives = { workspace = true, features = [
 
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
+similar-asserts.workspace = true
 
 [features]
 default = ["std"]
 std = ["alloy-primitives/std", "serde/std", "serde_json/std"]
-arbitrary = [
-    "dep:arbitrary",
-    "alloy-primitives/arbitrary",
-    "std",
-]
+arbitrary = ["dep:arbitrary", "alloy-primitives/arbitrary", "std"]

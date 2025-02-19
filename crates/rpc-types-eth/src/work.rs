@@ -1,9 +1,4 @@
-use alloy_primitives::{B256, U256};
-use serde::{
-    de::{Error, SeqAccess, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-use std::fmt;
+use alloy_primitives::B256;
 
 /// The result of an `eth_getWork` request
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -18,38 +13,39 @@ pub struct Work {
     pub number: Option<u64>,
 }
 
-impl Serialize for Work {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Work {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
-        match self.number.as_ref() {
-            Some(num) => {
-                (&self.pow_hash, &self.seed_hash, &self.target, U256::from(*num)).serialize(s)
-            }
+        match self.number.map(alloy_primitives::U64::from) {
+            Some(num) => (&self.pow_hash, &self.seed_hash, &self.target, num).serialize(s),
             None => (&self.pow_hash, &self.seed_hash, &self.target).serialize(s),
         }
     }
 }
 
-impl<'a> Deserialize<'a> for Work {
+#[cfg(feature = "serde")]
+impl<'a> serde::Deserialize<'a> for Work {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
         struct WorkVisitor;
 
-        impl<'a> Visitor<'a> for WorkVisitor {
+        impl<'a> serde::de::Visitor<'a> for WorkVisitor {
             type Value = Work;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(formatter, "Work object")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
-                A: SeqAccess<'a>,
+                A: serde::de::SeqAccess<'a>,
             {
+                use serde::de::Error;
                 let pow_hash = seq
                     .next_element::<B256>()?
                     .ok_or_else(|| A::Error::custom("missing pow hash"))?;

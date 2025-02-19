@@ -6,7 +6,6 @@ use alloy_primitives::{Address, Selector};
 use alloy_provider::Provider;
 use alloy_rpc_types_eth::Filter;
 use alloy_sol_types::SolEvent;
-use alloy_transport::Transport;
 use std::marker::PhantomData;
 
 /// A handle to an Ethereum contract at a specific address.
@@ -14,19 +13,18 @@ use std::marker::PhantomData;
 /// A contract is an abstraction of an executable program on Ethereum. Every deployed contract has
 /// an address, which is used to connect to it so that it may receive messages (transactions).
 #[derive(Clone)]
-pub struct ContractInstance<T, P, N = Ethereum> {
+pub struct ContractInstance<P, N = Ethereum> {
     address: Address,
     provider: P,
     interface: Interface,
-    transport: PhantomData<T>,
     network: PhantomData<N>,
 }
 
-impl<T, P, N> ContractInstance<T, P, N> {
+impl<P, N> ContractInstance<P, N> {
     /// Creates a new contract from the provided address, provider, and interface.
     #[inline]
     pub const fn new(address: Address, provider: P, interface: Interface) -> Self {
-        Self { address, provider, interface, transport: PhantomData, network: PhantomData }
+        Self { address, provider, interface, network: PhantomData }
     }
 
     /// Returns a reference to the contract's address.
@@ -61,21 +59,20 @@ impl<T, P, N> ContractInstance<T, P, N> {
     }
 }
 
-impl<T, P: Clone, N> ContractInstance<T, &P, N> {
+impl<P: Clone, N> ContractInstance<&P, N> {
     /// Clones the provider and returns a new contract instance with the cloned provider.
     #[inline]
-    pub fn with_cloned_provider(self) -> ContractInstance<T, P, N> {
+    pub fn with_cloned_provider(self) -> ContractInstance<P, N> {
         ContractInstance {
             address: self.address,
             provider: self.provider.clone(),
             interface: self.interface,
-            transport: PhantomData,
             network: PhantomData,
         }
     }
 }
 
-impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P, N> {
+impl<P: Provider<N>, N: Network> ContractInstance<P, N> {
     /// Returns a transaction builder for the provided function name.
     ///
     /// If there are multiple functions with the same name due to overloading, consider using
@@ -85,7 +82,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P,
         &self,
         name: &str,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<T, &P, Function, N>> {
+    ) -> Result<CallBuilder<(), &P, Function, N>> {
         let function = self.interface.get_from_name(name)?;
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
@@ -95,18 +92,18 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P,
         &self,
         selector: &Selector,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<T, &P, Function, N>> {
+    ) -> Result<CallBuilder<(), &P, Function, N>> {
         let function = self.interface.get_from_selector(selector)?;
         CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
 
     /// Returns an [`Event`] builder with the provided filter.
-    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<T, &P, E, N> {
+    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<(), &P, E, N> {
         Event::new(&self.provider, filter)
     }
 }
 
-impl<T, P, N> std::ops::Deref for ContractInstance<T, P, N> {
+impl<P, N> std::ops::Deref for ContractInstance<P, N> {
     type Target = Interface;
 
     fn deref(&self) -> &Self::Target {
@@ -114,7 +111,7 @@ impl<T, P, N> std::ops::Deref for ContractInstance<T, P, N> {
     }
 }
 
-impl<T, P, N> std::fmt::Debug for ContractInstance<T, P, N> {
+impl<P, N> std::fmt::Debug for ContractInstance<P, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractInstance").field("address", &self.address).finish()
     }
@@ -130,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn contract_interface() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let abi_str = r#"[{"inputs":[],"name":"counter","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"increment","outputs":[],"stateMutability":"nonpayable","type":"function"}]"#;
         let abi = serde_json::from_str::<JsonAbi>(abi_str).unwrap();

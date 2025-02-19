@@ -1,5 +1,4 @@
-use crate::{Network, ReceiptResponse, TransactionResponse};
-use alloy_primitives::Bytes;
+use crate::Network;
 
 mod builder;
 
@@ -30,49 +29,6 @@ impl Network for Ethereum {
     type ReceiptResponse = alloy_rpc_types_eth::TransactionReceipt;
 
     type HeaderResponse = alloy_rpc_types_eth::Header;
-}
 
-impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
-    fn contract_address(&self) -> Option<alloy_primitives::Address> {
-        self.contract_address
-    }
-
-    fn status(&self) -> bool {
-        self.inner.status()
-    }
-
-    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
-        self.block_hash
-    }
-
-    fn block_number(&self) -> Option<u64> {
-        self.block_number
-    }
-}
-
-impl TransactionResponse for alloy_rpc_types_eth::Transaction {
-    #[doc(alias = "transaction_hash")]
-    fn tx_hash(&self) -> alloy_primitives::B256 {
-        self.hash
-    }
-
-    fn from(&self) -> alloy_primitives::Address {
-        self.from
-    }
-
-    fn to(&self) -> Option<alloy_primitives::Address> {
-        self.to
-    }
-
-    fn value(&self) -> alloy_primitives::U256 {
-        self.value
-    }
-
-    fn gas(&self) -> u128 {
-        self.gas
-    }
-
-    fn input(&self) -> &Bytes {
-        &self.input
-    }
+    type BlockResponse = alloy_rpc_types_eth::Block;
 }

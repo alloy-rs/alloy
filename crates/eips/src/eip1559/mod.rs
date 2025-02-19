@@ -6,10 +6,7 @@ mod basefee;
 pub use basefee::BaseFeeParams;
 
 mod constants;
-pub use constants::{
-    DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR, DEFAULT_ELASTICITY_MULTIPLIER,
-    ETHEREUM_BLOCK_GAS_LIMIT, INITIAL_BASE_FEE, MIN_PROTOCOL_BASE_FEE, MIN_PROTOCOL_BASE_FEE_U256,
-};
+pub use constants::*;
 
 mod helpers;
-pub use helpers::calc_next_block_base_fee;
+pub use helpers::{calc_next_block_base_fee, calculate_block_gas_limit, Eip1559Estimation};

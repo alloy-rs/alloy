@@ -1,12 +1,11 @@
 use crate::managers::InFlight;
-use alloy_json_rpc::{Id, Response};
-use alloy_primitives::U256;
-use std::collections::BTreeMap;
+use alloy_json_rpc::{Id, Response, SubId};
+use alloy_primitives::map::HashMap;
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]
 pub(crate) struct RequestManager {
-    reqs: BTreeMap<Id, InFlight>,
+    reqs: HashMap<Id, InFlight>,
 }
 
 impl RequestManager {
@@ -30,7 +29,7 @@ impl RequestManager {
     /// If the request created a new subscription, this function returns the
     /// subscription ID and the in-flight request for conversion to an
     /// `ActiveSubscription`.
-    pub(crate) fn handle_response(&mut self, resp: Response) -> Option<(U256, InFlight)> {
+    pub(crate) fn handle_response(&mut self, resp: Response) -> Option<(SubId, InFlight)> {
         if let Some(in_flight) = self.reqs.remove(&resp.id) {
             return in_flight.fulfill(resp);
         }

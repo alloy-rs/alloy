@@ -1,6 +1,10 @@
 [advisories]
 version = 2
 yanked = "warn"
+ignore = [
+    # https://rustsec.org/advisories/RUSTSEC-2024-0388 used by ssz, will be removed https://github.com/sigp/ethereum_ssz/pull/34
+    "RUSTSEC-2024-0388"
+]
 
 [bans]
 multiple-versions = "warn"
@@ -16,12 +20,14 @@ allow = [
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-3-Clause",
+    "BSD-2-Clause",
     "0BSD",
     "ISC",
     "Unicode-3.0",
     "Unicode-DFS-2016",
     "Unlicense",
     "MPL-2.0",
+    "Zlib",
     # https://github.com/briansmith/ring/issues/902
     "LicenseRef-ring",
 ]
@@ -32,6 +38,7 @@ exceptions = [
     # https://tldrlegal.com/license/creative-commons-cc0-1.0-universal
     { allow = ["CC0-1.0"], name = "tiny-keccak" },
     { allow = ["CC0-1.0"], name = "trezor-client" },
+    { allow = ["BSD-2-Clause"], name = "zerocopy" },
 ]
 
 [[licenses.clarify]]

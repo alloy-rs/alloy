@@ -4,7 +4,7 @@ Low-level Ethereum JSON-RPC client implementation.
 
 ## Usage
 
-Usage of this crate typically means instantiating an `RpcClient<T>` over some
+Usage of this crate typically means instantiating an `RpcClient` over some
 `Transport`. The RPC client can then be used to make requests to the RPC
 server. Requests are captured as `RpcCall` futures, which can then be polled to
 completion.
@@ -16,7 +16,7 @@ For example, to make a simple request:
 let client: ReqwestClient = ClientBuilder::default().http(url);
 
 // Prepare a request to the server.
-let request = client.request("eth_blockNumber", ());
+let request = client.request_noparams("eth_blockNumber");
 
 // Poll the request to completion.
 let block_number = request.await.unwrap();

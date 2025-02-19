@@ -2,7 +2,6 @@ use crate::{
     any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
     TransactionBuilderError,
 };
-use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
@@ -85,19 +84,11 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_max_priority_fee_per_gas(max_priority_fee_per_gas);
     }
 
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.deref().max_fee_per_blob_gas()
-    }
-
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
-        self.deref_mut().set_max_fee_per_blob_gas(max_fee_per_blob_gas)
-    }
-
-    fn gas_limit(&self) -> Option<u128> {
+    fn gas_limit(&self) -> Option<u64> {
         self.deref().gas_limit()
     }
 
-    fn set_gas_limit(&mut self, gas_limit: u128) {
+    fn set_gas_limit(&mut self, gas_limit: u64) {
         self.deref_mut().set_gas_limit(gas_limit);
     }
 
@@ -109,14 +100,6 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     /// Sets the EIP-2930 access list.
     fn set_access_list(&mut self, access_list: AccessList) {
         self.deref_mut().set_access_list(access_list)
-    }
-
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.deref().blob_sidecar()
-    }
-
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.deref_mut().set_blob_sidecar(sidecar)
     }
 
     fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
@@ -153,7 +136,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
             )
             .into_unbuilt(self));
         }
-        Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
+        Ok(self.inner.build_typed_tx().expect("checked by missing_keys").into())
     }
 
     async fn build<W: NetworkWallet<AnyNetwork>>(

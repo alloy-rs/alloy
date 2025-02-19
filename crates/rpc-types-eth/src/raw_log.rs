@@ -3,6 +3,8 @@
 use alloy_primitives::{Address, Bloom, Bytes, B256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
+use alloc::vec::Vec;
+
 /// Ethereum Log
 #[derive(Clone, Debug, Default, PartialEq, Eq, RlpDecodable, RlpEncodable)]
 pub struct Log {

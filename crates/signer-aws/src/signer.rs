@@ -1,6 +1,6 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, ChainId, B256};
-use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
+use alloy_primitives::{hex, Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use aws_sdk_kms::{
     error::SdkError,
@@ -180,11 +180,7 @@ impl AwsSigner {
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
-        let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
-        if let Some(chain_id) = self.chain_id {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+        Ok(sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey))
     }
 }
 
@@ -233,7 +229,7 @@ fn sig_from_digest_bytes_trial_recovery(
     hash: &B256,
     pubkey: &VerifyingKey,
 ) -> Signature {
-    let signature = Signature::from_signature_and_parity(sig, false).unwrap();
+    let signature = Signature::from_signature_and_parity(sig, false);
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }

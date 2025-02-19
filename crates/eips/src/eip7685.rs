@@ -1,136 +1,206 @@
 //! [EIP-7685]: General purpose execution layer requests
 //!
-//! Contains traits for encoding and decoding EIP-7685 requests, as well as validation functions.
-//!
 //! [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
 
-#[cfg(not(feature = "std"))]
-use crate::alloc::{vec, vec::Vec};
+use alloc::vec::Vec;
+use alloy_primitives::{b256, Bytes, B256};
+use derive_more::{Deref, DerefMut, From, IntoIterator};
 
-use alloy_rlp::BufMut;
-use core::{
-    fmt,
-    fmt::{Display, Formatter},
-};
-
-/// [EIP-7685] decoding errors.
+/// The empty requests hash.
 ///
-/// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub enum Eip7685Error {
-    /// Rlp error from [`alloy_rlp`].
-    RlpError(alloy_rlp::Error),
-    /// Got an unexpected request type while decoding.
-    UnexpectedType(u8),
-    /// There was no request type in the buffer.
-    MissingType,
+/// This is equivalent to `sha256("")`
+pub const EMPTY_REQUESTS_HASH: B256 =
+    b256!("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+
+/// A container of EIP-7685 requests.
+///
+/// The container only holds the `requests` as defined by their respective EIPs. The first byte of
+/// each element is the `request_type` and the remaining bytes are the `request_data`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Deref, DerefMut, From, IntoIterator)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Requests(Vec<Bytes>);
+
+impl Requests {
+    /// Construct a new [`Requests`] container with the given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    /// Construct a new [`Requests`] container.
+    ///
+    /// This function assumes that the request type byte is already included as the
+    /// first byte in the provided `Bytes` blob.
+    pub const fn new(requests: Vec<Bytes>) -> Self {
+        Self(requests)
+    }
+
+    /// Add a new request into the container.
+    pub fn push_request(&mut self, request: Bytes) {
+        // Omit empty requests.
+        if request.len() == 1 {
+            return;
+        }
+        self.0.push(request);
+    }
+
+    /// Adds a new request with the given request type into the container.
+    pub fn push_request_with_type(
+        &mut self,
+        request_type: u8,
+        request: impl IntoIterator<Item = u8>,
+    ) {
+        let mut request = request.into_iter().peekable();
+        // Omit empty requests.
+        if request.peek().is_none() {
+            return;
+        }
+        self.0.push(core::iter::once(request_type).chain(request).collect());
+    }
+
+    /// Consumes [`Requests`] and returns the inner raw opaque requests.
+    ///
+    /// # Note
+    ///
+    /// These requests include the `request_type` as the first byte in each
+    /// `Bytes` element, followed by the `requests_data`.
+    pub fn take(self) -> Vec<Bytes> {
+        self.0
+    }
+
+    /// Get an iterator over the requests.
+    pub fn iter(&self) -> core::slice::Iter<'_, Bytes> {
+        self.0.iter()
+    }
+
+    /// Calculate the requests hash as defined in EIP-7685 for the requests.
+    ///
+    /// The requests hash is defined as
+    ///
+    /// ```text
+    /// sha256(sha256(requests_0) ++ sha256(requests_1) ++ ...)
+    /// ```
+    ///
+    /// Each request in the container is expected to already have the `request_type` prepended
+    /// to its corresponding `requests_data`. This function directly calculates the hash based
+    /// on the combined `request_type` and `requests_data`.
+    ///
+    /// Empty requests are omitted from the hash calculation.
+    /// Requests are sorted by their `request_type` before hashing, see also [Ordering](https://eips.ethereum.org/EIPS/eip-7685#ordering)
+    #[cfg(feature = "sha2")]
+    pub fn requests_hash(&self) -> B256 {
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+
+        let mut requests: Vec<_> = self.0.iter().filter(|req| !req.is_empty()).collect();
+        requests.sort_unstable_by_key(|req| {
+            // SAFETY: only includes non-empty requests
+            req[0]
+        });
+
+        for req in requests {
+            let mut req_hash = Sha256::new();
+            req_hash.update(req);
+            hash.update(req_hash.finalize());
+        }
+        B256::new(hash.finalize().into())
+    }
+
+    /// Extend this container with requests from another container.
+    pub fn extend(&mut self, other: Self) {
+        self.0.extend(other.take());
+    }
 }
 
-impl Display for Eip7685Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+/// A list of requests or a precomputed requests hash.
+///
+/// For testing purposes, the `Hash` variant stores a precomputed requests hash. This can be useful
+/// when the exact contents of the requests are unnecessary, and only a consistent hash value is
+/// needed to simulate the presence of requests without holding actual data.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RequestsOrHash {
+    /// Stores a list of requests, allowing for dynamic requests hash calculation.
+    Requests(Requests),
+    /// Stores a precomputed requests hash, used primarily for testing or mocking because the
+    /// header only contains the hash.
+    Hash(B256),
+}
+
+impl RequestsOrHash {
+    /// Returns the requests hash for the enum instance.
+    ///
+    /// - If the instance contains a list of requests, this function calculates the hash using
+    ///   `requests_hash` of the [`Requests`] struct.
+    /// - If it contains a precomputed hash, it returns that hash directly.
+    #[cfg(feature = "sha2")]
+    pub fn requests_hash(&self) -> B256 {
         match self {
-            Self::RlpError(err) => write!(f, "{err}"),
-            Self::UnexpectedType(t) => write!(f, "Unexpected request type. Got {t}."),
-            Self::MissingType => write!(f, "There was no type flag"),
+            Self::Requests(requests) => requests.requests_hash(),
+            Self::Hash(precomputed_hash) => *precomputed_hash,
+        }
+    }
+
+    /// Returns an instance with the [`EMPTY_REQUESTS_HASH`].
+    pub const fn empty() -> Self {
+        Self::Hash(EMPTY_REQUESTS_HASH)
+    }
+
+    /// Returns the requests, if any.
+    pub const fn requests(&self) -> Option<&Requests> {
+        match self {
+            Self::Requests(requests) => Some(requests),
+            Self::Hash(_) => None,
         }
     }
 }
 
-impl From<alloy_rlp::Error> for Eip7685Error {
-    fn from(err: alloy_rlp::Error) -> Self {
-        Self::RlpError(err)
+impl Default for RequestsOrHash {
+    fn default() -> Self {
+        Self::Requests(Requests::default())
     }
 }
 
-impl From<Eip7685Error> for alloy_rlp::Error {
-    fn from(err: Eip7685Error) -> Self {
-        match err {
-            Eip7685Error::RlpError(err) => err,
-            Eip7685Error::MissingType => Self::Custom("eip7685 decoding failed: missing type"),
-            Eip7685Error::UnexpectedType(_) => {
-                Self::Custom("eip7685 decoding failed: unexpected type")
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extend() {
+        // Test extending a Requests container with another Requests container
+        let mut reqs1 = Requests::new(vec![Bytes::from(vec![0x01, 0x02])]);
+        let reqs2 =
+            Requests::new(vec![Bytes::from(vec![0x03, 0x04]), Bytes::from(vec![0x05, 0x06])]);
+
+        // Extend reqs1 with reqs2
+        reqs1.extend(reqs2);
+
+        // Ensure the requests are correctly combined
+        assert_eq!(reqs1.0.len(), 3);
+        assert_eq!(
+            reqs1.0,
+            vec![
+                Bytes::from(vec![0x01, 0x02]),
+                Bytes::from(vec![0x03, 0x04]),
+                Bytes::from(vec![0x05, 0x06])
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "sha2")]
+    fn test_consistent_requests_hash() {
+        // We test that the empty requests hash is consistent with the EIP-7685 definition.
+        assert_eq!(Requests::default().requests_hash(), EMPTY_REQUESTS_HASH);
+
+        // Test to hash a non-empty vector of requests.
+        assert_eq!(
+            Requests(vec![
+                Bytes::from(vec![0x00, 0x0a, 0x0b, 0x0c]),
+                Bytes::from(vec![0x01, 0x0d, 0x0e, 0x0f])
+            ])
+            .requests_hash(),
+            b256!("be3a57667b9bb9e0275019c0faf0f415fdc8385a408fd03e13a5c50615e3530c"),
+        );
     }
 }
-
-/// Decoding trait for [EIP-7685] requests. The trait should be implemented for an envelope that
-/// wraps each possible request type.
-///
-/// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
-pub trait Decodable7685: Sized {
-    /// Extract the type byte from the buffer, if any. The type byte is the
-    /// first byte.
-    fn extract_type_byte(buf: &mut &[u8]) -> Option<u8> {
-        buf.first().copied()
-    }
-
-    /// Decode the appropriate variant, based on the request type.
-    ///
-    /// This function is invoked by [`Self::decode_7685`] with the type byte, and the tail of the
-    /// buffer.
-    ///
-    /// ## Note
-    ///
-    /// This should be a simple match block that invokes an inner type's decoder. The decoder is
-    /// request type dependent.
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip7685Error>;
-
-    /// Decode an EIP-7685 request into a concrete instance
-    fn decode_7685(buf: &mut &[u8]) -> Result<Self, Eip7685Error> {
-        Self::extract_type_byte(buf)
-            .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
-            .unwrap_or(Err(Eip7685Error::MissingType))
-    }
-}
-
-/// Encoding trait for [EIP-7685] requests. The trait should be implemented for an envelope that
-/// wraps each possible request type.
-///
-/// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
-pub trait Encodable7685: Sized + Send + Sync + 'static {
-    /// Return the request type.
-    fn request_type(&self) -> u8;
-
-    /// Encode the request according to [EIP-7685] rules.
-    ///
-    /// First a 1-byte flag specifying the request type, then the encoded payload.
-    ///
-    /// The encoding of the payload is request-type dependent.
-    ///
-    /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
-    fn encode_7685(&self, out: &mut dyn BufMut) {
-        out.put_u8(self.request_type());
-        self.encode_payload_7685(out);
-    }
-
-    /// Encode the request payload.
-    ///
-    /// The encoding for the payload is request type dependent.
-    fn encode_payload_7685(&self, out: &mut dyn BufMut);
-
-    /// Encode the request according to [EIP-7685] rules.
-    ///
-    /// First a 1-byte flag specifying the request type, then the encoded payload.
-    ///
-    /// The encoding of the payload is request-type dependent.
-    ///
-    /// This is a convenience method for encoding into a vec, and returning the
-    /// vec.
-    ///
-    /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
-    fn encoded_7685(&self) -> Vec<u8> {
-        let mut out = vec![];
-        self.encode_7685(&mut out);
-        out
-    }
-}
-
-/// An [EIP-7685] request envelope, blanket implemented for types that impl
-/// [`Encodable7685`] and [`Decodable7685`]. This envelope is a wrapper around
-/// a request, differentiated by the request type.
-///
-/// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
-pub trait Eip7685RequestEnvelope: Decodable7685 + Encodable7685 {}
-impl<T> Eip7685RequestEnvelope for T where T: Decodable7685 + Encodable7685 {}

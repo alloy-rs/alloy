@@ -13,7 +13,11 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
@@ -61,7 +65,7 @@ alloy-transport-ws = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest"]
+default = ["std", "reqwest", "alloy-core/default", "essentials"]
 
 # std
 std = [
@@ -72,19 +76,24 @@ std = [
     "alloy-consensus?/std",
 ]
 
+# essential features that enable basic network interactions out of the box.
+essentials = ["contract", "provider-http", "rpc-types", "signer-local"]
+
 # full
 full = [
     "consensus",
-    "contract",
     "eips",
+    "essentials",
     "k256",
     "kzg",
     "network",
-    "provider-http", # includes `providers`
-    "provider-ws",   # includes `providers`
-    "provider-ipc",  # includes `providers`
-    "rpc-types",     # includes `rpc-types-eth`
-    "signer-local",  # includes `signers`
+    "provider-ws",
+    "provider-ipc",
+    "provider-trace-api",
+    "provider-txpool-api",
+    "provider-debug-api",
+    "provider-anvil-api",
+    "pubsub",
 ]
 
 # configuration
@@ -131,7 +140,14 @@ network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider", "rpc-client", "eips"]
+providers = [
+    "dep:alloy-provider",
+    "rpc-client",
+    "transports",
+    "eips",
+    "consensus",
+    "network",
+]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
@@ -184,10 +200,10 @@ pubsub = [
 # rpc
 rpc = []
 json-rpc = ["rpc", "dep:alloy-json-rpc"]
-rpc-client = ["rpc", "dep:alloy-rpc-client"]
-rpc-client-ws = ["rpc-client", "alloy-rpc-client?/ws"]
-rpc-client-ipc = ["rpc-client", "alloy-rpc-client?/ipc"]
-rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
+rpc-client = ["rpc", "transports", "transport-http", "dep:alloy-rpc-client"]
+rpc-client-ws = ["rpc-client", "transport-ws", "alloy-rpc-client?/ws"]
+rpc-client-ipc = ["rpc-client", "transport-ipc", "alloy-rpc-client?/ipc"]
+rpc-types = ["rpc", "serde", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-admin = [
     "rpc-types",
     "alloy-rpc-types?/admin",
@@ -250,28 +266,32 @@ json-abi = ["alloy-core/json-abi"]
 json = ["alloy-core/json"]
 sol-types = ["alloy-core/sol-types"]
 
-tiny-keccak = ["alloy-core/tiny-keccak"]
-native-keccak = ["alloy-core/native-keccak"]
 asm-keccak = ["alloy-core/asm-keccak"]
+native-keccak = ["alloy-core/native-keccak"]
+sha3-keccak = ["alloy-core/sha3-keccak"]
+tiny-keccak = ["alloy-core/tiny-keccak"]
 
-postgres = ["alloy-core/postgres"]
+map = ["alloy-core/map"]
+map-hashbrown = ["alloy-core/map-hashbrown"]
+map-indexmap = ["alloy-core/map-indexmap"]
+map-fxhash = ["alloy-core/map-fxhash"]
+
 getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
-serde = ["alloy-core/serde", "alloy-eips?/serde", "dep:alloy-serde"]
-ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz"]
-arbitrary = [
-    "alloy-core/arbitrary",
-    "alloy-consensus?/arbitrary",
-    "alloy-eips?/arbitrary",
-    "alloy-rpc-types?/arbitrary",
+serde = [
+    "alloy-core/serde",
+    "alloy-eips?/serde",
+    "alloy-consensus?/serde",
+    "dep:alloy-serde",
 ]
+ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",
-    "alloy-eips?/k256",
     "alloy-network?/k256",
     "alloy-rpc-types?/k256",
+    "alloy-eips?/k256",
 ]
 kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
 eip712 = [
@@ -283,3 +303,11 @@ eip712 = [
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
+
+arbitrary = [
+    "alloy-core/arbitrary",
+    "alloy-consensus?/arbitrary",
+    "alloy-eips?/arbitrary",
+    "alloy-rpc-types?/arbitrary",
+]
+postgres = ["alloy-core/postgres"]

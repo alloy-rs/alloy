@@ -8,7 +8,7 @@
 
 use alloy_consensus::SignableTransaction;
 use alloy_network::{TxSigner, TxSignerSync};
-use alloy_primitives::{Address, ChainId, Signature, B256};
+use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
@@ -118,8 +118,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigner<C> {
     #[inline]
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
-        let (recoverable_sig, recovery_id) = self.credential.sign_prehash(hash.as_ref())?;
-        Ok(Signature::from_signature_and_parity(recoverable_sig, recovery_id)?)
+        Ok(self.credential.sign_prehash(hash.as_ref())?.into())
     }
 
     #[inline]
@@ -289,5 +288,16 @@ mod test {
         let error = sign_tx_test(&mut tx, Some(1)).await.unwrap_err();
         let expected_error = alloy_signer::Error::TransactionChainIdMismatch { signer: 1, tx: 2 };
         assert_eq!(error.to_string(), expected_error.to_string());
+    }
+
+    // <https://github.com/alloy-rs/core/issues/705>
+    #[test]
+    fn test_parity() {
+        let signer = PrivateKeySigner::random();
+        let message = b"hello";
+        let signature = signer.sign_message_sync(message).unwrap();
+        let value = signature.as_bytes().to_vec();
+        let recovered_signature: Signature = value.as_slice().try_into().unwrap();
+        assert_eq!(signature, recovered_signature);
     }
 }

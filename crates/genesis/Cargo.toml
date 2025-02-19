@@ -13,14 +13,20 @@ exclude.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
 
 [lints]
 workspace = true
 
 [dependencies]
+alloy-eips = { workspace = true, features = ["serde"] }
 alloy-primitives.workspace = true
 alloy-serde.workspace = true
+alloy-trie = { workspace = true, features = ["ethereum"] }
 
 # serde
 serde.workspace = true
@@ -30,4 +36,10 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-serde/std", "serde/std"]
+std = [
+	"alloy-primitives/std",
+	"alloy-serde/std",
+	"serde/std",
+	"alloy-trie/std",
+	"alloy-eips/std"
+]
