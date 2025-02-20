@@ -51,7 +51,7 @@ pub enum PayloadError {
     #[display("requests present in pre-prague payload")]
     PrePragueBlockRequests,
     /// Invalid payload block hash.
-    #[display("block hash mismatch: want {consensus}, got {execution}")]
+    #[display("block hash mismatch: want {execution}, got {consensus}")]
     BlockHash {
         /// The block hash computed from the payload.
         execution: B256,
