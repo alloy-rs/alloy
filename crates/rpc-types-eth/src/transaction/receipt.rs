@@ -2,6 +2,7 @@ use crate::Log;
 use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
+use alloy_sol_types::SolEvent;
 
 /// Transaction receipt
 ///
@@ -101,6 +102,16 @@ impl TransactionReceipt {
         }
         Some(self.from.create(nonce))
     }
+
+    /// Attempts to decode the logs to the provided log type.
+    ///
+    /// Returns the first log that decodes successfully.
+    ///
+    /// Returns None, if none of the logs could be decoded to the provided log type or if there
+    /// are no logs.
+    pub fn decoded_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().iter().find_map(|log| E::decode_log(&log.inner, false).ok())
+    }
 }
 
 impl<T> TransactionReceipt<T> {
@@ -149,6 +160,11 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
         L: Into<alloy_primitives::Log>,
     {
         self.map_logs(Into::into)
+    }
+
+    /// Get the receipt logs.
+    pub fn logs(&self) -> &[L] {
+        self.inner.logs()
     }
 }
 

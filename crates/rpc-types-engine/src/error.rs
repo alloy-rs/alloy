@@ -41,9 +41,6 @@ pub enum PayloadError {
     /// parent beacon block root missing in post-cancun payload.
     #[display("parent beacon block root missing in post-cancun payload")]
     PostCancunBlockWithoutParentBeaconBlockRoot,
-    /// blob transactions missing in post-cancun payload.
-    #[display("blob transactions missing in post-cancun payload")]
-    PostCancunBlockWithoutBlobTransactions,
     /// blob gas used missing in post-cancun payload.
     #[display("blob gas used missing in post-cancun payload")]
     PostCancunBlockWithoutBlobGasUsed,
