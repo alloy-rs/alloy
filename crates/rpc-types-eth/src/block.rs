@@ -2,8 +2,8 @@
 
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
-use alloy_eips::eip4895::Withdrawals;
+use alloy_consensus::{error::ValueError, BlockBody, BlockHeader, Sealed, TxEnvelope};
+use alloy_eips::{eip4895::Withdrawals, eip7840::BlobParams, Encodable2718};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
@@ -15,7 +15,6 @@ pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_eips::{eip7840::BlobParams, Encodable2718};
 
 /// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -103,6 +102,33 @@ impl<T, H> Block<T, H> {
     pub fn with_uncles(mut self, uncles: Vec<B256>) -> Self {
         self.uncles = uncles;
         self
+    }
+
+    /// Converts this block into a [`BlockBody`].
+    ///
+    /// Returns an error if the transactions are not full or if the block has uncles.
+    pub fn try_into_block_body(self) -> Result<BlockBody<T, H>, ValueError<Self>> {
+        if !self.uncles.is_empty() {
+            return Err(ValueError::new(self, "uncles not empty"));
+        }
+        if !self.transactions.is_full() {
+            return Err(ValueError::new(self, "transactions not full"));
+        }
+
+        Ok(self.into_block_body_unchecked())
+    }
+
+    /// Converts this block into a [`BlockBody`]
+    ///
+    /// Caution: The body will have empty transactions unless the block's transactions are
+    /// [`BlockTransactions::Full`]. This will disregard ommers/uncles and always return an empty
+    /// ommers vec.
+    pub fn into_block_body_unchecked(self) -> BlockBody<T, H> {
+        BlockBody {
+            transactions: self.transactions.into_transactions_vec(),
+            ommers: Default::default(),
+            withdrawals: self.withdrawals,
+        }
     }
 
     /// Converts the block's header type by applying a function to it.
