@@ -359,6 +359,8 @@ where
     }
 }
 
+/// Intermediate type that holds the filled transaction request until it is swapped with the
+/// unfilled tx request while preparing the final RPC call in `Caller`.
 struct EthCallFiller<N: Network> {
     filled_tx: N::TransactionRequest,
     client: WeakClient,
@@ -379,6 +381,7 @@ where
         &self,
         params: EthCallParams<'_, N>,
     ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
+        // Swap the filled tx with the unfilled tx
         let mut new_params = EthCallParams::<'_, N>::new(&self.filled_tx)
             .with_block(params.block().unwrap_or(BlockId::pending()));
 
@@ -393,6 +396,7 @@ where
         &self,
         params: EthCallParams<'_, N>,
     ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
+        // Swap the filled tx with the unfilled tx
         let mut new_params = EthCallParams::<'_, N>::new(&self.filled_tx)
             .with_block(params.block().unwrap_or(BlockId::pending()));
 
