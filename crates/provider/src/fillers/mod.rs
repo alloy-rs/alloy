@@ -7,6 +7,9 @@
 //! [`Provider`]: crate::Provider
 
 mod chain_id;
+use alloy_eips::{BlockId, BlockNumberOrTag};
+use alloy_rpc_client::WeakClient;
+use alloy_transport::TransportErrorKind;
 pub use chain_id::ChainIdFiller;
 
 mod wallet;
@@ -23,11 +26,13 @@ pub use join_fill::JoinFill;
 use tracing::error;
 
 use crate::{
-    provider::SendableTx, Identity, PendingTransactionBuilder, Provider, ProviderLayer,
-    RootProvider,
+    provider::{provider_rpc_call, SendableTx},
+    Caller, EthCall, EthCallParams, Identity, PendingTransactionBuilder, Provider, ProviderCall,
+    ProviderLayer, RootProvider,
 };
-use alloy_json_rpc::RpcError;
+use alloy_json_rpc::{RpcError, RpcRecv};
 use alloy_network::{AnyNetwork, Ethereum, Network};
+use alloy_primitives::{Bytes, U64};
 use alloy_transport::TransportResult;
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
@@ -202,6 +207,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
+    /// asyncronously
     fn prepare_call(
         &self,
         tx: &mut N::TransactionRequest,
@@ -209,6 +215,14 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         let _ = tx;
         // This is a no-op by default
         futures::future::ready(Ok(()))
+    }
+
+    /// Prepares transaction request with necessary fillers required for eth_call operations
+    /// syncronously
+    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+        let _ = tx;
+        // No-op default
+        Ok(())
     }
 }
 
@@ -280,11 +294,11 @@ where
     }
 
     /// Prepares a transaction request for eth_call operations using the configured fillers
-    pub async fn prepare_call(
+    pub fn prepare_call(
         &self,
         mut tx: N::TransactionRequest,
     ) -> TransportResult<N::TransactionRequest> {
-        self.filler.prepare_call(&mut tx).await?;
+        self.filler.prepare_call_sync(&mut tx)?;
         Ok(tx)
     }
 }
@@ -299,6 +313,30 @@ where
 {
     fn root(&self) -> &RootProvider<N> {
         self.inner.root()
+    }
+
+    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+        let call_filler = match self.prepare_call(tx.clone()) {
+            Ok(filled_tx) => EthCallFiller::new(filled_tx, self.weak_client()),
+            Err(e) => {
+                tracing::error!(?e, "preparing call for eth_call, using tx without filling");
+                EthCallFiller::new(tx.clone(), self.weak_client())
+            }
+        };
+        EthCall::call(call_filler, tx).block(BlockNumberOrTag::Pending.into())
+    }
+
+    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+        let call_filler = match self.prepare_call(tx.clone()) {
+            Ok(filled_tx) => EthCallFiller::new(filled_tx, self.weak_client()),
+            Err(e) => {
+                tracing::error!(?e, "preparing call for eth_call, using tx without filling");
+                EthCallFiller::new(tx.clone(), self.weak_client())
+            }
+        };
+        EthCall::gas_estimate(call_filler, tx)
+            .block(BlockNumberOrTag::Pending.into())
+            .map_resp(crate::utils::convert_u64)
     }
 
     async fn send_transaction_internal(
@@ -318,6 +356,62 @@ where
 
         // Errors in tx building happen further down the stack.
         self.inner.send_transaction_internal(tx).await
+    }
+}
+
+struct EthCallFiller<N: Network> {
+    filled_tx: N::TransactionRequest,
+    client: WeakClient,
+}
+
+impl<N: Network> EthCallFiller<N> {
+    fn new(filled_tx: N::TransactionRequest, client: WeakClient) -> Self {
+        Self { filled_tx, client }
+    }
+}
+
+impl<N, Resp> Caller<N, Resp> for EthCallFiller<N>
+where
+    N: Network,
+    Resp: RpcRecv,
+{
+    fn call(
+        &self,
+        params: EthCallParams<'_, N>,
+    ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
+        let mut new_params = EthCallParams::<'_, N>::new(&self.filled_tx)
+            .with_block(params.block().unwrap_or(BlockId::pending()));
+
+        if let Some(overrides) = params.overrides {
+            new_params.overrides = Some(overrides);
+        }
+
+        provider_rpc_call(&self.client, "eth_call", new_params)
+    }
+
+    fn estimate_gas(
+        &self,
+        params: EthCallParams<'_, N>,
+    ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
+        let mut new_params = EthCallParams::<'_, N>::new(&self.filled_tx)
+            .with_block(params.block().unwrap_or(BlockId::pending()));
+
+        if let Some(overrides) = params.overrides {
+            new_params.overrides = Some(overrides);
+        }
+
+        provider_rpc_call(&self.client, "eth_estimateGas", new_params)
+    }
+
+    fn call_many(
+        &self,
+        params: crate::EthCallManyParams<'_>,
+    ) -> TransportResult<crate::ProviderCall<crate::EthCallManyParams<'static>, Resp>> {
+        let client = self.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
+
+        let rpc_call = client.request("eth_callMany", params.into_owned());
+
+        Ok(ProviderCall::RpcCall(rpc_call))
     }
 }
 
