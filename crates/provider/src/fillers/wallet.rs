@@ -108,6 +108,16 @@ where
         }
         Ok(())
     }
+
+    fn prepare_call_sync(
+        &self,
+        tx: &mut <N as Network>::TransactionRequest,
+    ) -> TransportResult<()> {
+        if tx.from().is_none() {
+            tx.set_from(self.wallet.default_signer_address());
+        }
+        Ok(())
+    }
 }
 
 #[cfg(feature = "reqwest")]
