@@ -375,3 +375,12 @@ impl<T> WithEncoded<Option<T>> {
         self.1.map(|v| WithEncoded(self.0, v))
     }
 }
+
+impl<L: Typed2718, R: Typed2718> Typed2718 for either::Either<L, R> {
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Left(l) => l.ty(),
+            Self::Right(r) => r.ty(),
+        }
+    }
+}
