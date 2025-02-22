@@ -28,9 +28,10 @@ pub use receipt::TransactionReceipt;
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
-/// Transaction object used in RPC
+/// Transaction object used in RPC.
 ///
-/// This
+/// This represents a transaction in RPC format (`eth_getTransactionByHash`) and contains the full
+/// transaction object and additional block metadata if the transaction has been mined.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
