@@ -8,8 +8,8 @@
 
 mod chain_id;
 
-use std::borrow::Cow;
 pub use chain_id::ChainIdFiller;
+use std::borrow::Cow;
 
 mod wallet;
 pub use wallet::WalletFiller;
@@ -24,21 +24,29 @@ mod join_fill;
 pub use join_fill::JoinFill;
 use tracing::error;
 
-use crate::{provider::SendableTx, EthCall, EthCallMany, FilterPollerBuilder, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    provider::SendableTx, EthCall, EthCallMany, FilterPollerBuilder, Identity, PendingTransaction,
+    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
+    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
+use alloy_eips::{eip2930::AccessListResult, BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
+use alloy_network_primitives::BlockTransactionsKind;
+use alloy_primitives::{
+    Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
+};
+use alloy_rpc_client::NoParams;
+use alloy_rpc_types_eth::{
+    simulate::{SimulatePayload, SimulatedBlock},
+    Bundle, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter, FilterChanges, Index,
+    Log, SyncStatus,
+};
 use alloy_transport::TransportResult;
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
-use std::marker::PhantomData;
-use alloy_primitives::{Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64};
 use serde_json::value::RawValue;
-use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_eips::eip2930::AccessListResult;
-use alloy_network_primitives::BlockTransactionsKind;
-use alloy_rpc_client::NoParams;
-use alloy_rpc_types_eth::{Bundle, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus};
-use alloy_rpc_types_eth::simulate::{SimulatePayload, SimulatedBlock};
+use std::marker::PhantomData;
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
@@ -312,7 +320,6 @@ where
         self.inner.get_accounts()
     }
 
-
     fn get_blob_base_fee(&self) -> ProviderCall<NoParams, U128, u128> {
         self.inner.get_blob_base_fee()
     }
@@ -325,11 +332,17 @@ where
         self.inner.call(tx)
     }
 
-    fn call_many<'req>(&self, bundles: &'req Vec<Bundle>) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
+    fn call_many<'req>(
+        &self,
+        bundles: &'req Vec<Bundle>,
+    ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         self.inner.call_many(bundles)
     }
 
-    fn simulate<'req>(&self, payload: &'req SimulatePayload) -> RpcWithBlock<&'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
+    fn simulate<'req>(
+        &self,
+        payload: &'req SimulatePayload,
+    ) -> RpcWithBlock<&'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
         self.inner.simulate(payload)
     }
 
@@ -337,7 +350,10 @@ where
         self.inner.get_chain_id()
     }
 
-    fn create_access_list<'a>(&self, request: &'a N::TransactionRequest) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
+    fn create_access_list<'a>(
+        &self,
+        request: &'a N::TransactionRequest,
+    ) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
         self.inner.create_access_list(request)
     }
 
@@ -640,7 +656,6 @@ where
     fn transaction_request(&self) -> N::TransactionRequest {
         self.inner.transaction_request()
     }
-
 }
 
 /// A trait which may be used to configure default fillers for [Network] implementations.
