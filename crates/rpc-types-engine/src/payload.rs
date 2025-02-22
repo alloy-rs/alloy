@@ -1514,6 +1514,16 @@ impl ExecutionData {
         self.payload.block_number()
     }
 
+    /// Returns the parent beacon block root, if any.
+    pub fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.sidecar.parent_beacon_block_root()
+    }
+
+    /// Return the withdrawals for the payload or attributes.
+    pub fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
+        self.payload.withdrawals()
+    }
+
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
