@@ -7,9 +7,89 @@ use alloy_primitives::{
     Address, Bytes, B256, U256,
 };
 
+/// A StateOverride builder.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StateOverridesBuilder {
+    overrides: StateOverride,
+}
+
+impl StateOverridesBuilder {
+    /// Create a new StateOverridesBuilder.
+    pub fn new(map: AddressHashMap<AccountOverride>) -> Self {
+        Self { overrides: map }
+    }
+
+    /// Adds an account override for a specific address.
+    pub fn append(mut self, address: Address, account_override: AccountOverride) -> Self {
+        self.overrides.insert(address, account_override);
+        self
+    }
+
+    /// Adds multiple account overrides from an iterator.
+    pub fn extend<I>(mut self, account_overrides: I) -> Self
+    where
+        I: IntoIterator<Item = (Address, AccountOverride)>,
+    {
+        self.overrides.extend(account_overrides);
+        self
+    }
+
+    /// Get the underlying `StateOverride`.
+    pub fn value(self) -> StateOverride {
+        self.overrides
+    }
+
+    /// Configures an account override with a balance.
+    pub fn with_balance(mut self, address: Address, balance: U256) -> Self {
+        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_balance(balance);
+        self
+    }
+
+    /// Configures an account override with a nonce.
+    pub fn with_nonce(mut self, address: Address, nonce: u64) -> Self {
+        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_nonce(nonce);
+        self
+    }
+
+    /// Configures an account override with bytecode.
+    pub fn with_code(mut self, address: Address, code: impl Into<Bytes>) -> Self {
+        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_code(code);
+        self
+    }
+
+    /// Configures an account override with state overrides.
+    pub fn with_state(
+        mut self,
+        address: Address,
+        state: impl IntoIterator<Item = (B256, B256)>,
+    ) -> Self {
+        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_state(state);
+        self
+    }
+
+    /// Configures an account override with state diffs.
+    pub fn with_state_diff(
+        mut self,
+        address: Address,
+        state_diff: impl IntoIterator<Item = (B256, B256)>,
+    ) -> Self {
+        self.overrides
+            .entry(address)
+            .or_insert_with(AccountOverride::default)
+            .set_state_diff(state_diff);
+        self
+    }
+}
+
 /// A set of account overrides
 pub type StateOverride = AddressHashMap<AccountOverride>;
 
+/// Allows converting `StateOverridesBuilder` directly into `StateOverride`.
+impl From<StateOverridesBuilder> for StateOverride {
+    fn from(builder: StateOverridesBuilder) -> Self {
+        builder.overrides
+    }
+}
 /// Custom account override used in call
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
