@@ -197,6 +197,12 @@ where
     }
 }
 
+impl<T> From<Transaction<T>> for Recovered<T> {
+    fn from(tx: Transaction<T>) -> Self {
+        tx.into_recovered()
+    }
+}
+
 impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
 
