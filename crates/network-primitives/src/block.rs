@@ -293,7 +293,6 @@ pub enum BlockTransactionsKind {
 }
 
 impl BlockTransactionsKind {
-    
     /// Returns true if this is [`BlockTransactionsKind::Hashes`]
     pub const fn is_hashes(&self) -> bool {
         matches!(self, Self::Hashes)
