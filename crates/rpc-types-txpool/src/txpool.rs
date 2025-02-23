@@ -148,6 +148,28 @@ impl<T> TxpoolContent<T> {
             queued: self.queued.remove(sender).unwrap_or_default(),
         }
     }
+
+    /// Returns an iterator over references to all pending transactions
+    pub fn pending_transactions(&self) -> impl Iterator<Item = &T> {
+        self.pending.values().flat_map(|nonce_map| nonce_map.values())
+    }
+
+    /// Returns an iterator over references to all queued transactions
+    pub fn queued_transactions(&self) -> impl Iterator<Item = &T> {
+        self.queued.values().flat_map(|nonce_map| nonce_map.values())
+    }
+}
+
+impl<T: Clone> TxpoolContent<T> {
+    /// Returns an iterator that consumes and yields all pending transactions
+    pub fn into_pending_transactions(self) -> impl Iterator<Item = T> {
+        self.pending.into_values().flat_map(|nonce_map| nonce_map.into_values())
+    }
+
+    /// Returns an iterator that consumes and yields all queued transactions
+    pub fn into_queued_transactions(self) -> impl Iterator<Item = T> {
+        self.queued.into_values().flat_map(|nonce_map| nonce_map.into_values())
+    }
 }
 
 /// Transaction Pool Content From
