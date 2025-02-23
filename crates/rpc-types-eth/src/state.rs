@@ -35,25 +35,25 @@ impl StateOverridesBuilder {
     }
 
     /// Get the underlying `StateOverride`.
-    pub fn value(self) -> StateOverride {
+    pub fn build(self) -> StateOverride {
         self.overrides
     }
 
     /// Configures an account override with a balance.
     pub fn with_balance(mut self, address: Address, balance: U256) -> Self {
-        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_balance(balance);
+        self.overrides.entry(address).or_default().set_balance(balance);
         self
     }
 
     /// Configures an account override with a nonce.
     pub fn with_nonce(mut self, address: Address, nonce: u64) -> Self {
-        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_nonce(nonce);
+        self.overrides.entry(address).or_default().set_nonce(nonce);
         self
     }
 
     /// Configures an account override with bytecode.
     pub fn with_code(mut self, address: Address, code: impl Into<Bytes>) -> Self {
-        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_code(code);
+        self.overrides.entry(address).or_default().set_code(code);
         self
     }
 
@@ -63,7 +63,7 @@ impl StateOverridesBuilder {
         address: Address,
         state: impl IntoIterator<Item = (B256, B256)>,
     ) -> Self {
-        self.overrides.entry(address).or_insert_with(AccountOverride::default).set_state(state);
+        self.overrides.entry(address).or_default().set_state(state);
         self
     }
 
@@ -73,10 +73,7 @@ impl StateOverridesBuilder {
         address: Address,
         state_diff: impl IntoIterator<Item = (B256, B256)>,
     ) -> Self {
-        self.overrides
-            .entry(address)
-            .or_insert_with(AccountOverride::default)
-            .set_state_diff(state_diff);
+        self.overrides.entry(address).or_default().set_state_diff(state_diff);
         self
     }
 }
