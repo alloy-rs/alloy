@@ -255,6 +255,12 @@ impl From<Signed<TypedTransaction>> for TxEnvelope {
     }
 }
 
+impl From<TxEnvelope> for Signed<TypedTransaction> {
+    fn from(value: TxEnvelope) -> Self {
+        value.into_signed()
+    }
+}
+
 impl TxEnvelope {
     /// Returns true if the transaction is a legacy transaction.
     #[inline]
@@ -297,6 +303,17 @@ impl TxEnvelope {
             Self::Eip1559(tx) => Ok(tx.into()),
             Self::Eip4844(tx) => PooledTransaction::try_from(tx).map_err(ValueError::convert),
             Self::Eip7702(tx) => Ok(tx.into()),
+        }
+    }
+
+    /// Consumes the type into a [`Signed`]
+    pub fn into_signed(self) -> Signed<TypedTransaction> {
+        match self {
+            Self::Legacy(tx) => tx.convert(),
+            Self::Eip2930(tx) => tx.convert(),
+            Self::Eip1559(tx) => tx.convert(),
+            Self::Eip4844(tx) => tx.convert(),
+            Self::Eip7702(tx) => tx.convert(),
         }
     }
 
