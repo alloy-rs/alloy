@@ -5,8 +5,11 @@ use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
+use serde::{
+    de::{DeserializeOwned, MapAccess, Visitor},
+    Deserialize, Serialize,
+};
+use serde_json::{Map, Value};
 
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
@@ -230,33 +233,56 @@ impl<T> DerefMut for WithOtherFields<T> {
 
 impl<'de, T> Deserialize<'de> for WithOtherFields<T>
 where
-    T: Deserialize<'de> + Serialize,
+    T: DeserializeOwned + Serialize,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct WithOtherFieldsHelper<T> {
-            #[serde(flatten)]
-            inner: T,
-            #[serde(flatten)]
-            other: OtherFields,
+        deserializer.deserialize_map(WithOtherFieldsVisitor { marker: std::marker::PhantomData })
+    }
+}
+
+struct WithOtherFieldsVisitor<T> {
+    marker: std::marker::PhantomData<T>,
+}
+
+impl<'de, T> Visitor<'de> for WithOtherFieldsVisitor<T>
+where
+    T: DeserializeOwned + Serialize,
+{
+    type Value = WithOtherFields<T>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "struct WithOtherFields")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut inner_map = Map::new();
+        while let Some((key, value)) = map.next_entry::<String, Value>()? {
+            inner_map.insert(key, value);
         }
 
-        let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
-        // remove all fields present in the inner struct from the other fields, this is to avoid
-        // duplicate fields in the catch all other fields because serde flatten does not exclude
-        // already deserialized fields when deserializing the other fields.
-        if let Value::Object(map) =
-            serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
-        {
-            for key in map.keys() {
-                helper.other.remove(key);
-            }
-        }
+        // Try deserializing `inner`
+        let inner: T =
+            T::deserialize(Value::Object(inner_map.clone())).map_err(serde::de::Error::custom)?;
 
-        Ok(Self { inner: helper.inner, other: helper.other })
+        // Any fields not taken by `inner` will be in `other`
+        let inner_keys: std::collections::HashSet<_> = serde_json::to_value(&inner)
+            .map_err(serde::de::Error::custom)?
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+
+        let other_map =
+            inner_map.into_iter().filter(|(key, _)| !inner_keys.contains(key)).collect();
+
+        Ok(WithOtherFields { inner, other: OtherFields::new(other_map) })
     }
 }
 
