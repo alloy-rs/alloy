@@ -239,12 +239,12 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_map(WithOtherFieldsVisitor { marker: std::marker::PhantomData })
+        deserializer.deserialize_map(WithOtherFieldsVisitor { marker: core::marker::PhantomData })
     }
 }
 
 struct WithOtherFieldsVisitor<T> {
-    marker: std::marker::PhantomData<T>,
+    marker: core::marker::PhantomData<T>,
 }
 
 impl<'de, T> Visitor<'de> for WithOtherFieldsVisitor<T>
@@ -253,7 +253,7 @@ where
 {
     type Value = WithOtherFields<T>;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(formatter, "struct WithOtherFields")
     }
 
@@ -271,16 +271,16 @@ where
             T::deserialize(Value::Object(inner_map.clone())).map_err(serde::de::Error::custom)?;
 
         // Any fields not taken by `inner` will be in `other`
-        let inner_keys: std::collections::HashSet<_> = serde_json::to_value(&inner)
+        let inner_keys: BTreeMap<String, ()> = serde_json::to_value(&inner)
             .map_err(serde::de::Error::custom)?
             .as_object()
             .unwrap()
             .keys()
-            .cloned()
+            .map(|k| (k.clone(), ()))
             .collect();
 
         let other_map =
-            inner_map.into_iter().filter(|(key, _)| !inner_keys.contains(key)).collect();
+            inner_map.into_iter().filter(|(key, _)| !inner_keys.contains_key(key)).collect();
 
         Ok(WithOtherFields { inner, other: OtherFields::new(other_map) })
     }
