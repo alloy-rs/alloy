@@ -331,6 +331,11 @@ impl<T> WithEncoded<T> {
         &self.0
     }
 
+    /// Returns ownership of the encoded bytes.
+    pub fn into_encoded_bytes(self) -> Bytes {
+        self.0
+    }
+
     /// Get the underlying value
     pub const fn value(&self) -> &T {
         &self.1
