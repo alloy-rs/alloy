@@ -696,26 +696,22 @@ where
         &self,
         params: EthCallParams<'_, N>,
     ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
-        match &self.prepare_res {
-            Ok(tx) => provider_boxed_fut(&self.client, "eth_call", params, tx),
-            Err(e) => Err(TransportErrorKind::custom_str(&format!(
-                "Error filling eth_call tx req: {}",
-                e.to_string()
-            ))),
-        }
+        let tx = self.prepare_res.as_ref().map_err(|e| {
+            TransportErrorKind::custom_str(&format!("Error filling eth_call tx req: {e}"))
+        })?;
+
+        provider_boxed_fut(&self.client, "eth_call", params, tx)
     }
 
     fn estimate_gas(
         &self,
         params: EthCallParams<'_, N>,
     ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
-        match &self.prepare_res {
-            Ok(tx) => provider_boxed_fut(&self.client, "eth_estimateGas", params, tx),
-            Err(e) => Err(TransportErrorKind::custom_str(&format!(
-                "Error filling eth_estimateGas tx req: {}",
-                e.to_string()
-            ))),
-        }
+        let tx = self.prepare_res.as_ref().map_err(|e| {
+            TransportErrorKind::custom_str(&format!("Error filling eth_call tx req: {e}"))
+        })?;
+
+        provider_boxed_fut(&self.client, "eth_estimateGas", params, tx)
     }
 
     fn call_many(
