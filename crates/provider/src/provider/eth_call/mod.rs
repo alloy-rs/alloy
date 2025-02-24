@@ -14,7 +14,7 @@ pub use params::{EthCallManyParams, EthCallParams};
 mod call_many;
 pub use call_many::EthCallMany;
 
-pub(crate) mod caller;
+mod caller;
 pub use caller::Caller;
 
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.

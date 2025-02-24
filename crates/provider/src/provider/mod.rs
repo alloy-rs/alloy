@@ -1,4 +1,4 @@
-pub(crate) mod eth_call;
+mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
 mod prov_call;
