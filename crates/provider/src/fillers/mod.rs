@@ -13,7 +13,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{NoParams, WeakClient};
 use alloy_rpc_types_eth::{Bundle, Index, SyncStatus};
-use alloy_transport::TransportErrorKind;
+use alloy_transport::{RpcFut, TransportErrorKind};
 pub use chain_id::ChainIdFiller;
 use std::borrow::Cow;
 
@@ -743,7 +743,8 @@ fn provider_boxed_fut<N: Network, Resp: RpcRecv>(
     }
 
     let params = new_params.into_owned();
-    Ok(ProviderCall::BoxedFuture(Box::pin(async move { client.request(method, params).await })))
+    let fut: RpcFut<'_, Resp> = Box::pin(async move { client.request(method, params).await });
+    Ok(ProviderCall::BoxedFuture(fut))
 }
 /// A trait which may be used to configure default fillers for [Network] implementations.
 pub trait RecommendedFillers: Network {
