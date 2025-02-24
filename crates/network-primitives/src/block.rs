@@ -292,6 +292,18 @@ pub enum BlockTransactionsKind {
     Full,
 }
 
+impl BlockTransactionsKind {
+    /// Returns true if this is [`BlockTransactionsKind::Hashes`]
+    pub const fn is_hashes(&self) -> bool {
+        matches!(self, Self::Hashes)
+    }
+
+    /// Returns true if this is [`BlockTransactionsKind::Full`]
+    pub const fn is_full(&self) -> bool {
+        matches!(self, Self::Full)
+    }
+}
+
 impl From<bool> for BlockTransactionsKind {
     fn from(is_full: bool) -> Self {
         if is_full {
