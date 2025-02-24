@@ -103,9 +103,7 @@ where
     }
 
     async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        if tx.from().is_none() {
-            tx.set_from(self.wallet.default_signer_address());
-        }
+        self.prepare_call_sync(tx)?;
         Ok(())
     }
 
