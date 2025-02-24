@@ -170,7 +170,7 @@ impl<T> TxpoolContent<T> {
     }
 }
 
-impl<T: Clone> TxpoolContent<T> {
+impl<T> TxpoolContent<T> {
     /// Returns an iterator that consumes and yields all pending transactions
     pub fn into_pending_transactions(self) -> impl Iterator<Item = T> {
         self.pending.into_values().flat_map(|nonce_map| nonce_map.into_values())
