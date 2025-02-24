@@ -31,7 +31,7 @@ pub use join_fill::JoinFill;
 use tracing::error;
 
 use crate::{
-    provider::{provider_rpc_call, SendableTx},
+    provider::{eth_call::caller::provider_rpc_call, SendableTx},
     Caller, EthCall, EthCallMany, EthCallParams, FilterPollerBuilder, Identity, PendingTransaction,
     PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
     ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,

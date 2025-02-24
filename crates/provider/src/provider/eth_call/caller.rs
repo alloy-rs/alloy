@@ -65,7 +65,7 @@ where
 }
 
 /// Returns a [`ProviderCall::RpcCall`] from the provided method and [`EthCallParams`].
-pub fn provider_rpc_call<N: Network, Resp: RpcRecv>(
+pub(crate) fn provider_rpc_call<N: Network, Resp: RpcRecv>(
     client: &WeakClient,
     method: &'static str,
     params: EthCallParams<'_, N>,
