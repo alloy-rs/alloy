@@ -743,7 +743,7 @@ fn provider_boxed_fut<N: Network, Resp: RpcRecv>(
     }
 
     let params = new_params.into_owned();
-    let fut: RpcFut<'_, Resp> = Box::pin(async move { client.request(method, params).await });
+    let fut = Box::pin(async move { client.request(method, params).await }) as RpcFut<'_, Resp>;
     Ok(ProviderCall::BoxedFuture(fut))
 }
 /// A trait which may be used to configure default fillers for [Network] implementations.
