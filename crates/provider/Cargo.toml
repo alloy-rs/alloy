@@ -95,9 +95,10 @@ http-body-util.workspace = true
 http.workspace = true
 alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 ci_info.workspace = true
+similar-asserts.workspace = true
 
 [features]
-default = ["reqwest", "reqwest-default-tls"]
+default = ["reqwest", "reqwest-default-tls", "trace-api"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",

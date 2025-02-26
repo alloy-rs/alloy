@@ -1,5 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
-use crate::{Provider, RpcWithBlock};
+use crate::Provider;
 use alloy_eips::BlockId;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
@@ -9,6 +9,9 @@ use alloy_rpc_types_trace::{
     parity::{LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType},
 };
 use alloy_transport::TransportResult;
+
+mod with_block;
+pub use with_block::TraceRpcWithBlock;
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
@@ -25,11 +28,10 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call<'a, 'b>(
+    fn trace_call<'a>(
         &self,
         request: &'a N::TransactionRequest,
-        trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<(&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
+    ) -> TraceRpcWithBlock<&'a N::TransactionRequest, TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -42,7 +44,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>>;
+    ) -> TraceRpcWithBlock<TraceCallList<'a, N>, Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -104,19 +106,18 @@ where
     N: Network,
     P: Provider<N>,
 {
-    fn trace_call<'a, 'b>(
+    fn trace_call<'a>(
         &self,
         request: &'a <N as Network>::TransactionRequest,
-        trace_types: &'b [TraceType],
-    ) -> RpcWithBlock<(&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults> {
-        self.client().request("trace_call", (request, trace_types)).into()
+    ) -> TraceRpcWithBlock<&'a <N as Network>::TransactionRequest, TraceResults> {
+        TraceRpcWithBlock::new_rpc(self.client().request("trace_call", request).into())
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>> {
-        self.client().request("trace_callMany", (request,)).into()
+    ) -> TraceRpcWithBlock<TraceCallList<'a, N>, Vec<TraceResults>> {
+        TraceRpcWithBlock::new_rpc(self.client().request("trace_callMany", request).into())
     }
 
     async fn trace_transaction(
@@ -176,10 +177,11 @@ mod test {
     use super::*;
     use crate::{ext::test::async_ci_only, ProviderBuilder};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::TransactionBuilder;
+    use alloy_network::{EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
-    use alloy_primitives::address;
+    use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_signer_local::PrivateKeySigner;
 
     #[tokio::test]
     async fn trace_block() {
@@ -200,7 +202,7 @@ mod test {
                     .with_from(address!("0000000000000000000000000000000000000123"))
                     .with_to(address!("0000000000000000000000000000000000000456"));
 
-                let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
+                let result = provider.trace_call(&tx).await;
                 assert!(result.is_ok());
 
                 let traces = result.unwrap();
@@ -259,7 +261,6 @@ mod test {
                 let result = provider
                     .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
                     .await;
-                assert!(result.is_ok());
 
                 let traces = result.unwrap();
                 assert_eq!(
@@ -317,6 +318,68 @@ mod test {
 ]
 "#
                     .trim()
+                );
+            })
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(windows, ignore)]
+    async fn test_replay_tx() {
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let pk: PrivateKeySigner =
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                        .parse()
+                        .unwrap();
+
+                let wallet = EthereumWallet::new(pk);
+                let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+
+                let tx = TransactionRequest::default()
+                    .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                    .value(U256::from(1000))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
+
+                let res = provider.send_transaction(tx).await.unwrap();
+
+                let receipt = res.get_receipt().await.unwrap();
+
+                let hash = receipt.transaction_hash;
+
+                let result = provider.trace_replay_transaction(hash, &vec![TraceType::Trace]).await;
+                assert!(result.is_ok());
+
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap(),
+                    r#"{
+  "output": "0x",
+  "stateDiff": null,
+  "trace": [
+    {
+      "type": "call",
+      "action": {
+        "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+        "callType": "call",
+        "gas": "0x5208",
+        "input": "0x",
+        "to": "0x0000000000000000000000000000000000000456",
+        "value": "0x3e8"
+      },
+      "result": {
+        "gasUsed": "0x5208",
+        "output": "0x"
+      },
+      "subtraces": 0,
+      "traceAddress": []
+    }
+  ],
+  "vmTrace": null
+}"#
                 );
             })
             .await;

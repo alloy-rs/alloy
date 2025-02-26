@@ -1,7 +1,8 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcRecv, RpcSend};
-use alloy_primitives::B256;
+use alloy_primitives::{map::HashSet, B256};
 use alloy_rpc_client::RpcCall;
+use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::TransportResult;
 use std::future::IntoFuture;
 
@@ -14,6 +15,21 @@ pub struct ParamsWithBlock<Params: RpcSend> {
     pub params: Params,
     /// The block id to be used for the RPC call.
     pub block_id: BlockId,
+    /// The trace types to be used for the RPC call. Should only be specified for `trace_*` calls.
+    pub trace_types: Option<HashSet<TraceType>>,
+}
+
+impl<Params: RpcSend> ParamsWithBlock<Params> {
+    /// Create a new instance of `ParamsWithBlock`.
+    pub fn new(params: Params, block_id: BlockId) -> Self {
+        Self { params, block_id, trace_types: None }
+    }
+
+    /// Set the trace types for the RPC call.
+    pub fn with_trace_types(mut self, trace_types: HashSet<TraceType>) -> Self {
+        self.trace_types = Some(trace_types);
+        self
+    }
 }
 
 impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
@@ -24,16 +40,28 @@ impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
         // Serialize params to a Value first
         let mut ser = serde_json::to_value(&self.params).map_err(serde::ser::Error::custom)?;
 
-        // serialize the block id
-        let block_id = serde_json::to_value(self.block_id).map_err(serde::ser::Error::custom)?;
-
-        if let serde_json::Value::Array(ref mut arr) = ser {
-            arr.push(block_id);
-        } else if ser.is_null() {
-            ser = serde_json::Value::Array(vec![block_id]);
-        } else {
-            ser = serde_json::Value::Array(vec![ser, block_id]);
+        // Convert to array if needed
+        if !matches!(ser, serde_json::Value::Array(_)) {
+            if ser.is_null() {
+                ser = serde_json::Value::Array(Vec::new());
+            } else {
+                ser = serde_json::Value::Array(vec![ser]);
+            }
         }
+
+        // Get mutable reference to array
+        let arr = ser.as_array_mut().unwrap();
+
+        // Add trace_types if present
+        if let Some(trace_types) = &self.trace_types {
+            let trace_types =
+                serde_json::to_value(trace_types).map_err(serde::ser::Error::custom)?;
+            arr.push(trace_types);
+        }
+
+        // Add block_id last
+        let block_id = serde_json::to_value(self.block_id).map_err(serde::ser::Error::custom)?;
+        arr.push(block_id);
 
         ser.serialize(serializer)
     }
@@ -43,7 +71,7 @@ type ProviderCallProducer<Params, Resp, Output, Map> =
     Box<dyn Fn(BlockId) -> ProviderCall<ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
 
 /// Container for varous types of calls dependent on a block id.
-enum WithBlockInner<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub(crate) enum WithBlockInner<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -142,46 +170,89 @@ where
         self.block_id = block_id;
         self
     }
+}
+
+impl<Params, Resp, Output, Map> WithBlock for RpcWithBlock<Params, Resp, Output, Map>
+where
+    Params: RpcSend,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output + Clone,
+{
+    fn block_id(mut self, block_id: BlockId) -> Self {
+        self.block_id = block_id;
+        self
+    }
+}
+
+/// Trait to set the block id for a call. This should be implemented by any builder types that
+/// require a block id. e.g [`RpcWithBlock`].
+pub trait WithBlock {
+    /// Set the block id.
+    fn block_id(self, block_id: BlockId) -> Self;
 
     /// Set the block id to "pending".
-    pub const fn pending(self) -> Self {
+    fn pending(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::pending())
     }
 
     /// Set the block id to "latest".
-    pub const fn latest(self) -> Self {
+    fn latest(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::latest())
     }
 
     /// Set the block id to "earliest".
-    pub const fn earliest(self) -> Self {
+    fn earliest(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::earliest())
     }
 
     /// Set the block id to "finalized".
-    pub const fn finalized(self) -> Self {
+    fn finalized(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::finalized())
     }
 
     /// Set the block id to "safe".
-    pub const fn safe(self) -> Self {
+    fn safe(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::safe())
     }
 
     /// Set the block id to a specific height.
-    pub const fn number(self, number: u64) -> Self {
+    fn number(self, number: u64) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::number(number))
     }
 
     /// Set the block id to a specific hash, without requiring the hash be part
     /// of the canonical chain.
-    pub const fn hash(self, hash: B256) -> Self {
+    fn hash(self, hash: B256) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::hash(hash))
     }
 
     /// Set the block id to a specific hash and require the hash be part of the
     /// canonical chain.
-    pub const fn hash_canonical(self, hash: B256) -> Self {
+    fn hash_canonical(self, hash: B256) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::hash_canonical(hash))
     }
 }
@@ -201,7 +272,7 @@ where
         match self.inner {
             WithBlockInner::RpcCall(rpc_call) => {
                 let block_id = self.block_id;
-                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock { params, block_id });
+                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock::new(params, block_id));
                 ProviderCall::RpcCall(rpc_call)
             }
             WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),
