@@ -1,7 +1,8 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcRecv, RpcSend};
-use alloy_primitives::B256;
+use alloy_primitives::{map::HashSet, B256};
 use alloy_rpc_client::RpcCall;
+use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::TransportResult;
 use std::future::IntoFuture;
 
@@ -14,6 +15,21 @@ pub struct ParamsWithBlock<Params: RpcSend> {
     pub params: Params,
     /// The block id to be used for the RPC call.
     pub block_id: BlockId,
+    /// The trace types to be used for the RPC call. Should only be specified for `trace_*` calls.
+    pub trace_types: Option<HashSet<TraceType>>,
+}
+
+impl<Params: RpcSend> ParamsWithBlock<Params> {
+    /// Create a new instance of `ParamsWithBlock`.
+    pub fn new(params: Params, block_id: BlockId) -> Self {
+        Self { params, block_id, trace_types: None }
+    }
+
+    /// Set the trace types for the RPC call.
+    pub fn with_trace_types(mut self, trace_types: HashSet<TraceType>) -> Self {
+        self.trace_types = Some(trace_types);
+        self
+    }
 }
 
 impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
@@ -24,16 +40,28 @@ impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
         // Serialize params to a Value first
         let mut ser = serde_json::to_value(&self.params).map_err(serde::ser::Error::custom)?;
 
-        // serialize the block id
-        let block_id = serde_json::to_value(self.block_id).map_err(serde::ser::Error::custom)?;
-
-        if let serde_json::Value::Array(ref mut arr) = ser {
-            arr.push(block_id);
-        } else if ser.is_null() {
-            ser = serde_json::Value::Array(vec![block_id]);
-        } else {
-            ser = serde_json::Value::Array(vec![ser, block_id]);
+        // Convert to array if needed
+        if !matches!(ser, serde_json::Value::Array(_)) {
+            if ser.is_null() {
+                ser = serde_json::Value::Array(Vec::new());
+            } else {
+                ser = serde_json::Value::Array(vec![ser]);
+            }
         }
+
+        // Get mutable reference to array
+        let arr = ser.as_array_mut().unwrap();
+
+        // Add trace_types if present
+        if let Some(trace_types) = &self.trace_types {
+            let trace_types =
+                serde_json::to_value(trace_types).map_err(serde::ser::Error::custom)?;
+            arr.push(trace_types);
+        }
+
+        // Add block_id last
+        let block_id = serde_json::to_value(self.block_id).map_err(serde::ser::Error::custom)?;
+        arr.push(block_id);
 
         ser.serialize(serializer)
     }
@@ -128,6 +156,19 @@ where
 {
     fn from(inner: F) -> Self {
         Self::new_provider(inner)
+    }
+}
+
+impl<Params, Resp, Output, Map> RpcWithBlock<Params, Resp, Output, Map>
+where
+    Params: RpcSend,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output + Clone,
+{
+    /// Set the block id.
+    pub const fn block_id(mut self, block_id: BlockId) -> Self {
+        self.block_id = block_id;
+        self
     }
 }
 
@@ -231,7 +272,7 @@ where
         match self.inner {
             WithBlockInner::RpcCall(rpc_call) => {
                 let block_id = self.block_id;
-                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock { params, block_id });
+                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock::new(params, block_id));
                 ProviderCall::RpcCall(rpc_call)
             }
             WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),

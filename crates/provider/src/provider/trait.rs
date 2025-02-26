@@ -1182,7 +1182,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider, WithBlock};
+    use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_consensus::Transaction;
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::Anvil;
@@ -1884,6 +1884,7 @@ mod tests {
         feature = "reqwest-rustls-tls",
         feature = "reqwest-native-tls",
     ))]
+    #[ignore]
     async fn call_mainnet() {
         use alloy_network::TransactionBuilder;
         use alloy_sol_types::SolValue;

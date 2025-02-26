@@ -1,5 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
-use crate::{Provider, RpcWithBlock};
+use crate::Provider;
 use alloy_eips::BlockId;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
@@ -11,6 +11,7 @@ use alloy_rpc_types_trace::{
 use alloy_transport::TransportResult;
 
 mod with_block;
+pub use with_block::TraceRpcWithBlock;
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
@@ -27,11 +28,10 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call<'a, 'b>(
+    fn trace_call<'a>(
         &self,
         request: &'a N::TransactionRequest,
-        trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<(&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
+    ) -> TraceRpcWithBlock<&'a N::TransactionRequest, TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -44,7 +44,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>>;
+    ) -> TraceRpcWithBlock<TraceCallList<'a, N>, Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -106,19 +106,18 @@ where
     N: Network,
     P: Provider<N>,
 {
-    fn trace_call<'a, 'b>(
+    fn trace_call<'a>(
         &self,
         request: &'a <N as Network>::TransactionRequest,
-        trace_types: &'b [TraceType],
-    ) -> RpcWithBlock<(&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults> {
-        self.client().request("trace_call", (request, trace_types)).into()
+    ) -> TraceRpcWithBlock<&'a <N as Network>::TransactionRequest, TraceResults> {
+        TraceRpcWithBlock::new_rpc(self.client().request("trace_call", request).into())
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>> {
-        self.client().request("trace_callMany", (request,)).into()
+    ) -> TraceRpcWithBlock<TraceCallList<'a, N>, Vec<TraceResults>> {
+        TraceRpcWithBlock::new_rpc(self.client().request("trace_callMany", request).into())
     }
 
     async fn trace_transaction(
@@ -202,7 +201,7 @@ mod test {
                     .with_from(address!("0000000000000000000000000000000000000123"))
                     .with_to(address!("0000000000000000000000000000000000000456"));
 
-                let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
+                let result = provider.trace_call(&tx).await;
                 assert!(result.is_ok());
 
                 let traces = result.unwrap();

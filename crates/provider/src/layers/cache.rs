@@ -101,7 +101,7 @@ macro_rules! rpc_call_with_block {
             let client = client?;
 
             let result = client.request($req.method(), $req.params()).map_params(|params| {
-                ParamsWithBlock { params, block_id: $req.block_id.unwrap_or(BlockId::latest()) }
+                ParamsWithBlock::new(params, $req.block_id.unwrap_or(BlockId::latest()))
             });
 
             let res = result.await?;
@@ -526,7 +526,7 @@ async fn cache_get_or_fetch<Params: RpcSend, Resp: RpcObject>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, WithBlock};
+    use crate::ProviderBuilder;
     use alloy_network::{AnyNetwork, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{bytes, hex, Bytes, FixedBytes};
