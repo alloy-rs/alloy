@@ -338,8 +338,8 @@ where
     }
 
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
-        let prepare_res = self.prepare_call(tx.clone()).map_err(|e| e.to_string());
-        EthCall::call(self.weak_client(), tx).block(BlockId::pending()).prepare_res(prepare_res)
+        let prepare_res = self.prepare_call(tx.clone()).ok();
+        EthCall::call(self.weak_client(), tx).block(BlockId::pending()).filled_tx(prepare_res)
     }
 
     fn call_many<'req>(
@@ -368,10 +368,10 @@ where
     }
 
     fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
-        let prepare_res = self.prepare_call(tx.clone()).map_err(|e| e.to_string());
+        let prepare_res = self.prepare_call(tx.clone()).ok();
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockId::pending())
-            .prepare_res(prepare_res)
+            .filled_tx(prepare_res)
             .map_resp(crate::utils::convert_u64)
     }
 
