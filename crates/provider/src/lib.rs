@@ -52,7 +52,7 @@ pub use provider::{
     Dynamic, Empty, EthCall, EthCallMany, EthCallManyParams, EthCallParams, Failure,
     FilterPollerBuilder, MulticallBuilder, MulticallError, MulticallItem, ParamsWithBlock,
     Provider, ProviderCall, Result, RootProvider, RpcWithBlock, SendableTx, SendableTxErr,
-    WalletProvider, MULTICALL3_ADDRESS,
+    WalletProvider, WithBlock, MULTICALL3_ADDRESS,
 };
 
 pub mod utils;

@@ -1182,7 +1182,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
+    use crate::{builder, ProviderBuilder, WalletProvider, WithBlock};
     use alloy_consensus::Transaction;
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::Anvil;

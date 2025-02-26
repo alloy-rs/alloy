@@ -131,57 +131,87 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> RpcWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> WithBlock for RpcWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
 {
-    /// Set the block id.
-    pub const fn block_id(mut self, block_id: BlockId) -> Self {
+    fn block_id(mut self, block_id: BlockId) -> Self {
         self.block_id = block_id;
         self
     }
+}
+
+/// Trait to set the block id for a call. This should be implemented by any builder types that
+/// require a block id. e.g [`RpcWithBlock`].
+pub trait WithBlock {
+    /// Set the block id.
+    fn block_id(self, block_id: BlockId) -> Self;
 
     /// Set the block id to "pending".
-    pub const fn pending(self) -> Self {
+    fn pending(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::pending())
     }
 
     /// Set the block id to "latest".
-    pub const fn latest(self) -> Self {
+    fn latest(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::latest())
     }
 
     /// Set the block id to "earliest".
-    pub const fn earliest(self) -> Self {
+    fn earliest(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::earliest())
     }
 
     /// Set the block id to "finalized".
-    pub const fn finalized(self) -> Self {
+    fn finalized(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::finalized())
     }
 
     /// Set the block id to "safe".
-    pub const fn safe(self) -> Self {
+    fn safe(self) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::safe())
     }
 
     /// Set the block id to a specific height.
-    pub const fn number(self, number: u64) -> Self {
+    fn number(self, number: u64) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::number(number))
     }
 
     /// Set the block id to a specific hash, without requiring the hash be part
     /// of the canonical chain.
-    pub const fn hash(self, hash: B256) -> Self {
+    fn hash(self, hash: B256) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::hash(hash))
     }
 
     /// Set the block id to a specific hash and require the hash be part of the
     /// canonical chain.
-    pub const fn hash_canonical(self, hash: B256) -> Self {
+    fn hash_canonical(self, hash: B256) -> Self
+    where
+        Self: Sized,
+    {
         self.block_id(BlockId::hash_canonical(hash))
     }
 }

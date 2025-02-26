@@ -526,7 +526,7 @@ async fn cache_get_or_fetch<Params: RpcSend, Resp: RpcObject>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{ProviderBuilder, WithBlock};
     use alloy_network::{AnyNetwork, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{bytes, hex, Bytes, FixedBytes};
