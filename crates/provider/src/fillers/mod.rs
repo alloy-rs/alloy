@@ -11,9 +11,8 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_primitives::{
     Address, BlockHash, BlockNumber, StorageKey, StorageValue, TxHash, B256, U128, U256,
 };
-use alloy_rpc_client::{NoParams, WeakClient};
+use alloy_rpc_client::NoParams;
 use alloy_rpc_types_eth::{Bundle, Index, SyncStatus};
-use alloy_transport::{RpcFut, TransportErrorKind};
 pub use chain_id::ChainIdFiller;
 use std::borrow::Cow;
 
@@ -31,11 +30,11 @@ pub use join_fill::JoinFill;
 use tracing::error;
 
 use crate::{
-    provider::SendableTx, Caller, EthCall, EthCallMany, EthCallParams, FilterPollerBuilder,
-    Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    provider::SendableTx, EthCall, EthCallMany, FilterPollerBuilder, Identity, PendingTransaction,
+    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
+    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
 };
-use alloy_json_rpc::{RpcError, RpcRecv};
+use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
 use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
@@ -339,9 +338,8 @@ where
     }
 
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
-        let prepare_res = self.prepare_call(tx.clone());
-        let call_filler = EthCallFiller::new(prepare_res, self.weak_client());
-        EthCall::call(call_filler, tx).block(BlockId::pending())
+        let prepare_res = self.prepare_call(tx.clone()).map_err(|e| e.to_string());
+        EthCall::call(self.weak_client(), tx).block(BlockId::pending()).prepare_res(prepare_res)
     }
 
     fn call_many<'req>(
@@ -370,10 +368,10 @@ where
     }
 
     fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
-        let prepare_res = self.prepare_call(tx.clone());
-        let call_filler = EthCallFiller::new(prepare_res, self.weak_client());
-        EthCall::gas_estimate(call_filler, tx)
+        let prepare_res = self.prepare_call(tx.clone()).map_err(|e| e.to_string());
+        EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockId::pending())
+            .prepare_res(prepare_res)
             .map_resp(crate::utils::convert_u64)
     }
 
@@ -674,78 +672,6 @@ where
     }
 }
 
-/// Intermediate type that holds the filled transaction request until it is swapped with the
-/// unfilled tx request while preparing the final RPC call in `Caller`.
-struct EthCallFiller<N: Network> {
-    prepare_res: TransportResult<N::TransactionRequest>,
-    client: WeakClient,
-}
-
-impl<N: Network> EthCallFiller<N> {
-    fn new(prepare_res: TransportResult<N::TransactionRequest>, client: WeakClient) -> Self {
-        Self { prepare_res, client }
-    }
-}
-
-impl<N, Resp> Caller<N, Resp> for EthCallFiller<N>
-where
-    N: Network,
-    Resp: RpcRecv,
-{
-    fn call(
-        &self,
-        params: EthCallParams<'_, N>,
-    ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
-        let tx = self.prepare_res.as_ref().map_err(|e| {
-            TransportErrorKind::custom_str(&format!("Error filling eth_call tx req: {e}"))
-        })?;
-
-        provider_boxed_fut(&self.client, "eth_call", params, tx)
-    }
-
-    fn estimate_gas(
-        &self,
-        params: EthCallParams<'_, N>,
-    ) -> TransportResult<crate::ProviderCall<EthCallParams<'static, N>, Resp>> {
-        let tx = self.prepare_res.as_ref().map_err(|e| {
-            TransportErrorKind::custom_str(&format!("Error filling eth_call tx req: {e}"))
-        })?;
-
-        provider_boxed_fut(&self.client, "eth_estimateGas", params, tx)
-    }
-
-    fn call_many(
-        &self,
-        params: crate::EthCallManyParams<'_>,
-    ) -> TransportResult<crate::ProviderCall<crate::EthCallManyParams<'static>, Resp>> {
-        let client = self.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
-
-        let rpc_call = client.request("eth_callMany", params.into_owned());
-
-        Ok(ProviderCall::RpcCall(rpc_call))
-    }
-}
-
-/// Helper function to create a boxed future for the provider call.
-fn provider_boxed_fut<N: Network, Resp: RpcRecv>(
-    client: &WeakClient,
-    method: &'static str,
-    existing_params: EthCallParams<'_, N>,
-    filled_tx: &N::TransactionRequest,
-) -> TransportResult<ProviderCall<EthCallParams<'static, N>, Resp>> {
-    let client = client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
-
-    let mut new_params = EthCallParams::<'_, N>::new(filled_tx)
-        .with_block(existing_params.block().unwrap_or(BlockId::pending()));
-
-    if let Some(overrides) = existing_params.overrides {
-        new_params.overrides = Some(overrides);
-    }
-
-    let params = new_params.into_owned();
-    let fut = Box::pin(async move { client.request(method, params).await }) as RpcFut<'_, Resp>;
-    Ok(ProviderCall::BoxedFuture(fut))
-}
 /// A trait which may be used to configure default fillers for [Network] implementations.
 pub trait RecommendedFillers: Network {
     /// Recommended fillers for this network.
