@@ -7,7 +7,6 @@ use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
 use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
-
 mod params;
 pub use params::{EthCallManyParams, EthCallParams};
 
@@ -42,6 +41,7 @@ where
         caller: Arc<dyn Caller<N, Resp>>,
         params: EthCallParams<'req, N>,
         method: &'static str,
+        filled_tx: Option<N::TransactionRequest>,
         map: Map,
     },
     Running {
@@ -60,7 +60,7 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Preparing { caller: _, params, method, map: _ } => {
+            Self::Preparing { caller: _, params, method, map: _, filled_tx: _ } => {
                 f.debug_struct("Preparing").field("params", params).field("method", method).finish()
             }
             Self::Running { .. } => f.debug_tuple("Running").finish(),
@@ -87,11 +87,15 @@ where
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Preparing { caller, params, method, map } =
+        let EthCallFutInner::Preparing { caller, mut params, method, map, filled_tx } =
             std::mem::replace(&mut self.inner, EthCallFutInner::Polling)
         else {
             unreachable!("bad state")
         };
+
+        if let Some(tx) = filled_tx {
+            params.data = Cow::Owned(tx);
+        }
 
         let fut =
             if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
@@ -149,6 +153,7 @@ where
     caller: Arc<dyn Caller<N, Resp>>,
     params: EthCallParams<'req, N>,
     method: &'static str,
+    filled_tx: Option<N::TransactionRequest>,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
@@ -182,6 +187,7 @@ where
             params: EthCallParams::new(data),
             method,
             map: std::convert::identity,
+            filled_tx: None,
             _pd: PhantomData,
         }
     }
@@ -228,6 +234,7 @@ where
             caller: self.caller,
             params: self.params,
             method: self.method,
+            filled_tx: self.filled_tx,
             map,
             _pd: PhantomData,
         }
@@ -268,6 +275,12 @@ where
         self.params.block = Some(block);
         self
     }
+
+    /// Filled transaction request obtained from the [`FillProvider`](crate::fillers::FillProvider).
+    pub fn filled_tx(mut self, filled_tx: Option<N::TransactionRequest>) -> Self {
+        self.filled_tx = filled_tx;
+        self
+    }
 }
 
 impl<'req, N, Resp, Output, Map> std::future::IntoFuture for EthCall<'req, N, Resp, Output, Map>
@@ -287,6 +300,7 @@ where
                 caller: self.caller,
                 params: self.params,
                 method: self.method,
+                filled_tx: self.filled_tx,
                 map: self.map,
             },
         }

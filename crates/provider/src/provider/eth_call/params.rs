@@ -7,7 +7,7 @@ use std::borrow::Cow;
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
 pub struct EthCallParams<'req, N: Network> {
-    data: Cow<'req, N::TransactionRequest>,
+    pub(crate) data: Cow<'req, N::TransactionRequest>,
     pub(crate) block: Option<BlockId>,
     pub(crate) overrides: Option<Cow<'req, StateOverride>>,
 }

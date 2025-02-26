@@ -11,6 +11,13 @@ use std::{
 };
 use tokio::sync::oneshot;
 
+#[cfg(not(target_arch = "wasm32"))]
+/// Boxed future type used in [`ProviderCall`] for non-wasm targets.
+pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>;
+
+#[cfg(target_arch = "wasm32")]
+/// Boxed future type used in [`ProviderCall`] for wasm targets.
+pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>>>>;
 /// The primary future type for the [`Provider`].
 ///
 /// This future abstracts over several potential data sources. It allows
@@ -33,7 +40,7 @@ where
     /// A waiter for a batched call to a remote RPC server.
     Waiter(Waiter<Resp, Output, Map>),
     /// A boxed future.
-    BoxedFuture(Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>),
+    BoxedFuture(BoxedFut<Output>),
     /// The output, produces synchronously.
     Ready(Option<TransportResult<Output>>),
 }
@@ -97,9 +104,7 @@ where
     }
 
     /// Fallible cast to a boxed future.
-    pub const fn as_boxed_future(
-        &self,
-    ) -> Option<&Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>> {
+    pub const fn as_boxed_future(&self) -> Option<&BoxedFut<Output>> {
         match self {
             Self::BoxedFuture(fut) => Some(fut),
             _ => None,

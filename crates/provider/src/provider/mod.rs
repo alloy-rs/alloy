@@ -2,7 +2,7 @@ mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
 mod prov_call;
-pub use prov_call::ProviderCall;
+pub use prov_call::{BoxedFut, ProviderCall};
 
 mod root;
 pub use root::{builder, RootProvider};
