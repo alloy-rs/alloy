@@ -5,8 +5,9 @@
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
+    PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
+    SendableTx,
 };
 use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
@@ -350,70 +351,31 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBalance", address).into()
     }
 
-    /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
+    /// Gets a block by either its hash, tag, or number
     async fn get_block(
         &self,
         block: BlockId,
         kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
-        match block {
-            BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
-            BlockId::Number(number) => self.get_block_by_number(number, kind).await,
-        }
+        EthGetBlock::<N>::by_block(self.weak_client(), block).with_kind(kind).await
     }
 
-    /// Gets a block by its [BlockHash], with full transactions or only hashes.
+    /// Gets a block by its [BlockHash]
     async fn get_block_by_hash(
         &self,
         hash: BlockHash,
         kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let block = self
-            .client()
-            .request::<_, Option<N::BlockResponse>>("eth_getBlockByHash", (hash, full))
-            .await?
-            .map(|mut block| {
-                if !full {
-                    // this ensures an empty response for `Hashes` has the expected form
-                    // this is required because deserializing [] is ambiguous
-                    block.transactions_mut().convert_to_hashes();
-                }
-                block
-            });
-
-        Ok(block)
+        EthGetBlock::<N>::by_hash(self.weak_client(), hash).with_kind(kind).await
     }
 
-    /// Get a block by its number.
-    // TODO: Network associate
+    /// Gets a block by its [BlockNumberOrTag]
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
         kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let block = self
-            .client()
-            .request::<_, Option<N::BlockResponse>>("eth_getBlockByNumber", (number, full))
-            .await?
-            .map(|mut block| {
-                if !full {
-                    // this ensures an empty response for `Hashes` has the expected form
-                    // this is required because deserializing [] is ambiguous
-                    block.transactions_mut().convert_to_hashes();
-                }
-                block
-            });
-        Ok(block)
+        EthGetBlock::<N>::by_number(self.weak_client(), number).with_kind(kind).await
     }
 
     /// Returns the number of transactions in a block from a block matching the given block hash.
