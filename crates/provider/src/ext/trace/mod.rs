@@ -10,6 +10,8 @@ use alloy_rpc_types_trace::{
 };
 use alloy_transport::TransportResult;
 
+mod with_block;
+
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
 
