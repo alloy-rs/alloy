@@ -177,10 +177,11 @@ mod test {
     use super::*;
     use crate::{ext::test::async_ci_only, ProviderBuilder};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::TransactionBuilder;
+    use alloy_network::{EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
-    use alloy_primitives::address;
+    use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_signer_local::PrivateKeySigner;
 
     #[tokio::test]
     async fn trace_block() {
@@ -260,7 +261,6 @@ mod test {
                 let result = provider
                     .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
                     .await;
-                assert!(result.is_ok());
 
                 let traces = result.unwrap();
                 assert_eq!(
@@ -318,6 +318,68 @@ mod test {
 ]
 "#
                     .trim()
+                );
+            })
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(windows, ignore)]
+    async fn test_replay_tx() {
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let pk: PrivateKeySigner =
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                        .parse()
+                        .unwrap();
+
+                let wallet = EthereumWallet::new(pk);
+                let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+
+                let tx = TransactionRequest::default()
+                    .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                    .value(U256::from(1000))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
+
+                let res = provider.send_transaction(tx).await.unwrap();
+
+                let receipt = res.get_receipt().await.unwrap();
+
+                let hash = receipt.transaction_hash;
+
+                let result = provider.trace_replay_transaction(hash, &vec![TraceType::Trace]).await;
+                assert!(result.is_ok());
+
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap(),
+                    r#"{
+  "output": "0x",
+  "stateDiff": null,
+  "trace": [
+    {
+      "type": "call",
+      "action": {
+        "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+        "callType": "call",
+        "gas": "0x5208",
+        "input": "0x",
+        "to": "0x0000000000000000000000000000000000000456",
+        "value": "0x3e8"
+      },
+      "result": {
+        "gasUsed": "0x5208",
+        "output": "0x"
+      },
+      "subtraces": 0,
+      "traceAddress": []
+    }
+  ],
+  "vmTrace": null
+}"#
                 );
             })
             .await;
