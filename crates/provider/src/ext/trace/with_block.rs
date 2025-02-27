@@ -7,10 +7,10 @@ use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::TransportResult;
 use std::future::IntoFuture;
 
-/// An wrapper for [`TraceRpcWithBlock`] that takes an optional [`TraceType`] parameter. By default
+/// An wrapper for [`TraceWithBlock`] that takes an optional [`TraceType`] parameter. By default
 /// this will use "trace".
 #[derive(Debug)]
-pub struct TraceRpcWithBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct TraceWithBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -21,7 +21,7 @@ where
     trace_types: HashSet<TraceType>,
 }
 
-impl<Params, Resp, Output, Map> TraceRpcWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> TraceWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -52,7 +52,7 @@ where
 }
 
 impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
-    for TraceRpcWithBlock<Params, Resp, Output, Map>
+    for TraceWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -63,7 +63,7 @@ where
     }
 }
 
-impl<F, Params, Resp, Output, Map> From<F> for TraceRpcWithBlock<Params, Resp, Output, Map>
+impl<F, Params, Resp, Output, Map> From<F> for TraceWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -75,7 +75,7 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> WithBlock for TraceRpcWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> WithBlock for TraceWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -87,7 +87,7 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> TraceRpcWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> TraceWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -126,7 +126,7 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> IntoFuture for TraceRpcWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> IntoFuture for TraceWithBlock<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,

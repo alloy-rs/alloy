@@ -11,7 +11,7 @@ use alloy_rpc_types_trace::{
 use alloy_transport::TransportResult;
 
 mod with_block;
-pub use with_block::TraceRpcWithBlock;
+pub use with_block::TraceWithBlock;
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
@@ -31,7 +31,7 @@ where
     fn trace_call<'a>(
         &self,
         request: &'a N::TransactionRequest,
-    ) -> TraceRpcWithBlock<&'a N::TransactionRequest, TraceResults>;
+    ) -> TraceWithBlock<&'a N::TransactionRequest, TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -44,7 +44,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> TraceRpcWithBlock<TraceCallList<'a, N>, Vec<TraceResults>>;
+    ) -> TraceWithBlock<TraceCallList<'a, N>, Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -109,15 +109,15 @@ where
     fn trace_call<'a>(
         &self,
         request: &'a <N as Network>::TransactionRequest,
-    ) -> TraceRpcWithBlock<&'a <N as Network>::TransactionRequest, TraceResults> {
-        TraceRpcWithBlock::new_rpc(self.client().request("trace_call", request).into())
+    ) -> TraceWithBlock<&'a <N as Network>::TransactionRequest, TraceResults> {
+        TraceWithBlock::new_rpc(self.client().request("trace_call", request).into())
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> TraceRpcWithBlock<TraceCallList<'a, N>, Vec<TraceResults>> {
-        TraceRpcWithBlock::new_rpc(self.client().request("trace_callMany", request).into())
+    ) -> TraceWithBlock<TraceCallList<'a, N>, Vec<TraceResults>> {
+        TraceWithBlock::new_rpc(self.client().request("trace_callMany", request).into())
     }
 
     async fn trace_transaction(
