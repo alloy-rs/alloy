@@ -192,7 +192,7 @@ fn trace_params<Params: RpcSend>(
             // Trace types is ignored as it is set per request in `params`.
             return TraceParams { params, block_id: Some(block_id), trace_types: None };
         }
-        "trace_replayTransaction" => {
+        "trace_replayTransaction" | "trace_rawTransaction" => {
             // BlockId is ignored
             let trace_types = trace_types.unwrap_or_else(|| {
                 let mut set = HashSet::default();
@@ -246,8 +246,10 @@ impl<Params: RpcSend> serde::Serialize for TraceParams<Params> {
         }
 
         // Add block_id last
-        let block_id = serde_json::to_value(self.block_id).map_err(serde::ser::Error::custom)?;
-        arr.push(block_id);
+        if let Some(block_id) = &self.block_id {
+            let block_id = serde_json::to_value(block_id).map_err(serde::ser::Error::custom)?;
+            arr.push(block_id);
+        }
 
         ser.serialize(serializer)
     }

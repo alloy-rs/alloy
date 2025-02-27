@@ -25,6 +25,8 @@ where
 {
     /// Executes the given transaction and returns a number of possible traces.
     ///
+    /// Default trace type is [`TraceType::Trace`].
+    ///
     /// # Note
     ///
     /// Not all nodes support this call.
@@ -37,6 +39,8 @@ where
     /// on top of the given block with all `n - 1` transaction applied first.
     ///
     /// Allows tracing dependent transactions.
+    ///
+    /// If [`BlockId`] is unset the default at which calls will be executed is [`BlockId::Pending`].
     ///
     /// # Note
     ///
@@ -65,11 +69,7 @@ where
     ) -> TransportResult<LocalizedTransactionTrace>;
 
     /// Trace the given raw transaction.
-    async fn trace_raw_transaction(
-        &self,
-        data: &[u8],
-        trace_type: &[TraceType],
-    ) -> TransportResult<TraceResults>;
+    fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<(&'a [u8],), TraceResults>;
 
     /// Traces matching given filter.
     async fn trace_filter(
@@ -85,6 +85,8 @@ where
     async fn trace_block(&self, block: BlockId) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     /// Replays a transaction.
+    ///
+    /// Default trace type is [`TraceType::Trace`].
     fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, TraceResults>;
 
     /// Replays all transactions in the given block.
@@ -132,12 +134,8 @@ where
         self.client().request("trace_get", (hash, (Index::from(index),))).await
     }
 
-    async fn trace_raw_transaction(
-        &self,
-        data: &[u8],
-        trace_types: &[TraceType],
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_rawTransaction", (data, trace_types)).await
+    fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<(&'a [u8],), TraceResults> {
+        TraceBuilder::new_rpc(self.client().request("trace_rawTransaction", (data,)))
     }
 
     async fn trace_filter(
@@ -168,7 +166,7 @@ where
 mod test {
     use super::*;
     use crate::{ext::test::async_ci_only, ProviderBuilder};
-    use alloy_eips::BlockNumberOrTag;
+    use alloy_eips::{BlockNumberOrTag, Encodable2718};
     use alloy_network::{EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{address, U256};
@@ -185,21 +183,21 @@ mod test {
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_call() {
-        async_ci_only(|| async move {
-            run_with_tempdir("reth-test-", |temp_dir| async move {
-                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        // async_ci_only(|| async move {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-                let tx = TransactionRequest::default()
-                    .with_from(address!("0000000000000000000000000000000000000123"))
-                    .with_to(address!("0000000000000000000000000000000000000456"));
+            let tx = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
 
-                let result = provider.trace_call(&tx).await;
+            let result = provider.trace_call(&tx).await;
 
-                let traces = result.unwrap();
-                similar_asserts::assert_eq!(
-                    serde_json::to_string_pretty(&traces).unwrap().trim(),
-                    r#"
+            let traces = result.unwrap();
+            similar_asserts::assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
 {
   "output": "0x",
   "stateDiff": null,
@@ -225,38 +223,38 @@ mod test {
   "vmTrace": null
 }
 "#
-                    .trim(),
-                );
-            })
-            .await;
+                .trim(),
+            );
         })
         .await;
+        // })
+        // .await;
     }
 
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_call_many() {
-        async_ci_only(|| async move {
-            run_with_tempdir("reth-test-", |temp_dir| async move {
-                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        // async_ci_only(|| async move {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-                let tx1 = TransactionRequest::default()
-                    .with_from(address!("0000000000000000000000000000000000000123"))
-                    .with_to(address!("0000000000000000000000000000000000000456"));
+            let tx1 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
 
-                let tx2 = TransactionRequest::default()
-                    .with_from(address!("0000000000000000000000000000000000000456"))
-                    .with_to(address!("0000000000000000000000000000000000000789"));
+            let tx2 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000456"))
+                .with_to(address!("0000000000000000000000000000000000000789"));
 
-                let result = provider
-                    .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
-                    .await;
+            let result = provider
+                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                .await;
 
-                let traces = result.unwrap();
-                similar_asserts::assert_eq!(
-                    serde_json::to_string_pretty(&traces).unwrap().trim(),
-                    r#"
+            let traces = result.unwrap();
+            similar_asserts::assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
 [
   {
     "output": "0x",
@@ -308,12 +306,12 @@ mod test {
   }
 ]
 "#
-                    .trim()
-                );
-            })
-            .await;
+                .trim()
+            );
         })
         .await;
+        // })
+        // .await;
     }
 
     #[tokio::test]
@@ -345,6 +343,71 @@ mod test {
             assert!(result.is_ok());
 
             let traces = result.unwrap();
+            similar_asserts::assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap(),
+                r#"{
+  "output": "0x",
+  "stateDiff": null,
+  "trace": [
+    {
+      "type": "call",
+      "action": {
+        "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+        "callType": "call",
+        "gas": "0x5208",
+        "input": "0x",
+        "to": "0x0000000000000000000000000000000000000456",
+        "value": "0x3e8"
+      },
+      "result": {
+        "gasUsed": "0x5208",
+        "output": "0x"
+      },
+      "subtraces": 0,
+      "traceAddress": []
+    }
+  ],
+  "vmTrace": null
+}"#
+            );
+        })
+        .await;
+        // })
+        // .await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(windows, ignore)]
+    async fn trace_raw_tx() {
+        tracing_subscriber::fmt::init();
+        // async_ci_only(|| async move {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let pk: PrivateKeySigner =
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                    .parse()
+                    .unwrap();
+
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+            let tx = TransactionRequest::default()
+                .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                .gas_limit(21000)
+                .nonce(0)
+                .value(U256::from(1000))
+                .with_chain_id(provider.get_chain_id().await.unwrap())
+                .with_to(address!("0000000000000000000000000000000000000456"))
+                .with_max_priority_fee_per_gas(1_000_000_000)
+                .with_max_fee_per_gas(20_000_000_000);
+
+            let wallet = EthereumWallet::new(pk);
+
+            let raw = tx.build(&wallet).await.unwrap().encoded_2718();
+
+            let result = provider.trace_raw_transaction(&raw).await;
+
+            let traces = result.unwrap();
+
             similar_asserts::assert_eq!(
                 serde_json::to_string_pretty(&traces).unwrap(),
                 r#"{
