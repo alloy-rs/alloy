@@ -17,7 +17,6 @@ mod wallet;
 pub use wallet::WalletProvider;
 
 mod with_block;
-pub(crate) use with_block::WithBlockInner;
 pub use with_block::{ParamsWithBlock, RpcWithBlock, WithBlock};
 
 mod multicall;
