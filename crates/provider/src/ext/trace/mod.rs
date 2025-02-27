@@ -90,6 +90,8 @@ where
     fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, TraceResults>;
 
     /// Replays all transactions in the given block.
+    ///
+    /// Default trace type is [`TraceType::Trace`].
     fn trace_replay_block_transactions(
         &self,
         block: BlockId,
@@ -181,21 +183,21 @@ mod test {
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_call() {
-        // async_ci_only(|| async move {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let tx = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000123"))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000123"))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let result = provider.trace_call(&tx).await;
+                let result = provider.trace_call(&tx).await;
 
-            let traces = result.unwrap();
-            similar_asserts::assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"
 {
   "output": "0x",
   "stateDiff": null,
@@ -221,38 +223,38 @@ mod test {
   "vmTrace": null
 }
 "#
-                .trim(),
-            );
+                    .trim(),
+                );
+            })
+            .await;
         })
         .await;
-        // })
-        // .await;
     }
 
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_call_many() {
-        // async_ci_only(|| async move {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let tx1 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000123"))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx1 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000123"))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let tx2 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000456"))
-                .with_to(address!("0000000000000000000000000000000000000789"));
+                let tx2 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000456"))
+                    .with_to(address!("0000000000000000000000000000000000000789"));
 
-            let result = provider
-                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
-                .await;
+                let result = provider
+                    .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                    .await;
 
-            let traces = result.unwrap();
-            similar_asserts::assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"
 [
   {
     "output": "0x",
@@ -304,46 +306,46 @@ mod test {
   }
 ]
 "#
-                .trim()
-            );
+                    .trim()
+                );
+            })
+            .await;
         })
         .await;
-        // })
-        // .await;
     }
 
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn test_replay_tx() {
-        // async_ci_only(|| async move {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let pk: PrivateKeySigner =
-                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-                    .parse()
-                    .unwrap();
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let pk: PrivateKeySigner =
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                        .parse()
+                        .unwrap();
 
-            let wallet = EthereumWallet::new(pk);
-            let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+                let wallet = EthereumWallet::new(pk);
+                let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
 
-            let tx = TransactionRequest::default()
-                .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-                .value(U256::from(1000))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx = TransactionRequest::default()
+                    .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                    .value(U256::from(1000))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let res = provider.send_transaction(tx).await.unwrap();
+                let res = provider.send_transaction(tx).await.unwrap();
 
-            let receipt = res.get_receipt().await.unwrap();
+                let receipt = res.get_receipt().await.unwrap();
 
-            let hash = receipt.transaction_hash;
+                let hash = receipt.transaction_hash;
 
-            let result = provider.trace_replay_transaction(hash).await;
-            assert!(result.is_ok());
+                let result = provider.trace_replay_transaction(hash).await;
+                assert!(result.is_ok());
 
-            let traces = result.unwrap();
-            similar_asserts::assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap(),
-                r#"{
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap(),
+                    r#"{
   "output": "0x",
   "stateDiff": null,
   "trace": [
@@ -367,48 +369,47 @@ mod test {
   ],
   "vmTrace": null
 }"#
-            );
+                );
+            })
+            .await;
         })
         .await;
-        // })
-        // .await;
     }
 
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_raw_tx() {
-        tracing_subscriber::fmt::init();
-        // async_ci_only(|| async move {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let pk: PrivateKeySigner =
-                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-                    .parse()
-                    .unwrap();
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let pk: PrivateKeySigner =
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                        .parse()
+                        .unwrap();
 
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let tx = TransactionRequest::default()
-                .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-                .gas_limit(21000)
-                .nonce(0)
-                .value(U256::from(1000))
-                .with_chain_id(provider.get_chain_id().await.unwrap())
-                .with_to(address!("0000000000000000000000000000000000000456"))
-                .with_max_priority_fee_per_gas(1_000_000_000)
-                .with_max_fee_per_gas(20_000_000_000);
+                let tx = TransactionRequest::default()
+                    .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                    .gas_limit(21000)
+                    .nonce(0)
+                    .value(U256::from(1000))
+                    .with_chain_id(provider.get_chain_id().await.unwrap())
+                    .with_to(address!("0000000000000000000000000000000000000456"))
+                    .with_max_priority_fee_per_gas(1_000_000_000)
+                    .with_max_fee_per_gas(20_000_000_000);
 
-            let wallet = EthereumWallet::new(pk);
+                let wallet = EthereumWallet::new(pk);
 
-            let raw = tx.build(&wallet).await.unwrap().encoded_2718();
+                let raw = tx.build(&wallet).await.unwrap().encoded_2718();
 
-            let result = provider.trace_raw_transaction(&raw).await;
+                let result = provider.trace_raw_transaction(&raw).await;
 
-            let traces = result.unwrap();
+                let traces = result.unwrap();
 
-            similar_asserts::assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap(),
-                r#"{
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap(),
+                    r#"{
   "output": "0x",
   "stateDiff": null,
   "trace": [
@@ -432,46 +433,46 @@ mod test {
   ],
   "vmTrace": null
 }"#
-            );
+                );
+            })
+            .await;
         })
         .await;
-        // })
-        // .await;
     }
 
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_replay_block_transactions() {
-        tracing_subscriber::fmt::init();
-        // async_ci_only(|| async move {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let pk: PrivateKeySigner =
-                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-                    .parse()
-                    .unwrap();
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let pk: PrivateKeySigner =
+                    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                        .parse()
+                        .unwrap();
 
-            let wallet = EthereumWallet::new(pk);
-            let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+                let wallet = EthereumWallet::new(pk);
+                let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
 
-            let tx = TransactionRequest::default()
-                .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
-                .value(U256::from(1000))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx = TransactionRequest::default()
+                    .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                    .value(U256::from(1000))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let res = provider.send_transaction(tx).await.unwrap();
+                let res = provider.send_transaction(tx).await.unwrap();
 
-            let receipt = res.get_receipt().await.unwrap();
+                let receipt = res.get_receipt().await.unwrap();
 
-            let block_num = receipt.block_number.unwrap();
+                let block_num = receipt.block_number.unwrap();
 
-            let result = provider.trace_replay_block_transactions(BlockId::number(block_num)).await;
-            assert!(result.is_ok());
+                let result =
+                    provider.trace_replay_block_transactions(BlockId::number(block_num)).await;
+                assert!(result.is_ok());
 
-            let traces = result.unwrap();
-            similar_asserts::assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"[
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"[
   {
     "output": "0x",
     "stateDiff": null,
@@ -498,11 +499,11 @@ mod test {
     "transactionHash": "0x744426e308ba55f122913c74009be469da45153a941932d520aa959d8547da7b"
   }
 ]"#
-                .trim()
-            );
+                    .trim()
+                );
+            })
+            .await;
         })
         .await;
-        // })
-        // .await;
     }
 }

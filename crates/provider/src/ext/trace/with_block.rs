@@ -152,14 +152,14 @@ fn trace_params<Params: RpcSend>(
     block_id: Option<BlockId>,
     trace_types: Option<HashSet<TraceType>>,
 ) -> TraceParams<Params> {
+    let block_id = block_id.unwrap_or(BlockId::pending());
+    let trace_types = trace_types.unwrap_or_else(|| {
+        let mut set = HashSet::default();
+        set.insert(TraceType::Trace);
+        set
+    });
     match method.as_str() {
         "trace_call" => {
-            let block_id = block_id.unwrap_or(BlockId::pending());
-            let trace_types = trace_types.unwrap_or_else(|| {
-                let mut set = HashSet::default();
-                set.insert(TraceType::Trace);
-                set
-            });
             return TraceParams {
                 params,
                 block_id: Some(block_id),
@@ -167,21 +167,15 @@ fn trace_params<Params: RpcSend>(
             };
         }
         "trace_callMany" => {
-            let block_id = block_id.unwrap_or(BlockId::pending());
-            // Trace types is ignored as it is set per request in `params`.
+            // Trace types are ignored as they are set per-tx-request in `params`.
             return TraceParams { params, block_id: Some(block_id), trace_types: None };
         }
         "trace_replayTransaction" | "trace_rawTransaction" | "trace_replayBlockTransactions" => {
             // BlockId is ignored
-            let trace_types = trace_types.unwrap_or_else(|| {
-                let mut set = HashSet::default();
-                set.insert(TraceType::Trace);
-                set
-            });
             return TraceParams { params, block_id: None, trace_types: Some(trace_types) };
         }
         _ => {
-            todo!()
+            unreachable!("{method} is not supported by TraceBuilder due to custom serialization requirements");
         }
     }
 }
