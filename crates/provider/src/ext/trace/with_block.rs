@@ -7,10 +7,9 @@ use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::TransportResult;
 use std::future::IntoFuture;
 
-/// An wrapper for [`TraceWithBlock`] that takes an optional [`TraceType`] parameter. By default
-/// this will use "trace".
+/// A builder for trace_* api calls.
 #[derive(Debug)]
-pub struct TraceWithBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct TraceBuilder<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -21,7 +20,7 @@ where
     trace_types: Option<HashSet<TraceType>>,
 }
 
-impl<Params, Resp, Output, Map> TraceWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -46,7 +45,7 @@ where
 }
 
 impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
-    for TraceWithBlock<Params, Resp, Output, Map>
+    for TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -57,7 +56,7 @@ where
     }
 }
 
-impl<F, Params, Resp, Output, Map> From<F> for TraceWithBlock<Params, Resp, Output, Map>
+impl<F, Params, Resp, Output, Map> From<F> for TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -69,7 +68,7 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> WithBlock for TraceWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> WithBlock for TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -81,7 +80,7 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> TraceWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -141,7 +140,7 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> IntoFuture for TraceWithBlock<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> IntoFuture for TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
@@ -192,6 +191,15 @@ fn trace_params<Params: RpcSend>(
             let block_id = block_id.unwrap_or(BlockId::pending());
             // Trace types is ignored as it is set per request in `params`.
             return TraceParams { params, block_id: Some(block_id), trace_types: None };
+        }
+        "trace_replayTransaction" => {
+            // BlockId is ignored
+            let trace_types = trace_types.unwrap_or_else(|| {
+                let mut set = HashSet::default();
+                set.insert(TraceType::Trace);
+                set
+            });
+            return TraceParams { params, block_id: None, trace_types: Some(trace_types) };
         }
         _ => {
             todo!()
