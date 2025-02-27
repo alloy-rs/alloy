@@ -117,27 +117,6 @@ where
     pub const fn get_trace_types(&self) -> Option<&HashSet<TraceType>> {
         self.trace_types.as_ref()
     }
-
-    pub fn get_params(&self, method: &str, params: Params) -> TraceParams<Params> {
-        match method {
-            "trace_call" => {
-                let block_id = self.block_id.unwrap_or(BlockId::pending());
-                let trace_types = self.trace_types.clone().unwrap_or_else(|| {
-                    let mut set = HashSet::default();
-                    set.insert(TraceType::Trace);
-                    set
-                });
-                return TraceParams {
-                    params,
-                    block_id: Some(block_id),
-                    trace_types: Some(trace_types),
-                };
-            }
-            _ => {
-                todo!()
-            }
-        }
-    }
 }
 
 impl<Params, Resp, Output, Map> IntoFuture for TraceBuilder<Params, Resp, Output, Map>
@@ -192,7 +171,7 @@ fn trace_params<Params: RpcSend>(
             // Trace types is ignored as it is set per request in `params`.
             return TraceParams { params, block_id: Some(block_id), trace_types: None };
         }
-        "trace_replayTransaction" | "trace_rawTransaction" => {
+        "trace_replayTransaction" | "trace_rawTransaction" | "trace_replayBlockTransactions" => {
             // BlockId is ignored
             let trace_types = trace_types.unwrap_or_else(|| {
                 let mut set = HashSet::default();
@@ -256,15 +235,18 @@ impl<Params: RpcSend> serde::Serialize for TraceParams<Params> {
 }
 
 impl<Params: RpcSend> TraceParams<Params> {
+    /// Create a new `TraceParams` with the given parameters.
     pub fn new(params: Params) -> Self {
         Self { params, block_id: None, trace_types: None }
     }
 
+    /// Set the block id.
     pub fn block_id(mut self, block_id: BlockId) -> Self {
         self.block_id = Some(block_id);
         self
     }
 
+    /// Set the trace types.
     pub fn trace_types(mut self, trace_types: HashSet<TraceType>) -> Self {
         self.trace_types = Some(trace_types);
         self

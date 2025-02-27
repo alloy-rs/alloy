@@ -11,7 +11,7 @@ use alloy_rpc_types_trace::{
 use alloy_transport::TransportResult;
 
 mod with_block;
-pub use with_block::TraceBuilder;
+pub use with_block::{TraceBuilder, TraceParams};
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
@@ -90,11 +90,10 @@ where
     fn trace_replay_transaction(&self, hash: TxHash) -> TraceBuilder<TxHash, TraceResults>;
 
     /// Replays all transactions in the given block.
-    async fn trace_replay_block_transactions(
+    fn trace_replay_block_transactions(
         &self,
         block: BlockId,
-        trace_types: &[TraceType],
-    ) -> TransportResult<Vec<TraceResultsWithTransactionHash>>;
+    ) -> TraceBuilder<BlockId, Vec<TraceResultsWithTransactionHash>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -153,12 +152,11 @@ where
         TraceBuilder::new_rpc(self.client().request("trace_replayTransaction", hash))
     }
 
-    async fn trace_replay_block_transactions(
+    fn trace_replay_block_transactions(
         &self,
         block: BlockId,
-        trace_types: &[TraceType],
-    ) -> TransportResult<Vec<TraceResultsWithTransactionHash>> {
-        self.client().request("trace_replayBlockTransactions", (block, trace_types)).await
+    ) -> TraceBuilder<BlockId, Vec<TraceResultsWithTransactionHash>> {
+        TraceBuilder::new_rpc(self.client().request("trace_replayBlockTransactions", block))
     }
 }
 
@@ -434,6 +432,73 @@ mod test {
   ],
   "vmTrace": null
 }"#
+            );
+        })
+        .await;
+        // })
+        // .await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(windows, ignore)]
+    async fn trace_replay_block_transactions() {
+        tracing_subscriber::fmt::init();
+        // async_ci_only(|| async move {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let pk: PrivateKeySigner =
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                    .parse()
+                    .unwrap();
+
+            let wallet = EthereumWallet::new(pk);
+            let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+
+            let tx = TransactionRequest::default()
+                .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+                .value(U256::from(1000))
+                .with_to(address!("0000000000000000000000000000000000000456"));
+
+            let res = provider.send_transaction(tx).await.unwrap();
+
+            let receipt = res.get_receipt().await.unwrap();
+
+            let block_num = receipt.block_number.unwrap();
+
+            let result = provider.trace_replay_block_transactions(BlockId::number(block_num)).await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            similar_asserts::assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"[
+  {
+    "output": "0x",
+    "stateDiff": null,
+    "trace": [
+      {
+        "type": "call",
+        "action": {
+          "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+          "callType": "call",
+          "gas": "0x5208",
+          "input": "0x",
+          "to": "0x0000000000000000000000000000000000000456",
+          "value": "0x3e8"
+        },
+        "result": {
+          "gasUsed": "0x5208",
+          "output": "0x"
+        },
+        "subtraces": 0,
+        "traceAddress": []
+      }
+    ],
+    "vmTrace": null,
+    "transactionHash": "0x744426e308ba55f122913c74009be469da45153a941932d520aa959d8547da7b"
+  }
+]"#
+                .trim()
             );
         })
         .await;
