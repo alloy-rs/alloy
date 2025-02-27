@@ -40,7 +40,7 @@ where
     ///
     /// Allows tracing dependent transactions.
     ///
-    /// If [`BlockId`] is unset the default at which calls will be executed is [`BlockId::Pending`].
+    /// If [`BlockId`] is unset the default at which calls will be executed is [`BlockId::pending`].
     ///
     /// # Note
     ///

@@ -26,12 +26,12 @@ where
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output + Clone,
 {
-    /// Create a new [`RpcWithBlock`] from a [`RpcCall`].
+    /// Create a new [`TraceBuilder`] from a [`RpcCall`].
     pub fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self { inner: WithBlockInner::RpcCall(inner), block_id: None, trace_types: None }
     }
 
-    /// Create a new [`RpcWithBlock`] from a closure producing a [`ProviderCall`].
+    /// Create a new [`TraceBuilder`] from a closure producing a [`ProviderCall`].
     pub fn new_provider<F>(get_call: F) -> Self
     where
         F: Fn(Option<BlockId>) -> ProviderCall<TraceParams<Params>, Resp, Output, Map>
@@ -160,19 +160,15 @@ fn trace_params<Params: RpcSend>(
     });
     match method.as_str() {
         "trace_call" => {
-            return TraceParams {
-                params,
-                block_id: Some(block_id),
-                trace_types: Some(trace_types),
-            };
+            TraceParams { params, block_id: Some(block_id), trace_types: Some(trace_types) }
         }
         "trace_callMany" => {
             // Trace types are ignored as they are set per-tx-request in `params`.
-            return TraceParams { params, block_id: Some(block_id), trace_types: None };
+            TraceParams { params, block_id: Some(block_id), trace_types: None }
         }
         "trace_replayTransaction" | "trace_rawTransaction" | "trace_replayBlockTransactions" => {
             // BlockId is ignored
-            return TraceParams { params, block_id: None, trace_types: Some(trace_types) };
+            TraceParams { params, block_id: None, trace_types: Some(trace_types) }
         }
         _ => {
             unreachable!("{method} is not supported by TraceBuilder due to custom serialization requirements");
