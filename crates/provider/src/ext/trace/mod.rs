@@ -44,7 +44,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> TraceWithBlock<TraceCallList<'a, N>, Vec<TraceResults>>;
+    ) -> TraceWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -116,8 +116,8 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> TraceWithBlock<TraceCallList<'a, N>, Vec<TraceResults>> {
-        TraceWithBlock::new_rpc(self.client().request("trace_callMany", request)).pending()
+    ) -> TraceWithBlock<(TraceCallList<'a, N>,), Vec<TraceResults>> {
+        TraceWithBlock::new_rpc(self.client().request("trace_callMany", (request,))).pending()
     }
 
     async fn trace_transaction(
@@ -244,28 +244,27 @@ mod test {
     #[tokio::test]
     #[cfg_attr(windows, ignore)]
     async fn trace_call_many() {
-        tracing_subscriber::fmt::init();
-        // async_ci_only(|| async move {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let tx1 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000123"))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx1 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000123"))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let tx2 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000456"))
-                .with_to(address!("0000000000000000000000000000000000000789"));
+                let tx2 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000456"))
+                    .with_to(address!("0000000000000000000000000000000000000789"));
 
-            let result = provider
-                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
-                .await;
+                let result = provider
+                    .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                    .await;
 
-            let traces = result.unwrap();
-            similar_asserts::assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"
+                let traces = result.unwrap();
+                similar_asserts::assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"
 [
   {
     "output": "0x",
@@ -276,13 +275,13 @@ mod test {
         "action": {
           "from": "0x0000000000000000000000000000000000000123",
           "callType": "call",
-          "gas": "0x2fa9e78",
+          "gas": "0x2faf080",
           "input": "0x",
           "to": "0x0000000000000000000000000000000000000456",
           "value": "0x0"
         },
         "result": {
-          "gasUsed": "0x0",
+          "gasUsed": "0x5208",
           "output": "0x"
         },
         "subtraces": 0,
@@ -300,13 +299,13 @@ mod test {
         "action": {
           "from": "0x0000000000000000000000000000000000000456",
           "callType": "call",
-          "gas": "0x2fa9e78",
+          "gas": "0x2faf080",
           "input": "0x",
           "to": "0x0000000000000000000000000000000000000789",
           "value": "0x0"
         },
         "result": {
-          "gasUsed": "0x0",
+          "gasUsed": "0x5208",
           "output": "0x"
         },
         "subtraces": 0,
@@ -317,12 +316,12 @@ mod test {
   }
 ]
 "#
-                .trim()
-            );
+                    .trim()
+                );
+            })
+            .await;
         })
         .await;
-        // })
-        // .await;
     }
 
     #[tokio::test]
