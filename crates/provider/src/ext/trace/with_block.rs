@@ -1,7 +1,7 @@
-use crate::{ProviderCall, WithBlock};
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcRecv, RpcSend};
-use alloy_primitives::map::HashSet;
+use alloy_primitives::{map::HashSet, B256};
 use alloy_rpc_client::RpcCall;
 use alloy_rpc_types_trace::parity::TraceType;
 use alloy_transport::TransportResult;
@@ -68,18 +68,6 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> WithBlock for TraceBuilder<Params, Resp, Output, Map>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output + Clone,
-{
-    fn block_id(mut self, block_id: BlockId) -> Self {
-        self.block_id = Some(block_id);
-        self
-    }
-}
-
 impl<Params, Resp, Output, Map> TraceBuilder<Params, Resp, Output, Map>
 where
     Params: RpcSend,
@@ -116,6 +104,54 @@ where
     /// Get the trace types.
     pub const fn get_trace_types(&self) -> Option<&HashSet<TraceType>> {
         self.trace_types.as_ref()
+    }
+
+    /// Set the block id.
+    pub const fn block_id(mut self, block_id: BlockId) -> Self {
+        self.block_id = Some(block_id);
+        self
+    }
+
+    /// Set the block id to "pending".
+    pub const fn pending(self) -> Self {
+        self.block_id(BlockId::pending())
+    }
+
+    /// Set the block id to "latest".
+    pub const fn latest(self) -> Self {
+        self.block_id(BlockId::latest())
+    }
+
+    /// Set the block id to "earliest".
+    pub const fn earliest(self) -> Self {
+        self.block_id(BlockId::earliest())
+    }
+
+    /// Set the block id to "finalized".
+    pub const fn finalized(self) -> Self {
+        self.block_id(BlockId::finalized())
+    }
+
+    /// Set the block id to "safe".
+    pub const fn safe(self) -> Self {
+        self.block_id(BlockId::safe())
+    }
+
+    /// Set the block id to a specific height.
+    pub const fn number(self, number: u64) -> Self {
+        self.block_id(BlockId::number(number))
+    }
+
+    /// Set the block id to a specific hash, without requiring the hash be part
+    /// of the canonical chain.
+    pub const fn hash(self, hash: B256) -> Self {
+        self.block_id(BlockId::hash(hash))
+    }
+
+    /// Set the block id to a specific hash and require the hash be part of the
+    /// canonical chain.
+    pub const fn hash_canonical(self, hash: B256) -> Self {
+        self.block_id(BlockId::hash_canonical(hash))
     }
 }
 
