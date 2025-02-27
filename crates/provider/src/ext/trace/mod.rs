@@ -207,13 +207,13 @@ mod test {
       "action": {
         "from": "0x0000000000000000000000000000000000000123",
         "callType": "call",
-        "gas": "0x2faf080",
+        "gas": "0x2fa9e78",
         "input": "0x",
         "to": "0x0000000000000000000000000000000000000456",
         "value": "0x0"
       },
       "result": {
-        "gasUsed": "0x5208",
+        "gasUsed": "0x0",
         "output": "0x"
       },
       "subtraces": 0,
@@ -265,13 +265,13 @@ mod test {
         "action": {
           "from": "0x0000000000000000000000000000000000000123",
           "callType": "call",
-          "gas": "0x2faf080",
+          "gas": "0x2fa9e78",
           "input": "0x",
           "to": "0x0000000000000000000000000000000000000456",
           "value": "0x0"
         },
         "result": {
-          "gasUsed": "0x5208",
+          "gasUsed": "0x0",
           "output": "0x"
         },
         "subtraces": 0,
@@ -289,13 +289,13 @@ mod test {
         "action": {
           "from": "0x0000000000000000000000000000000000000456",
           "callType": "call",
-          "gas": "0x2faf080",
+          "gas": "0x2fa9e78",
           "input": "0x",
           "to": "0x0000000000000000000000000000000000000789",
           "value": "0x0"
         },
         "result": {
-          "gasUsed": "0x5208",
+          "gasUsed": "0x0",
           "output": "0x"
         },
         "subtraces": 0,
@@ -354,13 +354,13 @@ mod test {
       "action": {
         "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
         "callType": "call",
-        "gas": "0x5208",
+        "gas": "0x0",
         "input": "0x",
         "to": "0x0000000000000000000000000000000000000456",
         "value": "0x3e8"
       },
       "result": {
-        "gasUsed": "0x5208",
+        "gasUsed": "0x0",
         "output": "0x"
       },
       "subtraces": 0,
@@ -418,13 +418,13 @@ mod test {
       "action": {
         "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
         "callType": "call",
-        "gas": "0x5208",
+        "gas": "0x0",
         "input": "0x",
         "to": "0x0000000000000000000000000000000000000456",
         "value": "0x3e8"
       },
       "result": {
-        "gasUsed": "0x5208",
+        "gasUsed": "0x0",
         "output": "0x"
       },
       "subtraces": 0,
@@ -482,13 +482,13 @@ mod test {
         "action": {
           "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
           "callType": "call",
-          "gas": "0x5208",
+          "gas": "0x0",
           "input": "0x",
           "to": "0x0000000000000000000000000000000000000456",
           "value": "0x3e8"
         },
         "result": {
-          "gasUsed": "0x5208",
+          "gasUsed": "0x0",
           "output": "0x"
         },
         "subtraces": 0,
