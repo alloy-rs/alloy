@@ -20,7 +20,7 @@ pub use transaction::{
 };
 
 mod ethereum;
-pub use ethereum::{Ethereum, EthereumWallet};
+pub use ethereum::{Ethereum, EthereumWallet, IntoWallet};
 
 mod any;
 pub use any::{

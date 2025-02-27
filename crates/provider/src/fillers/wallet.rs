@@ -1,6 +1,8 @@
+use std::fmt::Debug;
+
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, NetworkWallet, TransactionBuilder};
+use alloy_network::{IntoWallet, Network, NetworkWallet, TransactionBuilder};
 use alloy_transport::TransportResult;
 
 use super::{FillerControlFlow, TxFiller};
@@ -53,7 +55,7 @@ impl<W> WalletFiller<W> {
 impl<W, N> TxFiller<N> for WalletFiller<W>
 where
     N: Network,
-    W: NetworkWallet<N> + Clone,
+    W: IntoWallet<N> + Clone,
 {
     type Fillable = ();
 
@@ -71,7 +73,7 @@ where
     fn fill_sync(&self, tx: &mut SendableTx<N>) {
         if let Some(builder) = tx.as_mut_builder() {
             if builder.from().is_none() {
-                builder.set_from(self.wallet.default_signer_address());
+                builder.set_from(self.wallet.into_wallet().default_signer_address());
             }
         }
     }
@@ -97,14 +99,15 @@ where
             _ => return Ok(tx),
         };
 
-        let envelope = builder.build(&self.wallet).await.map_err(RpcError::local_usage)?;
+        let envelope =
+            builder.build(&self.wallet.into_wallet()).await.map_err(RpcError::local_usage)?;
 
         Ok(SendableTx::Envelope(envelope))
     }
 
     async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         if tx.from().is_none() {
-            tx.set_from(self.wallet.default_signer_address());
+            tx.set_from(self.wallet.into_wallet().default_signer_address());
         }
         Ok(())
     }
@@ -116,6 +119,7 @@ mod tests {
     use crate::{Provider, ProviderBuilder};
     use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_signer_local::PrivateKeySigner;
 
     #[tokio::test]
     async fn poc() {
@@ -148,5 +152,26 @@ mod tests {
             provider.get_transaction_receipt(local_hash2).await.unwrap().expect("no receipt");
         let receipt_hash = receipt.transaction_hash;
         assert_eq!(receipt_hash, node_hash);
+    }
+
+    #[tokio::test]
+    async fn ingest_pk_signer() {
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+
+        let provider = ProviderBuilder::new().wallet(pk.clone()).on_anvil();
+
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+
+        assert_eq!(receipt.from, pk.address());
     }
 }
