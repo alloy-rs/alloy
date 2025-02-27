@@ -126,6 +126,18 @@ impl<T> ReceiptEnvelope<T> {
         }
     }
 
+    /// Return the mutable inner receipt with bloom. Currently this is
+    /// infallible, however, future receipt types may be added.
+    pub fn as_receipt_with_bloom_mut(&mut self) -> Option<&mut ReceiptWithBloom<Receipt<T>>> {
+        match self {
+            Self::Legacy(t)
+            | Self::Eip2930(t)
+            | Self::Eip1559(t)
+            | Self::Eip4844(t)
+            | Self::Eip7702(t) => Some(t),
+        }
+    }
+
     /// Return the inner receipt. Currently this is infallible, however, future
     /// receipt types may be added.
     pub const fn as_receipt(&self) -> Option<&Receipt<T>> {
