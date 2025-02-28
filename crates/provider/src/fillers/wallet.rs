@@ -18,11 +18,11 @@ use super::{FillerControlFlow, TxFiller};
 /// ```
 /// # use alloy_network::{IntoWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
+/// # use alloy_signer_local::PrivateKeySigner;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<W: IntoWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::new()
-///     .wallet(wallet)
-///     .on_http(url);
+/// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
+/// let pk: PrivateKeySigner = "0x...".parse()?;
+/// let provider = ProviderBuilder::new().wallet(pk).on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())
@@ -116,6 +116,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{Provider, ProviderBuilder, WalletProvider};
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_signer_local::PrivateKeySigner;
@@ -158,7 +159,9 @@ mod tests {
         let pk: PrivateKeySigner =
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
 
-        let provider = ProviderBuilder::new().wallet(pk.clone()).on_anvil();
+        let anvil = Anvil::new().spawn();
+
+        let provider = ProviderBuilder::new().wallet(pk.clone()).on_http(anvil.endpoint_url());
 
         let tx = TransactionRequest {
             nonce: Some(0),
