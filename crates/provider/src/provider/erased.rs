@@ -12,6 +12,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, NoParams, WeakClient};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
@@ -326,6 +327,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.0.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.0.send_raw_transaction_conditional(encoded_tx, conditional).await
     }
 
     async fn send_transaction(
