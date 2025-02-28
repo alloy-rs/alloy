@@ -558,7 +558,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn debug_trace_call_many() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -612,7 +612,7 @@ mod test {
     // TODO: Enable for next reth release > v1.2.0
     /*
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_debug_code_by_hash() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
