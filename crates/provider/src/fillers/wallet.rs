@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
-use alloy_network::{IntoWallet, Network, NetworkWallet, TransactionBuilder};
+use alloy_network::{Network, NetworkWallet, TransactionBuilder};
 use alloy_transport::TransportResult;
 
 use super::{FillerControlFlow, TxFiller};
@@ -29,39 +29,27 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct WalletFiller<W, N: Network> {
+pub struct WalletFiller<W, N> {
     wallet: W,
     _pd: std::marker::PhantomData<N>,
 }
 
-impl<W, N> AsRef<W> for WalletFiller<W, N>
-where
-    W: NetworkWallet<N>,
-    N: Network,
-{
+impl<W, N> AsRef<W> for WalletFiller<W, N> {
     fn as_ref(&self) -> &W {
         &self.wallet
     }
 }
 
-impl<W, N> AsMut<W> for WalletFiller<W, N>
-where
-    W: NetworkWallet<N>,
-    N: Network,
-{
+impl<W, N> AsMut<W> for WalletFiller<W, N> {
     fn as_mut(&mut self) -> &mut W {
         &mut self.wallet
     }
 }
 
-impl<W, N> WalletFiller<W, N>
-where
-    W: IntoWallet<N>,
-    N: Network,
-{
+impl<W, N> WalletFiller<W, N> {
     /// Creates a new wallet layer with the given wallet.
-    pub fn new(wallet: W) -> WalletFiller<W::NetworkWallet, N> {
-        WalletFiller { wallet: wallet.into_wallet(), _pd: std::marker::PhantomData }
+    pub fn new(wallet: W) -> WalletFiller<W, N> {
+        WalletFiller { wallet, _pd: std::marker::PhantomData }
     }
 }
 

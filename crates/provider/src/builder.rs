@@ -395,7 +395,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self,
         wallet: W,
     ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet, N>>, N> {
-        self.filler(WalletFiller::new(wallet))
+        self.filler(WalletFiller::new(wallet.into_wallet()))
     }
 }
 
