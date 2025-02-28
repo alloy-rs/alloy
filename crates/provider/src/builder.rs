@@ -390,6 +390,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     /// Add a wallet layer to the stack being built.
     ///
     /// See [`WalletFiller`].
+    #[allow(clippy::type_complexity)]
     pub fn wallet<W: IntoWallet<N>>(
         self,
         wallet: W,

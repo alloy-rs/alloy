@@ -175,21 +175,13 @@ pub trait IntoWallet<N: Network>: Send + Sync + Debug {
     /// The wallet type for the network.
     type NetworkWallet: NetworkWallet<N>;
     /// Convert the signer into a wallet.
-    fn into_wallet(&self) -> Self::NetworkWallet;
+    fn into_wallet(self) -> Self::NetworkWallet;
 }
 
-impl IntoWallet<Ethereum> for EthereumWallet {
-    type NetworkWallet = Self;
+impl<W: NetworkWallet<N>, N: Network> IntoWallet<N> for W {
+    type NetworkWallet = W;
 
-    fn into_wallet(&self) -> Self::NetworkWallet {
-        self.clone()
-    }
-}
-
-impl IntoWallet<AnyNetwork> for EthereumWallet {
-    type NetworkWallet = Self;
-
-    fn into_wallet(&self) -> Self::NetworkWallet {
-        self.clone()
+    fn into_wallet(self) -> Self::NetworkWallet {
+        self
     }
 }

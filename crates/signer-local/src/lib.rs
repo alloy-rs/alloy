@@ -39,16 +39,16 @@ pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 impl IntoWallet<Ethereum> for PrivateKeySigner {
     type NetworkWallet = EthereumWallet;
 
-    fn into_wallet(&self) -> Self::NetworkWallet {
-        EthereumWallet::new(self.clone())
+    fn into_wallet(self) -> Self::NetworkWallet {
+        EthereumWallet::new(self)
     }
 }
 
 impl IntoWallet<AnyNetwork> for PrivateKeySigner {
     type NetworkWallet = EthereumWallet;
 
-    fn into_wallet(&self) -> Self::NetworkWallet {
-        EthereumWallet::new(self.clone())
+    fn into_wallet(self) -> Self::NetworkWallet {
+        EthereumWallet::new(self)
     }
 }
 
