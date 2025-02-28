@@ -7,7 +7,7 @@ use crate::{
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, Network};
+use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -250,13 +250,6 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
-    /// Add a wallet layer to the stack being built.
-    ///
-    /// See [`WalletFiller`].
-    pub fn wallet<W>(self, wallet: W) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W>>, N> {
-        self.filler(WalletFiller::new(wallet))
-    }
-
     /// Change the network.
     ///
     /// By default, the network is `Ethereum`. This method must be called to configure a different
@@ -393,8 +386,21 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
+impl<L, F, N: Network> ProviderBuilder<L, F, N> {
+    /// Add a wallet layer to the stack being built.
+    ///
+    /// See [`WalletFiller`].
+    pub fn wallet<W: IntoWallet<N>>(
+        self,
+        wallet: W,
+    ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet, N>>, N> {
+        self.filler(WalletFiller::new(wallet))
+    }
+}
+
 #[cfg(any(test, feature = "anvil-node"))]
-type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
+type JoinedEthereumWalletFiller<F> =
+    JoinFill<F, WalletFiller<alloy_network::EthereumWallet, Ethereum>>;
 
 #[cfg(any(test, feature = "anvil-node"))]
 type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;

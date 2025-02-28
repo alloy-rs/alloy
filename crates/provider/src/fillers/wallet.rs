@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, NetworkWallet, TransactionBuilder};
+use alloy_network::{IntoWallet, Network, NetworkWallet, TransactionBuilder};
 use alloy_transport::TransportResult;
 
 use super::{FillerControlFlow, TxFiller};
@@ -29,30 +29,43 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct WalletFiller<W> {
+pub struct WalletFiller<W, N: Network> {
     wallet: W,
+    _pd: std::marker::PhantomData<N>,
 }
 
-impl<W> AsRef<W> for WalletFiller<W> {
+impl<W, N> AsRef<W> for WalletFiller<W, N>
+where
+    W: NetworkWallet<N>,
+    N: Network,
+{
     fn as_ref(&self) -> &W {
         &self.wallet
     }
 }
 
-impl<W> AsMut<W> for WalletFiller<W> {
+impl<W, N> AsMut<W> for WalletFiller<W, N>
+where
+    W: NetworkWallet<N>,
+    N: Network,
+{
     fn as_mut(&mut self) -> &mut W {
         &mut self.wallet
     }
 }
 
-impl<W> WalletFiller<W> {
+impl<W, N> WalletFiller<W, N>
+where
+    W: IntoWallet<N>,
+    N: Network,
+{
     /// Creates a new wallet layer with the given wallet.
-    pub const fn new(wallet: W) -> Self {
-        Self { wallet }
+    pub fn new(wallet: W) -> WalletFiller<W::NetworkWallet, N> {
+        WalletFiller { wallet: wallet.into_wallet(), _pd: std::marker::PhantomData }
     }
 }
 
-impl<W, N> TxFiller<N> for WalletFiller<W>
+impl<W, N> TxFiller<N> for WalletFiller<W, N>
 where
     N: Network,
     W: NetworkWallet<N> + Clone,
@@ -118,7 +131,7 @@ mod tests {
     use crate::{Provider, ProviderBuilder};
     use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
-    // use alloy_signer_local::PrivateKeySigner;
+    use alloy_signer_local::PrivateKeySigner;
 
     #[tokio::test]
     async fn poc() {
@@ -153,25 +166,24 @@ mod tests {
         assert_eq!(receipt_hash, node_hash);
     }
 
-    // #[tokio::test]
-    // async fn ingest_pk_signer() {
-    //     let pk: PrivateKeySigner =
-    //         "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().
-    // unwrap();
+    #[tokio::test]
+    async fn ingest_pk_signer() {
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
 
-    //     let provider = ProviderBuilder::new().wallet(pk.clone()).on_anvil();
+        let provider = ProviderBuilder::new().wallet(pk.clone()).on_anvil();
 
-    //     let tx = TransactionRequest {
-    //         nonce: Some(0),
-    //         value: Some(U256::from(100)),
-    //         to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-    //         gas_price: Some(20e9 as u128),
-    //         gas: Some(21000),
-    //         ..Default::default()
-    //     };
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
 
-    //     let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+        let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
-    //     assert_eq!(receipt.from, pk.address());
-    // }
+        assert_eq!(receipt.from, pk.address());
+    }
 }
