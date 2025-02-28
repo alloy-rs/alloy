@@ -48,8 +48,8 @@ impl<W, N> AsMut<W> for WalletFiller<W, N> {
 
 impl<W, N> WalletFiller<W, N> {
     /// Creates a new wallet layer with the given wallet.
-    pub fn new(wallet: W) -> WalletFiller<W, N> {
-        WalletFiller { wallet, _pd: std::marker::PhantomData }
+    pub fn new(wallet: W) -> Self {
+        Self { wallet, _pd: std::marker::PhantomData }
     }
 }
 
