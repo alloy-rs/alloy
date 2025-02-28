@@ -47,7 +47,7 @@ impl<W> AsMut<W> for WalletFiller<W> {
 
 impl<W> WalletFiller<W> {
     /// Creates a new wallet layer with the given wallet.
-    pub fn new(wallet: W) -> Self {
+    pub const fn new(wallet: W) -> Self {
         Self { wallet }
     }
 }
