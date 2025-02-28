@@ -429,8 +429,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u64> {
-        let mut estimate = self.provider.estimate_gas(&self.request);
-        if let Some(state) = &self.state {
+        let mut estimate = self.provider.estimate_gas(self.request.clone());
+        if let Some(state) = self.state.clone() {
             estimate = estimate.overrides(state);
         }
         estimate.block(self.block).await.map_err(Into::into)
@@ -443,7 +443,7 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, '_, D, N> {
+    pub fn call(&self) -> EthCall<'_, D, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -453,9 +453,9 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, '_, (), N> {
-        let call = self.provider.call(&self.request).block(self.block);
-        let call = match &self.state {
+    pub fn call_raw(&self) -> EthCall<'_, (), N> {
+        let call = self.provider.call(self.request.clone()).block(self.block);
+        let call = match self.state.clone() {
             Some(state) => call.overrides(state),
             None => call,
         };

@@ -328,7 +328,7 @@ where
         self.inner.get_block_number()
     }
 
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         self.inner.call(tx)
     }
 
@@ -357,7 +357,7 @@ where
         self.inner.create_access_list(request)
     }
 
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         self.inner.estimate_gas(tx)
     }
 
