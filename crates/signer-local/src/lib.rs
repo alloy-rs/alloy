@@ -7,7 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_consensus::SignableTransaction;
-use alloy_network::{AnyNetwork, Ethereum, EthereumWallet, IntoWallet, TxSigner, TxSignerSync};
+use alloy_network::{AnyNetwork, EthereumWallet, IntoWallet, TxSigner, TxSignerSync};
 use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
@@ -36,7 +36,7 @@ pub use coins_bip39;
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
-impl IntoWallet<Ethereum> for PrivateKeySigner {
+impl IntoWallet for PrivateKeySigner {
     type NetworkWallet = EthereumWallet;
 
     fn into_wallet(self) -> Self::NetworkWallet {

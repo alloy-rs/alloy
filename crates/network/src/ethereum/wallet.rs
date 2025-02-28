@@ -171,7 +171,7 @@ impl NetworkWallet<AnyNetwork> for EthereumWallet {
 }
 
 /// A trait for converting a signer into a [`NetworkWallet`].
-pub trait IntoWallet<N: Network>: Send + Sync + Debug {
+pub trait IntoWallet<N: Network = Ethereum>: Send + Sync + Debug {
     /// The wallet type for the network.
     type NetworkWallet: NetworkWallet<N>;
     /// Convert the signer into a wallet.
