@@ -99,3 +99,23 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type BlockResponse: RpcObject
         + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
 }
+
+/// Utility to implment IntoWallet for signer over the specified network.
+#[macro_export]
+macro_rules! impl_into_wallet {
+    ($signer:ty) => {
+        impl IntoWallet for $signer {
+            type NetworkWallet = EthereumWallet;
+            fn into_wallet(self) -> Self::NetworkWallet {
+                EthereumWallet::from(self)
+            }
+        }
+
+        impl IntoWallet<AnyNetwork> for $signer {
+            type NetworkWallet = EthereumWallet;
+            fn into_wallet(self) -> Self::NetworkWallet {
+                EthereumWallet::from(self)
+            }
+        }
+    };
+}
