@@ -34,7 +34,7 @@ pub trait WalletProvider<N: Network = Ethereum> {
     }
 }
 
-impl<W, N> WalletProvider<N> for WalletFiller<W, N>
+impl<W, N> WalletProvider<N> for WalletFiller<W>
 where
     W: NetworkWallet<N> + Clone,
     N: Network,

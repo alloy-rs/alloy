@@ -394,14 +394,13 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     pub fn wallet<W: IntoWallet<N>>(
         self,
         wallet: W,
-    ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet, N>>, N> {
+    ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet>>, N> {
         self.filler(WalletFiller::new(wallet.into_wallet()))
     }
 }
 
 #[cfg(any(test, feature = "anvil-node"))]
-type JoinedEthereumWalletFiller<F> =
-    JoinFill<F, WalletFiller<alloy_network::EthereumWallet, Ethereum>>;
+type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
 
 #[cfg(any(test, feature = "anvil-node"))]
 type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;

@@ -29,31 +29,30 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct WalletFiller<W, N> {
+pub struct WalletFiller<W> {
     wallet: W,
-    _pd: std::marker::PhantomData<N>,
 }
 
-impl<W, N> AsRef<W> for WalletFiller<W, N> {
+impl<W> AsRef<W> for WalletFiller<W> {
     fn as_ref(&self) -> &W {
         &self.wallet
     }
 }
 
-impl<W, N> AsMut<W> for WalletFiller<W, N> {
+impl<W> AsMut<W> for WalletFiller<W> {
     fn as_mut(&mut self) -> &mut W {
         &mut self.wallet
     }
 }
 
-impl<W, N> WalletFiller<W, N> {
+impl<W> WalletFiller<W> {
     /// Creates a new wallet layer with the given wallet.
     pub fn new(wallet: W) -> Self {
-        Self { wallet, _pd: std::marker::PhantomData }
+        Self { wallet }
     }
 }
 
-impl<W, N> TxFiller<N> for WalletFiller<W, N>
+impl<W, N> TxFiller<N> for WalletFiller<W>
 where
     N: Network,
     W: NetworkWallet<N> + Clone,
