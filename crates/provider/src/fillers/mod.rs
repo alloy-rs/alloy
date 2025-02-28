@@ -38,6 +38,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::NoParams;
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     Bundle, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter, FilterChanges, Index,
     Log, SyncStatus,
@@ -574,6 +575,14 @@ where
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.inner.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction_conditional(encoded_tx, conditional).await
     }
 
     async fn send_transaction_internal(
