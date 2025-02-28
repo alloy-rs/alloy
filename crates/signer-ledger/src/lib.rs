@@ -10,7 +10,6 @@
 extern crate tracing;
 
 mod signer;
-use alloy_network::{impl_into_wallet, AnyNetwork, EthereumWallet, IntoWallet};
 pub use signer::LedgerSigner;
 
 mod types;
@@ -19,5 +18,3 @@ pub use types::{DerivationType as HDPath, LedgerError};
 #[doc(hidden)]
 #[deprecated(note = "use `LedgerSigner` instead")]
 pub type Ledger = LedgerSigner;
-
-impl_into_wallet!(LedgerSigner);
