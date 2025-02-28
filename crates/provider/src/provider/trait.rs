@@ -1355,7 +1355,7 @@ mod tests {
 
     #[cfg(feature = "hyper")]
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_auth_layer_transport() {
         crate::ext::test::async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
@@ -1439,21 +1439,24 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
-        let anvil = Anvil::new().block_time(1).spawn();
+        let anvil = Anvil::new().block_time_f64(0.2).spawn();
         let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
         let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
         let provider = RootProvider::<Ethereum>::new(client);
 
         let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(2);
-        let mut n = 1;
+        let mut stream = sub.into_stream().take(5);
+        let mut next = None;
         while let Some(header) = stream.next().await {
-            assert_eq!(header.number, n);
-            n += 1;
+            if let Some(next) = &mut next {
+                assert_eq!(header.number, *next);
+                *next += 1;
+            } else {
+                next = Some(header.number + 1);
+            }
         }
     }
 
