@@ -1889,7 +1889,7 @@ mod tests {
         use alloy_network::TransactionBuilder;
         use alloy_sol_types::SolValue;
 
-        let url = "https://reth-ethereum.ithaca.xyz/rpc";
+        let url = "https://docs-demo.quiknode.pro/";
         let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
