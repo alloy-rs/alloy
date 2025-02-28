@@ -16,6 +16,13 @@ pub struct ParamsWithBlock<Params: RpcSend> {
     pub block_id: BlockId,
 }
 
+impl<Params: RpcSend> ParamsWithBlock<Params> {
+    /// Create a new instance of `ParamsWithBlock`.
+    pub fn new(params: Params, block_id: BlockId) -> Self {
+        Self { params, block_id }
+    }
+}
+
 impl<Params: RpcSend> serde::Serialize for ParamsWithBlock<Params> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -201,7 +208,7 @@ where
         match self.inner {
             WithBlockInner::RpcCall(rpc_call) => {
                 let block_id = self.block_id;
-                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock { params, block_id });
+                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock::new(params, block_id));
                 ProviderCall::RpcCall(rpc_call)
             }
             WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),
