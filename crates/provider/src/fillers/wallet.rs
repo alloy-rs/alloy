@@ -128,7 +128,7 @@ where
 #[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
-    use crate::{Provider, ProviderBuilder};
+    use crate::{Provider, ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_signer_local::PrivateKeySigner;
@@ -184,6 +184,12 @@ mod tests {
 
         let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
-        assert_eq!(receipt.from, pk.address());
+        // Can access wallet via provider
+        let wallet = provider.wallet();
+
+        let default_address = wallet.default_signer().address();
+
+        assert_eq!(pk.address(), default_address);
+        assert_eq!(receipt.from, default_address);
     }
 }
