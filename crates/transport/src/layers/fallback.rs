@@ -460,9 +460,9 @@ impl FallbackLayer {
     ///
     /// The `active_transport_count` parameter controls how many
     /// transports are used for requests at any one time.
-    pub fn new(active_transport_count: usize) -> Self {
+    pub fn with_active_transport_count(count: usize) -> Self {
         Self {
-            active_transport_count,
+            active_transport_count: count,
             rank: false,
             interval: DEFAULT_INTERVAL,
             sample_count: DEFAULT_SAMPLE_COUNT,
