@@ -10,3 +10,7 @@ pub use retry::{RateLimitRetryPolicy, RetryBackoffLayer, RetryBackoffService, Re
 #[cfg(feature = "throttle")]
 /// ThrottleLayer
 pub use throttle::{ThrottleLayer, ThrottleService};
+mod fallback;
+
+/// FallbackLayer
+pub use fallback::{FallbackLayer, FallbackService};
