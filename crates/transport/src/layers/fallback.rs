@@ -21,7 +21,7 @@ const STABILITY_WEIGHT: f64 = 0.7;
 const LATENCY_WEIGHT: f64 = 0.3;
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(10);
 const DEFAULT_SAMPLE_COUNT: usize = 10;
-
+const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
 /// Represents performance metrics for a transport.
 #[derive(Debug)]
 struct TransportMetrics {
@@ -456,17 +456,10 @@ pub struct FallbackLayer {
 }
 
 impl FallbackLayer {
-    /// Create a new fallback layer.
-    ///
-    /// The `active_transport_count` parameter controls how many
-    /// transports are used for requests at any one time.
-    pub fn with_active_transport_count(count: usize) -> Self {
-        Self {
-            active_transport_count: count,
-            rank: false,
-            interval: DEFAULT_INTERVAL,
-            sample_count: DEFAULT_SAMPLE_COUNT,
-        }
+    /// Set the number of active transports to use
+    pub fn with_active_transport_count(mut self, count: usize) -> Self {
+        self.active_transport_count = count;
+        self
     }
 
     /// Enable or disable automatic transport ranking
@@ -485,6 +478,17 @@ impl FallbackLayer {
     pub fn with_sample_count(mut self, count: usize) -> Self {
         self.sample_count = count;
         self
+    }
+}
+
+impl Default for FallbackLayer {
+    fn default() -> Self {
+        Self {
+            active_transport_count: DEFAULT_ACTIVE_TRANSPORT_COUNT,
+            rank: false,
+            interval: DEFAULT_INTERVAL,
+            sample_count: DEFAULT_SAMPLE_COUNT,
+        }
     }
 }
 
