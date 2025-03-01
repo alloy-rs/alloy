@@ -284,4 +284,18 @@ mod tests {
             .expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce(), 1);
     }
+
+    #[tokio::test]
+    async fn cloned_managers() {
+        let cnm1 = CachedNonceManager::default();
+        let cnm2 = cnm1.clone();
+
+        let provider = ProviderBuilder::new().on_anvil();
+        let address = Address::ZERO;
+
+        assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 0);
+        assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 1);
+        assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 2);
+        assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 3);
+    }
 }
