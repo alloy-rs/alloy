@@ -3,12 +3,15 @@ use std::{
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
     task::{Context, Poll},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 
 use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, SerializedRequest};
 use futures::{stream::FuturesUnordered, StreamExt};
-use tower::{Layer, Service};
+use tower::{
+    util::rng::{self, Rng},
+    Layer, Service,
+};
 use tracing::{debug, info};
 
 use crate::{TransportError, TransportErrorKind, TransportFut};
@@ -517,7 +520,7 @@ where
         + 'static,
 {
     // Create a simple ping request
-    let ping_id = format!("ping-{}", current_timestamp_ms());
+    let ping_id = format!("ping-{}", rng::HasherRng::new().next_u64());
     let ping_req = RequestPacket::from(
         SerializedRequest::try_from(Request::new("net_version", ping_id.into(), ()))
             .expect("valid serialization"),
@@ -537,9 +540,4 @@ where
             false
         }
     }
-}
-
-/// Returns the current timestamp since the UNIX epoch in milliseconds.
-fn current_timestamp_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis() as u64
 }
