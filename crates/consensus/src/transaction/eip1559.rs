@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{transaction::RlpEcdsaTx, SignableTransaction, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
@@ -274,9 +274,8 @@ impl SignableTransaction<Signature> for TxEip1559 {
         self.length() + 1
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let tx_hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, tx_hash)
+    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
+        self.tx_hash(signature)
     }
 }
 

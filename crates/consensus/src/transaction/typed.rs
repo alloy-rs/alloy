@@ -473,12 +473,14 @@ impl SignableTransaction<Signature> for TypedTransaction {
         }
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
-    where
-        Self: Sized,
-    {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
+    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
+        match self {
+            Self::Legacy(tx) => tx.tx_hash_with_signature(signature),
+            Self::Eip2930(tx) => tx.tx_hash_with_signature(signature),
+            Self::Eip1559(tx) => tx.tx_hash_with_signature(signature),
+            Self::Eip4844(tx) => tx.tx_hash_with_signature(signature),
+            Self::Eip7702(tx) => tx.tx_hash_with_signature(signature),
+        }
     }
 }
 

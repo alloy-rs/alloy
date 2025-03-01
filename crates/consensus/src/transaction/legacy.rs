@@ -343,9 +343,8 @@ impl SignableTransaction<Signature> for TxLegacy {
         Header { list: true, payload_length }.length_with_payload()
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
+    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
+        self.tx_hash(signature)
     }
 }
 
