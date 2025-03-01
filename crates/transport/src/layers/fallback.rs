@@ -21,7 +21,7 @@ const DEFAULT_SAMPLE_COUNT: usize = 10;
 
 /// Represents performance metrics for a transport.
 #[derive(Debug)]
-pub(crate) struct TransportMetrics {
+struct TransportMetrics {
     // Latency history - tracks last N responses
     latencies: VecDeque<Duration>,
     // Success history - tracks last N successes (true) or failures (false)
@@ -132,7 +132,7 @@ impl Default for TransportMetrics {
 
 /// A scored transport that can be ordered in a heap.
 #[derive(Debug, Clone)]
-pub(crate) struct ScoredTransport<S> {
+struct ScoredTransport<S> {
     id: usize, // Unique identifier for the transport
     transport: S,
     metrics: Arc<Mutex<TransportMetrics>>,
@@ -203,10 +203,7 @@ pub struct FallbackService<S> {
     rank: bool,
 }
 
-impl<S> FallbackService<S>
-where
-    S: std::fmt::Debug,
-{
+impl<S> FallbackService<S> {
     /// Create a new fallback provider from a list of transports.
     ///
     /// - The `active_transport_count` parameter controls how many
@@ -261,8 +258,8 @@ where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + Clone
-        + 'static
-        + std::fmt::Debug,
+        + std::fmt::Debug
+        + 'static,
 {
     async fn make_request(&self, req: RequestPacket) -> Result<ResponsePacket, TransportError> {
         let mut top_transports = Vec::new();
@@ -400,8 +397,8 @@ where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + Clone
-        + 'static
-        + std::fmt::Debug,
+        + std::fmt::Debug
+        + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
