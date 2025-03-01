@@ -271,8 +271,8 @@ impl AnyTxEnvelope {
         f: impl FnOnce(UnknownTxEnvelope) -> Result<T, E>,
     ) -> Result<Either<TxEnvelope, T>, E> {
         match self {
-            AnyTxEnvelope::Ethereum(tx) => Ok(Either::Left(tx)),
-            AnyTxEnvelope::Unknown(tx) => Ok(Either::Right(f(tx)?)),
+            Self::Ethereum(tx) => Ok(Either::Left(tx)),
+            Self::Unknown(tx) => Ok(Either::Right(f(tx)?)),
         }
     }
 
