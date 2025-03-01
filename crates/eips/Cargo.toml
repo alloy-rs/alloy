@@ -30,6 +30,7 @@ alloy-eip7702.workspace = true
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
+either = { workspace = true }
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -70,12 +71,12 @@ rand.workspace = true
 [features]
 default = ["std", "kzg-sidecar"]
 std = [
-	"alloy-primitives/std",
-	"alloy-rlp/std",
-	"serde?/std",
-	"c-kzg?/std",
-	"once_cell?/std",
-	"alloy-serde?/std"
+    "alloy-primitives/std",
+    "alloy-rlp/std",
+    "serde?/std",
+    "c-kzg?/std",
+    "once_cell?/std",
+    "alloy-serde?/std",
 ]
 serde = [
     "dep:alloy-serde",
