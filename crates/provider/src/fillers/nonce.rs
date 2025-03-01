@@ -100,13 +100,15 @@ impl NonceManager for CachedNonceManager {
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
+/// # use alloy_network::{Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::default()
+/// # use alloy_signer_local::PrivateKeySigner;
+/// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
+/// let pk: PrivateKeySigner = "0x...".parse()?;
+/// let provider = ProviderBuilder::<_, _, Ethereum>::default()
 ///     .with_simple_nonce_management()
-///     .wallet(wallet)
+///     .wallet(pk)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;

@@ -10,6 +10,7 @@
 extern crate tracing;
 
 mod signer;
+use alloy_network::{impl_into_wallet, AnyNetwork, EthereumWallet, IntoWallet};
 pub use signer::TrezorSigner;
 
 mod types;
@@ -22,3 +23,5 @@ pub type Trezor = TrezorSigner;
 #[doc(hidden)]
 #[deprecated(note = "use `HDPath` instead")]
 pub type TrezorHDPath = HDPath;
+
+impl_into_wallet!(TrezorSigner);

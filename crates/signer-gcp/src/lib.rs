@@ -10,4 +10,7 @@
 extern crate tracing;
 
 mod signer;
+use alloy_network::{impl_into_wallet, AnyNetwork, EthereumWallet, IntoWallet};
 pub use signer::{GcpKeyRingRef, GcpSigner, GcpSignerError, KeySpecifier};
+
+impl_into_wallet!(GcpSigner);
