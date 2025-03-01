@@ -1,5 +1,6 @@
 use std::{
     collections::{BinaryHeap, VecDeque},
+    num::NonZeroUsize,
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
     task::{Context, Poll},
@@ -9,16 +10,16 @@ use std::{
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use futures::{stream::FuturesUnordered, StreamExt};
 use tower::{Layer, Service};
-use tracing::{info, trace};
+use tracing::{debug, trace};
 
 use crate::{TransportError, TransportErrorKind, TransportFut};
 
 // Constants for the ranking algorithm
 const STABILITY_WEIGHT: f64 = 0.7;
 const LATENCY_WEIGHT: f64 = 0.3;
-const DEFAULT_INTERVAL: Duration = Duration::from_secs(10);
 const DEFAULT_SAMPLE_COUNT: usize = 10;
 const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
+
 /// Represents performance metrics for a transport.
 #[derive(Debug)]
 struct TransportMetrics {
@@ -35,6 +36,7 @@ struct TransportMetrics {
 }
 
 impl TransportMetrics {
+    /// Track a successful request and its latency.
     fn track_success(&mut self, duration: Duration) {
         self.total_requests += 1;
         self.successful_requests += 1;
@@ -53,6 +55,7 @@ impl TransportMetrics {
         }
     }
 
+    /// Track a failed request.
     fn track_failure(&mut self) {
         self.total_requests += 1;
         self.last_update = Instant::now();
@@ -198,7 +201,7 @@ impl<S> Ord for ScoredTransport<S> {
 pub struct FallbackService<S> {
     transports: Arc<Mutex<BinaryHeap<ScoredTransport<S>>>>,
     active_transport_count: usize,
-    rank: bool,
+    log_transport_rankings: bool,
 }
 
 impl<S> FallbackService<S> {
@@ -206,8 +209,13 @@ impl<S> FallbackService<S> {
     ///
     /// - The `active_transport_count` parameter controls how many
     ///   transports are used for requests at any one time.
-    /// - The `rank` parameter enables automatic transport ranking.
-    pub fn new(transports: Vec<S>, active_transport_count: usize, rank: bool) -> Self {
+    /// - The `log_transport_rankings` parameter controls whether the
+    ///   current transport rankings are output as traces
+    pub fn new(
+        transports: Vec<S>,
+        active_transport_count: usize,
+        log_transport_rankings: bool,
+    ) -> Self {
         let scored_transports = transports
             .into_iter()
             .enumerate()
@@ -217,7 +225,7 @@ impl<S> FallbackService<S> {
         Self {
             transports: Arc::new(Mutex::new(BinaryHeap::from(scored_transports))),
             active_transport_count,
-            rank,
+            log_transport_rankings,
         }
     }
 
@@ -236,9 +244,9 @@ impl<S> FallbackService<S> {
         let mut sorted_transports: Vec<_> = transports.iter().collect();
         sorted_transports.sort_by(|a, b| b.cmp(a)); // Sort by score (descending)
 
-        info!("Current transport rankings:");
+        debug!("Current transport rankings:");
         for (idx, transport) in sorted_transports.iter().enumerate() {
-            info!("  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary());
+            debug!("  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary());
         }
     }
 }
@@ -283,6 +291,7 @@ where
                     start.elapsed(),
                     if result.is_ok() { "success" } else { "fail" }
                 );
+
                 (result, transport_clone, start.elapsed())
             };
 
@@ -301,7 +310,7 @@ where
                     {
                         let mut metrics = transport.metrics.lock().expect("Lock poisoned");
                         metrics.track_success(duration);
-                    } // Release the metrics lock
+                    }
 
                     // Put all transports back in the heap
                     {
@@ -311,10 +320,13 @@ where
                         }
                     }
 
-                    // Log current rankings if ranking is enabled
-                    if self.rank {
+                    // Log current rankings if enabled
+                    if self.log_transport_rankings {
                         self.log_transport_rankings();
                     }
+
+                    // clear the remaining futures to avoid unnecessary work
+                    futures.clear();
 
                     return Ok(response);
                 }
@@ -323,18 +335,19 @@ where
                     {
                         let mut metrics = transport.metrics.lock().expect("Lock poisoned");
                         metrics.track_failure();
-                    } // Release the metrics lock
+                    }
 
                     last_error = Some(error);
                 }
             }
         }
 
-        // If we got here, all transports failed.
-        // Put all transports back in the heap
-        let mut transports = self.transports.lock().expect("Lock poisoned");
-        for transport in top_transports {
-            transports.push(transport);
+        // If we got here, all transports failed. Put them back in the heap
+        {
+            let mut transports = self.transports.lock().expect("Lock poisoned");
+            for transport in top_transports {
+                transports.push(transport);
+            }
         }
 
         Err(last_error.unwrap_or_else(|| TransportErrorKind::custom_str("All transports failed")))
@@ -364,63 +377,46 @@ where
     }
 }
 
-/// Fallback layer for transparent transport failover.
+/// Fallback layer for transparent transport failover. This layer will
+/// consume a list of transports to provide better availability and
+/// reliability.
 ///
-/// This layer will transparently failover to a different transport if
-/// the current transport fails.
-///
-/// The fallback service will attempt to make requests to multiple
+/// The [`FallbackService`] will attempt to make requests to multiple
 /// transports in parallel, and return the first successful response.
 ///
 /// If all transports fail, the fallback service will return an error.
 ///
 /// # Automatic Transport Ranking
 ///
-/// When ranking is enabled with `with_ranking(true)`, each transport is
-/// automatically ranked based on latency & stability using a weighted
-/// algorithm. By default:
+/// Each transport is automatically ranked based on latency & stability
+/// using a weighted algorithm. By default:
 ///
-/// - Every 10 seconds (configurable with `with_interval`), all transports
-///   are pinged to measure their performance
 /// - Stability (success rate) is weighted at 70%
 /// - Latency (response time) is weighted at 30%
-/// - The transport with the best combined score is prioritized first
+/// - The `active_transport_count` parameter controls how many
+///   transports are queried at any one time.
 ///
-/// Ranks are also automatically updated when transports are used,
-/// so that the service can adapt to changing network conditions.
+/// The `log_transport_rankings` parameter controls whether the
+/// current transport rankings are output as traces. In order to
+/// see them, make sure to enable the `alloy_transport` target
+/// (i.e. `RUST_LOG=alloy_transport=debug`).
 #[derive(Debug, Clone)]
 pub struct FallbackLayer {
     active_transport_count: usize,
-    /// Enable automatic transport ranking
-    rank: bool,
-    /// Interval for health checks (when ranking is enabled)
-    interval: Duration,
-    /// Number of samples to keep for calculation
-    sample_count: usize,
+    log_transport_rankings: bool,
 }
 
 impl FallbackLayer {
-    /// Set the number of active transports to use
-    pub fn with_active_transport_count(mut self, count: usize) -> Self {
-        self.active_transport_count = count;
+    /// Set the number of active transports to use (must be greater than 0)
+    pub fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
+        self.active_transport_count = count.get();
         self
     }
 
-    /// Enable or disable automatic transport ranking
-    pub fn with_ranking(mut self, enabled: bool) -> Self {
-        self.rank = enabled;
-        self
-    }
-
-    /// Set the interval for health checks when ranking is enabled
-    pub fn with_interval(mut self, interval: Duration) -> Self {
-        self.interval = interval;
-        self
-    }
-
-    /// Set the number of samples to keep for score calculation
-    pub fn with_sample_count(mut self, count: usize) -> Self {
-        self.sample_count = count;
+    /// Set whether to log transport rankings on every request
+    /// (most useful for debugging)
+    pub fn with_log_transport_rankings(mut self, enabled: bool) -> Self {
+        self.log_transport_rankings = enabled;
         self
     }
 }
@@ -429,9 +425,7 @@ impl Default for FallbackLayer {
     fn default() -> Self {
         Self {
             active_transport_count: DEFAULT_ACTIVE_TRANSPORT_COUNT,
-            rank: false,
-            interval: DEFAULT_INTERVAL,
-            sample_count: DEFAULT_SAMPLE_COUNT,
+            log_transport_rankings: false,
         }
     }
 }
@@ -447,6 +441,6 @@ where
     type Service = FallbackService<S>;
 
     fn layer(&self, inner: Vec<S>) -> Self::Service {
-        FallbackService::new(inner, self.active_transport_count, self.rank)
+        FallbackService::new(inner, self.active_transport_count, self.log_transport_rankings)
     }
 }
