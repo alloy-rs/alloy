@@ -30,7 +30,7 @@ alloy-eip7702.workspace = true
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
-either = { workspace = true }
+either.workspace = true
 
 # serde
 alloy-serde = { workspace = true, optional = true }

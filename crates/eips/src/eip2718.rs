@@ -376,6 +376,22 @@ impl<T> WithEncoded<Option<T>> {
     }
 }
 
+impl<L: Encodable2718, R: Encodable2718> Encodable2718 for either::Either<L, R> {
+    fn encode_2718_len(&self) -> usize {
+        match self {
+            Self::Left(l) => l.encode_2718_len(),
+            Self::Right(r) => r.encode_2718_len(),
+        }
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Left(l) => l.encode_2718(out),
+            Self::Right(r) => r.encode_2718(out),
+        }
+    }
+}
+
 impl<L: Typed2718, R: Typed2718> Typed2718 for either::Either<L, R> {
     fn ty(&self) -> u8 {
         match self {
