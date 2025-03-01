@@ -6,13 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, SerializedRequest};
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use futures::{stream::FuturesUnordered, StreamExt};
-use tower::{
-    util::rng::{self, Rng},
-    Layer, Service,
-};
-use tracing::{debug, info};
+use tower::{Layer, Service};
+use tracing::{info, trace};
 
 use crate::{TransportError, TransportErrorKind, TransportFut};
 
@@ -38,7 +35,7 @@ struct TransportMetrics {
 }
 
 impl TransportMetrics {
-    fn track_success(&mut self, duration: Duration, sample_count: usize) {
+    fn track_success(&mut self, duration: Duration) {
         self.total_requests += 1;
         self.successful_requests += 1;
         self.last_update = Instant::now();
@@ -48,15 +45,15 @@ impl TransportMetrics {
         self.successes.push_back(true);
 
         // Limit to sample count
-        while self.latencies.len() > sample_count {
+        while self.latencies.len() > DEFAULT_SAMPLE_COUNT {
             self.latencies.pop_front();
         }
-        while self.successes.len() > sample_count {
+        while self.successes.len() > DEFAULT_SAMPLE_COUNT {
             self.successes.pop_front();
         }
     }
 
-    fn track_failure(&mut self, sample_count: usize) {
+    fn track_failure(&mut self) {
         self.total_requests += 1;
         self.last_update = Instant::now();
 
@@ -64,7 +61,7 @@ impl TransportMetrics {
         self.successes.push_back(false);
 
         // Limit to sample count
-        while self.successes.len() > sample_count {
+        while self.successes.len() > DEFAULT_SAMPLE_COUNT {
             self.successes.pop_front();
         }
     }
@@ -139,12 +136,11 @@ struct ScoredTransport<S> {
     id: usize, // Unique identifier for the transport
     transport: S,
     metrics: Arc<Mutex<TransportMetrics>>,
-    sample_count: usize,
 }
 
 impl<S> ScoredTransport<S> {
-    fn new(id: usize, transport: S, sample_count: usize) -> Self {
-        Self { id, transport, metrics: Arc::new(Default::default()), sample_count }
+    fn new(id: usize, transport: S) -> Self {
+        Self { id, transport, metrics: Arc::new(Default::default()) }
     }
 
     /// Returns the current score of the transport based on the weighted algorithm.
@@ -202,7 +198,6 @@ impl<S> Ord for ScoredTransport<S> {
 pub struct FallbackService<S> {
     transports: Arc<Mutex<BinaryHeap<ScoredTransport<S>>>>,
     active_transport_count: usize,
-    sample_count: usize,
     rank: bool,
 }
 
@@ -211,25 +206,17 @@ impl<S> FallbackService<S> {
     ///
     /// - The `active_transport_count` parameter controls how many
     ///   transports are used for requests at any one time.
-    /// - The `sample_count` parameter controls how many samples are
-    ///   used to calculate the score of each transport.
     /// - The `rank` parameter enables automatic transport ranking.
-    pub fn new(
-        transports: Vec<S>,
-        active_transport_count: usize,
-        sample_count: usize,
-        rank: bool,
-    ) -> Self {
+    pub fn new(transports: Vec<S>, active_transport_count: usize, rank: bool) -> Self {
         let scored_transports = transports
             .into_iter()
             .enumerate()
-            .map(|(id, transport)| ScoredTransport::new(id, transport, sample_count))
+            .map(|(id, transport)| ScoredTransport::new(id, transport))
             .collect::<Vec<_>>();
 
         Self {
             transports: Arc::new(Mutex::new(BinaryHeap::from(scored_transports))),
             active_transport_count,
-            sample_count,
             rank,
         }
     }
@@ -290,6 +277,7 @@ where
 
             let future = async move {
                 let result = transport_clone.call(req_clone).await;
+                trace!("Transport[{}] completed in {:?}", transport_clone.id, start.elapsed());
                 (result, transport_clone, start.elapsed())
             };
 
@@ -305,7 +293,7 @@ where
                     // Record success
                     {
                         let mut metrics = transport.metrics.lock().expect("Lock poisoned");
-                        metrics.track_success(duration, transport.sample_count);
+                        metrics.track_success(duration);
                     } // Release the metrics lock
 
                     // Put all transports back in the heap
@@ -325,7 +313,7 @@ where
                     // Record failure
                     {
                         let mut metrics = transport.metrics.lock().expect("Lock poisoned");
-                        metrics.track_failure(transport.sample_count);
+                        metrics.track_failure();
                     } // Release the metrics lock
 
                     last_error = Some(error);
@@ -341,57 +329,6 @@ where
         }
 
         Err(last_error.unwrap_or_else(|| TransportErrorKind::custom_str("All transports failed")))
-    }
-
-    /// Start periodic health checks to rank transports
-    fn start_health_check_task(&self, interval: Duration)
-    where
-        S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
-            + Send
-            + Clone
-            + 'static,
-    {
-        let this = self.clone();
-        tokio::spawn(async move {
-            info!(
-                "Starting health check task with interval: {:?}, sample count: {}",
-                interval, this.sample_count
-            );
-            let mut tick = tokio::time::interval(interval);
-
-            loop {
-                tick.tick().await;
-                debug!("Running transport health checks");
-
-                // Get a copy of all transports
-                let mut transports = Vec::new();
-                {
-                    let mut heap = this.transports.lock().expect("Lock poisoned");
-                    while let Some(transport) = heap.pop() {
-                        transports.push(transport);
-                    }
-                }
-
-                // Ping each transport
-                for transport in &mut transports {
-                    let success = ping_transport(transport).await;
-                    debug!(
-                        "Health check for transport[{}]: {}",
-                        transport.id,
-                        if success { "success" } else { "failed" }
-                    );
-                }
-
-                // Put all transports back in the heap (they will be automatically resorted)
-                let mut heap = this.transports.lock().expect("Lock poisoned");
-                for transport in transports {
-                    heap.push(transport);
-                }
-
-                // Log current rankings
-                this.log_transport_rankings();
-            }
-        });
     }
 }
 
@@ -436,8 +373,6 @@ where
 ///
 /// - Every 10 seconds (configurable with `with_interval`), all transports
 ///   are pinged to measure their performance
-/// - The past 10 samples (configurable with `with_sample_count`) are used
-///   to calculate scores
 /// - Stability (success rate) is weighted at 70%
 /// - Latency (response time) is weighted at 30%
 /// - The transport with the best combined score is prioritized first
@@ -503,45 +438,6 @@ where
     type Service = FallbackService<S>;
 
     fn layer(&self, inner: Vec<S>) -> Self::Service {
-        let service =
-            FallbackService::new(inner, self.active_transport_count, self.sample_count, self.rank);
-
-        // If ranking is enabled, start the health check task
-        if self.rank {
-            service.start_health_check_task(self.interval);
-        }
-
-        service
-    }
-}
-
-/// Health check ping to test transport latency and availability
-async fn ping_transport<T>(transport: &mut ScoredTransport<T>) -> bool
-where
-    T: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
-        + Send
-        + Clone
-        + 'static,
-{
-    // Create a simple ping request
-    let ping_id = format!("ping-{}", rng::HasherRng::new().next_u64());
-    let ping_req = RequestPacket::from(
-        SerializedRequest::try_from(Request::new("net_version", ping_id.into(), ()))
-            .expect("valid serialization"),
-    );
-
-    let start = Instant::now();
-    match transport.call(ping_req).await {
-        Ok(_) => {
-            let duration = start.elapsed();
-            let mut metrics = transport.metrics.lock().expect("Lock poisoned");
-            metrics.track_success(duration, transport.sample_count);
-            true
-        }
-        Err(_) => {
-            let mut metrics = transport.metrics.lock().expect("Lock poisoned");
-            metrics.track_failure(transport.sample_count);
-            false
-        }
+        FallbackService::new(inner, self.active_transport_count, self.rank)
     }
 }
