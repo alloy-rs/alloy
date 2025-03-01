@@ -109,7 +109,7 @@ impl GasFiller {
             async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
                 .left_future()
         } else {
-            provider.estimate_eip1559_fees(None).right_future()
+            provider.estimate_eip1559_fees().right_future()
         };
 
         let (gas_limit, estimate) = futures::try_join!(gas_limit_fut, eip1559_fees_fut)?;

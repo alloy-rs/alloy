@@ -1,7 +1,7 @@
 use super::{EthCallMany, FilterPollerBuilder};
 use crate::{
     heart::PendingTransactionError,
-    utils::{Eip1559Estimation, EstimatorFunction},
+    utils::{Eip1559Estimation, Eip1559Estimator},
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
@@ -107,11 +107,15 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.estimate_gas(tx)
     }
 
-    async fn estimate_eip1559_fees(
+    async fn estimate_eip1559_fees_with(
         &self,
-        estimator: Option<EstimatorFunction>,
+        estimator: Eip1559Estimator,
     ) -> TransportResult<Eip1559Estimation> {
-        self.0.estimate_eip1559_fees(estimator).await
+        self.0.estimate_eip1559_fees_with(estimator).await
+    }
+
+    async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
+        self.0.estimate_eip1559_fees().await
     }
 
     async fn get_fee_history(
