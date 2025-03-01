@@ -12,6 +12,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, NoParams, WeakClient};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
@@ -27,14 +28,14 @@ use std::{borrow::Cow, sync::Arc};
 ///
 /// This is a convenience type for `Arc<dyn Provider<N> + 'static>`.
 #[derive(Clone)]
+#[doc(alias = "BoxProvider")]
 pub struct DynProvider<N = Ethereum>(Arc<dyn Provider<N> + 'static>);
 
 impl<N: Network> DynProvider<N> {
     /// Creates a new [`DynProvider`] by erasing the type.
-    pub fn new<P>(provider: P) -> Self
-    where
-        P: Provider<N> + 'static,
-    {
+    ///
+    /// This is the same as [`provider.erased()`](Provider::erased).
+    pub fn new<P: Provider<N> + 'static>(provider: P) -> Self {
         Self(Arc::new(provider))
     }
 }
@@ -54,8 +55,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.weak_client()
     }
 
-    #[allow(clippy::use_self)]
-    fn erased(self) -> DynProvider<N>
+    fn erased(self) -> Self
     where
         Self: Sized + 'static,
     {
@@ -327,6 +327,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.0.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.0.send_raw_transaction_conditional(encoded_tx, conditional).await
     }
 
     async fn send_transaction(

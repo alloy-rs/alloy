@@ -51,7 +51,7 @@ pub trait CallTuple: Sealed {
     /// #[tokio::main]
     /// async fn main() {
     ///     let target = Address::random();
-    ///     let provider = ProviderBuilder::new().on_builtin("https://..").await.unwrap();    
+    ///     let provider = ProviderBuilder::new().connect("https://..").await.unwrap();    
     ///     let some_contract = SomeContract::new(target, &provider);
     ///     let allow_failure_call = CallItem::<failureCall>::new(target, some_contract.failure().input()).allow_failure(true); // This calls is allowed to fail so that the batch doesn't revert.
     ///

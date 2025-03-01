@@ -60,7 +60,7 @@ mod tests {
         DummyThatFails::deploy(provider).await.unwrap()
     }
 
-    const FORK_URL: &str = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+    const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
 
     #[tokio::test]
     async fn test_single() {
