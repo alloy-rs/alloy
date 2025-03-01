@@ -1,7 +1,8 @@
 use crate::{
+    error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaTx,
+        PooledTransaction, RlpEcdsaTx,
     },
     Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
@@ -15,6 +16,8 @@ use alloy_primitives::{
 };
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
+
+use super::TypedTransaction;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].
@@ -224,6 +227,40 @@ impl From<Signed<TxEip7702>> for TxEnvelope {
     }
 }
 
+impl From<Signed<TypedTransaction>> for TxEnvelope {
+    fn from(v: Signed<TypedTransaction>) -> Self {
+        let (tx, sig, hash) = v.into_parts();
+        match tx {
+            TypedTransaction::Legacy(tx_legacy) => {
+                let tx = Signed::new_unchecked(tx_legacy, sig, hash);
+                Self::Legacy(tx)
+            }
+            TypedTransaction::Eip2930(tx_eip2930) => {
+                let tx = Signed::new_unchecked(tx_eip2930, sig, hash);
+                Self::Eip2930(tx)
+            }
+            TypedTransaction::Eip1559(tx_eip1559) => {
+                let tx = Signed::new_unchecked(tx_eip1559, sig, hash);
+                Self::Eip1559(tx)
+            }
+            TypedTransaction::Eip4844(tx_eip4844_variant) => {
+                let tx = Signed::new_unchecked(tx_eip4844_variant, sig, hash);
+                Self::Eip4844(tx)
+            }
+            TypedTransaction::Eip7702(tx_eip7702) => {
+                let tx = Signed::new_unchecked(tx_eip7702, sig, hash);
+                Self::Eip7702(tx)
+            }
+        }
+    }
+}
+
+impl From<TxEnvelope> for Signed<TypedTransaction> {
+    fn from(value: TxEnvelope) -> Self {
+        value.into_signed()
+    }
+}
+
 impl TxEnvelope {
     /// Returns true if the transaction is a legacy transaction.
     #[inline]
@@ -253,6 +290,31 @@ impl TxEnvelope {
     #[inline]
     pub const fn is_eip7702(&self) -> bool {
         matches!(self, Self::Eip7702(_))
+    }
+
+    /// Attempts to convert the envelope into the pooled variant.
+    ///
+    /// Returns an error if the envelope's variant is incompatible with the pooled format:
+    /// [`TxEip4844`] without the sidecar.
+    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+        match self {
+            Self::Legacy(tx) => Ok(tx.into()),
+            Self::Eip2930(tx) => Ok(tx.into()),
+            Self::Eip1559(tx) => Ok(tx.into()),
+            Self::Eip4844(tx) => PooledTransaction::try_from(tx).map_err(ValueError::convert),
+            Self::Eip7702(tx) => Ok(tx.into()),
+        }
+    }
+
+    /// Consumes the type into a [`Signed`]
+    pub fn into_signed(self) -> Signed<TypedTransaction> {
+        match self {
+            Self::Legacy(tx) => tx.convert(),
+            Self::Eip2930(tx) => tx.convert(),
+            Self::Eip1559(tx) => tx.convert(),
+            Self::Eip4844(tx) => tx.convert(),
+            Self::Eip7702(tx) => tx.convert(),
+        }
     }
 
     /// Returns true if the transaction is replay protected.

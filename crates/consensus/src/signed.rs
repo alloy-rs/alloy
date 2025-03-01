@@ -53,6 +53,48 @@ impl<T, Sig> Signed<T, Sig> {
     pub fn strip_signature(self) -> T {
         self.tx
     }
+
+    /// Converts the transaction type to the given alternative that is `From<T>`
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn convert<U>(self) -> Signed<U, Sig>
+    where
+        U: From<T>,
+    {
+        self.map(U::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the transaction with the new transaction type if all conversions were successful.
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn try_convert<U>(self) -> Result<Signed<U, Sig>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map(U::try_from)
+    }
+
+    /// Applies the given closure to the inner transaction type.
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Signed<Tx, Sig> {
+        let Self { tx, signature, hash } = self;
+        Signed { tx: f(tx), signature, hash }
+    }
+
+    /// Applies the given fallible closure to the inner transactions.
+    ///
+    /// Caution: This is only intended for converting transaction types that are structurally
+    /// equivalent (produce the same hash).
+    pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Signed<Tx, Sig>, E> {
+        let Self { tx, signature, hash } = self;
+        Ok(Signed { tx: f(tx)?, signature, hash })
+    }
 }
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {

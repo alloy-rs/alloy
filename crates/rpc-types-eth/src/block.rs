@@ -2,8 +2,8 @@
 
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_consensus::{BlockHeader, Sealed, TxEnvelope};
-use alloy_eips::eip4895::Withdrawals;
+use alloy_consensus::{error::ValueError, BlockBody, BlockHeader, Sealed, TxEnvelope};
+use alloy_eips::{eip4895::Withdrawals, eip7840::BlobParams, Encodable2718};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
@@ -15,7 +15,6 @@ pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_eips::{eip7840::BlobParams, Encodable2718};
 
 /// Block representation for RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -105,6 +104,33 @@ impl<T, H> Block<T, H> {
         self
     }
 
+    /// Converts this block into a [`BlockBody`].
+    ///
+    /// Returns an error if the transactions are not full or if the block has uncles.
+    pub fn try_into_block_body(self) -> Result<BlockBody<T, H>, ValueError<Self>> {
+        if !self.uncles.is_empty() {
+            return Err(ValueError::new(self, "uncles not empty"));
+        }
+        if !self.transactions.is_full() {
+            return Err(ValueError::new(self, "transactions not full"));
+        }
+
+        Ok(self.into_block_body_unchecked())
+    }
+
+    /// Converts this block into a [`BlockBody`]
+    ///
+    /// Caution: The body will have empty transactions unless the block's transactions are
+    /// [`BlockTransactions::Full`]. This will disregard ommers/uncles and always return an empty
+    /// ommers vec.
+    pub fn into_block_body_unchecked(self) -> BlockBody<T, H> {
+        BlockBody {
+            transactions: self.transactions.into_transactions_vec(),
+            ommers: Default::default(),
+            withdrawals: self.withdrawals,
+        }
+    }
+
     /// Converts the block's header type by applying a function to it.
     pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
         Block {
@@ -125,6 +151,24 @@ impl<T, H> Block<T, H> {
         })
     }
 
+    /// Converts the block's transaction type to the given alternative that is `From<T>`
+    pub fn convert_transactions<U>(self) -> Block<U, H>
+    where
+        U: From<T>,
+    {
+        self.map_transactions(U::from)
+    }
+
+    /// Converts the block's transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the block with the new transaction type if all conversions were successful.
+    pub fn try_convert_transactions<U>(self) -> Result<Block<U, H>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map_transactions(U::try_from)
+    }
+
     /// Converts the block's transaction type by applying a function to each transaction.
     ///
     /// Returns the block with the new transaction type.
@@ -139,7 +183,8 @@ impl<T, H> Block<T, H> {
 
     /// Converts the block's transaction type by applying a fallible function to each transaction.
     ///
-    /// Returns the block with the new transaction type if all transactions were successfully.
+    /// Returns the block with the new transaction type if all transactions were mapped
+    /// successfully.
     pub fn try_map_transactions<U, E>(
         self,
         f: impl FnMut(T) -> Result<U, E>,

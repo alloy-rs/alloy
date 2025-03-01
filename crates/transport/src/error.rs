@@ -98,7 +98,10 @@ impl TransportErrorKind {
 
 /// Type for holding HTTP errors such as 429 rate limit error.
 #[derive(Debug, thiserror::Error)]
-#[error("HTTP error {status} with body: {body}")]
+#[error(
+    "HTTP error {status} with {}",
+    if body.is_empty() { "empty body".to_string() } else { format!("body: {body}") }
+)]
 pub struct HttpError {
     /// The HTTP status code.
     pub status: u16,

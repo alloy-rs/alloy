@@ -7,9 +7,86 @@ use alloy_primitives::{
     Address, Bytes, B256, U256,
 };
 
+/// A StateOverride builder.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StateOverridesBuilder {
+    overrides: StateOverride,
+}
+
+impl StateOverridesBuilder {
+    /// Create a new StateOverridesBuilder.
+    pub fn new(map: AddressHashMap<AccountOverride>) -> Self {
+        Self { overrides: map }
+    }
+
+    /// Adds an account override for a specific address.
+    pub fn append(mut self, address: Address, account_override: AccountOverride) -> Self {
+        self.overrides.insert(address, account_override);
+        self
+    }
+
+    /// Adds multiple account overrides from an iterator.
+    pub fn extend<I>(mut self, account_overrides: I) -> Self
+    where
+        I: IntoIterator<Item = (Address, AccountOverride)>,
+    {
+        self.overrides.extend(account_overrides);
+        self
+    }
+
+    /// Get the underlying `StateOverride`.
+    pub fn build(self) -> StateOverride {
+        self.overrides
+    }
+
+    /// Configures an account override with a balance.
+    pub fn with_balance(mut self, address: Address, balance: U256) -> Self {
+        self.overrides.entry(address).or_default().set_balance(balance);
+        self
+    }
+
+    /// Configures an account override with a nonce.
+    pub fn with_nonce(mut self, address: Address, nonce: u64) -> Self {
+        self.overrides.entry(address).or_default().set_nonce(nonce);
+        self
+    }
+
+    /// Configures an account override with bytecode.
+    pub fn with_code(mut self, address: Address, code: impl Into<Bytes>) -> Self {
+        self.overrides.entry(address).or_default().set_code(code);
+        self
+    }
+
+    /// Configures an account override with state overrides.
+    pub fn with_state(
+        mut self,
+        address: Address,
+        state: impl IntoIterator<Item = (B256, B256)>,
+    ) -> Self {
+        self.overrides.entry(address).or_default().set_state(state);
+        self
+    }
+
+    /// Configures an account override with state diffs.
+    pub fn with_state_diff(
+        mut self,
+        address: Address,
+        state_diff: impl IntoIterator<Item = (B256, B256)>,
+    ) -> Self {
+        self.overrides.entry(address).or_default().set_state_diff(state_diff);
+        self
+    }
+}
+
 /// A set of account overrides
 pub type StateOverride = AddressHashMap<AccountOverride>;
 
+/// Allows converting `StateOverridesBuilder` directly into `StateOverride`.
+impl From<StateOverridesBuilder> for StateOverride {
+    fn from(builder: StateOverridesBuilder) -> Self {
+        builder.overrides
+    }
+}
 /// Custom account override used in call
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -51,6 +128,100 @@ pub struct AccountOverride {
         )
     )]
     pub move_precompile_to: Option<Address>,
+}
+
+impl AccountOverride {
+    /// Configures the bytecode override
+    pub fn with_code(mut self, code: impl Into<Bytes>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    /// Configures the state overrides
+    pub fn with_state(mut self, state: impl IntoIterator<Item = (B256, B256)>) -> Self {
+        self.state = Some(state.into_iter().collect());
+        self
+    }
+
+    /// Configures the state diffs
+    pub fn with_state_diff(mut self, state_diff: impl IntoIterator<Item = (B256, B256)>) -> Self {
+        self.state_diff = Some(state_diff.into_iter().collect());
+        self
+    }
+
+    /// Configures the balance override
+    pub fn with_balance(mut self, balance: U256) -> Self {
+        self.balance = Some(balance);
+        self
+    }
+
+    /// Configures the nonce override
+    pub fn with_nonce(mut self, nonce: u64) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
+    /// Sets the bytecode override in place.
+    pub fn set_code(&mut self, code: impl Into<Bytes>) {
+        self.code = Some(code.into());
+    }
+
+    /// Sets the state overrides in place.
+    pub fn set_state(&mut self, state: impl IntoIterator<Item = (B256, B256)>) {
+        self.state = Some(state.into_iter().collect());
+    }
+
+    /// Sets the state diffs in place.
+    pub fn set_state_diff(&mut self, state_diff: impl IntoIterator<Item = (B256, B256)>) {
+        self.state_diff = Some(state_diff.into_iter().collect());
+    }
+
+    /// Sets the balance override in place.
+    pub fn set_balance(&mut self, balance: U256) {
+        self.balance = Some(balance);
+    }
+
+    /// Sets the nonce override in place.
+    pub fn set_nonce(&mut self, nonce: u64) {
+        self.nonce = Some(nonce);
+    }
+
+    /// Sets the move precompile address in place.
+    pub fn set_move_precompile_to(&mut self, address: Address) {
+        self.move_precompile_to = Some(address);
+    }
+
+    /// Conditionally sets the bytecode override and returns self.
+    pub fn with_code_opt(mut self, code: Option<impl Into<Bytes>>) -> Self {
+        if let Some(code) = code {
+            self.code = Some(code.into());
+        }
+        self
+    }
+
+    /// Conditionally sets the balance override and returns self.
+    pub fn with_balance_opt(mut self, balance: Option<U256>) -> Self {
+        if let Some(balance) = balance {
+            self.balance = Some(balance);
+        }
+        self
+    }
+
+    /// Conditionally sets the nonce override and returns self.
+    pub fn with_nonce_opt(mut self, nonce: Option<u64>) -> Self {
+        if let Some(nonce) = nonce {
+            self.nonce = Some(nonce);
+        }
+        self
+    }
+
+    /// Conditionally sets the move precompile address and returns self.
+    pub fn with_move_precompile_to_opt(mut self, address: Option<Address>) -> Self {
+        if let Some(address) = address {
+            self.move_precompile_to = Some(address);
+        }
+        self
+    }
 }
 
 /// Helper type that bundles various overrides for EVM Execution.
@@ -108,7 +279,7 @@ impl EvmOverrides {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::address;
+    use alloy_primitives::{address, map::B256HashMap, Bytes, B256, U256};
     use similar_asserts::assert_eq;
 
     #[test]
@@ -183,6 +354,54 @@ mod tests {
         let acc =
             state_override.get(&address!("1b5212AF6b76113afD94cD2B5a78a73B7d7A8222")).unwrap();
         assert!(acc.state_diff.is_some());
+    }
+
+    #[test]
+    fn test_set_code_in_place() {
+        let mut account_override = AccountOverride::default();
+        let code = Bytes::from(vec![0x60, 0x60, 0x60, 0x60]);
+        account_override.set_code(code.clone());
+        assert_eq!(account_override.code, Some(code));
+    }
+
+    #[test]
+    fn test_set_state_in_place() {
+        let mut account_override = AccountOverride::default();
+        let state: B256HashMap<B256> = vec![(B256::ZERO, B256::ZERO)].into_iter().collect();
+        account_override.set_state(state.clone());
+        assert_eq!(account_override.state, Some(state));
+    }
+
+    #[test]
+    fn test_set_state_diff_in_place() {
+        let mut account_override = AccountOverride::default();
+        let state_diff: B256HashMap<B256> = vec![(B256::ZERO, B256::ZERO)].into_iter().collect();
+        account_override.set_state_diff(state_diff.clone());
+        assert_eq!(account_override.state_diff, Some(state_diff));
+    }
+
+    #[test]
+    fn test_set_balance_in_place() {
+        let mut account_override = AccountOverride::default();
+        let balance = U256::from(1000);
+        account_override.set_balance(balance);
+        assert_eq!(account_override.balance, Some(balance));
+    }
+
+    #[test]
+    fn test_set_nonce_in_place() {
+        let mut account_override = AccountOverride::default();
+        let nonce = 42;
+        account_override.set_nonce(nonce);
+        assert_eq!(account_override.nonce, Some(nonce));
+    }
+
+    #[test]
+    fn test_set_move_precompile_to_in_place() {
+        let mut account_override = AccountOverride::default();
+        let address = address!("0000000000000000000000000000000000000001");
+        account_override.set_move_precompile_to(address);
+        assert_eq!(account_override.move_precompile_to, Some(address));
     }
 
     #[test]

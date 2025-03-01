@@ -4,7 +4,7 @@ use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
 
 /// Signed transaction with recovered signer.
-#[derive(Debug, Clone, PartialEq, Hash, Eq, AsRef, Deref)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, AsRef, Deref)]
 pub struct Recovered<T> {
     /// Signer of the transaction
     signer: Address,
@@ -63,6 +63,22 @@ impl<T> Recovered<T> {
     #[inline]
     pub const fn new_unchecked(tx: T, signer: Address) -> Self {
         Self { tx, signer }
+    }
+
+    /// Converts the transaction type to the given alternative that is `From<T>`
+    pub fn convert_transaction<Tx>(self) -> Recovered<Tx>
+    where
+        Tx: From<T>,
+    {
+        self.map_transaction(Tx::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<T>`
+    pub fn try_convert_transaction<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
+    where
+        Tx: TryFrom<T>,
+    {
+        self.try_map_transaction(Tx::try_from)
     }
 
     /// Applies the given closure to the inner transaction type.

@@ -42,6 +42,7 @@ impl<N: Network> NewBlocks<N> {
     }
 
     #[cfg(test)]
+    #[allow(unused)]
     const fn with_next_yield(mut self, next_yield: u64) -> Self {
         self.next_yield = next_yield;
         self
@@ -205,7 +206,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
 
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
-        let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(&url).await.unwrap();
 
         let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
         let mut stream = Box::pin(new_blocks.into_stream());
@@ -236,7 +237,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
 
         let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
-        let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(&url).await.unwrap();
 
         let new_blocks = NewBlocks::<Ethereum>::new(provider.weak_client()).with_next_yield(1);
         let mut stream = Box::pin(new_blocks.into_stream());

@@ -144,6 +144,9 @@ impl EthCallBundle {
 }
 
 /// Response for `eth_callBundle`
+///
+/// <https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#eth_callbundle>
+/// <https://github.com/flashbots/mev-geth/blob/fddf97beec5877483f879a77b7dea2e58a58d653/internal/ethapi/api.go#L2212-L2220>
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EthCallBundleResponse {
@@ -164,10 +167,8 @@ pub struct EthCallBundleResponse {
     /// Results of individual transactions within the bundle
     pub results: Vec<EthCallBundleTransactionResult>,
     /// The block number used as a base for this simulation
-    #[serde(with = "alloy_serde::quantity")]
     pub state_block_number: u64,
     /// The total gas used by all transactions in the bundle
-    #[serde(with = "alloy_serde::quantity")]
     pub total_gas_used: u64,
 }
 
@@ -190,7 +191,6 @@ pub struct EthCallBundleTransactionResult {
     #[serde(with = "u256_numeric_string")]
     pub gas_price: U256,
     /// The amount of gas used by the transaction
-    #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The address to which the transaction is sent (optional)
     pub to_address: Option<Address>,
@@ -311,6 +311,43 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
+impl PrivateTransactionRequest {
+    /// Creates new [`PrivateTransactionRequest`] from the given encodable transaction.
+    pub fn new<T: Encodable2718>(tx: &T) -> Self {
+        Self {
+            tx: tx.encoded_2718().into(),
+            max_block_number: None,
+            preferences: Default::default(),
+        }
+    }
+
+    /// Apply a function to the request, returning the modified request.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
+    /// Sets private tx's max block number.
+    pub const fn max_block_number(mut self, num: u64) -> Self {
+        self.max_block_number = Some(num);
+        self
+    }
+
+    /// Sets private tx's preferences.
+    pub fn with_preferences(mut self, preferences: PrivateTransactionPreferences) -> Self {
+        self.preferences = preferences;
+        self
+    }
+}
+
+impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+    fn from(envelope: T) -> Self {
+        Self::new(&envelope)
+    }
+}
+
 /// Additional preferences for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct PrivateTransactionPreferences {
@@ -330,6 +367,29 @@ impl PrivateTransactionPreferences {
     pub const fn is_empty(&self) -> bool {
         self.fast.is_none() && self.validity.is_none() && self.privacy.is_none()
     }
+
+    /// Sets the `fast` option to true
+    pub fn into_fast(self) -> Self {
+        self.with_fast_mode(true)
+    }
+
+    /// Sets mode of tx execution
+    pub const fn with_fast_mode(mut self, fast: bool) -> Self {
+        self.fast = Some(fast);
+        self
+    }
+
+    /// Sets tx's validity
+    pub fn with_validity(mut self, validity: Validity) -> Self {
+        self.validity = Some(validity);
+        self
+    }
+
+    /// Sets tx's privacy
+    pub fn with_privacy(mut self, privacy: Privacy) -> Self {
+        self.privacy = Some(privacy);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -347,22 +407,22 @@ mod tests {
   {
     "coinbaseDiff": "10000000000063000",
     "ethSentToCoinbase": "10000000000000000",
-    "fromAddress": "0x02A727155aeF8609c9f7F2179b2a1f560B39F5A0",
+    "fromAddress": "0x02a727155aef8609c9f7f2179b2a1f560b39f5a0",
     "gasFees": "63000",
     "gasPrice": "476190476193",
     "gasUsed": 21000,
-    "toAddress": "0x73625f59CAdc5009Cb458B751b3E7b6b48C06f2C",
+    "toAddress": "0x73625f59cadc5009cb458b751b3e7b6b48c06f2c",
     "txHash": "0x669b4704a7d993a946cdd6e2f95233f308ce0c4649d2e04944e8299efcaa098a",
     "value": "0x"
   },
   {
     "coinbaseDiff": "10000000000063000",
     "ethSentToCoinbase": "10000000000000000",
-    "fromAddress": "0x02A727155aeF8609c9f7F2179b2a1f560B39F5A0",
+    "fromAddress": "0x02a727155aef8609c9f7f2179b2a1f560b39f5a0",
     "gasFees": "63000",
     "gasPrice": "476190476193",
     "gasUsed": 21000,
-    "toAddress": "0x73625f59CAdc5009Cb458B751b3E7b6b48C06f2C",
+    "toAddress": "0x73625f59cadc5009cb458b751b3e7b6b48c06f2c",
     "txHash": "0xa839ee83465657cac01adc1d50d96c1b586ed498120a84a64749c0034b4f19fa",
     "value": "0x"
   }
@@ -371,6 +431,8 @@ mod tests {
 "totalGasUsed": 42000
 }"#;
 
-        let _call = serde_json::from_str::<EthCallBundleResponse>(s).unwrap();
+        let response = serde_json::from_str::<EthCallBundleResponse>(s).unwrap();
+        let json: serde_json::Value = serde_json::from_str(s).unwrap();
+        similar_asserts::assert_eq!(json, serde_json::to_value(response).unwrap());
     }
 }

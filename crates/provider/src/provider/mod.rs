@@ -18,3 +18,9 @@ pub use wallet::WalletProvider;
 
 mod with_block;
 pub use with_block::{ParamsWithBlock, RpcWithBlock};
+
+mod multicall;
+pub use multicall::*;
+
+mod erased;
+pub use erased::DynProvider;

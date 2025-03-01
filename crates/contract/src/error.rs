@@ -1,6 +1,7 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::Selector;
+use alloy_primitives::{Bytes, Selector};
 use alloy_provider::PendingTransactionError;
+use alloy_sol_types::{SolError, SolInterface};
 use alloy_transport::TransportError;
 use thiserror::Error;
 
@@ -51,5 +52,102 @@ impl Error {
             return Self::ZeroData(name.to_string(), error);
         }
         Self::AbiError(error)
+    }
+
+    /// Return the revert data in case the call reverted.
+    pub fn as_revert_data(&self) -> Option<Bytes> {
+        if let Self::TransportError(e) = self {
+            return e.as_error_resp().and_then(|e| e.as_revert_data());
+        }
+
+        None
+    }
+
+    /// Attempts to decode the revert data into one of the custom errors in [`SolInterface`].
+    ///
+    /// Returns an enum container type consisting of the custom errors defined in the interface.
+    ///
+    /// None is returned if the revert data is empty or if the data could not be decoded into one of
+    /// the custom errors defined in the interface.
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// use alloy_provider::ProviderBuilder;
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///     #[derive(Debug, PartialEq, Eq)]
+    ///     #[sol(rpc, bytecode = "694207")]
+    ///     contract ThrowsError {
+    ///         error SomeCustomError(uint64 a);
+    ///         error AnotherError(uint64 b);
+    ///
+    ///         function error(uint64 a) external {
+    ///             revert SomeCustomError(a);
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///
+    ///     let throws_err = ThrowsError::deploy(provider).await.unwrap();
+    ///
+    ///     let err = throws_err.error(42).call().await.unwrap_err();
+    ///
+    ///     let custom_err =
+    ///         err.as_decoded_interface_error::<ThrowsError::ThrowsErrorErrors>().unwrap();
+    ///
+    ///     // Handle the custom error enum
+    ///     match custom_err {
+    ///         ThrowsError::ThrowsErrorErrors::SomeCustomError(a) => { /* handle error */ }
+    ///         ThrowsError::ThrowsErrorErrors::AnotherError(b) => { /* handle error */ }
+    ///     }
+    /// }
+    /// ```
+    pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
+    }
+
+    /// Decode the revert data into a custom [`SolError`] type.
+    ///
+    /// Returns an instance of the custom error type if decoding was successful, otherwise None.
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// use alloy_provider::ProviderBuilder;
+    /// use alloy_sol_types::sol;
+    /// use ThrowsError::SomeCustomError;
+    /// sol! {
+    ///     #[derive(Debug, PartialEq, Eq)]
+    ///     #[sol(rpc, bytecode = "694207")]
+    ///     contract ThrowsError {
+    ///         error SomeCustomError(uint64 a);
+    ///         error AnotherError(uint64 b);
+    ///
+    ///         function error(uint64 a) external {
+    ///             revert SomeCustomError(a);
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///
+    ///     let throws_err = ThrowsError::deploy(provider).await.unwrap();
+    ///
+    ///     let err = throws_err.error(42).call().await.unwrap_err();
+    ///
+    ///     let custom_err = err.as_decoded_error::<SomeCustomError>().unwrap();
+    ///
+    ///     assert_eq!(custom_err, SomeCustomError { a: 42 });
+    /// }
+    /// ```
+    pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
     }
 }

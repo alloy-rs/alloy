@@ -2,19 +2,22 @@
 
 use alloy_consensus::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
-    Typed2718,
+    Typed2718, TypedTransaction,
 };
 use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
-pub use alloy_consensus::BlobTransactionSidecar;
+use alloy_consensus::transaction::Recovered;
+pub use alloy_consensus::{
+    transaction::TransactionInfo, BlobTransactionSidecar, Receipt, ReceiptEnvelope,
+    ReceiptWithBloom, Transaction as TransactionTrait,
+};
+pub use alloy_consensus_any::AnyReceiptEnvelope;
 pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
     eip7702::Authorization,
 };
-
-pub use alloy_consensus::transaction::TransactionInfo;
 
 mod error;
 pub use error::ConversionError;
@@ -25,12 +28,10 @@ pub use receipt::TransactionReceipt;
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
-pub use alloy_consensus::{
-    Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
-};
-pub use alloy_consensus_any::AnyReceiptEnvelope;
-
-/// Transaction object used in RPC
+/// Transaction object used in RPC.
+///
+/// This represents a transaction in RPC format (`eth_getTransactionByHash`) and contains the full
+/// transaction object and additional block metadata if the transaction has been mined.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
@@ -64,6 +65,39 @@ pub struct Transaction<T = TxEnvelope> {
 }
 
 impl<T> Transaction<T> {
+    /// Consumes the type and returns the wrapped transaction.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    /// Consumes the type and returns a [`Recovered`] transaction with the sender
+    pub fn into_recovered(self) -> Recovered<T> {
+        Recovered::new_unchecked(self.inner, self.from)
+    }
+
+    /// Returns a `Recovered<&T>` with the transaction and the sender.
+    pub fn as_recovered(&self) -> Recovered<&T> {
+        Recovered::new_unchecked(&self.inner, self.from)
+    }
+
+    /// Converts the transaction type to the given alternative that is `From<T>`
+    pub fn convert<U>(self) -> Transaction<U>
+    where
+        U: From<T>,
+    {
+        self.map(U::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<T>`
+    ///
+    /// Returns the transaction with the new transaction type if all conversions were successful.
+    pub fn try_convert<U>(self) -> Result<Transaction<U>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map(U::try_from)
+    }
+
     /// Applies the given closure to the inner transaction type.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
         let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
@@ -142,12 +176,31 @@ where
     }
 }
 
+impl Transaction {
+    /// Consumes the transaction and returns it as [`Signed`] with [`TypedTransaction`] as the
+    /// transaction type.
+    pub fn into_signed(self) -> Signed<TypedTransaction> {
+        self.inner.into_signed()
+    }
+
+    /// Consumes the transaction and returns it a [`Recovered`] signed [`TypedTransaction`].
+    pub fn into_signed_recovered(self) -> Recovered<Signed<TypedTransaction>> {
+        self.convert().into_recovered()
+    }
+}
+
 impl<T> From<&Transaction<T>> for TransactionInfo
 where
     T: TransactionTrait + Encodable2718,
 {
     fn from(tx: &Transaction<T>) -> Self {
         tx.info()
+    }
+}
+
+impl<T> From<Transaction<T>> for Recovered<T> {
+    fn from(tx: Transaction<T>) -> Self {
+        tx.into_recovered()
     }
 }
 
@@ -235,6 +288,12 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
 impl From<Transaction> for TxEnvelope {
     fn from(tx: Transaction) -> Self {
         tx.inner
+    }
+}
+
+impl From<Transaction> for Signed<TypedTransaction> {
+    fn from(tx: Transaction) -> Self {
+        tx.into_signed()
     }
 }
 

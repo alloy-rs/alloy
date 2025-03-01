@@ -1,5 +1,3 @@
-//! Alloy serde helpers for primitive types.
-
 #![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
@@ -14,9 +12,6 @@ extern crate alloc;
 use alloc::format;
 use alloy_primitives::{hex, B256};
 use serde::Serializer;
-
-mod bool;
-pub use self::bool::*;
 
 pub mod displayfromstr;
 
@@ -33,7 +28,6 @@ pub mod ttd;
 pub use ttd::*;
 
 mod other;
-
 pub use other::{OtherFields, WithOtherFields};
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.

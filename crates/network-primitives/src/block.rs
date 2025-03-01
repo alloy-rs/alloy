@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::TransactionResponse;
 use alloc::{vec, vec::Vec};
+use alloy_consensus::error::ValueError;
 use alloy_eips::Encodable2718;
 use core::slice;
 
@@ -123,6 +124,17 @@ impl<T> BlockTransactions<T> {
         match self {
             Self::Full(txs) => txs,
             _ => vec![],
+        }
+    }
+
+    /// Attempts to unwrap the [`Self::Full`] variant.
+    ///
+    /// Returns an error if the type is different variant.
+    pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<Self>> {
+        match self {
+            Self::Full(txs) => Ok(txs),
+            txs @ Self::Hashes(_) => Err(ValueError::new(txs, "Unexpected hashes variant")),
+            txs @ Self::Uncle => Err(ValueError::new(txs, "Unexpected uncle variant")),
         }
     }
 
@@ -278,6 +290,18 @@ pub enum BlockTransactionsKind {
     Hashes,
     /// Include full transaction objects: [BlockTransactions::Full]
     Full,
+}
+
+impl BlockTransactionsKind {
+    /// Returns true if this is [`BlockTransactionsKind::Hashes`]
+    pub const fn is_hashes(&self) -> bool {
+        matches!(self, Self::Hashes)
+    }
+
+    /// Returns true if this is [`BlockTransactionsKind::Full`]
+    pub const fn is_full(&self) -> bool {
+        matches!(self, Self::Full)
+    }
 }
 
 impl From<bool> for BlockTransactionsKind {
