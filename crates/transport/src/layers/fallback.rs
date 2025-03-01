@@ -277,6 +277,12 @@ where
 
             let future = async move {
                 let result = transport_clone.call(req_clone).await;
+                trace!(
+                    "Transport[{}] completed: latency={:?}, status={}",
+                    transport_clone.id,
+                    start.elapsed(),
+                    if result.is_ok() { "success" } else { "fail" }
+                );
                 (result, transport_clone, start.elapsed())
             };
 
@@ -289,7 +295,7 @@ where
         while let Some((result, transport, duration)) = futures.next().await {
             match result {
                 Ok(response) => {
-                    trace!("Transport[{}]: success in {:?}", transport.id, duration);
+                    trace!("Transport[{}] delivered the first response", transport.id);
 
                     // Record success
                     {
@@ -313,8 +319,6 @@ where
                     return Ok(response);
                 }
                 Err(error) => {
-                    trace!("Transport[{}]: failure in {:?}", transport.id, duration);
-
                     // Record failure
                     {
                         let mut metrics = transport.metrics.lock().expect("Lock poisoned");
