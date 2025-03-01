@@ -24,7 +24,7 @@ workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["std", "k256"] }
-either.workspace
+either.workspace = true
 
 async-trait.workspace = true
 auto_impl.workspace = true
