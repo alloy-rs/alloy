@@ -32,6 +32,12 @@ pub struct LedgerSigner {
     pub(crate) address: Address,
 }
 
+// Required for IntoSigner
+#[cfg(target_arch = "wasm32")]
+unsafe impl Send for LedgerSigner {}
+#[cfg(target_arch = "wasm32")]
+unsafe impl Sync for LedgerSigner {}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl alloy_network::TxSigner<Signature> for LedgerSigner {
@@ -134,6 +140,8 @@ impl Signer for LedgerSigner {
         self.chain_id = chain_id;
     }
 }
+
+alloy_network::impl_into_wallet!(LedgerSigner);
 
 impl LedgerSigner {
     /// Instantiate the application by acquiring a lock on the ledger device.

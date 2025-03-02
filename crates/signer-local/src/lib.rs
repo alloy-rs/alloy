@@ -7,9 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_consensus::SignableTransaction;
-use alloy_network::{
-    impl_into_wallet, AnyNetwork, EthereumWallet, IntoWallet, TxSigner, TxSignerSync,
-};
+use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
 use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
@@ -38,8 +36,6 @@ pub use coins_bip39;
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
-impl_into_wallet!(PrivateKeySigner);
-
 #[doc(hidden)]
 #[deprecated(note = "use `PrivateKeySigner` instead")]
 pub type LocalWallet = PrivateKeySigner;
@@ -47,9 +43,6 @@ pub type LocalWallet = PrivateKeySigner;
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
 pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
-
-#[cfg(feature = "yubihsm")]
-impl_into_wallet!(YubiSigner);
 
 #[cfg(feature = "yubihsm")]
 #[doc(hidden)]
@@ -215,6 +208,8 @@ where
         sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
     }
 }
+
+impl_into_wallet!(@[C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync + 'static] LocalSigner<C>);
 
 #[cfg(test)]
 mod test {
