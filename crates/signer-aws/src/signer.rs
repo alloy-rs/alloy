@@ -135,6 +135,8 @@ impl Signer for AwsSigner {
     }
 }
 
+alloy_network::impl_into_wallet!(AwsSigner);
+
 impl AwsSigner {
     /// Instantiate a new signer from an existing `Client` and key ID.
     ///

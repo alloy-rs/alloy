@@ -103,18 +103,18 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 /// Utility to implment IntoWallet for signer over the specified network.
 #[macro_export]
 macro_rules! impl_into_wallet {
-    ($signer:ty) => {
-        impl IntoWallet for $signer {
-            type NetworkWallet = EthereumWallet;
+    ($(@[$($generics:tt)*])? $signer:ty) => {
+        impl $(<$($generics)*>)? $crate::IntoWallet for $signer {
+            type NetworkWallet = $crate::EthereumWallet;
             fn into_wallet(self) -> Self::NetworkWallet {
-                EthereumWallet::from(self)
+                $crate::EthereumWallet::from(self)
             }
         }
 
-        impl IntoWallet<AnyNetwork> for $signer {
-            type NetworkWallet = EthereumWallet;
+        impl $(<$($generics)*>)? $crate::IntoWallet<$crate::AnyNetwork> for $signer {
+            type NetworkWallet = $crate::EthereumWallet;
             fn into_wallet(self) -> Self::NetworkWallet {
-                EthereumWallet::from(self)
+                $crate::EthereumWallet::from(self)
             }
         }
     };

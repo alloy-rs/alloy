@@ -10,7 +10,4 @@
 extern crate tracing;
 
 mod signer;
-use alloy_network::{impl_into_wallet, AnyNetwork, EthereumWallet, IntoWallet};
 pub use signer::{AwsSigner, AwsSignerError};
-
-impl_into_wallet!(AwsSigner);
