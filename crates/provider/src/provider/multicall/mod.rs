@@ -520,13 +520,13 @@ where
             tx.set_value(value);
         }
 
-        let mut eth_call = self.provider.root().call(&tx);
+        let mut eth_call = self.provider.root().call(tx);
 
         if let Some(block) = self.block {
             eth_call = eth_call.block(block);
         }
 
-        if let Some(overrides) = &self.state_override {
+        if let Some(overrides) = self.state_override.clone() {
             eth_call = eth_call.overrides(overrides);
         }
 
