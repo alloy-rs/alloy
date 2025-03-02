@@ -394,8 +394,8 @@ where
 ///
 /// - Stability (success rate) is weighted at 70%
 /// - Latency (response time) is weighted at 30%
-/// - The `active_transport_count` parameter controls how many
-///   transports are queried at any one time.
+/// - The `active_transport_count` parameter controls how many transports are queried at any one
+///   time.
 ///
 /// The `log_transport_rankings` parameter controls whether the
 /// current transport rankings are output as traces. In order to
