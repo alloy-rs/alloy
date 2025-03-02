@@ -207,10 +207,11 @@ pub struct FallbackService<S> {
 impl<S> FallbackService<S> {
     /// Create a new fallback provider from a list of transports.
     ///
-    /// - The `active_transport_count` parameter controls how many
-    ///   transports are used for requests at any one time.
-    /// - The `log_transport_rankings` parameter controls whether the
-    ///   current transport rankings are output as traces
+    /// - The `active_transport_count` parameter controls how many transports are used for requests
+    ///   at any one time.
+    /// - The `log_transport_rankings` parameter controls whether the current transport rankings are
+    ///   output as traces. In order to see them, make sure to enable the `alloy_transport` target
+    ///   (i.e. `RUST_LOG=alloy_transport=debug`).
     pub fn new(
         transports: Vec<S>,
         active_transport_count: usize,
