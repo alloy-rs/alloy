@@ -407,10 +407,8 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
         self.tx().payload_len_for_signature()
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, hash)
+    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
+        self.tx_hash(signature)
     }
 }
 
@@ -607,9 +605,8 @@ impl SignableTransaction<Signature> for TxEip4844 {
         self.length() + 1
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
+    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
+        self.tx_hash(signature)
     }
 }
 
@@ -829,11 +826,8 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
         self.tx.payload_len_for_signature()
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
-        // important: must hash the tx WITHOUT the sidecar
-        let hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, hash)
+    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
+        self.tx_hash(signature)
     }
 }
 
