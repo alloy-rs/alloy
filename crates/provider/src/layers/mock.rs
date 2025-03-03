@@ -128,6 +128,21 @@ where
         MockProvider { inner, asserter, _network: std::marker::PhantomData }
     }
 
+    /// Return a reference to the asserter.
+    pub fn asserter(&self) -> &Asserter {
+        &self.asserter
+    }
+
+    /// Insert a successful response into the queue.
+    pub fn push_success<R: Serialize>(&self, response: R) {
+        self.asserter.push_success(response);
+    }
+
+    /// Push a server error payload into the queue.
+    pub fn push_error(&self, error: ErrorPayload) {
+        self.asserter.push_error(error);
+    }
+
     /// Helper function to get and deserialize the next response from the asserter
     fn next_response<T>(&self) -> Result<T, TransportError>
     where
