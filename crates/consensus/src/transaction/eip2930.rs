@@ -1,8 +1,10 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
+
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpTxHash};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -80,7 +82,7 @@ impl TxEip2930 {
     }
 }
 
-impl RlpEcdsaTx for TxEip2930 {
+impl RlpEcdsaEncodableTx for TxEip2930 {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     /// Outputs the length of the transaction's fields, without a RLP header.
@@ -105,7 +107,11 @@ impl RlpEcdsaTx for TxEip2930 {
         self.input.0.encode(out);
         self.access_list.encode(out);
     }
+}
 
+impl RlpTxHash for TxEip2930 {}
+
+impl RlpEcdsaDecodableTx for TxEip2930 {
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
@@ -250,8 +256,8 @@ impl Decodable for TxEip2930 {
 
 #[cfg(test)]
 mod tests {
-    use super::TxEip2930;
-    use crate::{transaction::RlpEcdsaTx, SignableTransaction, TxEnvelope};
+    use super::*;
+    use crate::{SignableTransaction, TxEnvelope};
     use alloy_primitives::{Address, PrimitiveSignature as Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
