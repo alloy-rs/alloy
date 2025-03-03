@@ -181,7 +181,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn trace_call() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -232,7 +232,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn trace_call_many() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -315,7 +315,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_replay_tx() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -377,7 +377,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn trace_raw_tx() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
@@ -441,7 +441,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn trace_replay_block_transactions() {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {

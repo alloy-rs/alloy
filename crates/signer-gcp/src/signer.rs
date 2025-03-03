@@ -187,6 +187,8 @@ impl Signer for GcpSigner {
     }
 }
 
+alloy_network::impl_into_wallet!(GcpSigner);
+
 impl GcpSigner {
     /// Instantiate a new signer from an existing `Client`, keyring reference, key ID, and version.
     ///

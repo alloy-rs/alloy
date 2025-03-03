@@ -7,7 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_consensus::SignableTransaction;
-use alloy_network::{TxSigner, TxSignerSync};
+use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
 use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
@@ -208,6 +208,8 @@ where
         sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
     }
 }
+
+impl_into_wallet!(@[C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync + 'static] LocalSigner<C>);
 
 #[cfg(test)]
 mod test {
