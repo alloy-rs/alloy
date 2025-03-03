@@ -173,41 +173,11 @@ where
                 let trace_types = self.trace_types;
                 let method = inner.method().to_string();
                 let inner = inner.map_params(|params| {
-                    trace_params(&method, params, block_id, trace_types.clone())
+                    TraceParams::new(&method, params, block_id, trace_types.clone())
                 });
                 ProviderCall::RpcCall(inner)
             }
             WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),
-        }
-    }
-}
-
-fn trace_params<Params: RpcSend>(
-    method: &String,
-    params: Params,
-    block_id: Option<BlockId>,
-    trace_types: Option<HashSet<TraceType>>,
-) -> TraceParams<Params> {
-    let block_id = block_id.unwrap_or(BlockId::pending());
-    let trace_types = trace_types.unwrap_or_else(|| {
-        let mut set = HashSet::default();
-        set.insert(TraceType::Trace);
-        set
-    });
-    match method.as_str() {
-        "trace_call" => {
-            TraceParams { params, block_id: Some(block_id), trace_types: Some(trace_types) }
-        }
-        "trace_callMany" => {
-            // Trace types are ignored as they are set per-tx-request in `params`.
-            TraceParams { params, block_id: Some(block_id), trace_types: None }
-        }
-        "trace_replayTransaction" | "trace_rawTransaction" | "trace_replayBlockTransactions" => {
-            // BlockId is ignored
-            TraceParams { params, block_id: None, trace_types: Some(trace_types) }
-        }
-        _ => {
-            unreachable!("{method} is not supported by TraceBuilder due to custom serialization requirements");
         }
     }
 }
@@ -222,6 +192,8 @@ pub struct TraceParams<Params: RpcSend> {
     block_id: Option<BlockId>,
     trace_types: Option<HashSet<TraceType>>,
 }
+
+impl<Params: RpcSend> TraceParams<Params> {}
 
 impl<Params: RpcSend> serde::Serialize for TraceParams<Params> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -262,20 +234,39 @@ impl<Params: RpcSend> serde::Serialize for TraceParams<Params> {
 
 impl<Params: RpcSend> TraceParams<Params> {
     /// Create a new `TraceParams` with the given parameters.
-    pub fn new(params: Params) -> Self {
-        Self { params, block_id: None, trace_types: None }
-    }
-
-    /// Set the block id.
-    pub fn block_id(mut self, block_id: BlockId) -> Self {
-        self.block_id = Some(block_id);
-        self
-    }
-
-    /// Set the trace types.
-    pub fn trace_types(mut self, trace_types: HashSet<TraceType>) -> Self {
-        self.trace_types = Some(trace_types);
-        self
+    ///
+    /// The `method` is used to determine which parameters to ignore according to the `trace_*` api
+    /// spec. See <https://reth.rs/jsonrpc/trace.html>.
+    pub fn new(
+        method: &String,
+        params: Params,
+        block_id: Option<BlockId>,
+        trace_types: Option<HashSet<TraceType>>,
+    ) -> Self {
+        let block_id = block_id.unwrap_or(BlockId::pending());
+        let trace_types = trace_types.unwrap_or_else(|| {
+            let mut set = HashSet::default();
+            set.insert(TraceType::Trace);
+            set
+        });
+        match method.as_str() {
+            "trace_call" => {
+                TraceParams { params, block_id: Some(block_id), trace_types: Some(trace_types) }
+            }
+            "trace_callMany" => {
+                // Trace types are ignored as they are set per-tx-request in `params`.
+                TraceParams { params, block_id: Some(block_id), trace_types: None }
+            }
+            "trace_replayTransaction"
+            | "trace_rawTransaction"
+            | "trace_replayBlockTransactions" => {
+                // BlockId is ignored
+                TraceParams { params, block_id: None, trace_types: Some(trace_types) }
+            }
+            _ => {
+                unreachable!("{method} is not supported by TraceBuilder due to custom serialization requirements");
+            }
+        }
     }
 }
 
