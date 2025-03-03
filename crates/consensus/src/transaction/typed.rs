@@ -1,7 +1,7 @@
 use crate::{
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaTx,
+        RlpTxHash,
     },
     SignableTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope,
     TxLegacy, TxType,

@@ -1,4 +1,7 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
+use crate::{
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpTxHash},
+    SignableTransaction, Signed, Transaction, TxType,
+};
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{
@@ -108,7 +111,7 @@ impl TxLegacy {
 
 // Legacy transaction network and 2718 encodings are identical to the RLP
 // encoding.
-impl RlpEcdsaTx for TxLegacy {
+impl RlpEcdsaEncodableTx for TxLegacy {
     const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
 
     fn rlp_encoded_fields_length(&self) -> usize {
@@ -167,7 +170,9 @@ impl RlpEcdsaTx for TxLegacy {
     fn network_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         self.rlp_encode_signed(signature, out);
     }
+}
 
+impl RlpEcdsaDecodableTx for TxLegacy {
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             nonce: Decodable::decode(buf)?,
@@ -223,7 +228,9 @@ impl RlpEcdsaTx for TxLegacy {
     ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
         Self::rlp_decode_signed(buf).map_err(Into::into)
     }
+}
 
+impl RlpTxHash for TxLegacy {
     fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
         let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
         self.rlp_encode_signed(signature, &mut buf);
@@ -683,7 +690,7 @@ mod tests {
     #[test]
     // Test vector from https://github.com/alloy-rs/alloy/issues/125
     fn decode_legacy_and_recover_signer() {
-        use crate::transaction::RlpEcdsaTx;
+        use crate::transaction::RlpEcdsaDecodableTx;
         let raw_tx = alloy_primitives::bytes!("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8");
 
         let tx = TxLegacy::rlp_decode_signed(&mut raw_tx.as_ref()).unwrap();

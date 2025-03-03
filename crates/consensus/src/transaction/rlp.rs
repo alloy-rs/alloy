@@ -6,6 +6,7 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
 /// Helper trait for managing RLP encoding of transactions inside 2718
 #[doc(hidden)]
+#[doc(alias = "RlpEncodableTx", alias = "RlpTxEncoding")]
 pub trait RlpEcdsaEncodableTx: SignableTransaction<Signature> + Sized {
     /// The default transaction type for this transaction.
     const DEFAULT_TX_TYPE: u8;
@@ -100,6 +101,7 @@ pub trait RlpEcdsaEncodableTx: SignableTransaction<Signature> + Sized {
 }
 
 /// Helper trait for calculating transaction hashes.
+#[doc(hidden)]
 pub trait RlpTxHash: RlpEcdsaEncodableTx {
     /// Calculate the transaction hash for the given signature and type.
     fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
@@ -116,6 +118,7 @@ pub trait RlpTxHash: RlpEcdsaEncodableTx {
 
 /// Helper trait for managing RLP decoding of transactions inside 2718 envelopes.
 #[doc(hidden)]
+#[doc(alias = "RlpDecodableTx", alias = "RlpTxDecoding")]
 pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
     /// Decodes the fields of the transaction from RLP bytes. Do not decode a
     /// header. You may assume the buffer is long enough to contain the

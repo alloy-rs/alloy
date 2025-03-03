@@ -423,7 +423,10 @@ pub(super) mod serde_bincode_compat {
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip1559;
-    use crate::{transaction::RlpEcdsaTx, SignableTransaction};
+    use crate::{
+        transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
+        SignableTransaction,
+    };
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{
         address, b256, hex, Address, PrimitiveSignature as Signature, B256, U256,
