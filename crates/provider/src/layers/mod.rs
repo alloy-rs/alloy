@@ -10,6 +10,9 @@ pub use anvil::{AnvilLayer, AnvilProvider};
 mod chain;
 pub use chain::ChainLayer;
 
+mod mock;
+pub use mock::{Asserter, MockError, MockLayer, MockProvider, MockResponse};
+
 #[cfg(not(target_arch = "wasm32"))]
 mod cache;
 #[cfg(not(target_arch = "wasm32"))]
