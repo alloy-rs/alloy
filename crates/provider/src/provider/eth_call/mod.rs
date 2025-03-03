@@ -6,7 +6,7 @@ use alloy_primitives::Address;
 use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
-use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
+use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
 
 mod params;
 pub use params::{EthCallManyParams, EthCallParams};
@@ -232,7 +232,7 @@ where
 
     /// Set the state overrides for this call.
     pub fn overrides(mut self, overrides: StateOverride) -> Self {
-        self.params.overrides = Some(Cow::Owned(overrides));
+        self.params.overrides = Some(overrides);
         self
     }
 
@@ -241,7 +241,7 @@ where
     /// Creates a new [`StateOverride`] if none has been set yet.
     pub fn account_override(mut self, address: Address, account_override: AccountOverride) -> Self {
         let mut overrides = self.params.overrides.unwrap_or_default();
-        overrides.to_mut().insert(address, account_override);
+        overrides.insert(address, account_override);
         self.params.overrides = Some(overrides);
 
         self

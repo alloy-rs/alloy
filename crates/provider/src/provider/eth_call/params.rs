@@ -7,9 +7,9 @@ use std::borrow::Cow;
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
 pub struct EthCallParams<N: Network> {
-    data: Cow<'static, N::TransactionRequest>,
+    data: N::TransactionRequest,
     pub(crate) block: Option<BlockId>,
-    pub(crate) overrides: Option<Cow<'static, StateOverride>>,
+    pub(crate) overrides: Option<StateOverride>,
 }
 
 impl<N> EthCallParams<N>
@@ -18,7 +18,7 @@ where
 {
     /// Instantiates a new `EthCallParams` with the given data (transaction).
     pub const fn new(data: N::TransactionRequest) -> Self {
-        Self { data: Cow::Owned(data), block: None, overrides: None }
+        Self { data, block: None, overrides: None }
     }
 
     /// Sets the block to use for this call.
@@ -29,13 +29,13 @@ where
 
     /// Sets the state overrides for this call.
     pub fn with_overrides(mut self, overrides: StateOverride) -> Self {
-        self.overrides = Some(Cow::Owned(overrides));
+        self.overrides = Some(overrides);
         self
     }
 
     /// Returns a reference to the state overrides if set.
     pub fn overrides(&self) -> Option<&StateOverride> {
-        self.overrides.as_deref()
+        self.overrides.as_ref()
     }
 
     /// Returns a reference to the transaction data.
