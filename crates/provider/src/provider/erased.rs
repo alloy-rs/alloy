@@ -74,7 +74,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_block_number()
     }
 
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         self.0.call(tx)
     }
 
@@ -103,7 +103,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.create_access_list(request)
     }
 
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         self.0.estimate_gas(tx)
     }
 

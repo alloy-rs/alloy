@@ -80,7 +80,7 @@ impl GasFiller {
         );
 
         let gas_limit_fut = tx.gas_limit().map_or_else(
-            || provider.estimate_gas(tx).into_future().right_future(),
+            || provider.estimate_gas(tx.clone()).into_future().right_future(),
             |gas_limit| async move { Ok(gas_limit) }.left_future(),
         );
 
@@ -99,7 +99,7 @@ impl GasFiller {
         N: Network,
     {
         let gas_limit_fut = tx.gas_limit().map_or_else(
-            || provider.estimate_gas(tx).into_future().right_future(),
+            || provider.estimate_gas(tx.clone()).into_future().right_future(),
             |gas_limit| async move { Ok(gas_limit) }.left_future(),
         );
 
