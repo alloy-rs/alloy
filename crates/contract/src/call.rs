@@ -789,11 +789,11 @@ mod tests {
         assert!(tx.from.is_none());
 
         let std_provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
-        let should_fail = std_provider.estimate_gas(&tx).await.is_err();
+        let should_fail = std_provider.estimate_gas(tx.clone()).await.is_err();
 
         assert!(should_fail);
 
-        let gas = wallet_provider.estimate_gas(&tx).await.unwrap();
+        let gas = wallet_provider.estimate_gas(tx).await.unwrap();
 
         assert_eq!(gas, 56555);
     }
