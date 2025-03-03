@@ -48,7 +48,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> TraceBuilder<(TraceCallList<'a, N>,), Vec<TraceResults>>;
+    ) -> TraceBuilder<TraceCallList<'a, N>, Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -115,8 +115,8 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> TraceBuilder<(TraceCallList<'a, N>,), Vec<TraceResults>> {
-        TraceBuilder::new_rpc(self.client().request("trace_callMany", (request,))).pending()
+    ) -> TraceBuilder<TraceCallList<'a, N>, Vec<TraceResults>> {
+        TraceBuilder::new_rpc(self.client().request("trace_callMany", request)).pending()
     }
 
     async fn trace_transaction(
