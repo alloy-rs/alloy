@@ -69,7 +69,7 @@ where
     ) -> TransportResult<LocalizedTransactionTrace>;
 
     /// Trace the given raw transaction.
-    fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<(&'a [u8],), TraceResults>;
+    fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<&'a [u8], TraceResults>;
 
     /// Traces matching given filter.
     async fn trace_filter(
@@ -135,8 +135,8 @@ where
         self.client().request("trace_get", (hash, (Index::from(index),))).await
     }
 
-    fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<(&'a [u8],), TraceResults> {
-        TraceBuilder::new_rpc(self.client().request("trace_rawTransaction", (data,)))
+    fn trace_raw_transaction<'a>(&self, data: &'a [u8]) -> TraceBuilder<&'a [u8], TraceResults> {
+        TraceBuilder::new_rpc(self.client().request("trace_rawTransaction", data))
     }
 
     async fn trace_filter(
