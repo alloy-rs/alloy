@@ -1,6 +1,7 @@
 mod builder;
 
 mod either;
+use alloy_consensus::TxEnvelope;
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 
 mod unknowns;
@@ -132,6 +133,16 @@ impl DerefMut for AnyRpcBlock {
     }
 }
 
+impl From<Block> for AnyRpcBlock {
+    fn from(value: Block) -> Self {
+        let block = value
+            .map_header(|h| h.map(|h| alloy_consensus_any::AnyHeader { ..h.into() }))
+            .map_transactions(|tx| WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)));
+
+        Self(WithOtherFields::new(block))
+    }
+}
+
 /// A wrapper for [`AnyRpcTransaction`] that allows for handling unknown transaction types.
 #[derive(Clone, Debug, From, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AnyRpcTransaction(WithOtherFields<Transaction<AnyTxEnvelope>>);
@@ -160,5 +171,12 @@ impl Deref for AnyRpcTransaction {
 impl DerefMut for AnyRpcTransaction {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl From<Transaction<TxEnvelope>> for AnyRpcTransaction {
+    fn from(tx: Transaction<TxEnvelope>) -> Self {
+        let tx = tx.map(AnyTxEnvelope::Ethereum);
+        Self(WithOtherFields::new(tx))
     }
 }
