@@ -37,7 +37,7 @@ pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
 
 mod rlp;
 #[doc(hidden)]
-pub use rlp::RlpEcdsaTx;
+pub use rlp::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpEcdsaTx, RlpTxHash};
 
 mod typed;
 pub use typed::TypedTransaction;
