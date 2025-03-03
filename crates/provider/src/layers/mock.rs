@@ -2,15 +2,15 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
-use alloy_json_rpc::ErrorPayload;
+use alloy_json_rpc::{ErrorPayload, RpcRecv};
 use alloy_network::Network;
-use alloy_primitives::U64;
+use alloy_primitives::{Address, Bytes, U128, U256, U64};
 use alloy_rpc_client::NoParams;
 use alloy_transport::{TransportError, TransportErrorKind};
 use parking_lot::RwLock;
 use serde::Serialize;
 
-use crate::{Provider, ProviderCall, ProviderLayer};
+use crate::{Caller, EthCall, Provider, ProviderCall, ProviderLayer, RpcWithBlock};
 
 /// A mock provider layer that returns responses that have been pushed to the [`Asserter`].
 #[derive(Debug, Clone)]
@@ -70,6 +70,20 @@ impl Asserter {
     pub fn pop_response(&self) -> Option<MockResponse> {
         self.responses.write().pop_front()
     }
+
+    /// Helper function to get and deserialize the next response from the asserter
+    pub fn pop_deser_response<T>(&self) -> Result<T, TransportError>
+    where
+        T: for<'de> serde::Deserialize<'de>,
+    {
+        let value = self.pop_response().ok_or(TransportErrorKind::custom(MockError::EmptyQueue));
+
+        match value {
+            Ok(MockResponse::Success(value)) => serde_json::from_value(value)
+                .map_err(|e| TransportErrorKind::custom(MockError::DeserError(e.to_string()))),
+            Ok(MockResponse::Err(err)) | Err(err) => Err(err),
+        }
+    }
 }
 
 /// A mock response that can be pushed into the asserter.
@@ -113,6 +127,14 @@ where
     pub fn new(inner: P, asserter: Asserter) -> Self {
         MockProvider { inner, asserter, _network: std::marker::PhantomData }
     }
+
+    /// Helper function to get and deserialize the next response from the asserter
+    fn next_response<T>(&self) -> Result<T, TransportError>
+    where
+        T: for<'de> serde::Deserialize<'de>,
+    {
+        self.asserter.pop_deser_response()
+    }
 }
 
 impl<P, N> Provider<N> for MockProvider<P, N>
@@ -124,9 +146,43 @@ where
         self.inner.root()
     }
 
+    fn get_accounts(&self) -> ProviderCall<NoParams, Vec<Address>> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
     fn get_block_number(&self) -> ProviderCall<NoParams, U64, u64> {
-        let value =
-            self.asserter.pop_response().ok_or(TransportErrorKind::custom(MockError::EmptyQueue));
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn get_blob_base_fee(&self) -> ProviderCall<NoParams, U128, u128> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn get_chain_id(&self) -> ProviderCall<NoParams, U64, u64> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+        EthCall::call(self.asserter.clone(), tx)
+    }
+
+    fn get_balance(&self, _address: Address) -> RpcWithBlock<Address, U256, U256> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response();
+            ProviderCall::Ready(Some(res))
+        })
+    }
+}
+
+/// [`Caller`] implementation for the [`Asserter`] to `eth_call` ops in the [`MockProvider`].
+impl<N: Network, Resp: RpcRecv> Caller<N, Resp> for Asserter {
+    fn call(
+        &self,
+        _params: crate::EthCallParams<'_, N>,
+    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<'static, N>, Resp>>
+    {
+        let value = self.pop_response().ok_or(TransportErrorKind::custom(MockError::EmptyQueue));
 
         let res = match value {
             Ok(MockResponse::Success(value)) => serde_json::from_value(value)
@@ -134,12 +190,31 @@ where
             Ok(MockResponse::Err(err)) | Err(err) => Err(err),
         };
 
-        ProviderCall::Ready(Some(res))
+        Ok(ProviderCall::Ready(Some(res)))
+    }
+
+    fn call_many(
+        &self,
+        _params: crate::EthCallManyParams<'_>,
+    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallManyParams<'static>, Resp>>
+    {
+        todo!()
+    }
+
+    fn estimate_gas(
+        &self,
+        _params: crate::EthCallParams<'_, N>,
+    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<'static, N>, Resp>>
+    {
+        todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::bytes;
+    use alloy_rpc_types_eth::TransactionRequest;
+
     use super::*;
     use crate::ProviderBuilder;
 
@@ -161,7 +236,24 @@ mod tests {
         assert!(matches!(err_res, TransportError::NullResp));
 
         let response = provider.get_block_number().await.unwrap_err();
-
         assert!(response.to_string().contains("empty response queue"));
+
+        asserter.push_success(vec![Address::with_last_byte(1), Address::with_last_byte(2)]);
+        let response = provider.get_accounts().await.unwrap();
+        assert_eq!(response, vec![Address::with_last_byte(1), Address::with_last_byte(2)]);
+
+        let call_resp = bytes!("12345678");
+
+        asserter.push_success(call_resp.clone());
+        let tx = TransactionRequest::default();
+        let response = provider.call(&tx).await.unwrap();
+
+        assert_eq!(response, call_resp);
+
+        let assert_bal = U256::from(123456780);
+        asserter.push_success(assert_bal);
+
+        let response = provider.get_balance(Address::default()).await.unwrap();
+        assert_eq!(response, assert_bal);
     }
 }
