@@ -242,17 +242,17 @@ impl<Params: RpcSend> TraceParams<Params> {
         });
         match method.as_str() {
             "trace_call" => {
-                TraceParams { params, block_id: Some(block_id), trace_types: Some(trace_types) }
+                Self { params, block_id: Some(block_id), trace_types: Some(trace_types) }
             }
             "trace_callMany" => {
                 // Trace types are ignored as they are set per-tx-request in `params`.
-                TraceParams { params, block_id: Some(block_id), trace_types: None }
+                Self { params, block_id: Some(block_id), trace_types: None }
             }
             "trace_replayTransaction"
             | "trace_rawTransaction"
             | "trace_replayBlockTransactions" => {
                 // BlockId is ignored
-                TraceParams { params, block_id: None, trace_types: Some(trace_types) }
+                Self { params, block_id: None, trace_types: Some(trace_types) }
             }
             _ => {
                 unreachable!("{method} is not supported by TraceBuilder due to custom serialization requirements");
