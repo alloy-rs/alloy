@@ -84,6 +84,8 @@ impl alloy_network::TxSigner<Signature> for TrezorSigner {
     }
 }
 
+alloy_network::impl_into_wallet!(TrezorSigner);
+
 impl TrezorSigner {
     /// Instantiates a new Trezor signer.
     #[instrument(ret)]

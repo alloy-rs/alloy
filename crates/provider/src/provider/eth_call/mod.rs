@@ -6,7 +6,8 @@ use alloy_primitives::Address;
 use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
 use alloy_transport::TransportResult;
 use futures::FutureExt;
-use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
+use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
+
 mod params;
 pub use params::{EthCallManyParams, EthCallParams};
 
@@ -21,17 +22,17 @@ pub use caller::Caller;
 #[doc(hidden)] // Not public API.
 #[allow(unnameable_types)]
 #[pin_project::pin_project]
-pub struct EthCallFut<'req, N, Resp, Output, Map>
+pub struct EthCallFut<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
-    inner: EthCallFutInner<'req, N, Resp, Output, Map>,
+    inner: EthCallFutInner<N, Resp, Output, Map>,
 }
 
-enum EthCallFutInner<'req, N, Resp, Output, Map>
+enum EthCallFutInner<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
@@ -39,19 +40,19 @@ where
 {
     Preparing {
         caller: Arc<dyn Caller<N, Resp>>,
-        params: EthCallParams<'req, N>,
+        params: EthCallParams<N>,
         method: &'static str,
         filled_tx: Option<N::TransactionRequest>,
         map: Map,
     },
     Running {
         map: Map,
-        fut: ProviderCall<EthCallParams<'static, N>, Resp>,
+        fut: ProviderCall<EthCallParams<N>, Resp>,
     },
     Polling,
 }
 
-impl<N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<'_, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
@@ -69,7 +70,7 @@ where
     }
 }
 
-impl<N, Resp, Output, Map> EthCallFut<'_, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> EthCallFut<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
@@ -114,7 +115,7 @@ where
     }
 }
 
-impl<N, Resp, Output, Map> Future for EthCallFut<'_, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> Future for EthCallFut<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
@@ -144,21 +145,21 @@ where
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone)]
-pub struct EthCall<'req, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct EthCall<N, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     N: Network,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     caller: Arc<dyn Caller<N, Resp>>,
-    params: EthCallParams<'req, N>,
+    params: EthCallParams<N>,
     method: &'static str,
     filled_tx: Option<N::TransactionRequest>,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<N, Resp> core::fmt::Debug for EthCall<'_, N, Resp>
+impl<N, Resp> core::fmt::Debug for EthCall<N, Resp>
 where
     N: Network,
     Resp: RpcRecv,
@@ -171,7 +172,7 @@ where
     }
 }
 
-impl<'req, N, Resp> EthCall<'req, N, Resp>
+impl<N, Resp> EthCall<N, Resp>
 where
     N: Network,
     Resp: RpcRecv,
@@ -180,7 +181,7 @@ where
     pub fn new(
         caller: impl Caller<N, Resp> + 'static,
         method: &'static str,
-        data: &'req N::TransactionRequest,
+        data: N::TransactionRequest,
     ) -> Self {
         Self {
             caller: Arc::new(caller),
@@ -193,20 +194,20 @@ where
     }
 
     /// Create a new [`EthCall`] with method set to `"eth_call"`.
-    pub fn call(caller: impl Caller<N, Resp> + 'static, data: &'req N::TransactionRequest) -> Self {
+    pub fn call(caller: impl Caller<N, Resp> + 'static, data: N::TransactionRequest) -> Self {
         Self::new(caller, "eth_call", data)
     }
 
     /// Create a new [`EthCall`] with method set to `"eth_estimateGas"`.
     pub fn gas_estimate(
         caller: impl Caller<N, Resp> + 'static,
-        data: &'req N::TransactionRequest,
+        data: N::TransactionRequest,
     ) -> Self {
         Self::new(caller, "eth_estimateGas", data)
     }
 }
 
-impl<'req, N, Resp, Output, Map> EthCall<'req, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> EthCall<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
@@ -223,10 +224,7 @@ where
     /// type. This can lead to confusing error messages.
     ///
     /// [fn pointers]: https://doc.rust-lang.org/std/primitive.fn.html#creating-function-pointers
-    pub fn map_resp<NewOutput, NewMap>(
-        self,
-        map: NewMap,
-    ) -> EthCall<'req, N, Resp, NewOutput, NewMap>
+    pub fn map_resp<NewOutput, NewMap>(self, map: NewMap) -> EthCall<N, Resp, NewOutput, NewMap>
     where
         NewMap: Fn(Resp) -> NewOutput,
     {
@@ -241,8 +239,8 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub fn overrides(mut self, overrides: &'req StateOverride) -> Self {
-        self.params.overrides = Some(Cow::Borrowed(overrides));
+    pub fn overrides(mut self, overrides: StateOverride) -> Self {
+        self.params.overrides = Some(overrides);
         self
     }
 
@@ -251,7 +249,7 @@ where
     /// Creates a new [`StateOverride`] if none has been set yet.
     pub fn account_override(mut self, address: Address, account_override: AccountOverride) -> Self {
         let mut overrides = self.params.overrides.unwrap_or_default();
-        overrides.to_mut().insert(address, account_override);
+        overrides.insert(address, account_override);
         self.params.overrides = Some(overrides);
 
         self
@@ -283,7 +281,7 @@ where
     }
 }
 
-impl<'req, N, Resp, Output, Map> std::future::IntoFuture for EthCall<'req, N, Resp, Output, Map>
+impl<N, Resp, Output, Map> std::future::IntoFuture for EthCall<N, Resp, Output, Map>
 where
     N: Network,
     Resp: RpcRecv,
@@ -292,7 +290,7 @@ where
 {
     type Output = TransportResult<Output>;
 
-    type IntoFuture = EthCallFut<'req, N, Resp, Output, Map>;
+    type IntoFuture = EthCallFut<N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut {
@@ -333,7 +331,7 @@ mod test {
         let overrides = StateOverride::default();
 
         // Expected: [data]
-        let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data);
+        let params: EthCallParams<Ethereum> = EthCallParams::new(data.clone());
 
         assert_eq!(params.data(), &data);
         assert_eq!(params.block(), None);
@@ -344,8 +342,8 @@ mod test {
         );
 
         // Expected: [data, block, overrides]
-        let params: EthCallParams<'_, Ethereum> =
-            EthCallParams::new(&data).with_block(block).with_overrides(&overrides);
+        let params: EthCallParams<Ethereum> =
+            EthCallParams::new(data.clone()).with_block(block).with_overrides(overrides.clone());
 
         assert_eq!(params.data(), &data);
         assert_eq!(params.block(), Some(block));
@@ -356,8 +354,8 @@ mod test {
         );
 
         // Expected: [data, (default), overrides]
-        let params: EthCallParams<'_, Ethereum> =
-            EthCallParams::new(&data).with_overrides(&overrides);
+        let params: EthCallParams<Ethereum> =
+            EthCallParams::new(data.clone()).with_overrides(overrides.clone());
 
         assert_eq!(params.data(), &data);
         assert_eq!(params.block(), None);
@@ -368,7 +366,7 @@ mod test {
         );
 
         // Expected: [data, block]
-        let params: EthCallParams<'_, Ethereum> = EthCallParams::new(&data).with_block(block);
+        let params: EthCallParams<Ethereum> = EthCallParams::new(data.clone()).with_block(block);
 
         assert_eq!(params.data(), &data);
         assert_eq!(params.block(), Some(block));

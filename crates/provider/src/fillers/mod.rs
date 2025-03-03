@@ -38,6 +38,7 @@ use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
 use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockTransactionsKind, EIP1186AccountProofResponse, EthCallResponse,
     FeeHistory, Filter, FilterChanges, Log,
@@ -337,9 +338,8 @@ where
         self.inner.get_block_number()
     }
 
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
-        let prepare_res = self.prepare_call(tx.clone()).ok();
-        EthCall::call(self.weak_client(), tx).block(BlockId::pending()).filled_tx(prepare_res)
+    fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
+        self.inner.call(tx)
     }
 
     fn call_many<'req>(
@@ -367,12 +367,8 @@ where
         self.inner.create_access_list(request)
     }
 
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
-        let prepare_res = self.prepare_call(tx.clone()).ok();
-        EthCall::gas_estimate(self.weak_client(), tx)
-            .block(BlockId::pending())
-            .filled_tx(prepare_res)
-            .map_resp(crate::utils::convert_u64)
+    fn estimate_gas<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
+        self.inner.estimate_gas(tx)
     }
 
     async fn get_fee_history(
@@ -588,6 +584,14 @@ where
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.inner.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction_conditional(encoded_tx, conditional).await
     }
 
     async fn send_transaction_internal(

@@ -1,9 +1,14 @@
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
-
 use crate::{
-    transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-    Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy, TxType,
+    transaction::{
+        eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+        RlpEcdsaTx,
+    },
+    SignableTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope,
+    TxLegacy, TxType,
+};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
+use alloy_primitives::{
+    bytes::BufMut, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
 };
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
@@ -138,6 +143,17 @@ impl TypedTransaction {
         match self {
             Self::Eip7702(tx) => Some(tx),
             _ => None,
+        }
+    }
+
+    /// Calculate the transaction hash for the given signature.
+    pub fn tx_hash(&self, signature: &Signature) -> TxHash {
+        match self {
+            Self::Legacy(tx) => tx.tx_hash(signature),
+            Self::Eip2930(tx) => tx.tx_hash(signature),
+            Self::Eip1559(tx) => tx.tx_hash(signature),
+            Self::Eip4844(tx) => tx.tx_hash(signature),
+            Self::Eip7702(tx) => tx.tx_hash(signature),
         }
     }
 }
@@ -339,6 +355,46 @@ impl Typed2718 for TypedTransaction {
             Self::Eip4844(tx) => tx.ty(),
             Self::Eip7702(tx) => tx.ty(),
         }
+    }
+}
+
+impl SignableTransaction<Signature> for TypedTransaction {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        match self {
+            Self::Legacy(tx) => tx.set_chain_id(chain_id),
+            Self::Eip2930(tx) => tx.set_chain_id(chain_id),
+            Self::Eip1559(tx) => tx.set_chain_id(chain_id),
+            Self::Eip4844(tx) => tx.set_chain_id(chain_id),
+            Self::Eip7702(tx) => tx.set_chain_id(chain_id),
+        }
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.encode_for_signing(out),
+            Self::Eip2930(tx) => tx.encode_for_signing(out),
+            Self::Eip1559(tx) => tx.encode_for_signing(out),
+            Self::Eip4844(tx) => tx.encode_for_signing(out),
+            Self::Eip7702(tx) => tx.encode_for_signing(out),
+        }
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        match self {
+            Self::Legacy(tx) => tx.payload_len_for_signature(),
+            Self::Eip2930(tx) => tx.payload_len_for_signature(),
+            Self::Eip1559(tx) => tx.payload_len_for_signature(),
+            Self::Eip4844(tx) => tx.payload_len_for_signature(),
+            Self::Eip7702(tx) => tx.payload_len_for_signature(),
+        }
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
+    where
+        Self: Sized,
+    {
+        let hash = self.tx_hash(&signature);
+        Signed::new_unchecked(self, signature, hash)
     }
 }
 

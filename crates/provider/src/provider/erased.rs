@@ -1,7 +1,7 @@
 use super::{EthCallMany, FilterPollerBuilder};
 use crate::{
     heart::PendingTransactionError,
-    utils::{Eip1559Estimation, EstimatorFunction},
+    utils::{Eip1559Estimation, Eip1559Estimator},
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
@@ -12,6 +12,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, NoParams, WeakClient};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
@@ -73,7 +74,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_block_number()
     }
 
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         self.0.call(tx)
     }
 
@@ -102,15 +103,19 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.create_access_list(request)
     }
 
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         self.0.estimate_gas(tx)
     }
 
-    async fn estimate_eip1559_fees(
+    async fn estimate_eip1559_fees_with(
         &self,
-        estimator: Option<EstimatorFunction>,
+        estimator: Eip1559Estimator,
     ) -> TransportResult<Eip1559Estimation> {
-        self.0.estimate_eip1559_fees(estimator).await
+        self.0.estimate_eip1559_fees_with(estimator).await
+    }
+
+    async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
+        self.0.estimate_eip1559_fees().await
     }
 
     async fn get_fee_history(
@@ -326,6 +331,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.0.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.0.send_raw_transaction_conditional(encoded_tx, conditional).await
     }
 
     async fn send_transaction(
