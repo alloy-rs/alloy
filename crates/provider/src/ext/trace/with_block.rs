@@ -200,35 +200,26 @@ impl<Params: RpcSend> serde::Serialize for TraceParams<Params> {
     where
         S: serde::Serializer,
     {
-        // Serialize params to a Value first
-        let mut ser = serde_json::to_value(&self.params).map_err(serde::ser::Error::custom)?;
+        use serde::ser::SerializeTuple;
+        // Calculate tuple length based on optional fields
+        let len = 1 + self.trace_types.is_some() as usize + self.block_id.is_some() as usize;
 
-        // Convert to array if needed
-        if !matches!(ser, serde_json::Value::Array(_)) {
-            if ser.is_null() {
-                ser = serde_json::Value::Array(Vec::new());
-            } else {
-                ser = serde_json::Value::Array(vec![ser]);
-            }
-        }
+        let mut tup = serializer.serialize_tuple(len)?;
 
-        // Get mutable reference to array
-        let arr = ser.as_array_mut().unwrap();
+        // Always serialize params first
+        tup.serialize_element(&self.params)?;
 
         // Add trace_types if present
         if let Some(trace_types) = &self.trace_types {
-            let trace_types =
-                serde_json::to_value(trace_types).map_err(serde::ser::Error::custom)?;
-            arr.push(trace_types);
+            tup.serialize_element(trace_types)?;
         }
 
-        // Add block_id last
+        // Add block_id last if present
         if let Some(block_id) = &self.block_id {
-            let block_id = serde_json::to_value(block_id).map_err(serde::ser::Error::custom)?;
-            arr.push(block_id);
+            tup.serialize_element(block_id)?;
         }
 
-        ser.serialize(serializer)
+        tup.end()
     }
 }
 
