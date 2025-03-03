@@ -339,7 +339,7 @@ where
     }
 
     fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
-        let mut tx = tx.clone();
+        let mut tx = tx;
         let _ = self.filler.prepare_call_sync(&mut tx);
         self.inner.call(tx)
     }
@@ -370,7 +370,7 @@ where
     }
 
     fn estimate_gas<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
-        let mut tx = tx.clone();
+        let mut tx = tx;
         let _ = self.filler.prepare_call_sync(&mut tx);
         self.inner.estimate_gas(tx)
     }
