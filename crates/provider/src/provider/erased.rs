@@ -1,4 +1,4 @@
-use super::{EthCallMany, FilterPollerBuilder};
+use super::{EthCallMany, EthGetBlock, FilterPollerBuilder};
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, Eip1559Estimator},
@@ -155,12 +155,11 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_block_by_hash(hash, kind).await
     }
 
-    async fn get_block_by_number(
+    fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.0.get_block_by_number(number, kind).await
+    ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
+        self.0.get_block_by_number(number)
     }
 
     async fn get_block_transaction_count_by_hash(

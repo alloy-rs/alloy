@@ -30,9 +30,9 @@ pub use join_fill::JoinFill;
 use tracing::error;
 
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, FilterPollerBuilder, Identity, PendingTransaction,
-    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
-    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -412,12 +412,11 @@ where
         self.inner.get_block_by_hash(hash, kind).await
     }
 
-    async fn get_block_by_number(
+    fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block_by_number(number, kind).await
+    ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
+        self.inner.get_block_by_number(number)
     }
 
     async fn get_block_transaction_count_by_hash(

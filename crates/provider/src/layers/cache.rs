@@ -1,4 +1,6 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    EthGetBlock, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
 use alloy_network::Network;
@@ -165,19 +167,13 @@ where
         cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_hash(hash, kind)).await
     }
 
-    async fn get_block_by_number(
+    fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
+    ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
+        let req = RequestType::new("eth_getBlockByNumber", number);
 
-        let req = RequestType::new("eth_getBlockByNumber", (number, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
+        todo!()
     }
 
     fn get_block_receipts(
