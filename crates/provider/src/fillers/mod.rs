@@ -30,9 +30,9 @@ pub use join_fill::JoinFill;
 use tracing::error;
 
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, FilterPollerBuilder, Identity, PendingTransaction,
-    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
-    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -40,8 +40,8 @@ use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, BlockTransactionsKind, EIP1186AccountProofResponse, EthCallResponse,
-    FeeHistory, Filter, FilterChanges, Log,
+    AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
+    FilterChanges, Log,
 };
 use alloy_transport::TransportResult;
 use async_trait::async_trait;
@@ -396,28 +396,22 @@ where
         self.inner.get_balance(address)
     }
 
-    async fn get_block(
-        &self,
-        block: BlockId,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block(block, kind).await
+    fn get_block(&self, block: BlockId) -> EthGetBlock<BlockId, Option<N::BlockResponse>> {
+        self.inner.get_block(block)
     }
 
-    async fn get_block_by_hash(
+    fn get_block_by_hash(
         &self,
         hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block_by_hash(hash, kind).await
+    ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
+        self.inner.get_block_by_hash(hash)
     }
 
-    async fn get_block_by_number(
+    fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block_by_number(number, kind).await
+    ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
+        self.inner.get_block_by_number(number)
     }
 
     async fn get_block_transaction_count_by_hash(

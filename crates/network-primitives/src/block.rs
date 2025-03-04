@@ -12,10 +12,10 @@ use core::slice;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BlockTransactions<T> {
-    /// Full transactions
-    Full(Vec<T>),
     /// Only hashes
     Hashes(Vec<B256>),
+    /// Full transactions
+    Full(Vec<T>),
     /// Special case for uncle response.
     Uncle,
 }
