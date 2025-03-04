@@ -1,4 +1,4 @@
-use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction};
+use crate::transaction::{RlpEcdsaTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
@@ -106,7 +106,7 @@ impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
 
 impl<T> Signed<T>
 where
-    T: RlpEcdsaEncodableTx + RlpEcdsaDecodableTx,
+    T: RlpEcdsaTx,
 {
     /// Get the length of the transaction when RLP encoded.
     pub fn rlp_encoded_length(&self) -> usize {
