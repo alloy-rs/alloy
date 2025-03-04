@@ -6,7 +6,6 @@ use crate::{
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_network::{Ethereum, Network};
-use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{
     Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
 };
@@ -139,20 +138,15 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_balance(address)
     }
 
-    async fn get_block(
-        &self,
-        block: BlockId,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.0.get_block(block, kind).await
+    fn get_block(&self, block: BlockId) -> EthGetBlock<BlockId, Option<N::BlockResponse>> {
+        self.0.get_block(block)
     }
 
-    async fn get_block_by_hash(
+    fn get_block_by_hash(
         &self,
         hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.0.get_block_by_hash(hash, kind).await
+    ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
+        self.0.get_block_by_hash(hash)
     }
 
     fn get_block_by_number(

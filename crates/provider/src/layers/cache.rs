@@ -7,9 +7,7 @@ use alloy_network::Network;
 use alloy_primitives::{
     keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256,
 };
-use alloy_rpc_types_eth::{
-    BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
-};
+use alloy_rpc_types_eth::{BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
@@ -152,19 +150,13 @@ where
         self.inner.root()
     }
 
-    async fn get_block_by_hash(
+    fn get_block_by_hash(
         &self,
         hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
+    ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
+        let req = RequestType::new("eth_getBlockByHash", hash);
 
-        let req = RequestType::new("eth_getBlockByHash", (hash, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_hash(hash, kind)).await
+        todo!()
     }
 
     fn get_block_by_number(
@@ -539,20 +531,17 @@ mod tests {
             let path = dir.join("rpc-cache-block.txt");
             shared_cache.load_cache(path.clone()).unwrap();
 
-            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block = provider.get_block(0.into()).full().await.unwrap(); // Received from RPC.
+            let block2 = provider.get_block(0.into()).full().await.unwrap(); // Received from cache.
             assert_eq!(block, block2);
 
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-            let latest_block =
-                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let latest_block = provider.get_block(BlockId::latest()).full().await.unwrap(); // Received from RPC.
             let latest_hash = latest_block.unwrap().header.hash;
 
-            let block3 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block4 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block3 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from RPC.
+            let block4 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from cache.
             assert_eq!(block3, block4);
 
             shared_cache.save_cache(path).unwrap();
@@ -574,20 +563,17 @@ mod tests {
             let path = dir.join("rpc-cache-block.txt");
             shared_cache.load_cache(path.clone()).unwrap();
 
-            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block = provider.get_block(0.into()).full().await.unwrap(); // Received from RPC.
+            let block2 = provider.get_block(0.into()).full().await.unwrap(); // Received from cache.
             assert_eq!(block, block2);
 
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-            let latest_block =
-                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let latest_block = provider.get_block(BlockId::latest()).full().await.unwrap(); // Received from RPC.
             let latest_hash = latest_block.unwrap().header.hash;
 
-            let block3 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block4 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            let block3 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from RPC.
+            let block4 = provider.get_block_by_hash(latest_hash).full().await.unwrap(); // Received from cache.
             assert_eq!(block3, block4);
 
             shared_cache.save_cache(path).unwrap();

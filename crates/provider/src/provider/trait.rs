@@ -14,7 +14,7 @@ use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
-use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
+use alloy_network_primitives::{BlockResponse, ReceiptResponse};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -356,21 +356,21 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by either its hash, tag, or number
-    async fn get_block(
-        &self,
-        block: BlockId,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        todo!("get_block")
+    fn get_block(&self, block: BlockId) -> EthGetBlock<BlockId, Option<N::BlockResponse>> {
+        let call = match block {
+            BlockId::Hash(_) => self.client().request("eth_getBlockByHash", block), // Hack
+            BlockId::Number(_) => self.client().request("eth_getBlockByNumber", block),
+        };
+
+        EthGetBlock::new_rpc(call)
     }
 
     /// Gets a block by its [BlockHash]
-    async fn get_block_by_hash(
+    fn get_block_by_hash(
         &self,
         hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        todo!("get_block_by_hash")
+    ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
+        EthGetBlock::new_rpc(self.client().request("eth_getBlockByHash", hash))
     }
 
     /// Gets a block by its [BlockNumberOrTag]
@@ -1591,8 +1591,7 @@ mod tests {
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
         let hash = block.header.hash;
-        let block =
-            provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block = provider.get_block_by_hash(hash).full().await.unwrap().unwrap();
         assert_eq!(block.header.hash, hash);
     }
 
@@ -1756,11 +1755,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_transaction_count_by_hash() {
         let provider = ProviderBuilder::new().on_anvil();
-        let block = provider
-            .get_block(BlockId::latest(), BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block(BlockId::latest()).await.unwrap().unwrap();
         let hash = block.header.hash;
         let tx_count = provider.get_block_transaction_count_by_hash(hash).await.unwrap();
         assert!(tx_count.is_some());

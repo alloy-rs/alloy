@@ -96,14 +96,10 @@ where
     fn into_future(self) -> Self::IntoFuture {
         match self.inner {
             GetBlockInner::RpcCall(call) => {
-                let rpc_call =
-                    call.map_params(|params| EthGetBlockParams::new(params, self.kind.clone()));
+                let rpc_call = call.map_params(|params| EthGetBlockParams::new(params, self.kind));
                 ProviderCall::RpcCall(rpc_call)
             }
-            GetBlockInner::ProviderCall(producer) => {
-                let kind = self.kind;
-                producer(kind)
-            }
+            GetBlockInner::ProviderCall(producer) => producer(self.kind),
         }
     }
 }
