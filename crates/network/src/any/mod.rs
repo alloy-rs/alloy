@@ -77,7 +77,7 @@ impl Network for AnyNetwork {
 
 /// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
 #[derive(Clone, Debug, From, PartialEq, Eq, Deserialize, Serialize)]
-pub struct AnyRpcBlock(WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>);
+pub struct AnyRpcBlock(pub WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>);
 
 impl AnyRpcBlock {
     /// Create a new [`AnyRpcBlock`].
@@ -156,7 +156,7 @@ impl From<Block> for AnyRpcBlock {
 
 /// A wrapper for [`AnyRpcTransaction`] that allows for handling unknown transaction types.
 #[derive(Clone, Debug, From, PartialEq, Eq, Deserialize, Serialize)]
-pub struct AnyRpcTransaction(WithOtherFields<Transaction<AnyTxEnvelope>>);
+pub struct AnyRpcTransaction(pub WithOtherFields<Transaction<AnyTxEnvelope>>);
 
 impl AnyRpcTransaction {
     /// Create a new [`AnyRpcTransaction`].
