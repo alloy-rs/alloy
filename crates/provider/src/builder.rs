@@ -7,7 +7,7 @@ use crate::{
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, Network};
+use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -250,13 +250,6 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
-    /// Add a wallet layer to the stack being built.
-    ///
-    /// See [`WalletFiller`].
-    pub fn wallet<W>(self, wallet: W) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W>>, N> {
-        self.filler(WalletFiller::new(wallet))
-    }
-
     /// Change the network.
     ///
     /// By default, the network is `Ethereum`. This method must be called to configure a different
@@ -312,7 +305,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Finish the layer stack by providing a connection string for a built-in
     /// transport type, outputting the final [`Provider`] type with all stack
     /// components.
-    pub async fn on_builtin(self, s: &str) -> Result<F::Provider, TransportError>
+    #[doc(alias = "on_builtin")]
+    pub async fn connect(self, s: &str) -> Result<F::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
@@ -320,6 +314,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().connect(s).await?;
         Ok(self.on_client(client))
+    }
+
+    /// Finish the layer stack by providing a connection string for a built-in
+    /// transport type, outputting the final [`Provider`] type with all stack
+    /// components.
+    #[deprecated = "use `connect` instead"]
+    #[doc(hidden)]
+    pub async fn on_builtin(self, s: &str) -> Result<F::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+    {
+        self.connect(s).await
     }
 
     /// Build this provider with a websocket connection.
@@ -375,6 +383,19 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().hyper_http(url);
         self.on_client(client)
+    }
+}
+
+impl<L, F, N: Network> ProviderBuilder<L, F, N> {
+    /// Add a wallet layer to the stack being built.
+    ///
+    /// See [`WalletFiller`].
+    #[allow(clippy::type_complexity)]
+    pub fn wallet<W: IntoWallet<N>>(
+        self,
+        wallet: W,
+    ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet>>, N> {
+        self.filler(WalletFiller::new(wallet.into_wallet()))
     }
 }
 

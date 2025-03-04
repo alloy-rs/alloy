@@ -94,6 +94,7 @@ full = [
     "provider-debug-api",
     "provider-anvil-api",
     "pubsub",
+    "rlp",
 ]
 
 # configuration

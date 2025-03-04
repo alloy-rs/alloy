@@ -2,9 +2,10 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 use crate::{
     heart::PendingTransactionError,
-    utils::{self, Eip1559Estimation, EstimatorFunction},
+    utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
     PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
     SendableTx,
@@ -20,6 +21,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
@@ -27,8 +29,6 @@ use alloy_rpc_types_eth::{
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
-
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -92,18 +92,20 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().weak_client()
     }
 
-    /// Returns a type erased provider wrapped in Arc [`super::DynProvider`].
+    /// Returns a type erased provider wrapped in Arc. See [`DynProvider`].
     ///
     /// ```no_run
     /// use alloy_provider::{DynProvider, Provider, ProviderBuilder};
-    /// # async fn f() {
-    /// let provider: DynProvider =
-    ///     ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).erased();
-    /// let block = provider.get_block_number().await.unwrap();
     ///
+    /// # async fn f() -> Result<(), Box<dyn std::error::Error>> {
+    /// let provider: DynProvider =
+    ///     ProviderBuilder::new().on_builtin("http://localhost:8080").await?.erased();
+    /// let block = provider.get_block_number().await?;
+    /// # Ok(())
     /// # }
     /// ```
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    #[doc(alias = "boxed")]
     fn erased(self) -> DynProvider<N>
     where
         Self: Sized + 'static,
@@ -156,13 +158,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
-    /// let output = provider.call(&tx).await?;
+    /// let output = provider.call(tx).await?;
     /// # Ok(())
     /// # }
     /// ```
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
@@ -269,7 +271,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Note
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
             .map_resp(utils::convert_u64)
@@ -277,11 +279,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     ///
-    /// Receives an optional [EstimatorFunction] that can be used to modify
+    /// Receives an [Eip1559Estimator] that can be used to modify
     /// how to estimate these fees.
-    async fn estimate_eip1559_fees(
+    async fn estimate_eip1559_fees_with(
         &self,
-        estimator: Option<EstimatorFunction>,
+        estimator: Eip1559Estimator,
     ) -> TransportResult<Eip1559Estimation> {
         let fee_history = self
             .get_fee_history(
@@ -308,10 +310,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             }
         };
 
-        Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
-            base_fee_per_gas,
-            &fee_history.reward.unwrap_or_default(),
-        ))
+        Ok(estimator.estimate(base_fee_per_gas, &fee_history.reward.unwrap_or_default()))
+    }
+
+    /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    ///
+    /// Uses the builtin estimator [`utils::eip1559_default_estimator`] function.
+    async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
+        self.estimate_eip1559_fees_with(Eip1559Estimator::default()).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -767,6 +773,29 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
+    /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
+    /// network.
+    ///
+    /// TransactionConditional represents the preconditions that determine the inclusion of the
+    /// transaction, enforced out-of-protocol by the sequencer.
+    ///
+    /// Note: This endpoint is only available on certain networks, e.g. opstack chains, polygon,
+    /// bsc.
+    ///
+    /// See [`TransactionConditional`] for more details.
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        let tx_hash = self
+            .client()
+            .request("eth_sendRawTransactionConditional", (rlp_hex, conditional))
+            .await?;
+        Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
+    }
+
     /// Broadcasts a transaction to the network.
     ///
     /// Returns a [`PendingTransactionBuilder`] which can be used to configure
@@ -1141,8 +1170,6 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Read, str::FromStr, time::Duration};
-
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_consensus::Transaction;
@@ -1153,6 +1180,8 @@ mod tests {
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
+    use std::{io::Read, str::FromStr, time::Duration};
+
     // For layer transport tests
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
@@ -1292,7 +1321,7 @@ mod tests {
 
     #[cfg(feature = "hyper")]
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_auth_layer_transport() {
         crate::ext::test::async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
@@ -1369,31 +1398,31 @@ mod tests {
     #[cfg(feature = "ws")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in [
-            "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F",
-            "wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754",
-        ] {
-            let _ = ProviderBuilder::<_, _, Ethereum>::default().on_builtin(url).await.unwrap();
+        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+            let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
-        let anvil = Anvil::new().block_time(1).spawn();
+        let anvil = Anvil::new().block_time_f64(0.2).spawn();
         let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
         let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
         let provider = RootProvider::<Ethereum>::new(client);
 
         let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(2);
-        let mut n = 1;
+        let mut stream = sub.into_stream().take(5);
+        let mut next = None;
         while let Some(header) = stream.next().await {
-            assert_eq!(header.number, n);
-            n += 1;
+            if let Some(next) = &mut next {
+                assert_eq!(header.number, *next);
+                *next += 1;
+            } else {
+                next = Some(header.number + 1);
+            }
         }
     }
 
@@ -1847,19 +1876,20 @@ mod tests {
         feature = "reqwest-rustls-tls",
         feature = "reqwest-native-tls",
     ))]
+    #[ignore = "ignore until <https://github.com/paradigmxyz/reth/pull/14727> is in"]
     async fn call_mainnet() {
         use alloy_network::TransactionBuilder;
         use alloy_sol_types::SolValue;
 
-        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let url = "https://docs-demo.quiknode.pro/";
         let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
             .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(&req).await.unwrap();
+        let result = provider.call(req.clone()).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
 
-        let result = provider.call(&req).block(0.into()).await.unwrap();
+        let result = provider.call(req).block(0.into()).await.unwrap();
         assert_eq!(result.to_string(), "0x");
     }
 
@@ -1934,11 +1964,11 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper-tls")]
     async fn hyper_https() {
-        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let url = "https://reth-ethereum.ithaca.xyz/rpc";
 
-        // With the `hyper` feature enabled .on_builtin builds the provider based on
+        // With the `hyper` feature enabled .connect builds the provider based on
         // `HyperTransport`.
-        let provider = ProviderBuilder::new().on_builtin(url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(url).await.unwrap();
 
         let _num = provider.get_block_number().await.unwrap();
     }
@@ -1995,5 +2025,20 @@ mod tests {
 
         assert!(output.contains("eth_sendTransaction"));
         assert!(output.contains("Block Number: 1"))
+    }
+
+    #[tokio::test]
+    async fn custom_estimator() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil();
+
+        let _ = provider
+            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_fee, _rewards| Eip1559Estimation {
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+            }))
+            .await;
     }
 }

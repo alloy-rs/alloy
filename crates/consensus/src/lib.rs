@@ -18,7 +18,7 @@ pub use alloy_trie::TrieAccount;
 pub use alloy_trie::TrieAccount as Account;
 
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, Header};
+pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
@@ -55,6 +55,8 @@ pub use alloy_primitives::{Sealable, Sealed};
 
 mod signed;
 pub use signed::Signed;
+
+pub mod error;
 
 /// Bincode-compatible serde implementations for consensus types.
 ///

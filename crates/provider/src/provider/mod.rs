@@ -5,7 +5,7 @@ mod eth_get_block;
 pub use eth_get_block::EthGetBlock;
 
 mod prov_call;
-pub use prov_call::ProviderCall;
+pub use prov_call::{BoxedFut, ProviderCall};
 
 mod root;
 pub use root::{builder, RootProvider};

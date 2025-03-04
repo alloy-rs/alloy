@@ -229,6 +229,12 @@ impl TransactionRequest {
         self
     }
 
+    /// Sets the maximum fee per blob gas for the transaction.
+    pub const fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
+        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas);
+        self
+    }
+
     /// Sets the recipient address for the transaction.
     #[inline]
     pub const fn to(mut self, to: Address) -> Self {
@@ -669,7 +675,7 @@ impl TransactionRequest {
     /// Build a [`TypedTransaction`]
     ///
     /// When `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_. Which
-    /// is to say, that it is signable, and the signed versino can be sent to the network.
+    /// is to say, that it is signable, and the signed version can be sent to the network.
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
         let Some(tx_type) = self.buildable_type() else {
             return Err(self);
