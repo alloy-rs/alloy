@@ -2,6 +2,8 @@ mod builder;
 
 mod either;
 use alloy_consensus::{Transaction as TxTrait, TxEnvelope};
+use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
+use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 
 mod unknowns;
@@ -10,9 +12,9 @@ pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::Network;
-use alloy_network_primitives::BlockResponse;
+use alloy_network_primitives::{BlockResponse, TransactionResponse};
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
-use alloy_rpc_types_eth::{Block, BlockTransactions, Transaction, TransactionRequest};
+use alloy_rpc_types_eth::{AccessList, Block, BlockTransactions, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use derive_more::From;
 use serde::{Deserialize, Serialize};
@@ -64,7 +66,7 @@ impl Network for AnyNetwork {
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = WithOtherFields<Transaction<AnyTxEnvelope>>;
+    type TransactionResponse = AnyRpcTransaction;
 
     type ReceiptResponse = AnyTransactionReceipt;
 
@@ -75,15 +77,11 @@ impl Network for AnyNetwork {
 
 /// A wrapper for [`AnyRpcBlock`] that allows for handling unknown block types.
 #[derive(Clone, Debug, From, PartialEq, Eq, Deserialize, Serialize)]
-pub struct AnyRpcBlock(
-    WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
-);
+pub struct AnyRpcBlock(WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>);
 
 impl AnyRpcBlock {
     /// Create a new [`AnyRpcBlock`].
-    pub fn new(
-        inner: WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>,
-    ) -> Self {
+    pub fn new(inner: WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>) -> Self {
         Self(inner)
     }
 
@@ -92,13 +90,7 @@ impl AnyRpcBlock {
     /// Returns an error if the block contains only transaction hashes or if it is an uncle block.
     pub fn try_into_transactions(self) -> Result<Vec<AnyRpcTransaction>, String> {
         match self.0.inner.transactions {
-            BlockTransactions::Full(txs) => {
-                let mut result = Vec::with_capacity(txs.len());
-                for tx in txs {
-                    result.push(AnyRpcTransaction::new(tx));
-                }
-                Ok(result)
-            }
+            BlockTransactions::Full(txs) => Ok(txs),
             BlockTransactions::Hashes(_) => {
                 Err("Block contains only transaction hashes".to_string())
             }
@@ -111,7 +103,7 @@ impl AnyRpcBlock {
 
 impl BlockResponse for AnyRpcBlock {
     type Header = AnyRpcHeader;
-    type Transaction = WithOtherFields<Transaction<AnyTxEnvelope>>;
+    type Transaction = AnyRpcTransaction;
 
     fn header(&self) -> &Self::Header {
         &self.0.inner.header
@@ -130,18 +122,14 @@ impl BlockResponse for AnyRpcBlock {
     }
 }
 
-impl AsRef<WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>>
-    for AnyRpcBlock
-{
-    fn as_ref(
-        &self,
-    ) -> &WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>> {
+impl AsRef<WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>> for AnyRpcBlock {
+    fn as_ref(&self) -> &WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>> {
         &self.0
     }
 }
 
 impl Deref for AnyRpcBlock {
-    type Target = WithOtherFields<Block<WithOtherFields<Transaction<AnyTxEnvelope>>, AnyRpcHeader>>;
+    type Target = WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -158,7 +146,9 @@ impl From<Block> for AnyRpcBlock {
     fn from(value: Block) -> Self {
         let block = value
             .map_header(|h| h.map(|h| alloy_consensus_any::AnyHeader { ..h.into() }))
-            .map_transactions(|tx| WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)));
+            .map_transactions(|tx| {
+                AnyRpcTransaction::new(WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)))
+            });
 
         Self(WithOtherFields::new(block))
     }
@@ -182,9 +172,8 @@ impl AnyRpcTransaction {
 
     /// Returns the inner transaction [`TxEnvelope`] if inner tx type if
     /// [`AnyTxEnvelope::Ethereum`].
-    pub fn as_envelope(self) -> Option<TxEnvelope> {
-        let (tx, _other) = self.into_parts();
-        tx.inner.as_envelope().cloned()
+    pub fn as_envelope(&self) -> Option<&TxEnvelope> {
+        self.inner.inner.as_envelope()
     }
 
     /// Maps the inner transaction to a new type that implements [`TxTrait`].
@@ -223,5 +212,107 @@ impl From<Transaction<TxEnvelope>> for AnyRpcTransaction {
     fn from(tx: Transaction<TxEnvelope>) -> Self {
         let tx = tx.map(AnyTxEnvelope::Ethereum);
         Self(WithOtherFields::new(tx))
+    }
+}
+
+impl alloy_consensus::Transaction for AnyRpcTransaction {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.inner.chain_id()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.inner.nonce()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        alloy_consensus::Transaction::gas_price(&self.0.inner)
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        alloy_consensus::Transaction::max_fee_per_gas(&self.inner)
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.inner.max_fee_per_blob_gas()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.inner.priority_fee_or_price()
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        self.inner.effective_gas_price(base_fee)
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        self.inner.is_dynamic_fee()
+    }
+
+    fn kind(&self) -> TxKind {
+        self.inner.kind()
+    }
+
+    fn is_create(&self) -> bool {
+        self.inner.is_create()
+    }
+
+    fn value(&self) -> U256 {
+        self.inner.value()
+    }
+
+    fn input(&self) -> &Bytes {
+        self.inner.input()
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        self.inner.access_list()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.inner.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.inner.authorization_list()
+    }
+}
+
+impl TransactionResponse for AnyRpcTransaction {
+    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
+        self.0.inner.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.inner.block_number
+    }
+
+    fn from(&self) -> alloy_primitives::Address {
+        self.inner.from
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        self.inner.effective_gas_price
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.inner.transaction_index
+    }
+
+    fn tx_hash(&self) -> alloy_primitives::TxHash {
+        self.inner.tx_hash()
+    }
+}
+
+impl Typed2718 for AnyRpcTransaction {
+    fn ty(&self) -> u8 {
+        self.inner.ty()
     }
 }
