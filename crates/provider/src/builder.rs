@@ -3,6 +3,7 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
+    layers::{Asserter, MockLayer, MockProvider},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -144,6 +145,18 @@ impl
     /// This is equivalent to creating the builder using `ProviderBuilder::default()`.
     pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
         ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
+    }
+
+    /// Create a new [`MockedProvider`] for testing purposes.
+    pub fn mocked() -> (MockProvider<RootProvider, Ethereum>, Asserter) {
+        let asserter = Asserter::new();
+        let layer = MockLayer::new(asserter.clone());
+
+        let mock_provider = ProviderBuilder::<_, _, Ethereum>::default()
+            .layer(layer)
+            .on_http("https://localhost:8545".parse().unwrap());
+
+        (mock_provider, asserter)
     }
 }
 
