@@ -41,13 +41,13 @@ where
     T: AsRef<Log>,
 {
     /// Calculates [`Log`]'s bloom filter. This is slow operation and
-    /// [ReceiptWithBloom] can be used to cache this value.
+    /// [`ReceiptWithBloom`] can be used to cache this value.
     pub fn bloom_slow(&self) -> Bloom {
         self.logs.iter().map(AsRef::as_ref).collect()
     }
 
     /// Calculates the bloom filter for the receipt and returns the
-    /// [ReceiptWithBloom] container type.
+    /// [`ReceiptWithBloom`] container type.
     pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom: self.bloom_slow(), receipt: self }
     }

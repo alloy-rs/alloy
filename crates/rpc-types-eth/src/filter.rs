@@ -679,8 +679,8 @@ impl Filter {
     ///
     /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
     /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
-    /// - For parsed RPC [`crate::Log<T>`]s (e.g. those returned by a
-    /// contract), see [`Self::rpc_matches_parsed`].
+    /// - For parsed RPC [`crate::Log<T>`]s (e.g. those returned by a contract), see
+    ///   [`Self::rpc_matches_parsed`].
     ///
     /// [`SolEvent`]: alloy_sol_types::SolEvent
     pub fn matches_parsed<T, U>(&self, log: &T) -> bool
@@ -702,8 +702,7 @@ impl Filter {
     /// parsed `T`, usually implementing [`SolEvent`].
     ///
     /// - For un-parsed [`Log<LogData>`] see [`Self::matches`].
-    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see
-    /// [`Self::matches_parsed`].
+    /// - For parsed [`Log<T>`]s (e.g. those returned by a contract), see [`Self::matches_parsed`].
     /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
     ///
     /// [`SolEvent`]: alloy_sol_types::SolEvent
