@@ -1,7 +1,7 @@
 mod builder;
 
 mod either;
-use alloy_consensus::TxEnvelope;
+use alloy_consensus::{Transaction as TxTrait, TxEnvelope};
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
 
 mod unknowns;
@@ -86,6 +86,27 @@ impl AnyRpcBlock {
     ) -> Self {
         Self(inner)
     }
+
+    /// Tries to convert inner transactions into a vector of [`AnyRpcTransaction`].
+    ///
+    /// Returns an error if the block contains only transaction hashes or if it is an uncle block.
+    pub fn try_into_transactions(self) -> Result<Vec<AnyRpcTransaction>, String> {
+        match self.0.inner.transactions {
+            BlockTransactions::Full(txs) => {
+                let mut result = Vec::with_capacity(txs.len());
+                for tx in txs {
+                    result.push(AnyRpcTransaction::new(tx));
+                }
+                Ok(result)
+            }
+            BlockTransactions::Hashes(_) => {
+                Err("Block contains only transaction hashes".to_string())
+            }
+            BlockTransactions::Uncle => {
+                Err("Block is an uncle block with no transactions".to_string())
+            }
+        }
+    }
 }
 
 impl BlockResponse for AnyRpcBlock {
@@ -151,6 +172,30 @@ impl AnyRpcTransaction {
     /// Create a new [`AnyRpcTransaction`].
     pub fn new(inner: WithOtherFields<Transaction<AnyTxEnvelope>>) -> Self {
         Self(inner)
+    }
+
+    /// Split the transaction into its parts.
+    pub fn into_parts(self) -> (Transaction<AnyTxEnvelope>, alloy_serde::OtherFields) {
+        let WithOtherFields { inner, other } = self.0;
+        (inner, other)
+    }
+
+    /// Returns the inner transaction [`TxEnvelope`] if inner tx type if
+    /// [`AnyTxEnvelope::Ethereum`].
+    pub fn as_envelope(self) -> Option<TxEnvelope> {
+        let (tx, _other) = self.into_parts();
+        tx.inner.as_envelope().cloned()
+    }
+
+    /// Maps the inner transaction to a new type that implements [`TxTrait`].
+    ///
+    /// [`alloy_serde::OtherFields`] are ignored while mapping.
+    pub fn map<F, T: TxTrait>(self, f: F) -> T
+    where
+        F: FnOnce(Transaction<AnyTxEnvelope>) -> T,
+    {
+        let WithOtherFields { inner, other: _ } = self.0;
+        f(inner)
     }
 }
 
