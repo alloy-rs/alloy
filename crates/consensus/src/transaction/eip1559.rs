@@ -158,8 +158,6 @@ impl RlpEcdsaDecodableTx for TxEip1559 {
     }
 }
 
-// impl RlpEcdsaTx for TxEip1559 {}
-
 impl Transaction for TxEip1559 {
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
