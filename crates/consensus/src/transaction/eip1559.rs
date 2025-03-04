@@ -4,7 +4,7 @@ use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, 
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpTxHash};
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -127,8 +127,6 @@ impl RlpEcdsaEncodableTx for TxEip1559 {
         self.access_list.encode(out);
     }
 }
-
-impl RlpTxHash for TxEip1559 {}
 
 impl RlpEcdsaDecodableTx for TxEip1559 {
     /// Decodes the inner [TxEip1559] fields from RLP bytes.

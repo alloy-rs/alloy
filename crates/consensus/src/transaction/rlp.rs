@@ -98,11 +98,7 @@ pub trait RlpEcdsaEncodableTx: SignableTransaction<Signature> + Sized {
     fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.network_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
     }
-}
 
-/// Helper trait for calculating transaction hashes.
-#[doc(hidden)]
-pub trait RlpTxHash: RlpEcdsaEncodableTx {
     /// Calculate the transaction hash for the given signature and type.
     fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
         let mut buf = Vec::with_capacity(self.eip2718_encoded_length(signature));

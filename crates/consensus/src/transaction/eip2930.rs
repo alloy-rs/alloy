@@ -4,7 +4,7 @@ use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, 
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpTxHash};
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -108,8 +108,6 @@ impl RlpEcdsaEncodableTx for TxEip2930 {
         self.access_list.encode(out);
     }
 }
-
-impl RlpTxHash for TxEip2930 {}
 
 impl RlpEcdsaDecodableTx for TxEip2930 {
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {

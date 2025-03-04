@@ -11,7 +11,7 @@ use alloy_primitives::{
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpTxHash};
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -154,8 +154,6 @@ impl RlpEcdsaDecodableTx for TxEip7702 {
         })
     }
 }
-
-impl RlpTxHash for TxEip7702 {}
 
 impl Transaction for TxEip7702 {
     #[inline]

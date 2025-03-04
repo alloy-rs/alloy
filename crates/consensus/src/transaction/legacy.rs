@@ -1,5 +1,5 @@
 use crate::{
-    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpTxHash},
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
     SignableTransaction, Signed, Transaction, TxType,
 };
 use alloc::vec::Vec;
@@ -170,6 +170,12 @@ impl RlpEcdsaEncodableTx for TxLegacy {
     fn network_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         self.rlp_encode_signed(signature, out);
     }
+
+    fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
+        let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
+        self.rlp_encode_signed(signature, &mut buf);
+        keccak256(&buf)
+    }
 }
 
 impl RlpEcdsaDecodableTx for TxLegacy {
@@ -227,14 +233,6 @@ impl RlpEcdsaDecodableTx for TxLegacy {
         _ty: u8,
     ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
         Self::rlp_decode_signed(buf).map_err(Into::into)
-    }
-}
-
-impl RlpTxHash for TxLegacy {
-    fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
-        let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
-        self.rlp_encode_signed(signature, &mut buf);
-        keccak256(&buf)
     }
 }
 
