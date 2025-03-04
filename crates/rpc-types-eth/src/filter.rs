@@ -21,8 +21,8 @@ use itertools::{
 pub struct FilterSet<T: Eq + Hash> {
     set: HashSet<T>,
 
-    #[serde(skip, default)]
     #[cfg(feature = "std")]
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     bloom: std::sync::OnceLock<Bloom>,
 }
 
