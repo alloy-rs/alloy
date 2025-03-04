@@ -64,7 +64,7 @@ where
         Self { inner: GetBlockInner::RpcCall(inner), kind: BlockTransactionsKind::Hashes }
     }
 
-    /// Create a new [`EthGetBlock`] request with the given [`ProviderCallProducer`].
+    /// Create a new [`EthGetBlock`] request with a closure that returns a [`ProviderCall`].
     pub fn new_provider(producer: ProviderCallProducer<Params, Resp, Output, Map>) -> Self {
         Self { inner: GetBlockInner::ProviderCall(producer), kind: BlockTransactionsKind::Hashes }
     }
@@ -127,7 +127,7 @@ where
 {
     /// [`RpcCall`] with params that get wrapped into [`EthGetBlockParams`] in the future.
     RpcCall(RpcCall<Params, Resp, Output, Map>),
-    /// Closure that produces a [`ProviderCall`] given a [`BlockId`] and [`BlockTransactionsKind`].
+    /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
     ProviderCall(ProviderCallProducer<Params, Resp, Output, Map>),
 }
 
