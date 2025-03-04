@@ -5,9 +5,9 @@ use alloy_primitives::{keccak256, PrimitiveSignature as Signature, TxHash};
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
 /// Helper trait for managing RLP encoding of transactions inside 2718
-/// envelopes.
 #[doc(hidden)]
-pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
+#[doc(alias = "RlpEncodableTx", alias = "RlpTxEncoding")]
+pub trait RlpEcdsaEncodableTx: SignableTransaction<Signature> + Sized {
     /// The default transaction type for this transaction.
     const DEFAULT_TX_TYPE: u8;
 
@@ -99,6 +99,23 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         self.network_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
     }
 
+    /// Calculate the transaction hash for the given signature and type.
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
+        let mut buf = Vec::with_capacity(self.eip2718_encoded_length(signature));
+        self.eip2718_encode_with_type(signature, ty, &mut buf);
+        keccak256(&buf)
+    }
+
+    /// Calculate the transaction hash for the given signature.
+    fn tx_hash(&self, signature: &Signature) -> TxHash {
+        self.tx_hash_with_type(signature, Self::DEFAULT_TX_TYPE)
+    }
+}
+
+/// Helper trait for managing RLP decoding of transactions inside 2718 envelopes.
+#[doc(hidden)]
+#[doc(alias = "RlpDecodableTx", alias = "RlpTxDecoding")]
+pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
     /// Decodes the fields of the transaction from RLP bytes. Do not decode a
     /// header. You may assume the buffer is long enough to contain the
     /// transaction.
@@ -202,16 +219,12 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
         Self::network_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
     }
-
-    /// Calculate the transaction hash for the given signature and type.
-    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
-        let mut buf = Vec::with_capacity(self.eip2718_encoded_length(signature));
-        self.eip2718_encode_with_type(signature, ty, &mut buf);
-        keccak256(&buf)
-    }
-
-    /// Calculate the transaction hash for the given signature.
-    fn tx_hash(&self, signature: &Signature) -> TxHash {
-        self.tx_hash_with_type(signature, Self::DEFAULT_TX_TYPE)
-    }
 }
+
+/// Helper trait for managing RLP encoding and decoding of transactions inside 2718
+/// envelopes.
+#[doc(hidden)]
+pub trait RlpEcdsaTx: RlpEcdsaEncodableTx + RlpEcdsaDecodableTx {}
+
+// Implement RlpEcdsaTx for all types that implement both required traits
+impl<T> RlpEcdsaTx for T where T: RlpEcdsaEncodableTx + RlpEcdsaDecodableTx {}

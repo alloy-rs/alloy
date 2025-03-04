@@ -1,8 +1,10 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
+
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -95,7 +97,7 @@ impl TxEip1559 {
     }
 }
 
-impl RlpEcdsaTx for TxEip1559 {
+impl RlpEcdsaEncodableTx for TxEip1559 {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     /// Outputs the length of the transaction's fields, without a RLP header.
@@ -124,7 +126,9 @@ impl RlpEcdsaTx for TxEip1559 {
         self.input.0.encode(out);
         self.access_list.encode(out);
     }
+}
 
+impl RlpEcdsaDecodableTx for TxEip1559 {
     /// Decodes the inner [TxEip1559] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_
@@ -415,7 +419,10 @@ pub(super) mod serde_bincode_compat {
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip1559;
-    use crate::{transaction::RlpEcdsaTx, SignableTransaction};
+    use crate::{
+        transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
+        SignableTransaction,
+    };
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{
         address, b256, hex, Address, PrimitiveSignature as Signature, B256, U256,
