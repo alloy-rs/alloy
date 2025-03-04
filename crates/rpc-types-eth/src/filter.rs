@@ -112,6 +112,11 @@ impl<T: Eq + Hash> FilterSet<T> {
         self.set.is_empty()
     }
 
+    /// Returns the number of values in the filter
+    pub fn len(&self) -> usize {
+        self.set.len()
+    }
+
     /// Returns whether the given value matches the filter. It the filter is empty
     /// any value matches. Otherwise, the filter must include the value
     pub fn matches(&self, value: &T) -> bool {
@@ -122,6 +127,34 @@ impl<T: Eq + Hash> FilterSet<T> {
     /// in an arbitrary order.
     pub fn iter(&self) -> hash_set::Iter<'_, T> {
         self.set.iter()
+    }
+
+    /// Check if the filter contains the given value
+    pub fn contains(&self, value: &T) -> bool {
+        self.set.contains(value)
+    }
+
+    /// Drop the bloom filter if it exists. This should be invoked by any
+    /// method taking `&mut self`.
+    fn unseal(&mut self) {
+        #[cfg(feature = "std")]
+        self.bloom.take();
+    }
+
+    /// Insert a value into the filter
+    pub fn insert(&mut self, value: T) -> bool {
+        self.unseal();
+        self.set.insert(value)
+    }
+
+    /// Remove a value from the filter (if present)
+    pub fn remove(&mut self, value: &T) -> bool {
+        if self.contains(value) {
+            self.unseal();
+            self.set.remove(value)
+        } else {
+            false
+        }
     }
 }
 
