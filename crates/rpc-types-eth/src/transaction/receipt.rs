@@ -118,11 +118,8 @@ where
             0
         }
 
-        // Deserialize into our helper struct
         let helper = ReceiptDeserHelper::deserialize(deserializer)?;
-
-        // Convert to the actual TransactionReceipt
-        Ok(TransactionReceipt {
+        Ok(Self {
             inner: helper.inner,
             transaction_hash: helper.transaction_hash,
             transaction_index: helper.transaction_index,
