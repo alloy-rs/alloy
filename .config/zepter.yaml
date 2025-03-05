@@ -17,7 +17,6 @@ workflows:
         "--left-side-feature-missing=ignore",
         # Ignore the case that `A` it outside of the workspace. Otherwise it will report errors in external dependencies that we have no influence on.
         "--left-side-outside-workspace=ignore",
-        # limit to the workspace
         "--show-path",
         "--quiet",
       ]
