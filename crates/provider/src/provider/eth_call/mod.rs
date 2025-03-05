@@ -231,8 +231,8 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub fn overrides(mut self, overrides: StateOverride) -> Self {
-        self.params.overrides = Some(overrides);
+    pub fn overrides(mut self, overrides: impl Into<StateOverride>) -> Self {
+        self.params.overrides = Some(overrides.into());
         self
     }
 

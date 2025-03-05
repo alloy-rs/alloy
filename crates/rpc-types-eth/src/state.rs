@@ -7,7 +7,7 @@ use alloy_primitives::{
     Address, Bytes, B256, U256,
 };
 
-/// A StateOverride builder.
+/// A builder type for [`StateOverride`]. 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StateOverridesBuilder {
     overrides: StateOverride,
