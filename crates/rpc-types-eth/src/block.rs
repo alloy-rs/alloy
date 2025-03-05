@@ -342,6 +342,22 @@ impl<H> Header<H> {
         self.size = size;
         self
     }
+
+    /// Applies the given closure to the inner header.
+    #[allow(clippy::use_self)]
+    pub fn map<H1>(self, f: impl FnOnce(H) -> H1) -> Header<H1> {
+        let Header { hash, inner, total_difficulty, size } = self;
+
+        Header { hash, inner: f(inner), total_difficulty, size }
+    }
+
+    /// Applies the given fallible closure to the inner header.
+    #[allow(clippy::use_self)]
+    pub fn try_map<H1, E>(self, f: impl FnOnce(H) -> Result<H1, E>) -> Result<Header<H1>, E> {
+        let Header { hash, inner, total_difficulty, size } = self;
+
+        Ok(Header { hash, inner: f(inner)?, total_difficulty, size })
+    }
 }
 
 impl<H> Deref for Header<H> {

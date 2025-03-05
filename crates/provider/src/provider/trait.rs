@@ -157,13 +157,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
-    /// let output = provider.call(&tx).await?;
+    /// let output = provider.call(tx).await?;
     /// # Ok(())
     /// # }
     /// ```
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
@@ -270,7 +270,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Note
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
             .map_resp(utils::convert_u64)
@@ -1914,6 +1914,7 @@ mod tests {
         feature = "reqwest-rustls-tls",
         feature = "reqwest-native-tls",
     ))]
+    #[ignore = "ignore until <https://github.com/paradigmxyz/reth/pull/14727> is in"]
     async fn call_mainnet() {
         use alloy_network::TransactionBuilder;
         use alloy_sol_types::SolValue;
@@ -1923,10 +1924,10 @@ mod tests {
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
             .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(&req).await.unwrap();
+        let result = provider.call(req.clone()).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
 
-        let result = provider.call(&req).block(0.into()).await.unwrap();
+        let result = provider.call(req).block(0.into()).await.unwrap();
         assert_eq!(result.to_string(), "0x");
     }
 

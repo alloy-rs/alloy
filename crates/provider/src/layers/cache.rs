@@ -101,7 +101,7 @@ macro_rules! rpc_call_with_block {
             let client = client?;
 
             let result = client.request($req.method(), $req.params()).map_params(|params| {
-                ParamsWithBlock { params, block_id: $req.block_id.unwrap_or(BlockId::latest()) }
+                ParamsWithBlock::new(params, $req.block_id.unwrap_or(BlockId::latest()))
             });
 
             let res = result.await?;
