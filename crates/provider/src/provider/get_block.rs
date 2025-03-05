@@ -1,6 +1,6 @@
 use crate::ProviderCall;
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcRecv, RpcSend};
+use alloy_json_rpc::RpcRecv;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_rpc_client::RpcCall;
 use alloy_transport::TransportResult;
@@ -22,7 +22,10 @@ impl serde::Serialize for EthGetBlockParams {
         use serde::ser::SerializeTuple;
 
         let mut tuple = serializer.serialize_tuple(2)?;
-        tuple.serialize_element(&self.block)?;
+        match self.block {
+            BlockId::Hash(hash) => tuple.serialize_element(&hash.block_hash)?,
+            BlockId::Number(number) => tuple.serialize_element(&number)?,
+        }
         if self.kind.is_hashes() {
             tuple.serialize_element(&false)?;
         } else {
@@ -33,7 +36,8 @@ impl serde::Serialize for EthGetBlockParams {
 }
 
 impl EthGetBlockParams {
-    fn new(block: BlockId, kind: BlockTransactionsKind) -> Self {
+    /// Instantiate [`EthGetBlockParams`] with the given block and kind.
+    pub fn new(block: BlockId, kind: BlockTransactionsKind) -> Self {
         Self { block, kind }
     }
 }
@@ -44,30 +48,33 @@ impl EthGetBlockParams {
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthGetBlockBy must be awaited to execute the request"]
 //#[derive(Clone, Debug)]
-pub struct EthGetBlock<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct EthGetBlock<Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
-    inner: GetBlockInner<Params, Resp, Output, Map>,
+    inner: GetBlockInner<Resp, Output, Map>,
+    block: BlockId,
     kind: BlockTransactionsKind,
 }
 
-impl<Params, Resp, Output, Map> EthGetBlock<Params, Resp, Output, Map>
+impl<Resp, Output, Map> EthGetBlock<Resp, Output, Map>
 where
-    Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Create a new [`EthGetBlock`] request with the given [`RpcCall`].
-    pub fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
-        Self { inner: GetBlockInner::RpcCall(inner), kind: BlockTransactionsKind::Hashes }
+    pub fn new_rpc(block: BlockId, inner: RpcCall<EthGetBlockParams, Resp, Output, Map>) -> Self {
+        Self { block, inner: GetBlockInner::RpcCall(inner), kind: BlockTransactionsKind::Hashes }
     }
 
     /// Create a new [`EthGetBlock`] request with a closure that returns a [`ProviderCall`].
-    pub fn new_provider(producer: ProviderCallProducer<Resp, Output, Map>) -> Self {
-        Self { inner: GetBlockInner::ProviderCall(producer), kind: BlockTransactionsKind::Hashes }
+    pub fn new_provider(block: BlockId, producer: ProviderCallProducer<Resp, Output, Map>) -> Self {
+        Self {
+            block,
+            inner: GetBlockInner::ProviderCall(producer),
+            kind: BlockTransactionsKind::Hashes,
+        }
     }
 
     /// Set the [`BlockTransactionsKind`] for the request.
@@ -89,9 +96,8 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> std::future::IntoFuture for EthGetBlock<Params, Resp, Output, Map>
+impl<Resp, Output, Map> std::future::IntoFuture for EthGetBlock<Resp, Output, Map>
 where
-    Params: RpcSend,
     Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
@@ -104,7 +110,7 @@ where
         match self.inner {
             GetBlockInner::RpcCall(call) => {
                 let rpc_call =
-                    call.map_params(|params| EthGetBlockParams::new(BlockId::latest(), self.kind));
+                    call.map_params(|_params| EthGetBlockParams::new(self.block, self.kind));
                 ProviderCall::RpcCall(rpc_call)
             }
             GetBlockInner::ProviderCall(producer) => producer(self.kind),
@@ -112,9 +118,8 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> core::fmt::Debug for EthGetBlock<Params, Resp, Output, Map>
+impl<Resp, Output, Map> core::fmt::Debug for EthGetBlock<Resp, Output, Map>
 where
-    Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
@@ -125,21 +130,19 @@ where
 
 type ProviderCallProducer<Resp, Output, Map> =
     Box<dyn Fn(BlockTransactionsKind) -> ProviderCall<EthGetBlockParams, Resp, Output, Map> + Send>;
-enum GetBlockInner<Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+enum GetBlockInner<Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
-    Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// [`RpcCall`] with params that get wrapped into [`EthGetBlockParams`] in the future.
-    RpcCall(RpcCall<Params, Resp, Output, Map>),
+    RpcCall(RpcCall<EthGetBlockParams, Resp, Output, Map>),
     /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
     ProviderCall(ProviderCallProducer<Resp, Output, Map>),
 }
 
-impl<Params, Resp, Output, Map> core::fmt::Debug for GetBlockInner<Params, Resp, Output, Map>
+impl<Resp, Output, Map> core::fmt::Debug for GetBlockInner<Resp, Output, Map>
 where
-    Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {

@@ -138,21 +138,18 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_balance(address)
     }
 
-    fn get_block(&self, block: BlockId) -> EthGetBlock<BlockId, Option<N::BlockResponse>> {
+    fn get_block(&self, block: BlockId) -> EthGetBlock<Option<N::BlockResponse>> {
         self.0.get_block(block)
     }
 
-    fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-    ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<Option<N::BlockResponse>> {
         self.0.get_block_by_hash(hash)
     }
 
     fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-    ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
+    ) -> EthGetBlock<Option<N::BlockResponse>> {
         self.0.get_block_by_number(number)
     }
 

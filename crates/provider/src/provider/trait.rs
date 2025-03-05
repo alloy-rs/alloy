@@ -2,7 +2,7 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
+use super::{DynProvider, Empty, EthCallMany, EthGetBlockParams, MulticallBuilder};
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, Eip1559Estimator},
@@ -23,8 +23,9 @@ use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
+    AccessListResult, BlockId, BlockNumberOrTag, BlockTransactionsKind, Bundle,
+    EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log,
+    SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -356,41 +357,56 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by either its hash, tag, or number
-    fn get_block(&self, block: BlockId) -> EthGetBlock<BlockId, Option<N::BlockResponse>> {
+    fn get_block(&self, block: BlockId) -> EthGetBlock<Option<N::BlockResponse>> {
         let call = match block {
-            BlockId::Hash(_) => self.client().request("eth_getBlockByHash", block), // Hack
-            BlockId::Number(_) => self.client().request("eth_getBlockByNumber", block),
+            BlockId::Hash(_) => self.client().request(
+                "eth_getBlockByHash",
+                EthGetBlockParams::new(block, BlockTransactionsKind::Hashes),
+            ), // Hack
+            BlockId::Number(_) => self.client().request(
+                "eth_getBlockByNumber",
+                EthGetBlockParams::new(block, BlockTransactionsKind::Hashes),
+            ),
         }
         .map_resp(
             utils::convert_to_hashes::<N>
                 as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
         );
 
-        EthGetBlock::new_rpc(call)
+        EthGetBlock::new_rpc(block, call)
     }
 
     /// Gets a block by its [BlockHash]
-    fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-    ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
-        let rpc_call = self.client().request("eth_getBlockByHash", hash).map_resp(
-            utils::convert_to_hashes::<N>
-                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
-        );
-        EthGetBlock::new_rpc(rpc_call)
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<Option<N::BlockResponse>> {
+        let rpc_call = self
+            .client()
+            .request(
+                "eth_getBlockByHash",
+                EthGetBlockParams::new(hash.into(), BlockTransactionsKind::Hashes),
+            )
+            .map_resp(
+                utils::convert_to_hashes::<N>
+                    as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+            );
+        EthGetBlock::new_rpc(hash.into(), rpc_call)
     }
 
     /// Gets a block by its [BlockNumberOrTag]
     fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-    ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
-        let rpc_call = self.client().request("eth_getBlockByNumber", number).map_resp(
-            utils::convert_to_hashes::<N>
-                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
-        );
-        EthGetBlock::new_rpc(rpc_call)
+    ) -> EthGetBlock<Option<N::BlockResponse>> {
+        let rpc_call = self
+            .client()
+            .request(
+                "eth_getBlockByNumber",
+                EthGetBlockParams::new(number.into(), BlockTransactionsKind::Hashes),
+            )
+            .map_resp(
+                utils::convert_to_hashes::<N>
+                    as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+            );
+        EthGetBlock::new_rpc(number.into(), rpc_call)
     }
 
     /// Returns the number of transactions in a block from a block matching the given block hash.
