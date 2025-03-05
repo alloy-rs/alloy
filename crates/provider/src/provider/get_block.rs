@@ -75,9 +75,15 @@ where
         self
     }
 
-    /// Set the `full:bool` argument in RPC calls
+    /// Set the [`BlockTransactionsKind`] to [`BlockTransactionsKind::Full`].
     pub fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
+        self
+    }
+
+    /// Set the [`BlockTransactionsKind`] to [`BlockTransactionsKind::Hashes`].
+    pub fn hashes(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Hashes;
         self
     }
 }
