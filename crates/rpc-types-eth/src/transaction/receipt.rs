@@ -95,8 +95,8 @@ where
             // 1. Use effectiveGasPrice if present
             // 2. Fallback to use gasPrice
             // 3. Default to 0 if neither is present
-            #[serde(default = "default_gas", alias = "gasPrice", with = "alloy_serde::quantity")]
-            pub effective_gas_price: u128,
+            #[serde(default, alias = "gasPrice", with = "alloy_serde::quantity::opt")]
+            effective_gas_price: Option<u128>,
             #[serde(
                 default,
                 skip_serializing_if = "Option::is_none",
@@ -114,10 +114,6 @@ where
             contract_address: Option<Address>,
         }
 
-        fn default_gas() -> u128 {
-            0
-        }
-
         let helper = ReceiptDeserHelper::deserialize(deserializer)?;
         Ok(Self {
             inner: helper.inner,
@@ -126,7 +122,7 @@ where
             block_hash: helper.block_hash,
             block_number: helper.block_number,
             gas_used: helper.gas_used,
-            effective_gas_price: helper.effective_gas_price,
+            effective_gas_price: helper.effective_gas_price.unwrap_or(0),
             blob_gas_used: helper.blob_gas_used,
             blob_gas_price: helper.blob_gas_price,
             from: helper.from,
