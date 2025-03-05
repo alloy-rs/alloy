@@ -1,6 +1,9 @@
+use std::marker::PhantomData;
+
 use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
+use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_rpc_client::RpcCall;
 use alloy_transport::TransportResult;
@@ -48,24 +51,32 @@ impl EthGetBlockParams {
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthGetBlockBy must be awaited to execute the request"]
 //#[derive(Clone, Debug)]
-pub struct EthGetBlock<Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct EthGetBlock<N, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
+    N: Network,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     inner: GetBlockInner<Resp, Output, Map>,
     block: BlockId,
     kind: BlockTransactionsKind,
+    _pd: std::marker::PhantomData<N>,
 }
 
-impl<Resp, Output, Map> EthGetBlock<Resp, Output, Map>
+impl<N, Resp, Output, Map> EthGetBlock<N, Resp, Output, Map>
 where
+    N: Network,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
     /// Create a new [`EthGetBlock`] request with the given [`RpcCall`].
     pub fn new_rpc(block: BlockId, inner: RpcCall<EthGetBlockParams, Resp, Output, Map>) -> Self {
-        Self { block, inner: GetBlockInner::RpcCall(inner), kind: BlockTransactionsKind::Hashes }
+        Self {
+            block,
+            inner: GetBlockInner::RpcCall(inner),
+            kind: BlockTransactionsKind::Hashes,
+            _pd: PhantomData,
+        }
     }
 
     /// Create a new [`EthGetBlock`] request with a closure that returns a [`ProviderCall`].
@@ -74,6 +85,7 @@ where
             block,
             inner: GetBlockInner::ProviderCall(producer),
             kind: BlockTransactionsKind::Hashes,
+            _pd: PhantomData,
         }
     }
 
@@ -96,8 +108,9 @@ where
     }
 }
 
-impl<Resp, Output, Map> std::future::IntoFuture for EthGetBlock<Resp, Output, Map>
+impl<N, Resp, Output, Map> std::future::IntoFuture for EthGetBlock<N, Resp, Output, Map>
 where
+    N: Network,
     Resp: RpcRecv,
     Output: 'static,
     Map: Fn(Resp) -> Output,
@@ -118,8 +131,9 @@ where
     }
 }
 
-impl<Resp, Output, Map> core::fmt::Debug for EthGetBlock<Resp, Output, Map>
+impl<N, Resp, Output, Map> core::fmt::Debug for EthGetBlock<N, Resp, Output, Map>
 where
+    N: Network,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {

@@ -357,7 +357,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by either its hash, tag, or number
-    fn get_block(&self, block: BlockId) -> EthGetBlock<Option<N::BlockResponse>> {
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N, Option<N::BlockResponse>> {
         let call = match block {
             BlockId::Hash(_) => self.client().request(
                 "eth_getBlockByHash",
@@ -377,7 +377,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by its [BlockHash]
-    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<Option<N::BlockResponse>> {
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N, Option<N::BlockResponse>> {
         let rpc_call = self
             .client()
             .request(
@@ -395,7 +395,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
-    ) -> EthGetBlock<Option<N::BlockResponse>> {
+    ) -> EthGetBlock<N, Option<N::BlockResponse>> {
         let rpc_call = self
             .client()
             .request(
