@@ -4,6 +4,7 @@ use crate::{
     fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
     Identity,
 };
+use alloy_network::{BlockResponse, Network};
 use alloy_primitives::{U128, U64};
 use std::{fmt, fmt::Formatter};
 
@@ -124,6 +125,18 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
 
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
+}
+
+pub(crate) fn convert_to_hashes<N: Network>(
+    r: Option<N::BlockResponse>,
+) -> Option<N::BlockResponse> {
+    r.map(|mut block| {
+        if block.transactions().is_empty() {
+            block.transactions_mut().convert_to_hashes();
+        }
+
+        block
+    })
 }
 
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],

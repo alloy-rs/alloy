@@ -360,7 +360,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         let call = match block {
             BlockId::Hash(_) => self.client().request("eth_getBlockByHash", block), // Hack
             BlockId::Number(_) => self.client().request("eth_getBlockByNumber", block),
-        };
+        }
+        .map_resp(
+            utils::convert_to_hashes::<N>
+                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+        );
 
         EthGetBlock::new_rpc(call)
     }
@@ -370,7 +374,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         hash: BlockHash,
     ) -> EthGetBlock<BlockHash, Option<N::BlockResponse>> {
-        EthGetBlock::new_rpc(self.client().request("eth_getBlockByHash", hash))
+        let rpc_call = self.client().request("eth_getBlockByHash", hash).map_resp(
+            utils::convert_to_hashes::<N>
+                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+        );
+        EthGetBlock::new_rpc(rpc_call)
     }
 
     /// Gets a block by its [BlockNumberOrTag]
@@ -378,7 +386,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         number: BlockNumberOrTag,
     ) -> EthGetBlock<BlockNumberOrTag, Option<N::BlockResponse>> {
-        EthGetBlock::new_rpc(self.client().request("eth_getBlockByNumber", number))
+        let rpc_call = self.client().request("eth_getBlockByNumber", number).map_resp(
+            utils::convert_to_hashes::<N>
+                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+        );
+        EthGetBlock::new_rpc(rpc_call)
     }
 
     /// Returns the number of transactions in a block from a block matching the given block hash.
