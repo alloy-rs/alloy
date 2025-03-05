@@ -934,7 +934,7 @@ mod tests {
 
         let block = serde_json::from_str::<Block>(s).unwrap();
         assert!(block.transactions.is_empty());
-        assert!(block.transactions.as_transactions().is_none());
+        assert!(block.transactions.as_transactions().is_some());
     }
 
     #[test]
