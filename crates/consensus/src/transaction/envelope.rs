@@ -2,7 +2,7 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        PooledTransaction, RlpEcdsaTx,
+        PooledTransaction, RlpEcdsaDecodableTx,
     },
     Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
