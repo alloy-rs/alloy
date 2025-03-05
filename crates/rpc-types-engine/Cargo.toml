@@ -68,7 +68,6 @@ serde = [
 	"alloy-eips/serde",
 	"alloy-primitives/serde",
 	"rand?/serde",
-	"similar-asserts/serde"
 ]
 jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]

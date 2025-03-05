@@ -84,7 +84,6 @@ serde = [
 	"alloy-eips/serde",
 	"alloy-consensus-any/serde",
 	"rand/serde",
-	"similar-asserts/serde"
 ]
 arbitrary = [
     "std",
