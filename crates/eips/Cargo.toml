@@ -82,7 +82,8 @@ std = [
 	"alloy-eip7702/std",
 	"derive_more/std",
 	"serde_json/std",
-	"sha2?/std"
+	"sha2?/std",
+	"either/std"
 ]
 serde = [
 	"dep:alloy-serde",
