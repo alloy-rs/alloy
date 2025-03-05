@@ -396,18 +396,15 @@ where
         self.inner.get_balance(address)
     }
 
-    fn get_block(&self, block: BlockId) -> EthGetBlock<N, Option<N::BlockResponse>> {
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
         self.inner.get_block(block)
     }
 
-    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N, Option<N::BlockResponse>> {
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
         self.inner.get_block_by_hash(hash)
     }
 
-    fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-    ) -> EthGetBlock<N, Option<N::BlockResponse>> {
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
         self.inner.get_block_by_number(number)
     }
 

@@ -1,9 +1,9 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{utils, ProviderCall};
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
-use alloy_network::Network;
+use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::BlockHash;
 use alloy_rpc_client::{ClientRef, RpcCall};
@@ -52,30 +52,27 @@ impl EthGetBlockParams {
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthGetBlockBy must be awaited to execute the request"]
 //#[derive(Clone, Debug)]
-pub struct EthGetBlock<N, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct EthGetBlock<BlockResp>
 where
-    N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
+    BlockResp: alloy_network::BlockResponse + RpcRecv,
 {
-    inner: GetBlockInner<Resp, Output, Map>,
+    inner: GetBlockInner<BlockResp>,
     block: BlockId,
     kind: BlockTransactionsKind,
-    _pd: std::marker::PhantomData<N>,
+    _pd: std::marker::PhantomData<BlockResp>,
 }
 
-impl<N> EthGetBlock<N, Option<N::BlockResponse>>
+impl<BlockResp> EthGetBlock<BlockResp>
 where
-    N: Network,
+    BlockResp: alloy_network::BlockResponse + RpcRecv,
 {
     /// Create a new [`EthGetBlock`] request to get the block by hash i.e call
     /// `"eth_getBlockByHash"`.
     pub fn by_hash(hash: BlockHash, client: ClientRef<'_>) -> Self {
         let params = EthGetBlockParams::default();
-        let call = client.request("eth_getBlockByHash", params).map_resp(
-            utils::convert_to_hashes::<N>
-                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
-        );
+        let call = client
+            .request("eth_getBlockByHash", params)
+            .map_resp(utils::convert_to_hashes as fn(Option<BlockResp>) -> Option<BlockResp>);
         Self::new_rpc(hash.into(), call)
     }
 
@@ -83,22 +80,19 @@ where
     /// `"eth_getBlockByNumber"`.
     pub fn by_number(number: BlockNumberOrTag, client: ClientRef<'_>) -> Self {
         let params = EthGetBlockParams::default();
-        let call = client.request("eth_getBlockByNumber", params).map_resp(
-            utils::convert_to_hashes::<N>
-                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
-        );
+        let call = client
+            .request("eth_getBlockByNumber", params)
+            .map_resp(utils::convert_to_hashes as fn(Option<BlockResp>) -> Option<BlockResp>);
         Self::new_rpc(number.into(), call)
     }
 }
 
-impl<N, Resp, Output, Map> EthGetBlock<N, Resp, Output, Map>
+impl<BlockResp> EthGetBlock<BlockResp>
 where
-    N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
+    BlockResp: alloy_network::BlockResponse + RpcRecv,
 {
     /// Create a new [`EthGetBlock`] request with the given [`RpcCall`].
-    pub fn new_rpc(block: BlockId, inner: RpcCall<EthGetBlockParams, Resp, Output, Map>) -> Self {
+    pub fn new_rpc(block: BlockId, inner: RpcCall<EthGetBlockParams, Option<BlockResp>>) -> Self {
         Self {
             block,
             inner: GetBlockInner::RpcCall(inner),
@@ -108,7 +102,7 @@ where
     }
 
     /// Create a new [`EthGetBlock`] request with a closure that returns a [`ProviderCall`].
-    pub fn new_provider(block: BlockId, producer: ProviderCallProducer<Resp, Output, Map>) -> Self {
+    pub fn new_provider(block: BlockId, producer: ProviderCallProducer<BlockResp>) -> Self {
         Self {
             block,
             inner: GetBlockInner::ProviderCall(producer),
@@ -136,16 +130,13 @@ where
     }
 }
 
-impl<N, Resp, Output, Map> std::future::IntoFuture for EthGetBlock<N, Resp, Output, Map>
+impl<BlockResp> std::future::IntoFuture for EthGetBlock<BlockResp>
 where
-    N: Network,
-    Resp: RpcRecv,
-    Output: 'static,
-    Map: Fn(Resp) -> Output,
+    BlockResp: alloy_network::BlockResponse + RpcRecv,
 {
-    type Output = TransportResult<Output>;
+    type Output = TransportResult<Option<BlockResp>>;
 
-    type IntoFuture = ProviderCall<EthGetBlockParams, Resp, Output, Map>;
+    type IntoFuture = ProviderCall<EthGetBlockParams, Option<BlockResp>>;
 
     fn into_future(self) -> Self::IntoFuture {
         match self.inner {
@@ -159,34 +150,31 @@ where
     }
 }
 
-impl<N, Resp, Output, Map> core::fmt::Debug for EthGetBlock<N, Resp, Output, Map>
+impl<BlockResp> core::fmt::Debug for EthGetBlock<BlockResp>
 where
-    N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
+    BlockResp: BlockResponse + RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("EthGetBlock").field("kind", &self.kind).finish()
+        f.debug_struct("EthGetBlock").field("block", &self.block).field("kind", &self.kind).finish()
     }
 }
 
-type ProviderCallProducer<Resp, Output, Map> =
-    Box<dyn Fn(BlockTransactionsKind) -> ProviderCall<EthGetBlockParams, Resp, Output, Map> + Send>;
-enum GetBlockInner<Resp, Output = Resp, Map = fn(Resp) -> Output>
+type ProviderCallProducer<BlockResp> =
+    Box<dyn Fn(BlockTransactionsKind) -> ProviderCall<EthGetBlockParams, Option<BlockResp>> + Send>;
+
+enum GetBlockInner<BlockResp>
 where
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
+    BlockResp: BlockResponse + RpcRecv,
 {
     /// [`RpcCall`] with params that get wrapped into [`EthGetBlockParams`] in the future.
-    RpcCall(RpcCall<EthGetBlockParams, Resp, Output, Map>),
+    RpcCall(RpcCall<EthGetBlockParams, Option<BlockResp>>),
     /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
-    ProviderCall(ProviderCallProducer<Resp, Output, Map>),
+    ProviderCall(ProviderCallProducer<BlockResp>),
 }
 
-impl<Resp, Output, Map> core::fmt::Debug for GetBlockInner<Resp, Output, Map>
+impl<BlockResp> core::fmt::Debug for GetBlockInner<BlockResp>
 where
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
+    BlockResp: BlockResponse + RpcRecv,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

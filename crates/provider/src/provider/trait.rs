@@ -365,7 +365,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```ignore
     /// let block = provider.get_block(BlockId::latest()).full().await.unwrap();
     /// ```
-    fn get_block(&self, block: BlockId) -> EthGetBlock<N, Option<N::BlockResponse>> {
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
         match block {
             BlockId::Hash(hash) => EthGetBlock::by_hash(hash.block_hash, self.client()),
             BlockId::Number(number) => EthGetBlock::by_number(number, self.client()),
@@ -397,7 +397,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     let block = provider.get_block_by_hash(block_hash).full().await.unwrap();
     /// }
     /// ```
-    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N, Option<N::BlockResponse>> {
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
         EthGetBlock::by_hash(hash, self.client())
     }
 
@@ -424,10 +424,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     let block = provider.get_block_by_number(num).full().await.unwrap();
     /// }
     /// ```
-    fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-    ) -> EthGetBlock<N, Option<N::BlockResponse>> {
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
         EthGetBlock::by_number(number, self.client())
     }
 
