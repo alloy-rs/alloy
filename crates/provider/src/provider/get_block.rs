@@ -1,17 +1,18 @@
 use std::marker::PhantomData;
 
-use crate::ProviderCall;
-use alloy_eips::BlockId;
+use crate::{utils, ProviderCall};
+use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
-use alloy_rpc_client::RpcCall;
+use alloy_primitives::BlockHash;
+use alloy_rpc_client::{ClientRef, RpcCall};
 use alloy_transport::TransportResult;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
 /// Default is "latest" block with transaction hashes.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EthGetBlockParams {
     block: BlockId,
     kind: BlockTransactionsKind,
@@ -61,6 +62,33 @@ where
     block: BlockId,
     kind: BlockTransactionsKind,
     _pd: std::marker::PhantomData<N>,
+}
+
+impl<N> EthGetBlock<N, Option<N::BlockResponse>>
+where
+    N: Network,
+{
+    /// Create a new [`EthGetBlock`] request to get the block by hash i.e call
+    /// `"eth_getBlockByHash"`.
+    pub fn by_hash(hash: BlockHash, client: ClientRef<'_>) -> Self {
+        let params = EthGetBlockParams::default();
+        let call = client.request("eth_getBlockByHash", params).map_resp(
+            utils::convert_to_hashes::<N>
+                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+        );
+        EthGetBlock::<N, Option<N::BlockResponse>>::new_rpc(hash.into(), call)
+    }
+
+    /// Create a new [`EthGetBlock`] request to get the block by number i.e call
+    /// `"eth_getBlockByNumber"`.
+    pub fn by_number(number: BlockNumberOrTag, client: ClientRef<'_>) -> Self {
+        let params = EthGetBlockParams::default();
+        let call = client.request("eth_getBlockByNumber", params).map_resp(
+            utils::convert_to_hashes::<N>
+                as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
+        );
+        EthGetBlock::<N, Option<N::BlockResponse>>::new_rpc(number.into(), call)
+    }
 }
 
 impl<N, Resp, Output, Map> EthGetBlock<N, Resp, Output, Map>
