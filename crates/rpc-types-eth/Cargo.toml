@@ -68,7 +68,12 @@ std = [
 	"alloy-eips/std",
 	"alloy-consensus-any/std",
 	"alloy-network-primitives/std",
-	"alloy-serde?/std"
+	"alloy-serde?/std",
+	"alloy-rlp/std",
+	"alloy-sol-types/std",
+	"serde?/std",
+	"serde_json?/std",
+	"thiserror/std"
 ]
 serde = [
 	"dep:serde",
@@ -77,7 +82,8 @@ serde = [
 	"alloy-primitives/serde",
 	"alloy-consensus/serde",
 	"alloy-eips/serde",
-	"alloy-consensus-any/serde"
+	"alloy-consensus-any/serde",
+	"rand/serde",
 ]
 arbitrary = [
     "std",

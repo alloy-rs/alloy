@@ -39,5 +39,6 @@ std = [
 	"alloy-primitives/std",
 	"alloy-consensus/std",
 	"alloy-eips/std",
-	"alloy-serde/std"
+	"alloy-serde/std",
+	"serde/std"
 ]
