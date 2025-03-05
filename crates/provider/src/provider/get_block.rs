@@ -76,7 +76,7 @@ where
             utils::convert_to_hashes::<N>
                 as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
         );
-        EthGetBlock::<N, Option<N::BlockResponse>>::new_rpc(hash.into(), call)
+        Self::new_rpc(hash.into(), call)
     }
 
     /// Create a new [`EthGetBlock`] request to get the block by number i.e call
@@ -87,7 +87,7 @@ where
             utils::convert_to_hashes::<N>
                 as fn(Option<N::BlockResponse>) -> Option<N::BlockResponse>,
         );
-        EthGetBlock::<N, Option<N::BlockResponse>>::new_rpc(number.into(), call)
+        Self::new_rpc(number.into(), call)
     }
 }
 

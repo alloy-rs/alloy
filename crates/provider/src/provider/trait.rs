@@ -356,6 +356,15 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by either its hash, tag, or number
+    ///
+    /// By default this fetches the block with only the transaction hashes, and not full
+    /// transactions.
+    ///
+    /// To get full transactions one can do:
+    ///
+    /// ```ignore
+    /// let block = provider.get_block(BlockId::latest()).full().await.unwrap();
+    /// ```
     fn get_block(&self, block: BlockId) -> EthGetBlock<N, Option<N::BlockResponse>> {
         match block {
             BlockId::Hash(hash) => EthGetBlock::by_hash(hash.block_hash, self.client()),
@@ -364,11 +373,57 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Gets a block by its [BlockHash]
+    ///
+    /// By default this fetches the block with only the transaction hashes populated in the block,
+    /// and not the full transactions.
+    ///
+    ///
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_primitives::b256;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let block_hash = b256!("6032d03ee8e43e8999c2943152a4daebfc4b75b7f7a9647d2677299d215127da");
+    ///
+    ///     // Gets a block by its hash with only transactions hashes.
+    ///     let block = provider.get_block_by_hash(block_hash).await.unwrap();
+    ///
+    ///     // Gets a block by its hash with full transactions.
+    ///     let block = provider.get_block_by_hash(block_hash).full().await.unwrap();
+    /// }
+    /// ```
     fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N, Option<N::BlockResponse>> {
         EthGetBlock::by_hash(hash, self.client())
     }
 
     /// Gets a block by its [BlockNumberOrTag]
+    ///
+    /// By default this fetches the block with only the transaction hashes populated in the block,
+    /// and not the full transactions.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_eips::BlockNumberOrTag;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let num = BlockNumberOrTag::Number(0);
+    ///
+    ///     // Gets a block by its number with only transactions hashes.
+    ///     let block = provider.get_block_by_number(num).await.unwrap();
+    ///
+    ///     // Gets a block by its number with full transactions.
+    ///     let block = provider.get_block_by_number(num).full().await.unwrap();
+    /// }
+    /// ```
     fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
