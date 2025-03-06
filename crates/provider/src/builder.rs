@@ -1,3 +1,5 @@
+#[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
+use crate::layers::{Asserter, MockLayer, MockProvider};
 use crate::{
     fillers::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
@@ -150,9 +152,7 @@ impl
     ///
     /// Sets the dummy RPC_URL to `http://localhost:8545`.
     #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
-    pub fn mocked() -> (crate::layers::MockProvider<RootProvider, Ethereum>, crate::layers::Asserter)
-    {
-        use crate::layers::{Asserter, MockLayer};
+    pub fn mocked() -> (MockProvider<RootProvider, Ethereum>, Asserter) {
         let asserter = Asserter::new();
         let layer = MockLayer::new(asserter.clone());
 
