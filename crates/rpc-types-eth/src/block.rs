@@ -274,7 +274,7 @@ impl<T> Block<T> {
 /// This wraps the consensus header and adds additional fields for RPC.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Header<H = alloy_consensus::Header> {
     /// Hash of the block
@@ -290,6 +290,56 @@ pub struct Header<H = alloy_consensus::Header> {
     /// Integer the size of this block in bytes.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub size: Option<U256>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de, H> serde::Deserialize<'de> for Header<H>
+where
+    H: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut deser_value = serde_json::Value::deserialize(deserializer)?;
+
+        // Check for fields that maybe missing in Pending blocks
+        if deser_value.get("hash").is_none() || deser_value.get("hash").unwrap().is_null() {
+            deser_value["hash"] = serde_json::Value::String(format!("{}", B256::ZERO));
+        }
+
+        if deser_value.get("nonce").is_none() || deser_value.get("nonce").unwrap().is_null() {
+            deser_value["nonce"] = serde_json::Value::String(format!("{}", B64::ZERO));
+        }
+
+        if (deser_value.get("miner").is_none() || deser_value.get("miner").unwrap().is_null())
+            && (deser_value.get("beneficiary").is_none()
+                || deser_value.get("beneficiary").unwrap().is_null())
+        {
+            deser_value["miner"] = serde_json::Value::String(format!("{}", Address::ZERO));
+        }
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct HeaderHelper<H = alloy_consensus::Header> {
+            hash: BlockHash,
+            #[serde(flatten)]
+            inner: H,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            total_difficulty: Option<U256>,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            size: Option<U256>,
+        }
+
+        let helper = HeaderHelper::deserialize(deser_value).map_err(serde::de::Error::custom)?;
+
+        Ok(Header {
+            hash: helper.hash,
+            inner: helper.inner,
+            total_difficulty: helper.total_difficulty,
+            size: helper.size,
+        })
+    }
 }
 
 impl<H> Header<H> {
@@ -694,12 +744,12 @@ mod tests {
             withdrawals: Some(Default::default()),
         };
         let serialized = serde_json::to_string(&block).unwrap();
-        assert_eq!(
+        similar_asserts::assert_eq!(
             serialized,
             r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[]}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(block, deserialized);
+        similar_asserts::assert_eq!(block, deserialized);
     }
 
     #[test]
@@ -1172,7 +1222,7 @@ mod tests {
         );
 
         let deserialized: BadBlock = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(bad_block, deserialized);
+        similar_asserts::assert_eq!(bad_block, deserialized);
     }
 
     // <https://github.com/succinctlabs/kona/issues/31>
@@ -1180,5 +1230,40 @@ mod tests {
     fn deserde_tenderly_block() {
         let s = include_str!("../testdata/tenderly.sepolia.json");
         let _block: Block = serde_json::from_str(s).unwrap();
+    }
+
+    // <https://github.com/alloy-rs/alloy/issues/2117>
+    #[test]
+    fn deser_pending_blocks() {
+        let json = r#"{
+    "baseFeePerGas": "0x0",
+    "blobGasUsed": "0x40000",
+    "difficulty": "0x2",
+    "excessBlobGas": "0x0",
+    "extraData": "0xd983010412846765746889676f312e32312e3133856c696e7578000060adae27f8b58317ffffb860a77ce14aeaf26b0099df5118f0751f6975fe18c91804e9affb0b468f59b997de33b98853f1d477bbf0396b9a6d674a420ba0ee2d83b8429a36b23bc0d3155c26924a37d9608a6845bf0b6292e167b70aa63a840201aa5a67f09de28bec0582fdf84c8402cb0a92a0b34a963e856bf10286829796602b508515555c2eca2a2e1305db239a33d0301a8402cb0a93a0275ca5b621bb2783f7bcdfdd5e14428dee3f2706669c6b66af463853484a4287800ebe41f4dac1f0dcef91ad0eb84115efb4b7ca72667746cdce217429766b51141502846fece71ef05843c2f0348974c7f4e06a74d56d6ced93277b6f6912afec01",
+    "gasLimit": "0x8583b00",
+    "gasUsed": "0xc684f8",
+    "hash": null,
+    "logsBloom": "0x15ed82ee9d020418029188d2b4202b453484128a082992086d67a27025889504c001590362c3d1aa804648359a1f080a840dd0a18caafc500e800061902727a26c489090a960386e03101918a1630124e07c3237415c0f48d10d1096b8a054394709b42a43f22a33154a03b1a5c01821ac20947700818da4305c489ce08e00cd0825e560e5202ac136980e020c288ceb60e526a51202810c6b4229c813d05a6882cc193b3b2079254b1660ca2694193901174a6ee392801190455031222872d54187f1164722551225aa800941699a14a2c035300564861c0656c22b2185e4781edd338144316c030b495ae40469c5c7193cdd04c10461e87708c02294c9703e",
+    "miner": null,
+    "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "nonce": null,
+    "number": "0x2cb0a94",
+    "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "parentHash": "0x275ca5b621bb2783f7bcdfdd5e14428dee3f2706669c6b66af463853484a4287",
+    "receiptsRoot": "0x3a141664e592b274981a20d43b98ae9fd7a04982fca7bb1ace74cbbf789bf932",
+    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    "size": "0xa445",
+    "stateRoot": "0x92817c00d5c7aa90f1663bdbc7978c87d2339d8c08fdc1d228068a81e2034f89",
+    "timestamp": "0x67b8cd0c",
+    "totalDifficulty": "0x58d40eb",
+    "transactions": ["0x92b24a5a6f9e0595a66261dadab168959f0ec7a717a648e77d64841fd1a87b29"],
+    "transactionsRoot": "0x56f32aeb5d8d992f0551f4fca41cde702a676bf95fea3351ecd013e7691b90c2",
+    "uncles": [],
+    "withdrawals": [],
+    "withdrawalsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+}"#;
+
+        let _block = serde_json::from_str::<Block>(json).unwrap();
     }
 }
