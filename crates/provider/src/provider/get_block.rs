@@ -71,9 +71,7 @@ where
     /// `"eth_getBlockByHash"`.
     pub fn by_hash(hash: BlockHash, client: ClientRef<'_>) -> Self {
         let params = EthGetBlockParams::default();
-        let call = client
-            .request("eth_getBlockByHash", params)
-            .map_resp(utils::convert_to_hashes as fn(Option<BlockResp>) -> Option<BlockResp>);
+        let call = client.request("eth_getBlockByHash", params);
         Self::new_rpc(hash.into(), call)
     }
 
@@ -83,15 +81,10 @@ where
         let params = EthGetBlockParams::default();
 
         if number.is_pending() {
-            let call = client.request("eth_getBlockByNumber", params);
-            return Self::new_pending_rpc(call);
+            return Self::new_pending_rpc(client.request("eth_getBlockByNumber", params));
         }
 
-        let call = client
-            .request("eth_getBlockByNumber", params)
-            .map_resp(utils::convert_to_hashes as fn(Option<BlockResp>) -> Option<BlockResp>);
-
-        Self::new_rpc(number.into(), call)
+        Self::new_rpc(number.into(), client.request("eth_getBlockByNumber", params))
     }
 }
 
@@ -110,7 +103,7 @@ where
     }
 
     /// Create a new [`EthGetBlock`] request with the given [`RpcCall`] for pending block.
-    pub fn new_pending_rpc(inner: RpcCall<EthGetBlockParams, Option<Value>>) -> Self {
+    pub fn new_pending_rpc(inner: RpcCall<EthGetBlockParams, Value>) -> Self {
         Self {
             block: BlockId::pending(),
             inner: GetBlockInner::PendingBlock(inner),
@@ -161,40 +154,54 @@ where
             GetBlockInner::RpcCall(call) => {
                 let rpc_call =
                     call.map_params(|_params| EthGetBlockParams::new(self.block, self.kind));
-                ProviderCall::RpcCall(rpc_call)
+
+                let fut = async move {
+                    let resp = rpc_call.await?;
+                    let result =
+                        if self.kind.is_hashes() { utils::convert_to_hashes(resp) } else { resp };
+                    Ok(result)
+                };
+
+                ProviderCall::BoxedFuture(Box::pin(fut))
             }
             GetBlockInner::PendingBlock(call) => {
                 let rpc_call =
                     call.map_params(|_params| EthGetBlockParams::new(self.block, self.kind));
 
                 let map_fut = async move {
-                    let block = rpc_call.await?;
+                    let mut block = rpc_call.await?;
 
-                    if let Some(mut block) = block {
-                        tracing::trace!(pending_block = ?block.to_string());
-                        if block.get("hash").map_or(true, |v| v.is_null()) {
-                            block["hash"] = Value::String(format!("{}", B256::ZERO));
-                        }
-
-                        if block.get("nonce").map_or(true, |v| v.is_null()) {
-                            block["nonce"] = Value::String(format!("{}", B64::ZERO));
-                        }
-
-                        if block.get("miner").map_or(true, |v| v.is_null())
-                            || block.get("beneficiary").map_or(true, |v| v.is_null())
-                        {
-                            block["miner"] = Value::String(format!("{}", Address::ZERO));
-                        }
-
-                        let block = serde_json::from_value(block.clone())
-                            .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
-
-                        let block = utils::convert_to_hashes(Some(block));
-
-                        return Ok(block);
+                    if block.is_null() {
+                        return Ok(None);
                     }
 
-                    Ok(None)
+                    // Ref: <https://github.com/alloy-rs/alloy/issues/2117>
+                    // Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
+                    tracing::trace!(pending_block = ?block.to_string());
+                    if block.get("hash").map_or(true, |v| v.is_null()) {
+                        block["hash"] = Value::String(format!("{}", B256::ZERO));
+                    }
+
+                    if block.get("nonce").map_or(true, |v| v.is_null()) {
+                        block["nonce"] = Value::String(format!("{}", B64::ZERO));
+                    }
+
+                    if block.get("miner").map_or(true, |v| v.is_null())
+                        || block.get("beneficiary").map_or(true, |v| v.is_null())
+                    {
+                        block["miner"] = Value::String(format!("{}", Address::ZERO));
+                    }
+
+                    let block = serde_json::from_value(block.clone())
+                        .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
+
+                    let block = if self.kind.is_hashes() {
+                        utils::convert_to_hashes(Some(block))
+                    } else {
+                        Some(block)
+                    };
+
+                    Ok(block)
                 };
 
                 ProviderCall::BoxedFuture(Box::pin(map_fut))
@@ -230,8 +237,8 @@ where
     /// This is specifically true in case of the response is returned from a geth node. See: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
     ///
     /// In such case, we first deserialize to [`Value`] and then check if the fields are missing or
-    /// set to null. If so, we set them to default values.
-    PendingBlock(RpcCall<EthGetBlockParams, Option<serde_json::Value>>),
+    /// set to null. If so, we set them to default values.  
+    PendingBlock(RpcCall<EthGetBlockParams, Value>),
     /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
     ProviderCall(ProviderCallProducer<BlockResp>),
 }
