@@ -416,8 +416,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// # Note
     ///
     /// Not all client implementations will support this as a parameter to `eth_call`.
-    pub fn state(mut self, state: StateOverride) -> Self {
-        self.state = Some(state);
+    pub fn state(mut self, state: impl Into<StateOverride>) -> Self {
+        self.state = Some(state.into());
         self
     }
 

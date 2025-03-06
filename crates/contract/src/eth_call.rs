@@ -70,7 +70,7 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub fn overrides(mut self, overrides: StateOverride) -> Self {
+    pub fn overrides(mut self, overrides: impl Into<StateOverride>) -> Self {
         self.inner = self.inner.overrides(overrides);
         self
     }
