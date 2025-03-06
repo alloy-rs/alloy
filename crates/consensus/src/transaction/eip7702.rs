@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2930::AccessList,
@@ -263,12 +263,6 @@ impl SignableTransaction<Signature> for TxEip7702 {
 
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let tx_hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, tx_hash)
     }
 }
 

@@ -53,6 +53,7 @@ derive_more = { workspace = true, features = [
 auto_impl.workspace = true
 thiserror.workspace = true
 either.workspace = true
+once_cell = { workspace = true, features = ["critical-section"]}
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }
@@ -80,7 +81,8 @@ std = [
 	"serde_json/std",
 	"serde_with?/std",
 	"thiserror/std",
-	"either/std"
+	"either/std",
+	"once_cell/std"
 ]
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]

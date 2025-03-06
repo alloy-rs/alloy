@@ -3,8 +3,8 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
         RlpEcdsaEncodableTx,
     },
-    SignableTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope,
-    TxLegacy, TxType,
+    SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy,
+    TxType,
 };
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{
@@ -471,14 +471,6 @@ impl SignableTransaction<Signature> for TypedTransaction {
             Self::Eip4844(tx) => tx.payload_len_for_signature(),
             Self::Eip7702(tx) => tx.payload_len_for_signature(),
         }
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
-    where
-        Self: Sized,
-    {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
     }
 }
 

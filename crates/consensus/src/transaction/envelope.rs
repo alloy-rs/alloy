@@ -420,7 +420,7 @@ impl TxEnvelope {
 
     /// Return the hash of the inner Signed.
     #[doc(alias = "transaction_hash")]
-    pub const fn tx_hash(&self) -> &B256 {
+    pub fn tx_hash(&self) -> &B256 {
         match self {
             Self::Legacy(tx) => tx.hash(),
             Self::Eip2930(tx) => tx.hash(),

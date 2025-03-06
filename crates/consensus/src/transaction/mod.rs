@@ -263,11 +263,13 @@ pub trait SignableTransaction<Signature>: Transaction {
         keccak256(self.encoded_for_signing())
     }
 
-    /// Convert to a signed transaction by adding a signature and computing the
-    /// hash.
+    /// Convert to a [`Signed`] object.
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        Signed::new_unhashed(self, signature)
+    }
 }
 
 // TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)

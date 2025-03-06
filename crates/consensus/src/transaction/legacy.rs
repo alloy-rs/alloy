@@ -342,11 +342,6 @@ impl SignableTransaction<Signature> for TxLegacy {
         // 'header length' + 'payload length'
         Header { list: true, payload_length }.length_with_payload()
     }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
-    }
 }
 
 impl Typed2718 for TxLegacy {
