@@ -5,9 +5,10 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
-use alloy_primitives::BlockHash;
+use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportError, TransportResult};
+use serde_json::Value;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
@@ -80,9 +81,16 @@ where
     /// `"eth_getBlockByNumber"`.
     pub fn by_number(number: BlockNumberOrTag, client: ClientRef<'_>) -> Self {
         let params = EthGetBlockParams::default();
+
+        if number.is_pending() {
+            let call = client.request("eth_getBlockByNumber", params);
+            return Self::new_pending_rpc(call);
+        }
+
         let call = client
             .request("eth_getBlockByNumber", params)
             .map_resp(utils::convert_to_hashes as fn(Option<BlockResp>) -> Option<BlockResp>);
+
         Self::new_rpc(number.into(), call)
     }
 }
@@ -96,6 +104,16 @@ where
         Self {
             block,
             inner: GetBlockInner::RpcCall(inner),
+            kind: BlockTransactionsKind::Hashes,
+            _pd: PhantomData,
+        }
+    }
+
+    /// Create a new [`EthGetBlock`] request with the given [`RpcCall`] for pending block.
+    pub fn new_pending_rpc(inner: RpcCall<EthGetBlockParams, Option<Value>>) -> Self {
+        Self {
+            block: BlockId::pending(),
+            inner: GetBlockInner::PendingBlock(inner),
             kind: BlockTransactionsKind::Hashes,
             _pd: PhantomData,
         }
@@ -145,6 +163,42 @@ where
                     call.map_params(|_params| EthGetBlockParams::new(self.block, self.kind));
                 ProviderCall::RpcCall(rpc_call)
             }
+            GetBlockInner::PendingBlock(call) => {
+                let rpc_call =
+                    call.map_params(|_params| EthGetBlockParams::new(self.block, self.kind));
+
+                let map_fut = async move {
+                    let block = rpc_call.await?;
+
+                    if let Some(mut block) = block {
+                        tracing::trace!(pending_block = ?block.to_string());
+                        if block.get("hash").map_or(true, |v| v.is_null()) {
+                            block["hash"] = Value::String(format!("{}", B256::ZERO));
+                        }
+
+                        if block.get("nonce").map_or(true, |v| v.is_null()) {
+                            block["nonce"] = Value::String(format!("{}", B64::ZERO));
+                        }
+
+                        if block.get("miner").map_or(true, |v| v.is_null())
+                            || block.get("beneficiary").map_or(true, |v| v.is_null())
+                        {
+                            block["miner"] = Value::String(format!("{}", Address::ZERO));
+                        }
+
+                        let block = serde_json::from_value(block.clone())
+                            .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
+
+                        let block = utils::convert_to_hashes(Some(block));
+
+                        return Ok(block);
+                    }
+
+                    Ok(None)
+                };
+
+                ProviderCall::BoxedFuture(Box::pin(map_fut))
+            }
             GetBlockInner::ProviderCall(producer) => producer(self.kind),
         }
     }
@@ -168,6 +222,8 @@ where
 {
     /// [`RpcCall`] with params that get wrapped into [`EthGetBlockParams`] in the future.
     RpcCall(RpcCall<EthGetBlockParams, Option<BlockResp>>),
+    /// Pending Block Call
+    PendingBlock(RpcCall<EthGetBlockParams, Option<serde_json::Value>>),
     /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
     ProviderCall(ProviderCallProducer<BlockResp>),
 }
@@ -179,7 +235,23 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
+            Self::PendingBlock(call) => f.debug_tuple("PendingBlockCall").field(call).finish(),
             Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Provider, ProviderBuilder};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_pending_block_deser() {
+        let provider =
+            ProviderBuilder::new().on_http("https://binance.llamarpc.com".parse().unwrap());
+
+        let _block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
     }
 }
