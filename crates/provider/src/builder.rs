@@ -3,7 +3,6 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
-    layers::{Asserter, MockLayer, MockProvider},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -147,14 +146,23 @@ impl
         ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
     }
 
-    /// Create a new [`MockedProvider`] for testing purposes.
-    pub fn mocked() -> (MockProvider<RootProvider, Ethereum>, Asserter) {
+    /// Create a new [`MockProvider`] for testing purposes.
+    ///
+    /// Sets the dummy RPC_URL to `http://localhost:8545`.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
+    pub fn mocked() -> (crate::layers::MockProvider<RootProvider, Ethereum>, crate::layers::Asserter)
+    {
+        use crate::layers::{Asserter, MockLayer};
         let asserter = Asserter::new();
         let layer = MockLayer::new(asserter.clone());
 
-        let mock_provider = ProviderBuilder::<_, _, Ethereum>::default()
-            .layer(layer)
-            .on_http("https://localhost:8545".parse().unwrap());
+        let builder = ProviderBuilder::<_, _, Ethereum>::default().layer(layer);
+
+        #[cfg(any(test, feature = "reqwest"))]
+        let mock_provider = builder.on_http("http://localhost:8545".parse().unwrap());
+
+        #[cfg(feature = "hyper")]
+        let mock_provider = builder.on_hyper_http("http://localhost:8545".parse().unwrap());
 
         (mock_provider, asserter)
     }

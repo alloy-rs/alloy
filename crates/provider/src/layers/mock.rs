@@ -21,7 +21,7 @@ pub struct MockLayer {
 impl MockLayer {
     /// Instantiate a new mock layer with the given [`Asserter`].
     pub fn new(asserter: Asserter) -> Self {
-        MockLayer { asserter }
+        Self { asserter }
     }
 }
 
@@ -46,7 +46,7 @@ pub struct Asserter {
 impl Asserter {
     /// Instantiate a new asserter.
     pub fn new() -> Self {
-        Asserter::default()
+        Self::default()
     }
 
     /// Insert a successful response into the queue.
@@ -125,7 +125,7 @@ where
 {
     /// Instantiate a new mock provider.
     pub fn new(inner: P, asserter: Asserter) -> Self {
-        MockProvider { inner, asserter, _network: std::marker::PhantomData }
+        Self { inner, asserter, _network: std::marker::PhantomData }
     }
 
     /// Return a reference to the asserter.
