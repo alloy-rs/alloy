@@ -5,6 +5,7 @@ use derive_more::{AsRef, Deref};
 
 /// Signed transaction with recovered signer.
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, AsRef, Deref)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Recovered<T> {
     /// Signer of the transaction
     signer: Address,
