@@ -177,7 +177,7 @@ where
         ProviderCall::Ready(Some(self.next_response()))
     }
 
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         EthCall::call(self.asserter.clone(), tx)
     }
 
@@ -194,9 +194,8 @@ where
 impl<N: Network, Resp: RpcRecv> Caller<N, Resp> for Asserter {
     fn call(
         &self,
-        _params: crate::EthCallParams<'_, N>,
-    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<'static, N>, Resp>>
-    {
+        _params: crate::EthCallParams<N>,
+    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<N>, Resp>> {
         let value = self.pop_response().ok_or(TransportErrorKind::custom(MockError::EmptyQueue));
 
         let res = match value {
@@ -218,9 +217,8 @@ impl<N: Network, Resp: RpcRecv> Caller<N, Resp> for Asserter {
 
     fn estimate_gas(
         &self,
-        _params: crate::EthCallParams<'_, N>,
-    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<'static, N>, Resp>>
-    {
+        _params: crate::EthCallParams<N>,
+    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<N>, Resp>> {
         todo!()
     }
 }
@@ -261,7 +259,7 @@ mod tests {
 
         asserter.push_success(call_resp.clone());
         let tx = TransactionRequest::default();
-        let response = provider.call(&tx).await.unwrap();
+        let response = provider.call(tx).await.unwrap();
 
         assert_eq!(response, call_resp);
 
