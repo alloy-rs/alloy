@@ -4,7 +4,7 @@ use std::{collections::VecDeque, sync::Arc};
 
 use crate::{utils, EthCallMany, EthGetBlock};
 use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_json_rpc::{ErrorPayload, RpcRecv};
+use alloy_json_rpc::{ErrorPayload, RpcRecv, RpcSend};
 use alloy_network::Network;
 use alloy_primitives::{
     Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U128, U256, U64,
@@ -378,32 +378,37 @@ impl<N: Network, Resp: RpcRecv> Caller<N, Resp> for Asserter {
     fn call(
         &self,
         _params: crate::EthCallParams<N>,
-    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<N>, Resp>> {
-        let value = self.pop_response().ok_or(TransportErrorKind::custom(MockError::EmptyQueue));
-
-        let res = match value {
-            Ok(MockResponse::Success(value)) => serde_json::from_value(value)
-                .map_err(|e| TransportErrorKind::custom(MockError::DeserError(e.to_string()))),
-            Ok(MockResponse::Err(err)) | Err(err) => Err(err),
-        };
-
-        Ok(ProviderCall::Ready(Some(res)))
+    ) -> TransportResult<ProviderCall<crate::EthCallParams<N>, Resp>> {
+        provider_eth_call(self)
     }
 
     fn call_many(
         &self,
         _params: crate::EthCallManyParams<'_>,
-    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallManyParams<'static>, Resp>>
-    {
-        todo!()
+    ) -> TransportResult<ProviderCall<crate::EthCallManyParams<'static>, Resp>> {
+        provider_eth_call(self)
     }
 
     fn estimate_gas(
         &self,
         _params: crate::EthCallParams<N>,
-    ) -> alloy_transport::TransportResult<ProviderCall<crate::EthCallParams<N>, Resp>> {
-        todo!()
+    ) -> TransportResult<ProviderCall<crate::EthCallParams<N>, Resp>> {
+        provider_eth_call(self)
     }
+}
+
+fn provider_eth_call<Params: RpcSend, Resp: RpcRecv>(
+    asserter: &Asserter,
+) -> TransportResult<ProviderCall<Params, Resp>> {
+    let value = asserter.pop_response().ok_or(TransportErrorKind::custom(MockError::EmptyQueue));
+
+    let res = match value {
+        Ok(MockResponse::Success(value)) => serde_json::from_value(value)
+            .map_err(|e| TransportErrorKind::custom(MockError::DeserError(e.to_string()))),
+        Ok(MockResponse::Err(err)) | Err(err) => Err(err),
+    };
+
+    Ok(ProviderCall::Ready(Some(res)))
 }
 
 #[cfg(test)]
