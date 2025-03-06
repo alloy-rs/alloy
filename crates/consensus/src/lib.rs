@@ -69,6 +69,7 @@ pub mod error;
 pub mod serde_bincode_compat {
     pub use super::{
         block::serde_bincode_compat::*,
+        receipt::serde_bincode_compat::*,
         transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
 }
