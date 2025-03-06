@@ -1,6 +1,9 @@
 //! Helper errors.
 
-use alloc::string::{String, ToString};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+};
 
 /// Helper type that is [`core::error::Error`] and wraps a value and an error message.
 ///
@@ -9,13 +12,13 @@ use alloc::string::{String, ToString};
 #[error("{msg}")]
 pub struct ValueError<T> {
     msg: String,
-    value: T,
+    value: Box<T>,
 }
 
 impl<T> ValueError<T> {
     /// Creates a new error with the given value and error message.
     pub fn new(value: T, msg: impl core::fmt::Display) -> Self {
-        Self { msg: msg.to_string(), value }
+        Self { msg: msg.to_string(), value: Box::new(value) }
     }
 
     /// Converts the value to the given alternative that is `From<T>`.
@@ -28,12 +31,12 @@ impl<T> ValueError<T> {
 
     /// Maps the error's value with the given closure.
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> ValueError<U> {
-        ValueError { msg: self.msg, value: f(self.value) }
+        ValueError { msg: self.msg, value: Box::new(f(*self.value)) }
     }
 
     /// Consumes the type and returns the underlying value.
     pub fn into_value(self) -> T {
-        self.value
+        *self.value
     }
 
     /// Returns a reference to the value.
