@@ -126,6 +126,18 @@ pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
 
+pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
+    r: Option<BlockResp>,
+) -> Option<BlockResp> {
+    r.map(|mut block| {
+        if block.transactions().is_empty() {
+            block.transactions_mut().convert_to_hashes();
+        }
+
+        block
+    })
+}
+
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],
 /// [`BlobGasFiller`], [`NonceFiller`], and [`ChainIdFiller`].
 pub type JoinedRecommendedFillers = JoinFill<

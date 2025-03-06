@@ -429,8 +429,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u64> {
-        let mut estimate = self.provider.estimate_gas(&self.request);
-        if let Some(state) = &self.state {
+        let mut estimate = self.provider.estimate_gas(self.request.clone());
+        if let Some(state) = self.state.clone() {
             estimate = estimate.overrides(state);
         }
         estimate.block(self.block).await.map_err(Into::into)
@@ -443,7 +443,7 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, '_, D, N> {
+    pub fn call(&self) -> EthCall<'_, D, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -453,9 +453,9 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, '_, (), N> {
-        let call = self.provider.call(&self.request).block(self.block);
-        let call = match &self.state {
+    pub fn call_raw(&self) -> EthCall<'_, (), N> {
+        let call = self.provider.call(self.request.clone()).block(self.block);
+        let call = match self.state.clone() {
             Some(state) => call.overrides(state),
             None => call,
         };
@@ -534,9 +534,12 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 mod tests {
     use super::*;
     use alloy_consensus::Transaction;
+    use alloy_network::EthereumWallet;
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
     use alloy_rpc_types_eth::AccessListItem;
+    use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
     use futures::Future;
 
@@ -753,5 +756,45 @@ mod tests {
             max_priority_fee_per_gas.to(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"
         )
+    }
+
+    sol! {
+        #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b506101448061001c5f395ff3fe60806040526004361061001d575f3560e01c8063785d04f514610021575b5f80fd5b61003461002f3660046100d5565b610036565b005b5f816001600160a01b0316836040515f6040518083038185875af1925050503d805f811461007f576040519150601f19603f3d011682016040523d82523d5f602084013e610084565b606091505b50509050806100d05760405162461bcd60e51b81526020600482015260146024820152734661696c656420746f2073656e64206d6f6e657960601b604482015260640160405180910390fd5b505050565b5f80604083850312156100e6575f80fd5b8235915060208301356001600160a01b0381168114610103575f80fd5b80915050925092905056fea2646970667358221220188e65dcedbc4bd68fdebc795292d5a9bf643385f138383969a28f796ff8858664736f6c63430008190033")]
+        contract SendMoney {
+            function send(uint256 amount, address target) external payable {
+                (bool success, ) = target.call{value: amount}("");
+                require(success, "Failed to send money");
+            }
+        }
+    }
+
+    // <https://github.com/alloy-rs/alloy/issues/1942>
+    #[tokio::test]
+    async fn fill_eth_call() {
+        let anvil = Anvil::new().spawn();
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+
+        let wallet = EthereumWallet::new(pk);
+
+        let wallet_provider = ProviderBuilder::new().wallet(wallet).on_http(anvil.endpoint_url());
+
+        let contract = SendMoney::deploy(wallet_provider.clone()).await.unwrap();
+
+        let tx = contract
+            .send(U256::from(1000000), Address::with_last_byte(1))
+            .into_transaction_request()
+            .value(U256::from(1000000));
+
+        assert!(tx.from.is_none());
+
+        let std_provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
+        let should_fail = std_provider.estimate_gas(tx.clone()).await.is_err();
+
+        assert!(should_fail);
+
+        let gas = wallet_provider.estimate_gas(tx).await.unwrap();
+
+        assert_eq!(gas, 56555);
     }
 }

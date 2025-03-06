@@ -29,6 +29,9 @@ pub use alloy_eips::eip4844::{
 pub use eip4844::BlobTransactionValidationError;
 pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
+/// Re-export for convenience
+pub use either::Either;
+
 mod envelope;
 pub use envelope::{TxEnvelope, TxType};
 
@@ -37,7 +40,7 @@ pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
 
 mod rlp;
 #[doc(hidden)]
-pub use rlp::RlpEcdsaTx;
+pub use rlp::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpEcdsaTx};
 
 mod typed;
 pub use typed::TypedTransaction;

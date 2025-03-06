@@ -52,7 +52,7 @@ derive_more = { workspace = true, features = [
 ], default-features = false }
 auto_impl.workspace = true
 thiserror.workspace = true
-either = { workspace = true }
+either.workspace = true
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }
@@ -67,15 +67,33 @@ tokio = { workspace = true, features = ["macros"] }
 
 [features]
 default = ["std"]
-std = ["alloy-eips/std", "c-kzg?/std", "alloy-serde?/std"]
+std = [
+	"alloy-eips/std",
+	"c-kzg?/std",
+	"alloy-serde?/std",
+	"alloy-primitives/std",
+	"alloy-rlp/std",
+	"alloy-trie/std",
+	"derive_more/std",
+	"k256?/std",
+	"serde?/std",
+	"serde_json/std",
+	"serde_with?/std",
+	"thiserror/std",
+	"either/std"
+]
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = [
-    "dep:serde",
-    "alloy-primitives/serde",
-    "dep:alloy-serde",
-    "alloy-eips/serde",
-    "alloy-trie/serde",
+	"dep:serde",
+	"alloy-primitives/serde",
+	"dep:alloy-serde",
+	"alloy-eips/serde",
+	"alloy-trie/serde",
+	"c-kzg?/serde",
+	"either/serde",
+	"k256?/serde",
+	"rand?/serde"
 ]
 serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]

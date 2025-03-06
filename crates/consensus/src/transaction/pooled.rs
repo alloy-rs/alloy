@@ -3,7 +3,7 @@
 
 use crate::{
     error::ValueError,
-    transaction::{RlpEcdsaTx, TxEip1559, TxEip2930, TxEip4844, TxLegacy},
+    transaction::{RlpEcdsaDecodableTx, TxEip1559, TxEip2930, TxEip4844, TxLegacy},
     SignableTransaction, Signed, Transaction, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702,
     TxEnvelope, TxType,
 };

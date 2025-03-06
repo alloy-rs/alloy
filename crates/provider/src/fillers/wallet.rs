@@ -105,6 +105,14 @@ where
     }
 
     async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+        self.prepare_call_sync(tx)?;
+        Ok(())
+    }
+
+    fn prepare_call_sync(
+        &self,
+        tx: &mut <N as Network>::TransactionRequest,
+    ) -> TransportResult<()> {
         if tx.from().is_none() {
             tx.set_from(self.wallet.default_signer_address());
         }
