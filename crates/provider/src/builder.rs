@@ -1,3 +1,5 @@
+#[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
+use crate::layers::{Asserter, MockLayer, MockProvider};
 use crate::{
     fillers::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
@@ -144,6 +146,25 @@ impl
     /// This is equivalent to creating the builder using `ProviderBuilder::default()`.
     pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
         ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
+    }
+
+    /// Create a new [`MockProvider`] for testing purposes.
+    ///
+    /// Sets the dummy RPC_URL to `http://localhost:8545`.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
+    pub fn mocked() -> (MockProvider<RootProvider, Ethereum>, Asserter) {
+        let asserter = Asserter::new();
+        let layer = MockLayer::new(asserter.clone());
+
+        let builder = ProviderBuilder::<_, _, Ethereum>::default().layer(layer);
+
+        #[cfg(any(test, feature = "reqwest"))]
+        let mock_provider = builder.on_http("http://localhost:8545".parse().unwrap());
+
+        #[cfg(all(feature = "hyper", not(feature = "reqwest")))]
+        let mock_provider = builder.on_hyper_http("http://localhost:8545".parse().unwrap());
+
+        (mock_provider, asserter)
     }
 }
 
