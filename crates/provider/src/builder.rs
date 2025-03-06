@@ -161,7 +161,7 @@ impl
         #[cfg(any(test, feature = "reqwest"))]
         let mock_provider = builder.on_http("http://localhost:8545".parse().unwrap());
 
-        #[cfg(feature = "hyper")]
+        #[cfg(all(feature = "hyper", not(feature = "reqwest")))]
         let mock_provider = builder.on_hyper_http("http://localhost:8545".parse().unwrap());
 
         (mock_provider, asserter)
