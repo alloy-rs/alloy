@@ -342,10 +342,6 @@ impl SignableTransaction<Signature> for TxLegacy {
         // 'header length' + 'payload length'
         Header { list: true, payload_length }.length_with_payload()
     }
-
-    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
-        self.tx_hash(signature)
-    }
 }
 
 impl Typed2718 for TxLegacy {

@@ -1,4 +1,4 @@
-use crate::transaction::{RlpEcdsaTx, SignableTransaction};
+use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
@@ -94,24 +94,24 @@ impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     pub fn signature_hash(&self) -> B256 {
         self.tx.signature_hash()
     }
-
-    /// Returns a reference to the transaction hash.
-    #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    pub fn hash(&self) -> &B256 {
-        self.hash.get_or_init(|| self.tx.tx_hash_with_signature(&self.signature))
-    }
-
-    /// Splits the transaction into parts.
-    pub fn into_parts(self) -> (T, Sig, B256) {
-        let hash = *self.hash();
-        (self.tx, self.signature, hash)
-    }
 }
 
 impl<T> Signed<T>
 where
-    T: RlpEcdsaTx,
+    T: RlpEcdsaEncodableTx,
 {
+    /// Returns a reference to the transaction hash.
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
+    pub fn hash(&self) -> &B256 {
+        self.hash.get_or_init(|| self.tx.tx_hash(&self.signature))
+    }
+
+    /// Splits the transaction into parts.
+    pub fn into_parts(self) -> (T, Signature, B256) {
+        let hash = *self.hash();
+        (self.tx, self.signature, hash)
+    }
+
     /// Get the length of the transaction when RLP encoded.
     pub fn rlp_encoded_length(&self) -> usize {
         self.tx.rlp_encoded_length_with_signature(&self.signature)
@@ -151,7 +151,12 @@ where
     pub fn network_encode(&self, out: &mut dyn BufMut) {
         self.tx.network_encode(&self.signature, out);
     }
+}
 
+impl<T> Signed<T>
+where
+    T: RlpEcdsaDecodableTx,
+{
     /// RLP decode the signed transaction.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         T::rlp_decode_signed(buf)
@@ -178,13 +183,13 @@ where
     }
 }
 
-impl<T: SignableTransaction<Sig> + PartialEq, Sig: PartialEq> PartialEq for Signed<T, Sig> {
+impl<T: RlpEcdsaEncodableTx + PartialEq> PartialEq for Signed<T> {
     fn eq(&self, other: &Self) -> bool {
         self.hash() == other.hash() && self.tx == other.tx && self.signature == other.signature
     }
 }
 
-impl<T: SignableTransaction<Sig> + PartialEq, Sig: PartialEq> Eq for Signed<T, Sig> {}
+impl<T: RlpEcdsaEncodableTx + PartialEq> Eq for Signed<T> {}
 
 #[cfg(feature = "k256")]
 impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
@@ -224,7 +229,7 @@ impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary
 
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::SignableTransaction;
+    use crate::transaction::RlpEcdsaEncodableTx;
     use alloc::borrow::Cow;
     use alloy_primitives::B256;
     use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
@@ -238,10 +243,9 @@ mod serde {
         hash: Cow<'a, B256>,
     }
 
-    impl<T, Sig> Serialize for super::Signed<T, Sig>
+    impl<T> Serialize for super::Signed<T>
     where
-        T: Clone + SignableTransaction<Sig> + Serialize,
-        Sig: Clone + Serialize,
+        T: Clone + RlpEcdsaEncodableTx + Serialize,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where

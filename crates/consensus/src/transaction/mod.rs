@@ -263,9 +263,6 @@ pub trait SignableTransaction<Signature>: Transaction {
         keccak256(self.encoded_for_signing())
     }
 
-    /// Calculate the transaction hash for this transaction with the given signature.
-    fn tx_hash_with_signature(&self, signature: &Signature) -> B256;
-
     /// Convert to a [`Signed`] object.
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
     where

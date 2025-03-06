@@ -264,10 +264,6 @@ impl SignableTransaction<Signature> for TxEip7702 {
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
     }
-
-    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
-        self.tx_hash(signature)
-    }
 }
 
 impl Typed2718 for TxEip7702 {

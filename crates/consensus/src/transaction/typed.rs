@@ -472,16 +472,6 @@ impl SignableTransaction<Signature> for TypedTransaction {
             Self::Eip7702(tx) => tx.payload_len_for_signature(),
         }
     }
-
-    fn tx_hash_with_signature(&self, signature: &Signature) -> B256 {
-        match self {
-            Self::Legacy(tx) => tx.tx_hash_with_signature(signature),
-            Self::Eip2930(tx) => tx.tx_hash_with_signature(signature),
-            Self::Eip1559(tx) => tx.tx_hash_with_signature(signature),
-            Self::Eip4844(tx) => tx.tx_hash_with_signature(signature),
-            Self::Eip7702(tx) => tx.tx_hash_with_signature(signature),
-        }
-    }
 }
 
 #[cfg(feature = "serde")]
