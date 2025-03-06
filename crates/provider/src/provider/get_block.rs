@@ -223,6 +223,14 @@ where
     /// [`RpcCall`] with params that get wrapped into [`EthGetBlockParams`] in the future.
     RpcCall(RpcCall<EthGetBlockParams, Option<BlockResp>>),
     /// Pending Block Call
+    ///
+    /// This has been made explicit to handle cases where fields such as `hash`, `nonce`, `miner`
+    /// are either missing or set to null causing deserilization issues. See: <https://github.com/alloy-rs/alloy/issues/2117>
+    ///
+    /// This is specifically true in case of the response is returned from a geth node. See: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
+    ///
+    /// In such case, we first deserialize to [`Value`] and then check if the fields are missing or
+    /// set to null. If so, we set them to default values.
     PendingBlock(RpcCall<EthGetBlockParams, Option<serde_json::Value>>),
     /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
     ProviderCall(ProviderCallProducer<BlockResp>),
@@ -243,10 +251,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{Provider, ProviderBuilder};
 
-    use super::*;
-
+    // <https://github.com/alloy-rs/alloy/issues/2117>
     #[tokio::test]
     async fn test_pending_block_deser() {
         let provider =
