@@ -390,15 +390,10 @@ impl TxEnvelope {
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
     pub fn try_into_recovered(
-        &self,
+        self,
     ) -> Result<crate::transaction::Recovered<Self>, alloy_primitives::SignatureError> {
-        match self {
-            Self::Legacy(tx) => tx.try_into_recovered(),
-            Self::Eip2930(tx) => tx.try_into_recovered(),
-            Self::Eip1559(tx) => tx.try_into_recovered(),
-            Self::Eip4844(tx) => tx.try_into_recovered(),
-            Self::Eip7702(tx) => tx.try_into_recovered(),
-        }
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
     }
 
     /// Calculate the signing hash for the transaction.
