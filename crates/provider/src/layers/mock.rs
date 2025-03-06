@@ -2,11 +2,18 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
+use crate::{utils, EthCallMany, EthGetBlock};
+use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::{ErrorPayload, RpcRecv};
 use alloy_network::Network;
-use alloy_primitives::{Address, Bytes, U128, U256, U64};
+use alloy_primitives::{
+    Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U128, U256, U64,
+};
 use alloy_rpc_client::NoParams;
-use alloy_transport::{TransportError, TransportErrorKind};
+use alloy_rpc_types_eth::{
+    AccessListResult, Bundle, EIP1186AccountProofResponse, EthCallResponse, Filter, Log,
+};
+use alloy_transport::{TransportError, TransportErrorKind, TransportResult};
 use parking_lot::RwLock;
 use serde::Serialize;
 
@@ -152,6 +159,7 @@ where
     }
 }
 
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<P, N> Provider<N> for MockProvider<P, N>
 where
     P: Provider<N>,
@@ -181,12 +189,187 @@ where
         EthCall::call(self.asserter.clone(), tx)
     }
 
+    fn call_many<'req>(
+        &self,
+        bundles: &'req Vec<Bundle>,
+    ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
+        EthCallMany::new(self.asserter.clone(), bundles)
+    }
+
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
+        EthCall::gas_estimate(self.asserter.clone(), tx).map_resp(utils::convert_u64)
+    }
+
+    fn create_access_list<'a>(
+        &self,
+        _request: &'a N::TransactionRequest,
+    ) -> RpcWithBlock<&'a N::TransactionRequest, AccessListResult> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response();
+            ProviderCall::Ready(Some(res))
+        })
+    }
+
     fn get_balance(&self, _address: Address) -> RpcWithBlock<Address, U256, U256> {
         let asserter = self.asserter.clone();
         RpcWithBlock::new_provider(move |_block_id| {
             let res = asserter.pop_deser_response();
             ProviderCall::Ready(Some(res))
         })
+    }
+
+    fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn get_account(&self, _address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response();
+            ProviderCall::Ready(Some(res))
+        })
+    }
+
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
+        let asserter = self.asserter.clone();
+        EthGetBlock::new_provider(
+            block,
+            Box::new(move |_kind| {
+                let res = asserter.pop_deser_response();
+                ProviderCall::Ready(Some(res))
+            }),
+        )
+    }
+
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
+        let asserter = self.asserter.clone();
+        EthGetBlock::new_provider(
+            number.into(),
+            Box::new(move |_kind| {
+                let res = asserter.pop_deser_response();
+                ProviderCall::Ready(Some(res))
+            }),
+        )
+    }
+
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
+        let asserter = self.asserter.clone();
+        EthGetBlock::new_provider(
+            hash.into(),
+            Box::new(move |_kind| {
+                let res = asserter.pop_deser_response();
+                ProviderCall::Ready(Some(res))
+            }),
+        )
+    }
+
+    async fn get_block_transaction_count_by_hash(
+        &self,
+        _hash: BlockHash,
+    ) -> TransportResult<Option<u64>> {
+        let res = self.next_response::<Option<U64>>()?;
+        Ok(res.map(utils::convert_u64))
+    }
+
+    async fn get_block_transaction_count_by_number(
+        &self,
+        _block_number: BlockNumberOrTag,
+    ) -> TransportResult<Option<u64>> {
+        let res = self.next_response::<Option<U64>>()?;
+        Ok(res.map(utils::convert_u64))
+    }
+
+    fn get_block_receipts(
+        &self,
+        _block: BlockId,
+    ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn get_code_at(&self, _address: Address) -> RpcWithBlock<Address, Bytes> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response();
+            ProviderCall::Ready(Some(res))
+        })
+    }
+
+    async fn get_logs(&self, _filter: &Filter) -> TransportResult<Vec<Log>> {
+        self.next_response()
+    }
+
+    fn get_proof(
+        &self,
+        _address: Address,
+        _keys: Vec<StorageKey>,
+    ) -> RpcWithBlock<(Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response();
+            ProviderCall::Ready(Some(res))
+        })
+    }
+
+    fn get_storage_at(
+        &self,
+        _address: Address,
+        _key: U256,
+    ) -> RpcWithBlock<(Address, U256), StorageValue> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response();
+            ProviderCall::Ready(Some(res))
+        })
+    }
+
+    fn get_transaction_by_hash(
+        &self,
+        _hash: TxHash,
+    ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn get_raw_transaction_by_hash(&self, _hash: TxHash) -> ProviderCall<(TxHash,), Option<Bytes>> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    fn get_transaction_count(
+        &self,
+        _address: Address,
+    ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
+        let asserter = self.asserter.clone();
+        RpcWithBlock::new_provider(move |_block_id| {
+            let res = asserter.pop_deser_response::<U64>();
+            let res = res.map(utils::convert_u64);
+            ProviderCall::Ready(Some(res))
+        })
+    }
+
+    fn get_transaction_receipt(
+        &self,
+        _hash: TxHash,
+    ) -> ProviderCall<(TxHash,), Option<N::ReceiptResponse>> {
+        ProviderCall::Ready(Some(self.next_response()))
+    }
+
+    async fn get_uncle(
+        &self,
+        tag: BlockId,
+        _idx: u64,
+    ) -> TransportResult<Option<N::BlockResponse>> {
+        match tag {
+            BlockId::Hash(_) | BlockId::Number(_) => self.next_response(),
+        }
+    }
+
+    /// Gets the number of uncles for the block specified by the tag [BlockId].
+    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
+        match tag {
+            BlockId::Hash(_) | BlockId::Number(_) => {
+                self.next_response::<U64>().map(utils::convert_u64)
+            }
+        }
     }
 }
 
