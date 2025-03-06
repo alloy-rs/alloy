@@ -145,9 +145,14 @@ where
         self.asserter.push_success(response);
     }
 
-    /// Push a server error payload into the queue.
+    /// Push a JSON-RPC 2.0 [`ErrorPayload`] into the queue.
     pub fn push_error(&self, error: ErrorPayload) {
         self.asserter.push_error(error);
+    }
+
+    /// Push a [`TransportError`] into the queue.
+    pub fn push_err(&self, err: TransportError) {
+        self.asserter.push_err(err);
     }
 
     /// Helper function to get and deserialize the next response from the asserter
