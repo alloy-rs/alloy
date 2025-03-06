@@ -391,6 +391,16 @@ impl RlpEcdsaEncodableTx for TypedTransaction {
         }
     }
 
+    fn eip2718_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.eip2718_encode(signature, out),
+            Self::Eip2930(tx) => tx.eip2718_encode(signature, out),
+            Self::Eip1559(tx) => tx.eip2718_encode(signature, out),
+            Self::Eip4844(tx) => tx.eip2718_encode(signature, out),
+            Self::Eip7702(tx) => tx.eip2718_encode(signature, out),
+        }
+    }
+
     fn network_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         match self {
             Self::Legacy(tx) => tx.network_encode_with_type(signature, tx.ty(), out),
@@ -401,6 +411,16 @@ impl RlpEcdsaEncodableTx for TypedTransaction {
         }
     }
 
+    fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
+        match self {
+            Self::Legacy(tx) => tx.network_encode(signature, out),
+            Self::Eip2930(tx) => tx.network_encode(signature, out),
+            Self::Eip1559(tx) => tx.network_encode(signature, out),
+            Self::Eip4844(tx) => tx.network_encode(signature, out),
+            Self::Eip7702(tx) => tx.network_encode(signature, out),
+        }
+    }
+
     fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> TxHash {
         match self {
             Self::Legacy(tx) => tx.tx_hash_with_type(signature, tx.ty()),
@@ -408,6 +428,16 @@ impl RlpEcdsaEncodableTx for TypedTransaction {
             Self::Eip1559(tx) => tx.tx_hash_with_type(signature, tx.ty()),
             Self::Eip4844(tx) => tx.tx_hash_with_type(signature, tx.ty()),
             Self::Eip7702(tx) => tx.tx_hash_with_type(signature, tx.ty()),
+        }
+    }
+
+    fn tx_hash(&self, signature: &Signature) -> TxHash {
+        match self {
+            Self::Legacy(tx) => tx.tx_hash(signature),
+            Self::Eip2930(tx) => tx.tx_hash(signature),
+            Self::Eip1559(tx) => tx.tx_hash(signature),
+            Self::Eip4844(tx) => tx.tx_hash(signature),
+            Self::Eip7702(tx) => tx.tx_hash(signature),
         }
     }
 }
