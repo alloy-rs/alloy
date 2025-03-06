@@ -295,7 +295,7 @@ impl TransactionResponse for AnyRpcTransaction {
     }
 
     fn from(&self) -> alloy_primitives::Address {
-        self.inner.from
+        self.inner.from()
     }
 
     fn gas_price(&self) -> Option<u128> {

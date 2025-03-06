@@ -183,6 +183,14 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
         let sighash = self.tx.signature_hash();
         self.signature.recover_address_from_prehash(&sighash)
     }
+
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] object.
+    pub fn try_into_recovered(
+        self,
+    ) -> Result<crate::transaction::Recovered<T>, alloy_primitives::SignatureError> {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(self.tx, signer))
+    }
 }
 
 #[cfg(all(any(test, feature = "arbitrary"), feature = "k256"))]
