@@ -333,7 +333,7 @@ where
 
         let helper = HeaderHelper::deserialize(deser_value).map_err(serde::de::Error::custom)?;
 
-        Ok(Header {
+        Ok(Self {
             hash: helper.hash,
             inner: helper.inner,
             total_difficulty: helper.total_difficulty,
