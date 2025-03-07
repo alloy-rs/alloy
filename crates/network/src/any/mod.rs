@@ -210,12 +210,28 @@ impl AnyRpcTransaction {
         self.0.inner.inner.into_inner().try_into_envelope()
     }
 
-    /// Attempts to convert the [`UnknownTxEnvelope`] into `Either::Right` if this is an unknown
+    /// Attempts to convert the [`AnyRpcTransaction`] into `Either::Right` if this is an unknown
     /// variant.
     ///
     /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
     /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
     pub fn try_into_either<T>(self) -> Result<Either<TxEnvelope, T>, T::Error>
+    where
+        T: TryFrom<Self>,
+    {
+        if self.0.inner.inner.inner().is_ethereum() {
+            Ok(Either::Left(self.0.inner.inner.into_inner().try_into_envelope().unwrap()))
+        } else {
+            T::try_from(self).map(Either::Right)
+        }
+    }
+
+    /// Attempts to convert the [`UnknownTxEnvelope`] into `Either::Right` if this is an unknown
+    /// variant.
+    ///
+    /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
+    /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    pub fn try_unknown_into_either<T>(self) -> Result<Either<TxEnvelope, T>, T::Error>
     where
         T: TryFrom<UnknownTxEnvelope>,
     {
