@@ -215,6 +215,16 @@ pub enum AnyTxEnvelope {
 }
 
 impl AnyTxEnvelope {
+    /// Returns true if this is the ethereum transaction variant
+    pub const fn is_ethereum(&self) -> bool {
+        matches!(self, Self::Ethereum(_))
+    }
+
+    /// Returns true if this is the unknown transaction variant
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown(_))
+    }
+
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     pub const fn as_envelope(&self) -> Option<&TxEnvelope> {
         match self {
