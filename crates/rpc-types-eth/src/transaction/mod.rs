@@ -114,7 +114,7 @@ impl<T> Transaction<T> {
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
         let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Transaction {
-            inner: inner.map_inner(f),
+            inner: inner.map(f),
             block_hash,
             block_number,
             transaction_index,
@@ -126,7 +126,7 @@ impl<T> Transaction<T> {
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
         let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Ok(Transaction {
-            inner: inner.try_map_inner(f)?,
+            inner: inner.try_map(f)?,
             block_hash,
             block_number,
             transaction_index,

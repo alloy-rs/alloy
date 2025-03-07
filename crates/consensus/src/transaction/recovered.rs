@@ -92,7 +92,7 @@ impl<T> Recovered<T> {
     where
         Tx: From<T>,
     {
-        self.map_inner(Tx::from)
+        self.map(Tx::from)
     }
 
     /// Converts the transaction type to the given alternative that is `From<T>`
@@ -101,7 +101,7 @@ impl<T> Recovered<T> {
     where
         Tx: From<T>,
     {
-        self.map_inner(Tx::from)
+        self.map(Tx::from)
     }
 
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
@@ -109,7 +109,7 @@ impl<T> Recovered<T> {
     where
         Tx: TryFrom<T>,
     {
-        self.try_map_inner(Tx::try_from)
+        self.try_map(Tx::try_from)
     }
 
     /// Converts the transaction to the given alternative that is `TryFrom<T>`
@@ -118,7 +118,7 @@ impl<T> Recovered<T> {
     where
         Tx: TryFrom<T>,
     {
-        self.try_map_inner(Tx::try_from)
+        self.try_map(Tx::try_from)
     }
 
     /// Applies the given closure to the inner signed object.
@@ -133,10 +133,7 @@ impl<T> Recovered<T> {
     }
 
     /// Applies the given fallible closure to the inner signed object.
-    pub fn try_map<Tx, E>(
-        self,
-        f: impl FnOnce(T) -> Result<Tx, E>,
-    ) -> Result<Recovered<Tx>, E> {
+    pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Recovered<Tx>, E> {
         Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
     }
 
