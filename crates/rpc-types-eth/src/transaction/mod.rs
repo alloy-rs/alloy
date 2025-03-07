@@ -79,7 +79,7 @@ where
 impl<T> Transaction<T> {
     /// Consumes the type and returns the wrapped transaction.
     pub fn into_inner(self) -> T {
-        self.inner.into_tx()
+        self.inner.into_inner()
     }
 
     /// Consumes the type and returns a [`Recovered`] transaction with the sender
@@ -114,7 +114,7 @@ impl<T> Transaction<T> {
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
         let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Transaction {
-            inner: inner.map_transaction(f),
+            inner: inner.map_inner(f),
             block_hash,
             block_number,
             transaction_index,
@@ -126,7 +126,7 @@ impl<T> Transaction<T> {
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
         let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Ok(Transaction {
-            inner: inner.try_map_transaction(f)?,
+            inner: inner.try_map_inner(f)?,
             block_hash,
             block_number,
             transaction_index,
@@ -180,7 +180,7 @@ where
     /// During this conversion data for [TransactionRequest::sidecar] is not
     /// populated as it is not part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
-        self.inner.into_tx().into()
+        self.inner.into_inner().into()
     }
 }
 
@@ -188,7 +188,7 @@ impl Transaction {
     /// Consumes the transaction and returns it as [`Signed`] with [`TypedTransaction`] as the
     /// transaction type.
     pub fn into_signed(self) -> Signed<TypedTransaction> {
-        self.inner.into_tx().into_signed()
+        self.inner.into_inner().into_signed()
     }
 
     /// Consumes the transaction and returns it a [`Recovered`] signed [`TypedTransaction`].
@@ -216,7 +216,7 @@ impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner.into_tx() {
+        match tx.inner.into_inner() {
             TxEnvelope::Legacy(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.tx_type()))),
         }
@@ -227,7 +227,7 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner.into_tx() {
+        match tx.inner.into_inner() {
             TxEnvelope::Eip1559(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Eip1559, got {}", tx.tx_type()))),
         }
@@ -238,7 +238,7 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner.into_tx() {
+        match tx.inner.into_inner() {
             TxEnvelope::Eip2930(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Eip2930, got {}", tx.tx_type()))),
         }
@@ -261,7 +261,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner.into_tx() {
+        match tx.inner.into_inner() {
             TxEnvelope::Eip4844(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!(
                 "expected TxEip4844Variant, got {}",
@@ -275,7 +275,7 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner.into_tx() {
+        match tx.inner.into_inner() {
             TxEnvelope::Eip7702(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Eip7702, got {}", tx.tx_type()))),
         }
@@ -284,7 +284,7 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
 
 impl From<Transaction> for TxEnvelope {
     fn from(tx: Transaction) -> Self {
-        tx.inner.into_tx()
+        tx.inner.into_inner()
     }
 }
 
