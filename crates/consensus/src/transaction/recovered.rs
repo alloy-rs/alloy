@@ -12,7 +12,7 @@ pub struct Recovered<T> {
     /// Signed object
     #[deref]
     #[as_ref]
-    tx: T,
+    inner: T,
 }
 
 impl<T> Recovered<T> {
@@ -28,12 +28,12 @@ impl<T> Recovered<T> {
 
     /// Reference to the inner signed object.
     pub const fn inner(&self) -> &T {
-        &self.tx
+        &self.inner
     }
 
     /// Reference to the inner signed object.
     pub fn into_inner(self) -> T {
-        self.tx
+        self.inner
     }
 
     /// Clone the inner signed object.
@@ -41,21 +41,21 @@ impl<T> Recovered<T> {
     where
         T: Clone,
     {
-        self.tx.clone()
+        self.inner.clone()
     }
 
     /// Returns a reference to the transaction.
     #[doc(alias = "transaction")]
     #[deprecated = "Use `inner` instead"]
     pub const fn tx(&self) -> &T {
-        &self.tx
+        &self.inner
     }
 
     /// Transform back to the transaction.
     #[doc(alias = "into_transaction")]
     #[deprecated = "Use `into_inner` instead"]
     pub fn into_tx(self) -> T {
-        self.tx
+        self.inner
     }
 
     /// Clone the inner transaction.
@@ -65,26 +65,26 @@ impl<T> Recovered<T> {
     where
         T: Clone,
     {
-        self.tx.clone()
+        self.inner.clone()
     }
 
     /// Dissolve Self to its component
     #[doc(alias = "split")]
     pub fn into_parts(self) -> (T, Address) {
-        (self.tx, self.signer)
+        (self.inner, self.signer)
     }
 
     /// Converts from `&Recovered<T>` to `Recovered<&T>`.
     pub const fn as_recovered_ref(&self) -> Recovered<&T> {
-        Recovered { tx: &self.tx, signer: self.signer() }
+        Recovered { inner: &self.inner, signer: self.signer() }
     }
 
     /// Create [`Recovered`] from the given transaction and [`Address`] of the signer.
     ///
     /// Note: This does not check if the signer is the actual signer of the transaction.
     #[inline]
-    pub const fn new_unchecked(tx: T, signer: Address) -> Self {
-        Self { tx, signer }
+    pub const fn new_unchecked(inner: T, signer: Address) -> Self {
+        Self { inner, signer }
     }
 
     /// Converts the inner signed object to the given alternative that is `From<T>`
@@ -123,13 +123,13 @@ impl<T> Recovered<T> {
 
     /// Applies the given closure to the inner signed object.
     pub fn map_inner<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
-        Recovered::new_unchecked(f(self.tx), self.signer)
+        Recovered::new_unchecked(f(self.inner), self.signer)
     }
 
     /// Applies the given closure to the inner transaction type.
     #[deprecated = "Use `map_inner` instead"]
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
-        Recovered::new_unchecked(f(self.tx), self.signer)
+        Recovered::new_unchecked(f(self.inner), self.signer)
     }
 
     /// Applies the given fallible closure to the inner signed object.
@@ -137,7 +137,7 @@ impl<T> Recovered<T> {
         self,
         f: impl FnOnce(T) -> Result<Tx, E>,
     ) -> Result<Recovered<Tx>, E> {
-        Ok(Recovered::new_unchecked(f(self.tx)?, self.signer))
+        Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
     }
 
     /// Applies the given fallible closure to the inner transaction type.
@@ -146,7 +146,7 @@ impl<T> Recovered<T> {
         self,
         f: impl FnOnce(T) -> Result<Tx, E>,
     ) -> Result<Recovered<Tx>, E> {
-        Ok(Recovered::new_unchecked(f(self.tx)?, self.signer))
+        Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
     }
 }
 
@@ -156,19 +156,19 @@ impl<T> Recovered<&T> {
     where
         T: Clone,
     {
-        let Self { tx, signer } = self;
-        Recovered::new_unchecked(tx.clone(), signer)
+        let Self { inner, signer } = self;
+        Recovered::new_unchecked(inner.clone(), signer)
     }
 }
 
 impl<T: Encodable> Encodable for Recovered<T> {
     /// This encodes the transaction _with_ the signature, and an rlp header.
     fn encode(&self, out: &mut dyn bytes::BufMut) {
-        self.tx.encode(out)
+        self.inner.encode(out)
     }
 
     fn length(&self) -> usize {
-        self.tx.length()
+        self.inner.length()
     }
 }
 
@@ -184,21 +184,21 @@ impl<T: Decodable + SignerRecoverable> Decodable for Recovered<T> {
 
 impl<T: Typed2718> Typed2718 for Recovered<T> {
     fn ty(&self) -> u8 {
-        self.tx.ty()
+        self.inner.ty()
     }
 }
 
 impl<T: Encodable2718> Encodable2718 for Recovered<T> {
     fn encode_2718_len(&self) -> usize {
-        self.tx.encode_2718_len()
+        self.inner.encode_2718_len()
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.tx.encode_2718(out)
+        self.inner.encode_2718(out)
     }
 
     fn trie_hash(&self) -> B256 {
-        self.tx.trie_hash()
+        self.inner.trie_hash()
     }
 }
 
