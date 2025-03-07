@@ -222,6 +222,12 @@ impl From<Transaction<TxEnvelope>> for AnyRpcTransaction {
     }
 }
 
+impl From<AnyRpcTransaction> for AnyTxEnvelope {
+    fn from(tx: AnyRpcTransaction) -> Self {
+        tx.inner.inner.
+    }
+}
+
 impl TryFrom<AnyRpcTransaction> for TxEnvelope {
     type Error = ValueError<AnyTxEnvelope>;
 
