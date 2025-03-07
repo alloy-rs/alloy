@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Clean up top level docs ([#2028](https://github.com/alloy-rs/alloy/issues/2028))
 
+### Miscellaneous Tasks
+
+- Release 0.11.1
+
 ## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Documentation
