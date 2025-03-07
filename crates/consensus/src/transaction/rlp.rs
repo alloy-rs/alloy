@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed};
+use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::eip2718::{Eip2718Error, Eip2718Result};
 use alloy_primitives::{keccak256, PrimitiveSignature as Signature, TxHash};
@@ -7,7 +7,8 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 /// Helper trait for managing RLP encoding of transactions inside 2718
 #[doc(hidden)]
 #[doc(alias = "RlpEncodableTx", alias = "RlpTxEncoding")]
-pub trait RlpEcdsaEncodableTx: SignableTransaction<Signature> + Sized {
+#[auto_impl::auto_impl(&, Arc)]
+pub trait RlpEcdsaEncodableTx: Sized {
     /// The default transaction type for this transaction.
     const DEFAULT_TX_TYPE: u8;
 
@@ -166,7 +167,8 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
     /// Decodes the transaction from RLP bytes, including the signature
     /// Produces a [`Signed`].
     fn rlp_decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        Self::rlp_decode_with_signature(buf).map(|(tx, signature)| tx.into_signed(signature))
+        Self::rlp_decode_with_signature(buf)
+            .map(|(tx, signature)| Signed::new_unhashed(tx, signature))
     }
 
     /// Decodes the transaction from eip2718 bytes, expecting the given type

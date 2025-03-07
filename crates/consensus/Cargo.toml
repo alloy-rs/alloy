@@ -53,7 +53,7 @@ derive_more = { workspace = true, features = [
 auto_impl.workspace = true
 thiserror.workspace = true
 either.workspace = true
-once_cell = { workspace = true, features = ["critical-section"]}
+once_cell = { workspace = true, features = ["race", "alloc"]}
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }
