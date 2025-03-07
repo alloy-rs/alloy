@@ -222,7 +222,7 @@ impl AnyRpcTransaction {
         self.0.inner.inner.into_inner().try_into_either()
     }
 
-    /// Maps the inner transaction to a new type that implements [`TxTrait`].
+    /// Applies the given closure to the inner transaction type.
     ///
     /// [`alloy_serde::OtherFields`] are stripped away while mapping.
     /// Applies the given closure to the inner transaction type.
