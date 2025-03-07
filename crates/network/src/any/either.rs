@@ -236,7 +236,7 @@ impl AnyTxEnvelope {
     pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<Self>> {
         match self {
             Self::Ethereum(inner) => Ok(inner),
-            this => Err(ValueError::new(this, "unknown transaction envelope")),
+            this => Err(ValueError::new_static(this, "unknown transaction envelope")),
         }
     }
 

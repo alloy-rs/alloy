@@ -109,10 +109,10 @@ impl<T, H> Block<T, H> {
     /// Returns an error if the transactions are not full or if the block has uncles.
     pub fn try_into_block_body(self) -> Result<BlockBody<T, H>, ValueError<Self>> {
         if !self.uncles.is_empty() {
-            return Err(ValueError::new(self, "uncles not empty"));
+            return Err(ValueError::new_static(self, "uncles not empty"));
         }
         if !self.transactions.is_full() {
-            return Err(ValueError::new(self, "transactions not full"));
+            return Err(ValueError::new_static(self, "transactions not full"));
         }
 
         Ok(self.into_block_body_unchecked())
