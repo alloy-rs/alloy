@@ -1,7 +1,7 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
-    transaction::Either, Signed, Transaction as TransactionTrait, TxEip1559, TxEip2930,
-    TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
+    error::ValueError, transaction::Either, Signed, Transaction as TransactionTrait, TxEip1559,
+    TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
@@ -233,10 +233,10 @@ impl AnyTxEnvelope {
 
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     /// If the transaction is not an Ethereum transaction, it is returned as an error.
-    pub fn try_into_envelope(self) -> Result<TxEnvelope, Self> {
+    pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<Self>> {
         match self {
             Self::Ethereum(inner) => Ok(inner),
-            this => Err(this),
+            this => Err(ValueError::new(this, "unknown transaction envelope")),
         }
     }
 

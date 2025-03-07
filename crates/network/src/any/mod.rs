@@ -12,6 +12,7 @@ pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::Network;
+use alloy_consensus::error::ValueError;
 use alloy_network_primitives::{BlockResponse, TransactionResponse};
 pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
 use alloy_rpc_types_eth::{AccessList, Block, BlockTransactions, Transaction, TransactionRequest};
@@ -176,6 +177,12 @@ impl AnyRpcTransaction {
         self.inner.inner.as_envelope()
     }
 
+    /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
+    /// If the transaction is not an Ethereum transaction, it is returned as an error.
+    pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<AnyTxEnvelope>> {
+        self.0.inner.inner.into_tx().try_into_envelope()
+    }
+
     /// Maps the inner transaction to a new type that implements [`TxTrait`].
     ///
     /// [`alloy_serde::OtherFields`] are ignored while mapping.
@@ -212,6 +219,14 @@ impl From<Transaction<TxEnvelope>> for AnyRpcTransaction {
     fn from(tx: Transaction<TxEnvelope>) -> Self {
         let tx = tx.map(AnyTxEnvelope::Ethereum);
         Self(WithOtherFields::new(tx))
+    }
+}
+
+impl TryFrom<AnyRpcTransaction> for TxEnvelope {
+    type Error = ValueError<AnyTxEnvelope>;
+
+    fn try_from(value: AnyRpcTransaction) -> Result<Self, Self::Error> {
+        value.try_into_envelope()
     }
 }
 
@@ -286,6 +301,10 @@ impl alloy_consensus::Transaction for AnyRpcTransaction {
 }
 
 impl TransactionResponse for AnyRpcTransaction {
+    fn tx_hash(&self) -> alloy_primitives::TxHash {
+        self.inner.tx_hash()
+    }
+
     fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
         self.0.inner.block_hash
     }
@@ -294,20 +313,16 @@ impl TransactionResponse for AnyRpcTransaction {
         self.inner.block_number
     }
 
+    fn transaction_index(&self) -> Option<u64> {
+        self.inner.transaction_index
+    }
+
     fn from(&self) -> alloy_primitives::Address {
         self.inner.from()
     }
 
     fn gas_price(&self) -> Option<u128> {
         self.inner.effective_gas_price
-    }
-
-    fn transaction_index(&self) -> Option<u64> {
-        self.inner.transaction_index
-    }
-
-    fn tx_hash(&self) -> alloy_primitives::TxHash {
-        self.inner.tx_hash()
     }
 }
 
