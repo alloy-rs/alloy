@@ -148,15 +148,23 @@ impl
         ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
     }
 
-    /// Create a new [`MockProvider`] for testing purposes.
+    /// Create a new [`MockProvider`] for the [`Ethereum`] network.
     ///
     /// Sets the dummy RPC_URL to `http://localhost:8545`.
     #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
     pub fn mocked() -> MockProvider<RootProvider, Ethereum> {
+        Self::mocked_network()
+    }
+
+    /// Create a new [`MockProvider`] for a specific network.
+    ///
+    /// Sets the dummy RPC_URL to `http://localhost:8545`.
+    #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
+    pub fn mocked_network<Net: Network>() -> MockProvider<RootProvider<Net>, Net> {
         let asserter = Asserter::new();
         let layer = MockLayer::new(asserter.clone());
 
-        let builder = ProviderBuilder::<_, _, Ethereum>::default().layer(layer);
+        let builder = ProviderBuilder::<_, _, Net>::default().layer(layer);
 
         #[cfg(any(test, feature = "reqwest"))]
         let mock_provider = builder.on_http("http://localhost:8545".parse().unwrap());
