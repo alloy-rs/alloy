@@ -104,6 +104,20 @@ impl<T, H> Block<T, H> {
         self
     }
 
+    /// Tries to convert inner transactions into a vector of full transactions
+    ///
+    /// Returns an error if the block contains only transaction hashes or if it is an uncle block.
+    pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<BlockTransactions<T>>> {
+        self.transactions.try_into_transactions()
+    }
+
+    /// Consumes the type and returns the transactions as a vector.
+    ///
+    /// Note: if this is an uncle or hashes, this will return an empty vector.
+    pub fn into_transactions_vec(self) -> Vec<T> {
+        self.transactions.into_transactions_vec()
+    }
+
     /// Converts this block into a [`BlockBody`].
     ///
     /// Returns an error if the transactions are not full or if the block has uncles.
