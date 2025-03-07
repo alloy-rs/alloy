@@ -8,6 +8,8 @@ ignore = [
     "RUSTSEC-2025-0007",
     # https://rustsec.org/advisories/RUSTSEC-2024-0437, trezor-client dependency, no fix available yet
     "RUSTSEC-2024-0437",
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
 ]
 
 [bans]
