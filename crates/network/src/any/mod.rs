@@ -180,7 +180,7 @@ impl AnyRpcTransaction {
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     /// If the transaction is not an Ethereum transaction, it is returned as an error.
     pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<AnyTxEnvelope>> {
-        self.0.inner.inner.into_tx().try_into_envelope()
+        self.0.inner.inner.into_inner().try_into_envelope()
     }
 
     /// Maps the inner transaction to a new type that implements [`TxTrait`].
