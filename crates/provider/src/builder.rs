@@ -152,7 +152,7 @@ impl
     ///
     /// Sets the dummy RPC_URL to `http://localhost:8545`.
     #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
-    pub fn mocked() -> (MockProvider<RootProvider, Ethereum>, Asserter) {
+    pub fn mocked() -> MockProvider<RootProvider, Ethereum> {
         let asserter = Asserter::new();
         let layer = MockLayer::new(asserter.clone());
 
@@ -164,7 +164,7 @@ impl
         #[cfg(all(feature = "hyper", not(feature = "reqwest")))]
         let mock_provider = builder.on_hyper_http("http://localhost:8545".parse().unwrap());
 
-        (mock_provider, asserter)
+        mock_provider
     }
 }
 

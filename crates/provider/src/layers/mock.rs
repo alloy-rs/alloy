@@ -426,8 +426,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock() {
-        let (provider, asserter) = ProviderBuilder::mocked();
+        let provider = ProviderBuilder::mocked();
 
+        let asserter = provider.asserter();
         asserter.push_success(21965802);
         asserter.push_success(21965803);
         asserter.push_err(TransportError::NullResp);
