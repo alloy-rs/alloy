@@ -162,7 +162,7 @@ impl
     #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
     pub fn mocked_network<Net: Network>() -> MockProvider<RootProvider<Net>, Net> {
         let asserter = Asserter::new();
-        let layer = MockLayer::new(asserter.clone());
+        let layer = MockLayer::new(asserter);
 
         let builder = ProviderBuilder::<_, _, Net>::default().layer(layer);
 
