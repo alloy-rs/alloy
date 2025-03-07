@@ -312,11 +312,11 @@ impl BlobTransactionSidecar {
         I: IntoIterator<Item = B>,
         B: AsRef<str>,
     {
-        let blobs = blobs
-            .into_iter()
-            .map(|blob| c_kzg::Blob::from_hex(blob.as_ref()))
-            .collect::<Result<Vec<_>, _>>()?;
-        Self::try_from_blobs(blobs)
+        let mut b = Vec::new();
+        for blob in blobs {
+            b.push(c_kzg::Blob::from_hex(blob.as_ref())?)
+        }
+        Self::try_from_blobs(b)
     }
 
     /// Tries to create a new [`BlobTransactionSidecar`] from the given blob bytes.
@@ -328,11 +328,11 @@ impl BlobTransactionSidecar {
         I: IntoIterator<Item = B>,
         B: AsRef<[u8]>,
     {
-        let blobs = blobs
-            .into_iter()
-            .map(|blob| c_kzg::Blob::from_bytes(blob.as_ref()))
-            .collect::<Result<Vec<_>, _>>()?;
-        Self::try_from_blobs(blobs)
+        let mut b = Vec::new();
+        for blob in blobs {
+            b.push(c_kzg::Blob::from_bytes(blob.as_ref())?)
+        }
+        Self::try_from_blobs(b)
     }
 
     /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs.
