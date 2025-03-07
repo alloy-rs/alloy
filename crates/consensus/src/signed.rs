@@ -31,6 +31,7 @@ impl<T, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
     pub fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
         let value = OnceLock::new();
+        #[allow(clippy::useless_conversion)]
         value.get_or_init(|| hash.into());
         Self { tx, signature, hash: value }
     }
@@ -118,6 +119,7 @@ where
     /// Returns a reference to the transaction hash.
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
     pub fn hash(&self) -> &B256 {
+        #[allow(clippy::useless_conversion)]
         self.hash.get_or_init(|| self.tx.tx_hash(&self.signature).into())
     }
 
@@ -292,11 +294,13 @@ mod serde {
         where
             D: Deserializer<'de>,
         {
-            Signed::<T, Sig>::deserialize(deserializer).map(|value| Self::new_unchecked(
-                value.tx.into_owned(),
-                value.signature.into_owned(),
-                value.hash.into_owned(),
-            ))
+            Signed::<T, Sig>::deserialize(deserializer).map(|value| {
+                Self::new_unchecked(
+                    value.tx.into_owned(),
+                    value.signature.into_owned(),
+                    value.hash.into_owned(),
+                )
+            })
         }
     }
 }
