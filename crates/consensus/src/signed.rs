@@ -2,27 +2,42 @@ use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTrans
 use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
-use once_cell::sync::OnceCell;
+#[cfg(not(feature = "std"))]
+use once_cell::race::OnceBox as OnceLock;
+#[cfg(feature = "std")]
+use std::sync::OnceLock;
 
 /// A transaction with a signature and hash seal.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Signed<T, Sig = Signature> {
     #[doc(alias = "transaction")]
     tx: T,
     signature: Sig,
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    hash: OnceCell<B256>,
+    hash: OnceLock<B256>,
+}
+
+impl<T: Clone, Sig: Clone> Clone for Signed<T, Sig> {
+    fn clone(&self) -> Self {
+        if let Some(hash) = self.hash.get() {
+            Self::new_unchecked(self.tx.clone(), self.signature.clone(), *hash)
+        } else {
+            Self::new_unhashed(self.tx.clone(), self.signature.clone())
+        }
+    }
 }
 
 impl<T, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
-    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash: OnceCell::with_value(hash) }
+    pub fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
+        let value = OnceLock::new();
+        value.get_or_init(|| hash.into());
+        Self { tx, signature, hash: value }
     }
 
     /// Instantiate from a transaction and signature. Does not verify the signature.
     pub const fn new_unhashed(tx: T, signature: Sig) -> Self {
-        Self { tx, signature, hash: OnceCell::new() }
+        Self { tx, signature, hash: OnceLock::new() }
     }
 
     /// Returns a reference to the transaction.
@@ -103,7 +118,7 @@ where
     /// Returns a reference to the transaction hash.
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
     pub fn hash(&self) -> &B256 {
-        self.hash.get_or_init(|| self.tx.tx_hash(&self.signature))
+        self.hash.get_or_init(|| self.tx.tx_hash(&self.signature).into())
     }
 
     /// Splits the transaction into parts.
@@ -277,11 +292,11 @@ mod serde {
         where
             D: Deserializer<'de>,
         {
-            Signed::<T, Sig>::deserialize(deserializer).map(|value| Self {
-                tx: value.tx.into_owned(),
-                signature: value.signature.into_owned(),
-                hash: value.hash.into_owned().into(),
-            })
+            Signed::<T, Sig>::deserialize(deserializer).map(|value| Self::new_unchecked(
+                value.tx.into_owned(),
+                value.signature.into_owned(),
+                value.hash.into_owned(),
+            ))
         }
     }
 }
