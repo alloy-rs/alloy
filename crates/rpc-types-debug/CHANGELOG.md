@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove preimage hashes from execution witness ([#2059](https://github.com/alloy-rs/alloy/issues/2059))
 
+### Miscellaneous Tasks
+
+- Release 0.12.0
+
 ## [0.11.1](https://github.com/alloy-rs/alloy/releases/tag/v0.11.1) - 2025-02-12
 
 ### Miscellaneous Tasks

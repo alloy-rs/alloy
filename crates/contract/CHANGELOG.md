@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.12.0
 - Use impl Into StateOverride ([#2145](https://github.com/alloy-rs/alloy/issues/2145))
 - Rename `on_builtin` to `connect` ([#2078](https://github.com/alloy-rs/alloy/issues/2078))
 - Update url ([#2071](https://github.com/alloy-rs/alloy/issues/2071))

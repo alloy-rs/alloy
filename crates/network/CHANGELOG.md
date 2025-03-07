@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.12.0
 - Support static error msg ([#2158](https://github.com/alloy-rs/alloy/issues/2158))
 - [`consensus`] Rename `Recovered` methods ([#2155](https://github.com/alloy-rs/alloy/issues/2155))
 - Add any tx conversion ([#2153](https://github.com/alloy-rs/alloy/issues/2153))

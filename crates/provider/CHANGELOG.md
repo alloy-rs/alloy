@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.12.0
 - [`provider`] Fix `mocked` ret type ([#2156](https://github.com/alloy-rs/alloy/issues/2156))
 - Use impl Into StateOverride ([#2145](https://github.com/alloy-rs/alloy/issues/2145))
 - [`provider`] Use quicknode ([#2121](https://github.com/alloy-rs/alloy/issues/2121))

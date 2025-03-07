@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [`eip4844`] Heap allocated blob ([#2050](https://github.com/alloy-rs/alloy/issues/2050))
 - Add helpers to create a BlobSidecar ([#2047](https://github.com/alloy-rs/alloy/issues/2047))
 
+### Miscellaneous Tasks
+
+- Release 0.12.0
+
 ### Other
 
 - Implement Transaction type on Either type ([#2097](https://github.com/alloy-rs/alloy/issues/2097))

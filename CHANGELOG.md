@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1](https://github.com/alloy-rs/alloy/releases/tag/v0.12.1) - 2025-03-07
+
+### Miscellaneous Tasks
+
+- Add inner_mut ([#2160](https://github.com/alloy-rs/alloy/issues/2160))
+
 ## [0.12.0](https://github.com/alloy-rs/alloy/releases/tag/v0.12.0) - 2025-03-07
 
 ### Bug Fixes
@@ -71,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.12.0
 - Support static error msg ([#2158](https://github.com/alloy-rs/alloy/issues/2158))
 - [`consensus`] Rename `Recovered` methods ([#2155](https://github.com/alloy-rs/alloy/issues/2155))
 - Add any tx conversion ([#2153](https://github.com/alloy-rs/alloy/issues/2153))
