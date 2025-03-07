@@ -797,4 +797,33 @@ mod tests {
 
         assert_eq!(gas, 56555);
     }
+
+    #[tokio::test]
+    async fn decode_eth_call_ret_bytes() {
+        sol! {
+            #[derive(Debug, PartialEq)]
+            #[sol(rpc, bytecode = "0x6080604052348015600e575f5ffd5b506101578061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80630d1d2c641461002d575b5f5ffd5b61003561004b565b6040516100429190610108565b60405180910390f35b61005361007b565b6040518060400160405280602a67ffffffffffffffff16815260200160011515815250905090565b60405180604001604052805f67ffffffffffffffff1681526020015f151581525090565b5f67ffffffffffffffff82169050919050565b6100bb8161009f565b82525050565b5f8115159050919050565b6100d5816100c1565b82525050565b604082015f8201516100ef5f8501826100b2565b50602082015161010260208501826100cc565b50505050565b5f60408201905061011b5f8301846100db565b9291505056fea264697066735822122039acc87c027f3bddf6806ff9914411d4245bdc708bca36a07138a37b1b98573464736f6c634300081c0033")]
+            contract RetStruct {
+                struct MyStruct {
+                    uint64 a;
+                    bool b;
+                }
+
+                function retStruct() external pure returns (MyStruct memory) {
+                    return MyStruct(42, true);
+                }
+            }
+        }
+
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+
+        let contract = RetStruct::deploy(provider.clone()).await.unwrap();
+
+        let tx = contract.retStruct().into_transaction_request();
+
+        let result =
+            provider.call(tx).decode_resp::<RetStruct::retStructCall>().await.unwrap().unwrap();
+
+        assert_eq!(result._0, RetStruct::MyStruct { a: 42, b: true });
+    }
 }
