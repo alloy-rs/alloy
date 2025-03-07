@@ -25,14 +25,8 @@ pub struct ThrottleLayer {
 
 impl ThrottleLayer {
     /// Creates a new throttle layer with the specified requests per second.
-    /// # Panics
-    /// Panics if requests_per_second is not a non-zero positive integer.
-    pub fn new(requests_per_second: u32) -> Self {
-        let quota = Quota::per_second(
-            NonZeroU32::new(requests_per_second)
-                .expect("requests_per_second must be a non-zero positive integer"),
-        );
-
+    pub fn new(requests_per_second: NonZeroU32) -> Self {
+        let quota = Quota::per_second(requests_per_second);
         let throttle = Arc::new(RateLimiter::direct(quota));
 
         ThrottleLayer { throttle }
