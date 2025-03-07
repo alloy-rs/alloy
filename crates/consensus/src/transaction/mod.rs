@@ -43,7 +43,7 @@ mod rlp;
 pub use rlp::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpEcdsaTx};
 
 mod typed;
-pub use typed::TypedTransaction;
+pub use typed::{EthereumTypedTransaction, TypedTransaction};
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
