@@ -88,7 +88,7 @@ impl<T> Recovered<T> {
     }
 
     /// Converts the inner signed object to the given alternative that is `From<T>`
-    pub fn convert_inner<Tx>(self) -> Recovered<Tx>
+    pub fn convert<Tx>(self) -> Recovered<Tx>
     where
         Tx: From<T>,
     {
@@ -105,7 +105,7 @@ impl<T> Recovered<T> {
     }
 
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
-    pub fn try_convert_inner<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
+    pub fn try_convert<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
         Tx: TryFrom<T>,
     {
@@ -122,7 +122,7 @@ impl<T> Recovered<T> {
     }
 
     /// Applies the given closure to the inner signed object.
-    pub fn map_inner<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
+    pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.inner), self.signer)
     }
 
@@ -133,7 +133,7 @@ impl<T> Recovered<T> {
     }
 
     /// Applies the given fallible closure to the inner signed object.
-    pub fn try_map_inner<Tx, E>(
+    pub fn try_map<Tx, E>(
         self,
         f: impl FnOnce(T) -> Result<Tx, E>,
     ) -> Result<Recovered<Tx>, E> {
