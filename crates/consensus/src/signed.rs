@@ -19,11 +19,10 @@ pub struct Signed<T, Sig = Signature> {
 
 impl<T: Clone, Sig: Clone> Clone for Signed<T, Sig> {
     fn clone(&self) -> Self {
-        if let Some(hash) = self.hash.get() {
-            Self::new_unchecked(self.tx.clone(), self.signature.clone(), *hash)
-        } else {
-            Self::new_unhashed(self.tx.clone(), self.signature.clone())
-        }
+        self.hash.get().map_or_else(
+            || Self::new_unhashed(self.tx.clone(), self.signature.clone()),
+            |hash| Self::new_unchecked(self.tx.clone(), self.signature.clone(), *hash),
+        )
     }
 }
 
