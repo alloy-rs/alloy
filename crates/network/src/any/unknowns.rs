@@ -410,7 +410,7 @@ mod tests {
 
         let tx: AnyRpcTransaction = serde_json::from_str(input).unwrap();
 
-        let AnyTxEnvelope::Unknown(inner) = tx.inner.inner.tx().clone() else {
+        let AnyTxEnvelope::Unknown(inner) = tx.inner.inner.inner().clone() else {
             panic!("expected unknown envelope");
         };
 

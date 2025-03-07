@@ -250,7 +250,7 @@ impl TryFrom<Signed<TxEip4844Variant>> for PooledTransaction {
     fn try_from(value: Signed<TxEip4844Variant>) -> Result<Self, Self::Error> {
         let (value, signature, hash) = value.into_parts();
         match value {
-            tx @ TxEip4844Variant::TxEip4844(_) => Err(ValueError::new(
+            tx @ TxEip4844Variant::TxEip4844(_) => Err(ValueError::new_static(
                 Signed::new_unchecked(tx, signature, hash),
                 "pooled transaction requires 4844 sidecar",
             )),

@@ -1,9 +1,6 @@
 //! Helper errors.
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, boxed::Box, string::ToString};
 
 /// Helper type that is [`core::error::Error`] and wraps a value and an error message.
 ///
@@ -11,14 +8,19 @@ use alloc::{
 #[derive(Debug, thiserror::Error)]
 #[error("{msg}")]
 pub struct ValueError<T> {
-    msg: String,
+    msg: Cow<'static, str>,
     value: Box<T>,
 }
 
 impl<T> ValueError<T> {
     /// Creates a new error with the given value and error message.
     pub fn new(value: T, msg: impl core::fmt::Display) -> Self {
-        Self { msg: msg.to_string(), value: Box::new(value) }
+        Self { msg: Cow::Owned(msg.to_string()), value: Box::new(value) }
+    }
+
+    /// Creates a new error with a static error message.
+    pub fn new_static(value: T, msg: &'static str) -> Self {
+        Self { msg: Cow::Borrowed(msg), value: Box::new(value) }
     }
 
     /// Converts the value to the given alternative that is `From<T>`.
