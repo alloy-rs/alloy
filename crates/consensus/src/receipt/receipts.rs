@@ -406,7 +406,7 @@ pub(crate) mod serde_bincode_compat {
     /// }
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct Receipt<'a, T: Clone> {
+    pub struct Receipt<'a, T: Clone = alloy_primitives::Log> {
         logs: Cow<'a, Vec<T>>,
         status: bool,
         cumulative_gas_used: u64,
