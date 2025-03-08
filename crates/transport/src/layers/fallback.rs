@@ -27,8 +27,6 @@ const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
 ///
 /// The service ranks transports based on latency and stability metrics,
 /// and will attempt to always use the best available transports.
-///
-/// For details on how the ranking strategy works, see [`ScoredTransport`].
 #[derive(Debug, Clone)]
 pub struct FallbackService<S> {
     /// The list of transports to use
@@ -218,7 +216,7 @@ where
 ///
 /// # Automatic Transport Ranking
 ///
-/// Each [`ScoredTransport`] is automatically ranked based on latency & stability
+/// Each transport is automatically ranked based on latency & stability
 /// using a weighted algorithm. By default:
 ///
 /// - Stability (success rate) is weighted at 70%
