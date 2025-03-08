@@ -79,7 +79,12 @@ pub enum UnsupportedSignerOperation {
 
 impl fmt::Display for UnsupportedSignerOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
+        match self {
+            Self::SignHash => {
+                write!(f, "Operation `{}` is intentionally not supported for security reasons (blind signing is discouraged)", self.as_str())
+            }
+            _ => self.as_str().fmt(f),
+        }
     }
 }
 
