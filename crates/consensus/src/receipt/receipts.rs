@@ -387,6 +387,7 @@ where
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) mod serde_bincode_compat {
     use alloc::{borrow::Cow, vec::Vec};
+    use alloy_primitives::Log;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -406,7 +407,7 @@ pub(crate) mod serde_bincode_compat {
     /// }
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct Receipt<'a, T: Clone> {
+    pub struct Receipt<'a, T: Clone = Log> {
         logs: Cow<'a, Vec<T>>,
         status: bool,
         cumulative_gas_used: u64,
