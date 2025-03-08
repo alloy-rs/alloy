@@ -37,7 +37,7 @@ impl ThrottleLayer {
         .allow_burst(NonZeroU32::new(1).unwrap());
         let throttle = Arc::new(RateLimiter::direct(quota));
 
-        ThrottleLayer { throttle }
+        Self { throttle }
     }
 }
 
