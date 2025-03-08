@@ -454,6 +454,12 @@ impl TxEnvelope {
     }
 }
 
+impl core::hash::Hash for TxEnvelope {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.trie_hash().hash(state);
+    }
+}
+
 impl Encodable for TxEnvelope {
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
         self.network_encode(out)
