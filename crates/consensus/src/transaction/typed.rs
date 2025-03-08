@@ -3,8 +3,8 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
         RlpEcdsaEncodableTx,
     },
-    SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy,
-    TxType,
+    EthereumTxEnvelope, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702,
+    TxLegacy, TxType,
 };
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{
@@ -103,14 +103,14 @@ impl<Eip4844> From<TxEip7702> for EthereumTypedTransaction<Eip4844> {
     }
 }
 
-impl From<TxEnvelope> for TypedTransaction {
-    fn from(envelope: TxEnvelope) -> Self {
+impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for EthereumTypedTransaction<Eip4844> {
+    fn from(envelope: EthereumTxEnvelope<Eip4844>) -> Self {
         match envelope {
-            TxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
-            TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
-            TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
-            TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
-            TxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
+            EthereumTxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
+            EthereumTxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
+            EthereumTxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
+            EthereumTxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
+            EthereumTxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
         }
     }
 }
@@ -502,8 +502,11 @@ impl<Eip4844, T: From<EthereumTypedTransaction<Eip4844>>> From<EthereumTypedTran
 }
 
 #[cfg(feature = "serde")]
-impl<T: From<TxEnvelope>> From<TxEnvelope> for alloy_serde::WithOtherFields<T> {
-    fn from(value: TxEnvelope) -> Self {
+impl<Eip4844, T> From<EthereumTxEnvelope<Eip4844>> for alloy_serde::WithOtherFields<T>
+where
+    T: From<EthereumTxEnvelope<Eip4844>>,
+{
+    fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
         Self::new(value.into())
     }
 }

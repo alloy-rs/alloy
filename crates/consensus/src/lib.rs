@@ -38,9 +38,9 @@ pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
-    EthereumTypedTransaction, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844,
-    TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType,
-    TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction, TxEip1559,
+    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
+    TxType, TypedTransaction,
 };
 
 pub use alloy_eips::{
