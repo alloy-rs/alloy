@@ -33,6 +33,9 @@ thiserror = { workspace = true, features = ["std"] }
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+derive_more.workspace = true
 
 # non-WASM only
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
