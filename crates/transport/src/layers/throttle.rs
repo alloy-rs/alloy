@@ -25,8 +25,16 @@ pub struct ThrottleLayer {
 
 impl ThrottleLayer {
     /// Creates a new throttle layer with the specified requests per second.
-    pub fn new(requests_per_second: NonZeroU32) -> Self {
-        let quota = Quota::per_second(requests_per_second);
+    ///
+    /// # Panics
+    ///
+    /// Panics if `requests_per_second` is 0.
+    pub fn new(requests_per_second: u32) -> Self {
+        let quota = Quota::per_second(
+            NonZeroU32::new(requests_per_second)
+                .expect("Request per second must be greater than 0"),
+        )
+        .allow_burst(NonZeroU32::new(1).unwrap());
         let throttle = Arc::new(RateLimiter::direct(quota));
 
         ThrottleLayer { throttle }

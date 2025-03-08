@@ -2074,4 +2074,27 @@ mod tests {
             }))
             .await;
     }
+
+    #[cfg(feature = "throttle")]
+    use alloy_transport::layers::ThrottleLayer;
+
+    #[cfg(feature = "throttle")]
+    #[tokio::test]
+    async fn test_throttled_provider() {
+        let request_per_second = 10;
+        let throttle_layer = ThrottleLayer::new(request_per_second);
+
+        let anvil = Anvil::new().spawn();
+        let client = RpcClient::builder().layer(throttle_layer).http(anvil.endpoint_url());
+        let provider = RootProvider::<Ethereum>::new(client);
+
+        let num_requests = 10;
+        let start = std::time::Instant::now();
+        for _ in 0..num_requests {
+            provider.get_block_number().await.unwrap();
+        }
+
+        let elapsed = start.elapsed();
+        assert_eq!(elapsed.as_secs_f64().round() as u32, 1);
+    }
 }
