@@ -156,7 +156,7 @@ impl Typed2718 for TxType {
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -451,12 +451,6 @@ impl TxEnvelope {
             Self::Eip4844(t) => t.eip2718_encoded_length(),
             Self::Eip7702(t) => t.eip2718_encoded_length(),
         }
-    }
-}
-
-impl core::hash::Hash for TxEnvelope {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.trie_hash().hash(state);
     }
 }
 
