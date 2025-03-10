@@ -1,4 +1,3 @@
-use alloy_network::Ethereum;
 use alloy_primitives::{bytes, Address, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types_eth::TransactionRequest;
@@ -7,7 +6,7 @@ use alloy_transport::mock::Asserter;
 #[tokio::test]
 async fn mocked_default_provider() {
     let asserter = Asserter::new();
-    let provider = ProviderBuilder::<_, _, Ethereum>::default().on_mocked_client(asserter.clone());
+    let provider = ProviderBuilder::new().on_mocked_client(asserter.clone());
 
     asserter.push_success(&21965802);
     asserter.push_success(&21965803);

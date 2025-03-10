@@ -2,6 +2,22 @@
 //!
 //! [`MockTransport`] returns responses that have been pushed into its associated [`Asserter`]'s
 //! queue using FIFO.
+//!
+//! # Examples
+//!
+//! ```ignore (dependency cycle)
+//! use alloy_transport::mock::*;
+//!
+//! let asserter = Asserter::new();
+//! let provider = ProviderBuilder::new()
+//!     /* ... */
+//!     .on_mocked_client(asserter.clone());
+//!
+//! let n = 12345;
+//! asserter.push_success(&n);
+//! let actual = provider.get_block_number().await.unwrap();
+//! assert_eq!(actual, n);
+//! ```
 
 use crate::{TransportErrorKind, TransportResult};
 use alloy_json_rpc as j;
@@ -18,6 +34,8 @@ pub type MockResponse = j::ResponsePayload;
 /// Container for pushing responses into a [`MockTransport`].
 ///
 /// Mock responses are stored and returned with a FIFO queue.
+///
+/// See the [module documentation][self].
 #[derive(Debug, Clone, Default)]
 pub struct Asserter {
     responses: Arc<RwLock<VecDeque<MockResponse>>>,
@@ -72,6 +90,8 @@ impl Asserter {
 }
 
 /// A transport that returns responses from an associated [`Asserter`].
+///
+/// See the [module documentation][self].
 #[derive(Clone, Debug)]
 pub struct MockTransport {
     asserter: Asserter,

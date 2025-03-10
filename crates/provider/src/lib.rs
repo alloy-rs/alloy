@@ -65,3 +65,6 @@ pub use alloy_rpc_client::WsConnect;
 
 #[cfg(feature = "ipc")]
 pub use alloy_rpc_client::IpcConnect;
+
+#[doc(no_inline)]
+pub use alloy_transport::mock;
