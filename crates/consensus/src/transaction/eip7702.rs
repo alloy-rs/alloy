@@ -107,8 +107,6 @@ impl TxEip7702 {
 }
 
 impl RlpEcdsaEncodableTx for TxEip7702 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     /// Outputs the length of the transaction's fields, without a RLP header.
     #[doc(hidden)]
     fn rlp_encoded_fields_length(&self) -> usize {

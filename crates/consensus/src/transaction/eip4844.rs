@@ -287,8 +287,6 @@ impl Typed2718 for TxEip4844 {
 }
 
 impl RlpEcdsaEncodableTx for TxEip4844Variant {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
             Self::TxEip4844(inner) => inner.rlp_encoded_fields_length(),
@@ -542,8 +540,6 @@ impl TxEip4844 {
 }
 
 impl RlpEcdsaEncodableTx for TxEip4844 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         self.chain_id.length()
             + self.nonce.length()
@@ -916,8 +912,6 @@ impl Typed2718 for TxEip4844WithSidecar {
 }
 
 impl RlpEcdsaEncodableTx for TxEip4844WithSidecar {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         self.sidecar.rlp_encoded_fields_length() + self.tx.rlp_encoded_length()
     }
