@@ -2,6 +2,7 @@ use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTrans
 use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
+use core::hash::{Hash, Hasher};
 #[cfg(not(feature = "std"))]
 use once_cell::race::OnceBox as OnceLock;
 #[cfg(feature = "std")]
@@ -196,6 +197,17 @@ where
     /// Network decode the signed transaction.
     pub fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         T::network_decode(buf)
+    }
+}
+
+impl<T> Hash for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash().hash(state);
+        self.tx.hash(state);
+        self.signature.hash(state);
     }
 }
 
