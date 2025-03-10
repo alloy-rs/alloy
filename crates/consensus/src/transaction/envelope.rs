@@ -14,7 +14,10 @@ use alloy_primitives::{
     Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
 };
 use alloy_rlp::{Decodable, Encodable};
-use core::{fmt, fmt::Debug};
+use core::{
+    fmt::{self, Debug},
+    hash::{Hash, Hasher},
+};
 
 use super::SignableTransaction;
 
@@ -253,6 +256,15 @@ where
 }
 
 impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> Eq for EthereumTxEnvelope<Eip4844> {}
+
+impl<Eip4844> Hash for EthereumTxEnvelope<Eip4844>
+where
+    Self: Encodable2718,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.trie_hash().hash(state);
+    }
+}
 
 impl<T, Eip4844> From<Signed<T>> for EthereumTxEnvelope<Eip4844>
 where
