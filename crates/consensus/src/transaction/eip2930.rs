@@ -53,7 +53,7 @@ pub struct TxEip2930 {
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
     pub access_list: AccessList,
-    /// Input has two uses depending if `to` field is Create or Call. 
+    /// Input has two uses depending if `to` field is Create or Call.
     /// pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
     /// data: An unlimited size byte array specifying the
