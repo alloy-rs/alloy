@@ -83,8 +83,6 @@ impl TxEip2930 {
 }
 
 impl RlpEcdsaEncodableTx for TxEip2930 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     /// Outputs the length of the transaction's fields, without a RLP header.
     fn rlp_encoded_fields_length(&self) -> usize {
         self.chain_id.length()
