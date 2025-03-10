@@ -6,7 +6,7 @@ mod anvil;
 pub use anvil::{AnvilLayer, AnvilProvider};
 
 mod batch;
-pub use batch::BatchLayer;
+pub use batch::{BatchLayer, BatchProvider};
 
 mod chain;
 pub use chain::ChainLayer;

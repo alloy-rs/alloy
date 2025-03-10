@@ -5,6 +5,7 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
+    layers::BatchLayer,
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -404,6 +405,13 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().hyper_http(url);
         self.on_client(client)
+    }
+
+    /// Aggregate multiple `eth_call` requests into a single batch request using Multicall3.
+    ///
+    /// See [`BatchLayer`] for more information.
+    pub fn with_multicall_batching(self) -> ProviderBuilder<Stack<BatchLayer, L>, F, N> {
+        self.layer(BatchLayer::new())
     }
 }
 
