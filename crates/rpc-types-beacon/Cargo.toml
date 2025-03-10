@@ -13,9 +13,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -30,6 +30,8 @@ alloy-primitives.workspace = true
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
+tree_hash = { workspace = true, optional = true }
+tree_hash_derive = { workspace = true, optional = true }
 
 serde.workspace = true
 serde_with = { workspace = true, features = ["alloc"] }
@@ -44,6 +46,8 @@ similar-asserts.workspace = true
 ssz = [
 	"dep:ethereum_ssz",
 	"dep:ethereum_ssz_derive",
+	"dep:tree_hash",
+	"dep:tree_hash_derive",
 	"alloy-rpc-types-engine/ssz",
-	"alloy-eips/ssz"
+	"alloy-eips/ssz",
 ]
