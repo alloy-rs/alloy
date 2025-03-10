@@ -133,8 +133,8 @@ impl<T> BlockTransactions<T> {
     pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<Self>> {
         match self {
             Self::Full(txs) => Ok(txs),
-            txs @ Self::Hashes(_) => Err(ValueError::new(txs, "Unexpected hashes variant")),
-            txs @ Self::Uncle => Err(ValueError::new(txs, "Unexpected uncle variant")),
+            txs @ Self::Hashes(_) => Err(ValueError::new_static(txs, "Unexpected hashes variant")),
+            txs @ Self::Uncle => Err(ValueError::new_static(txs, "Unexpected uncle variant")),
         }
     }
 

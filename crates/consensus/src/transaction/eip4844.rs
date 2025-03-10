@@ -408,12 +408,6 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
     fn payload_len_for_signature(&self) -> usize {
         self.tx().payload_len_for_signature()
     }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, hash)
-    }
 }
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
@@ -609,11 +603,6 @@ impl SignableTransaction<Signature> for TxEip4844 {
 
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
     }
 }
 
@@ -831,13 +820,6 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
         // The payload length is the length of the `transaction_payload_body` list.
         // The sidecar is NOT included.
         self.tx.payload_len_for_signature()
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
-        // important: must hash the tx WITHOUT the sidecar
-        let hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, hash)
     }
 }
 

@@ -1,5 +1,3 @@
-#[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
-use crate::layers::{Asserter, MockLayer, MockProvider};
 use crate::{
     fillers::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
@@ -125,7 +123,7 @@ pub struct ProviderBuilder<L, F, N = Ethereum> {
 impl
     ProviderBuilder<
         Identity,
-        JoinFill<Identity, <alloy_network::Ethereum as RecommendedFillers>::RecommendedFillers>,
+        JoinFill<Identity, <Ethereum as RecommendedFillers>::RecommendedFillers>,
         Ethereum,
     >
 {
@@ -147,25 +145,6 @@ impl
     /// This is equivalent to creating the builder using `ProviderBuilder::default()`.
     pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
         ProviderBuilder { layer: self.layer, filler: Identity, network: self.network }
-    }
-
-    /// Create a new [`MockProvider`] for testing purposes.
-    ///
-    /// Sets the dummy RPC_URL to `http://localhost:8545`.
-    #[cfg(all(not(target_arch = "wasm32"), any(test, feature = "reqwest", feature = "hyper")))]
-    pub fn mocked() -> (MockProvider<RootProvider, Ethereum>, Asserter) {
-        let asserter = Asserter::new();
-        let layer = MockLayer::new(asserter.clone());
-
-        let builder = ProviderBuilder::<_, _, Ethereum>::default().layer(layer);
-
-        #[cfg(any(test, feature = "reqwest"))]
-        let mock_provider = builder.on_http("http://localhost:8545".parse().unwrap());
-
-        #[cfg(all(feature = "hyper", not(feature = "reqwest")))]
-        let mock_provider = builder.on_hyper_http("http://localhost:8545".parse().unwrap());
-
-        (mock_provider, asserter)
     }
 }
 
@@ -189,14 +168,14 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 
     /// Add gas estimation to the stack being built.
     ///
-    /// See [`GasFiller`]
+    /// See [`GasFiller`] for more information.
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<Identity, GasFiller>, N> {
         self.filler(GasFiller)
     }
 
     /// Add nonce management to the stack being built.
     ///
-    /// See [`NonceFiller`]
+    /// See [`NonceFiller`] for more information.
     pub fn with_nonce_management<M: NonceManager>(
         self,
         nonce_manager: M,
@@ -206,7 +185,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 
     /// Add simple nonce management to the stack being built.
     ///
-    /// See [`SimpleNonceManager`]
+    /// See [`SimpleNonceManager`] for more information.
     pub fn with_simple_nonce_management(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
@@ -215,7 +194,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 
     /// Add cached nonce management to the stack being built.
     ///
-    /// See [`CachedNonceManager`]
+    /// See [`CachedNonceManager`] for more information.
     pub fn with_cached_nonce_management(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<CachedNonceManager>>, N> {
@@ -314,7 +293,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::provider<RpcClient>`.
+    /// `ProviderBuilder::on_provider(RootProvider::new(client))`.
     pub fn on_client(self, client: RpcClient) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -322,6 +301,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         N: Network,
     {
         self.on_provider(RootProvider::new(client))
+    }
+
+    /// Finish the layer stack by providing a [`RpcClient`] that mocks responses, outputting
+    /// the final [`Provider`] type with all stack components.
+    ///
+    /// This is a convenience function for
+    /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
+    pub fn on_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+    {
+        self.on_client(RpcClient::mocked(asserter))
     }
 
     /// Finish the layer stack by providing a connection string for a built-in

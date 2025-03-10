@@ -2,8 +2,9 @@ use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
+use alloy_sol_types::SolCall;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
 use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
@@ -264,6 +265,29 @@ where
     pub const fn block(mut self, block: BlockId) -> Self {
         self.params.block = Some(block);
         self
+    }
+}
+
+impl<N> EthCall<N, Bytes>
+where
+    N: Network,
+{
+    /// Decode the [`Bytes`] returned by an `"eth_call"` into a [`SolCall::Return`] type.
+    ///
+    /// ## Note
+    ///
+    /// The result of the `eth_call` will be [`alloy_sol_types::Result`] with the Ok variant
+    /// containing the decoded [`SolCall::Return`] type.
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// let call = EthCall::call(provider, data).decode_resp::<MySolCall>().await?.unwrap();
+    ///
+    /// assert!(matches!(call.return_value, MySolCall::MyStruct { .. }));
+    /// ```
+    pub fn decode_resp<S: SolCall>(self) -> EthCall<N, Bytes, alloy_sol_types::Result<S::Return>> {
+        self.map_resp(|data| S::abi_decode_returns(&data, false))
     }
 }
 
