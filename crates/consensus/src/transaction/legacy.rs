@@ -112,7 +112,6 @@ impl TxLegacy {
 // Legacy transaction network and 2718 encodings are identical to the RLP
 // encoding.
 impl RlpEcdsaEncodableTx for TxLegacy {
-    const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
 
     fn rlp_encoded_fields_length(&self) -> usize {
         self.nonce.length()
@@ -224,7 +223,7 @@ impl RlpEcdsaDecodableTx for TxLegacy {
         Self::rlp_decode_signed(buf).map_err(Into::into)
     }
 
-    fn eip2718_decode(buf: &mut &[u8]) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
+    fn eip2718_decode(&self, buf: &mut &[u8]) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
         Self::rlp_decode_signed(buf).map_err(Into::into)
     }
 

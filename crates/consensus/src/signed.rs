@@ -184,12 +184,12 @@ where
     }
 
     /// EIP-2718 decode the signed transaction.
-    pub fn eip2718_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+    pub fn eip2718_decode(self, buf: &mut &[u8]) -> Eip2718Result<Self> {
         T::eip2718_decode(buf)
     }
 
     /// Network decode the signed transaction with a specified type flag.
-    pub fn network_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Self> {
+    pub fn network_decode_with_type(&self.tx, buf: &mut &[u8], ty: u8) -> Eip2718Result<Self> {
         T::network_decode_with_type(buf, ty)
     }
 
