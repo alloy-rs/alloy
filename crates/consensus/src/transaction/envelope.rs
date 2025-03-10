@@ -476,6 +476,17 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
+    /// Reference to transaction hash. Used to identify transaction.
+    pub fn hash(&self) -> &B256 {
+        match self {
+            Self::Legacy(tx) => tx.hash(),
+            Self::Eip2930(tx) => tx.hash(),
+            Self::Eip1559(tx) => tx.hash(),
+            Self::Eip7702(tx) => tx.hash(),
+            Self::Eip4844(tx) => tx.hash(),
+        }
+    }
+
     /// Return the [`TxType`] of the inner txn.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
