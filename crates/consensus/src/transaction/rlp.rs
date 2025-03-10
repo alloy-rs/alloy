@@ -11,10 +11,7 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 #[doc(hidden)]
 #[doc(alias = "RlpEncodableTx", alias = "RlpTxEncoding")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait RlpEcdsaEncodableTx: Sized {
-    /// The default transaction type for this transaction.
-    const DEFAULT_TX_TYPE: u8;
-
+pub trait RlpEcdsaEncodableTx: Sized + Typed2718 {
     /// Calculate the encoded length of the transaction's fields, without a RLP
     /// header.
     fn rlp_encoded_fields_length(&self) -> usize;
@@ -74,7 +71,7 @@ pub trait RlpEcdsaEncodableTx: Sized {
     /// EIP-2718 encode the transaction with the given signature and the default
     /// type flag.
     fn eip2718_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.eip2718_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
+        self.eip2718_encode_with_type(signature, self.ty(), out);
     }
 
     /// Create an rlp header for the network encoded transaction. This will
@@ -100,7 +97,7 @@ pub trait RlpEcdsaEncodableTx: Sized {
     /// Network encode the transaction with the given signature and the default
     /// type flag.
     fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.network_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
+        self.network_encode_with_type(signature, self.ty(), out);
     }
 
     /// Calculate the transaction hash for the given signature and type.
@@ -112,14 +109,14 @@ pub trait RlpEcdsaEncodableTx: Sized {
 
     /// Calculate the transaction hash for the given signature.
     fn tx_hash(&self, signature: &Signature) -> TxHash {
-        self.tx_hash_with_type(signature, Self::DEFAULT_TX_TYPE)
+        self.tx_hash_with_type(signature, self.ty())
     }
 }
 
 /// Helper trait for managing RLP decoding of transactions inside 2718 envelopes.
 #[doc(hidden)]
 #[doc(alias = "RlpDecodableTx", alias = "RlpTxDecoding")]
-pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
+pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx + Typed2718 {
     /// Decodes the fields of the transaction from RLP bytes. Do not decode a
     /// header. You may assume the buffer is long enough to contain the
     /// transaction.
@@ -198,8 +195,8 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
 
     /// Decodes the transaction from eip2718 bytes, expecting the default type
     /// flag.
-    fn eip2718_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
-        Self::eip2718_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
+    fn eip2718_decode(self, buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
+        Self::eip2718_decode_with_type(buf, slef.ty())
     }
 
     /// Decodes the transaction from network bytes.
@@ -221,8 +218,8 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
 
     /// Decodes the transaction from network bytes, expecting the default type
     /// flag.
-    fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
-        Self::network_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
+    fn network_decode(&self, buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
+        Self::network_decode_with_type(buf, self.ty())
     }
 }
 
