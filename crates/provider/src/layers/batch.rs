@@ -317,6 +317,8 @@ mod tests {
     use super::*;
     use alloy_transport::mock::Asserter;
 
+    // TODO: test with anvil by deploying Multicall3 bytecode
+
     fn push_m3_success(asserter: &Asserter, returns: &[(bool, Vec<u8>)]) {
         asserter.push_success(
             &returns
@@ -348,9 +350,10 @@ mod tests {
             // TODO: ?
             // assert_eq!(provider.inner.inner.inner.pending.len(), 2);
         };
-        let (bn, chain, ()) =
+        let (block_number, chain_id, ()) =
             tokio::join!(provider.get_block_number(), provider.get_chain_id(), assert_backend);
-        assert_eq!(bn.unwrap(), 1);
-        assert_eq!(chain.unwrap(), 2);
+        assert_eq!(block_number.unwrap(), 1);
+        assert_eq!(chain_id.unwrap(), 2);
+        assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
     }
 }
