@@ -14,8 +14,7 @@ use alloy_primitives::{
     Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
 };
 use alloy_rlp::{Decodable, Encodable};
-use core::fmt;
-use std::fmt::Debug;
+use core::{fmt, fmt::Debug};
 
 use super::SignableTransaction;
 
@@ -36,7 +35,7 @@ impl TxEnvelope {
     /// Attempts to convert the envelope into the pooled variant.
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
-    /// [`TxEip4844`] without the sidecar.
+    /// [`crate::TxEip4844`] without the sidecar.
     pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
@@ -56,14 +55,15 @@ impl TxEnvelope {
 /// 4. EIP4844 [`TxEip4844Variant`]
 ///
 /// This type is generic over Eip4844 variant to support the following cases:
-/// 1. Only-[`TxEip4844`] transaction type, such transaction representation is returned by RPC and
-///    stored by nodes internally.
-/// 2. Only-[`TxEip4844WithSidecar`] transactions which are broadcasted over the network, submitted
-///    to RPC and stored in transaction pool.
+/// 1. Only-[`crate::TxEip4844`] transaction type, such transaction representation is returned by
+///    RPC and stored by nodes internally.
+/// 2. Only-[`crate::TxEip4844WithSidecar`] transactions which are broadcasted over the network,
+///    submitted to RPC and stored in transaction pool.
 /// 3. Dynamic [`TxEip4844Variant`] transactions to support both of the above cases via a single
 ///    type.
-/// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
-/// [4844], and [7702].
+///
+/// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930], [4844], and
+/// [7702].
 ///
 /// [2718]: https://eips.ethereum.org/EIPS/eip-2718
 /// [1559]: https://eips.ethereum.org/EIPS/eip-1559
@@ -242,27 +242,17 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (EthereumTxEnvelope::Legacy(f0_self), EthereumTxEnvelope::Legacy(f0_other)) => {
-                f0_self.eq(f0_other)
-            }
-            (EthereumTxEnvelope::Eip2930(f0_self), EthereumTxEnvelope::Eip2930(f0_other)) => {
-                f0_self.eq(f0_other)
-            }
-            (EthereumTxEnvelope::Eip1559(f0_self), EthereumTxEnvelope::Eip1559(f0_other)) => {
-                f0_self.eq(f0_other)
-            }
-            (EthereumTxEnvelope::Eip4844(f0_self), EthereumTxEnvelope::Eip4844(f0_other)) => {
-                f0_self.eq(f0_other)
-            }
-            (EthereumTxEnvelope::Eip7702(f0_self), EthereumTxEnvelope::Eip7702(f0_other)) => {
-                f0_self.eq(f0_other)
-            }
+            (Self::Legacy(f0_self), Self::Legacy(f0_other)) => f0_self.eq(f0_other),
+            (Self::Eip2930(f0_self), Self::Eip2930(f0_other)) => f0_self.eq(f0_other),
+            (Self::Eip1559(f0_self), Self::Eip1559(f0_other)) => f0_self.eq(f0_other),
+            (Self::Eip4844(f0_self), Self::Eip4844(f0_other)) => f0_self.eq(f0_other),
+            (Self::Eip7702(f0_self), Self::Eip7702(f0_other)) => f0_self.eq(f0_other),
             _unused => false,
         }
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> Eq for EthereumTxEnvelope<Eip4844> where Eip4844: Eq {}
+impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> Eq for EthereumTxEnvelope<Eip4844> {}
 
 impl<T, Eip4844> From<Signed<T>> for EthereumTxEnvelope<Eip4844>
 where
