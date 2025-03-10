@@ -43,6 +43,11 @@ where
         &self.data
     }
 
+    /// Consumes the `EthCallParams` and returns the transaction data.
+    pub fn into_data(self) -> N::TransactionRequest {
+        self.data
+    }
+
     /// Returns the block.
     pub const fn block(&self) -> Option<BlockId> {
         self.block

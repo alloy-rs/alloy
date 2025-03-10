@@ -11,11 +11,6 @@ mod chain;
 pub use chain::ChainLayer;
 
 #[cfg(not(target_arch = "wasm32"))]
-mod mock;
-#[cfg(not(target_arch = "wasm32"))]
-pub use mock::{Asserter, MockError, MockLayer, MockProvider, MockResponse};
-
-#[cfg(not(target_arch = "wasm32"))]
 mod cache;
 #[cfg(not(target_arch = "wasm32"))]
 pub use cache::{CacheLayer, CacheProvider, SharedCache};
