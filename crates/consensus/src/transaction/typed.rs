@@ -375,8 +375,6 @@ impl<Eip4844: Typed2718> Typed2718 for EthereumTypedTransaction<Eip4844> {
 impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
     for EthereumTypedTransaction<Eip4844>
 {
-    const DEFAULT_TX_TYPE: u8 = 0;
-
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
             Self::Legacy(tx) => tx.rlp_encoded_fields_length(),
