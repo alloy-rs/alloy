@@ -295,7 +295,7 @@ pub struct SerializedRequest {
     request: Box<RawValue>,
 }
 
-impl<Params> std::convert::TryFrom<Request<Params>> for SerializedRequest
+impl<Params> TryFrom<Request<Params>> for SerializedRequest
 where
     Params: RpcSend,
 {

@@ -60,6 +60,7 @@ pub struct ValidatorRegistrationMessage {
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(feature = "ssz", derive(tree_hash_derive::TreeHash))]
 pub struct BidTrace {
     /// The slot associated with the block.
     #[serde_as(as = "DisplayFromStr")]

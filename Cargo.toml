@@ -87,6 +87,8 @@ alloy-eip7702 = { version = "0.5.1", default-features = false }
 # ethereum
 ethereum_ssz_derive = "0.8"
 ethereum_ssz = "0.8"
+tree_hash = "0.9.1"
+tree_hash_derive = "0.9.1"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }
