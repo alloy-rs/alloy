@@ -561,10 +561,10 @@ where
     }
 }
 
-impl<Eip4844: Transaction> Transaction for EthereumTxEnvelope<Eip4844>
+impl<Eip4844> Transaction for EthereumTxEnvelope<Eip4844>
 where
     Self: Typed2718,
-    Eip4844: RlpEcdsaEncodableTx + Send + Sync,
+    Eip4844: Transaction + Send + Sync,
 {
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
