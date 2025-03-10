@@ -490,7 +490,7 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
 
 impl<Eip4844> Encodable for EthereumTxEnvelope<Eip4844>
 where
-    EthereumTxEnvelope<Eip4844>: Encodable2718,
+    Self: Encodable2718,
 {
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
         self.network_encode(out)
@@ -563,8 +563,8 @@ where
 
 impl<Eip4844: Transaction> Transaction for EthereumTxEnvelope<Eip4844>
 where
-    EthereumTxEnvelope<Eip4844>: Typed2718,
-    Eip4844: Sync + RlpEcdsaEncodableTx + Send,
+    Self: Typed2718,
+    Eip4844: RlpEcdsaEncodableTx + Send + Sync,
 {
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
