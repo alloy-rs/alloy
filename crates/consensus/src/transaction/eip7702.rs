@@ -75,10 +75,7 @@ pub struct TxEip7702 {
     /// the code referenced by `address`. These also include a `chain_id` (which
     /// can be set to zero and not evaluated) as well as an optional `nonce`.
     pub authorization_list: Vec<SignedAuthorization>,
-    /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-    /// Some). pub init: An unlimited size byte array specifying the
-    /// EVM-code for the account initialisation procedure CREATE,
-    /// data: An unlimited size byte array specifying the
+    /// An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
     pub input: Bytes,
 }
