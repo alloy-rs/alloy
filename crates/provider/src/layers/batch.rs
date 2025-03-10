@@ -312,15 +312,45 @@ where
     }
 }
 
-#[cfg(any())] // TODO
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layers::MockProvider;
+    use alloy_transport::mock::Asserter;
 
-    #[test]
-    fn basic() {
-        let (provider, asserter) = crate::ProviderBuilder::mocked();
-        MockProvider
+    fn push_m3_success(asserter: &Asserter, returns: &[(bool, Vec<u8>)]) {
+        asserter.push_success(
+            &returns
+                .iter()
+                .map(|&(success, ref data)| IMulticall3::Result {
+                    success,
+                    returnData: Bytes::copy_from_slice(data),
+                })
+                .collect::<Vec<_>>()
+                .abi_encode(),
+        )
+    }
+
+    #[tokio::test]
+    async fn basic() {
+        let asserter = Asserter::new();
+        let provider = crate::ProviderBuilder::new()
+            .with_multicall_batching()
+            .on_mocked_client(asserter.clone());
+        push_m3_success(
+            &asserter,
+            &[
+                (true, 1.abi_encode()), // IMulticall3::getBlockNumberCall
+                (true, 2.abi_encode()), // IMulticall3::getChainIdCall
+            ],
+        );
+        let assert_backend = async {
+            sleep(Duration::from_micros(50)).await;
+            // TODO: ?
+            // assert_eq!(provider.inner.inner.inner.pending.len(), 2);
+        };
+        let (bn, chain, ()) =
+            tokio::join!(provider.get_block_number(), provider.get_chain_id(), assert_backend);
+        assert_eq!(bn.unwrap(), 1);
+        assert_eq!(chain.unwrap(), 2);
     }
 }
