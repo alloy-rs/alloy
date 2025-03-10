@@ -15,6 +15,8 @@ pub use connect::TransportConnect;
 mod common;
 pub use common::Authorization;
 
+pub mod mock;
+
 mod error;
 #[doc(hidden)]
 pub use error::TransportErrorKind;

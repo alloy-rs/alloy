@@ -1,6 +1,6 @@
 use super::{EthCallManyParams, EthCallParams};
 use crate::ProviderCall;
-use alloy_json_rpc::RpcRecv;
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_network::Network;
 use alloy_rpc_client::WeakClient;
 use alloy_transport::{TransportErrorKind, TransportResult};
@@ -56,23 +56,17 @@ where
         &self,
         params: EthCallManyParams<'_>,
     ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, Resp>> {
-        let client = self.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
-
-        let rpc_call = client.request("eth_callMany", params.into_owned());
-
-        Ok(ProviderCall::RpcCall(rpc_call))
+        provider_rpc_call(self, "eth_callMany", params.into_owned())
     }
 }
 
 /// Returns a [`ProviderCall::RpcCall`] from the provided method and [`EthCallParams`].
-fn provider_rpc_call<N: Network, Resp: RpcRecv>(
+fn provider_rpc_call<Req: RpcSend, Resp: RpcRecv>(
     client: &WeakClient,
     method: &'static str,
-    params: EthCallParams<N>,
-) -> TransportResult<ProviderCall<EthCallParams<N>, Resp>> {
+    params: Req,
+) -> TransportResult<ProviderCall<Req, Resp>> {
     let client = client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
-
     let rpc_call = client.request(method, params);
-
     Ok(ProviderCall::RpcCall(rpc_call))
 }
