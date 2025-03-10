@@ -33,7 +33,7 @@ pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 pub use either::Either;
 
 mod envelope;
-pub use envelope::{TxEnvelope, TxType};
+pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 mod legacy;
 pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
