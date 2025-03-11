@@ -1,9 +1,13 @@
 use crate::{CallDecoder, Error, EthCall, Result};
+use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilder4844};
+use alloy_network::{
+    eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
+    TransactionBuilder4844, TransactionBuilderError, TxSigner,
+};
 use alloy_network_primitives::ReceiptResponse;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
@@ -134,6 +138,27 @@ impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
     /// Converts the call builder to the inner transaction request
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
+    }
+
+    /// Build a raw unsigned transaction for the call.
+    pub fn build_unsigned_raw_transaction(self) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        N::UnsignedTx: SignableTransaction<Signature>,
+    {
+        let tx = self.request.build_unsigned().map_err(|e| e.error)?;
+        Ok(tx.encoded_for_signing())
+    }
+
+    /// Build a signed raw transaction for the call.
+    pub async fn build_raw_transaction<S>(
+        self,
+        signer: S,
+    ) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        S: TxSigner<Signature> + IntoWallet<N>,
+    {
+        let tx = self.request.build(&signer.into_wallet()).await?;
+        Ok(tx.encoded_2718())
     }
 }
 
