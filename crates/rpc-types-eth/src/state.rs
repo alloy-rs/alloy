@@ -83,6 +83,12 @@ impl StateOverridesBuilder {
     }
 }
 
+impl FromIterator<(Address, AccountOverride)> for StateOverridesBuilder {
+    fn from_iter<T: IntoIterator<Item = (Address, AccountOverride)>>(iter: T) -> Self {
+        Self::new(StateOverride::from_iter(iter))
+    }
+}
+
 /// A set of account overrides
 pub type StateOverride = AddressHashMap<AccountOverride>;
 
