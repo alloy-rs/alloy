@@ -287,8 +287,6 @@ impl Typed2718 for TxEip4844 {
 }
 
 impl RlpEcdsaEncodableTx for TxEip4844Variant {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
             Self::TxEip4844(inner) => inner.rlp_encoded_fields_length(),
@@ -326,6 +324,8 @@ impl RlpEcdsaEncodableTx for TxEip4844Variant {
 }
 
 impl RlpEcdsaDecodableTx for TxEip4844Variant {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let needle = &mut &**buf;
 
@@ -542,8 +542,6 @@ impl TxEip4844 {
 }
 
 impl RlpEcdsaEncodableTx for TxEip4844 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         self.chain_id.length()
             + self.nonce.length()
@@ -574,6 +572,8 @@ impl RlpEcdsaEncodableTx for TxEip4844 {
 }
 
 impl RlpEcdsaDecodableTx for TxEip4844 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
@@ -916,8 +916,6 @@ impl Typed2718 for TxEip4844WithSidecar {
 }
 
 impl RlpEcdsaEncodableTx for TxEip4844WithSidecar {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         self.sidecar.rlp_encoded_fields_length() + self.tx.rlp_encoded_length()
     }
@@ -946,6 +944,8 @@ impl RlpEcdsaEncodableTx for TxEip4844WithSidecar {
 }
 
 impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let tx = TxEip4844::rlp_decode(buf)?;
         let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
