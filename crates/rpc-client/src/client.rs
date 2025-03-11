@@ -1,6 +1,6 @@
 use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcRecv, RpcSend};
-use alloy_transport::{BoxTransport, IntoBoxTransport};
+use alloy_transport::{mock::Asserter, BoxTransport, IntoBoxTransport};
 use std::{
     borrow::Cow,
     ops::Deref,
@@ -50,17 +50,23 @@ impl RpcClient {
 }
 
 impl RpcClient {
+    /// Creates a new [`RpcClient`] with the given transport.
+    pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
+        Self::new_maybe_pubsub(t, is_local, None)
+    }
+
+    /// Create a new [`RpcClient`] with a transport that returns mocked responses from the given
+    /// [`Asserter`].
+    pub fn mocked(asserter: Asserter) -> Self {
+        Self::new(alloy_transport::mock::MockTransport::new(asserter), true)
+    }
+
     /// Create a new [`RpcClient`] with an HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn new_http(url: reqwest::Url) -> Self {
         let http = alloy_transport_http::Http::new(url);
         let is_local = http.guess_local();
         Self::new(http, is_local)
-    }
-
-    /// Creates a new [`RpcClient`] with the given transport.
-    pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
-        Self::new_maybe_pubsub(t, is_local, None)
     }
 
     /// Creates a new [`RpcClient`] with the given transport and an optional [`MaybePubsub`].
