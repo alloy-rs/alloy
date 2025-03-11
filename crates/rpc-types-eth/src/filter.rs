@@ -3,7 +3,7 @@ use alloc::{string::String, vec::Vec};
 use alloy_primitives::{
     keccak256,
     map::{hash_set, HashSet},
-    Address, BlockHash, Bloom, BloomInput, B256, U256, U64,
+    Address, BlockHash, Bloom, BloomInput, LogData, B256, U256, U64,
 };
 use core::{
     hash::Hash,
@@ -537,6 +537,33 @@ impl Filter {
     /// Returns true if at least one topic is set
     pub fn has_topics(&self) -> bool {
         self.topics.iter().any(|t| !t.is_empty())
+    }
+
+    /// Checks if a given Log matches this Filter.
+    ///
+    /// This function checks:
+    /// 1. If the log's address matches the filter's address (if any)
+    /// 2. If the log's topics match the filter's topics (if any)
+    ///
+    /// Returns true if the Log matches the Filter, false otherwise.
+    pub fn matches_log(&self, log: &RpcLog<LogData>) -> bool {
+        if !self.address.is_empty() && !self.address.matches(&log.address()) {
+            return false;
+        }
+        let log_topics = log.topics();
+
+        for (i, filter_topic) in self.topics.iter().enumerate() {
+            if filter_topic.is_empty() {
+                continue;
+            }
+            if i >= log_topics.len() {
+                return false;
+            }
+            if !filter_topic.matches(&log_topics[i]) {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -1164,6 +1191,7 @@ impl<'a> serde::Deserialize<'a> for PendingTransactionFilterKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::{Bytes, Log};
     use serde_json::json;
     use similar_asserts::assert_eq;
 
@@ -1729,5 +1757,70 @@ mod tests {
         assert!(!filter.is_pending_block_filter());
         let filter_params = FilteredParams::new(Some(filter));
         assert!(!filter_params.is_pending_block_filter());
+    }
+
+    #[test]
+    fn test_matches_log() {
+        let s = r#"{"fromBlock": "0xfc359e", "toBlock": "0xfc359e", "topics": [["0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"], [], ["0x0000000000000000000000000c17e776cd218252adfca8d4e761d3fe757e9778"]]}"#;
+        let filter = serde_json::from_str::<Filter>(s).unwrap();
+
+        // Create a log with the address and topics
+        let log = RpcLog {
+            inner: Log {
+                address: Default::default(),
+                data: LogData::new_unchecked(
+                    vec![
+                        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+                            .parse::<B256>()
+                            .unwrap(), // ERC-20 Transfer event signature
+                        "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
+                            .parse::<B256>()
+                            .unwrap(), // From address
+                        "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
+                            .parse::<B256>()
+                            .unwrap(), // To address
+                    ],
+                    Bytes::from_static(&[0x01, 0x02, 0x03]),
+                ),
+            },
+            block_hash: None,
+            block_number: None,
+            block_timestamp: None,
+            transaction_hash: None,
+            transaction_index: None,
+            log_index: None,
+            removed: false,
+        };
+        assert!(!filter.matches_log(&log));
+
+        // Create a log that should match the filter
+        let matching_log = RpcLog {
+            inner: Log {
+                address: Default::default(),
+                data: LogData::new_unchecked(
+                    vec![
+                        "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+                            .parse::<B256>()
+                            .unwrap(),
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                            .parse::<B256>()
+                            .unwrap(), // Empty topic as hex
+                        "0x0000000000000000000000000c17e776cd218252adfca8d4e761d3fe757e9778"
+                            .parse::<B256>()
+                            .unwrap(),
+                    ],
+                    Bytes::from_static(&[0x01, 0x02, 0x03]),
+                ),
+            },
+            block_hash: None,
+            block_number: None,
+            block_timestamp: None,
+            transaction_hash: None,
+            transaction_index: None,
+            log_index: None,
+            removed: false,
+        };
+
+        assert!(filter.matches_log(&matching_log));
     }
 }
