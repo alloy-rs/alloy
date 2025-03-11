@@ -19,6 +19,11 @@ impl StateOverridesBuilder {
         Self { overrides: map }
     }
 
+    /// Creates a new [`StateOverridesBuilder`] with the given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::new(StateOverride::with_capacity_and_hasher(capacity, Default::default()))
+    }
+
     /// Adds an account override for a specific address.
     pub fn append(mut self, address: Address, account_override: AccountOverride) -> Self {
         self.overrides.insert(address, account_override);
