@@ -108,6 +108,8 @@ impl RlpEcdsaEncodableTx for TxEip2930 {
 }
 
 impl RlpEcdsaDecodableTx for TxEip2930 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,

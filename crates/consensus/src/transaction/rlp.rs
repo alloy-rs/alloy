@@ -116,7 +116,10 @@ pub trait RlpEcdsaEncodableTx: Sized + Typed2718 {
 /// Helper trait for managing RLP decoding of transactions inside 2718 envelopes.
 #[doc(hidden)]
 #[doc(alias = "RlpDecodableTx", alias = "RlpTxDecoding")]
-pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx + Typed2718 {
+pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
+    /// The default transaction type for this transaction.
+    const DEFAULT_TX_TYPE: u8;
+
     /// Decodes the fields of the transaction from RLP bytes. Do not decode a
     /// header. You may assume the buffer is long enough to contain the
     /// transaction.
@@ -195,8 +198,8 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx + Typed2718 {
 
     /// Decodes the transaction from eip2718 bytes, expecting the default type
     /// flag.
-    fn eip2718_decode(&self, buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
-        Self::eip2718_decode_with_type(buf, self.ty())
+    fn eip2718_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
+        Self::eip2718_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
     }
 
     /// Decodes the transaction from network bytes.
@@ -218,8 +221,8 @@ pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx + Typed2718 {
 
     /// Decodes the transaction from network bytes, expecting the default type
     /// flag.
-    fn network_decode(&self, buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
-        Self::network_decode_with_type(buf, self.ty())
+    fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
+        Self::network_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
     }
 }
 

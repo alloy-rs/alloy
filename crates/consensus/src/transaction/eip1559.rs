@@ -127,6 +127,8 @@ impl RlpEcdsaEncodableTx for TxEip1559 {
 }
 
 impl RlpEcdsaDecodableTx for TxEip1559 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
     /// Decodes the inner [TxEip1559] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_
