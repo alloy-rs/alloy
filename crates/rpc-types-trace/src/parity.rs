@@ -483,6 +483,18 @@ pub struct LocalizedTransactionTrace {
     pub transaction_position: Option<u64>,
 }
 
+impl LocalizedTransactionTrace {
+    /// Sets the gas used of this trace.
+    ///
+    /// This is intended to manually set the root trace's gas used to the actual gas used by the
+    /// transaction, e.g. for geth's [`FlatCallFrame`](crate::geth::call::FlatCallFrame)
+    pub fn set_gas_used(&mut self, gas_used: u64) {
+        if let Some(res) = self.trace.result.as_mut() {
+            res.set_gas_used(gas_used);
+        }
+    }
+}
+
 // Implement Serialize manually to ensure consistent ordering of fields to match other client's
 // format
 impl Serialize for LocalizedTransactionTrace {
