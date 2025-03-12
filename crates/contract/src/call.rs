@@ -1,9 +1,13 @@
 use crate::{CallDecoder, Error, EthCall, Result};
+use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilder4844};
+use alloy_network::{
+    eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
+    TransactionBuilder4844, TransactionBuilderError, TxSigner,
+};
 use alloy_network_primitives::ReceiptResponse;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
@@ -134,6 +138,92 @@ impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
     /// Converts the call builder to the inner transaction request
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
+    }
+
+    /// Builds and returns a RLP-encoded unsigned transaction from the call that can be signed.
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::ProviderBuilder;
+    /// # use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///     #[sol(rpc, bytecode = "0x")]
+    ///    contract Counter {
+    ///        uint128 public counter;
+    ///
+    ///        function increment() external {
+    ///            counter += 1;
+    ///        }
+    ///    }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///
+    ///     let my_contract = Counter::deploy(provider).await.unwrap();
+    ///
+    ///     let call = my_contract.increment();
+    ///
+    ///     let unsigned_raw_tx: Vec<u8> = call.build_unsigned_raw_transaction().unwrap();
+    ///
+    ///     assert!(!unsigned_raw_tx.is_empty())
+    /// }
+    /// ```
+    pub fn build_unsigned_raw_transaction(self) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        N::UnsignedTx: SignableTransaction<Signature>,
+    {
+        let tx = self.request.build_unsigned().map_err(|e| e.error)?;
+        Ok(tx.encoded_for_signing())
+    }
+
+    /// Build a RLP-encoded signed raw transaction for the call that can be sent to the network
+    /// using [`Provider::send_raw_transaction`].
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{ProviderBuilder, Provider};
+    /// # use alloy_sol_types::sol;
+    /// # use alloy_signer_local::PrivateKeySigner;
+    ///
+    /// sol! {
+    ///    #[sol(rpc, bytecode = "0x")]
+    ///   contract Counter {
+    ///      uint128 public counter;
+    ///
+    ///     function increment() external {
+    ///        counter += 1;
+    ///    }
+    ///  }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///
+    ///     let my_contract = Counter::deploy(&provider).await.unwrap();
+    ///
+    ///     let call = my_contract.increment();
+    ///
+    ///     let pk_signer: PrivateKeySigner = "0x..".parse().unwrap();
+    ///     let signed_raw_tx: Vec<u8> = call.build_raw_transaction(pk_signer).await.unwrap();
+    ///
+    ///     let tx = provider.send_raw_transaction(&signed_raw_tx).await.unwrap();
+    /// }
+    /// ```
+    pub async fn build_raw_transaction<S>(
+        self,
+        signer: S,
+    ) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        S: TxSigner<Signature> + IntoWallet<N>,
+    {
+        let tx = self.request.build(&signer.into_wallet()).await?;
+        Ok(tx.encoded_2718())
     }
 }
 
