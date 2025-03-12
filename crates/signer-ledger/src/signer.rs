@@ -3,7 +3,7 @@
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{
-    hex, normalize_v, Address, ChainId, PrimitiveSignature as Signature, SignatureError, B256,
+    hex, normalize_v, Address, ChainId,  Signature, SignatureError, B256,
 };
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;

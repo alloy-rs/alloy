@@ -4,9 +4,7 @@ use crate::{
 };
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{
-    keccak256, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
-};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
@@ -649,7 +647,7 @@ mod tests {
         SignableTransaction, TxLegacy,
     };
     use alloy_primitives::{
-        address, b256, hex, Address, PrimitiveSignature as Signature, TxKind, B256, U256,
+        address, b256, hex, Address,  Signature, TxKind, B256, U256,
     };
 
     #[test]

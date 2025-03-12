@@ -7,7 +7,7 @@ use alloy_network::{
     TransactionBuilder4844, TransactionBuilderError, TxSigner,
 };
 use alloy_network_primitives::ReceiptResponse;
-use alloy_primitives::{Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId,  Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;

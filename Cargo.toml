@@ -164,8 +164,8 @@ tempfile = "3.10"
 tower-http = "0.6.1"
 
 [patch.crates-io]
-alloy-core = { git = "https://github.com/alloy-rs/core", branch = "yash/rm-fake-transport" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", branch = "yash/rm-fake-transport" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", branch = "yash/rm-fake-transport" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", branch = "yash/rm-fake-transport" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", branch = "yash/rm-fake-transport" }
+alloy-core = { git = "https://github.com/alloy-rs/core", branch = "v1.0-rc" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", branch = "v1.0-rc" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", branch = "v1.0-rc" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", branch = "v1.0-rc" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", branch = "v1.0-rc" }

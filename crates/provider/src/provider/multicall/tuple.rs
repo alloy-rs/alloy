@@ -135,7 +135,7 @@ macro_rules! impl_tuple {
                 }
 
                 // Decode each return value in order
-                Ok(($($ty::abi_decode_returns(&data[$idx], false).map_err(MulticallError::DecodeError)?,)+))
+                Ok(($($ty::abi_decode_returns(&data[$idx]).map_err(MulticallError::DecodeError)?,)+))
             }
 
             fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns> {
@@ -145,7 +145,7 @@ macro_rules! impl_tuple {
 
                 Ok(($(
                     match &results[$idx].success {
-                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData, false).map_err(MulticallError::DecodeError)?),
+                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData).map_err(MulticallError::DecodeError)?),
                         false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
                     },
                 )+))

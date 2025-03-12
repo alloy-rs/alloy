@@ -10,9 +10,7 @@ use alloy_eips::{
     eip2930::AccessList,
     Typed2718,
 };
-use alloy_primitives::{
-    Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
-};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256, U64, U8};
 use alloy_rlp::{Decodable, Encodable};
 use core::{
     fmt::{self, Debug},
@@ -968,7 +966,7 @@ mod tests {
     };
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
-    use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{hex, Address, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]

@@ -1,6 +1,6 @@
 use crate::{SignableTransaction, Transaction, TxType};
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -251,7 +251,7 @@ impl Decodable for TxEip2930 {
 mod tests {
     use super::*;
     use crate::{SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address, PrimitiveSignature as Signature, TxKind, U256};
+    use alloy_primitives::{Address,  Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
