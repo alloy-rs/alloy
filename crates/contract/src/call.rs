@@ -115,7 +115,7 @@ pub type RawCallBuilder<P, N = Ethereum> = CallBuilder<P, (), N>;
 /// let raw_builder: RawCallBuilder<_, _> = call_builder.clone().clear_decoder();
 /// let raw_result: Bytes = raw_builder.call().await?;
 /// // Decode the raw bytes:
-/// let decoded_result: Vec<DynSolValue> = call_builder.decode_output(raw_result, false)?;
+/// let decoded_result: Vec<DynSolValue> = call_builder.decode_output(raw_result)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -332,7 +332,7 @@ impl<P: Provider<N>, N: Network> RawCallBuilder<P, N> {
     /// let call_builder = MyContract::deploy_builder(&provider)
     ///     .with_sol_decoder::<MyContract::constructorReturnCall>();
     /// let result = call_builder.call().await?;
-    /// assert_eq!(result.s, MyContract::MyStruct { a: 42, b: true });
+    /// assert_eq!(result, MyContract::MyStruct { a: 42, b: true });
     /// # Ok(())
     /// # }
     /// ```
