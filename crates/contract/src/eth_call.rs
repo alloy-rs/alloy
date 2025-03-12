@@ -190,8 +190,7 @@ impl CallDecoder for Function {
 
     #[inline]
     fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
-        FunctionExt::abi_decode_output(self, &data, validate)
-            .map_err(|e| Error::decode(&self.name, &data, e))
+        FunctionExt::abi_decode_output(self, &data).map_err(|e| Error::decode(&self.name, &data, e))
     }
 
     #[inline]
@@ -205,8 +204,7 @@ impl<C: SolCall> CallDecoder for PhantomData<C> {
 
     #[inline]
     fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
-        C::abi_decode_returns(&data, validate)
-            .map_err(|e| Error::decode(C::SIGNATURE, &data, e.into()))
+        C::abi_decode_returns(&data).map_err(|e| Error::decode(C::SIGNATURE, &data, e.into()))
     }
 
     #[inline]

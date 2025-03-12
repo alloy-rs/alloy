@@ -221,7 +221,7 @@ impl<E: SolEvent> EventPoller<E> {
 fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
     let log_data: &LogData = log.as_ref();
 
-    E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data, false)
+    E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data)
 }
 
 #[cfg(feature = "pubsub")]

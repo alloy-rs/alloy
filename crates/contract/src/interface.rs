@@ -55,7 +55,7 @@ impl Interface {
         data: &[u8],
         validate: bool,
     ) -> Result<Vec<DynSolValue>> {
-        self.get_from_name(name)?.abi_decode_input(data, validate).map_err(Into::into)
+        self.get_from_name(name)?.abi_decode_input(data).map_err(Into::into)
     }
 
     /// Decode the provided ABI encoded bytes as the input of the provided function selector.
@@ -65,7 +65,7 @@ impl Interface {
         data: &[u8],
         validate: bool,
     ) -> Result<Vec<DynSolValue>> {
-        self.get_from_selector(selector)?.abi_decode_input(data, validate).map_err(Into::into)
+        self.get_from_selector(selector)?.abi_decode_input(data).map_err(Into::into)
     }
 
     /// Decode the provided ABI encoded bytes as the output of the first function with the given
@@ -81,7 +81,7 @@ impl Interface {
         data: &[u8],
         validate: bool,
     ) -> Result<Vec<DynSolValue>> {
-        self.get_from_name(name)?.abi_decode_output(data, validate).map_err(Into::into)
+        self.get_from_name(name)?.abi_decode_output(data).map_err(Into::into)
     }
 
     /// Decode the provided ABI encoded bytes as the output of the provided function selector.
@@ -91,7 +91,7 @@ impl Interface {
         data: &[u8],
         validate: bool,
     ) -> Result<Vec<DynSolValue>> {
-        self.get_from_selector(selector)?.abi_decode_output(data, validate).map_err(Into::into)
+        self.get_from_selector(selector)?.abi_decode_output(data).map_err(Into::into)
     }
 
     /// Returns a reference to the contract's ABI.
