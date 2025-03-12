@@ -14,14 +14,16 @@ use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702,
-    TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
+    BuildResult, FullSigner, FullSignerSync, NetworkWallet, TransactionBuilder,
+    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
-pub use ethereum::{Ethereum, EthereumWallet};
+pub use ethereum::{Ethereum, EthereumWallet, IntoWallet};
 
-mod any;
+/// Types for handling unknown network types.
+pub mod any;
 pub use any::{
     AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction,
     AnyTransactionReceipt, AnyTxEnvelope, AnyTxType, AnyTypedTransaction, UnknownTxEnvelope,
@@ -97,4 +99,24 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     /// The JSON body of a block response.
     type BlockResponse: RpcObject
         + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
+}
+
+/// Utility to implment IntoWallet for signer over the specified network.
+#[macro_export]
+macro_rules! impl_into_wallet {
+    ($(@[$($generics:tt)*])? $signer:ty) => {
+        impl $(<$($generics)*>)? $crate::IntoWallet for $signer {
+            type NetworkWallet = $crate::EthereumWallet;
+            fn into_wallet(self) -> Self::NetworkWallet {
+                $crate::EthereumWallet::from(self)
+            }
+        }
+
+        impl $(<$($generics)*>)? $crate::IntoWallet<$crate::AnyNetwork> for $signer {
+            type NetworkWallet = $crate::EthereumWallet;
+            fn into_wallet(self) -> Self::NetworkWallet {
+                $crate::EthereumWallet::from(self)
+            }
+        }
+    };
 }

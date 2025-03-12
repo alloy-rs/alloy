@@ -23,6 +23,9 @@ pub enum PayloadError {
     /// withdrawals missing in post-shanghai payload.
     #[display("withdrawals missing in post-shanghai payload")]
     PostShanghaiBlockWithoutWithdrawals,
+    /// parent beacon block root present in pre-cancun payload.
+    #[display("parent beacon block root present in pre-cancun payload")]
+    PreCancunBlockWithParentBeaconBlockRoot,
     /// blob transactions present in pre-cancun payload.
     #[display("blob transactions present in pre-cancun payload")]
     PreCancunBlockWithBlobTransactions,
@@ -35,9 +38,9 @@ pub enum PayloadError {
     /// cancun fields present in pre-cancun payload.
     #[display("cancun fields present in pre-cancun payload")]
     PreCancunWithCancunFields,
-    /// blob transactions missing in post-cancun payload.
-    #[display("blob transactions missing in post-cancun payload")]
-    PostCancunBlockWithoutBlobTransactions,
+    /// parent beacon block root missing in post-cancun payload.
+    #[display("parent beacon block root missing in post-cancun payload")]
+    PostCancunBlockWithoutParentBeaconBlockRoot,
     /// blob gas used missing in post-cancun payload.
     #[display("blob gas used missing in post-cancun payload")]
     PostCancunBlockWithoutBlobGasUsed,
@@ -54,7 +57,7 @@ pub enum PayloadError {
     #[display("requests present in pre-prague payload")]
     PrePragueBlockRequests,
     /// Invalid payload block hash.
-    #[display("block hash mismatch: want {consensus}, got {execution}")]
+    #[display("block hash mismatch: want {execution}, got {consensus}")]
     BlockHash {
         /// The block hash computed from the payload.
         execution: B256,

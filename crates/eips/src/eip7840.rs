@@ -1,6 +1,6 @@
 //! Contains constants and utility functions for [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md)
 
-use crate::{eip4844, eip7691};
+use crate::{eip4844, eip4844::DATA_GAS_PER_BLOB, eip7691};
 
 // helpers for serde
 #[cfg(feature = "serde")]
@@ -51,6 +51,20 @@ impl BlobParams {
             update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
         }
+    }
+
+    /// Returns the maximum available blob gas in a block.
+    ///
+    /// This is `max blob count * DATA_GAS_PER_BLOB`
+    pub const fn max_blob_gas_per_block(&self) -> u64 {
+        self.max_blob_count * DATA_GAS_PER_BLOB
+    }
+
+    /// Returns the blob gas target per block.
+    ///
+    /// This is `target blob count * DATA_GAS_PER_BLOB`
+    pub const fn target_blob_gas_per_block(&self) -> u64 {
+        self.target_blob_count * DATA_GAS_PER_BLOB
     }
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block

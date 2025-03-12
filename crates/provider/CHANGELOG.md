@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
+
+### Features
+
+- Mock transport instead of provider ([#2173](https://github.com/alloy-rs/alloy/issues/2173))
+
+## [0.12.4](https://github.com/alloy-rs/alloy/releases/tag/v0.12.4) - 2025-03-07
+
+### Miscellaneous Tasks
+
+- Release 0.12.4
+
+## [0.12.3](https://github.com/alloy-rs/alloy/releases/tag/v0.12.3) - 2025-03-07
+
+### Miscellaneous Tasks
+
+- Release 0.12.3
+
+## [0.12.2](https://github.com/alloy-rs/alloy/releases/tag/v0.12.2) - 2025-03-07
+
+### Miscellaneous Tasks
+
+- Release 0.12.2
+- Release 0.12.1
+
+## [0.12.0](https://github.com/alloy-rs/alloy/releases/tag/v0.12.0) - 2025-03-07
+
+### Bug Fixes
+
+- [`provider`] Custom deser for pending blocks ([#2146](https://github.com/alloy-rs/alloy/issues/2146))
+- [`provider`] Fill txs on `eth_call` ops ([#2092](https://github.com/alloy-rs/alloy/issues/2092))
+- Tokio interval not supported on wasm ([#2053](https://github.com/alloy-rs/alloy/issues/2053))
+
+### Features
+
+- [`provider`] `decode_resp` for `EthCall` ([#2157](https://github.com/alloy-rs/alloy/issues/2157))
+- [`provider`] MockProvider ([#2137](https://github.com/alloy-rs/alloy/issues/2137))
+- [`provider`] `EthGetBlock` builder type ([#2044](https://github.com/alloy-rs/alloy/issues/2044))
+- [`eth-call`] Rm borrowing from provider api ([#2127](https://github.com/alloy-rs/alloy/issues/2127))
+- [`provider`] Trace api builder ([#2119](https://github.com/alloy-rs/alloy/issues/2119))
+- Add eip1559 estimator type ([#2022](https://github.com/alloy-rs/alloy/issues/2022))
+- Introduce `IntoWallet` to pass signer directly to `ProviderBuilder` ([#2120](https://github.com/alloy-rs/alloy/issues/2120))
+- Add eth_sendRawTransactionConditional ([#2128](https://github.com/alloy-rs/alloy/issues/2128))
+- [provider] Improve `DynProvider` discoverability ([#2076](https://github.com/alloy-rs/alloy/issues/2076))
+- [provider] Add debug_codeByHash method ([#2075](https://github.com/alloy-rs/alloy/issues/2075))
+
+### Miscellaneous Tasks
+
+- Release 0.12.0
+- [`provider`] Fix `mocked` ret type ([#2156](https://github.com/alloy-rs/alloy/issues/2156))
+- Use impl Into StateOverride ([#2145](https://github.com/alloy-rs/alloy/issues/2145))
+- [`provider`] Use quicknode ([#2121](https://github.com/alloy-rs/alloy/issues/2121))
+- Rename `on_builtin` to `connect` ([#2078](https://github.com/alloy-rs/alloy/issues/2078))
+- Update url ([#2071](https://github.com/alloy-rs/alloy/issues/2071))
+
+### Styling
+
+- Delegate provider fns in fill provider ([#2099](https://github.com/alloy-rs/alloy/issues/2099))
+
+### Testing
+
+- Add a test for cloning CachedNonceManager ([#2129](https://github.com/alloy-rs/alloy/issues/2129))
+- Enable more tests on windows ([#2126](https://github.com/alloy-rs/alloy/issues/2126))
+
+## [0.11.1](https://github.com/alloy-rs/alloy/releases/tag/v0.11.1) - 2025-02-12
+
+### Bug Fixes
+
+- Make `ChainLayer` network agnostic ([#2045](https://github.com/alloy-rs/alloy/issues/2045))
+- [`multicall`] Impl Error for `Failure` +  clear returns `Empty` builder. ([#2043](https://github.com/alloy-rs/alloy/issues/2043))
+- [docs] Update outdated Provider doc comment ([#1991](https://github.com/alloy-rs/alloy/issues/1991))
+- Opt-in to keep stdout ([#1985](https://github.com/alloy-rs/alloy/issues/1985))
+
+### Features
+
+- [`provider`] Multicall ([#2010](https://github.com/alloy-rs/alloy/issues/2010))
+- Add helpers for account overrides ([#2040](https://github.com/alloy-rs/alloy/issues/2040))
+- [filler] Add prepare_call method ([#2011](https://github.com/alloy-rs/alloy/issues/2011))
+- [provider] DynProvider added as a helper on provider ([#2008](https://github.com/alloy-rs/alloy/issues/2008))
+- [provider] Expose inner `AnvilInstance` from `AnvilProvider` ([#2037](https://github.com/alloy-rs/alloy/issues/2037))
+- Add helper fn to unwrap Sendable ([#2001](https://github.com/alloy-rs/alloy/issues/2001))
+- [`node-bindings`] Expose anvil wallet ([#1994](https://github.com/alloy-rs/alloy/issues/1994))
+
+### Miscellaneous Tasks
+
+- Release 0.11.1
+- Silence unused warnings ([#2031](https://github.com/alloy-rs/alloy/issues/2031))
+- Add serde support for Eip1559Estimation ([#2012](https://github.com/alloy-rs/alloy/issues/2012))
+- [provider] Default to `Ethereum` network in `FillProvider` ([#1995](https://github.com/alloy-rs/alloy/issues/1995))
+
 ## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Bug Fixes
@@ -30,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.11.0
 - Rm passthrough txcount request ([#1970](https://github.com/alloy-rs/alloy/issues/1970))
 - Release 0.10.0
 

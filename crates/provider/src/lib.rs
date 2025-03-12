@@ -48,9 +48,11 @@ pub mod layers;
 
 mod provider;
 pub use provider::{
-    builder, Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams, FilterPollerBuilder,
-    ParamsWithBlock, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
-    WalletProvider,
+    bindings, builder, BoxedFut, CallInfoTrait, CallItem, CallItemBuilder, CallTuple, Caller,
+    DynProvider, Dynamic, Empty, EthCall, EthCallMany, EthCallManyParams, EthCallParams,
+    EthGetBlock, EthGetBlockParams, Failure, FilterPollerBuilder, MulticallBuilder, MulticallError,
+    MulticallItem, ParamsWithBlock, Provider, ProviderCall, Result, RootProvider, RpcWithBlock,
+    SendableTx, SendableTxErr, WalletProvider, MULTICALL3_ADDRESS,
 };
 
 pub mod utils;
@@ -63,3 +65,6 @@ pub use alloy_rpc_client::WsConnect;
 
 #[cfg(feature = "ipc")]
 pub use alloy_rpc_client::IpcConnect;
+
+#[doc(no_inline)]
+pub use alloy_transport::mock;

@@ -1,11 +1,13 @@
 //! Provider-related utilities.
 
-use alloy_primitives::{U128, U64};
-
 use crate::{
     fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
     Identity,
 };
+use alloy_primitives::{U128, U64};
+use std::{fmt, fmt::Formatter};
+
+pub use alloy_eips::eip1559::Eip1559Estimation;
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
@@ -19,13 +21,66 @@ pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 /// An estimator function for EIP1559 fees.
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
-/// Return type of EIP1155 gas fee estimator.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Eip1559Estimation {
-    /// The base fee per gas.
-    pub max_fee_per_gas: u128,
-    /// The max priority fee per gas.
-    pub max_priority_fee_per_gas: u128,
+/// A trait responsible for estimating EIP-1559 values
+pub trait Eip1559EstimatorFn: Send + Unpin {
+    /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
+    fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation;
+}
+
+/// EIP-1559 estimator variants
+#[derive(Default)]
+pub enum Eip1559Estimator {
+    /// Uses the builtin estimator
+    #[default]
+    Default,
+    /// Uses a custom estimator
+    Custom(Box<dyn Eip1559EstimatorFn>),
+}
+
+impl Eip1559Estimator {
+    /// Creates a new estimator from a closure
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin + 'static,
+    {
+        Self::new_estimator(f)
+    }
+
+    /// Creates a new estimate fn
+    pub fn new_estimator<F: Eip1559EstimatorFn + 'static>(f: F) -> Self {
+        Self::Custom(Box::new(f))
+    }
+
+    /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
+    pub fn estimate(self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
+        match self {
+            Self::Default => eip1559_default_estimator(base_fee, rewards),
+            Self::Custom(val) => val.estimate(base_fee, rewards),
+        }
+    }
+}
+
+impl<F> Eip1559EstimatorFn for F
+where
+    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin,
+{
+    fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
+        (self)(base_fee, rewards)
+    }
+}
+
+impl fmt::Debug for Eip1559Estimator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Eip1559Estimator")
+            .field(
+                "estimator",
+                &match self {
+                    Self::Default => "default",
+                    Self::Custom(_) => "custom",
+                },
+            )
+            .finish()
+    }
 }
 
 fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
@@ -69,6 +124,18 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
 
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
+}
+
+pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
+    r: Option<BlockResp>,
+) -> Option<BlockResp> {
+    r.map(|mut block| {
+        if block.transactions().is_empty() {
+            block.transactions_mut().convert_to_hashes();
+        }
+
+        block
+    })
 }
 
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],

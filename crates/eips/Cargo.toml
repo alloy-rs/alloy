@@ -30,6 +30,7 @@ alloy-eip7702.workspace = true
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
+either.workspace = true
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -75,15 +76,25 @@ std = [
 	"serde?/std",
 	"c-kzg?/std",
 	"once_cell?/std",
-	"alloy-serde?/std"
+	"alloy-serde?/std",
+	"alloy-eip2124/std",
+	"alloy-eip2930/std",
+	"alloy-eip7702/std",
+	"derive_more/std",
+	"serde_json/std",
+	"sha2?/std",
+	"either/std"
 ]
 serde = [
-    "dep:alloy-serde",
-    "dep:serde",
-    "alloy-primitives/serde",
-    "c-kzg?/serde",
-    "alloy-eip2930/serde",
-    "alloy-eip7702/serde",
+	"dep:alloy-serde",
+	"dep:serde",
+	"alloy-primitives/serde",
+	"c-kzg?/serde",
+	"alloy-eip2930/serde",
+	"alloy-eip7702/serde",
+	"alloy-eip2124/serde",
+	"either/serde",
+	"rand/serde"
 ]
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
 kzg = ["kzg-sidecar", "sha2", "dep:c-kzg", "dep:once_cell"]

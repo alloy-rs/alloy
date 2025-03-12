@@ -373,7 +373,7 @@ mod tests {
         {
             let provider = alloy_provider::ProviderBuilder::new()
                 .wallet(wallet)
-                .on_builtin(&anvil.ws_endpoint())
+                .connect(&anvil.ws_endpoint())
                 .await
                 .unwrap();
 
@@ -479,7 +479,7 @@ mod tests {
         {
             let provider = alloy_provider::ProviderBuilder::new()
                 .wallet(wallet)
-                .on_builtin(&anvil.ws_endpoint())
+                .connect(&anvil.ws_endpoint())
                 .await
                 .unwrap();
 

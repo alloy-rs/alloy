@@ -22,7 +22,7 @@ mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
-use alloy_primitives::{b256, FixedBytes, B256, U256};
+use alloy_primitives::{b256, Bytes, FixedBytes, B256, U256};
 
 use crate::eip7840;
 
@@ -102,6 +102,100 @@ where
         Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?,
     );
     Ok(blob)
+}
+
+/// A heap allocated blob that serializes as 0x-prefixed hex string
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, alloy_rlp::RlpEncodableWrapper)]
+pub struct HeapBlob(Bytes);
+
+impl HeapBlob {
+    /// Create a new heap blob from a byte slice.
+    pub fn new(blob: &[u8]) -> Result<Self, InvalidBlobLength> {
+        if blob.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(blob.len()));
+        }
+
+        Ok(Self(Bytes::copy_from_slice(blob)))
+    }
+
+    /// Create a new heap blob from an array.
+    pub fn from_array(blob: [u8; BYTES_PER_BLOB]) -> Self {
+        Self(Bytes::from(blob))
+    }
+
+    /// Create a new heap blob from [`Bytes`].
+    pub fn from_bytes(bytes: Bytes) -> Result<Self, InvalidBlobLength> {
+        if bytes.len() != BYTES_PER_BLOB {
+            return Err(InvalidBlobLength(bytes.len()));
+        }
+
+        Ok(Self(bytes))
+    }
+
+    /// Generate a new heap blob with all bytes set to `byte`.
+    pub fn repeat_byte(byte: u8) -> Self {
+        Self(Bytes::from(vec![byte; BYTES_PER_BLOB]))
+    }
+
+    /// Get the inner
+    pub fn inner(&self) -> &Bytes {
+        &self.0
+    }
+}
+
+impl Default for HeapBlob {
+    fn default() -> Self {
+        Self::repeat_byte(0)
+    }
+}
+
+/// Error indicating that the blob length is invalid.
+#[derive(Debug, Clone)]
+pub struct InvalidBlobLength(usize);
+impl core::fmt::Display for InvalidBlobLength {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Invalid blob length: {}, expected: {BYTES_PER_BLOB}", self.0)
+    }
+}
+impl core::error::Error for InvalidBlobLength {}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for HeapBlob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner().serialize(serializer)
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for HeapBlob {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut blob = vec![0u8; BYTES_PER_BLOB];
+        u.fill_buffer(&mut blob)?;
+        Ok(Self(Bytes::from(blob)))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for HeapBlob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let inner = <Bytes>::deserialize(deserializer)?;
+
+        Self::from_bytes(inner).map_err(serde::de::Error::custom)
+    }
+}
+
+impl alloy_rlp::Decodable for HeapBlob {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let bytes = <Bytes>::decode(buf)?;
+
+        Self::from_bytes(bytes).map_err(|_| alloy_rlp::Error::Custom("invalid blob length"))
+    }
 }
 
 /// A commitment/proof serialized as 0x-prefixed hex string
@@ -261,5 +355,15 @@ mod tests {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_heap_blob() {
+        let blob = HeapBlob::repeat_byte(0x42);
+        let serialized = serde_json::to_string(&blob).unwrap();
+
+        let deserialized: HeapBlob = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(blob, deserialized);
     }
 }

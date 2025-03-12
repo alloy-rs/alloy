@@ -46,6 +46,7 @@ alloy-transport-ws = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport.workspace = true
 alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
 
 alloy-chains.workspace = true
 async-stream = "0.3"
@@ -75,7 +76,6 @@ alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
-alloy-sol-types.workspace = true
 alloy-signer.workspace = true
 alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest", "jwt-auth"] }
@@ -95,6 +95,7 @@ http-body-util.workspace = true
 http.workspace = true
 alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 ci_info.workspace = true
+similar-asserts.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
@@ -122,3 +123,4 @@ net-api = []
 trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
+throttle = ["alloy-transport/throttle"]

@@ -2,23 +2,26 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 use crate::{
     heart::PendingTransactionError,
-    utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    utils::{self, Eip1559Estimation, Eip1559Estimator},
+    EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
+    PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
+    SendableTx,
 };
 use alloy_consensus::BlockHeader;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
-use alloy_network_primitives::{BlockResponse, BlockTransactionsKind, ReceiptResponse};
+use alloy_network_primitives::{BlockResponse, ReceiptResponse};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
@@ -26,8 +29,6 @@ use alloy_rpc_types_eth::{
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
-
-use super::EthCallMany;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -91,6 +92,27 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().weak_client()
     }
 
+    /// Returns a type erased provider wrapped in Arc. See [`DynProvider`].
+    ///
+    /// ```no_run
+    /// use alloy_provider::{DynProvider, Provider, ProviderBuilder};
+    ///
+    /// # async fn f() -> Result<(), Box<dyn std::error::Error>> {
+    /// let provider: DynProvider =
+    ///     ProviderBuilder::new().on_builtin("http://localhost:8080").await?.erased();
+    /// let block = provider.get_block_number().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    #[doc(alias = "boxed")]
+    fn erased(self) -> DynProvider<N>
+    where
+        Self: Sized + 'static,
+    {
+        DynProvider::new(self)
+    }
+
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
     fn get_accounts(&self) -> ProviderCall<NoParams, Vec<Address>> {
@@ -136,13 +158,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
-    /// let output = provider.call(&tx).await?;
+    /// let output = provider.call(tx).await?;
     /// # Ok(())
     /// # }
     /// ```
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
@@ -160,6 +182,51 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         bundles: &'req Vec<Bundle>,
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         EthCallMany::new(self.weak_client(), bundles)
+    }
+
+    /// Execute a multicall by leveraging the [`MulticallBuilder`].
+    ///
+    /// This function returns a [`MulticallBuilder`] which is used to add multiple calls and execute
+    /// them.
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// use alloy_primitives::address;
+    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///    #[sol(rpc)]
+    ///    #[derive(Debug, PartialEq)]
+    ///    interface ERC20 {
+    ///        function totalSupply() external view returns (uint256 totalSupply);
+    ///        function balanceOf(address owner) external view returns (uint256 balance);
+    ///    }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let erc20 = ERC20::new(weth, &provider);
+    ///
+    ///     let ts_call = erc20.totalSupply();
+    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
+    ///
+    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
+    ///
+    ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
+    ///
+    ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
+    /// }
+    /// ```
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    fn multicall(&self) -> MulticallBuilder<Empty, &Self, N>
+    where
+        Self: Sized,
+    {
+        MulticallBuilder::new(self)
     }
 
     /// Executes an arbitrary number of transactions on top of the requested state.
@@ -204,7 +271,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Note
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
             .map_resp(utils::convert_u64)
@@ -212,11 +279,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     ///
-    /// Receives an optional [EstimatorFunction] that can be used to modify
+    /// Receives an [Eip1559Estimator] that can be used to modify
     /// how to estimate these fees.
-    async fn estimate_eip1559_fees(
+    async fn estimate_eip1559_fees_with(
         &self,
-        estimator: Option<EstimatorFunction>,
+        estimator: Eip1559Estimator,
     ) -> TransportResult<Eip1559Estimation> {
         let fee_history = self
             .get_fee_history(
@@ -232,7 +299,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
-                self.get_block_by_number(BlockNumberOrTag::Latest, BlockTransactionsKind::Hashes)
+                self.get_block_by_number(BlockNumberOrTag::Latest)
                     .await?
                     .ok_or(RpcError::NullResp)?
                     .header()
@@ -243,10 +310,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             }
         };
 
-        Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
-            base_fee_per_gas,
-            &fee_history.reward.unwrap_or_default(),
-        ))
+        Ok(estimator.estimate(base_fee_per_gas, &fee_history.reward.unwrap_or_default()))
+    }
+
+    /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    ///
+    /// Uses the builtin estimator [`utils::eip1559_default_estimator`] function.
+    async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
+        self.estimate_eip1559_fees_with(Eip1559Estimator::default()).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -284,70 +355,77 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBalance", address).into()
     }
 
-    /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
-    async fn get_block(
-        &self,
-        block: BlockId,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
+    /// Gets a block by either its hash, tag, or number
+    ///
+    /// By default this fetches the block with only the transaction hashes, and not full
+    /// transactions.
+    ///
+    /// To get full transactions one can do:
+    ///
+    /// ```ignore
+    /// let block = provider.get_block(BlockId::latest()).full().await.unwrap();
+    /// ```
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
         match block {
-            BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
-            BlockId::Number(number) => self.get_block_by_number(number, kind).await,
+            BlockId::Hash(hash) => EthGetBlock::by_hash(hash.block_hash, self.client()),
+            BlockId::Number(number) => EthGetBlock::by_number(number, self.client()),
         }
     }
 
-    /// Gets a block by its [BlockHash], with full transactions or only hashes.
-    async fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let block = self
-            .client()
-            .request::<_, Option<N::BlockResponse>>("eth_getBlockByHash", (hash, full))
-            .await?
-            .map(|mut block| {
-                if !full {
-                    // this ensures an empty response for `Hashes` has the expected form
-                    // this is required because deserializing [] is ambiguous
-                    block.transactions_mut().convert_to_hashes();
-                }
-                block
-            });
-
-        Ok(block)
+    /// Gets a block by its [BlockHash]
+    ///
+    /// By default this fetches the block with only the transaction hashes populated in the block,
+    /// and not the full transactions.
+    ///
+    ///
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_primitives::b256;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let block_hash = b256!("6032d03ee8e43e8999c2943152a4daebfc4b75b7f7a9647d2677299d215127da");
+    ///
+    ///     // Gets a block by its hash with only transactions hashes.
+    ///     let block = provider.get_block_by_hash(block_hash).await.unwrap();
+    ///
+    ///     // Gets a block by its hash with full transactions.
+    ///     let block = provider.get_block_by_hash(block_hash).full().await.unwrap();
+    /// }
+    /// ```
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
+        EthGetBlock::by_hash(hash, self.client())
     }
 
-    /// Get a block by its number.
-    // TODO: Network associate
-    async fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let block = self
-            .client()
-            .request::<_, Option<N::BlockResponse>>("eth_getBlockByNumber", (number, full))
-            .await?
-            .map(|mut block| {
-                if !full {
-                    // this ensures an empty response for `Hashes` has the expected form
-                    // this is required because deserializing [] is ambiguous
-                    block.transactions_mut().convert_to_hashes();
-                }
-                block
-            });
-        Ok(block)
+    /// Gets a block by its [BlockNumberOrTag]
+    ///
+    /// By default this fetches the block with only the transaction hashes populated in the block,
+    /// and not the full transactions.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_eips::BlockNumberOrTag;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let num = BlockNumberOrTag::Number(0);
+    ///
+    ///     // Gets a block by its number with only transactions hashes.
+    ///     let block = provider.get_block_by_number(num).await.unwrap();
+    ///
+    ///     // Gets a block by its number with full transactions.
+    ///     let block = provider.get_block_by_number(num).full().await.unwrap();
+    /// }
+    /// ```
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
+        EthGetBlock::by_number(number, self.client())
     }
 
     /// Returns the number of transactions in a block from a block matching the given block hash.
@@ -741,6 +819,29 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
+    /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
+    /// network.
+    ///
+    /// TransactionConditional represents the preconditions that determine the inclusion of the
+    /// transaction, enforced out-of-protocol by the sequencer.
+    ///
+    /// Note: This endpoint is only available on certain networks, e.g. opstack chains, polygon,
+    /// bsc.
+    ///
+    /// See [`TransactionConditional`] for more details.
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        let tx_hash = self
+            .client()
+            .request("eth_sendRawTransactionConditional", (rlp_hex, conditional))
+            .await?;
+        Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
+    }
+
     /// Broadcasts a transaction to the network.
     ///
     /// Returns a [`PendingTransactionBuilder`] which can be used to configure
@@ -1115,8 +1216,6 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Read, str::FromStr, time::Duration};
-
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_consensus::Transaction;
@@ -1127,6 +1226,8 @@ mod tests {
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
+    use std::{io::Read, str::FromStr, time::Duration};
+
     // For layer transport tests
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
@@ -1266,7 +1367,7 @@ mod tests {
 
     #[cfg(feature = "hyper")]
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
+    #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_auth_layer_transport() {
         crate::ext::test::async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
@@ -1343,31 +1444,31 @@ mod tests {
     #[cfg(feature = "ws")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        for url in [
-            "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F",
-            "wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754",
-        ] {
-            let _ = ProviderBuilder::<_, _, Ethereum>::default().on_builtin(url).await.unwrap();
+        for url in ["wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754"] {
+            let _ = ProviderBuilder::<_, _, Ethereum>::default().connect(url).await.unwrap();
         }
     }
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    #[cfg_attr(windows, ignore)]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
-        let anvil = Anvil::new().block_time(1).spawn();
+        let anvil = Anvil::new().block_time_f64(0.2).spawn();
         let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
         let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
         let provider = RootProvider::<Ethereum>::new(client);
 
         let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(2);
-        let mut n = 1;
+        let mut stream = sub.into_stream().take(5);
+        let mut next = None;
         while let Some(header) = stream.next().await {
-            assert_eq!(header.number, n);
-            n += 1;
+            if let Some(next) = &mut next {
+                assert_eq!(header.number, *next);
+                *next += 1;
+            } else {
+                next = Some(header.number + 1);
+            }
         }
     }
 
@@ -1535,11 +1636,9 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block =
-            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
         let hash = block.header.hash;
-        let block =
-            provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block = provider.get_block_by_hash(hash).full().await.unwrap().unwrap();
         assert_eq!(block.header.hash, hash);
     }
 
@@ -1548,8 +1647,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block =
-            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
         let hash = block.header.hash;
         let block: Block = provider
             .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
@@ -1563,8 +1661,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block =
-            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1573,8 +1670,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block =
-            provider.get_block_by_number(tag, BlockTransactionsKind::Full).await.unwrap().unwrap();
+        let block = provider.get_block_by_number(tag).full().await.unwrap().unwrap();
         assert_eq!(block.header.number, num);
     }
 
@@ -1706,11 +1802,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_transaction_count_by_hash() {
         let provider = ProviderBuilder::new().on_anvil();
-        let block = provider
-            .get_block(BlockId::latest(), BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block(BlockId::latest()).await.unwrap().unwrap();
         let hash = block.header.hash;
         let tx_count = provider.get_block_transaction_count_by_hash(hash).await.unwrap();
         assert!(tx_count.is_some());
@@ -1821,19 +1913,20 @@ mod tests {
         feature = "reqwest-rustls-tls",
         feature = "reqwest-native-tls",
     ))]
+    #[ignore = "ignore until <https://github.com/paradigmxyz/reth/pull/14727> is in"]
     async fn call_mainnet() {
         use alloy_network::TransactionBuilder;
         use alloy_sol_types::SolValue;
 
-        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let url = "https://docs-demo.quiknode.pro/";
         let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
             .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(&req).await.unwrap();
+        let result = provider.call(req.clone()).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
 
-        let result = provider.call(&req).block(0.into()).await.unwrap();
+        let result = provider.call(req).block(0.into()).await.unwrap();
         assert_eq!(result.to_string(), "0x");
     }
 
@@ -1908,11 +2001,11 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "hyper-tls")]
     async fn hyper_https() {
-        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let url = "https://reth-ethereum.ithaca.xyz/rpc";
 
-        // With the `hyper` feature enabled .on_builtin builds the provider based on
+        // With the `hyper` feature enabled .connect builds the provider based on
         // `HyperTransport`.
-        let provider = ProviderBuilder::new().on_builtin(url).await.unwrap();
+        let provider = ProviderBuilder::new().connect(url).await.unwrap();
 
         let _num = provider.get_block_number().await.unwrap();
     }
@@ -1921,11 +2014,7 @@ mod tests {
     async fn test_empty_transactions() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let block = provider
-            .get_block_by_number(0.into(), BlockTransactionsKind::Hashes)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_number(0.into()).await.unwrap().unwrap();
         assert!(block.transactions.is_hashes());
     }
 
@@ -1969,5 +2058,43 @@ mod tests {
 
         assert!(output.contains("eth_sendTransaction"));
         assert!(output.contains("Block Number: 1"))
+    }
+
+    #[tokio::test]
+    async fn custom_estimator() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_cached_nonce_management()
+            .on_anvil();
+
+        let _ = provider
+            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_fee, _rewards| Eip1559Estimation {
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+            }))
+            .await;
+    }
+
+    #[cfg(feature = "throttle")]
+    use alloy_transport::layers::ThrottleLayer;
+
+    #[cfg(feature = "throttle")]
+    #[tokio::test]
+    async fn test_throttled_provider() {
+        let request_per_second = 10;
+        let throttle_layer = ThrottleLayer::new(request_per_second);
+
+        let anvil = Anvil::new().spawn();
+        let client = RpcClient::builder().layer(throttle_layer).http(anvil.endpoint_url());
+        let provider = RootProvider::<Ethereum>::new(client);
+
+        let num_requests = 10;
+        let start = std::time::Instant::now();
+        for _ in 0..num_requests {
+            provider.get_block_number().await.unwrap();
+        }
+
+        let elapsed = start.elapsed();
+        assert_eq!(elapsed.as_secs_f64().round() as u32, 1);
     }
 }

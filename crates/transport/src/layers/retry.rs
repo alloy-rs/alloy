@@ -20,6 +20,9 @@ use wasmtimer::tokio::sleep;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::time::sleep;
 
+/// The default average cost of a request in compute units (CU).
+const DEFAULT_AVG_COST: u64 = 17u64;
+
 /// A Transport Layer that is responsible for retrying requests based on the
 /// error type. See [`TransportError`].
 ///
@@ -32,6 +35,8 @@ pub struct RetryBackoffLayer<P: RetryPolicy = RateLimitRetryPolicy> {
     initial_backoff: u64,
     /// The number of compute units per second for this provider
     compute_units_per_second: u64,
+    /// The average cost of a request. Defaults to [DEFAULT_AVG_COST]
+    avg_cost: u64,
     /// The [RetryPolicy] to use. Defaults to [RateLimitRetryPolicy]
     policy: P,
 }
@@ -47,8 +52,24 @@ impl RetryBackoffLayer {
             max_rate_limit_retries,
             initial_backoff,
             compute_units_per_second,
+            avg_cost: DEFAULT_AVG_COST,
             policy: RateLimitRetryPolicy,
         }
+    }
+
+    /// Set the average cost of a request. Defaults to `17` CU
+    /// The cost of requests are usually weighted and can vary from 10 CU to several 100 CU,
+    /// cheaper requests are more common some example alchemy
+    /// weights:
+    /// - `eth_getStorageAt`: 17
+    /// - `eth_getBlockByNumber`: 16
+    /// - `eth_newFilter`: 20
+    ///
+    /// (coming from forking mode) assuming here that storage request will be the
+    /// driver for Rate limits we choose `17` as the average cost
+    /// of any request
+    pub fn with_avg_unit_cost(mut self, avg_cost: u64) {
+        self.avg_cost = avg_cost;
     }
 }
 
@@ -60,7 +81,13 @@ impl<P: RetryPolicy> RetryBackoffLayer<P> {
         compute_units_per_second: u64,
         policy: P,
     ) -> Self {
-        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second, policy }
+        Self {
+            max_rate_limit_retries,
+            initial_backoff,
+            compute_units_per_second,
+            policy,
+            avg_cost: DEFAULT_AVG_COST,
+        }
     }
 }
 
@@ -102,6 +129,7 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
             requests_enqueued: Arc::new(AtomicU32::new(0)),
+            avg_cost: self.avg_cost,
         }
     }
 }
@@ -122,6 +150,8 @@ pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     compute_units_per_second: u64,
     /// The number of requests currently enqueued
     requests_enqueued: Arc<AtomicU32>,
+    /// The average cost of a request.
+    avg_cost: u64,
 }
 
 impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
@@ -189,19 +219,8 @@ where
                     let backoff_hint = this.policy.backoff_hint(&err);
                     let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
 
-                    // requests are usually weighted and can vary from 10 CU to several 100 CU,
-                    // cheaper requests are more common some example alchemy
-                    // weights:
-                    // - `eth_getStorageAt`: 17
-                    // - `eth_getBlockByNumber`: 16
-                    // - `eth_newFilter`: 20
-                    //
-                    // (coming from forking mode) assuming here that storage request will be the
-                    // driver for Rate limits we choose `17` as the average cost
-                    // of any request
-                    const AVG_COST: u64 = 17u64;
                     let seconds_to_wait_for_compute_budget = compute_unit_offset_in_secs(
-                        AVG_COST,
+                        this.avg_cost,
                         this.compute_units_per_second,
                         current_queued_reqs,
                         ahead_in_queue,
@@ -244,10 +263,23 @@ fn compute_unit_offset_in_secs(
     current_queued_requests: u64,
     ahead_in_queue: u64,
 ) -> u64 {
-    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost);
+    let request_capacity_per_second = compute_units_per_second.saturating_div(avg_cost).max(1);
     if current_queued_requests > request_capacity_per_second {
         current_queued_requests.min(ahead_in_queue).saturating_div(request_capacity_per_second)
     } else {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_units_per_second() {
+        let offset = compute_unit_offset_in_secs(17, 10, 0, 0);
+        assert_eq!(offset, 0);
+        let offset = compute_unit_offset_in_secs(17, 10, 2, 2);
+        assert_eq!(offset, 2);
     }
 }

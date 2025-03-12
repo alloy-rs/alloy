@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
+
+### Bug Fixes
+
+- Filter out requests with len 1 ([#2167](https://github.com/alloy-rs/alloy/issues/2167))
+
+## [0.12.4](https://github.com/alloy-rs/alloy/releases/tag/v0.12.4) - 2025-03-07
+
+### Miscellaneous Tasks
+
+- Release 0.12.4
+
+## [0.12.3](https://github.com/alloy-rs/alloy/releases/tag/v0.12.3) - 2025-03-07
+
+### Miscellaneous Tasks
+
+- Release 0.12.3
+
+## [0.12.2](https://github.com/alloy-rs/alloy/releases/tag/v0.12.2) - 2025-03-07
+
+### Bug Fixes
+
+- Reduce stack for blob helpers ([#2161](https://github.com/alloy-rs/alloy/issues/2161))
+
+### Miscellaneous Tasks
+
+- Release 0.12.2
+- Release 0.12.1
+
+## [0.12.0](https://github.com/alloy-rs/alloy/releases/tag/v0.12.0) - 2025-03-07
+
+### Bug Fixes
+
+- Run zepter checks for features of non-workspace dependencies ([#2144](https://github.com/alloy-rs/alloy/issues/2144))
+
+### Features
+
+- Add encodable to either ([#2130](https://github.com/alloy-rs/alloy/issues/2130))
+- Add into bytes ([#2109](https://github.com/alloy-rs/alloy/issues/2109))
+- [`eip4844`] Heap allocated blob ([#2050](https://github.com/alloy-rs/alloy/issues/2050))
+- Add helpers to create a BlobSidecar ([#2047](https://github.com/alloy-rs/alloy/issues/2047))
+
+### Miscellaneous Tasks
+
+- Release 0.12.0
+
+### Other
+
+- Implement Transaction type on Either type ([#2097](https://github.com/alloy-rs/alloy/issues/2097))
+- Move WithEncoded helper type to alloy ([#2098](https://github.com/alloy-rs/alloy/issues/2098))
+
+## [0.11.1](https://github.com/alloy-rs/alloy/releases/tag/v0.11.1) - 2025-02-12
+
+### Features
+
+- Add helpers for the blob gas ([#2009](https://github.com/alloy-rs/alloy/issues/2009))
+
+### Miscellaneous Tasks
+
+- Release 0.11.1
+- Re-export kzgsettings ([#2034](https://github.com/alloy-rs/alloy/issues/2034))
+- Camelcase serde ([#2018](https://github.com/alloy-rs/alloy/issues/2018))
+- Add serde support for Eip1559Estimation ([#2012](https://github.com/alloy-rs/alloy/issues/2012))
+
+### Other
+
+- Increase default gas limit from 30M to 36M ([#1785](https://github.com/alloy-rs/alloy/issues/1785))
+
 ## [0.11.0](https://github.com/alloy-rs/alloy/releases/tag/v0.11.0) - 2025-01-31
 
 ### Documentation
@@ -19,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.11.0
 - Update system contract addresses for devnet 6 ([#1975](https://github.com/alloy-rs/alloy/issues/1975))
 - Feature gate serde ([#1967](https://github.com/alloy-rs/alloy/issues/1967))
 - Forward arbitrary feature ([#1941](https://github.com/alloy-rs/alloy/issues/1941))

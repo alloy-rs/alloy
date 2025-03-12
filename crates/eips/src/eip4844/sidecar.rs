@@ -303,6 +303,38 @@ impl BlobTransactionSidecar {
             self.proofs.len() * BYTES_PER_PROOF // proofs
     }
 
+    /// Tries to create a new [`BlobTransactionSidecar`] from the hex encoded blob str.
+    ///
+    /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_hex<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        let mut b = Vec::new();
+        for blob in blobs {
+            b.push(c_kzg::Blob::from_hex(blob.as_ref())?)
+        }
+        Self::try_from_blobs(b)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blob bytes.
+    ///
+    /// See also [`Blob::from_bytes`](c_kzg::Blob::from_bytes)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_bytes<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        let mut b = Vec::new();
+        for blob in blobs {
+            b.push(c_kzg::Blob::from_bytes(blob.as_ref())?)
+        }
+        Self::try_from_blobs(b)
+    }
+
     /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs.
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
     pub fn try_from_blobs(blobs: Vec<c_kzg::Blob>) -> Result<Self, c_kzg::Error> {
