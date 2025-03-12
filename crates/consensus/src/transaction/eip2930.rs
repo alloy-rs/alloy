@@ -251,7 +251,7 @@ impl Decodable for TxEip2930 {
 mod tests {
     use super::*;
     use crate::{SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address,  Signature, TxKind, U256};
+    use alloy_primitives::{Address, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]

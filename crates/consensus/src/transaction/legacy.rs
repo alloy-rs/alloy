@@ -646,9 +646,7 @@ mod tests {
         transaction::{from_eip155_value, to_eip155_value},
         SignableTransaction, TxLegacy,
     };
-    use alloy_primitives::{
-        address, b256, hex, Address,  Signature, TxKind, B256, U256,
-    };
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
 
     #[test]
     fn recover_signer_legacy() {

@@ -419,9 +419,7 @@ mod tests {
         SignableTransaction,
     };
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{
-        address, b256, hex, Address,  Signature, B256, U256,
-    };
+    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
 
     #[test]
     fn recover_signer_eip1559() {
