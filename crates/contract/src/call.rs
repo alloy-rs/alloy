@@ -548,8 +548,8 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
 
     /// Decodes the output of a contract function using the provided decoder.
     #[inline]
-    pub fn decode_output(&self, data: Bytes, validate: bool) -> Result<D::CallOutput> {
-        self.decoder.abi_decode_output(data, validate)
+    pub fn decode_output(&self, data: Bytes) -> Result<D::CallOutput> {
+        self.decoder.abi_decode_output(data)
     }
 
     /// Broadcasts the underlying transaction to the network as a deployment transaction, returning

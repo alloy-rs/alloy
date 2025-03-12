@@ -49,12 +49,7 @@ impl Interface {
     ///
     /// If the function exists multiple times and you want to use one of the overloaded versions,
     /// consider using [`Self::decode_input_with_selector`].
-    pub fn decode_input(
-        &self,
-        name: &str,
-        data: &[u8],
-        validate: bool,
-    ) -> Result<Vec<DynSolValue>> {
+    pub fn decode_input(&self, name: &str, data: &[u8]) -> Result<Vec<DynSolValue>> {
         self.get_from_name(name)?.abi_decode_input(data).map_err(Into::into)
     }
 
@@ -63,7 +58,6 @@ impl Interface {
         &self,
         selector: &Selector,
         data: &[u8],
-        validate: bool,
     ) -> Result<Vec<DynSolValue>> {
         self.get_from_selector(selector)?.abi_decode_input(data).map_err(Into::into)
     }
@@ -75,12 +69,7 @@ impl Interface {
     ///
     /// If there are multiple functions with the same name, consider using
     /// [`Self::decode_output_with_selector`]
-    pub fn decode_output(
-        &self,
-        name: &str,
-        data: &[u8],
-        validate: bool,
-    ) -> Result<Vec<DynSolValue>> {
+    pub fn decode_output(&self, name: &str, data: &[u8]) -> Result<Vec<DynSolValue>> {
         self.get_from_name(name)?.abi_decode_output(data).map_err(Into::into)
     }
 
@@ -89,7 +78,6 @@ impl Interface {
         &self,
         selector: &Selector,
         data: &[u8],
-        validate: bool,
     ) -> Result<Vec<DynSolValue>> {
         self.get_from_selector(selector)?.abi_decode_output(data).map_err(Into::into)
     }

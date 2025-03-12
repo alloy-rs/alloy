@@ -156,7 +156,7 @@ where
         let pin = std::pin::pin!(&mut this.inner);
         match pin.poll(cx) {
             std::task::Poll::Ready(Ok(data)) => {
-                std::task::Poll::Ready(this.decoder.abi_decode_output(data, false))
+                std::task::Poll::Ready(this.decoder.abi_decode_output(data))
             }
             std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(e.into())),
             std::task::Poll::Pending => std::task::Poll::Pending,
@@ -179,7 +179,7 @@ pub trait CallDecoder: private::Sealed {
 
     /// Decodes the output of a contract function.
     #[doc(hidden)]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput>;
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput>;
 
     #[doc(hidden)]
     fn as_debug_field(&self) -> impl std::fmt::Debug;
@@ -189,7 +189,7 @@ impl CallDecoder for Function {
     type CallOutput = Vec<DynSolValue>;
 
     #[inline]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput> {
         FunctionExt::abi_decode_output(self, &data).map_err(|e| Error::decode(&self.name, &data, e))
     }
 
@@ -203,7 +203,7 @@ impl<C: SolCall> CallDecoder for PhantomData<C> {
     type CallOutput = C::Return;
 
     #[inline]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput> {
         C::abi_decode_returns(&data).map_err(|e| Error::decode(C::SIGNATURE, &data, e.into()))
     }
 
@@ -217,7 +217,7 @@ impl CallDecoder for () {
     type CallOutput = Bytes;
 
     #[inline]
-    fn abi_decode_output(&self, data: Bytes, _validate: bool) -> Result<Self::CallOutput> {
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput> {
         Ok(data)
     }
 
