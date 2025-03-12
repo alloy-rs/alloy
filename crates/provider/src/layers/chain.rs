@@ -11,8 +11,13 @@ use std::time::Duration;
 pub struct ChainLayer(NamedChain);
 
 impl ChainLayer {
+    /// Create a new `ChainLayer` from the given chain.
+    pub fn new(chain: NamedChain) -> Self {
+        Self(chain)
+    }
+
     /// Get the chain's average blocktime, if applicable.
-    pub const fn average_blocktime_hint(&self) -> Option<Duration> {
+    pub fn average_blocktime_hint(&self) -> Option<Duration> {
         self.0.average_blocktime_hint()
     }
 }

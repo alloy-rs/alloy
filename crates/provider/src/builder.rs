@@ -3,7 +3,7 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
-    layers::BatchLayer,
+    layers::{BatchLayer, ChainLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -267,12 +267,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the client's poll interval based on the average block time for this chain.
     ///
     /// Does nothing to the client with a local transport.
-    pub fn with_chain(
-        self,
-        chain: NamedChain,
-    ) -> ProviderBuilder<Stack<crate::layers::ChainLayer, L>, F, N> {
-        let chain_layer = crate::layers::ChainLayer::from(chain);
-        self.layer(chain_layer)
+    pub fn with_chain(self, chain: NamedChain) -> ProviderBuilder<Stack<ChainLayer, L>, F, N> {
+        self.layer(ChainLayer::new(chain))
     }
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
@@ -403,7 +399,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Aggregate multiple `eth_call` requests into a single batch request using Multicall3.
     ///
     /// See [`BatchLayer`] for more information.
-    pub fn with_multicall_batching(self) -> ProviderBuilder<Stack<BatchLayer, L>, F, N> {
+    pub fn with_call_batching(self) -> ProviderBuilder<Stack<BatchLayer, L>, F, N> {
         self.layer(BatchLayer::new())
     }
 }
