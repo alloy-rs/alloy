@@ -30,6 +30,26 @@ impl StateOverridesBuilder {
         self
     }
 
+    /// Helper `append` function that appends an optional override.
+    pub fn append_opt<F>(self, f: F) -> Self
+    where
+        F: FnOnce() -> Option<(Address, AccountOverride)>,
+    {
+        if let Some((add, acc)) = f() {
+            self.append(add, acc)
+        } else {
+            self
+        }
+    }
+
+    /// Apply a function to the builder, returning the modified builder.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
     /// Adds multiple account overrides from an iterator.
     pub fn extend<I>(mut self, account_overrides: I) -> Self
     where
