@@ -1,6 +1,6 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
-use alloy_transport::utils::Spawnable;
+use alloy_transport::{utils::Spawnable, RpcFut, TransportResult};
 use futures::{Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
@@ -147,6 +147,24 @@ where
         self
     }
 
+    /// Consumes the [`PollerBuilder`] and returns a new [`TransformPollerBuilder`] that transforms
+    /// the [`PollerBuilder::into_stream`] response to a different type using the provided
+    /// transform function that takes the response from the [`PollerBuilder`] and returns the
+    /// transformed response.
+    pub fn transform<F, Fut, T>(self, transform: F) -> TransformPollerBuilder<Params, Resp, T>
+    where
+        F: Fn(Resp) -> Fut + Send + Sync + 'static,
+        Fut: futures::Future<Output = TransportResult<T>> + Send + 'static,
+        T: Clone + Send + 'static,
+    {
+        let boxed_transform = Box::new(move |resp| {
+            let fut = transform(resp);
+            Box::pin(fut) as RpcFut<'static, T>
+        });
+
+        TransformPollerBuilder { inner: self, transform: boxed_transform }
+    }
+
     /// Starts the poller in a new Tokio task, returning a channel to receive the responses on.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
@@ -206,6 +224,77 @@ where
     /// in the future.
     // TODO: can we name this type? This should be a different type from `PollChannel::into_stream`
     pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
+        self.spawn().into_stream()
+    }
+}
+
+/// A poller that transforms the the stream of responses from [`PollerBuilder`] into the response of
+/// the provided transform future.
+pub struct TransformPollerBuilder<Params, Resp, T> {
+    inner: PollerBuilder<Params, Resp>,
+    transform: Box<dyn Fn(Resp) -> RpcFut<'static, T> + Send + Sync>,
+}
+
+impl<Params, Resp, T> core::fmt::Debug for TransformPollerBuilder<Params, Resp, T>
+where
+    Params: RpcSend + 'static,
+    Resp: RpcRecv + Clone,
+    T: RpcRecv + Clone,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("TransformPollerBuilder").field("inner", &self.inner).finish_non_exhaustive()
+    }
+}
+
+impl<Params, Resp, T> TransformPollerBuilder<Params, Resp, T>
+where
+    Params: RpcSend + 'static,
+    Resp: RpcRecv + Clone + RpcSend,
+    T: RpcRecv + Clone,
+{
+    /// Sets the duration between polls.
+    pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
+        self.inner.set_poll_interval(poll_interval);
+        self
+    }
+
+    /// Starts the poller in a new Tokio task, returning a channel to receive the transformed
+    /// responses on.
+    pub fn spawn(self) -> PollChannel<T> {
+        let (tx, rx) = broadcast::channel(self.inner.channel_size());
+        let method = self.inner.method.clone();
+        let span = debug_span!("transform_poller", method = %method);
+
+        // Get the inner poll channel
+        let inner_channel = self.inner.spawn();
+        let transform = self.transform;
+
+        async move {
+            let mut inner_stream = inner_channel.into_stream();
+
+            while let Some(resp) = inner_stream.next().await {
+                match (transform)(resp).await {
+                    Ok(transformed) => {
+                        if tx.send(transformed).is_err() {
+                            debug!("channel closed");
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        error!(%err, "transformation failed");
+                        // Continue polling even if transformation fails
+                    }
+                }
+            }
+        }
+        .instrument(span)
+        .spawn_task();
+
+        rx.into()
+    }
+
+    /// Starts the poller and returns the stream of transformed responses.
+    pub fn into_stream(self) -> impl Stream<Item = T> + Unpin {
         self.spawn().into_stream()
     }
 }

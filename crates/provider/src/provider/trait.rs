@@ -19,16 +19,17 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
+use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, TransformPollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
 };
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportError, TransportResult};
+use alloy_transport_http::hyper::client;
 use serde_json::value::RawValue;
-use std::borrow::Cow;
+use std::{borrow::Cow, future::IntoFuture};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -488,6 +489,42 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    async fn watch_full_blocks(
+        &self,
+    ) -> TransportResult<TransformPollerBuilder<(U256,), Vec<B256>, Vec<Option<N::BlockResponse>>>>
+    {
+        let id = self.new_block_filter().await?;
+
+        let client = self.weak_client().clone();
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)).transform(
+            move |hashes: Vec<B256>| {
+                let client = client.clone();
+
+                async move {
+                    let mut futures = Vec::with_capacity(hashes.len());
+
+                    for hash in hashes {
+                        let fut = {
+                            let client = client
+                                .upgrade()
+                                .ok_or(TransportError::local_usage_str("client dropped"))?;
+
+                            client.request::<_, Option<N::BlockResponse>>(
+                                "eth_getBlockByHash",
+                                (hash, false),
+                            )
+                        };
+
+                        futures.push(fut);
+                    }
+
+                    let blocks = futures::future::try_join_all(futures).await?;
+                    Ok(blocks)
+                }
+            },
+        ))
     }
 
     /// Watch for new pending transaction by polling the provider with
@@ -1225,7 +1262,9 @@ mod tests {
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
+    use alloy_sol_types::abi::token;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
+    use futures::StreamExt;
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
@@ -2073,6 +2112,26 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
+    }
+
+    #[tokio::test]
+    async fn watch_full_blocks() {
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
+
+        let mut stream = provider
+            .watch_full_blocks()
+            .await
+            .unwrap()
+            .with_poll_interval(Duration::from_secs(1))
+            .into_stream()
+            .take(5);
+
+        let mut blocks = Vec::new();
+        while let Some(new_blocks) = stream.next().await {
+            blocks.extend(new_blocks);
+        }
+
+        assert!(blocks.len() >= 4);
     }
 
     #[cfg(feature = "throttle")]
