@@ -1,9 +1,13 @@
 use crate::{CallDecoder, Error, EthCall, Result};
+use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilder4844};
+use alloy_network::{
+    eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
+    TransactionBuilder4844, TransactionBuilderError, TxSigner,
+};
 use alloy_network_primitives::ReceiptResponse;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
@@ -134,6 +138,92 @@ impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
     /// Converts the call builder to the inner transaction request
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
+    }
+
+    /// Builds and returns a RLP-encoded unsigned transaction from the call that can be signed.
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::ProviderBuilder;
+    /// # use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///     #[sol(rpc, bytecode = "0x")]
+    ///    contract Counter {
+    ///        uint128 public counter;
+    ///
+    ///        function increment() external {
+    ///            counter += 1;
+    ///        }
+    ///    }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///
+    ///     let my_contract = Counter::deploy(provider).await.unwrap();
+    ///
+    ///     let call = my_contract.increment();
+    ///
+    ///     let unsigned_raw_tx: Vec<u8> = call.build_unsigned_raw_transaction().unwrap();
+    ///
+    ///     assert!(!unsigned_raw_tx.is_empty())
+    /// }
+    /// ```
+    pub fn build_unsigned_raw_transaction(self) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        N::UnsignedTx: SignableTransaction<Signature>,
+    {
+        let tx = self.request.build_unsigned().map_err(|e| e.error)?;
+        Ok(tx.encoded_for_signing())
+    }
+
+    /// Build a RLP-encoded signed raw transaction for the call that can be sent to the network
+    /// using [`Provider::send_raw_transaction`].
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{ProviderBuilder, Provider};
+    /// # use alloy_sol_types::sol;
+    /// # use alloy_signer_local::PrivateKeySigner;
+    ///
+    /// sol! {
+    ///    #[sol(rpc, bytecode = "0x")]
+    ///   contract Counter {
+    ///      uint128 public counter;
+    ///
+    ///     function increment() external {
+    ///        counter += 1;
+    ///    }
+    ///  }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///
+    ///     let my_contract = Counter::deploy(&provider).await.unwrap();
+    ///
+    ///     let call = my_contract.increment();
+    ///
+    ///     let pk_signer: PrivateKeySigner = "0x..".parse().unwrap();
+    ///     let signed_raw_tx: Vec<u8> = call.build_raw_transaction(pk_signer).await.unwrap();
+    ///
+    ///     let tx = provider.send_raw_transaction(&signed_raw_tx).await.unwrap();
+    /// }
+    /// ```
+    pub async fn build_raw_transaction<S>(
+        self,
+        signer: S,
+    ) -> Result<Vec<u8>, TransactionBuilderError<N>>
+    where
+        S: TxSigner<Signature> + IntoWallet<N>,
+    {
+        let tx = self.request.build(&signer.into_wallet()).await?;
+        Ok(tx.encoded_2718())
     }
 }
 
@@ -416,8 +506,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// # Note
     ///
     /// Not all client implementations will support this as a parameter to `eth_call`.
-    pub fn state(mut self, state: StateOverride) -> Self {
-        self.state = Some(state);
+    pub fn state(mut self, state: impl Into<StateOverride>) -> Self {
+        self.state = Some(state.into());
         self
     }
 
@@ -429,8 +519,8 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u64> {
-        let mut estimate = self.provider.estimate_gas(&self.request);
-        if let Some(state) = &self.state {
+        let mut estimate = self.provider.estimate_gas(self.request.clone());
+        if let Some(state) = self.state.clone() {
             estimate = estimate.overrides(state);
         }
         estimate.block(self.block).await.map_err(Into::into)
@@ -443,7 +533,7 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, '_, D, N> {
+    pub fn call(&self) -> EthCall<'_, D, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -453,9 +543,9 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, '_, (), N> {
-        let call = self.provider.call(&self.request).block(self.block);
-        let call = match &self.state {
+    pub fn call_raw(&self) -> EthCall<'_, (), N> {
+        let call = self.provider.call(self.request.clone()).block(self.block);
+        let call = match self.state.clone() {
             Some(state) => call.overrides(state),
             None => call,
         };
@@ -534,9 +624,12 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 mod tests {
     use super::*;
     use alloy_consensus::Transaction;
+    use alloy_network::EthereumWallet;
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
     use alloy_rpc_types_eth::AccessListItem;
+    use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
     use futures::Future;
 
@@ -753,5 +846,74 @@ mod tests {
             max_priority_fee_per_gas.to(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"
         )
+    }
+
+    sol! {
+        #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b506101448061001c5f395ff3fe60806040526004361061001d575f3560e01c8063785d04f514610021575b5f80fd5b61003461002f3660046100d5565b610036565b005b5f816001600160a01b0316836040515f6040518083038185875af1925050503d805f811461007f576040519150601f19603f3d011682016040523d82523d5f602084013e610084565b606091505b50509050806100d05760405162461bcd60e51b81526020600482015260146024820152734661696c656420746f2073656e64206d6f6e657960601b604482015260640160405180910390fd5b505050565b5f80604083850312156100e6575f80fd5b8235915060208301356001600160a01b0381168114610103575f80fd5b80915050925092905056fea2646970667358221220188e65dcedbc4bd68fdebc795292d5a9bf643385f138383969a28f796ff8858664736f6c63430008190033")]
+        contract SendMoney {
+            function send(uint256 amount, address target) external payable {
+                (bool success, ) = target.call{value: amount}("");
+                require(success, "Failed to send money");
+            }
+        }
+    }
+
+    // <https://github.com/alloy-rs/alloy/issues/1942>
+    #[tokio::test]
+    async fn fill_eth_call() {
+        let anvil = Anvil::new().spawn();
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+
+        let wallet = EthereumWallet::new(pk);
+
+        let wallet_provider = ProviderBuilder::new().wallet(wallet).on_http(anvil.endpoint_url());
+
+        let contract = SendMoney::deploy(wallet_provider.clone()).await.unwrap();
+
+        let tx = contract
+            .send(U256::from(1000000), Address::with_last_byte(1))
+            .into_transaction_request()
+            .value(U256::from(1000000));
+
+        assert!(tx.from.is_none());
+
+        let std_provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
+        let should_fail = std_provider.estimate_gas(tx.clone()).await.is_err();
+
+        assert!(should_fail);
+
+        let gas = wallet_provider.estimate_gas(tx).await.unwrap();
+
+        assert_eq!(gas, 56555);
+    }
+
+    #[tokio::test]
+    async fn decode_eth_call_ret_bytes() {
+        sol! {
+            #[derive(Debug, PartialEq)]
+            #[sol(rpc, bytecode = "0x6080604052348015600e575f5ffd5b506101578061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80630d1d2c641461002d575b5f5ffd5b61003561004b565b6040516100429190610108565b60405180910390f35b61005361007b565b6040518060400160405280602a67ffffffffffffffff16815260200160011515815250905090565b60405180604001604052805f67ffffffffffffffff1681526020015f151581525090565b5f67ffffffffffffffff82169050919050565b6100bb8161009f565b82525050565b5f8115159050919050565b6100d5816100c1565b82525050565b604082015f8201516100ef5f8501826100b2565b50602082015161010260208501826100cc565b50505050565b5f60408201905061011b5f8301846100db565b9291505056fea264697066735822122039acc87c027f3bddf6806ff9914411d4245bdc708bca36a07138a37b1b98573464736f6c634300081c0033")]
+            contract RetStruct {
+                struct MyStruct {
+                    uint64 a;
+                    bool b;
+                }
+
+                function retStruct() external pure returns (MyStruct memory) {
+                    return MyStruct(42, true);
+                }
+            }
+        }
+
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+
+        let contract = RetStruct::deploy(provider.clone()).await.unwrap();
+
+        let tx = contract.retStruct().into_transaction_request();
+
+        let result =
+            provider.call(tx).decode_resp::<RetStruct::retStructCall>().await.unwrap().unwrap();
+
+        assert_eq!(result._0, RetStruct::MyStruct { a: 42, b: true });
     }
 }

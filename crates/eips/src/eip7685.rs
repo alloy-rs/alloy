@@ -92,7 +92,17 @@ impl Requests {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
 
-        let mut requests: Vec<_> = self.0.iter().filter(|req| !req.is_empty()).collect();
+        let mut requests: Vec<_> = self
+            .0
+            .iter()
+            .filter(|req| {
+                // filter out all requests that are empty or only have the type byte
+                // <type-id> <data>
+                req.len() > 1
+            })
+            .collect();
+
+        // requests should only contain unique types: `id [r1,r2,..]`
         requests.sort_unstable_by_key(|req| {
             // SAFETY: only includes non-empty requests
             req[0]

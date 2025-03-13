@@ -12,6 +12,8 @@ extern crate alloc;
 #[cfg(feature = "arbitrary")]
 use rand as _;
 
+use once_cell as _;
+
 pub use alloy_trie::TrieAccount;
 
 #[deprecated(since = "0.7.3", note = "use TrieAccount instead")]
@@ -36,8 +38,9 @@ pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
-    SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
-    TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction, TxEip1559,
+    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
+    TxType, TypedTransaction,
 };
 
 pub use alloy_eips::{
@@ -69,6 +72,7 @@ pub mod error;
 pub mod serde_bincode_compat {
     pub use super::{
         block::serde_bincode_compat::*,
+        receipt::serde_bincode_compat::*,
         transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
 }

@@ -122,6 +122,24 @@ where
         };
         Ok(tx)
     }
+
+    async fn prepare_call(
+        &self,
+        tx: &mut <N as Network>::TransactionRequest,
+    ) -> TransportResult<()> {
+        self.left.prepare_call(tx).await?;
+        self.right.prepare_call(tx).await?;
+        Ok(())
+    }
+
+    fn prepare_call_sync(
+        &self,
+        tx: &mut <N as Network>::TransactionRequest,
+    ) -> TransportResult<()> {
+        self.left.prepare_call_sync(tx)?;
+        self.right.prepare_call_sync(tx)?;
+        Ok(())
+    }
 }
 
 impl<L, R, P, N> ProviderLayer<P, N> for JoinFill<L, R>

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkWallet, TransactionBuilder};
@@ -14,13 +16,13 @@ use super::{FillerControlFlow, TxFiller};
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
+/// # use alloy_network::{IntoWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
+/// # use alloy_signer_local::PrivateKeySigner;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::new()
-///     .wallet(wallet)
-///     .on_http(url);
+/// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
+/// let pk: PrivateKeySigner = "0x...".parse()?;
+/// let provider = ProviderBuilder::new().wallet(pk).on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())
@@ -103,6 +105,14 @@ where
     }
 
     async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+        self.prepare_call_sync(tx)?;
+        Ok(())
+    }
+
+    fn prepare_call_sync(
+        &self,
+        tx: &mut <N as Network>::TransactionRequest,
+    ) -> TransportResult<()> {
         if tx.from().is_none() {
             tx.set_from(self.wallet.default_signer_address());
         }
@@ -113,9 +123,11 @@ where
 #[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
-    use crate::{Provider, ProviderBuilder};
+    use crate::{Provider, ProviderBuilder, WalletProvider};
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_signer_local::PrivateKeySigner;
 
     #[tokio::test]
     async fn poc() {
@@ -148,5 +160,34 @@ mod tests {
             provider.get_transaction_receipt(local_hash2).await.unwrap().expect("no receipt");
         let receipt_hash = receipt.transaction_hash;
         assert_eq!(receipt_hash, node_hash);
+    }
+
+    #[tokio::test]
+    async fn ingest_pk_signer() {
+        let pk: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+
+        let anvil = Anvil::new().spawn();
+
+        let provider = ProviderBuilder::new().wallet(pk.clone()).on_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+
+        // Can access wallet via provider
+        let wallet = provider.wallet();
+
+        let default_address = wallet.default_signer().address();
+
+        assert_eq!(pk.address(), default_address);
+        assert_eq!(receipt.from, default_address);
     }
 }

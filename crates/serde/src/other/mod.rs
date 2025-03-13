@@ -215,6 +215,16 @@ impl<T> WithOtherFields<T> {
     pub fn new(inner: T) -> Self {
         Self { inner, other: Default::default() }
     }
+
+    /// Consumes the type and returns the wrapped value.
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    /// Returns the wrapped value.
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
 }
 
 impl<T> Deref for WithOtherFields<T> {

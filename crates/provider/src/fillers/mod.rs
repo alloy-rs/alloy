@@ -7,7 +7,12 @@
 //! [`Provider`]: crate::Provider
 
 mod chain_id;
-
+use alloy_eips::{BlockId, BlockNumberOrTag};
+use alloy_primitives::{
+    Address, BlockHash, BlockNumber, StorageKey, StorageValue, TxHash, B256, U128, U256,
+};
+use alloy_rpc_client::NoParams;
+use alloy_rpc_types_eth::{Bundle, Index, SyncStatus};
 pub use chain_id::ChainIdFiller;
 use std::borrow::Cow;
 
@@ -25,22 +30,18 @@ pub use join_fill::JoinFill;
 use tracing::error;
 
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, FilterPollerBuilder, Identity, PendingTransaction,
-    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
-    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
 };
-use alloy_eips::{eip2930::AccessListResult, BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
-use alloy_network_primitives::BlockTransactionsKind;
-use alloy_primitives::{
-    Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
-};
-use alloy_rpc_client::NoParams;
+use alloy_primitives::{Bytes, U64};
 use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
-    Bundle, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter, FilterChanges, Index,
-    Log, SyncStatus,
+    AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
+    FilterChanges, Log,
 };
 use alloy_transport::TransportResult;
 use async_trait::async_trait;
@@ -217,6 +218,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
+    /// asyncronously
     fn prepare_call(
         &self,
         tx: &mut N::TransactionRequest,
@@ -224,6 +226,14 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         let _ = tx;
         // This is a no-op by default
         futures::future::ready(Ok(()))
+    }
+
+    /// Prepares transaction request with necessary fillers required for eth_call operations
+    /// syncronously
+    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+        let _ = tx;
+        // No-op default
+        Ok(())
     }
 }
 
@@ -295,11 +305,11 @@ where
     }
 
     /// Prepares a transaction request for eth_call operations using the configured fillers
-    pub async fn prepare_call(
+    pub fn prepare_call(
         &self,
         mut tx: N::TransactionRequest,
     ) -> TransportResult<N::TransactionRequest> {
-        self.filler.prepare_call(&mut tx).await?;
+        self.filler.prepare_call_sync(&mut tx)?;
         Ok(tx)
     }
 }
@@ -328,7 +338,9 @@ where
         self.inner.get_block_number()
     }
 
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, Bytes> {
+    fn call<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, Bytes> {
+        let mut tx = tx;
+        let _ = self.filler.prepare_call_sync(&mut tx);
         self.inner.call(tx)
     }
 
@@ -357,7 +369,9 @@ where
         self.inner.create_access_list(request)
     }
 
-    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, N, U64, u64> {
+    fn estimate_gas<'req>(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
+        let mut tx = tx;
+        let _ = self.filler.prepare_call_sync(&mut tx);
         self.inner.estimate_gas(tx)
     }
 
@@ -382,28 +396,16 @@ where
         self.inner.get_balance(address)
     }
 
-    async fn get_block(
-        &self,
-        block: BlockId,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block(block, kind).await
+    fn get_block(&self, block: BlockId) -> EthGetBlock<N::BlockResponse> {
+        self.inner.get_block(block)
     }
 
-    async fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block_by_hash(hash, kind).await
+    fn get_block_by_hash(&self, hash: BlockHash) -> EthGetBlock<N::BlockResponse> {
+        self.inner.get_block_by_hash(hash)
     }
 
-    async fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        self.inner.get_block_by_number(number, kind).await
+    fn get_block_by_number(&self, number: BlockNumberOrTag) -> EthGetBlock<N::BlockResponse> {
+        self.inner.get_block_by_number(number)
     }
 
     async fn get_block_transaction_count_by_hash(
@@ -574,6 +576,14 @@ where
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.inner.send_raw_transaction(encoded_tx).await
+    }
+
+    async fn send_raw_transaction_conditional(
+        &self,
+        encoded_tx: &[u8],
+        conditional: TransactionConditional,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        self.inner.send_raw_transaction_conditional(encoded_tx, conditional).await
     }
 
     async fn send_transaction_internal(

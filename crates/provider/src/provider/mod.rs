@@ -1,8 +1,11 @@
 mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
+mod get_block;
+pub use get_block::{EthGetBlock, EthGetBlockParams};
+
 mod prov_call;
-pub use prov_call::ProviderCall;
+pub use prov_call::{BoxedFut, ProviderCall};
 
 mod root;
 pub use root::{builder, RootProvider};

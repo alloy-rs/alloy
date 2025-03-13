@@ -29,18 +29,21 @@ pub use alloy_eips::eip4844::{
 pub use eip4844::BlobTransactionValidationError;
 pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
+/// Re-export for convenience
+pub use either::Either;
+
 mod envelope;
-pub use envelope::{TxEnvelope, TxType};
+pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 mod legacy;
 pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
 
 mod rlp;
 #[doc(hidden)]
-pub use rlp::RlpEcdsaTx;
+pub use rlp::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpEcdsaTx};
 
 mod typed;
-pub use typed::TypedTransaction;
+pub use typed::{EthereumTypedTransaction, TypedTransaction};
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
@@ -260,11 +263,13 @@ pub trait SignableTransaction<Signature>: Transaction {
         keccak256(self.encoded_for_signing())
     }
 
-    /// Convert to a signed transaction by adding a signature and computing the
-    /// hash.
+    /// Convert to a [`Signed`] object.
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        Signed::new_unhashed(self, signature)
+    }
 }
 
 // TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
@@ -363,5 +368,172 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+}
+
+impl<L, R> Transaction for either::Either<L, R>
+where
+    L: Transaction,
+    R: Transaction,
+{
+    fn chain_id(&self) -> Option<ChainId> {
+        match self {
+            Self::Left(tx) => tx.chain_id(),
+            Self::Right(tx) => tx.chain_id(),
+        }
+    }
+
+    fn nonce(&self) -> u64 {
+        match self {
+            Self::Left(tx) => tx.nonce(),
+            Self::Right(tx) => tx.nonce(),
+        }
+    }
+
+    fn gas_limit(&self) -> u64 {
+        match self {
+            Self::Left(tx) => tx.gas_limit(),
+            Self::Right(tx) => tx.gas_limit(),
+        }
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        match self {
+            Self::Left(tx) => tx.gas_price(),
+            Self::Right(tx) => tx.gas_price(),
+        }
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        match self {
+            Self::Left(tx) => tx.max_fee_per_gas(),
+            Self::Right(tx) => tx.max_fee_per_gas(),
+        }
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        match self {
+            Self::Left(tx) => tx.max_priority_fee_per_gas(),
+            Self::Right(tx) => tx.max_priority_fee_per_gas(),
+        }
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        match self {
+            Self::Left(tx) => tx.max_fee_per_blob_gas(),
+            Self::Right(tx) => tx.max_fee_per_blob_gas(),
+        }
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::Left(tx) => tx.priority_fee_or_price(),
+            Self::Right(tx) => tx.priority_fee_or_price(),
+        }
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        match self {
+            Self::Left(tx) => tx.effective_gas_price(base_fee),
+            Self::Right(tx) => tx.effective_gas_price(base_fee),
+        }
+    }
+
+    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
+        match self {
+            Self::Left(tx) => tx.effective_tip_per_gas(base_fee),
+            Self::Right(tx) => tx.effective_tip_per_gas(base_fee),
+        }
+    }
+
+    fn is_dynamic_fee(&self) -> bool {
+        match self {
+            Self::Left(tx) => tx.is_dynamic_fee(),
+            Self::Right(tx) => tx.is_dynamic_fee(),
+        }
+    }
+
+    fn kind(&self) -> TxKind {
+        match self {
+            Self::Left(tx) => tx.kind(),
+            Self::Right(tx) => tx.kind(),
+        }
+    }
+
+    fn is_create(&self) -> bool {
+        match self {
+            Self::Left(tx) => tx.is_create(),
+            Self::Right(tx) => tx.is_create(),
+        }
+    }
+
+    fn to(&self) -> Option<Address> {
+        match self {
+            Self::Left(tx) => tx.to(),
+            Self::Right(tx) => tx.to(),
+        }
+    }
+
+    fn value(&self) -> U256 {
+        match self {
+            Self::Left(tx) => tx.value(),
+            Self::Right(tx) => tx.value(),
+        }
+    }
+
+    fn input(&self) -> &Bytes {
+        match self {
+            Self::Left(tx) => tx.input(),
+            Self::Right(tx) => tx.input(),
+        }
+    }
+
+    fn function_selector(&self) -> Option<&Selector> {
+        match self {
+            Self::Left(tx) => tx.function_selector(),
+            Self::Right(tx) => tx.function_selector(),
+        }
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        match self {
+            Self::Left(tx) => tx.access_list(),
+            Self::Right(tx) => tx.access_list(),
+        }
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        match self {
+            Self::Left(tx) => tx.blob_versioned_hashes(),
+            Self::Right(tx) => tx.blob_versioned_hashes(),
+        }
+    }
+
+    fn blob_count(&self) -> Option<u64> {
+        match self {
+            Self::Left(tx) => tx.blob_count(),
+            Self::Right(tx) => tx.blob_count(),
+        }
+    }
+
+    fn blob_gas_used(&self) -> Option<u64> {
+        match self {
+            Self::Left(tx) => tx.blob_gas_used(),
+            Self::Right(tx) => tx.blob_gas_used(),
+        }
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        match self {
+            Self::Left(tx) => tx.authorization_list(),
+            Self::Right(tx) => tx.authorization_list(),
+        }
+    }
+
+    fn authorization_count(&self) -> Option<u64> {
+        match self {
+            Self::Left(tx) => tx.authorization_count(),
+            Self::Right(tx) => tx.authorization_count(),
+        }
     }
 }

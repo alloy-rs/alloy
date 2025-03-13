@@ -1,8 +1,8 @@
 use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
-use alloy_primitives::{Bytes, Log, TxHash, U256};
-use alloy_rpc_types_eth::BlockOverrides;
+use alloy_primitives::{Bytes, TxHash, U256};
+use alloy_rpc_types_eth::{BlockOverrides, Log};
 use serde::{Deserialize, Serialize};
 
 /// A bundle of transactions to send to the matchmaker.

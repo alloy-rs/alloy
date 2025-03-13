@@ -3,7 +3,7 @@ use crate::Network;
 mod builder;
 
 mod wallet;
-pub use wallet::EthereumWallet;
+pub use wallet::{EthereumWallet, IntoWallet};
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Clone, Copy, Debug)]

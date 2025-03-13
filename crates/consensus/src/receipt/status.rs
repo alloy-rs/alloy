@@ -29,6 +29,11 @@ impl Eip658Value {
         matches!(self, Self::Eip658(true) | Self::PostState(_))
     }
 
+    /// Coerce this variant into a [`Eip658Value::Eip658`] with [`Self::coerce_status`].
+    pub fn coerced_eip658(&mut self) {
+        *self = Self::Eip658(self.coerce_status())
+    }
+
     /// Returns true if the transaction was a pre-[EIP-658] transaction.
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658

@@ -244,6 +244,11 @@ where
         request.as_ref().expect("no request in prepared")
     }
 
+    /// Returns the RPC method
+    pub fn method(&self) -> &str {
+        &self.request().meta.method
+    }
+
     /// Returns a mutable reference to the request.
     ///
     /// # Panics
