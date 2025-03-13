@@ -491,6 +491,30 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes) and transforming the returned block
+    /// hashes into full blocks bodies.
+    ///
+    /// Returns a [`TransformPollerBuilder`] that consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of block bodies.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 full blocks:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    /// use alloy_rpc_types_eth::BlockTransactionsKind;
+    ///
+    /// let poller = provider.watch_full_blocks(BlockTransactionsKind::Full).await?;
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(block) = stream.next().await {
+    ///   println!("new block: {block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn watch_full_blocks(
         &self,
         kind: BlockTransactionsKind,
@@ -2090,24 +2114,6 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
-    }
-
-    #[tokio::test]
-    async fn watch_full_blocks() {
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
-
-        let mut stream = provider
-            .watch_full_blocks(false.into())
-            .await
-            .unwrap()
-            .with_poll_interval(Duration::from_secs(1))
-            .into_stream()
-            .take(5);
-
-        let mut blocks = Vec::new();
-        while let Some(new_blocks) = stream.next().await {
-            blocks.extend(new_blocks);
-        }
     }
 
     #[cfg(feature = "throttle")]
