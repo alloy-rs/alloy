@@ -160,6 +160,14 @@ impl TryFrom<u64> for TxType {
     }
 }
 
+impl TryFrom<U8> for TxType {
+    type Error = Eip2718Error;
+
+    fn try_from(value: U8) -> Result<Self, Self::Error> {
+        value.to::<u8>().try_into()
+    }
+}
+
 impl TryFrom<U64> for TxType {
     type Error = &'static str;
 
