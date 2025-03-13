@@ -49,9 +49,9 @@ impl TxEnvelope {
         }
     }
 
-    /// Consumes the type and returns the transaction.
+    /// Consumes the type, removes the signature and returns the transaction.
     #[inline]
-    pub fn into_transaction(self) -> EthereumTypedTransaction<TxEip4844Variant> {
+    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<TxEip4844Variant> {
         match self {
             Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
             Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx.into_parts().0),
