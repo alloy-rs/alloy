@@ -153,12 +153,12 @@ where
     /// transformed response.
     pub fn transform<F, Fut, T>(self, transform: F) -> TransformPollerBuilder<Params, Resp, T>
     where
-        F: Fn(Resp) -> Fut + Send + Sync + 'static,
+        F: Fn(Resp, WeakClient) -> Fut + Send + Sync + 'static,
         Fut: futures::Future<Output = TransportResult<T>> + Send + 'static,
         T: Clone + Send + 'static,
     {
-        let boxed_transform = Box::new(move |resp| {
-            let fut = transform(resp);
+        let boxed_transform = Box::new(move |resp, client| {
+            let fut = transform(resp, client);
             Box::pin(fut) as RpcFut<'static, T>
         });
 
@@ -226,13 +226,18 @@ where
     pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
         self.spawn().into_stream()
     }
+
+    /// Returns the [`WeakClient`] associated with the poller.
+    pub fn client(&self) -> WeakClient {
+        self.client.clone()
+    }
 }
 
 /// A poller that transforms the the stream of responses from [`PollerBuilder`] into the response of
 /// the provided transform future.
 pub struct TransformPollerBuilder<Params, Resp, T> {
     inner: PollerBuilder<Params, Resp>,
-    transform: Box<dyn Fn(Resp) -> RpcFut<'static, T> + Send + Sync>,
+    transform: Box<dyn Fn(Resp, WeakClient) -> RpcFut<'static, T> + Send + Sync>,
 }
 
 impl<Params, Resp, T> core::fmt::Debug for TransformPollerBuilder<Params, Resp, T>
@@ -266,6 +271,7 @@ where
         let span = debug_span!("transform_poller", method = %method);
 
         // Get the inner poll channel
+        let client = self.inner.client();
         let inner_channel = self.inner.spawn();
         let transform = self.transform;
 
@@ -273,7 +279,7 @@ where
             let mut inner_stream = inner_channel.into_stream();
 
             while let Some(resp) = inner_stream.next().await {
-                match (transform)(resp).await {
+                match (transform)(resp, client.clone()).await {
                     Ok(transformed) => {
                         if tx.send(transformed).is_err() {
                             debug!("channel closed");
