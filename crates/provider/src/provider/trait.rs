@@ -1266,7 +1266,6 @@ mod tests {
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
-    use futures::StreamExt;
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
