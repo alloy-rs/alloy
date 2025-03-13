@@ -12,7 +12,7 @@ use derive_more::{Deref, DerefMut};
 use futures::{stream::FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
 use tower::{Layer, Service};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use crate::{TransportError, TransportErrorKind, TransportFut};
 
@@ -30,37 +30,24 @@ const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
 #[derive(Debug, Clone)]
 pub struct FallbackService<S> {
     /// The list of transports to use
-    transports: Arc<RwLock<Vec<ScoredTransport<S>>>>,
+    transports: Arc<Vec<ScoredTransport<S>>>,
     /// The maximum number of transports to use in parallel
     active_transport_count: usize,
-    /// Whether to log transport rankings
-    log_transport_rankings: bool,
 }
 
-impl<S> FallbackService<S> {
+impl<S: Clone> FallbackService<S> {
     /// Create a new fallback service from a list of transports.
     ///
-    /// - The `active_transport_count` parameter controls how many transports are used for requests
-    ///   at any one time.
-    /// - The `log_transport_rankings` parameter controls whether the current transport rankings are
-    ///   output as traces. In order to see them, make sure to enable the `alloy_transport` target
-    ///   (i.e. `RUST_LOG=alloy_transport=debug`).
-    pub fn new(
-        transports: Vec<S>,
-        active_transport_count: usize,
-        log_transport_rankings: bool,
-    ) -> Self {
+    /// The `active_transport_count` parameter controls how many transports are used for requests
+    /// at any one time.
+    pub fn new(transports: Vec<S>, active_transport_count: usize) -> Self {
         let scored_transports = transports
             .into_iter()
             .enumerate()
             .map(|(id, transport)| ScoredTransport::new(id, transport))
             .collect::<Vec<_>>();
 
-        Self {
-            transports: Arc::new(RwLock::new(scored_transports)),
-            active_transport_count,
-            log_transport_rankings,
-        }
+        Self { transports: Arc::new(scored_transports), active_transport_count }
     }
 
     /// Log the current ranking of transports
@@ -68,11 +55,18 @@ impl<S> FallbackService<S> {
     where
         S: Debug,
     {
-        let transports = self.transports.read();
+        let mut transports = (*self.transports).clone();
+        transports.sort_by(|a, b| b.cmp(a));
 
-        debug!("Current transport rankings:");
+        trace!(
+            target: "alloy_fallback_transport_rankings",
+            "Current transport rankings:"
+        );
         for (idx, transport) in transports.iter().enumerate() {
-            debug!("  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary());
+            trace!(
+                target: "alloy_fallback_transport_rankings",
+                "  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary()
+            );
         }
     }
 }
@@ -89,20 +83,20 @@ where
     ///
     /// Here is a high-level overview of how requests are handled:
     ///
-    /// - At the start of each request, we assume `self.transports` to be sorted by score
-    /// - We take the top `self.active_transport_count` transports and call them in parallel
-    /// - If any of them succeeds, we re-sort `self.transports` to reflect the new scores
-    /// - We then return the first successful response and clear the remaining futures
-    /// - If all transports fail, we return the last error that occurred
+    /// - At the start of each request, we sort transports by score
+    /// - We take the top `self.active_transport_count` and call them in parallel
+    /// - If any of them succeeds, we update the transport scores and return the response
+    /// - If all transports fail, we update the scores and return the last error that occurred
     ///
     /// This strategy allows us to always make requests to the best available transports
-    /// while keeping them available. We also only update the transport scores after receiving
-    /// a response, avoiding unnecessary re-sorting.
+    /// while keeping them available.
     async fn make_request(&self, req: RequestPacket) -> Result<ResponsePacket, TransportError> {
-        // Get the top transports to use, without removing them from the heap
+        // Get the top transports to use for this request
         let top_transports = {
-            let transports = self.transports.read();
-            transports.iter().take(self.active_transport_count).cloned().collect::<Vec<_>>()
+            // Clone the vec, sort it, and take the top `self.active_transport_count`
+            let mut transports_clone = (*self.transports).clone();
+            transports_clone.sort_by(|a, b| b.cmp(a));
+            transports_clone.into_iter().take(self.active_transport_count).collect::<Vec<_>>()
         };
 
         // Create a collection of future requests
@@ -110,11 +104,11 @@ where
 
         // Launch requests to all active transports in parallel
         for transport in top_transports {
-            let start = Instant::now();
             let req_clone = req.clone();
             let mut transport_clone = transport.clone();
 
             let future = async move {
+                let start = Instant::now();
                 let result = transport_clone.call(req_clone).await;
                 trace!(
                     "Transport[{}] completed: latency={:?}, status={}",
@@ -136,39 +130,15 @@ where
             match result {
                 Ok(response) => {
                     // Record success
-                    {
-                        let mut metrics = transport.metrics.write();
-                        metrics.track_success(duration);
-                    }
+                    transport.track_success(duration);
 
-                    // Sort transports after updating metrics
-                    {
-                        let mut transports = self.transports.write();
-                        transports.sort_by(|a, b| b.cmp(a));
-                    }
-
-                    // Log current rankings if enabled
-                    if self.log_transport_rankings {
-                        self.log_transport_rankings();
-                    }
-
-                    // clear the remaining futures to avoid unnecessary work
-                    futures.clear();
+                    self.log_transport_rankings();
 
                     return Ok(response);
                 }
                 Err(error) => {
                     // Record failure
-                    {
-                        let mut metrics = transport.metrics.write();
-                        metrics.track_failure();
-                    }
-
-                    // Sort transports after updating metrics
-                    {
-                        let mut transports = self.transports.write();
-                        transports.sort_by(|a, b| b.cmp(a));
-                    }
+                    transport.track_failure();
 
                     last_error = Some(error);
                 }
@@ -223,30 +193,16 @@ where
 /// - Latency (response time) is weighted at 30%
 /// - The `active_transport_count` parameter controls how many transports are queried at any one
 ///   time.
-///
-/// The `log_transport_rankings` parameter controls whether the
-/// current transport rankings are output as traces. In order to
-/// see them, make sure to enable the `alloy_transport` target
-/// (i.e. `RUST_LOG=alloy_transport=debug`).
 #[derive(Debug, Clone)]
 pub struct FallbackLayer {
     /// The maximum number of transports to use in parallel
     active_transport_count: usize,
-    /// Whether to log transport rankings
-    log_transport_rankings: bool,
 }
 
 impl FallbackLayer {
     /// Set the number of active transports to use (must be greater than 0)
     pub fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
         self.active_transport_count = count.get();
-        self
-    }
-
-    /// Set whether to log transport rankings on every request
-    /// (most useful for debugging)
-    pub fn with_log_transport_rankings(mut self, enabled: bool) -> Self {
-        self.log_transport_rankings = enabled;
         self
     }
 }
@@ -262,16 +218,13 @@ where
     type Service = FallbackService<S>;
 
     fn layer(&self, inner: Vec<S>) -> Self::Service {
-        FallbackService::new(inner, self.active_transport_count, self.log_transport_rankings)
+        FallbackService::new(inner, self.active_transport_count)
     }
 }
 
 impl Default for FallbackLayer {
     fn default() -> Self {
-        Self {
-            active_transport_count: DEFAULT_ACTIVE_TRANSPORT_COUNT,
-            log_transport_rankings: false,
-        }
+        Self { active_transport_count: DEFAULT_ACTIVE_TRANSPORT_COUNT }
     }
 }
 
@@ -315,6 +268,18 @@ impl<S> ScoredTransport<S> {
     fn metrics_summary(&self) -> String {
         let metrics = self.metrics.read();
         metrics.get_summary()
+    }
+
+    /// Track a successful request and its latency.
+    fn track_success(&self, duration: Duration) {
+        let mut metrics = self.metrics.write();
+        metrics.track_success(duration);
+    }
+
+    /// Track a failed request.
+    fn track_failure(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.track_failure();
     }
 }
 
