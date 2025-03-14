@@ -1,13 +1,14 @@
 use crate::{
-    bindings::IMulticall3, Caller, Provider, ProviderLayer, RootProvider, MULTICALL3_ADDRESS,
+    bindings::IMulticall3, Caller, Provider, ProviderCall, ProviderLayer, RootProvider,
+    MULTICALL3_ADDRESS,
 };
 use alloy_eips::BlockId;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_client::WeakClient;
 use alloy_sol_types::{SolCall, SolType, SolValue};
 use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
-use std::{fmt, marker::PhantomData, sync::Arc, time::Duration};
+use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(target_arch = "wasm32")]
@@ -101,6 +102,7 @@ enum BatchProviderMessageKind<N: Network = Ethereum> {
     Call(N::TransactionRequest),
     BlockNumber,
     ChainId,
+    Balance(Address),
 }
 
 impl BatchProviderMessage {
@@ -128,6 +130,7 @@ impl<N: Network> BatchProviderMessageKind<N> {
             },
             Self::BlockNumber => m3a_call(IMulticall3::getBlockNumberCall {}.abi_encode()),
             Self::ChainId => m3a_call(IMulticall3::getChainIdCall {}.abi_encode()),
+            Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr }.abi_encode()),
         }
     }
 }
@@ -139,6 +142,12 @@ pub struct BatchProvider<P, N: Network = Ethereum> {
     provider: Arc<P>,
     inner: BatchProviderInner,
     _pd: PhantomData<N>,
+}
+
+impl<P, N: Network> Clone for BatchProvider<P, N> {
+    fn clone(&self) -> Self {
+        Self { provider: self.provider.clone(), inner: self.inner.clone(), _pd: PhantomData }
+    }
 }
 
 impl<P: fmt::Debug, N: Network> fmt::Debug for BatchProvider<P, N> {
@@ -320,7 +329,7 @@ impl<P: Provider<N> + 'static, N: Network> BatchProviderBackend<P, N> {
     }
 }
 
-impl<P: Provider<N>, N: Network> Provider<N> for BatchProvider<P, N> {
+impl<P: Provider<N> + 'static, N: Network> Provider<N> for BatchProvider<P, N> {
     fn root(&self) -> &RootProvider<N> {
         self.provider.root()
     }
@@ -353,7 +362,20 @@ impl<P: Provider<N>, N: Network> Provider<N> for BatchProvider<P, N> {
         ))
     }
 
-    // TODO: override rest with self.provider
+    fn get_balance(&self, address: Address) -> crate::RpcWithBlock<Address, U256, U256> {
+        let this = self.clone();
+        crate::RpcWithBlock::new_provider(move |block| {
+            if block != BlockId::latest() {
+                this.provider.get_balance(address).block_id(block).into_future()
+            } else {
+                ProviderCall::BoxedFuture(Box::pin(
+                    this.inner
+                        .clone()
+                        .schedule_and_decode::<N, U256>(BatchProviderMessageKind::Balance(address)),
+                ))
+            }
+        })
+    }
 }
 
 struct BatchProviderCaller {
@@ -455,6 +477,7 @@ mod tests {
     async fn basic() {
         let provider = ProviderBuilder::new().with_call_batching().on_anvil();
         provider.anvil_set_code(COUNTER_ADDRESS, COUNTER_DEPLOYED_CODE.into()).await.unwrap();
+        provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(123)).await.unwrap();
 
         let do_calls = async || {
             tokio::join!(
@@ -470,22 +493,25 @@ mod tests {
                 ),
                 provider.get_block_number(),
                 provider.get_chain_id(),
+                provider.get_balance(COUNTER_ADDRESS),
             )
         };
 
         // Multicall3 has not yet been deployed.
-        let (a, b, c, d) = do_calls().await;
+        let (a, b, c, d, e) = do_calls().await;
         assert!(a.unwrap_err().to_string().contains("Multicall3 not deployed"));
         assert!(b.unwrap_err().to_string().contains("Multicall3 not deployed"));
         assert!(c.unwrap_err().to_string().contains("Multicall3 not deployed"));
         assert!(d.unwrap_err().to_string().contains("Multicall3 not deployed"));
+        assert!(e.unwrap_err().to_string().contains("Multicall3 not deployed"));
 
         provider.anvil_set_code(MULTICALL3_ADDRESS, MULTICALL3_DEPLOYED_CODE.into()).await.unwrap();
 
-        let (counter, block_number_raw, block_number, chain_id) = do_calls().await;
+        let (counter, block_number_raw, block_number, chain_id, balance) = do_calls().await;
         assert_eq!(counter.unwrap(), 0u64.abi_encode());
         assert_eq!(block_number_raw.unwrap(), 1u64.abi_encode());
         assert_eq!(block_number.unwrap(), 1);
         assert_eq!(chain_id.unwrap(), alloy_chains::NamedChain::AnvilHardhat as u64);
+        assert_eq!(balance.unwrap(), U256::from(123));
     }
 }
