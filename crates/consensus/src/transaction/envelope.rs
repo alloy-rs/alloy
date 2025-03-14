@@ -18,7 +18,7 @@ use core::{
     fmt::{self, Debug},
     hash::{Hash, Hasher},
 };
-
+use alloy_primitives::bytes::BufMut;
 use super::SignableTransaction;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
@@ -573,6 +573,32 @@ impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844>
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
+    }
+}
+
+impl<T> Typed2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Send + Sync + Typed2718,
+{
+    fn ty(&self) -> u8 {
+        self.tx().ty()
+    }
+}
+
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
     }
 }
 
