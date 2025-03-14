@@ -477,7 +477,7 @@ mod tests {
         provider.anvil_set_code(COUNTER_ADDRESS, COUNTER_DEPLOYED_CODE.into()).await.unwrap();
         provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(123)).await.unwrap();
 
-        let do_calls = async || {
+        let do_calls = || async {
             tokio::join!(
                 provider.call(
                     TransactionRequest::default()
