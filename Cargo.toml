@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.12.4"
+version = "0.12.5"
 edition = "2021"
 rust-version = "1.81"
 authors = ["Alloy Contributors"]
@@ -87,6 +87,8 @@ alloy-eip7702 = { version = "0.5.1", default-features = false }
 # ethereum
 ethereum_ssz_derive = "0.8"
 ethereum_ssz = "0.8"
+tree_hash = "0.9.1"
+tree_hash_derive = "0.9.1"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }
@@ -142,7 +144,7 @@ http = "1.1.0"
 itertools = { version = ">=0.13, <=0.14", default-features = false }
 jsonwebtoken = "9.3.0"
 lru = "0.13"
-once_cell = { version = "1.19", default-features = false }
+once_cell = { version = "1.21", default-features = false }
 parking_lot = "0.12.3"
 pin-project = "1.1"
 rand = "0.8"
