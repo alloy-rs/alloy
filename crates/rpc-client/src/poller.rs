@@ -1,6 +1,7 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
+use async_stream::stream;
 use futures::{Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
@@ -156,6 +157,25 @@ where
     }
 
     async fn into_future(self, tx: broadcast::Sender<Resp>) {
+        let mut stream = self.into_stream();
+        while let Some(resp) = stream.next().await {
+            if tx.send(resp).is_err() {
+                debug!("channel closed");
+                break;
+            }
+        }
+    }
+
+    /// Starts the poller and returns the stream of responses.
+    ///
+    /// Note that this does not spawn the poller on a separate task, thus all responses will be
+    /// polled on the current thread once this stream is polled.
+    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
+        Box::pin(self.into_local_stream())
+    }
+
+    fn into_local_stream(self) -> impl Stream<Item = Resp> {
+        stream! {
         let mut params = ParamsOnce::Typed(self.params);
         let mut retries = MAX_RETRIES;
         'outer: for _ in 0..self.limit {
@@ -176,12 +196,7 @@ where
             loop {
                 trace!("polling");
                 match client.request(self.method.clone(), params).await {
-                    Ok(resp) => {
-                        if tx.send(resp).is_err() {
-                            debug!("channel closed");
-                            break 'outer;
-                        }
-                    }
+                    Ok(resp) => yield resp,
                     Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
                         debug!(%err, "failed to poll, retrying");
                         retries -= 1;
@@ -198,15 +213,7 @@ where
             trace!(duration=?self.poll_interval, "sleeping");
             sleep(self.poll_interval).await;
         }
-    }
-
-    /// Starts the poller and returns the stream of responses.
-    ///
-    /// Note that this is currently equivalent to `self.spawn().into_stream()`, but this may change
-    /// in the future.
-    // TODO: can we name this type? This should be a different type from `PollChannel::into_stream`
-    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
-        self.spawn().into_stream()
+        }
     }
 }
 

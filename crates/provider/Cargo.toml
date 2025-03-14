@@ -49,7 +49,7 @@ alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
 alloy-chains.workspace = true
-async-stream = "0.3"
+async-stream.workspace = true
 async-trait.workspace = true
 auto_impl.workspace = true
 dashmap = "6.0"

@@ -28,6 +28,7 @@ alloy-json-rpc.workspace = true
 alloy-transport-http.workspace = true
 alloy-transport.workspace = true
 
+async-stream.workspace = true
 futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
