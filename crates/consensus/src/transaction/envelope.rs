@@ -18,6 +18,7 @@ use core::{
     fmt::{self, Debug},
     hash::{Hash, Hasher},
 };
+
 use super::SignableTransaction;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
