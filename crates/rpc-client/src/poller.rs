@@ -148,7 +148,7 @@ where
         self
     }
 
-    /// Starts the poller in a new Tokio task, returning a channel to receive the responses on.
+    /// Starts the poller in a new task, returning a channel to receive the responses on.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
         let span = debug_span!("poller", method = %self.method);
