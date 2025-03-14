@@ -13,7 +13,7 @@ use std::{
 };
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
-use tracing::Instrument;
+use tracing_futures::Instrument;
 
 #[cfg(target_arch = "wasm32")]
 use wasmtimer::tokio::sleep;
@@ -151,8 +151,7 @@ where
     /// Starts the poller in a new task, returning a channel to receive the responses on.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
-        let span = debug_span!("poller", method = %self.method);
-        self.into_future(tx).instrument(span).spawn_task();
+        self.into_future(tx).spawn_task();
         rx.into()
     }
 
@@ -175,6 +174,7 @@ where
     }
 
     fn into_local_stream(self) -> impl Stream<Item = Resp> {
+        let span = debug_span!("poller", method = %self.method);
         stream! {
         let mut params = ParamsOnce::Typed(self.params);
         let mut retries = MAX_RETRIES;
@@ -214,6 +214,7 @@ where
             sleep(self.poll_interval).await;
         }
         }
+        .instrument(span)
     }
 }
 
