@@ -27,3 +27,6 @@ pub use multicall::*;
 
 mod erased;
 pub use erased::DynProvider;
+
+mod delegate;
+pub use delegate::*;

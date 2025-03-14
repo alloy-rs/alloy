@@ -1,14 +1,34 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    heart::PendingTransactionError,
+    provider::EthCallMany,
+    utils::{Eip1559Estimation, Eip1559Estimator},
+    EthCall, EthGetBlock, FilterPollerBuilder, ParamsWithBlock, PendingTransaction,
+    PendingTransactionBuilder, PendingTransactionConfig, Provider, ProviderCall, ProviderLayer,
+    RootProvider, RpcWithBlock, SendableTx,
+};
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcSend};
+use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::Network;
-use alloy_primitives::{keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256};
-use alloy_rpc_types_eth::{BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log};
+use alloy_primitives::{
+    keccak256, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256,
+    U128, U256, U64,
+};
+use alloy_rpc_client::{ClientRef, NoParams, WeakClient};
+use alloy_rpc_types_eth::{
+    erc4337::TransactionConditional,
+    simulate::{SimulatePayload, SimulatedBlock},
+    AccessListResult, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse, EthCallResponse,
+    FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
+};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
+use serde_json::value::RawValue;
+use std::{
+    borrow::Cow, io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc,
+};
+
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
 /// In order to initialize the caching layer, the path to the cache file is provided along with the
@@ -328,6 +348,22 @@ where
             Ok(result)
         }))
     }
+
+    //#[cfg(any())]
+    crate::provider_delegate_except!(
+        inner,
+        [
+            root,
+            get_block_receipts,
+            get_code_at,
+            get_logs,
+            get_proof,
+            get_storage_at,
+            get_transaction_by_hash,
+            get_raw_transaction_by_hash,
+            get_transaction_receipt
+        ]
+    );
 }
 
 /// Internal type to handle different types of requests and generating their param hashes.

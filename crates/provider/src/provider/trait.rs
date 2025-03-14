@@ -1059,9 +1059,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Subscribe to an RPC event.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
+    async fn subscribe<Pa, R>(&self, params: Pa) -> TransportResult<alloy_pubsub::Subscription<R>>
     where
-        P: RpcSend,
+        Pa: RpcSend,
         R: RpcRecv,
         Self: Sized,
     {
@@ -1125,9 +1125,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     ///
     /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
-    async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
+    async fn raw_request<Pa, R>(&self, method: Cow<'static, str>, params: Pa) -> TransportResult<R>
     where
-        P: RpcSend,
+        Pa: RpcSend,
         R: RpcRecv,
         Self: Sized,
     {
@@ -1170,6 +1170,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Default::default()
     }
 }
+
+// TRAIT PROVIDER END
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
