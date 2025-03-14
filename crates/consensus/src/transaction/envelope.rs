@@ -18,7 +18,6 @@ use core::{
     fmt::{self, Debug},
     hash::{Hash, Hasher},
 };
-use alloy_primitives::bytes::BufMut;
 use super::SignableTransaction;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
