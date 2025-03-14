@@ -20,6 +20,6 @@ pub struct BlobAndProofV1 {
 pub struct BlobAndProofV2 {
     /// The blob data.
     pub blob: Box<Blob>,
-    /// The KZG proof for the blob.
+    /// The cell proof for the blob.
     pub cell_proof: Bytes48,
 }
