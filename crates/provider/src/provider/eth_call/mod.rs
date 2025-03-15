@@ -287,7 +287,7 @@ where
     /// assert!(matches!(call.return_value, MySolCall::MyStruct { .. }));
     /// ```
     pub fn decode_resp<S: SolCall>(self) -> EthCall<N, Bytes, alloy_sol_types::Result<S::Return>> {
-        self.map_resp(|data| S::abi_decode_returns(&data, false))
+        self.map_resp(|data| S::abi_decode_returns(&data))
     }
 }
 

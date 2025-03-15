@@ -352,12 +352,12 @@ where
     /// Extracts revert data and tries decoding it into given custom errors set present in the
     /// [`SolInterface`].
     pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
+        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
     }
 
     /// Extracts revert data and tries decoding it into custom [`SolError`].
     pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
+        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
     }
 }
 
