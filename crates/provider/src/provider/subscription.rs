@@ -2,10 +2,12 @@ use crate::{Provider, RootProvider};
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
 use alloy_transport::TransportResult;
-use std::{future::Future, pin::Pin};
+use std::{borrow::Cow, future::Future, pin::Pin};
 
-/// Future type Subscription struct that wraps client requests to `eth_subscribe`
-/// Allows configuration of channel size
+/// A general-purpose subscription request builder
+///
+/// This struct allows configuring subscription parameters and channel size
+/// before initiating a request to subscribe to Ethereum events.
 pub struct GetSubscription<P, R, N = Ethereum>
 where
     P: RpcSend,
@@ -13,7 +15,8 @@ where
     N: Network,
 {
     root: RootProvider<N>,
-    params: P,
+    method: Cow<'static, str>,
+    params: Option<P>,
     channel_size: Option<usize>,
     _marker: std::marker::PhantomData<fn() -> R>,
 }
@@ -25,8 +28,18 @@ where
     R: RpcRecv,
 {
     /// Creates a new [`GetSubscription`] instance
-    pub fn new(root: RootProvider<N>, params: P) -> Self {
-        Self { root, channel_size: None, params, _marker: std::marker::PhantomData }
+    pub fn new(
+        root: RootProvider<N>,
+        method: impl Into<Cow<'static, str>>,
+        params: Option<P>,
+    ) -> Self {
+        Self {
+            root,
+            method: method.into(),
+            channel_size: None,
+            params,
+            _marker: std::marker::PhantomData,
+        }
     }
 
     /// Set the channel_size for the subscription stream.
@@ -43,7 +56,10 @@ where
     R: RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("GetSubscription").field("channel_size", &self.channel_size).finish()
+        f.debug_struct("GetSubscription")
+            .field("channel_size", &self.channel_size)
+            .field("method", &self.method)
+            .finish()
     }
 }
 
@@ -59,11 +75,24 @@ where
 
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(async move {
-            self.root
-                .pubsub_frontend()?
-                .set_channel_size(self.channel_size.unwrap_or(16)); //default size
+            let pubsub = self.root.pubsub_frontend()?;
 
-            let id = self.root.client().request("eth_subscribe", self.params).await?;
+            // Set config channel size if any
+            if let Some(size) = self.channel_size {
+                pubsub.set_channel_size(size);
+            }
+
+            // Handle params and no-params case separately
+            let id = if let Some(params) = self.params {
+                let mut call = self.root.client().request(self.method, params);
+                call.set_is_subscription();
+                call.await?
+            } else {
+                let mut call = self.root.client().request_noparams(self.method);
+                call.set_is_subscription();
+                call.await?
+            };
+
             self.root.get_subscription(id).await
         })
     }
