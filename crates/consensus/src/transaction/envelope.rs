@@ -519,28 +519,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     }
 }
 
-impl<T> Encodable for Signed<T>
-where
-    Self: Encodable2718,
-{
-    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.network_encode(out)
-    }
-
-    fn length(&self) -> usize {
-        self.network_len()
-    }
-}
-
-impl<T> Decodable for Signed<T>
-where
-    T: RlpEcdsaDecodableTx,
-{
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self::network_decode(buf)?)
-    }
-}
-
 impl<Eip4844> Encodable for EthereumTxEnvelope<Eip4844>
 where
     Self: Encodable2718,
