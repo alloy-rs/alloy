@@ -183,6 +183,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_sync_info_serialization() {
         let sync_info = SyncInfo {
             starting_block: U256::from(0x3cbed5),
@@ -204,6 +205,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_peer_info_serialization() {
         let peer_info = PeerInfo {
             id: Some("peer_id_123".to_string()),
@@ -231,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_sync_status_serialization() {
         let sync_status = SyncStatus::Info(Box::new(SyncInfo {
             starting_block: U256::from(0x3cbed5),
