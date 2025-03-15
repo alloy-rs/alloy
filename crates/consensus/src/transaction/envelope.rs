@@ -580,6 +580,19 @@ where
     }
 }
 
+impl<T> Decodable2718 for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
+{
+    fn typed_decode(_ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
+    }
+}
+
 impl<Eip4844> Encodable2718 for EthereumTxEnvelope<Eip4844>
 where
     Eip4844: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
