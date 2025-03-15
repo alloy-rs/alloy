@@ -531,6 +531,28 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     }
 }
 
+impl<T> Encodable for Signed<T>
+where
+    Self: Encodable2718,
+{
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.network_encode(out)
+    }
+
+    fn length(&self) -> usize {
+        self.network_len()
+    }
+}
+
+impl<T> Decodable for Signed<T>
+where
+    T: RlpEcdsaDecodableTx,
+{
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self::network_decode(buf)?)
+    }
+}
+
 impl<Eip4844> Encodable for EthereumTxEnvelope<Eip4844>
 where
     Self: Encodable2718,
@@ -563,6 +585,32 @@ impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844>
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
+    }
+}
+
+impl<T> Typed2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Send + Sync + Typed2718,
+{
+    fn ty(&self) -> u8 {
+        self.tx().ty()
+    }
+}
+
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
     }
 }
 
