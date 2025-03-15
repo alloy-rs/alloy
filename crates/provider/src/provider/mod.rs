@@ -29,4 +29,4 @@ mod erased;
 pub use erased::DynProvider;
 
 mod subscription;
-pub use subscription::EthSuscribe;
+pub use subscription::GetSubscription;

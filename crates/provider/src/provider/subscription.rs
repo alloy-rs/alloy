@@ -6,7 +6,7 @@ use std::{future::Future, pin::Pin};
 
 /// Future type Subscription struct that wraps client requests to `eth_subscribe`
 /// Allows configuration of channel size
-pub struct EthSuscribe<P, R, N = Ethereum>
+pub struct GetSubscription<P, R, N = Ethereum>
 where
     P: RpcSend,
     R: RpcRecv,
@@ -18,13 +18,13 @@ where
     _marker: std::marker::PhantomData<fn() -> R>,
 }
 
-impl<P, R, N> EthSuscribe<P, R, N>
+impl<P, R, N> GetSubscription<P, R, N>
 where
     N: Network,
     P: RpcSend,
     R: RpcRecv,
 {
-    /// Creates a new [`EthSuscribe`] instance
+    /// Creates a new [`GetSubscription`] instance
     pub fn new(root: RootProvider<N>, params: P) -> Self {
         Self { root, channel_size: None, params, _marker: std::marker::PhantomData }
     }
@@ -36,19 +36,19 @@ where
     }
 }
 
-impl<P, R, N> core::fmt::Debug for EthSuscribe<P, R, N>
+impl<P, R, N> core::fmt::Debug for GetSubscription<P, R, N>
 where
     N: Network,
     P: RpcSend,
     R: RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("EthSuscribe").field("channel_size", &self.channel_size).finish()
+        f.debug_struct("GetSubscription").field("channel_size", &self.channel_size).finish()
     }
 }
 
 #[cfg(feature = "pubsub")]
-impl<P, R, N> std::future::IntoFuture for EthSuscribe<P, R, N>
+impl<P, R, N> std::future::IntoFuture for GetSubscription<P, R, N>
 where
     N: Network,
     P: RpcSend + 'static,
