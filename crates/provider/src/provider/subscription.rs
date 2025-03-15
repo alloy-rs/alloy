@@ -31,8 +31,7 @@ where
 
     /// Set the channel_size for the subscription stream.
     pub fn buffer(mut self, size: usize) -> Self {
-        const MAX_BUFFER_SIZE: usize = 1024; // upper limit
-        self.channel_size = Some(size.min(MAX_BUFFER_SIZE));
+        self.channel_size = Some(size);
         self
     }
 }
