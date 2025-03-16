@@ -35,6 +35,15 @@ pub enum Error {
     /// Signature error.
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
+    /// The operation is intentionally not supported
+    /// due to security restrictions
+    #[error("Security restriction: {operation} is deliberately disabled - {reason}")]
+    SecurityRestriction {
+        /// The usupported operation
+        operation: UnsupportedSignerOperation,
+        /// The reason it is disabled
+        reason: String,
+    },
     /// Generic error.
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
@@ -79,12 +88,7 @@ pub enum UnsupportedSignerOperation {
 
 impl fmt::Display for UnsupportedSignerOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::SignHash => {
-                write!(f, "Operation `{}` is intentionally not supported for security reasons (blind signing is discouraged)", self.as_str())
-            }
-            _ => self.as_str().fmt(f),
-        }
+        self.as_str().fmt(f)
     }
 }
 
