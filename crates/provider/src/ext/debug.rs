@@ -16,7 +16,10 @@ use alloy_transport::TransportResult;
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait DebugApi<N>: Send + Sync {
+pub trait DebugApi<N>: Send + Sync
+where
+    N: Network,
+{
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
 
@@ -132,7 +135,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_as<R>(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
@@ -151,7 +154,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_js(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value>;
@@ -168,7 +171,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_callframe(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame>;
@@ -216,7 +219,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call(
         &self,
-        tx: TransactionRequest,
+        request: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
@@ -345,7 +348,7 @@ where
 
     async fn debug_trace_call_as<R>(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
@@ -357,7 +360,7 @@ where
 
     async fn debug_trace_call_js(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value> {
@@ -366,7 +369,7 @@ where
 
     async fn debug_trace_call_callframe(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame> {
@@ -391,7 +394,7 @@ where
 
     async fn debug_trace_call(
         &self,
-        tx: TransactionRequest,
+        tx: &N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
@@ -473,7 +476,7 @@ mod test {
 
             let trace = provider
                 .debug_trace_call(
-                    tx,
+                    &tx,
                     BlockNumberOrTag::Latest.into(),
                     GethDebugTracingCallOptions::default(),
                 )
