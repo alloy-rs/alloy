@@ -234,22 +234,10 @@ impl CallBatchProviderInner {
         if tx.to().is_none() {
             return false;
         }
-        macro_rules! any_is_some {
-            ($($name:ident),* $(,)?) => { false $(|| tx.$name().is_some())* };
-        }
-        // TODO: Not exhaustive, should we serialize to JSON and check that instead?
-        if any_is_some!(
-            chain_id,
-            nonce,
-            from,
-            value,
-            gas_price,
-            max_fee_per_gas,
-            max_priority_fee_per_gas,
-            gas_limit,
-            access_list
-        ) {
-            return false;
+        if let Ok(serde_json::Value::Object(obj)) = serde_json::to_value(tx) {
+            if obj.keys().any(|k| !matches!(k.as_str(), "to" | "data" | "input")) {
+                return false;
+            }
         }
         true
     }
