@@ -3,7 +3,7 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
-    layers::{BatchLayer, ChainLayer},
+    layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -398,9 +398,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Aggregate multiple `eth_call` requests into a single batch request using Multicall3.
     ///
-    /// See [`BatchLayer`] for more information.
-    pub fn with_call_batching(self) -> ProviderBuilder<Stack<BatchLayer, L>, F, N> {
-        self.layer(BatchLayer::new())
+    /// See [`CallBatchLayer`] for more information.
+    pub fn with_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
+        self.layer(CallBatchLayer::new())
     }
 }
 
