@@ -12,3 +12,14 @@ pub struct BlobAndProofV1 {
     /// The KZG proof for the blob.
     pub proof: Bytes48,
 }
+
+/// Blob type returned in responses to `engine_getBlobsV2`: <https://github.com/ethereum/execution-apis/pull/630>
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct BlobAndProofV2 {
+    /// The blob data.
+    pub blob: Box<Blob>,
+    /// The cell proof for the blob.
+    pub cell_proof: Bytes48,
+}

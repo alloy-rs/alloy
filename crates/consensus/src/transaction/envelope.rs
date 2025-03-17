@@ -48,6 +48,18 @@ impl TxEnvelope {
             Self::Eip7702(tx) => Ok(tx.into()),
         }
     }
+
+    /// Consumes the type, removes the signature and returns the transaction.
+    #[inline]
+    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<TxEip4844Variant> {
+        match self {
+            Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
+            Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx.into_parts().0),
+            Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx.into_parts().0),
+            Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(tx.into_parts().0),
+            Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
+        }
+    }
 }
 
 /// The TxEnvelope enum represents all Ethereum transaction envelope types,
@@ -157,6 +169,14 @@ impl TryFrom<u64> for TxType {
         let err = || "invalid tx type";
         let value: u8 = value.try_into().map_err(|_| err())?;
         Self::try_from(value).map_err(|_| err())
+    }
+}
+
+impl TryFrom<U8> for TxType {
+    type Error = Eip2718Error;
+
+    fn try_from(value: U8) -> Result<Self, Self::Error> {
+        value.to::<u8>().try_into()
     }
 }
 
