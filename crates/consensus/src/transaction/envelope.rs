@@ -584,8 +584,14 @@ impl<T> Decodable2718 for Signed<T>
 where
     T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
 {
-    fn typed_decode(_ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::rlp_decode_signed(buf).map_err(Into::into)
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let decoded = T::rlp_decode_signed(buf).map_err(Into::into)?;
+
+        if decoded.ty() != ty {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
+        Ok(decoded)
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
