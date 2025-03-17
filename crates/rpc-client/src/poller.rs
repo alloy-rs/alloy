@@ -151,10 +151,30 @@ where
     /// the [`PollerBuilder::into_stream`] response to a different type using the provided
     /// transform function that takes the response from the [`PollerBuilder`] and returns the
     /// transformed response.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn transform<F, Fut, T>(self, transform: F) -> TransformPollerBuilder<Params, Resp, T>
     where
         F: Fn(Resp, WeakClient) -> Fut + Send + Sync + 'static,
         Fut: futures::Future<Output = TransportResult<T>> + Send + 'static,
+        T: Clone + Send + 'static,
+    {
+        let boxed_transform = Box::new(move |resp, client| {
+            let fut = transform(resp, client);
+            Box::pin(fut) as RpcFut<'static, T>
+        });
+
+        TransformPollerBuilder { inner: self, transform: boxed_transform }
+    }
+
+    /// Consumes the [`PollerBuilder`] and returns a new [`TransformPollerBuilder`] that transforms
+    /// the [`PollerBuilder::into_stream`] response to a different type using the provided
+    /// transform function that takes the response from the [`PollerBuilder`] and returns the
+    /// transformed response.
+    #[cfg(target_arch = "wasm32")]
+    pub fn transform<F, Fut, T>(self, transform: F) -> TransformPollerBuilder<Params, Resp, T>
+    where
+        F: Fn(Resp, WeakClient) -> Fut + Send + Sync + 'static,
+        Fut: futures::Future<Output = TransportResult<T>> + 'static,
         T: Clone + Send + 'static,
     {
         let boxed_transform = Box::new(move |resp, client| {
