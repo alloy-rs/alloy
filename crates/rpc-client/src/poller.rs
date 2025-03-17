@@ -148,10 +148,10 @@ where
         self
     }
 
-    /// Consumes the [`PollerBuilder`] and returns a new [`TransformPollerBuilder`] that transforms
-    /// the [`PollerBuilder::into_stream`] response to a different type using the provided
-    /// transform function that takes the response from the [`PollerBuilder`] and returns the
-    /// transformed response.
+    /// Consumes the [`PollerBuilder`] and returns a new [`TransformPollerBuilder`].
+    ///
+    /// [`TransformPollerBuilder`] transforms the responses from the [`PollerBuilder::into_stream`]
+    /// response to a different type using the provided transform function.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn transform<F, Fut, T>(self, transform: F) -> TransformPollerBuilder<Params, Resp, T>
     where
@@ -263,6 +263,8 @@ where
 
 /// A poller that transforms the the stream of responses from [`PollerBuilder`] into the response of
 /// the provided transform future.
+///
+/// This can be instatiated by using [`PollerBuilder::transform`].
 pub struct TransformPollerBuilder<Params, Resp, T> {
     inner: PollerBuilder<Params, Resp>,
     transform: Box<dyn Fn(Resp, WeakClient) -> RpcFut<'static, T> + Send + Sync>,
@@ -291,6 +293,19 @@ where
         self
     }
 
+    /// Sets the channel size for the poller task.
+    pub fn with_channel_size(mut self, channel_size: usize) -> Self {
+        self.inner.set_channel_size(channel_size);
+        self
+    }
+
+    /// Sets a limit on the number of successful polls.
+    /// If `None` is passed, the poller will run indefinitely.
+    pub fn with_limit(mut self, limit: Option<usize>) -> Self {
+        self.inner.set_limit(limit);
+        self
+    }
+
     /// Starts the poller in a new Tokio task, returning a channel to receive the transformed
     /// responses on.
     pub fn spawn(self) -> PollChannel<T> {
@@ -316,7 +331,7 @@ where
                     }
                     Err(err) => {
                         error!(%err, "transformation failed");
-                        // Continue polling even if transformation fails
+                        break;
                     }
                 }
             }
