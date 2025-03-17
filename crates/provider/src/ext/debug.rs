@@ -135,7 +135,7 @@ where
     /// Not all nodes support this call.
     async fn debug_trace_call_as<R>(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
@@ -154,7 +154,7 @@ where
     /// Not all nodes support this call.
     async fn debug_trace_call_js(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value>;
@@ -171,7 +171,7 @@ where
     /// Not all nodes support this call.
     async fn debug_trace_call_callframe(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame>;
@@ -219,7 +219,7 @@ where
     /// Not all nodes support this call.
     async fn debug_trace_call(
         &self,
-        request: &N::TransactionRequest,
+        request: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
@@ -348,7 +348,7 @@ where
 
     async fn debug_trace_call_as<R>(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
@@ -360,7 +360,7 @@ where
 
     async fn debug_trace_call_js(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value> {
@@ -369,7 +369,7 @@ where
 
     async fn debug_trace_call_callframe(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame> {
@@ -394,7 +394,7 @@ where
 
     async fn debug_trace_call(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
@@ -476,7 +476,7 @@ mod test {
 
             let trace = provider
                 .debug_trace_call(
-                    &tx,
+                    tx,
                     BlockNumberOrTag::Latest.into(),
                     GethDebugTracingCallOptions::default(),
                 )
