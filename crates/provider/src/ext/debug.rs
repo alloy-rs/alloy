@@ -219,7 +219,7 @@ where
     /// Not all nodes support this call.
     async fn debug_trace_call(
         &self,
-        request: N::TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
