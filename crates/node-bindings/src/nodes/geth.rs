@@ -202,6 +202,7 @@ pub struct Geth {
     data_dir: Option<PathBuf>,
     chain_id: Option<u64>,
     insecure_unlock: bool,
+    keep_err: bool,
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
@@ -366,6 +367,14 @@ impl Geth {
     /// Sets the port for authenticated RPC connections.
     pub const fn authrpc_port(mut self, port: u16) -> Self {
         self.authrpc_port = Some(port);
+        self
+    }
+
+    /// Keep the handle to geth's stderr in order to read from it.
+    ///
+    /// Caution: if the stderr handle isn't used, this can end up blocking.
+    pub const fn keep_stderr(mut self) -> Self {
+        self.keep_err = true;
         self
     }
 
@@ -635,7 +644,20 @@ impl Geth {
             }
         }
 
-        child.stderr = Some(reader.into_inner());
+        if self.keep_err {
+            // re-attach the stderr handle if requested
+            child.stderr = Some(reader.into_inner());
+        } else {
+            // We need to consume the stderr otherwise geth is non-responsive and RPC server results
+            // in connection refused.
+            // See: <https://github.com/alloy-rs/alloy/issues/2091#issuecomment-2676134147>
+            std::thread::spawn(move || {
+                let mut buf = String::new();
+                loop {
+                    let _ = reader.read_line(&mut buf);
+                }
+            });
+        }
 
         Ok(GethInstance {
             pid: child,
