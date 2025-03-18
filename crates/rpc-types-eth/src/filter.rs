@@ -542,14 +542,55 @@ impl Filter {
     /// Checks if a given Log matches this Filter.
     ///
     /// This function checks:
-    /// 1. If the log's address matches the filter's address (if any)
-    /// 2. If the log's topics match the filter's topics (if any)
+    /// 1. If the log's block number/hash matches the filter's block option (if any)
+    /// 2. If the log's address matches the filter's address (if any)
+    /// 3. If the log's topics match the filter's topics (if any)
     ///
     /// Returns true if the Log matches the Filter, false otherwise.
     pub fn matches_log(&self, log: &RpcLog<LogData>) -> bool {
+        // Check if block option matches
+        match self.block_option {
+            FilterBlockOption::Range { from_block, to_block } => {
+                // Check from_block if specified
+                if let Some(from) = from_block {
+                    if let (Some(block_number), Some(from_num)) =
+                        (log.block_number, from.as_number())
+                    {
+                        if block_number < from_num {
+                            return false;
+                        }
+                    }
+                }
+
+                // Check to_block if specified
+                if let Some(to) = to_block {
+                    if let (Some(block_number), Some(to_num)) = (log.block_number, to.as_number()) {
+                        if block_number > to_num {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            FilterBlockOption::AtBlockHash(hash) => {
+                // If a specific block hash is requested, check it
+                if let Some(log_block_hash) = log.block_hash {
+                    if log_block_hash != hash {
+                        return false;
+                    }
+                } else {
+                    // If log doesn't have a block hash, it can't match a block hash filter
+                    return false;
+                }
+            }
+        }
+
+        // Check address
         if !self.address.is_empty() && !self.address.matches(&log.address()) {
             return false;
         }
+
+        // Check topics
         let log_topics = log.topics();
 
         for (i, filter_topic) in self.topics.iter().enumerate() {
@@ -1822,5 +1863,79 @@ mod tests {
         };
 
         assert!(filter.matches_log(&matching_log));
+    }
+
+    #[test]
+    fn test_matches_log_with_block_range() {
+        let filter = Filter::new()
+            .from_block(100u64)
+            .to_block(200u64)
+            .event("Transfer(address,address,uint256)");
+
+        // Create logs with different block numbers
+        let create_log = |block_number: Option<u64>| RpcLog {
+            inner: Log {
+                address: Default::default(),
+                data: LogData::new_unchecked(
+                    vec![keccak256("Transfer(address,address,uint256)".as_bytes())],
+                    Bytes::from_static(&[0x01, 0x02, 0x03]),
+                ),
+            },
+            block_hash: None,
+            block_number,
+            block_timestamp: None,
+            transaction_hash: None,
+            transaction_index: None,
+            log_index: None,
+            removed: false,
+        };
+
+        let log_below_range = create_log(Some(99));
+        let log_at_range_start = create_log(Some(100));
+        let log_in_range = create_log(Some(150));
+        let log_at_range_end = create_log(Some(200));
+        let log_above_range = create_log(Some(201));
+        let log_no_block = create_log(None);
+
+        assert!(!filter.matches_log(&log_below_range), "Log below range should not match");
+        assert!(filter.matches_log(&log_at_range_start), "Log at range start should match");
+        assert!(filter.matches_log(&log_in_range), "Log in range should match");
+        assert!(filter.matches_log(&log_at_range_end), "Log at range end should match");
+        assert!(!filter.matches_log(&log_above_range), "Log above range should not match");
+        assert!(
+            filter.matches_log(&log_no_block),
+            "Log with no block number should match (no block range check possible)"
+        );
+    }
+
+    #[test]
+    fn test_matches_log_with_block_hash() {
+        let block_hash = B256::random();
+        let filter = Filter::new().at_block_hash(block_hash);
+
+        let create_log = |hash: Option<B256>| RpcLog {
+            inner: Log { address: Default::default(), data: LogData::default() },
+            block_hash: hash,
+            block_number: None,
+            block_timestamp: None,
+            transaction_hash: None,
+            transaction_index: None,
+            log_index: None,
+            removed: false,
+        };
+
+        let log_matching_hash = create_log(Some(block_hash));
+        let log_different_hash = create_log(Some(B256::random()));
+        let log_no_hash = create_log(None);
+
+        assert!(filter.matches_log(&log_matching_hash), "Log with matching hash should match");
+        assert!(
+            !filter.matches_log(&log_different_hash),
+            "Log with different hash should not match"
+        );
+        assert!(
+            !filter.matches_log(&log_no_hash),
+            "Log with no hash should not match a block hash filter"
+        );
     }
 }
