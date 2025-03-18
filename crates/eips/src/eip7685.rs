@@ -164,6 +164,16 @@ impl RequestsOrHash {
             Self::Hash(_) => None,
         }
     }
+
+    /// Returns `true` if the variant is a list of requests.
+    pub const fn is_requests(&self) -> bool {
+        matches!(self, Self::Requests(_))
+    }
+
+    /// Returns `true` if the variant is a precomputed hash.
+    pub const fn is_hash(&self) -> bool {
+        matches!(self, Self::Hash(_))
+    }
 }
 
 impl Default for RequestsOrHash {
