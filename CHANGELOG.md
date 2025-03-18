@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
+
+### Bug Fixes
+
+- [signer-gcp] Use default public key format ([#2217](https://github.com/alloy-rs/alloy/issues/2217))
+- Drop geth's stderr handle ([#2104](https://github.com/alloy-rs/alloy/issues/2104))
+- Debug_executionWitness call ([#2209](https://github.com/alloy-rs/alloy/issues/2209))
+- Broken links `eip1559/constants.rs` ([#2190](https://github.com/alloy-rs/alloy/issues/2190))
+
+### Dependencies
+
+- Bump gcloud sdk ([#2218](https://github.com/alloy-rs/alloy/issues/2218))
+- Bump once_cell ([#2185](https://github.com/alloy-rs/alloy/issues/2185))
+
+### Features
+
+- [eips] Serde untagged for EIP-7685 `RequestsOrHash` ([#2216](https://github.com/alloy-rs/alloy/issues/2216))
+- Define subscription type ([#2203](https://github.com/alloy-rs/alloy/issues/2203))
+- [providers] Add multicall batch layer ([#2174](https://github.com/alloy-rs/alloy/issues/2174))
+- Add BlobsBundleV2 ([#2206](https://github.com/alloy-rs/alloy/issues/2206))
+- [consensus] Add hoodi genesis hash ([#2210](https://github.com/alloy-rs/alloy/issues/2210))
+- [`node-bindings`] Anvil typed hardforks ([#2207](https://github.com/alloy-rs/alloy/issues/2207))
+- Derive `Serialize` and `Deserialize` for `Recovered<T>` ([#2204](https://github.com/alloy-rs/alloy/issues/2204))
+- Add BlobAndProofV2 ([#2202](https://github.com/alloy-rs/alloy/issues/2202))
+- `FallbackLayer` transport ([#2135](https://github.com/alloy-rs/alloy/issues/2135))
+- Remove poller task indirection ([#2197](https://github.com/alloy-rs/alloy/issues/2197))
+- Impl into_transaction TxEnvelope ([#2192](https://github.com/alloy-rs/alloy/issues/2192))
+- Add missing U8 conversion ([#2189](https://github.com/alloy-rs/alloy/issues/2189))
+- Ad helper append fn ([#2186](https://github.com/alloy-rs/alloy/issues/2186))
+- Add `ThrottleLayer` to Transport layers ([#2154](https://github.com/alloy-rs/alloy/issues/2154))
+
+### Miscellaneous Tasks
+
+- [meta] Update CODEOWNERS ([#2213](https://github.com/alloy-rs/alloy/issues/2213))
+- [provider] Remove 'latest' channel from heartbeat ([#2198](https://github.com/alloy-rs/alloy/issues/2198))
+- Export * from provider ([#2195](https://github.com/alloy-rs/alloy/issues/2195))
+
+### Other
+
+- Add encodable and decodable for `Signed<T>` ([#2193](https://github.com/alloy-rs/alloy/issues/2193))
+- Update contributing
+
+### Styling
+
+- Update tx fee comment about Transaction trait ([#2208](https://github.com/alloy-rs/alloy/issues/2208))
+
 ## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
 
 ### Bug Fixes
@@ -20,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.12.5
 - Add fromiter helper for stateoverridesbuilder ([#2182](https://github.com/alloy-rs/alloy/issues/2182))
 - Add helper to set trace's gas used ([#2180](https://github.com/alloy-rs/alloy/issues/2180))
 - Add with capacity helper ([#2183](https://github.com/alloy-rs/alloy/issues/2183))

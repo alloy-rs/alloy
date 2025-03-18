@@ -29,7 +29,7 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-gcloud-sdk = { version = "0.26", features = [
+gcloud-sdk = { workspace = true, features = [
     "google-cloud-kms-v1",
     "google-longrunning",
 ] }
