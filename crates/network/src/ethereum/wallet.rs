@@ -1,7 +1,7 @@
 use crate::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, Network, NetworkWallet, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_primitives::{map::AddressHashMap, Address, PrimitiveSignature as Signature};
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use super::Ethereum;
 
@@ -167,5 +167,21 @@ impl NetworkWallet<AnyNetwork> for EthereumWallet {
             )),
             _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
         }
+    }
+}
+
+/// A trait for converting a signer into a [`NetworkWallet`].
+pub trait IntoWallet<N: Network = Ethereum>: Send + Sync + Debug {
+    /// The wallet type for the network.
+    type NetworkWallet: NetworkWallet<N>;
+    /// Convert the signer into a wallet.
+    fn into_wallet(self) -> Self::NetworkWallet;
+}
+
+impl<W: NetworkWallet<N>, N: Network> IntoWallet<N> for W {
+    type NetworkWallet = W;
+
+    fn into_wallet(self) -> Self::NetworkWallet {
+        self
     }
 }

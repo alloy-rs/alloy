@@ -100,13 +100,15 @@ impl NonceManager for CachedNonceManager {
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
+/// # use alloy_network::{Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
-/// let provider = ProviderBuilder::default()
+/// # use alloy_signer_local::PrivateKeySigner;
+/// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
+/// let pk: PrivateKeySigner = "0x...".parse()?;
+/// let provider = ProviderBuilder::<_, _, Ethereum>::default()
 ///     .with_simple_nonce_management()
-///     .wallet(wallet)
+///     .wallet(pk)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -283,5 +285,19 @@ mod tests {
             .expect("fail to fetch tx")
             .expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce(), 1);
+    }
+
+    #[tokio::test]
+    async fn cloned_managers() {
+        let cnm1 = CachedNonceManager::default();
+        let cnm2 = cnm1.clone();
+
+        let provider = ProviderBuilder::new().on_anvil();
+        let address = Address::ZERO;
+
+        assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 0);
+        assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 1);
+        assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 2);
+        assert_eq!(cnm2.get_next_nonce(&provider, address).await.unwrap(), 3);
     }
 }

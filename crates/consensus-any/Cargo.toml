@@ -43,7 +43,10 @@ default = ["std"]
 std = [
 	"alloy-eips/std",
 	"alloy-consensus/std",
-	"alloy-serde?/std"
+	"alloy-serde?/std",
+	"alloy-primitives/std",
+	"alloy-rlp/std",
+	"serde?/std"
 ]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = [

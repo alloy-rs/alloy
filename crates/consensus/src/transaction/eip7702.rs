@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2930::AccessList,
@@ -11,7 +11,7 @@ use alloy_primitives::{
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
-use super::RlpEcdsaTx;
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -106,9 +106,7 @@ impl TxEip7702 {
     }
 }
 
-impl RlpEcdsaTx for TxEip7702 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
+impl RlpEcdsaEncodableTx for TxEip7702 {
     /// Outputs the length of the transaction's fields, without a RLP header.
     #[doc(hidden)]
     fn rlp_encoded_fields_length(&self) -> usize {
@@ -136,6 +134,10 @@ impl RlpEcdsaTx for TxEip7702 {
         self.access_list.encode(out);
         self.authorization_list.encode(out);
     }
+}
+
+impl RlpEcdsaDecodableTx for TxEip7702 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
@@ -261,12 +263,6 @@ impl SignableTransaction<Signature> for TxEip7702 {
 
     fn payload_len_for_signature(&self) -> usize {
         self.length() + 1
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let tx_hash = self.tx_hash(&signature);
-
-        Signed::new_unchecked(self, signature, tx_hash)
     }
 }
 

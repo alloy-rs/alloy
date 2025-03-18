@@ -17,8 +17,9 @@ workflows:
         "--left-side-feature-missing=ignore",
         # Ignore the case that `A` it outside of the workspace. Otherwise it will report errors in external dependencies that we have no influence on.
         "--left-side-outside-workspace=ignore",
-        # limit to the workspace
-        "--workspace",
+        # Only check normal dependencies. 
+        # Propagating to dev-dependencies leads to compilation issues: https://github.com/alloy-rs/alloy/pull/2144#issuecomment-2702291349
+        "--dep-kinds=normal:check,dev:ignore",
         "--show-path",
         "--quiet",
       ]

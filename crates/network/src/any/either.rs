@@ -1,7 +1,7 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
-    Signed, Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702,
-    TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
+    error::ValueError, transaction::Either, Signed, Transaction as TransactionTrait, TxEip1559,
+    TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
@@ -215,6 +215,16 @@ pub enum AnyTxEnvelope {
 }
 
 impl AnyTxEnvelope {
+    /// Returns true if this is the ethereum transaction variant
+    pub const fn is_ethereum(&self) -> bool {
+        matches!(self, Self::Ethereum(_))
+    }
+
+    /// Returns true if this is the unknown transaction variant
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown(_))
+    }
+
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     pub const fn as_envelope(&self) -> Option<&TxEnvelope> {
         match self {
@@ -233,18 +243,46 @@ impl AnyTxEnvelope {
 
     /// Returns the inner Ethereum transaction envelope, if it is an Ethereum transaction.
     /// If the transaction is not an Ethereum transaction, it is returned as an error.
-    pub fn try_into_envelope(self) -> Result<TxEnvelope, Self> {
+    pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<Self>> {
         match self {
             Self::Ethereum(inner) => Ok(inner),
-            this => Err(this),
+            this => Err(ValueError::new_static(this, "unknown transaction envelope")),
         }
     }
+
     /// Returns the inner [`UnknownTxEnvelope`], if it is an unknown transaction.
     /// If the transaction is not an unknown transaction, it is returned as an error.
     pub fn try_into_unknown(self) -> Result<UnknownTxEnvelope, Self> {
         match self {
             Self::Unknown(inner) => Ok(inner),
             this => Err(this),
+        }
+    }
+
+    /// Attempts to convert the [`UnknownTxEnvelope`] into `Either::Right` if this is an unknown
+    /// variant.
+    ///
+    /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
+    /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    pub fn try_into_either<T>(self) -> Result<Either<TxEnvelope, T>, T::Error>
+    where
+        T: TryFrom<UnknownTxEnvelope>,
+    {
+        self.try_map_unknown(|inner| inner.try_into())
+    }
+
+    /// Attempts to convert the [`UnknownTxEnvelope`] into `Either::Right` if this is an
+    /// [`AnyTxEnvelope::Unknown`].
+    ///
+    /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
+    /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    pub fn try_map_unknown<T, E>(
+        self,
+        f: impl FnOnce(UnknownTxEnvelope) -> Result<T, E>,
+    ) -> Result<Either<TxEnvelope, T>, E> {
+        match self {
+            Self::Ethereum(tx) => Ok(Either::Left(tx)),
+            Self::Unknown(tx) => Ok(Either::Right(f(tx)?)),
         }
     }
 

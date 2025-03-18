@@ -104,15 +104,29 @@ impl<T, H> Block<T, H> {
         self
     }
 
+    /// Tries to convert inner transactions into a vector of full transactions
+    ///
+    /// Returns an error if the block contains only transaction hashes or if it is an uncle block.
+    pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<BlockTransactions<T>>> {
+        self.transactions.try_into_transactions()
+    }
+
+    /// Consumes the type and returns the transactions as a vector.
+    ///
+    /// Note: if this is an uncle or hashes, this will return an empty vector.
+    pub fn into_transactions_vec(self) -> Vec<T> {
+        self.transactions.into_transactions_vec()
+    }
+
     /// Converts this block into a [`BlockBody`].
     ///
     /// Returns an error if the transactions are not full or if the block has uncles.
     pub fn try_into_block_body(self) -> Result<BlockBody<T, H>, ValueError<Self>> {
         if !self.uncles.is_empty() {
-            return Err(ValueError::new(self, "uncles not empty"));
+            return Err(ValueError::new_static(self, "uncles not empty"));
         }
         if !self.transactions.is_full() {
-            return Err(ValueError::new(self, "transactions not full"));
+            return Err(ValueError::new_static(self, "transactions not full"));
         }
 
         Ok(self.into_block_body_unchecked())
@@ -341,6 +355,22 @@ impl<H> Header<H> {
     pub const fn with_size(mut self, size: Option<U256>) -> Self {
         self.size = size;
         self
+    }
+
+    /// Applies the given closure to the inner header.
+    #[allow(clippy::use_self)]
+    pub fn map<H1>(self, f: impl FnOnce(H) -> H1) -> Header<H1> {
+        let Header { hash, inner, total_difficulty, size } = self;
+
+        Header { hash, inner: f(inner), total_difficulty, size }
+    }
+
+    /// Applies the given fallible closure to the inner header.
+    #[allow(clippy::use_self)]
+    pub fn try_map<H1, E>(self, f: impl FnOnce(H) -> Result<H1, E>) -> Result<Header<H1>, E> {
+        let Header { hash, inner, total_difficulty, size } = self;
+
+        Ok(Header { hash, inner: f(inner)?, total_difficulty, size })
     }
 }
 
@@ -678,12 +708,12 @@ mod tests {
             withdrawals: Some(Default::default()),
         };
         let serialized = serde_json::to_string(&block).unwrap();
-        assert_eq!(
+        similar_asserts::assert_eq!(
             serialized,
             r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[]}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(block, deserialized);
+        similar_asserts::assert_eq!(block, deserialized);
     }
 
     #[test]
@@ -1156,7 +1186,7 @@ mod tests {
         );
 
         let deserialized: BadBlock = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(bad_block, deserialized);
+        similar_asserts::assert_eq!(bad_block, deserialized);
     }
 
     // <https://github.com/succinctlabs/kona/issues/31>

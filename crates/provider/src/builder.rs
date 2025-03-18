@@ -3,11 +3,12 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
+    layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, Network};
+use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -122,7 +123,7 @@ pub struct ProviderBuilder<L, F, N = Ethereum> {
 impl
     ProviderBuilder<
         Identity,
-        JoinFill<Identity, <alloy_network::Ethereum as RecommendedFillers>::RecommendedFillers>,
+        JoinFill<Identity, <Ethereum as RecommendedFillers>::RecommendedFillers>,
         Ethereum,
     >
 {
@@ -167,14 +168,14 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 
     /// Add gas estimation to the stack being built.
     ///
-    /// See [`GasFiller`]
+    /// See [`GasFiller`] for more information.
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<Identity, GasFiller>, N> {
         self.filler(GasFiller)
     }
 
     /// Add nonce management to the stack being built.
     ///
-    /// See [`NonceFiller`]
+    /// See [`NonceFiller`] for more information.
     pub fn with_nonce_management<M: NonceManager>(
         self,
         nonce_manager: M,
@@ -184,7 +185,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 
     /// Add simple nonce management to the stack being built.
     ///
-    /// See [`SimpleNonceManager`]
+    /// See [`SimpleNonceManager`] for more information.
     pub fn with_simple_nonce_management(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
@@ -193,7 +194,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
 
     /// Add cached nonce management to the stack being built.
     ///
-    /// See [`CachedNonceManager`]
+    /// See [`CachedNonceManager`] for more information.
     pub fn with_cached_nonce_management(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<CachedNonceManager>>, N> {
@@ -250,13 +251,6 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
-    /// Add a wallet layer to the stack being built.
-    ///
-    /// See [`WalletFiller`].
-    pub fn wallet<W>(self, wallet: W) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W>>, N> {
-        self.filler(WalletFiller::new(wallet))
-    }
-
     /// Change the network.
     ///
     /// By default, the network is `Ethereum`. This method must be called to configure a different
@@ -273,12 +267,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the client's poll interval based on the average block time for this chain.
     ///
     /// Does nothing to the client with a local transport.
-    pub fn with_chain(
-        self,
-        chain: NamedChain,
-    ) -> ProviderBuilder<Stack<crate::layers::ChainLayer, L>, F, N> {
-        let chain_layer = crate::layers::ChainLayer::from(chain);
-        self.layer(chain_layer)
+    pub fn with_chain(self, chain: NamedChain) -> ProviderBuilder<Stack<ChainLayer, L>, F, N> {
+        self.layer(ChainLayer::new(chain))
     }
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
@@ -299,7 +289,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::provider<RpcClient>`.
+    /// `ProviderBuilder::on_provider(RootProvider::new(client))`.
     pub fn on_client(self, client: RpcClient) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -307,6 +297,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         N: Network,
     {
         self.on_provider(RootProvider::new(client))
+    }
+
+    /// Finish the layer stack by providing a [`RpcClient`] that mocks responses, outputting
+    /// the final [`Provider`] type with all stack components.
+    ///
+    /// This is a convenience function for
+    /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
+    pub fn on_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+    {
+        self.on_client(RpcClient::mocked(asserter))
     }
 
     /// Finish the layer stack by providing a connection string for a built-in
@@ -390,6 +394,26 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().hyper_http(url);
         self.on_client(client)
+    }
+
+    /// Aggregate multiple `eth_call` requests into a single batch request using Multicall3.
+    ///
+    /// See [`CallBatchLayer`] for more information.
+    pub fn with_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
+        self.layer(CallBatchLayer::new())
+    }
+}
+
+impl<L, F, N: Network> ProviderBuilder<L, F, N> {
+    /// Add a wallet layer to the stack being built.
+    ///
+    /// See [`WalletFiller`].
+    #[allow(clippy::type_complexity)]
+    pub fn wallet<W: IntoWallet<N>>(
+        self,
+        wallet: W,
+    ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet>>, N> {
+        self.filler(WalletFiller::new(wallet.into_wallet()))
     }
 }
 
