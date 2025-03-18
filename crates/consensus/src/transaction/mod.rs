@@ -91,7 +91,8 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// This is also commonly referred to as the "Gas Fee Cap".
     fn max_fee_per_gas(&self) -> u128;
 
-    /// For dynamic fee transactions returns the Priority fee the caller is paying to the block author.
+    /// For dynamic fee transactions returns the Priority fee the caller is paying to the block
+    /// author.
     ///
     /// This will return `None` for legacy fee transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
