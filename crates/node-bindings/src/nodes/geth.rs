@@ -650,7 +650,7 @@ impl Geth {
         } else {
             // We need to consume the stderr otherwise geth is non-responsive and RPC server results
             // in connection refused.
-            tokio::task::spawn_blocking(move || {
+            std::thread::spawn(move || {
                 let mut buf = String::new();
                 loop {
                     let _ = reader.read_line(&mut buf);

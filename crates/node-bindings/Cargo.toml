@@ -36,7 +36,6 @@ tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 url.workspace = true
-tokio.workspace = true
 
 
 [dev-dependencies]
