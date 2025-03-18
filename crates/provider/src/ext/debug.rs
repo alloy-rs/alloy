@@ -411,7 +411,7 @@ where
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<ExecutionWitness> {
-        self.client().request("debug_executionWitness", block).await
+        self.client().request("debug_executionWitness", (block,)).await
     }
 
     async fn debug_code_by_hash(
