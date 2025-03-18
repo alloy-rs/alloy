@@ -2,7 +2,7 @@ mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
 mod get_block;
-pub use get_block::{EthGetBlock, EthGetBlockParams};
+pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 
 mod prov_call;
 pub use prov_call::{BoxedFut, ProviderCall};

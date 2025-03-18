@@ -2,7 +2,7 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, Eip1559Estimator},
@@ -19,13 +19,12 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, TransformPollerBuilder, WeakClient};
+use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, BlockId, BlockNumberOrTag, BlockTransactionsKind, Bundle,
-    EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log,
-    SyncStatus,
+    AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
+    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -495,8 +494,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// [`eth_getFilterChanges`](Self::get_filter_changes) and transforming the returned block
     /// hashes into full blocks bodies.
     ///
-    /// Returns a [`TransformPollerBuilder`] that consumes the stream of block hashes from
-    /// [`PollerBuilder`] and returns a stream of block bodies.
+    /// Returns the [`WatchBlocks`] type which consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of [`BlockResponse`]'s.
     ///
     /// # Examples
     ///
@@ -505,9 +504,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
-    /// use alloy_rpc_types_eth::BlockTransactionsKind;
     ///
-    /// let poller = provider.watch_full_blocks(BlockTransactionsKind::Full).await?;
+    /// let poller = provider.watch_full_blocks().await?.full();
     /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
     /// while let Some(block) = stream.next().await {
     ///   println!("new block: {block:#?}");
@@ -515,19 +513,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_full_blocks(
-        &self,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<TransformPollerBuilder<(U256,), Vec<B256>, Vec<Option<N::BlockResponse>>>>
-    {
+    async fn watch_full_blocks(&self) -> TransportResult<WatchBlocks<N::BlockResponse>> {
         let id = self.new_block_filter().await?;
+        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
 
-        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,))
-            .transform(move |hashes, client| async move {
-                utils::hashes_to_blocks::<N>(hashes, client, kind.is_full()).await
-            });
-
-        Ok(poller)
+        Ok(WatchBlocks::new(poller))
     }
 
     /// Watch for new pending transaction by polling the provider with
