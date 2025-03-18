@@ -647,6 +647,15 @@ impl Geth {
         if self.keep_err {
             // re-attach the stderr handle if requested
             child.stderr = Some(reader.into_inner());
+        } else {
+            // We need to consume the stderr otherwise geth is non-responsive and RPC server results
+            // in connection refused.
+            tokio::task::spawn_blocking(move || {
+                let mut buf = String::new();
+                loop {
+                    let _ = reader.read_line(&mut buf);
+                }
+            });
         }
 
         Ok(GethInstance {
