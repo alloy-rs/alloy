@@ -107,9 +107,14 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-1", |temp_dir_1| async move {
                 run_with_tempdir("geth-test-2", |temp_dir_2| async move {
-                    let geth1 = Geth::new().disable_discovery().data_dir(&temp_dir_1).spawn();
-                    let mut geth2 =
-                        Geth::new().disable_discovery().port(0u16).data_dir(&temp_dir_2).spawn();
+                    let geth1 =
+                        Geth::new().disable_discovery().keep_stderr().data_dir(&temp_dir_1).spawn();
+                    let mut geth2 = Geth::new()
+                        .disable_discovery()
+                        .keep_stderr()
+                        .port(0u16)
+                        .data_dir(&temp_dir_2)
+                        .spawn();
 
                     let provider1 = ProviderBuilder::new().on_http(geth1.endpoint_url());
                     let provider2 = ProviderBuilder::new().on_http(geth2.endpoint_url());
