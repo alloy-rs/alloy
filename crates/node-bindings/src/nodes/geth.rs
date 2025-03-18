@@ -650,6 +650,7 @@ impl Geth {
         } else {
             // We need to consume the stderr otherwise geth is non-responsive and RPC server results
             // in connection refused.
+            // See: <https://github.com/alloy-rs/alloy/issues/2091#issuecomment-2676134147>
             std::thread::spawn(move || {
                 let mut buf = String::new();
                 loop {
