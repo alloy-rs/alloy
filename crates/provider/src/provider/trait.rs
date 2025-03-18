@@ -2,6 +2,8 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
+#[cfg(feature = "pubsub")]
+use super::get_block::SubFullBlocks;
 use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 use crate::{
     heart::PendingTransactionError,
@@ -941,6 +943,38 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
+    }
+
+    /// Subscribe to a stream of full block bodies.
+    ///
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_full_blocks().await?.full();
+    /// let mut stream = sub.into_stream().take(5);
+    ///
+    /// while let Some(block) = stream.next().await {
+    ///   println!("{block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_full_blocks(&self) -> TransportResult<SubFullBlocks<N>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().request("eth_subscribe", ("newHeads", true)).await?;
+        let sub = self.root().get_subscription(id).await?;
+
+        Ok(SubFullBlocks::new(sub, self.weak_client()))
     }
 
     /// Subscribe to a stream of pending transaction hashes.

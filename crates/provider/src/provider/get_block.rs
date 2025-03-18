@@ -8,6 +8,8 @@ use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
 use alloy_transport::{TransportError, TransportResult};
+#[cfg(feature = "pubsub")]
+use futures::{Stream, StreamExt, TryStreamExt};
 use serde_json::Value;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
@@ -252,6 +254,93 @@ where
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
             Self::PendingBlock(call) => f.debug_tuple("PendingBlockCall").field(call).finish(),
             Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
+        }
+    }
+}
+
+/// A builder type for subscribing to full blocks i.e [`alloy_network_primitives::BlockResponse`],
+/// and not just [`alloy_network_primitives::HeaderResponse`].
+///
+/// By default this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
+/// subscribe to blocks with full transactions.
+#[derive(Debug)]
+#[must_use = "this does nothing unless you call `.into_stream`"]
+#[cfg(feature = "pubsub")]
+pub struct SubFullBlocks<N: alloy_network::Network> {
+    sub: alloy_pubsub::Subscription<N::HeaderResponse>,
+    client: alloy_rpc_client::WeakClient,
+    kind: BlockTransactionsKind,
+}
+
+#[cfg(feature = "pubsub")]
+impl<N: alloy_network::Network> SubFullBlocks<N> {
+    /// Create a new [`SubFullBlocks`] subscription with the given [`alloy_pubsub::Subscription`].
+    ///
+    /// By default, this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
+    /// subscribe to blocks with full transactions.
+    pub fn new(
+        sub: alloy_pubsub::Subscription<N::HeaderResponse>,
+        client: alloy_rpc_client::WeakClient,
+    ) -> Self {
+        Self { sub, client, kind: BlockTransactionsKind::Hashes }
+    }
+
+    /// Subscribe to blocks with full transactions.
+    pub fn full(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Full;
+        self
+    }
+
+    /// Subscribe to blocks with transaction hashes only.
+    pub fn hashes(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Hashes;
+        self
+    }
+
+    /// Get a reference to the inner subscription.
+    pub fn inner(&self) -> &alloy_pubsub::Subscription<N::HeaderResponse> {
+        &self.sub
+    }
+
+    /// Subscribe to the inner stream of headers and map them to block responses.
+    pub fn into_stream(
+        self,
+    ) -> impl Stream<Item = TransportResult<Option<N::BlockResponse>>> + Unpin {
+        use alloy_network_primitives::HeaderResponse;
+
+        let stream = self
+            .sub
+            .into_stream()
+            .then(move |resp| {
+                let hash = resp.hash();
+                let kind = self.kind;
+                let client_weak = self.client.clone();
+
+                async move {
+                    let client = client_weak
+                        .upgrade()
+                        .ok_or(TransportError::local_usage_str("Client dropped"))?;
+
+                    let call = client.request("eth_getBlockByHash", (hash, kind.is_full()));
+                    let resp: Option<N::BlockResponse> = call.await?;
+
+                    if kind.is_hashes() {
+                        Ok(utils::convert_to_hashes(resp))
+                    } else {
+                        Ok(resp)
+                    }
+                }
+            })
+            .map_ok(|resp| resp);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            stream.boxed()
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            stream.boxed_local()
         }
     }
 }
