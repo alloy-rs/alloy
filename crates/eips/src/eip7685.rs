@@ -129,6 +129,7 @@ impl Requests {
 /// needed to simulate the presence of requests without holding actual data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum RequestsOrHash {
     /// Stores a list of requests, allowing for dynamic requests hash calculation.
     Requests(Requests),
