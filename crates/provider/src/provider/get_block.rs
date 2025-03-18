@@ -296,7 +296,8 @@ where
     pub fn into_stream(self) -> impl Stream<Item = TransportResult<BlockResp>> + Unpin {
         let client = self.poller.client();
         let kind = self.kind;
-        self.poller
+        let stream = self
+            .poller
             .into_stream()
             .then(move |hashes| {
                 let client = client.clone();
@@ -310,8 +311,17 @@ where
                     }
                     Err(err) => vec![Err(err)],
                 })
-            })
-            .boxed()
+            });
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            stream.boxed()
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            stream.boxed_local()
+        }
     }
 }
 
