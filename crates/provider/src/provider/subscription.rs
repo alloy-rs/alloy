@@ -3,7 +3,6 @@ use alloy_primitives::B256;
 use alloy_pubsub::Subscription;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{TransportErrorKind, TransportResult};
-use std::{future::Future, pin::Pin};
 
 /// A general-purpose subscription request builder
 ///
@@ -56,7 +55,7 @@ where
     R: RpcRecv,
 {
     type Output = TransportResult<alloy_pubsub::Subscription<R>>;
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send>>;
+    type IntoFuture = futures_utils_wasm::BoxFuture<'static, Self::Output>;
 
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(async move {
