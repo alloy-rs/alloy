@@ -27,28 +27,49 @@ where
     R: RpcRecv,
 {
     /// Creates a new [`GetSubscription`] instance
-    pub fn new(client: WeakClient, kind: SubscriptionKind, params: Params) -> Self {
-        Self { client, kind, params, channel_size: None, _marker: std::marker::PhantomData }
+    ///
+    /// By default, this sets the [`SubscriptionKind`] to [`SubscriptionKind::NewHeads`] and params
+    /// to [`Params::None`].
+    pub fn new(client: WeakClient) -> Self {
+        Self {
+            client,
+            kind: SubscriptionKind::NewHeads,
+            params: Params::None,
+            channel_size: None,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Set the [`SubscriptionKind`]
+    pub fn kind(mut self, kind: SubscriptionKind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    /// Set the params for the subscription
+    pub fn params(mut self, params: Params) -> Self {
+        self.params = params;
+        self
     }
 
     /// Create a [`SubscriptionKind::NewHeads`] subscription
     pub fn new_heads(client: WeakClient) -> Self {
-        Self::new(client, SubscriptionKind::NewHeads, Params::None)
+        Self::new(client).kind(SubscriptionKind::NewHeads)
     }
 
     /// Create a [`SubscriptionKind::Logs`] subscription
     pub fn logs(client: WeakClient, filter: Filter) -> Self {
-        Self::new(client, SubscriptionKind::Logs, Params::Logs(Box::new(filter)))
+        Self::new(client).kind(SubscriptionKind::Logs).params(Params::Logs(Box::new(filter)))
     }
 
     /// Create a [`SubscriptionKind::Syncing`] subscription
     pub fn syncing(client: WeakClient) -> Self {
-        Self::new(client, SubscriptionKind::Syncing, Params::None)
+        Self::new(client).kind(SubscriptionKind::Syncing)
     }
 
     /// Create a [`SubscriptionKind::NewPendingTransactions`] subscription
     pub fn new_pending_transactions(client: WeakClient) -> Self {
-        Self::new(client, SubscriptionKind::NewPendingTransactions, Params::Bool(false))
+        Self::new(client).kind(SubscriptionKind::NewPendingTransactions).params(Params::Bool(false))
     }
 
     /// Set the channel_size for the subscription stream.

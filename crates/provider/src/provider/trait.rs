@@ -1044,15 +1044,15 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Subscribe to an `"eth_subscribe"` RPC event.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
+    fn subscribe<R>(
+        &self,
+        kind: alloy_rpc_types_eth::pubsub::SubscriptionKind,
+    ) -> GetSubscription<R>
     where
-        P: RpcSend,
         R: RpcRecv,
         Self: Sized,
     {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", params).await?;
-        self.root().get_subscription(id).await
+        GetSubscription::new(self.weak_client()).kind(kind)
     }
 
     /// Cancels a subscription given the subscription ID.
