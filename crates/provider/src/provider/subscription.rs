@@ -7,7 +7,7 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::{TransportErrorKind, TransportResult};
 
-/// A build for `"eth_subscribe"`  requests.
+/// A builder for `"eth_subscribe"`  requests.
 ///
 /// This struct allows configuring subscription parameters and channel size
 /// before initiating a request to subscribe to Ethereum events.
