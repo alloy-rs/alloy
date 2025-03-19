@@ -350,7 +350,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> crate::GetSubscription<(String,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> crate::GetSubscription<(&'static str,), N::HeaderResponse> {
         self.0.subscribe_blocks()
     }
 

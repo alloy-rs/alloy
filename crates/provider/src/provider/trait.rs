@@ -937,8 +937,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> GetSubscription<(String,), N::HeaderResponse> {
-        let rpc_call = self.client().request("eth_subscribe", ("newHeads".to_string(),));
+    fn subscribe_blocks(&self) -> GetSubscription<(&'static str,), N::HeaderResponse> {
+        let rpc_call = self.client().request("eth_subscribe", ("newHeads",));
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 

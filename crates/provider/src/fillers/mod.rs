@@ -606,7 +606,7 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> crate::GetSubscription<(String,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> crate::GetSubscription<(&'static str,), N::HeaderResponse> {
         self.inner.subscribe_blocks()
     }
 
