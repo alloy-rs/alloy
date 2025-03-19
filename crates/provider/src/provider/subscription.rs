@@ -11,6 +11,10 @@ use alloy_transport::{TransportErrorKind, TransportResult};
 ///
 /// This struct allows configuring subscription parameters and channel size
 /// before initiating a request to subscribe to Ethereum events.
+///
+/// By default, this sets the [`SubscriptionKind`] to [`SubscriptionKind::NewHeads`] and params to
+/// [`Params::None`]. These can be altered using the [`GetSubscription::kind`] and
+/// [`GetSubscription::params`] methods.
 pub struct GetSubscription<R>
 where
     R: RpcRecv,
