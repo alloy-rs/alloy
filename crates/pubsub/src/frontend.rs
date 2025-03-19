@@ -5,7 +5,10 @@ use alloy_transport::{TransportError, TransportErrorKind, TransportFut, Transpor
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
 use std::{
     future::Future,
-    sync::{atomic::{AtomicUsize, Ordering}, Arc},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
