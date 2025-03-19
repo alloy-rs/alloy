@@ -1,79 +1,32 @@
-use alloy_json_rpc::RpcRecv;
+use alloy_json_rpc::{RpcRecv, RpcSend};
+use alloy_primitives::B256;
 use alloy_pubsub::Subscription;
-use alloy_rpc_client::WeakClient;
-use alloy_rpc_types_eth::{
-    pubsub::{Params, SubscriptionKind},
-    Filter,
-};
+use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{TransportErrorKind, TransportResult};
 
-/// A builder for `"eth_subscribe"`  requests.
+/// A general-purpose subscription request builder
 ///
 /// This struct allows configuring subscription parameters and channel size
 /// before initiating a request to subscribe to Ethereum events.
-///
-/// By default, this sets the [`SubscriptionKind`] to [`SubscriptionKind::NewHeads`] and params to
-/// [`Params::None`]. These can be altered using the [`GetSubscription::kind`] and
-/// [`GetSubscription::params`] methods.
-pub struct GetSubscription<R>
+pub struct GetSubscription<P, R>
 where
+    P: RpcSend,
     R: RpcRecv,
 {
     client: WeakClient,
-    kind: SubscriptionKind,
-    params: Params,
+    call: RpcCall<P, B256>,
     channel_size: Option<usize>,
     _marker: std::marker::PhantomData<fn() -> R>,
 }
 
-impl<R> GetSubscription<R>
+impl<P, R> GetSubscription<P, R>
 where
+    P: RpcSend,
     R: RpcRecv,
 {
     /// Creates a new [`GetSubscription`] instance
-    ///
-    /// By default, this sets the [`SubscriptionKind`] to [`SubscriptionKind::NewHeads`] and params
-    /// to [`Params::None`].
-    pub fn new(client: WeakClient) -> Self {
-        Self {
-            client,
-            kind: SubscriptionKind::NewHeads,
-            params: Params::None,
-            channel_size: None,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    /// Set the [`SubscriptionKind`]
-    pub fn kind(mut self, kind: SubscriptionKind) -> Self {
-        self.kind = kind;
-        self
-    }
-
-    /// Set the params for the subscription
-    pub fn params(mut self, params: Params) -> Self {
-        self.params = params;
-        self
-    }
-
-    /// Create a [`SubscriptionKind::NewHeads`] subscription
-    pub fn new_heads(client: WeakClient) -> Self {
-        Self::new(client).kind(SubscriptionKind::NewHeads)
-    }
-
-    /// Create a [`SubscriptionKind::Logs`] subscription
-    pub fn logs(client: WeakClient, filter: Filter) -> Self {
-        Self::new(client).kind(SubscriptionKind::Logs).params(Params::Logs(Box::new(filter)))
-    }
-
-    /// Create a [`SubscriptionKind::Syncing`] subscription
-    pub fn syncing(client: WeakClient) -> Self {
-        Self::new(client).kind(SubscriptionKind::Syncing)
-    }
-
-    /// Create a [`SubscriptionKind::NewPendingTransactions`] subscription
-    pub fn new_pending_transactions(client: WeakClient) -> Self {
-        Self::new(client).kind(SubscriptionKind::NewPendingTransactions).params(Params::Bool(false))
+    pub fn new(client: WeakClient, call: RpcCall<P, B256>) -> Self {
+        Self { client, call, channel_size: None, _marker: std::marker::PhantomData }
     }
 
     /// Set the channel_size for the subscription stream.
@@ -81,30 +34,24 @@ where
         self.channel_size = Some(size);
         self
     }
-
-    /// Applies only to [`SubscriptionKind::NewPendingTransactions`] requests.
-    ///
-    /// Set to `true` to receive the full pending transactions and not just the transaction hash.
-    pub fn full_pending_txs(mut self, yes: bool) -> Self {
-        self.params = Params::Bool(yes);
-        self
-    }
 }
 
-impl<R> core::fmt::Debug for GetSubscription<R>
+impl<P, R> core::fmt::Debug for GetSubscription<P, R>
 where
+    P: RpcSend,
     R: RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GetSubscription")
             .field("channel_size", &self.channel_size)
-            .field("kind", &self.kind)
+            .field("call", &self.call)
             .finish()
     }
 }
 
-impl<R> std::future::IntoFuture for GetSubscription<R>
+impl<P, R> std::future::IntoFuture for GetSubscription<P, R>
 where
+    P: RpcSend + 'static,
     R: RpcRecv,
 {
     type Output = TransportResult<alloy_pubsub::Subscription<R>>;
@@ -116,23 +63,12 @@ where
                 self.client.upgrade().ok_or(TransportErrorKind::custom_str("client dropped"))?;
             let pubsub = client.pubsub_frontend().ok_or(TransportErrorKind::PubsubUnavailable)?;
 
-            let id = match self.kind {
-                SubscriptionKind::NewHeads => {
-                    client.request("eth_subscribe", ("newHeads",)).await?
-                }
-                SubscriptionKind::Logs => {
-                    client.request("eth_subscribe", ("logs", self.params)).await?
-                }
-                SubscriptionKind::Syncing => client.request("eth_subscribe", ("syncing",)).await?,
-                SubscriptionKind::NewPendingTransactions => {
-                    client.request("eth_subscribe", ("newPendingTransactions", self.params)).await?
-                }
-            };
-
             // Set config channel size if any
             if let Some(size) = self.channel_size {
                 pubsub.set_channel_size(size);
             }
+
+            let id = self.call.await?;
 
             pubsub.get_subscription(id).await.map(Subscription::from)
         })
