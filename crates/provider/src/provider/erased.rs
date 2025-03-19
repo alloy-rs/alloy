@@ -355,20 +355,25 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> crate::GetSubscription<(String,), B256> {
-        self.0.subscribe_pending_transactions()
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn subscribe_full_pending_transactions(
+    async fn subscribe_pending_transactions(
         &self,
-    ) -> crate::GetSubscription<(String, bool), N::TransactionResponse> {
-        self.0.subscribe_full_pending_transactions()
+    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
+        self.0.subscribe_pending_transactions().await
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> crate::GetSubscription<(String, Filter), Log> {
-        self.0.subscribe_logs(filter)
+    async fn subscribe_full_pending_transactions(
+        &self,
+    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
+        self.0.subscribe_full_pending_transactions().await
+    }
+
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_logs(
+        &self,
+        filter: &Filter,
+    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
+        self.0.subscribe_logs(filter).await
     }
 
     #[cfg(feature = "pubsub")]

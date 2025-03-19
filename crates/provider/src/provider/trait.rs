@@ -968,10 +968,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> GetSubscription<(String,), B256> {
-        let rpc_call =
-            self.client().request("eth_subscribe", ("newPendingTransactions".to_string(),));
-        GetSubscription::new(self.weak_client(), rpc_call)
+    async fn subscribe_pending_transactions(
+        &self,
+    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().request("eth_subscribe", ("newPendingTransactions",)).await?;
+        self.root().get_subscription(id).await
     }
 
     /// Subscribe to a stream of pending transaction bodies.
@@ -1005,12 +1007,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_full_pending_transactions(
+    async fn subscribe_full_pending_transactions(
         &self,
-    ) -> GetSubscription<(String, bool), N::TransactionResponse> {
-        let rpc_call =
-            self.client().request("eth_subscribe", ("newPendingTransactions".to_string(), true));
-        GetSubscription::new(self.weak_client(), rpc_call)
+    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().request("eth_subscribe", ("newPendingTransactions", true)).await?;
+        self.root().get_subscription(id).await
     }
 
     /// Subscribe to a stream of logs matching given filter.
@@ -1044,22 +1046,27 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(String, Filter), Log> {
-        let rpc_call = self.client().request("eth_subscribe", ("logs".to_string(), filter.clone()));
-        GetSubscription::new(self.weak_client(), rpc_call)
+    async fn subscribe_logs(
+        &self,
+        filter: &Filter,
+    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().request("eth_subscribe", ("logs", filter)).await?;
+        self.root().get_subscription(id).await
     }
 
     /// Subscribe to an RPC event.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    fn subscribe<P, R>(&self, params: P) -> GetSubscription<P, R>
+    async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
     where
         P: RpcSend,
         R: RpcRecv,
         Self: Sized,
     {
-        let rpc_call = self.client().request("eth_subscribe", params);
-        GetSubscription::new(self.weak_client(), rpc_call)
+        self.root().pubsub_frontend()?;
+        let id = self.client().request("eth_subscribe", params).await?;
+        self.root().get_subscription(id).await
     }
 
     /// Cancels a subscription given the subscription ID.
