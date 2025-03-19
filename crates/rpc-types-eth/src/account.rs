@@ -4,6 +4,7 @@ use alloc::{string::String, vec::Vec};
 use alloy_primitives::{Address, Bytes, B256, B512, U256};
 
 // re-export account type for `eth_getAccount`
+use alloy_consensus::constants::KECCAK_EMPTY;
 pub use alloy_consensus::Account;
 
 /// Account information.
@@ -61,6 +62,17 @@ pub struct EIP1186AccountProofResponse {
     pub account_proof: Vec<Bytes>,
     /// The storage proof.
     pub storage_proof: Vec<EIP1186StorageProof>,
+}
+
+impl EIP1186AccountProofResponse {
+    /// After `SpuriousDragon` empty account is defined as account with nonce == 0 && balance == 0
+    /// && bytecode = None (or hash is [`KECCAK_EMPTY`]).
+    pub fn is_empty(&self) -> bool {
+        self.nonce == 0
+            && self.balance.is_zero()
+            && self.storage_hash.is_zero()
+            && self.code_hash == KECCAK_EMPTY
+    }
 }
 
 /// Extended account information (used by `parity_allAccountInfo`).
