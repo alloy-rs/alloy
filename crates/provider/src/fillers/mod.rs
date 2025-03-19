@@ -611,25 +611,20 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
-        self.inner.subscribe_pending_transactions().await
+    fn subscribe_pending_transactions(&self) -> crate::GetSubscription<(String,), B256> {
+        self.inner.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_full_pending_transactions(
+    fn subscribe_full_pending_transactions(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
-        self.inner.subscribe_full_pending_transactions().await
+    ) -> crate::GetSubscription<(String, bool), N::TransactionResponse> {
+        self.inner.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
-        &self,
-        filter: &Filter,
-    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
-        self.inner.subscribe_logs(filter).await
+    fn subscribe_logs(&self, filter: &Filter) -> crate::GetSubscription<(String, Filter), Log> {
+        self.inner.subscribe_logs(filter)
     }
 
     #[cfg(feature = "pubsub")]
