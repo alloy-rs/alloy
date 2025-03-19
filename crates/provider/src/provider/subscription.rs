@@ -1,45 +1,33 @@
-use crate::{Provider, RootProvider};
 use alloy_json_rpc::{RpcRecv, RpcSend};
-use alloy_network::{Ethereum, Network};
-use alloy_transport::TransportResult;
-use std::{borrow::Cow, future::Future, pin::Pin};
+use alloy_primitives::B256;
+use alloy_pubsub::Subscription;
+use alloy_rpc_client::{RpcCall, WeakClient};
+use alloy_transport::{TransportErrorKind, TransportResult};
+use std::{future::Future, pin::Pin};
 
 /// A general-purpose subscription request builder
 ///
 /// This struct allows configuring subscription parameters and channel size
 /// before initiating a request to subscribe to Ethereum events.
-pub struct GetSubscription<P, R, N = Ethereum>
+pub struct GetSubscription<P, R>
 where
     P: RpcSend,
     R: RpcRecv,
-    N: Network,
 {
-    root: RootProvider<N>,
-    method: Cow<'static, str>,
-    params: Option<P>,
+    client: WeakClient,
+    call: RpcCall<P, B256>,
     channel_size: Option<usize>,
     _marker: std::marker::PhantomData<fn() -> R>,
 }
 
-impl<P, R, N> GetSubscription<P, R, N>
+impl<P, R> GetSubscription<P, R>
 where
-    N: Network,
     P: RpcSend,
     R: RpcRecv,
 {
     /// Creates a new [`GetSubscription`] instance
-    pub fn new(
-        root: RootProvider<N>,
-        method: impl Into<Cow<'static, str>>,
-        params: Option<P>,
-    ) -> Self {
-        Self {
-            root,
-            method: method.into(),
-            channel_size: None,
-            params,
-            _marker: std::marker::PhantomData,
-        }
+    pub fn new(client: WeakClient, call: RpcCall<P, B256>) -> Self {
+        Self { client, call, channel_size: None, _marker: std::marker::PhantomData }
     }
 
     /// Set the channel_size for the subscription stream.
@@ -49,51 +37,41 @@ where
     }
 }
 
-impl<P, R, N> core::fmt::Debug for GetSubscription<P, R, N>
+impl<P, R> core::fmt::Debug for GetSubscription<P, R>
 where
-    N: Network,
     P: RpcSend,
     R: RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GetSubscription")
             .field("channel_size", &self.channel_size)
-            .field("method", &self.method)
+            .field("call", &self.call)
             .finish()
     }
 }
 
-#[cfg(feature = "pubsub")]
-impl<P, R, N> std::future::IntoFuture for GetSubscription<P, R, N>
+impl<P, R> std::future::IntoFuture for GetSubscription<P, R>
 where
-    N: Network,
     P: RpcSend + 'static,
     R: RpcRecv,
 {
     type Output = TransportResult<alloy_pubsub::Subscription<R>>;
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send + 'static>>;
+    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send>>;
 
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(async move {
-            let pubsub = self.root.pubsub_frontend()?;
+            let client =
+                self.client.upgrade().ok_or(TransportErrorKind::custom_str("client dropped"))?;
+            let pubsub = client.pubsub_frontend().ok_or(TransportErrorKind::PubsubUnavailable)?;
 
             // Set config channel size if any
             if let Some(size) = self.channel_size {
                 pubsub.set_channel_size(size);
             }
 
-            // Handle params and no-params case separately
-            let id = if let Some(params) = self.params {
-                let mut call = self.root.client().request(self.method, params);
-                call.set_is_subscription();
-                call.await?
-            } else {
-                let mut call = self.root.client().request_noparams(self.method);
-                call.set_is_subscription();
-                call.await?
-            };
+            let id = self.call.await?;
 
-            self.root.get_subscription(id).await
+            pubsub.get_subscription(id).await.map(Subscription::from)
         })
     }
 }

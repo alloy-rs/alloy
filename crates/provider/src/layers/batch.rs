@@ -449,7 +449,7 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ext::AnvilApi, ProviderBuilder};
+    use crate::ProviderBuilder;
     use alloy_primitives::{address, hex};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_transport::mock::Asserter;
@@ -500,7 +500,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "anvil-api")]
     async fn basic() {
+        use crate::ext::AnvilApi;
         let provider = ProviderBuilder::new().with_call_batching().on_anvil();
         provider.anvil_set_code(COUNTER_ADDRESS, COUNTER_DEPLOYED_CODE.into()).await.unwrap();
         provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(123)).await.unwrap();
