@@ -1,9 +1,11 @@
 use super::{EthCallMany, EthGetBlock, FilterPollerBuilder};
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, Eip1559Estimator},
-    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
-    ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    EthCall, PendingTransaction, PendingTransactionBuilder,
+    PendingTransactionConfig, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
@@ -350,30 +352,25 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> crate::GetSubscription<(&'static str,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> GetSubscription<(&'static str,), N::HeaderResponse> {
         self.0.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
-        self.0.subscribe_pending_transactions().await
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(&'static str,), B256> {
+        self.0.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_full_pending_transactions(
+    fn subscribe_full_pending_transactions(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
-        self.0.subscribe_full_pending_transactions().await
+    ) -> GetSubscription<(&'static str, bool), N::TransactionResponse> {
+        self.0.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
-        &self,
-        filter: &Filter,
-    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
-        self.0.subscribe_logs(filter).await
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(&'static str, Filter), Log> {
+        self.0.subscribe_logs(filter)
     }
 
     #[cfg(feature = "pubsub")]
