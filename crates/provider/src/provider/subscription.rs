@@ -1,32 +1,54 @@
-use alloy_json_rpc::{RpcRecv, RpcSend};
-use alloy_primitives::B256;
+use alloy_json_rpc::RpcRecv;
 use alloy_pubsub::Subscription;
-use alloy_rpc_client::{RpcCall, WeakClient};
+use alloy_rpc_client::WeakClient;
+use alloy_rpc_types_eth::{
+    pubsub::{Params, SubscriptionKind},
+    Filter,
+};
 use alloy_transport::{TransportErrorKind, TransportResult};
 
-/// A general-purpose subscription request builder
+/// A build for `"eth_subscribe"`  requests.
 ///
 /// This struct allows configuring subscription parameters and channel size
 /// before initiating a request to subscribe to Ethereum events.
-pub struct GetSubscription<P, R>
+pub struct GetSubscription<R>
 where
-    P: RpcSend,
     R: RpcRecv,
 {
     client: WeakClient,
-    call: RpcCall<P, B256>,
+    kind: SubscriptionKind,
+    params: Params,
     channel_size: Option<usize>,
     _marker: std::marker::PhantomData<fn() -> R>,
 }
 
-impl<P, R> GetSubscription<P, R>
+impl<R> GetSubscription<R>
 where
-    P: RpcSend,
     R: RpcRecv,
 {
     /// Creates a new [`GetSubscription`] instance
-    pub fn new(client: WeakClient, call: RpcCall<P, B256>) -> Self {
-        Self { client, call, channel_size: None, _marker: std::marker::PhantomData }
+    pub fn new(client: WeakClient, kind: SubscriptionKind, params: Params) -> Self {
+        Self { client, kind, params, channel_size: None, _marker: std::marker::PhantomData }
+    }
+
+    /// Create a [`SubscriptionKind::NewHeads`] subscription
+    pub fn new_heads(client: WeakClient) -> Self {
+        Self::new(client, SubscriptionKind::NewHeads, Params::None)
+    }
+
+    /// Create a [`SubscriptionKind::Logs`] subscription
+    pub fn logs(client: WeakClient, filter: Filter) -> Self {
+        Self::new(client, SubscriptionKind::Logs, Params::Logs(Box::new(filter)))
+    }
+
+    /// Create a [`SubscriptionKind::Syncing`] subscription
+    pub fn syncing(client: WeakClient) -> Self {
+        Self::new(client, SubscriptionKind::Syncing, Params::None)
+    }
+
+    /// Create a [`SubscriptionKind::NewPendingTransactions`] subscription
+    pub fn new_pending_transactions(client: WeakClient) -> Self {
+        Self::new(client, SubscriptionKind::NewPendingTransactions, Params::Bool(false))
     }
 
     /// Set the channel_size for the subscription stream.
@@ -34,24 +56,30 @@ where
         self.channel_size = Some(size);
         self
     }
+
+    /// Applies only to [`SubscriptionKind::NewPendingTransactions`] requests.
+    ///
+    /// Set to `true` to receive the full pending transactions and not just the transaction hash.
+    pub fn full_pending_txs(mut self, yes: bool) -> Self {
+        self.params = Params::Bool(yes);
+        self
+    }
 }
 
-impl<P, R> core::fmt::Debug for GetSubscription<P, R>
+impl<R> core::fmt::Debug for GetSubscription<R>
 where
-    P: RpcSend,
     R: RpcRecv,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GetSubscription")
             .field("channel_size", &self.channel_size)
-            .field("call", &self.call)
+            .field("kind", &self.kind)
             .finish()
     }
 }
 
-impl<P, R> std::future::IntoFuture for GetSubscription<P, R>
+impl<R> std::future::IntoFuture for GetSubscription<R>
 where
-    P: RpcSend + 'static,
     R: RpcRecv,
 {
     type Output = TransportResult<alloy_pubsub::Subscription<R>>;
@@ -63,12 +91,23 @@ where
                 self.client.upgrade().ok_or(TransportErrorKind::custom_str("client dropped"))?;
             let pubsub = client.pubsub_frontend().ok_or(TransportErrorKind::PubsubUnavailable)?;
 
+            let id = match self.kind {
+                SubscriptionKind::NewHeads => {
+                    client.request("eth_subscribe", ("newHeads",)).await?
+                }
+                SubscriptionKind::Logs => {
+                    client.request("eth_subscribe", ("logs", self.params)).await?
+                }
+                SubscriptionKind::Syncing => client.request("eth_subscribe", ("syncing",)).await?,
+                SubscriptionKind::NewPendingTransactions => {
+                    client.request("eth_subscribe", ("newPendingTransactions", self.params)).await?
+                }
+            };
+
             // Set config channel size if any
             if let Some(size) = self.channel_size {
                 pubsub.set_channel_size(size);
             }
-
-            let id = self.call.await?;
 
             pubsub.get_subscription(id).await.map(Subscription::from)
         })

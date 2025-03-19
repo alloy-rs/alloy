@@ -350,24 +350,24 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> crate::GetSubscription<(String,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> crate::GetSubscription<N::HeaderResponse> {
         self.0.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> crate::GetSubscription<(String,), B256> {
+    fn subscribe_pending_transactions(&self) -> crate::GetSubscription<B256> {
         self.0.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
     fn subscribe_full_pending_transactions(
         &self,
-    ) -> crate::GetSubscription<(String, bool), N::TransactionResponse> {
+    ) -> crate::GetSubscription<N::TransactionResponse> {
         self.0.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> crate::GetSubscription<(String, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> crate::GetSubscription<Log> {
         self.0.subscribe_logs(filter)
     }
 

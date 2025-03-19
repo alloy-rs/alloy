@@ -606,24 +606,24 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> crate::GetSubscription<(String,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> crate::GetSubscription<N::HeaderResponse> {
         self.inner.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> crate::GetSubscription<(String,), B256> {
+    fn subscribe_pending_transactions(&self) -> crate::GetSubscription<B256> {
         self.inner.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
     fn subscribe_full_pending_transactions(
         &self,
-    ) -> crate::GetSubscription<(String, bool), N::TransactionResponse> {
+    ) -> crate::GetSubscription<N::TransactionResponse> {
         self.inner.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> crate::GetSubscription<(String, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> crate::GetSubscription<Log> {
         self.inner.subscribe_logs(filter)
     }
 
