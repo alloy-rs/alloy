@@ -9,7 +9,10 @@ use alloy_transport::TransportResult;
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait AdminApi<N>: Send + Sync {
+pub trait AdminApi<N>: Send + Sync
+where
+    N: Network,
+ {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
     async fn add_peer(&self, record: &str) -> TransportResult<bool>;
