@@ -108,7 +108,7 @@ impl Error {
     /// }
     /// ```
     pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
+        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
     }
 
     /// Decode the revert data into a custom [`SolError`] type.
@@ -148,6 +148,6 @@ impl Error {
     /// }
     /// ```
     pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data, false).ok())
+        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
     }
 }

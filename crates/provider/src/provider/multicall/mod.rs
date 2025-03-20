@@ -16,7 +16,7 @@ use crate::provider::multicall::bindings::IMulticall3::{
     aggregate3Call, aggregate3ValueCall, aggregateCall, getBasefeeCall, getBlockHashCall,
     getBlockNumberCall, getChainIdCall, getCurrentBlockCoinbaseCall, getCurrentBlockDifficultyCall,
     getCurrentBlockGasLimitCall, getCurrentBlockTimestampCall, getEthBalanceCall,
-    getLastBlockHashCall, tryAggregateCall, tryAggregateReturn,
+    getLastBlockHashCall, tryAggregateCall,
 };
 
 mod inner_types;
@@ -391,8 +391,7 @@ where
             .collect::<Vec<_>>();
         let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
-        let tryAggregateReturn { returnData } = output;
-        T::decode_return_results(&returnData)
+        T::decode_return_results(&output)
     }
 
     /// Call the `aggregate3` function
@@ -432,7 +431,7 @@ where
             .collect::<Vec<_>>();
         let call = aggregate3Call { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
-        T::decode_return_results(&output.returnData)
+        T::decode_return_results(&output)
     }
 
     /// Call the `aggregate3Value` function
@@ -466,7 +465,7 @@ where
         let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
         let call = aggregate3ValueCall { calls: self.calls.to_vec() };
         let output = self.build_and_call(call, Some(total_value)).await?;
-        T::decode_return_results(&output.returnData)
+        T::decode_return_results(&output)
     }
 
     /// Call the `blockAndAggregate` function
@@ -531,7 +530,7 @@ where
         }
 
         let res = eth_call.await.map_err(MulticallError::TransportError)?;
-        M::abi_decode_returns(&res, false).map_err(MulticallError::DecodeError)
+        M::abi_decode_returns(&res).map_err(MulticallError::DecodeError)
     }
 
     /// Add a call to get the block hash from a block number
