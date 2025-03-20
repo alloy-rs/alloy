@@ -36,7 +36,9 @@ pub trait AdminApi<N>: Send + Sync {
 
     /// Subscribe to events received by peers over the network.
     #[cfg(feature = "pubsub")]
-    fn subscribe_peer_events(&self) -> GetSubscription<(), alloy_rpc_types_admin::PeerEvent>;
+    fn subscribe_peer_events(
+        &self,
+    ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -71,7 +73,9 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_peer_events(&self) -> GetSubscription<(), alloy_rpc_types_admin::PeerEvent> {
+    fn subscribe_peer_events(
+        &self,
+    ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent> {
         let mut rpc_call = self.client().request_noparams("admin_peerEvents_subscribe");
         rpc_call.set_is_subscription();
         GetSubscription::new(self.weak_client(), rpc_call)
