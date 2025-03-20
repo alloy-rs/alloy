@@ -1041,7 +1041,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(&'static str, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(&'static str, &Filter), Log> {
         let rpc_call = self.client().request("eth_subscribe", ("logs", filter));
         GetSubscription::new(self.weak_client(), rpc_call)
     }
