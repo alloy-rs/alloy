@@ -4,10 +4,7 @@ use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
-#[allow(unused_imports)]
-use alloy_rpc_types_eth::{
-    BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
-};
+use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
     TraceResult,
@@ -434,6 +431,7 @@ mod test {
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
+    use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
     async fn test_debug_trace_transaction() {
