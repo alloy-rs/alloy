@@ -45,7 +45,7 @@ where
     Resp: RpcRecv,
 {
     /// Instantiates a new `EthCallMany` with the given parameters.
-    pub fn new(caller: impl Caller<N, Resp> + 'static, bundles: &'req Vec<Bundle>) -> Self {
+    pub fn new(caller: impl Caller<N, Resp> + 'static, bundles: &'req [Bundle]) -> Self {
         Self {
             caller: Arc::new(caller),
             params: EthCallManyParams::new(bundles),
@@ -127,7 +127,7 @@ where
 /// Intermediate future for `"eth_callMany"` requests.
 #[derive(Debug)]
 #[doc(hidden)] // Not public API.
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 #[pin_project::pin_project]
 pub struct CallManyFut<'req, N: Network, Resp: RpcRecv, Output, Map: Fn(Resp) -> Output> {
     inner: CallManyInnerFut<'req, N, Resp, Output, Map>,

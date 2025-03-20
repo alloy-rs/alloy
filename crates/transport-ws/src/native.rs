@@ -87,7 +87,7 @@ impl PubSubConnect for WsConnect {
 
 impl WsBackend<TungsteniteStream> {
     /// Handle a message from the server.
-    #[allow(clippy::result_unit_err)]
+    #[expect(clippy::result_unit_err)]
     pub fn handle(&mut self, msg: Message) -> Result<(), ()> {
         match msg {
             Message::Text(text) => self.handle_text(&text),

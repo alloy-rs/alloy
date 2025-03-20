@@ -179,7 +179,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[doc(alias = "eth_callMany")]
     fn call_many<'req>(
         &self,
-        bundles: &'req Vec<Bundle>,
+        bundles: &'req [Bundle],
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         EthCallMany::new(self.weak_client(), bundles)
     }
