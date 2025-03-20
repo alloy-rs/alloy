@@ -81,7 +81,6 @@ impl core::error::Error for Eip2718Error {}
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[auto_impl(&)]
 pub trait Decodable2718: Sized {
     /// Extract the type byte from the buffer, if any. The type byte is the
     /// first byte, provided that that first byte is 0x7f or lower.
@@ -180,6 +179,7 @@ pub trait Decodable2718: Sized {
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+#[auto_impl(&)]
 pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     /// Return the type flag (if any).
     ///
@@ -226,9 +226,9 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     }
 
     /// Seal the encodable, by encoding and hashing it.
-    fn seal(self) -> Sealed<Self> {
+    fn seal(&self) -> Sealed<Self> where Self: Clone {
         let hash = self.trie_hash();
-        Sealed::new_unchecked(self, hash)
+        Sealed::new_unchecked(self.clone(), hash)
     }
 
     /// The length of the 2718 encoded envelope in network format. This is the
