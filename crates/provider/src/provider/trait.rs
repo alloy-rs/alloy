@@ -964,7 +964,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// let sub = provider.subscribe_pending_transactions().await?;
     /// let mut stream = sub.into_stream().take(5);
     /// while let Some(tx_hash) = stream.next().await {
-    ///    println!("new pending transaction hash: {tx_hash}");
+    ///    println!("new pending transaction hash: {:?}", tx_hash);
     /// }
     /// # Ok(())
     /// # }
