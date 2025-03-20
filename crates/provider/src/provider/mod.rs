@@ -27,3 +27,6 @@ pub use multicall::*;
 
 mod erased;
 pub use erased::DynProvider;
+
+mod subscription;
+pub use subscription::GetSubscription;

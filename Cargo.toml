@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.12.5"
+version = "0.12.6"
 edition = "2021"
 rust-version = "1.81"
 authors = ["Alloy Contributors"]
@@ -84,6 +84,9 @@ alloy-eip2124 = { version = "0.1.0", default-features = false }
 alloy-eip2930 = { version = "0.1.0", default-features = false }
 alloy-eip7702 = { version = "0.5.1", default-features = false }
 
+# hardforks
+alloy-hardforks = "0.1.0"
+
 # ethereum
 ethereum_ssz_derive = "0.8"
 ethereum_ssz = "0.8"
@@ -97,6 +100,7 @@ k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 sha2 = { version = "0.10", default-features = false }
 spki = { version = "0.7", default-features = false }
 
+
 # async
 async-stream = "0.3"
 async-trait = "0.1"
@@ -106,6 +110,7 @@ futures-executor = "0.3"
 futures-utils-wasm = "0.1"
 wasmtimer = "0.4.0"
 
+gcloud-sdk = "0.26.4"
 hyper = { version = "1.2", default-features = false }
 hyper-util = "0.1"
 hyper-tls = "0.6.0"
