@@ -3,6 +3,8 @@
 #![allow(unknown_lints, elided_named_lifetimes)]
 
 use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, Eip1559Estimator},
@@ -935,12 +937,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::HeaderResponse>> {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
-        self.root().get_subscription(id).await
+    fn subscribe_blocks(&self) -> GetSubscription<(&'static str,), N::HeaderResponse> {
+        let rpc_call = self.client().request("eth_subscribe", ("newHeads",));
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 
     /// Subscribe to a stream of pending transaction hashes.

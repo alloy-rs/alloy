@@ -350,10 +350,8 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::HeaderResponse>> {
-        self.0.subscribe_blocks().await
+    fn subscribe_blocks(&self) -> crate::GetSubscription<(&'static str,), N::HeaderResponse> {
+        self.0.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
