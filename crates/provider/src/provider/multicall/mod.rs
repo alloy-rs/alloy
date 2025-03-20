@@ -57,7 +57,7 @@ pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE
 /// #[tokio::main]
 /// async fn main() {
 ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
 ///     let erc20 = ERC20::new(weth, &provider);
 ///
 ///     let ts_call = erc20.totalSupply();
@@ -137,7 +137,7 @@ where
     ///    let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
     ///    let usdc = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
     ///     
-    ///    let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///    let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///    let weth = ERC20::new(weth, &provider);
     ///    let usdc = ERC20::new(usdc, &provider);
     ///
@@ -306,7 +306,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///     let erc20 = ERC20::new(weth, &provider);
     ///
     ///     let ts_call = erc20.totalSupply();
@@ -369,7 +369,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///     let erc20 = ERC20::new(weth, &provider);
     ///
     ///     let ts_call = erc20.totalSupply();

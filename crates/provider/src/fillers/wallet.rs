@@ -22,7 +22,7 @@ use super::{FillerControlFlow, TxFiller};
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
 /// let pk: PrivateKeySigner = "0x...".parse()?;
-/// let provider = ProviderBuilder::new().wallet(pk).on_http(url);
+/// let provider = ProviderBuilder::new().wallet(pk).connect_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())
@@ -131,7 +131,7 @@ mod tests {
 
     #[tokio::test]
     async fn poc() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let tx = TransactionRequest {
             nonce: Some(0),
@@ -169,7 +169,7 @@ mod tests {
 
         let anvil = Anvil::new().spawn();
 
-        let provider = ProviderBuilder::new().wallet(pk.clone()).on_http(anvil.endpoint_url());
+        let provider = ProviderBuilder::new().wallet(pk.clone()).connect_http(anvil.endpoint_url());
 
         let tx = TransactionRequest {
             nonce: Some(0),

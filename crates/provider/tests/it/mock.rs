@@ -6,7 +6,7 @@ use alloy_transport::mock::Asserter;
 #[tokio::test]
 async fn mocked_default_provider() {
     let asserter = Asserter::new();
-    let provider = ProviderBuilder::new().on_mocked_client(asserter.clone());
+    let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
 
     asserter.push_success(&21965802);
     asserter.push_success(&21965803);

@@ -29,7 +29,7 @@ use crate::{
 /// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
 /// let pk: PrivateKeySigner = "0x...".parse()?;
 /// let provider =
-///     ProviderBuilder::<_, _, Ethereum>::default().with_chain_id(1).wallet(pk).on_http(url);
+///     ProviderBuilder::<_, _, Ethereum>::default().with_chain_id(1).wallet(pk).connect_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())

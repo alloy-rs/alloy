@@ -65,7 +65,7 @@ mod tests {
     #[tokio::test]
     async fn test_single() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
 
         let erc20 = ERC20::new(weth, &provider);
         let multicall = provider.multicall().add(erc20.totalSupply());
@@ -76,7 +76,7 @@ mod tests {
     #[tokio::test]
     async fn test_aggregate() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
 
         let erc20 = ERC20::new(weth, &provider);
 
@@ -96,7 +96,7 @@ mod tests {
     #[tokio::test]
     async fn test_try_aggregate_pass() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
         let erc20 = ERC20::new(weth, &provider);
 
         let multicall = provider
@@ -113,8 +113,9 @@ mod tests {
     async fn aggregate3() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
 
         let dummy = deploy_dummy(provider.clone()).await;
         let erc20 = ERC20::new(weth, &provider);
@@ -145,8 +146,9 @@ mod tests {
     #[tokio::test]
     async fn test_try_aggregate_fail() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
 
         let dummy_addr = deploy_dummy(provider.clone()).await;
         let erc20 = ERC20::new(weth, &provider);
@@ -176,7 +178,7 @@ mod tests {
     async fn test_util() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
         let provider = ProviderBuilder::new()
-            .on_anvil_with_config(|a| a.fork(FORK_URL).fork_block_number(21787144));
+            .connect_anvil_with_config(|a| a.fork(FORK_URL).fork_block_number(21787144));
         let erc20 = ERC20::new(weth, &provider);
         let multicall = provider
             .multicall()
@@ -212,8 +214,9 @@ mod tests {
 
     #[tokio::test]
     async fn aggregate3_value() {
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
 
         let payable_counter = PayableCounter::deploy(provider.clone()).await.unwrap();
 
@@ -258,7 +261,7 @@ mod tests {
     #[tokio::test]
     async fn test_clear() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
 
         let erc20 = ERC20::new(weth, &provider);
         let multicall = provider
@@ -273,7 +276,7 @@ mod tests {
     #[tokio::test]
     async fn add_dynamic() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
 
         let erc20 = ERC20::new(weth, &provider);
 
@@ -295,7 +298,7 @@ mod tests {
     #[tokio::test]
     async fn test_extend_dynamic() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.fork(FORK_URL));
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
         let erc20 = ERC20::new(weth, &provider);
         let ts_calls = vec![erc20.totalSupply(); 18];
         let multicall = MulticallBuilder::new_dynamic(provider.clone()).extend(ts_calls);

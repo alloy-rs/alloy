@@ -31,7 +31,7 @@ async fn ws_retry_pubsub() -> Result<(), Box<dyn std::error::Error>> {
 
     let rpc_client = RpcClient::builder().layer(retry_layer).ws(ws).await?;
 
-    let provider = ProviderBuilder::new().disable_recommended_fillers().on_client(rpc_client);
+    let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(rpc_client);
 
     let _ = provider.subscribe_blocks().await?;
 

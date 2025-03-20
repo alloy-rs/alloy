@@ -54,8 +54,10 @@ pub enum GasFillable {
 /// # use alloy_signer_local::PrivateKeySigner;
 /// # async fn test(url: url::Url) -> Result<(), Box<dyn std::error::Error>> {
 /// let pk: PrivateKeySigner = "0x...".parse()?;
-/// let provider =
-///     ProviderBuilder::<_, _, Ethereum>::default().with_gas_estimation().wallet(pk).on_http(url);
+/// let provider = ProviderBuilder::<_, _, Ethereum>::default()
+///     .with_gas_estimation()
+///     .wallet(pk)
+///     .connect_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())
@@ -253,7 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
@@ -273,7 +275,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest {
@@ -292,7 +294,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_max_fee_per_blob_gas() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
         let sidecar = sidecar.build().unwrap();
@@ -319,7 +321,7 @@ mod tests {
 
     #[tokio::test]
     async fn zero_max_fee_per_blob_gas() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
         let sidecar = sidecar.build().unwrap();

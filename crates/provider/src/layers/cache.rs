@@ -476,7 +476,7 @@ mod tests {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).connect_http(anvil.endpoint_url());
 
             let from = anvil.addresses()[0];
             let path = dir.join("rpc-cache-proof.txt");
@@ -524,7 +524,7 @@ mod tests {
             let provider = ProviderBuilder::new()
                 .disable_recommended_fillers()
                 .layer(cache_layer)
-                .on_http(anvil.endpoint_url());
+                .connect_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-tx.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -558,7 +558,7 @@ mod tests {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).connect_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-block-receipts.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -592,7 +592,7 @@ mod tests {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
-            let provider = ProviderBuilder::default().with_gas_estimation().layer(cache_layer).on_anvil_with_wallet();
+            let provider = ProviderBuilder::default().with_gas_estimation().layer(cache_layer).connect_anvil_with_wallet();
 
             let path = dir.join("rpc-cache-code.txt");
             shared_cache.load_cache(path.clone()).unwrap();
