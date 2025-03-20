@@ -12,6 +12,8 @@ use alloy_primitives::{
     Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
 };
 use alloy_rpc_client::{ClientRef, NoParams, WeakClient};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
@@ -352,24 +354,26 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> GetSubscription<(&'static str,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         self.0.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> GetSubscription<(&'static str,), B256> {
+    fn subscribe_pending_transactions(
+        &self,
+    ) -> GetSubscription<(SubscriptionKind,), N::TransactionResponse> {
         self.0.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
     fn subscribe_full_pending_transactions(
         &self,
-    ) -> GetSubscription<(&'static str, bool), N::TransactionResponse> {
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
         self.0.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(&'static str, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Filter), Log> {
         self.0.subscribe_logs(filter)
     }
 

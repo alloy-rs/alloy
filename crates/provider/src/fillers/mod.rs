@@ -12,6 +12,8 @@ use alloy_primitives::{
     Address, BlockHash, BlockNumber, StorageKey, StorageValue, TxHash, B256, U128, U256,
 };
 use alloy_rpc_client::NoParams;
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{Bundle, Index, SyncStatus};
 pub use chain_id::ChainIdFiller;
 use std::borrow::Cow;
@@ -608,24 +610,26 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> GetSubscription<(&'static str,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         self.inner.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(&self) -> GetSubscription<(&'static str,), B256> {
+    fn subscribe_pending_transactions(
+        &self,
+    ) -> GetSubscription<(SubscriptionKind,), N::TransactionResponse> {
         self.inner.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
     fn subscribe_full_pending_transactions(
         &self,
-    ) -> GetSubscription<(&'static str, bool), N::TransactionResponse> {
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
         self.inner.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(&'static str, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Filter), Log> {
         self.inner.subscribe_logs(filter)
     }
 
