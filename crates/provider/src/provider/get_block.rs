@@ -265,7 +265,7 @@ mod tests {
     #[tokio::test]
     async fn test_pending_block_deser() {
         let provider =
-            ProviderBuilder::new().on_http("https://binance.llamarpc.com".parse().unwrap());
+            ProviderBuilder::new().connect_http("https://binance.llamarpc.com".parse().unwrap());
 
         let _block = provider.get_block_by_number(BlockNumberOrTag::Pending).await.unwrap();
     }

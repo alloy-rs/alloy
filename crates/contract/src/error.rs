@@ -91,7 +91,7 @@ impl Error {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
     ///
     ///     let throws_err = ThrowsError::deploy(provider).await.unwrap();
     ///
@@ -136,7 +136,7 @@ impl Error {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
     ///
     ///     let throws_err = ThrowsError::deploy(provider).await.unwrap();
     ///

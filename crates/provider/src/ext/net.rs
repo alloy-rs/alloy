@@ -46,7 +46,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let version =
                     provider.net_version().await.expect("net_version call should succeed");
@@ -62,7 +62,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let count =
                     provider.net_peer_count().await.expect("net_peerCount call should succeed");
@@ -78,7 +78,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let listening =
                     provider.net_listening().await.expect("net_listening call should succeed");

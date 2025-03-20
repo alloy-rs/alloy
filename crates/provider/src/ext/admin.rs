@@ -93,7 +93,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let node_info = provider.node_info().await.unwrap();
                 assert!(node_info.enode.starts_with("enode://"));
             })
@@ -116,8 +116,8 @@ mod test {
                         .data_dir(&temp_dir_2)
                         .spawn();
 
-                    let provider1 = ProviderBuilder::new().on_http(geth1.endpoint_url());
-                    let provider2 = ProviderBuilder::new().on_http(geth2.endpoint_url());
+                    let provider1 = ProviderBuilder::new().connect_http(geth1.endpoint_url());
+                    let provider2 = ProviderBuilder::new().connect_http(geth2.endpoint_url());
                     let node1_info = provider1.node_info().await.unwrap();
                     let node1_id = node1_info.id;
                     let node1_enode = node1_info.enode;

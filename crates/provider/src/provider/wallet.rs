@@ -97,14 +97,15 @@ mod test {
 
     #[test]
     fn basic_usage() {
-        let provider = ProviderBuilder::new().disable_recommended_fillers().on_anvil_with_wallet();
+        let provider =
+            ProviderBuilder::new().disable_recommended_fillers().connect_anvil_with_wallet();
 
         assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }
 
     #[test]
     fn bubbles_through_fillers() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }

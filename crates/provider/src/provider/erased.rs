@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn test_erased_provider() {
         let provider =
-            ProviderBuilder::new().on_http("http://localhost:8080".parse().unwrap()).erased();
+            ProviderBuilder::new().connect_http("http://localhost:8080".parse().unwrap()).erased();
         assert_provider(provider);
     }
 }

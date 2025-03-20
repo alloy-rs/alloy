@@ -414,7 +414,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         N: Network,
     {
         let client = ClientBuilder::default().ws(connect).await?;
-        Ok(self.on_client(client))
+        Ok(self.connect_client(client))
     }
 
     /// Build this provider with an IPC connection.
@@ -539,7 +539,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
     {
-        self.on_anvil_with_config(std::convert::identity)
+        self.connect_anvil_with_config(std::convert::identity)
     }
 
     /// Build this provider with anvil, using the BoxTransport.
@@ -551,7 +551,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
     {
-        self.on_anvil_with_config(std::convert::identity)
+        self.connect_anvil_with_config(std::convert::identity)
     }
 
     /// Build this provider with anvil, using the BoxTransport. This
@@ -566,7 +566,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
     {
-        self.on_anvil_with_wallet_and_config(std::convert::identity)
+        self.connect_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
     }
 
@@ -583,7 +583,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
     {
-        self.on_anvil_with_wallet_and_config(std::convert::identity)
+        self.connect_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
     }
 

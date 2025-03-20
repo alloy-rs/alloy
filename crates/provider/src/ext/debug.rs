@@ -434,7 +434,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_transaction() {
         async_ci_only(|| async move {
-            let provider = ProviderBuilder::new().on_anvil_with_wallet();
+            let provider = ProviderBuilder::new().connect_anvil_with_wallet();
             let from = provider.default_signer_address();
 
             let gas_price = provider.get_gas_price().await.unwrap();
@@ -462,7 +462,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_call() {
         async_ci_only(|| async move {
-            let provider = ProviderBuilder::new().on_anvil_with_wallet();
+            let provider = ProviderBuilder::new().connect_anvil_with_wallet();
             let from = provider.default_signer_address();
             let gas_price = provider.get_gas_price().await.unwrap();
             let tx = TransactionRequest::default()
@@ -492,7 +492,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let rlp_header = provider
                     .debug_get_raw_header(BlockId::Number(BlockNumberOrTag::Latest))
@@ -511,7 +511,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let rlp_block = provider
                     .debug_get_raw_block(BlockId::Number(BlockNumberOrTag::Latest))
@@ -530,7 +530,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let result = provider
                     .debug_get_raw_receipts(BlockId::Number(BlockNumberOrTag::Latest))
@@ -547,7 +547,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let result = provider.debug_get_bad_blocks().await;
                 assert!(result.is_ok());
@@ -563,7 +563,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
                 let tx1 = TransactionRequest::default()
                     .with_from(address!("0000000000000000000000000000000000000123"))
@@ -617,7 +617,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
                 // Contract (mainnet): 0x4e59b44847b379578588920ca78fbf26c0b4956c
                 let code = provider.debug_code_by_hash(
