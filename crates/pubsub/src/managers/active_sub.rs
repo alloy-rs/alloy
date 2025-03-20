@@ -1,8 +1,9 @@
 use crate::RawSubscription;
 use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
+use parking_lot::Mutex;
 use serde_json::value::RawValue;
-use std::{fmt, hash::Hash, sync::Mutex};
+use std::{fmt, hash::Hash, ops::DerefMut};
 use tokio::sync::broadcast;
 
 /// An active subscription.
@@ -80,12 +81,8 @@ impl ActiveSubscription {
             return RawSubscription { rx: new_rx, local_id: self.local_id };
         }
 
-        let lock = self.rx.lock();
-
-        if lock.is_err() {
-            return RawSubscription { rx: new_rx, local_id: self.local_id };
-        }
-        if let Some(mut rx) = lock.unwrap().take() {
+        let mut lock = self.rx.lock();
+        if let Some(mut rx) = lock.deref_mut().take() {
             // Attempt to drain the queue by forwarding all pending notifications to the new
             // receiver.
 
