@@ -24,9 +24,6 @@ pub type NoParams = [(); 0];
 #[cfg(feature = "pubsub")]
 type MaybePubsub = Option<alloy_pubsub::PubSubFrontend>;
 
-#[cfg(not(feature = "pubsub"))]
-type MaybePubsub = ();
-
 /// A JSON-RPC client.
 ///
 /// [`RpcClient`] should never be instantiated directly. Instead, use
@@ -74,7 +71,7 @@ impl RpcClient {
         Self::new(http, is_local)
     }
 
-    /// Creates a new [`RpcClient`] with the given transport and an optional [`MaybePubsub`].
+    /// Creates a new [`RpcClient`] with the given transport and a `MaybePubsub`.
     fn new_maybe_pubsub(
         t: impl IntoBoxTransport,
         is_local: bool,
@@ -96,7 +93,7 @@ impl RpcClient {
     /// `PubSubFrontend` which we need for [`RpcClientInner::pubsub_frontend`].
     ///
     /// This workaround exists because due to how [`tower::ServiceBuilder::service`] collapses into
-    /// a [`BoxTransport`] we wouldn't be obtain the [`MaybePubsub`] by downcasting the layered
+    /// a [`BoxTransport`] we wouldn't be obtain the `MaybePubsub` by downcasting the layered
     /// `transport`.
     pub(crate) fn new_layered<F, T, R>(is_local: bool, main_transport: T, layer: F) -> Self
     where

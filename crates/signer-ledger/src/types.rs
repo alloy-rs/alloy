@@ -65,6 +65,7 @@ pub(crate) const P1_FIRST: u8 = 0x00;
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[expect(non_camel_case_types)]
+#[allow(dead_code)] // Some variants are only used with certain features.
 pub(crate) enum INS {
     GET_PUBLIC_KEY = 0x02,
     SIGN = 0x04,
