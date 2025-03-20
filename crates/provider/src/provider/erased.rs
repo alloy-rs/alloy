@@ -4,8 +4,8 @@ use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, Eip1559Estimator},
-    EthCall, PendingTransaction, PendingTransactionBuilder,
-    PendingTransactionConfig, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
+    ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{

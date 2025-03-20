@@ -32,8 +32,8 @@ use tracing::error;
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder,
-    Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
 };
 use alloy_json_rpc::RpcError;
