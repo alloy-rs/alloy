@@ -387,7 +387,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///     let block_hash = b256!("6032d03ee8e43e8999c2943152a4daebfc4b75b7f7a9647d2677299d215127da");
     ///
     ///     // Gets a block by its hash with only transactions hashes.
@@ -414,7 +415,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///     let num = BlockNumberOrTag::Number(0);
     ///
     ///     // Gets a block by its number with only transactions hashes.

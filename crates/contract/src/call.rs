@@ -867,7 +867,8 @@ mod tests {
 
         let wallet = EthereumWallet::new(pk);
 
-        let wallet_provider = ProviderBuilder::new().wallet(wallet).connect_http(anvil.endpoint_url());
+        let wallet_provider =
+            ProviderBuilder::new().wallet(wallet).connect_http(anvil.endpoint_url());
 
         let contract = SendMoney::deploy(wallet_provider.clone()).await.unwrap();
 

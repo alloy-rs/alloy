@@ -113,8 +113,9 @@ mod tests {
     async fn aggregate3() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
-        let provider =
-            ProviderBuilder::new().connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
 
         let dummy = deploy_dummy(provider.clone()).await;
         let erc20 = ERC20::new(weth, &provider);
@@ -145,8 +146,9 @@ mod tests {
     #[tokio::test]
     async fn test_try_aggregate_fail() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let provider =
-            ProviderBuilder::new().connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
 
         let dummy_addr = deploy_dummy(provider.clone()).await;
         let erc20 = ERC20::new(weth, &provider);
@@ -212,8 +214,9 @@ mod tests {
 
     #[tokio::test]
     async fn aggregate3_value() {
-        let provider =
-            ProviderBuilder::new().connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
 
         let payable_counter = PayableCounter::deploy(provider.clone()).await.unwrap();
 
