@@ -1,7 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_json_rpc::RpcRecv;
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
@@ -14,10 +14,7 @@ use alloy_transport::TransportResult;
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait DebugApi<N>: Send + Sync
-where
-    N: Network,
-{
+pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
 
