@@ -1018,6 +1018,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         );
         GetSubscription::new(self.weak_client(), rpc_call)
     }
+
     /// Subscribe to a stream of logs matching given filter.
     ///
     /// # Errors
