@@ -59,8 +59,10 @@ where
 
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(async move {
-            let client =
-                self.client.upgrade().ok_or(TransportErrorKind::custom_str("client dropped"))?;
+            let client = self
+                .client
+                .upgrade()
+                .ok_or_else(|| TransportErrorKind::custom_str("client dropped"))?;
             let pubsub = client.pubsub_frontend().ok_or(TransportErrorKind::PubsubUnavailable)?;
 
             // Set config channel size if any
