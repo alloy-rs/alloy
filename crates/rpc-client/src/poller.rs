@@ -1,4 +1,4 @@
-use crate::WeakClient;
+use crate::{stream::PollerStream, WeakClient};
 use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
 use async_stream::stream;
@@ -169,8 +169,8 @@ where
     ///
     /// Note that this does not spawn the poller on a separate task, thus all responses will be
     /// polled on the current thread once this stream is polled.
-    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
-        Box::pin(self.into_local_stream())
+    pub fn into_stream(self) -> PollerStream<Resp> {
+        PollerStream::new(Box::pin(self.into_local_stream()))
     }
 
     fn into_local_stream(self) -> impl Stream<Item = Resp> {
@@ -264,9 +264,8 @@ where
     }
 
     /// Converts the poll channel into a stream.
-    // TODO: can we name this type?
-    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
-        self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok()))
+    pub fn into_stream(self) -> PollerStream<Resp> {
+        PollerStream::new(self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok())))
     }
 
     /// Converts the poll channel into a stream that also yields
