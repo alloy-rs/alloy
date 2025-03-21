@@ -20,7 +20,7 @@ pub(crate) struct ActiveSubscription {
     /// using [`ActiveSubscription::new`] and [`ActiveSubscription::subscribe`]. Ref: <https://github.com/alloy-rs/alloy/issues/2187>
     ///
     /// This is wrapped in a [`Mutex`] to allow for mutable access to the receiver without making
-    /// [`ActiveSubscription::subscribe`] requiring mutable self.
+    /// [`ActiveSubscription::subscribe`] require mutable self.
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
 }
 
