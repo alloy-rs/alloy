@@ -29,6 +29,8 @@ missing-const-for-fn = "allow"          # TODO: https://github.com/rust-lang/rus
 use-self = "warn"
 option-if-let-else = "warn"
 redundant-clone = "warn"
+large-enum-variant = "allow"
+result-large-err = "allow"
 
 [workspace.dependencies]
 alloy-consensus = { version = "0.12", path = "crates/consensus", default-features = false }

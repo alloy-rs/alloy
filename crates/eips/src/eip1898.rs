@@ -542,7 +542,7 @@ impl<'de> serde::Deserialize<'de> for BlockId {
                     }
                 }
 
-                #[allow(clippy::option_if_let_else)]
+                #[expect(clippy::option_if_let_else)]
                 if let Some(number) = number {
                     Ok(number.into())
                 } else if let Some(block_hash) = block_hash {

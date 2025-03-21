@@ -1,4 +1,6 @@
 use super::{EthCallMany, EthGetBlock, FilterPollerBuilder};
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, Eip1559Estimator},
@@ -10,6 +12,8 @@ use alloy_primitives::{
     Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
 };
 use alloy_rpc_client::{ClientRef, NoParams, WeakClient};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
@@ -79,7 +83,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
 
     fn call_many<'req>(
         &self,
-        bundles: &'req Vec<Bundle>,
+        bundles: &'req [Bundle],
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         self.0.call_many(bundles)
     }
@@ -350,32 +354,25 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::HeaderResponse>> {
-        self.0.subscribe_blocks().await
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
+        self.0.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
-        self.0.subscribe_pending_transactions().await
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
+        self.0.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_full_pending_transactions(
+    fn subscribe_full_pending_transactions(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
-        self.0.subscribe_full_pending_transactions().await
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
+        self.0.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
-        &self,
-        filter: &Filter,
-    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
-        self.0.subscribe_logs(filter).await
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+        self.0.subscribe_logs(filter)
     }
 
     #[cfg(feature = "pubsub")]

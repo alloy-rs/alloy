@@ -83,7 +83,7 @@ impl<N: Network> RootProvider<N> {
 impl<N: Network> RootProvider<N> {
     /// Boxes the inner client.
     #[deprecated(since = "0.9.0", note = "`RootProvider` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
+    #[expect(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self
     }

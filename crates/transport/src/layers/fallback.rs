@@ -291,7 +291,7 @@ impl<S> PartialEq for ScoredTransport<S> {
 
 impl<S> Eq for ScoredTransport<S> {}
 
-#[allow(clippy::non_canonical_partial_ord_impl)]
+#[expect(clippy::non_canonical_partial_ord_impl)]
 impl<S> PartialOrd for ScoredTransport<S> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.score().partial_cmp(&other.score())

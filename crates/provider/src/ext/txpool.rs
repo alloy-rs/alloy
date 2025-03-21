@@ -6,7 +6,6 @@ use alloy_rpc_types_txpool::{TxpoolContent, TxpoolContentFrom, TxpoolInspect, Tx
 use alloy_transport::TransportResult;
 
 /// Txpool namespace rpc interface.
-#[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait TxPoolApi<N: Network = Ethereum>: Send + Sync {
