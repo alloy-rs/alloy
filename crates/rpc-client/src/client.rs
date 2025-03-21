@@ -24,9 +24,6 @@ pub type NoParams = [(); 0];
 #[cfg(feature = "pubsub")]
 type MaybePubsub = Option<alloy_pubsub::PubSubFrontend>;
 
-#[cfg(not(feature = "pubsub"))]
-type MaybePubsub = Option<()>;
-
 /// A JSON-RPC client.
 ///
 /// [`RpcClient`] should never be instantiated directly. Instead, use
@@ -52,7 +49,12 @@ impl RpcClient {
 impl RpcClient {
     /// Creates a new [`RpcClient`] with the given transport.
     pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
-        Self::new_maybe_pubsub(t, is_local, None)
+        Self::new_maybe_pubsub(
+            t,
+            is_local,
+            #[cfg(feature = "pubsub")]
+            None,
+        )
     }
 
     /// Create a new [`RpcClient`] with a transport that returns mocked responses from the given
@@ -69,13 +71,18 @@ impl RpcClient {
         Self::new(http, is_local)
     }
 
-    /// Creates a new [`RpcClient`] with the given transport and an optional [`MaybePubsub`].
-    pub(crate) fn new_maybe_pubsub(
+    /// Creates a new [`RpcClient`] with the given transport and a `MaybePubsub`.
+    fn new_maybe_pubsub(
         t: impl IntoBoxTransport,
         is_local: bool,
-        pubsub: MaybePubsub,
+        #[cfg(feature = "pubsub")] pubsub: MaybePubsub,
     ) -> Self {
-        Self(Arc::new(RpcClientInner::new_maybe_pubsub(t, is_local, pubsub)))
+        Self(Arc::new(RpcClientInner::new_maybe_pubsub(
+            t,
+            is_local,
+            #[cfg(feature = "pubsub")]
+            pubsub,
+        )))
     }
 
     /// Creates the [`RpcClient`] with the `main_transport` (ipc, ws, http) and a `layer` closure.
@@ -84,8 +91,9 @@ impl RpcClient {
     /// transport services. The `main_transport` is expected to the type that actually emits the
     /// request object: `PubSubFrontend`. This exists so that we can intercept the
     /// `PubSubFrontend` which we need for [`RpcClientInner::pubsub_frontend`].
+    ///
     /// This workaround exists because due to how [`tower::ServiceBuilder::service`] collapses into
-    /// a [`BoxTransport`] we wouldn't be obtain the [`MaybePubsub`] by downcasting the layered
+    /// a [`BoxTransport`] we wouldn't be obtain the `MaybePubsub` by downcasting the layered
     /// `transport`.
     pub(crate) fn new_layered<F, T, R>(is_local: bool, main_transport: T, layer: F) -> Self
     where
@@ -155,7 +163,7 @@ impl RpcClient {
 
     /// Boxes the transport.
     #[deprecated(since = "0.9.0", note = "`RpcClient` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
+    #[expect(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self
     }
@@ -198,7 +206,7 @@ pub struct RpcClientInner {
     /// layer the actual transport can be an arbitrary type and we would be unable to obtain the
     /// `PubSubFrontend` by downcasting the `transport`. For example
     /// `RetryTransport<PubSubFrontend>`.
-    #[allow(unused)]
+    #[cfg(feature = "pubsub")]
     pub(crate) pubsub: MaybePubsub,
     /// `true` if the transport is local.
     pub(crate) is_local: bool,
@@ -217,6 +225,7 @@ impl RpcClientInner {
     pub fn new(t: impl IntoBoxTransport, is_local: bool) -> Self {
         Self {
             transport: t.into_box_transport(),
+            #[cfg(feature = "pubsub")]
             pubsub: None,
             is_local,
             id: AtomicU64::new(0),
@@ -229,9 +238,13 @@ impl RpcClientInner {
     pub(crate) fn new_maybe_pubsub(
         t: impl IntoBoxTransport,
         is_local: bool,
-        pubsub: MaybePubsub,
+        #[cfg(feature = "pubsub")] pubsub: MaybePubsub,
     ) -> Self {
-        Self { pubsub, ..Self::new(t.into_box_transport(), is_local) }
+        Self {
+            #[cfg(feature = "pubsub")]
+            pubsub,
+            ..Self::new(t.into_box_transport(), is_local)
+        }
     }
 
     /// Sets the starting ID for the client.
@@ -368,7 +381,7 @@ impl RpcClientInner {
     /// Type erase the service in the transport, allowing it to be used in a
     /// generic context.
     #[deprecated(since = "0.9.0", note = "`RpcClientInner` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
+    #[expect(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self
     }

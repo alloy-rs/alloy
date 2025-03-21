@@ -235,7 +235,7 @@ where
     }
 
     /// Appends a [`SolCall`] to the stack.
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn add<Item: MulticallItem>(self, item: Item) -> MulticallBuilder<T::Pushed, P, N>
     where
         Item::Decoder: 'static,
