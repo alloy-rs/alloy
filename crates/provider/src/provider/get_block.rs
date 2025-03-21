@@ -5,11 +5,14 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
-use alloy_primitives::{Address, BlockHash, B256, B64, U256};
-use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall};
+use alloy_primitives::{Address, BlockHash, B256, B64};
+use alloy_rpc_client::{ClientRef, RpcCall};
 use alloy_transport::{TransportError, TransportResult};
+use either::Either;
 use futures::{Stream, StreamExt};
 use serde_json::Value;
+
+use super::FilterPollerBuilder;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
@@ -257,15 +260,28 @@ where
     }
 }
 
-/// A builder type for polling full blocks.
+/// A builder type for polling new blocks using the [`FilterPollerBuilder`].
 ///
 /// By default, this polls for blocks with [`BlockTransactionsKind::Hashes`].
+///
+/// [`WatchBlocks::full`] should be used to poll for blocks with
+/// [`BlockTransactionsKind::Full`].
 ///
 /// The polling stream must be consumed by calling [`WatchBlocks::into_stream`].
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
 pub struct WatchBlocks<BlockResp> {
-    poller: PollerBuilder<(U256,), Vec<B256>>,
+    /// [`PollerBuilder`] for polling new block hashes.
+    ///
+    /// On every poll it returns an array of block hashes [`Vec<B256>`] as `eth_getFilterChanges`
+    /// returns an array of logs. See <https://docs.alchemy.com/reference/eth-getfilterchanges-1>.
+    poller: FilterPollerBuilder<B256>,
+    /// The [`BlockTransactionsKind`] to retrieve on each poll.
+    ///
+    /// Default is [`BlockTransactionsKind::Hashes`].
+    ///
+    /// [`WatchBlocks::full`] should be used to poll for blocks with
+    /// [`BlockTransactionsKind::Full`].
     kind: BlockTransactionsKind,
     _pd: std::marker::PhantomData<BlockResp>,
 }
@@ -275,7 +291,7 @@ where
     BlockResp: BlockResponse + RpcRecv,
 {
     /// Create a new [`WatchBlocks`] instance.
-    pub fn new(poller: PollerBuilder<(U256,), Vec<B256>>) -> Self {
+    pub(crate) fn new(poller: FilterPollerBuilder<B256>) -> Self {
         Self { poller, kind: BlockTransactionsKind::Hashes, _pd: PhantomData }
     }
 
@@ -307,9 +323,9 @@ where
                 futures::stream::iter(match res {
                     Ok(blocks) => {
                         // Ignore `None` responses.
-                        blocks.into_iter().filter_map(|opt_block| opt_block.map(Ok)).collect()
+                        Either::Left(blocks.into_iter().filter_map(|block| block.map(Ok)))
                     }
-                    Err(err) => vec![Err(err)],
+                    Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
 
