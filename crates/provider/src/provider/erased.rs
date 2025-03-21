@@ -359,9 +359,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(
-        &self,
-    ) -> GetSubscription<(SubscriptionKind,), N::TransactionResponse> {
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
         self.0.subscribe_pending_transactions()
     }
 
@@ -373,7 +371,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
         self.0.subscribe_logs(filter)
     }
 

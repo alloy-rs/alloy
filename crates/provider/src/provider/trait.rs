@@ -964,15 +964,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// let sub = provider.subscribe_pending_transactions().await?;
     /// let mut stream = sub.into_stream().take(5);
     /// while let Some(tx_hash) = stream.next().await {
-    ///    println!("new pending transaction hash: {:?}", tx_hash);
+    ///    println!("new pending transaction hash: {tx_hash}");
     /// }
     /// # Ok(())
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(
-        &self,
-    ) -> GetSubscription<(SubscriptionKind,), N::TransactionResponse> {
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
         let rpc_call =
             self.client().request("eth_subscribe", (SubscriptionKind::NewPendingTransactions,));
         GetSubscription::new(self.weak_client(), rpc_call)
@@ -1050,9 +1048,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Filter), Log> {
-        let rpc_call =
-            self.client().request("eth_subscribe", (SubscriptionKind::Logs, filter.clone()));
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+        let rpc_call = self.client().request(
+            "eth_subscribe",
+            (SubscriptionKind::Logs, Params::Logs(Box::new(filter.clone()))),
+        );
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 

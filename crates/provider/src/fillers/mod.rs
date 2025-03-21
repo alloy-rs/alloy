@@ -615,9 +615,7 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_pending_transactions(
-        &self,
-    ) -> GetSubscription<(SubscriptionKind,), N::TransactionResponse> {
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
         self.inner.subscribe_pending_transactions()
     }
 
@@ -629,7 +627,7 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Filter), Log> {
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
         self.inner.subscribe_logs(filter)
     }
 
