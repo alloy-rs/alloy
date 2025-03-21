@@ -265,7 +265,9 @@ where
 
     /// Converts the poll channel into a stream.
     pub fn into_stream(self) -> PollerStream<Resp> {
-        PollerStream::new(self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok())))
+        PollerStream::new(
+            self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok())).boxed(),
+        )
     }
 
     /// Converts the poll channel into a stream that also yields

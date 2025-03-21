@@ -2,11 +2,10 @@ use crate::Error;
 use alloy_network::Ethereum;
 use alloy_primitives::{Address, LogData, B256};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
+use alloy_rpc_client::PollerStream;
 use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
 use alloy_transport::TransportResult;
-use futures::Stream;
-use futures_util::StreamExt;
 use std::{fmt, marker::PhantomData};
 
 /// Helper for managing the event filter before querying or streaming its logs
@@ -212,7 +211,10 @@ impl<E: SolEvent> EventPoller<E> {
     /// Starts the poller and returns a stream that yields the decoded event and the raw log.
     ///
     /// Note that this stream will not return `None` until the provider is dropped.
-    pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
+    pub fn into_stream(self) -> PollerStream<alloy_sol_types::Result<(E, Log)>>
+    where
+        E: 'static,
+    {
         self.poller
             .into_stream()
             .flat_map(futures_util::stream::iter)
@@ -230,6 +232,7 @@ fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
 pub(crate) mod subscription {
     use super::*;
     use alloy_pubsub::Subscription;
+    use futures_util::StreamExt;
 
     /// An event subscription.
     ///
@@ -271,7 +274,9 @@ pub(crate) mod subscription {
 
     impl<E: SolEvent> EventSubscription<E> {
         /// Converts the subscription into a stream.
-        pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
+        pub fn into_stream(
+            self,
+        ) -> impl futures::Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
             self.sub.into_stream().map(|log| decode_log(&log).map(|e| (e, log)))
         }
     }
@@ -284,6 +289,7 @@ mod tests {
     use alloy_primitives::U256;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
+    use futures_util::StreamExt;
 
     sol! {
         // solc v0.8.24; solc a.sol --via-ir --optimize --bin
