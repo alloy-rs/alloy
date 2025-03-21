@@ -73,29 +73,13 @@ impl ActiveSubscription {
 
     /// Get a subscription.
     pub(crate) fn subscribe(&self) -> RawSubscription {
-        let new_rx = self.tx.subscribe();
-
-        // Check if any events are in queue
-        let mut pending = self.tx.len();
-        if pending == 0 {
-            return RawSubscription { rx: new_rx, local_id: self.local_id };
+        if self.tx.len() == 0 {
+            return RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id };
         }
-
-        let mut lock = self.rx.lock();
-        if let Some(mut rx) = lock.deref_mut().take() {
-            // Attempt to drain the queue by forwarding all pending notifications to the new
-            // receiver.
-
-            while let Ok(notification) = rx.try_recv() {
-                self.notify(notification);
-                pending -= 1;
-                if pending == 0 {
-                    break;
-                }
-            }
+        RawSubscription {
+            rx: self.rx.lock().deref_mut().take().unwrap_or(self.tx.subscribe()),
+            local_id: self.local_id,
         }
-
-        RawSubscription { rx: new_rx, local_id: self.local_id }
     }
 
     /// Notify the subscription channel of a new value, if any receiver exists.
