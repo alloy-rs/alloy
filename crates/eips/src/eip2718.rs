@@ -179,7 +179,7 @@ pub trait Decodable2718: Sized {
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[auto_impl(&)]
+#[auto_impl(keep_default_for(&))]
 pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     /// Return the type flag (if any).
     ///
@@ -226,9 +226,9 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     }
 
     /// Seal the encodable, by encoding and hashing it.
-    fn seal(&self) -> Sealed<Self> where Self: Clone {
+    fn seal(self) -> Sealed<Self> {
         let hash = self.trie_hash();
-        Sealed::new_unchecked(self.clone(), hash)
+        Sealed::new_unchecked(self, hash)
     }
 
     /// The length of the 2718 encoded envelope in network format. This is the
