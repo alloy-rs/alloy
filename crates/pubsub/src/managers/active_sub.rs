@@ -73,7 +73,7 @@ impl ActiveSubscription {
 
     /// Get a subscription.
     pub(crate) fn subscribe(&self) -> RawSubscription {
-        if self.tx.len() == 0 {
+        if self.tx.is_empty() {
             return RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id };
         }
         RawSubscription {
