@@ -170,7 +170,7 @@ where
     /// Note that this does not spawn the poller on a separate task, thus all responses will be
     /// polled on the current thread once this stream is polled.
     pub fn into_stream(self) -> PollerStream<Resp> {
-        PollerStream::new(Box::pin(self.into_local_stream()))
+        PollerStream::new(self.into_local_stream())
     }
 
     fn into_local_stream(self) -> impl Stream<Item = Resp> {
@@ -265,9 +265,7 @@ where
 
     /// Converts the poll channel into a stream.
     pub fn into_stream(self) -> PollerStream<Resp> {
-        PollerStream::new(
-            self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok())).boxed(),
-        )
+        PollerStream::new(self.into_stream_raw()).filter_map(|r| futures::future::ready(r.ok()))
     }
 
     /// Converts the poll channel into a stream that also yields
