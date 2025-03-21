@@ -1031,9 +1031,9 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    #[allow(unused_imports)]
-    use alloy_primitives::{b256, Bytes, TxKind};
-    use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{
+        b256, hex, Address, Bytes, PrimitiveSignature as Signature, TxKind, U256,
+    };
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]

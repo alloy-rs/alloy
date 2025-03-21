@@ -78,7 +78,7 @@ impl From<TxType> for AnyTxType {
 /// [`AnyTxEnvelope`]: crate::AnyTxEnvelope
 /// [`AnyTypedTransaction`]: crate::AnyTypedTransaction
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub struct DeserMemo {
     pub input: OnceLock<Bytes>,
     pub access_list: OnceLock<AccessList>,

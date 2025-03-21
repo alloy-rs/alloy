@@ -83,7 +83,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
 
     fn call_many<'req>(
         &self,
-        bundles: &'req Vec<Bundle>,
+        bundles: &'req [Bundle],
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         self.0.call_many(bundles)
     }
