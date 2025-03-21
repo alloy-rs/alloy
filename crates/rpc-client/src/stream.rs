@@ -1,5 +1,3 @@
-//! A helper stream
-
 use futures::{Stream, StreamExt};
 use std::pin::Pin;
 
