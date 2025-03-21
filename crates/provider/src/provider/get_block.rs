@@ -7,9 +7,11 @@ use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::SubscriptionKind;
 use alloy_transport::{TransportError, TransportResult};
 #[cfg(feature = "pubsub")]
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::Stream;
 use serde_json::Value;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
@@ -267,19 +269,19 @@ where
 #[must_use = "this does nothing unless you call `.into_stream`"]
 #[cfg(feature = "pubsub")]
 pub struct SubFullBlocks<N: alloy_network::Network> {
-    sub: alloy_pubsub::Subscription<N::HeaderResponse>,
+    sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
     client: alloy_rpc_client::WeakClient,
     kind: BlockTransactionsKind,
 }
 
 #[cfg(feature = "pubsub")]
 impl<N: alloy_network::Network> SubFullBlocks<N> {
-    /// Create a new [`SubFullBlocks`] subscription with the given [`alloy_pubsub::Subscription`].
+    /// Create a new [`SubFullBlocks`] subscription with the given [`super::GetSubscription`].
     ///
     /// By default, this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
     /// subscribe to blocks with full transactions.
     pub fn new(
-        sub: alloy_pubsub::Subscription<N::HeaderResponse>,
+        sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
         client: alloy_rpc_client::WeakClient,
     ) -> Self {
         Self { sub, client, kind: BlockTransactionsKind::Hashes }
@@ -297,19 +299,22 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
         self
     }
 
-    /// Get a reference to the inner subscription.
-    pub fn inner(&self) -> &alloy_pubsub::Subscription<N::HeaderResponse> {
-        &self.sub
+    /// Set the channel size
+    pub fn channel_size(mut self, size: usize) -> Self {
+        self.sub = self.sub.channel_size(size);
+        self
     }
 
     /// Subscribe to the inner stream of headers and map them to block responses.
-    pub fn into_stream(
+    pub async fn into_stream(
         self,
-    ) -> impl Stream<Item = TransportResult<Option<N::BlockResponse>>> + Unpin {
+    ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
         use alloy_network_primitives::HeaderResponse;
+        use futures::StreamExt;
 
-        let stream = self
-            .sub
+        let sub = self.sub.await?;
+
+        let stream = sub
             .into_stream()
             .then(move |resp| {
                 let hash = resp.hash();
@@ -322,7 +327,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
                         .ok_or(TransportError::local_usage_str("Client dropped"))?;
 
                     let call = client.request("eth_getBlockByHash", (hash, kind.is_full()));
-                    let resp: Option<N::BlockResponse> = call.await?;
+                    let resp = call.await?;
 
                     if kind.is_hashes() {
                         Ok(utils::convert_to_hashes(resp))
@@ -331,16 +336,16 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
                     }
                 }
             })
-            .map_ok(|resp| resp);
+            .filter_map(|result| futures::future::ready(result.transpose()));
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            stream.boxed()
+            Ok(stream.boxed())
         }
 
         #[cfg(target_arch = "wasm32")]
         {
-            stream.boxed_local()
+            Ok(stream.boxed_local())
         }
     }
 }
