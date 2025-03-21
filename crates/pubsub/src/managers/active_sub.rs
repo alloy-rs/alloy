@@ -14,7 +14,13 @@ pub(crate) struct ActiveSubscription {
     pub(crate) request: SerializedRequest,
     /// The channel via which notifications are broadcast.
     pub(crate) tx: broadcast::Sender<Box<RawValue>>,
-    /// The channel via which notifications are received.
+    /// The initial channel via which notifications are received.
+    ///
+    /// This is stored so that we don't drop any notifications between initializing
+    /// using [`ActiveSubscription::new`] and [`ActiveSubscription::subscribe`]. Ref: <https://github.com/alloy-rs/alloy/issues/2187>
+    ///
+    /// This is wrapped in a [`Mutex`] to allow for mutable access to the receiver without making
+    /// [`ActiveSubscription::subscribe`] requiring mutable self.
     pub(crate) rx: Mutex<Option<broadcast::Receiver<Box<RawValue>>>>,
 }
 
@@ -74,8 +80,15 @@ impl ActiveSubscription {
     /// Get a subscription.
     pub(crate) fn subscribe(&self) -> RawSubscription {
         if self.tx.is_empty() {
+            // If there are no pending notifications, we can subscribe directly and return a new
+            // subscriber.
             return RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id };
         }
+
+        // If there are pending notifications, we need to ensure that they are not dropped.
+        // Hence, we first try to return the initial receiver (if it exists), which will receive
+        // those pending notifications.
+        // Ref: <https://github.com/alloy-rs/alloy/issues/2187>
         RawSubscription {
             rx: self.rx.lock().deref_mut().take().unwrap_or(self.tx.subscribe()),
             local_id: self.local_id,
