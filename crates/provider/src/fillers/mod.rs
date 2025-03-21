@@ -12,6 +12,8 @@ use alloy_primitives::{
     Address, BlockHash, BlockNumber, StorageKey, StorageValue, TxHash, B256, U128, U256,
 };
 use alloy_rpc_client::NoParams;
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{Bundle, Index, SyncStatus};
 pub use chain_id::ChainIdFiller;
 use std::borrow::Cow;
@@ -29,6 +31,8 @@ mod join_fill;
 pub use join_fill::JoinFill;
 use tracing::error;
 
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::{
     provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
@@ -606,30 +610,25 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    fn subscribe_blocks(&self) -> crate::GetSubscription<(&'static str,), N::HeaderResponse> {
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         self.inner.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
-        self.inner.subscribe_pending_transactions().await
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
+        self.inner.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_full_pending_transactions(
+    fn subscribe_full_pending_transactions(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
-        self.inner.subscribe_full_pending_transactions().await
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
+        self.inner.subscribe_full_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
-        &self,
-        filter: &Filter,
-    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
-        self.inner.subscribe_logs(filter).await
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+        self.inner.subscribe_logs(filter)
     }
 
     #[cfg(feature = "pubsub")]
