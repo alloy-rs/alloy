@@ -275,6 +275,8 @@ pub struct WatchBlocks<BlockResp> {
     ///
     /// On every poll it returns an array of block hashes [`Vec<B256>`] as `eth_getFilterChanges`
     /// returns an array of logs. See <https://docs.alchemy.com/reference/eth-getfilterchanges-1>.
+    ///
+    /// [`PollerBuilder`]: alloy_rpc_client::PollerBuilder
     poller: FilterPollerBuilder<B256>,
     /// The [`BlockTransactionsKind`] to retrieve on each poll.
     ///
@@ -307,8 +309,8 @@ where
         self
     }
 
-    /// Consumes the stream of block hashes from the inner [`PollerBuilder`] and maps it to a stream
-    /// of [`BlockResponse`].
+    /// Consumes the stream of block hashes from the inner [`FilterPollerBuilder`] and maps it to a
+    /// stream of [`BlockResponse`].
     pub fn into_stream(self) -> impl Stream<Item = TransportResult<BlockResp>> + Unpin {
         let client = self.poller.client();
         let kind = self.kind;
