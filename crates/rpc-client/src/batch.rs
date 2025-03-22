@@ -99,7 +99,7 @@ where
 }
 
 #[pin_project::pin_project(project = CallStateProj)]
-#[allow(unnameable_types, missing_debug_implementations)]
+#[expect(unnameable_types, missing_debug_implementations)]
 pub enum BatchFuture {
     Prepared {
         transport: BoxTransport,

@@ -9,6 +9,7 @@ changed or not.
 ## Requirements
 
 - [cargo-release](https://github.com/crate-ci/cargo-release): `cargo install cargo-release`
+- [cargo-semver-checks](https://github.com/obi1kenobi/cargo-semver-checks): `cargo install cargo-semver-checks`
 - [git-cliff](https://github.com/orhun/git-cliff) (patched with [orhun/git-cliff#711](https://github.com/orhun/git-cliff/pull/711)): `cargo install --git https://github.com/DaniPopes/git-cliff.git --branch fix-include-paths git-cliff`
 
 ## Steps
@@ -16,6 +17,8 @@ changed or not.
 - [ ] Update the version number in the [README](./README.md#installation) to the new version.
 - [ ] Make sure you're on the `main` branch.
 - [ ] (optional) Dry run `cargo-release`: `cargo release <version>`
+- [ ] Run `cargo-semver-checks` for a non-breaking release: `cargo +stable semver-checks`
+  - [ ] Breaking changes are not a blocker even for non-breaking release, but you must review them carefully in case of an accidental breaking change.
 - [ ] Run `cargo-release`: `PUBLISH_GRACE_SLEEP=10 cargo release --execute [--no-verify] <version>`
   - Ignore these warnings:
     - `warning: updating <crate> to <version> despite no changes made since...`

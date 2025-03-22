@@ -91,7 +91,7 @@ pub struct TraceEntry {
 
 /// Internal issuance struct for `BlockDetails` struct
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(missing_copy_implementations)]
+#[expect(missing_copy_implementations)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalIssuance {
     /// The block reward issued.

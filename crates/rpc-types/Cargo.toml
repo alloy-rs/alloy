@@ -60,7 +60,11 @@ mev = ["dep:alloy-rpc-types-mev"]
 trace = ["dep:alloy-rpc-types-trace"]
 txpool = ["dep:alloy-rpc-types-txpool"]
 
-arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
+arbitrary = [
+	"alloy-rpc-types-eth?/arbitrary",
+	"alloy-serde/arbitrary",
+	"alloy-primitives/arbitrary"
+]
 jsonrpsee-types = [
     "alloy-rpc-types-eth?/jsonrpsee-types",
     "alloy-rpc-types-engine?/jsonrpsee-types",

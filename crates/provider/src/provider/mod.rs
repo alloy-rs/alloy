@@ -28,5 +28,7 @@ pub use multicall::*;
 mod erased;
 pub use erased::DynProvider;
 
+#[cfg(feature = "pubsub")]
 mod subscription;
+#[cfg(feature = "pubsub")]
 pub use subscription::GetSubscription;

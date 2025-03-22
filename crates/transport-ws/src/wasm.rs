@@ -42,7 +42,7 @@ impl PubSubConnect for WsConnect {
 
 impl WsBackend<Fuse<WsStream>> {
     /// Handle a message from the websocket.
-    #[allow(clippy::result_unit_err)]
+    #[expect(clippy::result_unit_err)]
     pub fn handle(&mut self, item: WsMessage) -> Result<(), ()> {
         match item {
             WsMessage::Text(text) => self.handle_text(&text),
