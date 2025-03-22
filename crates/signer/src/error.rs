@@ -35,6 +35,15 @@ pub enum Error {
     /// Signature error.
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
+    /// The operation is intentionally not supported
+    /// due to security restrictions
+    #[error("Security restriction: {operation} is deliberately disabled - {reason}")]
+    SecurityRestriction {
+        /// The usupported operation
+        operation: UnsupportedSignerOperation,
+        /// The reason it is disabled
+        reason: String,
+    },
     /// Generic error.
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
