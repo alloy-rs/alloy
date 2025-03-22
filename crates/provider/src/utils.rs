@@ -4,7 +4,11 @@ use crate::{
     fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
     Identity,
 };
-use alloy_primitives::{U128, U64};
+use alloy_json_rpc::RpcRecv;
+use alloy_network::BlockResponse;
+use alloy_primitives::{B256, U128, U64};
+use alloy_rpc_client::WeakClient;
+use alloy_transport::{TransportError, TransportResult};
 use std::{fmt, fmt::Formatter};
 
 pub use alloy_eips::eip1559::Eip1559Estimation;
@@ -136,6 +140,22 @@ pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
 
         block
     })
+}
+
+/// Fetches full blocks for a list of block hashes
+pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
+    hashes: Vec<B256>,
+    client: WeakClient,
+    full: bool,
+) -> TransportResult<Vec<Option<BlockResp>>> {
+    let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
+    let blocks = futures::future::try_join_all(hashes.into_iter().map(|hash| {
+        client
+            .request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
+            .map_resp(|resp| if !full { convert_to_hashes(resp) } else { resp })
+    }))
+    .await?;
+    Ok(blocks)
 }
 
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],

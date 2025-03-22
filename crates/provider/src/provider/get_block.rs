@@ -8,7 +8,11 @@ use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
 use alloy_transport::{TransportError, TransportResult};
+use either::Either;
+use futures::{Stream, StreamExt};
 use serde_json::Value;
+
+use super::FilterPollerBuilder;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
@@ -252,6 +256,89 @@ where
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
             Self::PendingBlock(call) => f.debug_tuple("PendingBlockCall").field(call).finish(),
             Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
+        }
+    }
+}
+
+/// A builder type for polling new blocks using the [`FilterPollerBuilder`].
+///
+/// By default, this polls for blocks with [`BlockTransactionsKind::Hashes`].
+///
+/// [`WatchBlocks::full`] should be used to poll for blocks with
+/// [`BlockTransactionsKind::Full`].
+///
+/// The polling stream must be consumed by calling [`WatchBlocks::into_stream`].
+#[derive(Debug)]
+#[must_use = "this builder does nothing unless you call `.into_stream`"]
+pub struct WatchBlocks<BlockResp> {
+    /// [`PollerBuilder`] for polling new block hashes.
+    ///
+    /// On every poll it returns an array of block hashes [`Vec<B256>`] as `eth_getFilterChanges`
+    /// returns an array of logs. See <https://docs.alchemy.com/reference/eth-getfilterchanges-1>.
+    ///
+    /// [`PollerBuilder`]: alloy_rpc_client::PollerBuilder
+    poller: FilterPollerBuilder<B256>,
+    /// The [`BlockTransactionsKind`] to retrieve on each poll.
+    ///
+    /// Default is [`BlockTransactionsKind::Hashes`].
+    ///
+    /// [`WatchBlocks::full`] should be used to poll for blocks with
+    /// [`BlockTransactionsKind::Full`].
+    kind: BlockTransactionsKind,
+    _pd: std::marker::PhantomData<BlockResp>,
+}
+
+impl<BlockResp> WatchBlocks<BlockResp>
+where
+    BlockResp: BlockResponse + RpcRecv,
+{
+    /// Create a new [`WatchBlocks`] instance.
+    pub(crate) fn new(poller: FilterPollerBuilder<B256>) -> Self {
+        Self { poller, kind: BlockTransactionsKind::Hashes, _pd: PhantomData }
+    }
+
+    /// Poll for blocks with full transactions i.e [`BlockTransactionsKind::Full`].
+    pub fn full(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Full;
+        self
+    }
+
+    /// Poll for blocks with just transactions hashes i.e [`BlockTransactionsKind::Hashes`].
+    pub fn hashes(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Hashes;
+        self
+    }
+
+    /// Consumes the stream of block hashes from the inner [`FilterPollerBuilder`] and maps it to a
+    /// stream of [`BlockResponse`].
+    pub fn into_stream(self) -> impl Stream<Item = TransportResult<BlockResp>> + Unpin {
+        let client = self.poller.client();
+        let kind = self.kind;
+        let stream = self
+            .poller
+            .into_stream()
+            .then(move |hashes| {
+                let client = client.clone();
+                async move { utils::hashes_to_blocks(hashes, client, kind.into()).await }
+            })
+            .flat_map(|res| {
+                futures::stream::iter(match res {
+                    Ok(blocks) => {
+                        // Ignore `None` responses.
+                        Either::Left(blocks.into_iter().filter_map(|block| block.map(Ok)))
+                    }
+                    Err(err) => Either::Right(std::iter::once(Err(err))),
+                })
+            });
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            stream.boxed()
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            stream.boxed_local()
         }
     }
 }
