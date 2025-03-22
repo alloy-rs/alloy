@@ -90,7 +90,7 @@ impl ActiveSubscription {
         // those pending notifications.
         // Ref: <https://github.com/alloy-rs/alloy/issues/2187>
         RawSubscription {
-            rx: self.rx.lock().deref_mut().take().unwrap_or(self.tx.subscribe()),
+            rx: self.rx.lock().deref_mut().take().unwrap_or_else(|| self.tx.subscribe()),
             local_id: self.local_id,
         }
     }
