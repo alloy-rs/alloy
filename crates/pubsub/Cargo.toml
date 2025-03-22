@@ -35,3 +35,4 @@ tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 tower.workspace = true
 tracing.workspace = true
+parking_lot.workspace = true
