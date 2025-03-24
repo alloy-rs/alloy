@@ -383,8 +383,8 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         for blob in &self.inner.blobs {
             // SAFETY: same size
             let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-            let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
-            let proof = KzgProof::compute_blob_kzg_proof(blob, &commitment.to_bytes(), settings)?;
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let proof = settings.compute_blob_kzg_proof(blob, &commitment.to_bytes())?;
 
             // SAFETY: same size
             unsafe {
