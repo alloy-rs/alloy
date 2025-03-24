@@ -1223,7 +1223,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 mod tests {
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
-    use alloy_consensus::{Transaction, TxEip1559, TxEnvelope};
+    use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
@@ -2085,26 +2085,16 @@ mod tests {
     async fn eth_sign_transaction() {
         run_with_tempdir("reth-sign-tx", async |dir| {
             let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
-
             let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
             let accounts = provider.get_accounts().await.unwrap();
-
-            let fees = provider.estimate_eip1559_fees().await.unwrap();
-
             let from = accounts[0];
-
-            let balance = provider.get_balance(from).await.unwrap();
 
             let tx = TransactionRequest::default()
                 .from(from)
                 .to(Address::random())
                 .value(U256::from(100))
-                .nonce(provider.get_transaction_count(from).await.unwrap())
-                .gas_limit(21000)
-                .max_fee_per_gas(fees.max_fee_per_gas)
-                .max_priority_fee_per_gas(fees.max_priority_fee_per_gas)
-                .with_chain_id(1337);
+                .gas_limit(21000);
 
             let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
 
