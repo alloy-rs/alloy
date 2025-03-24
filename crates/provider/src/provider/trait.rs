@@ -913,6 +913,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
+    /// Signs a transaction that can be submitted to the network later using
+    /// [`Provider::send_raw_transaction`].
+    ///
+    /// The `"eth_signTransaction"` method is not supported by regular nodes.
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.client().request("eth_signTransaction", (tx,)).await
+    }
+
     /// Subscribe to a stream of new block headers.
     ///
     /// # Errors
@@ -1216,11 +1224,12 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
-    use alloy_consensus::Transaction;
+    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
+    use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::Anvil;
+    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
@@ -2072,6 +2081,36 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn eth_sign_transaction() {
+        async_ci_only(|| async {
+            run_with_tempdir("reth-sign-tx", |dir| async {
+                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
+
+                let tx = TransactionRequest::default()
+                    .from(from)
+                    .to(Address::random())
+                    .value(U256::from(100))
+                    .gas_limit(21000);
+
+                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
+
+                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
+
+                let signer = tx.recover_signer().unwrap();
+
+                assert_eq!(signer, from);
+            })
+            .await
+        })
+        .await;
     }
 
     #[cfg(feature = "throttle")]
