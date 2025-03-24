@@ -51,11 +51,11 @@ impl TxEnvelope {
     /// Returns a mutable reference to the transaction's input.
     pub fn input_mut(&mut self) -> &mut Bytes {
         match self {
-            TxEnvelope::Eip1559(tx) => &mut tx.tx_mut().input,
-            TxEnvelope::Eip2930(tx) => &mut tx.tx_mut().input,
-            TxEnvelope::Legacy(tx) => &mut tx.tx_mut().input,
-            TxEnvelope::Eip7702(tx) => &mut tx.tx_mut().input,
-            TxEnvelope::Eip4844(tx) => match tx.tx_mut() {
+            Self::Eip1559(tx) => &mut tx.tx_mut().input,
+            Self::Eip2930(tx) => &mut tx.tx_mut().input,
+            Self::Legacy(tx) => &mut tx.tx_mut().input,
+            Self::Eip7702(tx) => &mut tx.tx_mut().input,
+            Self::Eip4844(tx) => match tx.tx_mut() {
                 TxEip4844Variant::TxEip4844(inner) => &mut inner.input,
                 TxEip4844Variant::TxEip4844WithSidecar(inner) => &mut inner.tx.input,
             },
