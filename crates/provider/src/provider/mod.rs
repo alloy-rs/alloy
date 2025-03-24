@@ -2,6 +2,8 @@ mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
 mod get_block;
+#[cfg(feature = "pubsub")]
+pub use get_block::SubFullBlocks;
 pub use get_block::{EthGetBlock, EthGetBlockParams};
 
 mod prov_call;
@@ -27,3 +29,8 @@ pub use multicall::*;
 
 mod erased;
 pub use erased::DynProvider;
+
+#[cfg(feature = "pubsub")]
+mod subscription;
+#[cfg(feature = "pubsub")]
+pub use subscription::GetSubscription;

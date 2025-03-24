@@ -9,22 +9,13 @@ use once_cell::race::OnceBox as OnceLock;
 use std::sync::OnceLock;
 
 /// A transaction with a signature and hash seal.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Signed<T, Sig = Signature> {
     #[doc(alias = "transaction")]
     tx: T,
     signature: Sig,
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
     hash: OnceLock<B256>,
-}
-
-impl<T: Clone, Sig: Clone> Clone for Signed<T, Sig> {
-    fn clone(&self) -> Self {
-        self.hash.get().map_or_else(
-            || Self::new_unhashed(self.tx.clone(), self.signature.clone()),
-            |hash| Self::new_unchecked(self.tx.clone(), self.signature.clone(), *hash),
-        )
-    }
 }
 
 impl<T, Sig> Signed<T, Sig> {

@@ -83,7 +83,7 @@ impl<N: Network> RootProvider<N> {
 impl<N: Network> RootProvider<N> {
     /// Boxes the inner client.
     #[deprecated(since = "0.9.0", note = "`RootProvider` is now always boxed")]
-    #[allow(clippy::missing_const_for_fn)]
+    #[expect(clippy::missing_const_for_fn)]
     pub fn boxed(self) -> Self {
         self
     }
@@ -112,11 +112,11 @@ impl<N: Network> RootProvider<N> {
     }
 
     #[inline]
-    pub(crate) fn get_heart(&self) -> &HeartbeatHandle<N> {
+    pub(crate) fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
             let new_blocks = NewBlocks::<N>::new(self.inner.weak_client());
             let stream = new_blocks.into_stream();
-            Heartbeat::new(Box::pin(stream)).spawn()
+            Heartbeat::<N, _>::new(Box::pin(stream)).spawn()
         })
     }
 }
@@ -125,7 +125,7 @@ impl<N: Network> RootProvider<N> {
 /// base of every provider stack.
 pub(crate) struct RootProviderInner<N: Network = Ethereum> {
     client: RpcClient,
-    heart: OnceLock<HeartbeatHandle<N>>,
+    heart: OnceLock<HeartbeatHandle>,
     _network: PhantomData<N>,
 }
 

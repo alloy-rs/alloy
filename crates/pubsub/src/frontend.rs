@@ -5,7 +5,10 @@ use alloy_transport::{TransportError, TransportErrorKind, TransportFut, Transpor
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
 use std::{
     future::Future,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
@@ -14,25 +17,18 @@ use tokio::sync::{mpsc, oneshot};
 /// PubSub service.
 ///
 /// [`Transport`]: alloy_transport::Transport
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
     /// The number of items to buffer in new subscription channels. Defaults to
     /// 16. See [`tokio::sync::broadcast::channel`] for a description.
-    channel_size: AtomicUsize,
-}
-
-impl Clone for PubSubFrontend {
-    fn clone(&self) -> Self {
-        let channel_size = self.channel_size.load(Ordering::Relaxed);
-        Self { tx: self.tx.clone(), channel_size: AtomicUsize::new(channel_size) }
-    }
+    channel_size: Arc<AtomicUsize>,
 }
 
 impl PubSubFrontend {
     /// Create a new frontend.
-    pub(crate) const fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
-        Self { tx, channel_size: AtomicUsize::new(16) }
+    pub(crate) fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
+        Self { tx, channel_size: Arc::new(AtomicUsize::new(16)) }
     }
 
     /// Get the subscription ID for a local ID.

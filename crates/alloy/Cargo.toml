@@ -306,9 +306,10 @@ eip712 = [
 ]
 
 arbitrary = [
-    "alloy-core/arbitrary",
-    "alloy-consensus?/arbitrary",
-    "alloy-eips?/arbitrary",
-    "alloy-rpc-types?/arbitrary",
+	"alloy-core/arbitrary",
+	"alloy-consensus?/arbitrary",
+	"alloy-eips?/arbitrary",
+	"alloy-rpc-types?/arbitrary",
+	"alloy-serde?/arbitrary"
 ]
 postgres = ["alloy-core/postgres"]

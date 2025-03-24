@@ -317,7 +317,16 @@ pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
-    /// Address
+    /// A filter set for matching contract addresses in log queries.
+    ///
+    /// This field determines which contract addresses the filter applies to. It supports:
+    /// - A single address to match logs from that address only.
+    /// - Multiple addresses to match logs from any of them.
+    ///
+    /// ## Notes:
+    /// - An empty array (`[]`) may result in no logs being returned.
+    /// - Some RPC providers handle empty arrays differently than `None`.
+    /// - Large address lists may affect performance or hit provider limits.
     pub address: FilterSet<Address>,
     /// Topics (maximum of 4)
     pub topics: [Topic; 4],

@@ -42,7 +42,6 @@ impl<N: Network> NewBlocks<N> {
     }
 
     #[cfg(test)]
-    #[allow(unused)]
     const fn with_next_yield(mut self, next_yield: u64) -> Self {
         self.next_yield = next_yield;
         self
@@ -100,9 +99,7 @@ impl<N: Network> NewBlocks<N> {
     fn into_poll_stream(mut self) -> impl Stream<Item = N::BlockResponse> + 'static {
         stream! {
         // Spawned lazily on the first `poll`.
-        let poll_task_builder: PollerBuilder<NoParams, U64> =
-            PollerBuilder::new(self.client.clone(), "eth_blockNumber", []);
-        let mut poll_task = poll_task_builder.spawn().into_stream_raw();
+        let mut poller = PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", []).into_stream();
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
@@ -112,17 +109,9 @@ impl<N: Network> NewBlocks<N> {
             }
 
             // Get the tip.
-            let block_number = match poll_task.next().await {
-                Some(Ok(block_number)) => block_number,
-                Some(Err(err)) => {
-                    // This is fine.
-                    debug!(%err, "polling stream lagged");
-                    continue 'task;
-                }
-                None => {
-                    debug!("polling stream ended");
-                    break 'task;
-                }
+            let Some(block_number) = poller.next().await else {
+                debug!("polling stream ended");
+                break 'task;
             };
             let block_number = block_number.to::<u64>();
             trace!(%block_number, "got block number");

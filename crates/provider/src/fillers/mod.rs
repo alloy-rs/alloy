@@ -12,6 +12,8 @@ use alloy_primitives::{
     Address, BlockHash, BlockNumber, StorageKey, StorageValue, TxHash, B256, U128, U256,
 };
 use alloy_rpc_client::NoParams;
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{Bundle, Index, SyncStatus};
 pub use chain_id::ChainIdFiller;
 use std::borrow::Cow;
@@ -29,6 +31,8 @@ mod join_fill;
 pub use join_fill::JoinFill;
 use tracing::error;
 
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::{
     provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
@@ -43,7 +47,7 @@ use alloy_rpc_types_eth::{
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
     FilterChanges, Log,
 };
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
@@ -346,7 +350,7 @@ where
 
     fn call_many<'req>(
         &self,
-        bundles: &'req Vec<Bundle>,
+        bundles: &'req [Bundle],
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         self.inner.call_many(bundles)
     }
@@ -605,33 +609,32 @@ where
         self.inner.send_transaction_internal(tx).await
     }
 
-    #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::HeaderResponse>> {
-        self.inner.subscribe_blocks().await
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        let tx = self.fill(tx).await?;
+        let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
+        self.inner.sign_transaction(tx).await
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
-        self.inner.subscribe_pending_transactions().await
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
+        self.inner.subscribe_blocks()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_full_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
-        self.inner.subscribe_full_pending_transactions().await
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
+        self.inner.subscribe_pending_transactions()
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
+    fn subscribe_full_pending_transactions(
         &self,
-        filter: &Filter,
-    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
-        self.inner.subscribe_logs(filter).await
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
+        self.inner.subscribe_full_pending_transactions()
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+        self.inner.subscribe_logs(filter)
     }
 
     #[cfg(feature = "pubsub")]

@@ -49,7 +49,7 @@ alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
 alloy-chains.workspace = true
-async-stream = "0.3"
+async-stream.workspace = true
 async-trait.workspace = true
 auto_impl.workspace = true
 dashmap = "6.0"
@@ -71,7 +71,7 @@ parking_lot.workspace = true
 wasmtimer.workspace = true
 
 [dev-dependencies]
-alloy-consensus = { workspace = true, features = ["kzg"] }
+alloy-consensus = { workspace = true, features = ["kzg", "k256"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
@@ -96,6 +96,7 @@ http.workspace = true
 alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 ci_info.workspace = true
 similar-asserts.workspace = true
+jsonrpsee = { workspace = true, features = ["server"] }
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
@@ -123,3 +124,4 @@ net-api = []
 trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
+throttle = ["alloy-transport/throttle"]

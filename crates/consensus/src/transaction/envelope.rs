@@ -48,6 +48,7 @@ impl TxEnvelope {
             Self::Eip7702(tx) => Ok(tx.into()),
         }
     }
+
     /// Returns a mutable reference to the transaction's input.
     pub fn input_mut(&mut self) -> &mut Bytes {
         match self {
@@ -59,6 +60,19 @@ impl TxEnvelope {
                 TxEip4844Variant::TxEip4844(inner) => &mut inner.input,
                 TxEip4844Variant::TxEip4844WithSidecar(inner) => &mut inner.tx.input,
             },
+
+      }
+  }
+    /// Consumes the type, removes the signature and returns the transaction.
+    #[inline]
+    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<TxEip4844Variant> {
+        match self {
+            Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
+            Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx.into_parts().0),
+            Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx.into_parts().0),
+            Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(tx.into_parts().0),
+            Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
+
         }
     }
 }
@@ -170,6 +184,14 @@ impl TryFrom<u64> for TxType {
         let err = || "invalid tx type";
         let value: u8 = value.try_into().map_err(|_| err())?;
         Self::try_from(value).map_err(|_| err())
+    }
+}
+
+impl TryFrom<U8> for TxType {
+    type Error = Eip2718Error;
+
+    fn try_from(value: U8) -> Result<Self, Self::Error> {
+        value.to::<u8>().try_into()
     }
 }
 
@@ -556,6 +578,51 @@ impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844>
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
+    }
+}
+
+impl<T> Typed2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Send + Sync + Typed2718,
+{
+    fn ty(&self) -> u8 {
+        self.tx().ty()
+    }
+}
+
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
+    }
+}
+
+impl<T> Decodable2718 for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != ty {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
+        Ok(decoded)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
     }
 }
 
@@ -979,9 +1046,9 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    #[allow(unused_imports)]
-    use alloy_primitives::{b256, Bytes, TxKind};
-    use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{
+        b256, hex, Address, Bytes, PrimitiveSignature as Signature, TxKind, U256,
+    };
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]
