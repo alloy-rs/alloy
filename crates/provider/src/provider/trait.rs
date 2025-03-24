@@ -2084,6 +2084,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(windows))]
     async fn eth_sign_transaction() {
         async_ci_only(|| async {
             run_with_tempdir("reth-sign-tx", |dir| async {
