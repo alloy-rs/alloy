@@ -66,6 +66,9 @@ pub mod serde_bincode_compat {
 use alloy_eips::Typed2718;
 
 /// Represents a minimal EVM transaction.
+/// Currently, EIP-1559, EIP-4844, and EIP-7702 support dynamic fees.
+/// We call these transactions "dynamic fee transactions".
+/// We call non dynamic fee transactions(EIP-155, EIP-2930) "legacy fee transactions".
 #[doc(alias = "Tx")]
 #[auto_impl::auto_impl(&, Arc)]
 pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static {
@@ -81,16 +84,17 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;
 
-    /// Returns the EIP-1559 the maximum fee per gas the caller is willing to pay.
+    /// For dynamic fee transactions returns the maximum fee per gas the caller is willing to pay.
     ///
-    /// For legacy transactions this is `gas_price`.
+    /// For legacy fee transactions this is `gas_price`.
     ///
     /// This is also commonly referred to as the "Gas Fee Cap".
     fn max_fee_per_gas(&self) -> u128;
 
-    /// Returns the EIP-1559 Priority fee the caller is paying to the block author.
+    /// For dynamic fee transactions returns the Priority fee the caller is paying to the block
+    /// author.
     ///
-    /// This will return `None` for non-EIP1559 transactions
+    /// This will return `None` for legacy fee transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
 
     /// Max fee per blob gas for EIP-4844 transaction.
@@ -100,24 +104,24 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// This is also commonly referred to as the "Blob Gas Fee Cap".
     fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
-    /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
+    /// Return the max priority fee per gas if the transaction is an dynamic fee transaction, and
     /// otherwise return the gas price.
     ///
     /// # Warning
     ///
     /// This is different than the `max_priority_fee_per_gas` method, which returns `None` for
-    /// non-EIP-1559 transactions.
+    /// legacy fee transactions.
     fn priority_fee_or_price(&self) -> u128;
 
     /// Returns the effective gas price for the given base fee.
     ///
-    /// If the transaction is a legacy or EIP2930 transaction, the gas price is returned.
+    /// If the transaction is a legacy fee transaction, the gas price is returned.
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128;
 
     /// Returns the effective tip for this transaction.
     ///
-    /// For EIP-1559 transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
-    /// For legacy transactions: `gas_price - base_fee`.
+    /// For dynamic fee transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
+    /// For legacy fee transactions: `gas_price - base_fee`.
     fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
         let base_fee = base_fee as u128;
 
@@ -131,7 +135,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
         // Calculate the difference between max_fee_per_gas and base_fee
         let fee = max_fee_per_gas - base_fee;
 
-        // Compare the fee with max_priority_fee_per_gas (or gas price for non-EIP1559 transactions)
+        // Compare the fee with max_priority_fee_per_gas (or gas price for legacy fee transactions)
         self.max_priority_fee_per_gas()
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }

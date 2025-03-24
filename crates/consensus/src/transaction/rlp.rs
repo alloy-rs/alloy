@@ -1,6 +1,9 @@
 use crate::Signed;
 use alloc::vec::Vec;
-use alloy_eips::eip2718::{Eip2718Error, Eip2718Result};
+use alloy_eips::{
+    eip2718::{Eip2718Error, Eip2718Result},
+    Typed2718,
+};
 use alloy_primitives::{keccak256, PrimitiveSignature as Signature, TxHash};
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
@@ -8,10 +11,7 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 #[doc(hidden)]
 #[doc(alias = "RlpEncodableTx", alias = "RlpTxEncoding")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait RlpEcdsaEncodableTx: Sized {
-    /// The default transaction type for this transaction.
-    const DEFAULT_TX_TYPE: u8;
-
+pub trait RlpEcdsaEncodableTx: Sized + Typed2718 {
     /// Calculate the encoded length of the transaction's fields, without a RLP
     /// header.
     fn rlp_encoded_fields_length(&self) -> usize;
@@ -71,7 +71,7 @@ pub trait RlpEcdsaEncodableTx: Sized {
     /// EIP-2718 encode the transaction with the given signature and the default
     /// type flag.
     fn eip2718_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.eip2718_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
+        self.eip2718_encode_with_type(signature, self.ty(), out);
     }
 
     /// Create an rlp header for the network encoded transaction. This will
@@ -97,7 +97,7 @@ pub trait RlpEcdsaEncodableTx: Sized {
     /// Network encode the transaction with the given signature and the default
     /// type flag.
     fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.network_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
+        self.network_encode_with_type(signature, self.ty(), out);
     }
 
     /// Calculate the transaction hash for the given signature and type.
@@ -109,7 +109,7 @@ pub trait RlpEcdsaEncodableTx: Sized {
 
     /// Calculate the transaction hash for the given signature.
     fn tx_hash(&self, signature: &Signature) -> TxHash {
-        self.tx_hash_with_type(signature, Self::DEFAULT_TX_TYPE)
+        self.tx_hash_with_type(signature, self.ty())
     }
 }
 
@@ -117,6 +117,9 @@ pub trait RlpEcdsaEncodableTx: Sized {
 #[doc(hidden)]
 #[doc(alias = "RlpDecodableTx", alias = "RlpTxDecoding")]
 pub trait RlpEcdsaDecodableTx: RlpEcdsaEncodableTx {
+    /// The default transaction type for this transaction.
+    const DEFAULT_TX_TYPE: u8;
+
     /// Decodes the fields of the transaction from RLP bytes. Do not decode a
     /// header. You may assume the buffer is long enough to contain the
     /// transaction.

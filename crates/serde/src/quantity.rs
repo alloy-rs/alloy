@@ -300,7 +300,7 @@ pub mod btreemap {
 }
 
 /// Private implementation details of the [`quantity`](self) module.
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 mod private {
     #[doc(hidden)]
     pub trait ConvertRuint: Copy + Sized {

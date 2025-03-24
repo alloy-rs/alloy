@@ -30,7 +30,7 @@ use tuple::TuplePush;
 pub use tuple::{CallTuple, Empty};
 
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
-pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
+pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE2a173976CA11");
 
 /// A Multicall3 builder
 ///
@@ -235,7 +235,7 @@ where
     }
 
     /// Appends a [`SolCall`] to the stack.
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn add<Item: MulticallItem>(self, item: Item) -> MulticallBuilder<T::Pushed, P, N>
     where
         Item::Decoder: 'static,
