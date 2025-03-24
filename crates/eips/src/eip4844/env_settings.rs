@@ -73,8 +73,7 @@ impl EnvKzgSettings {
     pub fn load_from_trusted_setup_file(
         trusted_setup_file: &std::path::Path,
     ) -> Result<Self, c_kzg::Error> {
-        // FIXME: Precompute value??
-        let precompute = 0;
+        let precompute = 0; // See: <https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112>
         let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file, precompute)?;
         Ok(Self::Custom(Arc::new(settings)))
     }
