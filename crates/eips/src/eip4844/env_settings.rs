@@ -48,6 +48,12 @@ impl EnvKzgSettings {
                     // FIXME
                     // KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
                     //     .expect("failed to load default trusted setup")
+                    KzgSettings::load_trusted_setup(
+                        g1_monomial_bytes,
+                        g1_lagrange_bytes,
+                        g2_monomial_bytes,
+                        0,
+                    );
                     todo!()
                 };
                 #[cfg(feature = "std")]
