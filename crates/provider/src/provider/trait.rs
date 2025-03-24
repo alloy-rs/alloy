@@ -915,6 +915,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Signs a transaction that can be submitted to the network later using
     /// [`Provider::send_raw_transaction`].
+    ///
+    /// The `"eth_signTransaction"` method is not supported by regular nodes.
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
         self.client().request("eth_signTransaction", (tx,)).await
     }
@@ -2083,7 +2085,7 @@ mod tests {
 
     #[tokio::test]
     async fn eth_sign_transaction() {
-        run_with_tempdir("reth-sign-tx", async |dir| {
+        run_with_tempdir("reth-sign-tx", |dir| async {
             let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
             let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
