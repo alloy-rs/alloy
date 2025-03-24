@@ -45,8 +45,10 @@ impl EnvKzgSettings {
         match self {
             Self::Default => {
                 let load = || {
-                    KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
-                        .expect("failed to load default trusted setup")
+                    // FIXME
+                    // KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
+                    //     .expect("failed to load default trusted setup")
+                    todo!()
                 };
                 #[cfg(feature = "std")]
                 {
@@ -71,7 +73,9 @@ impl EnvKzgSettings {
     pub fn load_from_trusted_setup_file(
         trusted_setup_file: &std::path::Path,
     ) -> Result<Self, c_kzg::Error> {
-        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file)?;
+        // FIXME: Precompute value??
+        let precompute = 0;
+        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file, precompute)?;
         Ok(Self::Custom(Arc::new(settings)))
     }
 }
