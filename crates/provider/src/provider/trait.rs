@@ -1224,7 +1224,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
+    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
@@ -2085,26 +2085,29 @@ mod tests {
 
     #[tokio::test]
     async fn eth_sign_transaction() {
-        run_with_tempdir("reth-sign-tx", |dir| async {
-            let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        async_ci_only(|| async {
+            run_with_tempdir("reth-sign-tx", |dir| async {
+                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let accounts = provider.get_accounts().await.unwrap();
-            let from = accounts[0];
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
 
-            let tx = TransactionRequest::default()
-                .from(from)
-                .to(Address::random())
-                .value(U256::from(100))
-                .gas_limit(21000);
+                let tx = TransactionRequest::default()
+                    .from(from)
+                    .to(Address::random())
+                    .value(U256::from(100))
+                    .gas_limit(21000);
 
-            let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
+                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
 
-            let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
+                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
 
-            let signer = tx.recover_signer().unwrap();
+                let signer = tx.recover_signer().unwrap();
 
-            assert_eq!(signer, from);
+                assert_eq!(signer, from);
+            })
+            .await
         })
         .await;
     }
