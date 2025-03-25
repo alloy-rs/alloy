@@ -68,6 +68,7 @@ This repository contains the following crates:
   - [`alloy-signer-ledger`] - [Ledger] signer implementation
   - [`alloy-signer-local`] - Local (private key, keystore, mnemonic, YubiHSM) signer implementations
   - [`alloy-signer-trezor`] - [Trezor] signer implementation
+  - [`alloy-signer-web3`] - [Web3Signer] implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
   - [`alloy-transport-http`] - HTTP transport implementation
   - [`alloy-transport-ipc`] - IPC transport implementation
@@ -105,16 +106,17 @@ This repository contains the following crates:
 [`alloy-signer-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger
 [`alloy-signer-local`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-local
 [`alloy-signer-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor
+[`alloy-signer-web3`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-web3
 [`alloy-transport`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport
 [`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
 [`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
 [`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
-
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms
 [Ledger]: https://www.ledger.com
 [Trezor]: https://trezor.io
+[Web3Signer]: https://docs.web3signer.consensys.io/
 [Serde]: https://serde.rs
 [beacon-apis]: https://ethereum.github.io/beacon-APIs
 [Anvil]: https://github.com/foundry-rs/foundry
