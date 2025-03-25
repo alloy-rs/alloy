@@ -2,6 +2,8 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
+#[cfg(feature = "pubsub")]
+use super::get_block::SubFullBlocks;
 use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -952,6 +954,34 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 
+    /// Subscribe to a stream of full block bodies.
+    ///
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_full_blocks().full().channel_size(10);
+    /// let mut stream = sub.into_stream().await?.take(5);
+    ///
+    /// while let Some(block) = stream.next().await {
+    ///   println!("{block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
+        SubFullBlocks::new(self.subscribe_blocks(), self.weak_client())
+    }
+
     /// Subscribe to a stream of pending transaction hashes.
     ///
     /// # Errors
@@ -1476,6 +1506,32 @@ mod tests {
                 *next += 1;
             } else {
                 next = Some(header.number + 1);
+            }
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_full_blocks() {
+        use futures::StreamExt;
+
+        let anvil = Anvil::new().block_time_f64(0.2).spawn();
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
+
+        let provider = RootProvider::<Ethereum>::new(client);
+
+        let sub = provider.subscribe_full_blocks().hashes().channel_size(10);
+
+        let mut stream = sub.into_stream().await.unwrap().take(5);
+
+        let mut next = None;
+        while let Some(Ok(block)) = stream.next().await {
+            if let Some(next) = &mut next {
+                assert_eq!(block.header().number, *next);
+                *next += 1;
+            } else {
+                next = Some(block.header().number + 1);
             }
         }
     }
