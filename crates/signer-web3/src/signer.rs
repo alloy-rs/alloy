@@ -1,12 +1,22 @@
 //! Ethereum Web3 Signer.
 
 use alloy_consensus::{SignableTransaction, TxEnvelope};
-use alloy_network::{eip2718::Decodable2718, Ethereum, Network, TransactionBuilder, TxSigner};
+use alloy_network::{
+    eip2718::Decodable2718, AnyNetwork, Ethereum, EthereumWallet, IntoWallet, Network,
+    TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TxSigner,
+};
 use alloy_primitives::{Address, Bytes, PrimitiveSignature as Signature};
 use alloy_provider::Provider;
 
-/// Web3 Signer.
-#[derive(Debug)]
+/// A remote signer that leverages the underlying provider to sign transactions using
+/// `"eth_signTransaction"` requests.
+///
+/// For more information, please see [Web3Signer](https://docs.web3signer.consensys.io/).
+///
+/// Note:
+///
+/// `"eth_signTransaction"` is not supported by regular nodes.
+#[derive(Debug, Clone)]
 pub struct Web3Signer<P: Provider<N>, N: Network = Ethereum> {
     /// The provider used to make `"eth_signTransaction"` requests.
     provider: P,
@@ -49,6 +59,7 @@ impl<P, N> TxSigner<Signature> for Web3Signer<P, N>
 where
     P: Provider<N>,
     N: Network,
+    N::TransactionRequest: TransactionBuilder7702 + TransactionBuilder4844,
 {
     fn address(&self) -> Address {
         self.address
@@ -72,7 +83,7 @@ where
 
         // Gas related fields
         request.set_gas_limit(tx.gas_limit());
-        let max_fee_or_gas_price = tx.max_fee_per_gas();
+        let max_fee_or_gas_price = tx.max_fee_per_gas(); // Returns `gasPrice` if not dynamic fee.
         if tx.is_dynamic_fee() {
             request.set_max_fee_per_gas(max_fee_or_gas_price);
             if let Some(max_priority_fee) = tx.max_priority_fee_per_gas() {
@@ -86,17 +97,12 @@ where
             request.set_access_list(access_list.clone());
         }
 
-        if let Some(hashes) = tx.blob_versioned_hashes() {
-            // Cannot set versioned hashes via TransactionBuilder.
-            todo!("Set versioned hashes")
+        if let Some(sidecar) = tx.blob_sidecar() {
+            request.set_blob_sidecar(sidecar.clone());
         }
 
-        // TODO: Read and set sidecar??
-        // Cannot access sidecar via Transaction trait
-
         if let Some(auth) = tx.authorization_list() {
-            // Cannot set authorization list via TransactionBuilder.
-            todo!("Set authorization list")
+            request.set_authorization_list(auth.to_vec());
         }
 
         let raw = self.sign_transaction(request).await?;
@@ -108,4 +114,20 @@ where
     }
 }
 
-alloy_network::impl_into_wallet!(@[P: Provider<N> + core::fmt::Debug + 'static, N: Network] Web3Signer<P, N>);
+impl<P: Provider + core::fmt::Debug + 'static> IntoWallet for Web3Signer<P> {
+    type NetworkWallet = EthereumWallet;
+
+    fn into_wallet(self) -> Self::NetworkWallet {
+        EthereumWallet::from(self)
+    }
+}
+
+impl<P: Provider<AnyNetwork> + core::fmt::Debug + 'static> IntoWallet<AnyNetwork>
+    for Web3Signer<P, AnyNetwork>
+{
+    type NetworkWallet = EthereumWallet;
+
+    fn into_wallet(self) -> Self::NetworkWallet {
+        EthereumWallet::from(self)
+    }
+}
