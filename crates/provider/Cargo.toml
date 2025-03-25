@@ -71,7 +71,7 @@ parking_lot.workspace = true
 wasmtimer.workspace = true
 
 [dev-dependencies]
-alloy-consensus = { workspace = true, features = ["kzg"] }
+alloy-consensus = { workspace = true, features = ["kzg", "k256"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
