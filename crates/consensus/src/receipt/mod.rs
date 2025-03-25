@@ -17,6 +17,7 @@ use alloy_eips::Typed2718;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) mod serde_bincode_compat {
     pub use super::receipts::serde_bincode_compat::*;
+    pub use super::envelope::serde_bincode_compat::*;
 }
 
 /// Receipt is the result of a transaction execution.

@@ -280,6 +280,104 @@ where
     }
 }
 
+/// Bincode-compatible [`ReceiptEnvelope`] serde implementation.
+// #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(crate) mod serde_bincode_compat {
+    use alloc::{borrow::Cow, vec::Vec};
+    use crate::Receipt;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::ReceiptEnvelope`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{ReceiptEnvelope, serde_bincode_compat};
+    /// use serde::{Deserialize, Serialize, de::DeserializeOwned};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+    ///     #[serde_as(as = "serde_bincode_compat::ReceiptEnvelope<'_, T>")]
+    ///     receipt: ReceiptEnvelope<T>,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub enum ReceiptEnvelope<'a, T> {
+      
+    }
+
+    impl<'a, T: Clone> From<&'a super::ReceiptEnvelope<T>> for ReceiptEnvelope<'a, T> {
+        fn from(value: &'a super::ReceiptEnvelope<T>) -> Self {
+           todo!()
+        }
+    }
+
+    impl<'a, T: Clone> From<ReceiptEnvelope<'a, T>> for super::ReceiptEnvelope<T> {
+        fn from(value: ReceiptEnvelope<'a, T>) -> Self {
+            todo!()
+        }
+    }
+
+    impl<T: Serialize + Clone> SerializeAs<super::ReceiptEnvelope<T>> for ReceiptEnvelope<'_, T> {
+        fn serialize_as<S>(
+            source: &super::ReceiptEnvelope<T>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            ReceiptEnvelope::<'_, T>::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de> + Clone> DeserializeAs<'de, super::ReceiptEnvelope<T>>
+    for ReceiptEnvelope<'de, T>
+    {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::ReceiptEnvelope<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            ReceiptEnvelope::<'_, T>::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::{ReceiptEnvelope, serde_bincode_compat};
+        use alloy_primitives::Log;
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize, de::DeserializeOwned};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_tx_deposit_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+                #[serde_as(as = "serde_bincode_compat::ReceiptEnvelope<'_,T>")]
+                transaction: ReceiptEnvelope<T>,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::rng().fill(bytes.as_mut_slice());
+            let mut data = Data {
+                transaction: ReceiptEnvelope::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                    .unwrap(),
+            };
+            // ensure we don't have an invalid poststate variant
+            data.transaction.inner.status = data.transaction.inner.status.coerce_status().into();
+
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data<Log> = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     #[cfg(feature = "serde")]
