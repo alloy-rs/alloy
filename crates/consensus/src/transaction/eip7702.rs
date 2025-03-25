@@ -102,7 +102,8 @@ impl TxEip7702 {
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() + // input
-        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
+        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>()
+        // authorization_list
     }
 }
 
