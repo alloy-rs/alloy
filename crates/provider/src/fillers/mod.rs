@@ -47,7 +47,7 @@ use alloy_rpc_types_eth::{
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
     FilterChanges, Log,
 };
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
@@ -607,6 +607,12 @@ where
 
         // Errors in tx building happen further down the stack.
         self.inner.send_transaction_internal(tx).await
+    }
+
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        let tx = self.fill(tx).await?;
+        let tx = tx.try_into_request().map_err(TransportError::local_usage)?;
+        self.inner.sign_transaction(tx).await
     }
 
     #[cfg(feature = "pubsub")]

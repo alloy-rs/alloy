@@ -2,6 +2,8 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
+#[cfg(feature = "pubsub")]
+use super::get_block::SubFullBlocks;
 use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -943,6 +945,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
+    /// Signs a transaction that can be submitted to the network later using
+    /// [`Provider::send_raw_transaction`].
+    ///
+    /// The `"eth_signTransaction"` method is not supported by regular nodes.
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.client().request("eth_signTransaction", (tx,)).await
+    }
+
     /// Subscribe to a stream of new block headers.
     ///
     /// # Errors
@@ -972,6 +982,34 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         let rpc_call = self.client().request("eth_subscribe", (SubscriptionKind::NewHeads,));
         GetSubscription::new(self.weak_client(), rpc_call)
+    }
+
+    /// Subscribe to a stream of full block bodies.
+    ///
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_full_blocks().full().channel_size(10);
+    /// let mut stream = sub.into_stream().await?.take(5);
+    ///
+    /// while let Some(block) = stream.next().await {
+    ///   println!("{block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
+        SubFullBlocks::new(self.subscribe_blocks(), self.weak_client())
     }
 
     /// Subscribe to a stream of pending transaction hashes.
@@ -1246,11 +1284,12 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
-    use alloy_consensus::Transaction;
+    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
+    use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::Anvil;
+    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
@@ -1497,6 +1536,32 @@ mod tests {
                 *next += 1;
             } else {
                 next = Some(header.number + 1);
+            }
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_full_blocks() {
+        use futures::StreamExt;
+
+        let anvil = Anvil::new().block_time_f64(0.2).spawn();
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
+
+        let provider = RootProvider::<Ethereum>::new(client);
+
+        let sub = provider.subscribe_full_blocks().hashes().channel_size(10);
+
+        let mut stream = sub.into_stream().await.unwrap().take(5);
+
+        let mut next = None;
+        while let Some(Ok(block)) = stream.next().await {
+            if let Some(next) = &mut next {
+                assert_eq!(block.header().number, *next);
+                *next += 1;
+            } else {
+                next = Some(block.header().number + 1);
             }
         }
     }
@@ -2102,6 +2167,36 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn eth_sign_transaction() {
+        async_ci_only(|| async {
+            run_with_tempdir("reth-sign-tx", |dir| async {
+                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
+
+                let tx = TransactionRequest::default()
+                    .from(from)
+                    .to(Address::random())
+                    .value(U256::from(100))
+                    .gas_limit(21000);
+
+                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
+
+                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
+
+                let signer = tx.recover_signer().unwrap();
+
+                assert_eq!(signer, from);
+            })
+            .await
+        })
+        .await;
     }
 
     #[cfg(feature = "throttle")]

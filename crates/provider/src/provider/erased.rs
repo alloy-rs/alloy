@@ -353,6 +353,10 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.send_transaction_internal(tx).await
     }
 
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.0.sign_transaction(tx).await
+    }
+
     #[cfg(feature = "pubsub")]
     fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
         self.0.subscribe_blocks()
