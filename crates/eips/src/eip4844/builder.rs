@@ -1,9 +1,5 @@
-use crate::eip4844::Blob;
-#[cfg(feature = "kzg")]
-use c_kzg::{KzgCommitment, KzgProof};
-
 use crate::eip4844::{
-    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
+    utils::WholeFe, Blob, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES_USIZE,
 };
 use alloc::vec::Vec;
 

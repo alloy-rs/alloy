@@ -36,20 +36,6 @@ impl Default for G2Points {
     }
 }
 
-/// Default G1 points.
-pub const G1_POINTS: &G1Points = {
-    const BYTES: &[u8] = include_bytes!("./g1_points.bin");
-    assert!(BYTES.len() == core::mem::size_of::<G1Points>());
-    unsafe { &*BYTES.as_ptr().cast::<G1Points>() }
-};
-
-/// Default G2 points.
-pub const G2_POINTS: &G2Points = {
-    const BYTES: &[u8] = include_bytes!("./g2_points.bin");
-    assert!(BYTES.len() == core::mem::size_of::<G2Points>());
-    unsafe { &*BYTES.as_ptr().cast::<G2Points>() }
-};
-
 /// Parses the contents of a KZG trusted setup file into a list of G1 and G2 points.
 ///
 /// These can then be used to create a KZG settings object with

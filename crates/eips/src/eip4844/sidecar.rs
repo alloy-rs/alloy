@@ -339,7 +339,6 @@ impl BlobTransactionSidecar {
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
     pub fn try_from_blobs(blobs: Vec<c_kzg::Blob>) -> Result<Self, c_kzg::Error> {
         use crate::eip4844::env_settings::EnvKzgSettings;
-        use c_kzg::{KzgCommitment, KzgProof};
 
         let kzg_settings = EnvKzgSettings::Default;
 
