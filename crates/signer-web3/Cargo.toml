@@ -33,6 +33,9 @@ async-trait.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-
+alloy-node-bindings.workspace = true
+alloy-provider = { workspace = true, features = ["reqwest"] }
+alloy-consensus = { workspace = true, features = ["k256"] }
+ci_info.workspace = true
 [features]
 eip712 = ["alloy-signer/eip712"]

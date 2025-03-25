@@ -131,3 +131,55 @@ impl<P: Provider<AnyNetwork> + core::fmt::Debug + 'static> IntoWallet<AnyNetwork
         EthereumWallet::from(self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_consensus::TxEnvelope;
+    use alloy_network::eip2718::Decodable2718;
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    use alloy_primitives::{Address, U256};
+    use alloy_provider::{Provider, ProviderBuilder};
+
+    async fn async_ci_only<F, Fut>(f: F)
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        if ci_info::is_ci() {
+            f().await;
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn eth_sign_transaction() {
+        async_ci_only(|| async {
+            run_with_tempdir("reth-sign-tx", |dir| async {
+                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
+                let signer = Web3Signer::new(provider.clone(), from);
+
+                let tx = provider
+                    .transaction_request()
+                    .from(from)
+                    .to(Address::ZERO)
+                    .value(U256::from(100))
+                    .gas_limit(21000);
+
+                let signed_tx = signer.sign_transaction(tx).await.unwrap();
+
+                let tx = TxEnvelope::decode_2718(&mut signed_tx.as_ref()).unwrap();
+
+                let signer = tx.recover_signer().unwrap();
+
+                assert_eq!(signer, from);
+            })
+            .await
+        })
+        .await;
+    }
+}
