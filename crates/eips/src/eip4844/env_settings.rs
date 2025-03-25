@@ -43,33 +43,7 @@ impl EnvKzgSettings {
     #[inline]
     pub fn get(&self) -> &KzgSettings {
         match self {
-            Self::Default => {
-                let load = || {
-                    // FIXME
-                    // KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
-                    //     .expect("failed to load default trusted setup")
-                    KzgSettings::load_trusted_setup(
-                        g1_monomial_bytes,
-                        g1_lagrange_bytes,
-                        g2_monomial_bytes,
-                        0,
-                    );
-                    todo!()
-                };
-                #[cfg(feature = "std")]
-                {
-                    use once_cell as _;
-                    use std::sync::OnceLock;
-                    static DEFAULT: OnceLock<KzgSettings> = OnceLock::new();
-                    DEFAULT.get_or_init(load)
-                }
-                #[cfg(not(feature = "std"))]
-                {
-                    use once_cell::race::OnceBox;
-                    static DEFAULT: OnceBox<KzgSettings> = OnceBox::new();
-                    DEFAULT.get_or_init(|| alloc::boxed::Box::new(load()))
-                }
-            }
+            Self::Default => c_kzg::ethereum_kzg_settings(0),
             Self::Custom(settings) => settings,
         }
     }

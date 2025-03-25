@@ -5,10 +5,11 @@ use derive_more::{AsMut, AsRef, Deref, DerefMut};
 
 pub use c_kzg::{BYTES_PER_COMMITMENT as BYTES_PER_G1_POINT, FIELD_ELEMENTS_PER_BLOB};
 
+/// Bytes per G2 point.
 pub const BYTES_PER_G2_POINT: usize = 96;
 
 /// Number of G1 Points.
-pub const NUM_G1_POINTS: usize = FIELD_ELEMENTS_PER_BLOB;
+pub const NUM_G1_POINTS: usize = 4096;
 
 /// Number of G2 Points.
 pub const NUM_G2_POINTS: usize = 65;
