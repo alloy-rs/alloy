@@ -54,6 +54,7 @@ use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
 mod filler_stack;
+pub use filler_stack::FillerStack;
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.

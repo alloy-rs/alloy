@@ -1,11 +1,12 @@
 use crate::{
-    fillers::{FillerControlFlow, TxFiller},
-    provider::SendableTx,
-    Provider,
+    fillers::{FillProvider, FillerControlFlow, TxFiller},
+    provider::Provider,
+    ProviderLayer, SendableTx,
 };
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_transport::TransportResult;
 use futures::try_join;
+use std::marker::PhantomData;
 
 /// Empty filler stack state
 #[derive(Debug, Clone)]
@@ -18,7 +19,7 @@ pub struct FillerStack<T> {
 }
 
 /// A trait for tuples that can have types pushed to them
-pub trait TuplePush<T> {
+pub trait TuplePush<T, N: Network> {
     /// The resulting type after pushing T
     type Pushed;
 }
@@ -31,10 +32,19 @@ trait TupleFrom<T> {
 
 /// Newtype wrapper for tuple conversions
 #[derive(Debug, Clone)]
-struct TupleWrapper<T>(T);
+struct TupleWrapper<T, N: Network> {
+    inner: T,
+    _network: PhantomData<N>,
+}
+
+impl<T, N: Network> TupleWrapper<T, N> {
+    fn new(inner: T) -> Self {
+        Self { inner, _network: PhantomData }
+    }
+}
 
 // Implement TuplePush for Empty
-impl<T: TxFiller> TuplePush<T> for Empty {
+impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
     type Pushed = (T,);
 }
 
@@ -49,19 +59,19 @@ impl FillerStack<Empty> {
 // Implement methods for all FillerStack variants
 impl<T> FillerStack<T> {
     /// Push a new filler onto the stack
-    pub fn push<F: TxFiller>(self, filler: F) -> FillerStack<T::Pushed>
+    pub fn push<F: TxFiller<N>, N: Network>(self, filler: F) -> FillerStack<T::Pushed>
     where
-        T: TuplePush<F>,
-        TupleWrapper<T::Pushed>: From<(T, F)>,
+        T: TuplePush<F, N>,
+        TupleWrapper<T::Pushed, N>: From<(T, F)>,
     {
-        FillerStack { fillers: TupleWrapper::from((self.fillers, filler)).0 }
+        FillerStack { fillers: TupleWrapper::from((self.fillers, filler)).inner }
     }
 }
 
 // Macro to implement TuplePush for tuples of different sizes
 macro_rules! impl_tuple {
     ($($idx:tt => $ty:ident),+) => {
-        impl<T: TxFiller, $($ty: TxFiller,)+> TuplePush<T> for ($($ty,)+) {
+        impl<T: TxFiller<N>, $($ty: TxFiller<N>,)+ N: Network> TuplePush<T, N> for ($($ty,)+) {
             type Pushed = ($($ty,)+ T,);
         }
     };
@@ -153,58 +163,98 @@ impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
 // Implement From for tuple types
-impl<T: TxFiller> From<(Empty, T)> for TupleWrapper<(T,)> {
+impl<T: TxFiller<N>, N: Network> From<(Empty, T)> for TupleWrapper<(T,), N> {
     fn from((_, t): (Empty, T)) -> Self {
-        TupleWrapper((t,))
+        TupleWrapper::new((t,))
     }
 }
 
-impl<T: TxFiller> From<((T,),)> for TupleWrapper<(T,)> {
+impl<T: TxFiller<N>, N: Network> From<((T,),)> for TupleWrapper<(T,), N> {
     fn from(value: ((T,),)) -> Self {
-        TupleWrapper(value.0)
+        TupleWrapper::new(value.0)
     }
 }
 
-impl<L: TxFiller, R: TxFiller> From<((L,), R)> for TupleWrapper<(L, R)> {
+impl<L: TxFiller<N>, R: TxFiller<N>, N: Network> From<((L,), R)> for TupleWrapper<(L, R), N> {
     fn from((l, r): ((L,), R)) -> Self {
-        TupleWrapper((l.0, r))
+        TupleWrapper::new((l.0, r))
     }
 }
 
-impl<A: TxFiller, B: TxFiller, C: TxFiller> From<((A, B), C)> for TupleWrapper<(A, B, C)> {
+impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, N: Network> From<((A, B), C)>
+    for TupleWrapper<(A, B, C), N>
+{
     fn from((ab, c): ((A, B), C)) -> Self {
-        TupleWrapper((ab.0, ab.1, c))
+        TupleWrapper::new((ab.0, ab.1, c))
     }
 }
 
-impl<A: TxFiller, B: TxFiller, C: TxFiller, D: TxFiller> From<((A, B, C), D)>
-    for TupleWrapper<(A, B, C, D)>
+impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, D: TxFiller<N>, N: Network>
+    From<((A, B, C), D)> for TupleWrapper<(A, B, C, D), N>
 {
     fn from((abc, d): ((A, B, C), D)) -> Self {
-        TupleWrapper((abc.0, abc.1, abc.2, d))
+        TupleWrapper::new((abc.0, abc.1, abc.2, d))
     }
 }
+
+/// Macro to implement ProviderLayer for tuples of different sizes
+macro_rules! impl_provider_layer {
+    ($($idx:tt => $ty:ident),+) => {
+        impl<$($ty: TxFiller<N>,)+ P: Provider<N>, N: Network> ProviderLayer<P, N> for FillerStack<($($ty,)+)> {
+            type Provider = FillProvider<Self, P, N>;
+            fn layer(&self, inner: P) -> Self::Provider {
+                FillProvider::new(inner, self.clone())
+            }
+        }
+    };
+}
+
+// Generate implementations for tuples from 1 to 8 fillers
+impl_provider_layer!(0 => T1);
+impl_provider_layer!(0 => T1, 1 => T2);
+impl_provider_layer!(0 => T1, 1 => T2, 2 => T3);
+impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
+impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
+impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
+impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
+impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
 #[cfg(test)]
 mod tests {
-    use alloy_network::EthereumWallet;
+    use alloy_network::{Ethereum, EthereumWallet};
     use alloy_signer_local::PrivateKeySigner;
 
     use super::*;
-    use crate::fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager, WalletFiller};
+    use crate::{
+        fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager, WalletFiller},
+        ProviderBuilder,
+    };
 
     #[test]
     fn test_filler_stack() {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
         let stack = FillerStack::new()
-            .push(GasFiller)
-            .push(NonceFiller::new(SimpleNonceManager::default()))
-            .push(ChainIdFiller::default())
-            .push(WalletFiller::new(EthereumWallet::new(pk)));
+            .push::<_, Ethereum>(GasFiller)
+            .push::<_, Ethereum>(NonceFiller::new(SimpleNonceManager::default()))
+            .push::<_, Ethereum>(ChainIdFiller::default())
+            .push::<_, Ethereum>(WalletFiller::new(EthereumWallet::new(pk)));
 
         // Type should be FillerStack<(GasFiller, NonceFiller, ChainIdFiller)>
         let _: FillerStack<(GasFiller, NonceFiller, ChainIdFiller, WalletFiller<EthereumWallet>)> =
             stack;
+    }
+
+    #[test]
+    fn filler_stack_provider() {
+        let pk: PrivateKeySigner =
+            "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
+        let stack = FillerStack::new()
+            .push::<_, Ethereum>(GasFiller)
+            .push::<_, Ethereum>(NonceFiller::new(SimpleNonceManager::default()))
+            .push::<_, Ethereum>(ChainIdFiller::default())
+            .push::<_, Ethereum>(WalletFiller::new(EthereumWallet::new(pk)));
+
+        let provider = ProviderBuilder::<_, _, Ethereum>::default();
     }
 }
