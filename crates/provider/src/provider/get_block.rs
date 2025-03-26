@@ -13,6 +13,7 @@ use alloy_transport::{TransportError, TransportResult};
 use either::Either;
 use futures::{Stream, StreamExt};
 use serde_json::Value;
+use std::time::Duration;
 
 use super::FilterPollerBuilder;
 
@@ -309,6 +310,21 @@ where
     pub fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
+    }
+
+    /// Sets the channel size for the poller task.
+    pub fn set_channel_size(&mut self, channel_size: usize) {
+        self.poller.set_channel_size(channel_size);
+    }
+
+    /// Sets a limit on the number of successful polls.
+    pub fn set_limit(&mut self, limit: Option<usize>) {
+        self.poller.set_limit(limit);
+    }
+
+    /// Sets the duration between polls.
+    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+        self.poller.set_poll_interval(poll_interval);
     }
 
     /// Consumes the stream of block hashes from the inner [`FilterPollerBuilder`] and maps it to a
