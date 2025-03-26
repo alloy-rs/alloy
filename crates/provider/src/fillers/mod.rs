@@ -53,6 +53,8 @@ use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
+mod filler_stack;
+
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
 pub type RecommendedFiller =
