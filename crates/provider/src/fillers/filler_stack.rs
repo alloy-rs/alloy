@@ -197,6 +197,20 @@ impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, D: TxFiller<N>, N: Network>
     }
 }
 
+impl<
+        A: TxFiller<N>,
+        B: TxFiller<N>,
+        C: TxFiller<N>,
+        D: TxFiller<N>,
+        E: TxFiller<N>,
+        N: Network,
+    > From<((A, B, C, D), E)> for TupleWrapper<(A, B, C, D, E), N>
+{
+    fn from((abcd, e): ((A, B, C, D), E)) -> Self {
+        TupleWrapper::new((abcd.0, abcd.1, abcd.2, abcd.3, e))
+    }
+}
+
 /// Macro to implement ProviderLayer for tuples of different sizes
 macro_rules! impl_provider_layer {
     ($($idx:tt => $ty:ident),+) => {
@@ -225,36 +239,20 @@ mod tests {
     use alloy_signer_local::PrivateKeySigner;
 
     use super::*;
-    use crate::{
-        fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager, WalletFiller},
-        ProviderBuilder,
+    use crate::fillers::{
+        BlobGasFiller, ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller,
     };
 
     #[test]
     fn test_filler_stack() {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
-        let stack = FillerStack::new()
-            .push::<_, Ethereum>(GasFiller)
-            .push::<_, Ethereum>(NonceFiller::new(SimpleNonceManager::default()))
-            .push::<_, Ethereum>(ChainIdFiller::default())
-            .push::<_, Ethereum>(WalletFiller::new(EthereumWallet::new(pk)));
 
         // Type should be FillerStack<(GasFiller, NonceFiller, ChainIdFiller)>
-        let _: FillerStack<(GasFiller, NonceFiller, ChainIdFiller, WalletFiller<EthereumWallet>)> =
-            stack;
-    }
+        let recommend: FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)> =
+            Ethereum::recommended_fillers();
 
-    #[test]
-    fn filler_stack_provider() {
-        let pk: PrivateKeySigner =
-            "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
-        let stack = FillerStack::new()
-            .push::<_, Ethereum>(GasFiller)
-            .push::<_, Ethereum>(NonceFiller::new(SimpleNonceManager::default()))
-            .push::<_, Ethereum>(ChainIdFiller::default())
-            .push::<_, Ethereum>(WalletFiller::new(EthereumWallet::new(pk)));
-
-        let provider = ProviderBuilder::<_, _, Ethereum>::default();
+        let _full_stack =
+            recommend.push::<_, Ethereum>(WalletFiller::new(EthereumWallet::from(pk)));
     }
 }

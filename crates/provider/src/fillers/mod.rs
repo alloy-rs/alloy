@@ -683,20 +683,44 @@ pub trait RecommendedFillers: Network {
     fn recommended_fillers() -> Self::RecommendedFillers;
 }
 
+// impl RecommendedFillers for Ethereum {
+//     type RecommendedFillers =
+//         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+
+//     fn recommended_fillers() -> Self::RecommendedFillers {
+//         Default::default()
+//     }
+// }
+
 impl RecommendedFillers for Ethereum {
-    type RecommendedFillers =
-        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+    type RecommendedFillers = FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        Default::default()
+        FillerStack::new()
+            .push::<_, Ethereum>(GasFiller)
+            .push::<_, Ethereum>(BlobGasFiller)
+            .push::<_, Ethereum>(NonceFiller::new(SimpleNonceManager::default()))
+            .push::<_, Ethereum>(ChainIdFiller::default())
     }
 }
 
+// impl RecommendedFillers for AnyNetwork {
+//     type RecommendedFillers =
+//         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+
+//     fn recommended_fillers() -> Self::RecommendedFillers {
+//         Default::default()
+//     }
+// }
+
 impl RecommendedFillers for AnyNetwork {
-    type RecommendedFillers =
-        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+    type RecommendedFillers = FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        Default::default()
+        FillerStack::new()
+            .push::<_, AnyNetwork>(GasFiller)
+            .push::<_, AnyNetwork>(BlobGasFiller)
+            .push::<_, AnyNetwork>(NonceFiller::new(SimpleNonceManager::default()))
+            .push::<_, AnyNetwork>(ChainIdFiller::default())
     }
 }
