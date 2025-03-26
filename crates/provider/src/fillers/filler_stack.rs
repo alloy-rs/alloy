@@ -58,247 +58,99 @@ impl<T> FillerStack<T> {
     }
 }
 
-// Macro to implement for tuples of different sizes
+// Macro to implement TuplePush for tuples of different sizes
 macro_rules! impl_tuple {
     ($($idx:tt => $ty:ident),+) => {
-        // Implement pushing a new type onto the tuple
         impl<T: TxFiller, $($ty: TxFiller,)+> TuplePush<T> for ($($ty,)+) {
             type Pushed = ($($ty,)+ T,);
         }
     };
 }
 
-// Implement for tuples up to 3 elements (can be extended if needed)
+// Implement TuplePush for tuples up to 8 elements
 impl_tuple!(0 => T1);
 impl_tuple!(0 => T1, 1 => T2);
 impl_tuple!(0 => T1, 1 => T2, 2 => T3);
+impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
+impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
+impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
+impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
+impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
-// Implement TxFiller for Empty
-impl<N: Network> TxFiller<N> for FillerStack<Empty> {
-    type Fillable = ();
+/// Macro to implement TxFiller for tuples of different sizes
+macro_rules! impl_tx_filler {
+    ($($idx:tt => $ty:ident),+) => {
+        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for FillerStack<($($ty,)+)> {
+            type Fillable = ($(Option<$ty::Fillable>,)+);
 
-    fn status(&self, _tx: &N::TransactionRequest) -> FillerControlFlow {
-        FillerControlFlow::Finished
-    }
-
-    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
-
-    async fn prepare<P>(
-        &self,
-        _provider: &P,
-        _tx: &N::TransactionRequest,
-    ) -> TransportResult<Self::Fillable>
-    where
-        P: Provider<N>,
-    {
-        Ok(())
-    }
-
-    async fn fill(
-        &self,
-        _fillable: Self::Fillable,
-        tx: SendableTx<N>,
-    ) -> TransportResult<SendableTx<N>> {
-        Ok(tx)
-    }
-
-    async fn prepare_call(&self, _tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        Ok(())
-    }
-
-    fn prepare_call_sync(&self, _tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        Ok(())
-    }
-}
-
-// Implement TxFiller for single filler
-impl<F: TxFiller<N>, N: Network> TxFiller<N> for FillerStack<(F,)> {
-    type Fillable = F::Fillable;
-
-    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
-        F::status(&self.fillers.0, tx)
-    }
-
-    fn fill_sync(&self, tx: &mut SendableTx<N>) {
-        F::fill_sync(&self.fillers.0, tx)
-    }
-
-    async fn prepare<P>(
-        &self,
-        provider: &P,
-        tx: &N::TransactionRequest,
-    ) -> TransportResult<Self::Fillable>
-    where
-        P: Provider<N>,
-    {
-        F::prepare(&self.fillers.0, provider, tx).await
-    }
-
-    async fn fill(
-        &self,
-        fillable: Self::Fillable,
-        tx: SendableTx<N>,
-    ) -> TransportResult<SendableTx<N>> {
-        F::fill(&self.fillers.0, fillable, tx).await
-    }
-
-    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        F::prepare_call(&self.fillers.0, tx).await
-    }
-
-    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        F::prepare_call_sync(&self.fillers.0, tx)
-    }
-}
-
-// Implement TxFiller for tuple of two fillers
-impl<L: TxFiller<N>, R: TxFiller<N>, N: Network> TxFiller<N> for FillerStack<(L, R)> {
-    type Fillable = (Option<L::Fillable>, Option<R::Fillable>);
-
-    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
-        L::status(&self.fillers.0, tx).absorb(R::status(&self.fillers.1, tx))
-    }
-
-    fn fill_sync(&self, tx: &mut SendableTx<N>) {
-        L::fill_sync(&self.fillers.0, tx);
-        R::fill_sync(&self.fillers.1, tx);
-    }
-
-    async fn prepare<P>(
-        &self,
-        provider: &P,
-        tx: &N::TransactionRequest,
-    ) -> TransportResult<Self::Fillable>
-    where
-        P: Provider<N>,
-    {
-        try_join!(
-            async {
-                if L::ready(&self.fillers.0, tx) {
-                    L::prepare(&self.fillers.0, provider, tx).await.map(Some)
-                } else {
-                    Ok(None)
-                }
-            },
-            async {
-                if R::ready(&self.fillers.1, tx) {
-                    R::prepare(&self.fillers.1, provider, tx).await.map(Some)
-                } else {
-                    Ok(None)
-                }
+            fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
+                let mut flow = FillerControlFlow::Finished;
+                $(
+                    flow = flow.absorb($ty::status(&self.fillers.$idx, tx));
+                )+
+                flow
             }
-        )
-    }
 
-    async fn fill(
-        &self,
-        to_fill: Self::Fillable,
-        mut tx: SendableTx<N>,
-    ) -> TransportResult<SendableTx<N>> {
-        if let Some(to_fill) = to_fill.0 {
-            tx = L::fill(&self.fillers.0, to_fill, tx).await?;
-        }
-        if let Some(to_fill) = to_fill.1 {
-            tx = R::fill(&self.fillers.1, to_fill, tx).await?;
-        }
-        Ok(tx)
-    }
-
-    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        L::prepare_call(&self.fillers.0, tx).await?;
-        R::prepare_call(&self.fillers.1, tx).await?;
-        Ok(())
-    }
-
-    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        L::prepare_call_sync(&self.fillers.0, tx)?;
-        R::prepare_call_sync(&self.fillers.1, tx)?;
-        Ok(())
-    }
-}
-
-// Implement TxFiller for tuple of three fillers
-impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, N: Network> TxFiller<N>
-    for FillerStack<(A, B, C)>
-{
-    type Fillable = (Option<A::Fillable>, Option<B::Fillable>, Option<C::Fillable>);
-
-    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
-        A::status(&self.fillers.0, tx)
-            .absorb(B::status(&self.fillers.1, tx))
-            .absorb(C::status(&self.fillers.2, tx))
-    }
-
-    fn fill_sync(&self, tx: &mut SendableTx<N>) {
-        A::fill_sync(&self.fillers.0, tx);
-        B::fill_sync(&self.fillers.1, tx);
-        C::fill_sync(&self.fillers.2, tx);
-    }
-
-    async fn prepare<P>(
-        &self,
-        provider: &P,
-        tx: &N::TransactionRequest,
-    ) -> TransportResult<Self::Fillable>
-    where
-        P: Provider<N>,
-    {
-        try_join!(
-            async {
-                if A::ready(&self.fillers.0, tx) {
-                    A::prepare(&self.fillers.0, provider, tx).await.map(Some)
-                } else {
-                    Ok(None)
-                }
-            },
-            async {
-                if B::ready(&self.fillers.1, tx) {
-                    B::prepare(&self.fillers.1, provider, tx).await.map(Some)
-                } else {
-                    Ok(None)
-                }
-            },
-            async {
-                if C::ready(&self.fillers.2, tx) {
-                    C::prepare(&self.fillers.2, provider, tx).await.map(Some)
-                } else {
-                    Ok(None)
-                }
+            fn fill_sync(&self, tx: &mut SendableTx<N>) {
+                $($ty::fill_sync(&self.fillers.$idx, tx);)+
             }
-        )
-    }
 
-    async fn fill(
-        &self,
-        to_fill: Self::Fillable,
-        mut tx: SendableTx<N>,
-    ) -> TransportResult<SendableTx<N>> {
-        if let Some(to_fill) = to_fill.0 {
-            tx = A::fill(&self.fillers.0, to_fill, tx).await?;
-        }
-        if let Some(to_fill) = to_fill.1 {
-            tx = B::fill(&self.fillers.1, to_fill, tx).await?;
-        }
-        if let Some(to_fill) = to_fill.2 {
-            tx = C::fill(&self.fillers.2, to_fill, tx).await?;
-        }
-        Ok(tx)
-    }
+            async fn prepare<P>(
+                &self,
+                provider: &P,
+                tx: &N::TransactionRequest,
+            ) -> TransportResult<Self::Fillable>
+            where
+                P: Provider<N>,
+            {
+                try_join!(
+                    $(
+                        async {
+                            if $ty::ready(&self.fillers.$idx, tx) {
+                                $ty::prepare(&self.fillers.$idx, provider, tx).await.map(Some)
+                            } else {
+                                Ok(None)
+                            }
+                        },
+                    )+
+                )
+            }
 
-    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        A::prepare_call(&self.fillers.0, tx).await?;
-        B::prepare_call(&self.fillers.1, tx).await?;
-        C::prepare_call(&self.fillers.2, tx).await?;
-        Ok(())
-    }
+            async fn fill(
+                &self,
+                to_fill: Self::Fillable,
+                mut tx: SendableTx<N>,
+            ) -> TransportResult<SendableTx<N>> {
+                $(
+                    if let Some(to_fill) = to_fill.$idx {
+                        tx = $ty::fill(&self.fillers.$idx, to_fill, tx).await?;
+                    }
+                )+
+                Ok(tx)
+            }
 
-    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        A::prepare_call_sync(&self.fillers.0, tx)?;
-        B::prepare_call_sync(&self.fillers.1, tx)?;
-        C::prepare_call_sync(&self.fillers.2, tx)?;
-        Ok(())
-    }
+            async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+                $($ty::prepare_call(&self.fillers.$idx, tx).await?;)+
+                Ok(())
+            }
+
+            fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+                $($ty::prepare_call_sync(&self.fillers.$idx, tx)?;)+
+                Ok(())
+            }
+        }
+    };
 }
+
+// Generate implementations for tuples from 1 to 8 fillers
+impl_tx_filler!(0 => T1);
+impl_tx_filler!(0 => T1, 1 => T2);
+impl_tx_filler!(0 => T1, 1 => T2, 2 => T3);
+impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
+impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
+impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
+impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
+impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
 // Implement From for tuple types
 impl<T: TxFiller> From<(Empty, T)> for TupleWrapper<(T,)> {
@@ -307,28 +159,42 @@ impl<T: TxFiller> From<(Empty, T)> for TupleWrapper<(T,)> {
     }
 }
 
+impl<T: TxFiller> From<((T,),)> for TupleWrapper<(T,)> {
+    fn from(value: ((T,),)) -> Self {
+        TupleWrapper(value.0)
+    }
+}
+
 impl<L: TxFiller, R: TxFiller> From<((L,), R)> for TupleWrapper<(L, R)> {
-    fn from(((l,), r): ((L,), R)) -> Self {
-        TupleWrapper((l, r))
+    fn from((l, r): ((L,), R)) -> Self {
+        TupleWrapper((l.0, r))
     }
 }
 
 impl<A: TxFiller, B: TxFiller, C: TxFiller> From<((A, B), C)> for TupleWrapper<(A, B, C)> {
-    fn from(((a, b), c): ((A, B), C)) -> Self {
-        TupleWrapper((a, b, c))
+    fn from((ab, c): ((A, B), C)) -> Self {
+        TupleWrapper((ab.0, ab.1, c))
+    }
+}
+
+impl<A: TxFiller, B: TxFiller, C: TxFiller, D: TxFiller> From<((A, B, C), D)>
+    for TupleWrapper<(A, B, C, D)>
+{
+    fn from((abc, d): ((A, B, C), D)) -> Self {
+        TupleWrapper((abc.0, abc.1, abc.2, d))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fillers::{ChainIdFiller, GasFiller, NonceFiller};
+    use crate::fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager};
 
     #[test]
     fn test_filler_stack() {
         let stack = FillerStack::new()
             .push(GasFiller)
-            .push(NonceFiller::default())
+            .push(NonceFiller::new(SimpleNonceManager::default()))
             .push(ChainIdFiller::default());
 
         // Type should be FillerStack<(GasFiller, NonceFiller, ChainIdFiller)>
