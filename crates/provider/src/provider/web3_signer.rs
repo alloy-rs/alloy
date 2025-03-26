@@ -1,12 +1,10 @@
-//! Ethereum Web3 Signer.
-
+use crate::Provider;
 use alloy_consensus::{SignableTransaction, TxEnvelope};
 use alloy_network::{
     eip2718::Decodable2718, AnyNetwork, Ethereum, EthereumWallet, IntoWallet, Network,
     TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TxSigner,
 };
 use alloy_primitives::{Address, Bytes, PrimitiveSignature as Signature};
-use alloy_provider::Provider;
 
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
@@ -135,21 +133,11 @@ impl<P: Provider<AnyNetwork> + core::fmt::Debug + 'static> IntoWallet<AnyNetwork
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
     use alloy_consensus::TxEnvelope;
     use alloy_network::eip2718::Decodable2718;
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{Address, U256};
-    use alloy_provider::{Provider, ProviderBuilder};
-
-    async fn async_ci_only<F, Fut>(f: F)
-    where
-        F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = ()>,
-    {
-        if ci_info::is_ci() {
-            f().await;
-        }
-    }
 
     #[tokio::test]
     #[cfg(not(windows))]
