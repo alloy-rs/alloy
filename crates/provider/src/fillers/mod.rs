@@ -54,7 +54,7 @@ use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
 mod filler_stack;
-pub use filler_stack::FillerStack;
+pub use filler_stack::{FillerStack, TuplePush, TupleWrapper};
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
@@ -693,14 +693,15 @@ pub trait RecommendedFillers: Network {
 // }
 
 impl RecommendedFillers for Ethereum {
-    type RecommendedFillers = FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)>;
+    type RecommendedFillers =
+        FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        FillerStack::new()
-            .push::<_, Ethereum>(GasFiller)
-            .push::<_, Ethereum>(BlobGasFiller)
-            .push::<_, Ethereum>(NonceFiller::new(SimpleNonceManager::default()))
-            .push::<_, Ethereum>(ChainIdFiller::default())
+        FillerStack::default()
+            .push(GasFiller)
+            .push(BlobGasFiller)
+            .push(NonceFiller::new(SimpleNonceManager::default()))
+            .push(ChainIdFiller::default())
     }
 }
 
@@ -714,13 +715,14 @@ impl RecommendedFillers for Ethereum {
 // }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecommendedFillers = FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)>;
+    type RecommendedFillers =
+        FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        FillerStack::new()
-            .push::<_, AnyNetwork>(GasFiller)
-            .push::<_, AnyNetwork>(BlobGasFiller)
-            .push::<_, AnyNetwork>(NonceFiller::new(SimpleNonceManager::default()))
-            .push::<_, AnyNetwork>(ChainIdFiller::default())
+        FillerStack::default()
+            .push(GasFiller)
+            .push(BlobGasFiller)
+            .push(NonceFiller::new(SimpleNonceManager::default()))
+            .push(ChainIdFiller::default())
     }
 }

@@ -1,7 +1,8 @@
 use crate::{
     fillers::{
-        CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
-        NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
+        CachedNonceManager, ChainIdFiller, FillerControlFlow, FillerStack, GasFiller, NonceFiller,
+        NonceManager, RecommendedFillers, SimpleNonceManager, TuplePush, TupleWrapper, TxFiller,
+        WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
@@ -120,13 +121,7 @@ pub struct ProviderBuilder<L, F, N = Ethereum> {
     network: PhantomData<fn() -> N>,
 }
 
-impl
-    ProviderBuilder<
-        Identity,
-        JoinFill<Identity, <Ethereum as RecommendedFillers>::RecommendedFillers>,
-        Ethereum,
-    >
-{
+impl ProviderBuilder<Identity, <Ethereum as RecommendedFillers>::RecommendedFillers, Ethereum> {
     /// Create a new [`ProviderBuilder`] with the recommended filler enabled.
     ///
     /// Recommended fillers are preconfigured set of fillers that handle gas estimation, nonce
@@ -157,20 +152,26 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
 impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
-    pub fn with_recommended_fillers(
-        self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, N::RecommendedFillers>, N>
+    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, N::RecommendedFillers, N>
     where
         N: RecommendedFillers,
     {
-        self.filler(N::recommended_fillers())
+        ProviderBuilder {
+            layer: self.layer,
+            filler: N::recommended_fillers(),
+            network: PhantomData,
+        }
     }
 
     /// Add gas estimation to the stack being built.
     ///
     /// See [`GasFiller`] for more information.
-    pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<Identity, GasFiller>, N> {
-        self.filler(GasFiller)
+    pub fn with_gas_estimation(self) -> ProviderBuilder<L, FillerStack<(GasFiller,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::new((GasFiller::default(),)),
+            network: PhantomData,
+        }
     }
 
     /// Add nonce management to the stack being built.
@@ -179,8 +180,12 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     pub fn with_nonce_management<M: NonceManager>(
         self,
         nonce_manager: M,
-    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<M>>, N> {
-        self.filler(NonceFiller::new(nonce_manager))
+    ) -> ProviderBuilder<L, FillerStack<(NonceFiller<M>,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::new((NonceFiller::new(nonce_manager),)),
+            network: PhantomData,
+        }
     }
 
     /// Add simple nonce management to the stack being built.
@@ -188,7 +193,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// See [`SimpleNonceManager`] for more information.
     pub fn with_simple_nonce_management(
         self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
+    ) -> ProviderBuilder<L, FillerStack<(NonceFiller,), N>, N> {
         self.with_nonce_management(SimpleNonceManager::default())
     }
 
@@ -197,7 +202,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// See [`CachedNonceManager`] for more information.
     pub fn with_cached_nonce_management(
         self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<CachedNonceManager>>, N> {
+    ) -> ProviderBuilder<L, FillerStack<(NonceFiller<CachedNonceManager>,), N>, N> {
         self.with_nonce_management(CachedNonceManager::default())
     }
 
@@ -205,8 +210,12 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// to fetch the chain ID from the provider using
     /// [`Provider::get_chain_id`]. the first time a transaction is prepared,
     /// and will cache it for future transactions.
-    pub fn fetch_chain_id(self) -> ProviderBuilder<L, JoinFill<Identity, ChainIdFiller>, N> {
-        self.filler(ChainIdFiller::default())
+    pub fn fetch_chain_id(self) -> ProviderBuilder<L, FillerStack<(ChainIdFiller,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::new((ChainIdFiller::default(),)),
+            network: PhantomData,
+        }
     }
 
     /// Add a specific chain ID to the stack being built. The filler will
@@ -215,8 +224,32 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     pub fn with_chain_id(
         self,
         chain_id: ChainId,
-    ) -> ProviderBuilder<L, JoinFill<Identity, ChainIdFiller>, N> {
-        self.filler(ChainIdFiller::new(Some(chain_id)))
+    ) -> ProviderBuilder<L, FillerStack<(ChainIdFiller,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::new((ChainIdFiller::new(Some(chain_id)),)),
+            network: PhantomData,
+        }
+    }
+}
+
+impl<L, F, N: Network> ProviderBuilder<L, F, N> {
+    /// Add a transaction filler to the stack being built. Transaction fillers
+    /// are used to fill in missing fields on transactions before they are sent,
+    /// and are all joined to form the outermost layer of the stack.
+    pub fn filler<F2: TxFiller<N>>(
+        self,
+        filler: F2,
+    ) -> ProviderBuilder<L, FillerStack<F::Pushed, N>, N>
+    where
+        F: TuplePush<F2, N>,
+        TupleWrapper<<F as TuplePush<F2, N>>::Pushed, N>: From<(F, F2)>,
+    {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::new(self.filler).push(filler),
+            network: PhantomData,
+        }
     }
 }
 
@@ -240,17 +273,6 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
-    /// Add a transaction filler to the stack being built. Transaction fillers
-    /// are used to fill in missing fields on transactions before they are sent,
-    /// and are all joined to form the outermost layer of the stack.
-    pub fn filler<F2>(self, filler: F2) -> ProviderBuilder<L, JoinFill<F, F2>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: JoinFill::new(self.filler, filler),
-            network: PhantomData,
-        }
-    }
-
     /// Change the network.
     ///
     /// By default, the network is `Ethereum`. This method must be called to configure a different
@@ -259,8 +281,12 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, F, Net> {
-        ProviderBuilder { layer: self.layer, filler: self.filler, network: PhantomData }
+    pub fn network<Net: Network>(self) -> ProviderBuilder<L, FillerStack<F, Net>, Net> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::<_, Net>::new(self.filler),
+            network: PhantomData,
+        }
     }
 
     /// Add a chain layer to the stack being built. The layer will set
@@ -411,13 +437,23 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     pub fn wallet<W: IntoWallet<N>>(
         self,
         wallet: W,
-    ) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W::NetworkWallet>>, N> {
-        self.filler(WalletFiller::new(wallet.into_wallet()))
+    ) -> ProviderBuilder<L, FillerStack<F::Pushed, N>, N>
+    where
+        F: TuplePush<WalletFiller<W::NetworkWallet>, N>,
+        TupleWrapper<F::Pushed, N>: From<(F, WalletFiller<W::NetworkWallet>)>,
+        W::NetworkWallet: Clone,
+    {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: FillerStack::new(self.filler).push(WalletFiller::new(wallet.into_wallet())),
+            network: PhantomData,
+        }
     }
 }
 
 #[cfg(any(test, feature = "anvil-node"))]
-type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
+type EthereumWalletFillerStack<F> =
+    FillerStack<(F, WalletFiller<alloy_network::EthereumWallet>), Ethereum>;
 
 #[cfg(any(test, feature = "anvil-node"))]
 type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
@@ -442,7 +478,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// use in tests.
     pub fn on_anvil_with_wallet(
         self,
-    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider>>::Provider
+    ) -> <EthereumWalletFillerStack<F> as ProviderLayer<L::Provider>>::Provider
     where
         F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
         L: crate::builder::ProviderLayer<
@@ -478,7 +514,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> AnvilProviderResult<<JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider>>::Provider>
+    ) -> AnvilProviderResult<<EthereumWalletFillerStack<F> as ProviderLayer<L::Provider>>::Provider>
     where
         F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
         L: crate::builder::ProviderLayer<
@@ -495,7 +531,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
         let rpc_client = ClientBuilder::default().http(url);
 
-        Ok(self.wallet(wallet).layer(anvil_layer).on_client(rpc_client))
+        let p = self.wallet(wallet).layer(anvil_layer).on_client(rpc_client);
+
+        Ok(p)
     }
 }
 

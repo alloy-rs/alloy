@@ -6,7 +6,7 @@ use crate::{
 use alloy_network::{Ethereum, Network};
 use alloy_transport::TransportResult;
 use futures::try_join;
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 /// Empty filler stack state
 #[derive(Debug, Clone)]
@@ -14,8 +14,14 @@ pub struct Empty;
 
 /// A stack of transaction fillers
 #[derive(Debug, Clone)]
-pub struct FillerStack<T> {
-    fillers: T,
+pub struct FillerStack<T, N: Network = Ethereum> {
+    fillers: TupleWrapper<T, N>,
+}
+
+impl<N: Network> Default for FillerStack<Empty, N> {
+    fn default() -> Self {
+        FillerStack { fillers: TupleWrapper::new(Empty) }
+    }
 }
 
 /// A trait for tuples that can have types pushed to them
@@ -24,15 +30,9 @@ pub trait TuplePush<T, N: Network> {
     type Pushed;
 }
 
-/// Helper trait for tuple conversions
-trait TupleFrom<T> {
-    type Output;
-    fn tuple_from(t: T) -> Self::Output;
-}
-
 /// Newtype wrapper for tuple conversions
 #[derive(Debug, Clone)]
-struct TupleWrapper<T, N: Network> {
+pub struct TupleWrapper<T, N: Network> {
     inner: T,
     _network: PhantomData<N>,
 }
@@ -48,23 +48,58 @@ impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
     type Pushed = (T,);
 }
 
-// Implement base FillerStack methods
-impl FillerStack<Empty> {
-    /// Create a new empty filler stack
-    pub fn new() -> Self {
-        Self { fillers: Empty }
-    }
-}
-
 // Implement methods for all FillerStack variants
-impl<T> FillerStack<T> {
+impl<T, N: Network> FillerStack<T, N> {
+    pub fn new(filler: T) -> Self {
+        Self { fillers: TupleWrapper::new(filler) }
+    }
+
     /// Push a new filler onto the stack
-    pub fn push<F: TxFiller<N>, N: Network>(self, filler: F) -> FillerStack<T::Pushed>
+    pub fn push<F: TxFiller<N>>(self, filler: F) -> FillerStack<T::Pushed, N>
     where
         T: TuplePush<F, N>,
         TupleWrapper<T::Pushed, N>: From<(T, F)>,
     {
-        FillerStack { fillers: TupleWrapper::from((self.fillers, filler)).inner }
+        FillerStack { fillers: TupleWrapper::from((self.fillers.inner, filler)) }
+    }
+}
+
+impl<T, N: Network> TxFiller<N> for FillerStack<T, N>
+where
+    T: Clone + Debug + Send + Sync,
+    TupleWrapper<T, N>: TxFiller<N>,
+{
+    type Fillable = <TupleWrapper<T, N> as TxFiller<N>>::Fillable;
+
+    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        self.fillers.status(tx)
+    }
+
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        self.fillers.fill_sync(tx)
+    }
+
+    fn prepare_call_sync(
+        &self,
+        tx: &mut <N as Network>::TransactionRequest,
+    ) -> TransportResult<()> {
+        self.fillers.prepare_call_sync(tx)
+    }
+
+    fn prepare<P: Provider<N>>(
+        &self,
+        provider: &P,
+        tx: &<N as Network>::TransactionRequest,
+    ) -> alloy_transport::impl_future!(<Output = TransportResult<Self::Fillable>>) {
+        self.fillers.prepare(provider, tx)
+    }
+
+    fn fill(
+        &self,
+        fillable: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> alloy_transport::impl_future!(<Output = TransportResult<SendableTx<N>>>) {
+        self.fillers.fill(fillable, tx)
     }
 }
 
@@ -90,19 +125,19 @@ impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => 
 /// Macro to implement TxFiller for tuples of different sizes
 macro_rules! impl_tx_filler {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for FillerStack<($($ty,)+)> {
+        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for TupleWrapper<($($ty,)+), N> {
             type Fillable = ($(Option<$ty::Fillable>,)+);
 
             fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
                 let mut flow = FillerControlFlow::Finished;
                 $(
-                    flow = flow.absorb($ty::status(&self.fillers.$idx, tx));
+                    flow = flow.absorb($ty::status(&self.inner.$idx, tx));
                 )+
                 flow
             }
 
             fn fill_sync(&self, tx: &mut SendableTx<N>) {
-                $($ty::fill_sync(&self.fillers.$idx, tx);)+
+                $($ty::fill_sync(&self.inner.$idx, tx);)+
             }
 
             async fn prepare<P>(
@@ -116,8 +151,8 @@ macro_rules! impl_tx_filler {
                 try_join!(
                     $(
                         async {
-                            if $ty::ready(&self.fillers.$idx, tx) {
-                                $ty::prepare(&self.fillers.$idx, provider, tx).await.map(Some)
+                            if $ty::ready(&self.inner.$idx, tx) {
+                                $ty::prepare(&self.inner.$idx, provider, tx).await.map(Some)
                             } else {
                                 Ok(None)
                             }
@@ -133,19 +168,19 @@ macro_rules! impl_tx_filler {
             ) -> TransportResult<SendableTx<N>> {
                 $(
                     if let Some(to_fill) = to_fill.$idx {
-                        tx = $ty::fill(&self.fillers.$idx, to_fill, tx).await?;
+                        tx = $ty::fill(&self.inner.$idx, to_fill, tx).await?;
                     }
                 )+
                 Ok(tx)
             }
 
             async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-                $($ty::prepare_call(&self.fillers.$idx, tx).await?;)+
+                $($ty::prepare_call(&self.inner.$idx, tx).await?;)+
                 Ok(())
             }
 
             fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-                $($ty::prepare_call_sync(&self.fillers.$idx, tx)?;)+
+                $($ty::prepare_call_sync(&self.inner.$idx, tx)?;)+
                 Ok(())
             }
         }
@@ -214,7 +249,7 @@ impl<
 /// Macro to implement ProviderLayer for tuples of different sizes
 macro_rules! impl_provider_layer {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: TxFiller<N>,)+ P: Provider<N>, N: Network> ProviderLayer<P, N> for FillerStack<($($ty,)+)> {
+        impl<$($ty: TxFiller<N>,)+ P: Provider<N>, N: Network> ProviderLayer<P, N> for FillerStack<($($ty,)+), N> {
             type Provider = FillProvider<Self, P, N>;
             fn layer(&self, inner: P) -> Self::Provider {
                 FillProvider::new(inner, self.clone())
@@ -249,10 +284,11 @@ mod tests {
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
         // Type should be FillerStack<(GasFiller, NonceFiller, ChainIdFiller)>
-        let recommend: FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)> =
-            Ethereum::recommended_fillers();
+        let recommend: FillerStack<
+            (GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller),
+            Ethereum,
+        > = Ethereum::recommended_fillers();
 
-        let _full_stack =
-            recommend.push::<_, Ethereum>(WalletFiller::new(EthereumWallet::from(pk)));
+        let _full_stack = recommend.push(WalletFiller::new(EthereumWallet::from(pk)));
     }
 }

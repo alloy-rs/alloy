@@ -1931,10 +1931,9 @@ mod tests {
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
         let wallet = EthereumWallet::from(signer);
 
-        let provider = ProviderBuilder::new()
-            .network::<AnyNetwork>()
-            .wallet(wallet)
-            .on_http(anvil.endpoint_url());
+        let provider = ProviderBuilder::new().network::<AnyNetwork>().on_http(anvil.endpoint_url());
+        // .network::<AnyNetwork>()
+        //.wallet(wallet)
 
         let tx = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"))
