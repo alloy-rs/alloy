@@ -4,6 +4,13 @@ use core::hash::{Hash, Hasher};
 // Re-export for convenience
 pub use c_kzg::KzgSettings;
 
+/// Precompute value that optimizes computing cell kzg proofs.
+///
+/// Set to 0 as we do not use `compute_cells_and_kzg_proofs` or `recover_cells_and_kzg_proofs`.
+///
+/// Learn more: <https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112>
+const PRECOMPUTE: u64 = 0;
+
 /// KZG settings.
 #[derive(Clone, Debug, Default, Eq)]
 pub enum EnvKzgSettings {
@@ -42,7 +49,7 @@ impl EnvKzgSettings {
     #[inline]
     pub fn get(&self) -> &KzgSettings {
         match self {
-            Self::Default => c_kzg::ethereum_kzg_settings(0),
+            Self::Default => c_kzg::ethereum_kzg_settings(PRECOMPUTE),
             Self::Custom(settings) => settings,
         }
     }
@@ -52,8 +59,7 @@ impl EnvKzgSettings {
     pub fn load_from_trusted_setup_file(
         trusted_setup_file: &std::path::Path,
     ) -> Result<Self, c_kzg::Error> {
-        let precompute = 0; // See: <https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112>
-        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file, precompute)?;
+        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file, PRECOMPUTE)?;
         Ok(Self::Custom(Arc::new(settings)))
     }
 }
