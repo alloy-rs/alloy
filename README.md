@@ -68,7 +68,6 @@ This repository contains the following crates:
   - [`alloy-signer-ledger`] - [Ledger] signer implementation
   - [`alloy-signer-local`] - Local (private key, keystore, mnemonic, YubiHSM) signer implementations
   - [`alloy-signer-trezor`] - [Trezor] signer implementation
-  - [`alloy-signer-web3`] - [Web3Signer] implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
   - [`alloy-transport-http`] - HTTP transport implementation
   - [`alloy-transport-ipc`] - IPC transport implementation
@@ -116,7 +115,6 @@ This repository contains the following crates:
 [GCP KMS]: https://cloud.google.com/kms
 [Ledger]: https://www.ledger.com
 [Trezor]: https://trezor.io
-[Web3Signer]: https://docs.web3signer.consensys.io/
 [Serde]: https://serde.rs
 [beacon-apis]: https://ethereum.github.io/beacon-APIs
 [Anvil]: https://github.com/foundry-rs/foundry

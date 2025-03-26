@@ -101,7 +101,6 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-local \
             --exclude alloy-signer-trezor \
-            --exclude alloy-signer-web3 \
             --exclude alloy-transport-ipc
 
   wasm-wasi:
