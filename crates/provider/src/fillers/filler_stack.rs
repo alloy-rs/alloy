@@ -187,17 +187,24 @@ impl<A: TxFiller, B: TxFiller, C: TxFiller, D: TxFiller> From<((A, B, C), D)>
 
 #[cfg(test)]
 mod tests {
+    use alloy_network::EthereumWallet;
+    use alloy_signer_local::PrivateKeySigner;
+
     use super::*;
-    use crate::fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager};
+    use crate::fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager, WalletFiller};
 
     #[test]
     fn test_filler_stack() {
+        let pk: PrivateKeySigner =
+            "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
         let stack = FillerStack::new()
             .push(GasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
-            .push(ChainIdFiller::default());
+            .push(ChainIdFiller::default())
+            .push(WalletFiller::new(EthereumWallet::new(pk)));
 
         // Type should be FillerStack<(GasFiller, NonceFiller, ChainIdFiller)>
-        let _: FillerStack<(GasFiller, NonceFiller, ChainIdFiller)> = stack;
+        let _: FillerStack<(GasFiller, NonceFiller, ChainIdFiller, WalletFiller<EthereumWallet>)> =
+            stack;
     }
 }
