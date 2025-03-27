@@ -144,32 +144,36 @@ mod tests {
     #[tokio::test]
     #[cfg(not(windows))]
     async fn eth_sign_transaction() {
-        async_ci_only(|| async {
-            run_with_tempdir("reth-sign-tx", |dir| async {
-                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        // async_ci_only(|| async {
+        run_with_tempdir("reth-sign-tx", |dir| async {
+            let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-                let accounts = provider.get_accounts().await.unwrap();
-                let from = accounts[0];
-                let signer = Web3Signer::new(&provider, from);
+            let accounts = provider.get_accounts().await.unwrap();
+            let from = accounts[0];
+            let signer = Web3Signer::new(&provider, from);
 
-                let tx = provider
-                    .transaction_request()
-                    .from(from)
-                    .to(Address::ZERO)
-                    .value(U256::from(100))
-                    .gas_limit(21000);
+            let fees = provider.estimate_eip1559_fees().await.unwrap();
+            let tx = provider
+                .transaction_request()
+                .from(from)
+                .to(Address::ZERO)
+                .value(U256::from(100))
+                .gas_limit(21000)
+                .max_fee_per_gas(fees.max_fee_per_gas)
+                .max_priority_fee_per_gas(fees.max_priority_fee_per_gas)
+                .nonce(0);
 
-                let signed_tx = signer.sign_transaction(tx).await.unwrap();
+            let signed_tx = signer.sign_transaction(tx).await.unwrap();
 
-                let tx = TxEnvelope::decode_2718(&mut signed_tx.as_ref()).unwrap();
+            let tx = TxEnvelope::decode_2718(&mut signed_tx.as_ref()).unwrap();
 
-                let signer = tx.recover_signer().unwrap();
+            let signer = tx.recover_signer().unwrap();
 
-                assert_eq!(signer, from);
-            })
-            .await
+            assert_eq!(signer, from);
         })
-        .await;
+        .await
+        // })
+        // .await;
     }
 }
