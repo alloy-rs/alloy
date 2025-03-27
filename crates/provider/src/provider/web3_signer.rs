@@ -2,7 +2,6 @@ use crate::fillers::{FillerControlFlow, TxFiller};
 use alloy_eips::Decodable2718;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes};
-use alloy_rpc_client::WeakClient;
 use alloy_transport::{TransportErrorKind, TransportResult};
 
 use super::{DynProvider, Provider, SendableTx};
@@ -62,8 +61,8 @@ impl<N: Network> Web3Signer<N> {
         self.provider.sign_transaction(tx).await.map_err(alloy_signer::Error::other)
     }
 
-    /// Signs a transaction request using [`Web3Signer::sign_transaction`] and returns a
-    /// [`Network::TxEnvelope`].
+    /// Signs a transaction request using [`Web3Signer::sign_transaction`] and decodes the raw bytes
+    /// returning a [`Network::TxEnvelope`].
     pub async fn sign_and_decode(
         &self,
         tx: N::TransactionRequest,
@@ -115,10 +114,7 @@ impl<N: Network> TxFiller<N> for Web3Signer<N> {
             _ => return Ok(tx),
         };
 
-        let raw = self.sign_transaction(builder).await.map_err(TransportErrorKind::custom)?;
-
-        let envelope =
-            N::TxEnvelope::decode_2718(&mut raw.as_ref()).map_err(TransportErrorKind::custom)?;
+        let envelope = self.sign_and_decode(builder).await.map_err(TransportErrorKind::custom)?;
 
         Ok(SendableTx::Envelope(envelope))
     }
