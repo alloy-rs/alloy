@@ -1,10 +1,8 @@
-use crate::fillers::{FillerControlFlow, TxFiller};
 use alloy_eips::Decodable2718;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes};
-use alloy_transport::{TransportErrorKind, TransportResult};
 
-use super::{DynProvider, Provider, SendableTx};
+use super::Provider;
 
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
@@ -91,7 +89,8 @@ mod tests {
                 let from = accounts[0];
                 let signer = Web3Signer::new(provider, from);
 
-                let tx = provider
+                let tx = signer
+                    .provider()
                     .transaction_request()
                     .from(from)
                     .to(Address::ZERO)
