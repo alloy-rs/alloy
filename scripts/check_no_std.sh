@@ -18,4 +18,9 @@ for crate in "${crates[@]}"; do
 done
 
 echo "Running: ${cmd[*]}"
-"${cmd[@]}"
+
+# Execute the command and handle errors
+if ! "${cmd[@]}"; then
+    echo "Command failed: ${cmd[*]}"
+    exit 1
+fi
