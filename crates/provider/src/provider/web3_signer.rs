@@ -17,9 +17,9 @@ use super::{DynProvider, Provider, SendableTx};
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]
-pub struct Web3Signer<N: Network = Ethereum> {
+pub struct Web3Signer<P: Provider<N> + Clone, N: Network = Ethereum> {
     /// The provider used to make `"eth_signTransaction"` requests.
-    provider: DynProvider<N>,
+    provider: P,
     /// The address of the remote signer that will sign the transactions.
     ///
     /// This is set as the `from` field in the [`Network::TransactionRequest`]'s for the
@@ -28,20 +28,18 @@ pub struct Web3Signer<N: Network = Ethereum> {
     _pd: std::marker::PhantomData<N>,
 }
 
-impl<N: Network> Web3Signer<N> {
-    /// Instantiates a new [`Web3Signer`] with the given [`DynProvider`] and the signer address.
+impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
+    /// Instantiates a new [`Web3Signer`] with the given [`Provider`] and the signer address.
     ///
     /// The `address` is used to set the `from` field in the transaction requests.
     ///
     /// The remote signer's address _must_ be the same as the signer address provided here.
-    ///
-    /// A [`DynProvider`] can be obtained via [`Provider::erased`].
-    pub fn new(provider: DynProvider<N>, address: Address) -> Self {
+    pub fn new(provider: P, address: Address) -> Self {
         Self { provider, address, _pd: std::marker::PhantomData }
     }
 
-    /// Returns the underlying [`DynProvider`] used by the [`Web3Signer`].
-    pub fn provider(&self) -> DynProvider<N> {
+    /// Returns the underlying [`Provider`] used by the [`Web3Signer`].
+    pub fn provider(&self) -> P {
         self.provider.clone()
     }
     /// Signs a transaction request and return the raw signed transaction in the form of [`Bytes`].
@@ -91,7 +89,7 @@ mod tests {
 
                 let accounts = provider.get_accounts().await.unwrap();
                 let from = accounts[0];
-                let signer = Web3Signer::new(provider.clone().erased(), from);
+                let signer = Web3Signer::new(provider, from);
 
                 let tx = provider
                     .transaction_request()
