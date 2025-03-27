@@ -1,6 +1,8 @@
-use crate::Provider;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes};
+use alloy_rpc_client::WeakClient;
+
+use super::Provider;
 
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
@@ -11,9 +13,9 @@ use alloy_primitives::{Address, Bytes};
 ///
 /// `"eth_signTransaction"` is not supported by regular nodes.
 #[derive(Debug, Clone)]
-pub struct Web3Signer<P: Provider<N>, N: Network = Ethereum> {
-    /// The provider used to make `"eth_signTransaction"` requests.
-    provider: P,
+pub struct Web3Signer<N: Network = Ethereum> {
+    /// The [`WeakClient`] used to make `"eth_signTransaction"` requests.
+    client: WeakClient,
     /// The address of the remote signer that will sign the transactions.
     ///
     /// This is set as the `from` field in the [`Network::TransactionRequest`]'s for the
@@ -22,14 +24,18 @@ pub struct Web3Signer<P: Provider<N>, N: Network = Ethereum> {
     _pd: std::marker::PhantomData<N>,
 }
 
-impl<P: Provider<N>, N: Network> Web3Signer<P, N> {
-    /// Instantiates a new [`Web3Signer`] with the given provider and the signer address.
+impl<N: Network> Web3Signer<N> {
+    /// Instantiates a new [`Web3Signer`] with the given [`WeakClient`] and the signer address.
+    ///
+    /// A weak client can be obtained via the [`Provider::weak_client`] method.
     ///
     /// The `address` is used to set the `from` field in the transaction requests.
     ///
     /// The remote signer's address _must_ be the same as the signer address provided here.
-    pub fn new(provider: P, address: Address) -> Self {
-        Self { provider, address, _pd: std::marker::PhantomData }
+    ///
+    /// [`Provider::weak_client`]: crate::Provider::weak_client
+    pub fn new<P: Provider<N>>(provider: &P, address: Address) -> Self {
+        Self { client: provider.weak_client(), address, _pd: std::marker::PhantomData }
     }
 
     /// Signs a transaction request and return the raw signed transaction in the form of [`Bytes`].
@@ -43,7 +49,13 @@ impl<P: Provider<N>, N: Network> Web3Signer<P, N> {
         mut tx: N::TransactionRequest,
     ) -> alloy_signer::Result<Bytes> {
         tx.set_from(self.address);
-        self.provider.sign_transaction(tx).await.map_err(alloy_signer::Error::other)
+
+        let client = self
+            .client
+            .upgrade()
+            .ok_or_else(|| alloy_signer::Error::other("client dropped in web3signer"))?;
+
+        client.request("eth_signTransaction", (tx,)).await.map_err(alloy_signer::Error::other)
     }
 }
 
@@ -66,7 +78,7 @@ mod tests {
 
                 let accounts = provider.get_accounts().await.unwrap();
                 let from = accounts[0];
-                let signer = Web3Signer::new(provider.clone(), from);
+                let signer = Web3Signer::new(&provider, from);
 
                 let tx = provider
                     .transaction_request()
