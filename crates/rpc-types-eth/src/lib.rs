@@ -8,7 +8,6 @@
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 #[macro_use]
-#[allow(unused_imports)]
 extern crate alloc;
 
 pub use alloy_eips::eip4895::{Withdrawal, Withdrawals};

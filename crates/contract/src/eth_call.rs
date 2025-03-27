@@ -14,7 +14,7 @@ use alloy_sol_types::SolCall;
 /// Raw coder.
 const RAW_CODER: () = ();
 
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Function {}
@@ -131,7 +131,7 @@ where
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub struct EthCallFut<'coder, D, N>
 where
     N: Network,

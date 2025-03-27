@@ -39,7 +39,7 @@ pub struct CallItemBuilder;
 
 impl CallItemBuilder {
     /// Create a new [`CallItem`] instance.
-    #[allow(clippy::new_ret_no_self)]
+    #[expect(clippy::new_ret_no_self)]
     pub fn new<Item: MulticallItem>(item: Item) -> CallItem<Item::Decoder> {
         CallItem::new(item.target(), item.input())
     }

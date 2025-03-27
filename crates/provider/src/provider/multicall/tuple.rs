@@ -7,14 +7,14 @@ use alloy_sol_types::SolCall;
 
 /// Sealed trait to prevent external implementations
 mod private {
-    #[allow(unnameable_types)]
+    #[expect(unnameable_types)]
     pub trait Sealed {}
 }
 use private::Sealed;
 
 /// A trait for tuples that can have types pushed to them
 #[doc(hidden)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub trait TuplePush<T> {
     /// The resulting type after pushing T
     type Pushed;

@@ -190,7 +190,7 @@ struct BeaconExecutionPayloadV1<'a> {
     #[serde_as(as = "DisplayFromStr")]
     base_fee_per_gas: U256,
     block_hash: Cow<'a, B256>,
-    transactions: Cow<'a, Vec<Bytes>>,
+    transactions: Cow<'a, [Bytes]>,
 }
 
 impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {

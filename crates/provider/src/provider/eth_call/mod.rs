@@ -21,7 +21,7 @@ pub use caller::Caller;
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
 #[derive(Debug)]
 #[doc(hidden)] // Not public API.
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 #[pin_project::pin_project]
 pub struct EthCallFut<N, Resp, Output, Map>
 where

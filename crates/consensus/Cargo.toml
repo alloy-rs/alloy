@@ -86,7 +86,15 @@ std = [
 ]
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
-arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-eips/arbitrary"]
+arbitrary = [
+	"std",
+	"dep:rand",
+	"dep:arbitrary",
+	"alloy-eips/arbitrary",
+	"alloy-primitives/arbitrary",
+	"alloy-serde?/arbitrary",
+	"alloy-trie/arbitrary"
+]
 serde = [
 	"dep:serde",
 	"alloy-primitives/serde",
