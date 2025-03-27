@@ -174,9 +174,8 @@ tempfile = "3.10"
 tower-http = "0.6.1"
 
 [patch.crates-io]
-# https://github.com/alloy-rs/core/pull/901
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "85850de" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "85850de" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "85850de" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "85850de" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "85850de" }
+alloy-core = { git = "https://github.com/alloy-rs/core.git", rev = "378dcfd" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core.git", rev = "378dcfd" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core.git", rev = "378dcfd" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core.git", rev = "378dcfd" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core.git", rev = "378dcfd" }
