@@ -5,7 +5,7 @@ use alloy_primitives::{Address, Bytes};
 use alloy_rpc_client::WeakClient;
 use alloy_transport::{TransportErrorKind, TransportResult};
 
-use super::{Provider, SendableTx};
+use super::{DynProvider, Provider, SendableTx};
 
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
@@ -22,8 +22,8 @@ use super::{Provider, SendableTx};
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]
 pub struct Web3Signer<N: Network = Ethereum> {
-    /// The [`WeakClient`] used to make `"eth_signTransaction"` requests.
-    client: WeakClient,
+    /// The provider used to make `"eth_signTransaction"` requests.
+    provider: DynProvider<N>,
     /// The address of the remote signer that will sign the transactions.
     ///
     /// This is set as the `from` field in the [`Network::TransactionRequest`]'s for the
@@ -33,17 +33,15 @@ pub struct Web3Signer<N: Network = Ethereum> {
 }
 
 impl<N: Network> Web3Signer<N> {
-    /// Instantiates a new [`Web3Signer`] with the given [`WeakClient`] and the signer address.
-    ///
-    /// A weak client can be obtained via the [`Provider::weak_client`] method.
+    /// Instantiates a new [`Web3Signer`] with the given [`DynProvider`] and the signer address.
     ///
     /// The `address` is used to set the `from` field in the transaction requests.
     ///
     /// The remote signer's address _must_ be the same as the signer address provided here.
     ///
-    /// [`Provider::weak_client`]: crate::Provider::weak_client
-    pub fn new<P: Provider<N>>(provider: &P, address: Address) -> Self {
-        Self { client: provider.weak_client(), address, _pd: std::marker::PhantomData }
+    /// A [`DynProvider`] can be obtained via [`Provider::erased`].
+    pub fn new(provider: DynProvider<N>, address: Address) -> Self {
+        Self { provider, address, _pd: std::marker::PhantomData }
     }
 
     /// Signs a transaction request and return the raw signed transaction in the form of [`Bytes`].
@@ -52,19 +50,26 @@ impl<N: Network> Web3Signer<N> {
     /// [`Provider::send_raw_transaction`].
     ///
     /// Sets the `from` field to the provided `address`.
+    ///
+    /// If you'd like to receive a [`Network::TxEnvelope`] instead, use
+    /// [`Web3Signer::sign_and_decode`].
     pub async fn sign_transaction(
         &self,
         mut tx: N::TransactionRequest,
     ) -> alloy_signer::Result<Bytes> {
         // Always overrides the `from` field with the web3 signer's address.
         tx.set_from(self.address);
+        self.provider.sign_transaction(tx).await.map_err(alloy_signer::Error::other)
+    }
 
-        let client = self
-            .client
-            .upgrade()
-            .ok_or_else(|| alloy_signer::Error::other("client dropped in web3signer"))?;
-
-        client.request("eth_signTransaction", (tx,)).await.map_err(alloy_signer::Error::other)
+    /// Signs a transaction request using [`Web3Signer::sign_transaction`] and returns a
+    /// [`Network::TxEnvelope`].
+    pub async fn sign_and_decode(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> alloy_signer::Result<N::TxEnvelope> {
+        let raw = self.sign_transaction(tx).await?;
+        N::TxEnvelope::decode_2718(&mut raw.as_ref()).map_err(alloy_signer::Error::other)
     }
 }
 
@@ -78,7 +83,7 @@ impl<N: Network> TxFiller<N> for Web3Signer<N> {
 
         match tx.complete_preferred() {
             Ok(_) => FillerControlFlow::Ready,
-            Err(e) => FillerControlFlow::Missing(vec![("Wallet", e)]),
+            Err(e) => FillerControlFlow::Missing(vec![("Web3Signer", e)]),
         }
     }
 
@@ -89,13 +94,13 @@ impl<N: Network> TxFiller<N> for Web3Signer<N> {
         }
     }
 
-    async fn prepare<P>(
+    async fn prepare<P1>(
         &self,
-        _provider: &P,
+        _provider: &P1,
         _tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<N>,
+        P1: Provider<N>,
     {
         Ok(())
     }
@@ -151,18 +156,14 @@ mod tests {
 
                 let accounts = provider.get_accounts().await.unwrap();
                 let from = accounts[0];
-                let signer = Web3Signer::new(&provider, from);
+                let signer = Web3Signer::new(provider.clone().erased(), from);
 
-                let fees = provider.estimate_eip1559_fees().await.unwrap();
                 let tx = provider
                     .transaction_request()
                     .from(from)
                     .to(Address::ZERO)
                     .value(U256::from(100))
-                    .gas_limit(21000)
-                    .max_fee_per_gas(fees.max_fee_per_gas)
-                    .max_priority_fee_per_gas(fees.max_priority_fee_per_gas)
-                    .nonce(0);
+                    .gas_limit(21000);
 
                 let signed_tx = signer.sign_transaction(tx).await.unwrap();
 
