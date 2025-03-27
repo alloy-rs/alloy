@@ -40,6 +40,10 @@ impl<N: Network> Web3Signer<N> {
         Self { provider, address, _pd: std::marker::PhantomData }
     }
 
+    /// Returns the underlying [`DynProvider`] used by the [`Web3Signer`].
+    pub fn provider(&self) -> DynProvider<N> {
+        self.provider.clone()
+    }
     /// Signs a transaction request and return the raw signed transaction in the form of [`Bytes`].
     ///
     /// The returned [`Bytes`] can be used to broadcast the transaction to the network using
