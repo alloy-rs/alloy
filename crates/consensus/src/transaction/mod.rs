@@ -184,11 +184,6 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// `None`.
     fn blob_versioned_hashes(&self) -> Option<&[B256]>;
 
-    /// Blob sidecar for eip4844 transaction.
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        None
-    }
-
     /// Returns the number of blobs of this transaction.
     ///
     /// This is convenience function for `len(blob_versioned_hashes)`.

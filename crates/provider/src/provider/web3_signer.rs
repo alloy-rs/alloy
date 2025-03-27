@@ -1,10 +1,6 @@
 use crate::Provider;
-use alloy_consensus::{SignableTransaction, TxEnvelope};
-use alloy_network::{
-    eip2718::Decodable2718, AnyNetwork, Ethereum, EthereumWallet, IntoWallet, Network,
-    TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TxSigner,
-};
-use alloy_primitives::{Address, Bytes, PrimitiveSignature as Signature};
+use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_primitives::{Address, Bytes};
 
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
@@ -48,85 +44,6 @@ impl<P: Provider<N>, N: Network> Web3Signer<P, N> {
     ) -> alloy_signer::Result<Bytes> {
         tx.set_from(self.address);
         self.provider.sign_transaction(tx).await.map_err(alloy_signer::Error::other)
-    }
-}
-
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<P, N> TxSigner<Signature> for Web3Signer<P, N>
-where
-    P: Provider<N>,
-    N: Network,
-    N::TransactionRequest: TransactionBuilder7702 + TransactionBuilder4844,
-{
-    fn address(&self) -> Address {
-        self.address
-    }
-
-    async fn sign_transaction(
-        &self,
-        tx: &mut dyn SignableTransaction<Signature>,
-    ) -> alloy_signer::Result<Signature> {
-        let mut request = N::TransactionRequest::default();
-
-        // Basics
-        request.set_kind(tx.kind());
-        request.set_nonce(tx.nonce());
-        request.set_input(tx.input().clone());
-        request.set_value(tx.value());
-
-        if let Some(chain_id) = tx.chain_id() {
-            request.set_chain_id(chain_id);
-        }
-
-        // Gas related fields
-        request.set_gas_limit(tx.gas_limit());
-        let max_fee_or_gas_price = tx.max_fee_per_gas(); // Returns `gasPrice` if not dynamic fee.
-        if tx.is_dynamic_fee() {
-            request.set_max_fee_per_gas(max_fee_or_gas_price);
-            if let Some(max_priority_fee) = tx.max_priority_fee_per_gas() {
-                request.set_max_priority_fee_per_gas(max_priority_fee);
-            }
-        } else {
-            request.set_gas_price(max_fee_or_gas_price);
-        }
-
-        if let Some(access_list) = tx.access_list() {
-            request.set_access_list(access_list.clone());
-        }
-
-        if let Some(sidecar) = tx.blob_sidecar() {
-            request.set_blob_sidecar(sidecar.clone());
-        }
-
-        if let Some(auth) = tx.authorization_list() {
-            request.set_authorization_list(auth.to_vec());
-        }
-
-        let raw = self.sign_transaction(request).await?;
-
-        let envelope =
-            TxEnvelope::decode_2718(&mut raw.as_ref()).map_err(alloy_signer::Error::other)?;
-
-        Ok(*envelope.signature())
-    }
-}
-
-impl<P: Provider + core::fmt::Debug + 'static> IntoWallet for Web3Signer<P> {
-    type NetworkWallet = EthereumWallet;
-
-    fn into_wallet(self) -> Self::NetworkWallet {
-        EthereumWallet::from(self)
-    }
-}
-
-impl<P: Provider<AnyNetwork> + core::fmt::Debug + 'static> IntoWallet<AnyNetwork>
-    for Web3Signer<P, AnyNetwork>
-{
-    type NetworkWallet = EthereumWallet;
-
-    fn into_wallet(self) -> Self::NetworkWallet {
-        EthereumWallet::from(self)
     }
 }
 

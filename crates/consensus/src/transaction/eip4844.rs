@@ -276,14 +276,6 @@ impl Transaction for TxEip4844Variant {
     }
 
     #[inline]
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        match self {
-            Self::TxEip4844(_) => None,
-            Self::TxEip4844WithSidecar(tx) => Some(tx.sidecar()),
-        }
-    }
-
-    #[inline]
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
@@ -909,11 +901,6 @@ impl Transaction for TxEip4844WithSidecar {
     #[inline]
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.tx.blob_versioned_hashes()
-    }
-
-    #[inline]
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        Some(self.sidecar())
     }
 
     #[inline]
