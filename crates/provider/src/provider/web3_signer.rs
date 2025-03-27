@@ -9,10 +9,7 @@ use super::{DynProvider, Provider, SendableTx};
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
 ///
-/// For more information, please see [Web3Signer](https://docs.web3signer.consensys.io/).
-///
-/// [`Web3Signer`] also implements [`TxFiller`] to allow it to be used as a filler in the
-/// [`ProviderBuilder`].
+/// For more information, please see [Web3Signer](https://docs.web3signer.consensys.io/)
 ///
 /// Note:
 ///
@@ -69,68 +66,6 @@ impl<N: Network> Web3Signer<N> {
     ) -> alloy_signer::Result<N::TxEnvelope> {
         let raw = self.sign_transaction(tx).await?;
         N::TxEnvelope::decode_2718(&mut raw.as_ref()).map_err(alloy_signer::Error::other)
-    }
-}
-
-impl<N: Network> TxFiller<N> for Web3Signer<N> {
-    type Fillable = ();
-
-    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        if tx.from().is_none() {
-            return FillerControlFlow::Ready;
-        }
-
-        match tx.complete_preferred() {
-            Ok(_) => FillerControlFlow::Ready,
-            Err(e) => FillerControlFlow::Missing(vec![("Web3Signer", e)]),
-        }
-    }
-
-    fn fill_sync(&self, tx: &mut SendableTx<N>) {
-        if let Some(builder) = tx.as_mut_builder() {
-            // Always overrides the `from` field with the web3 signer's address.
-            builder.set_from(self.address);
-        }
-    }
-
-    async fn prepare<P1>(
-        &self,
-        _provider: &P1,
-        _tx: &<N as Network>::TransactionRequest,
-    ) -> TransportResult<Self::Fillable>
-    where
-        P1: Provider<N>,
-    {
-        Ok(())
-    }
-
-    async fn fill(
-        &self,
-        _fillable: Self::Fillable,
-        tx: SendableTx<N>,
-    ) -> TransportResult<SendableTx<N>> {
-        let builder = match tx {
-            SendableTx::Builder(builder) => builder,
-            _ => return Ok(tx),
-        };
-
-        let envelope = self.sign_and_decode(builder).await.map_err(TransportErrorKind::custom)?;
-
-        Ok(SendableTx::Envelope(envelope))
-    }
-
-    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
-        self.prepare_call_sync(tx)?;
-        Ok(())
-    }
-
-    fn prepare_call_sync(
-        &self,
-        tx: &mut <N as Network>::TransactionRequest,
-    ) -> TransportResult<()> {
-        // Always overrides the `from` field with the web3 signer's address.
-        tx.set_from(self.address);
-        Ok(())
     }
 }
 
