@@ -353,7 +353,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Provider, ProviderBuilder};
+    use crate::{ProviderBuilder, ProviderTrait};
 
     // <https://github.com/alloy-rs/alloy/issues/2117>
     #[tokio::test]

@@ -170,7 +170,7 @@ impl<N: Network> NewBlocks<N> {
 #[cfg(all(test, feature = "anvil-api"))] // Tests rely heavily on ability to mine blocks on demand.
 mod tests {
     use super::*;
-    use crate::{ext::AnvilApi, Provider, ProviderBuilder};
+    use crate::{ext::AnvilApi, ProviderBuilder, ProviderTrait};
     use alloy_node_bindings::Anvil;
     use std::{future::Future, time::Duration};
 

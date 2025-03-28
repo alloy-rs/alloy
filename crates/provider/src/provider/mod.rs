@@ -16,7 +16,7 @@ mod sendable;
 pub use sendable::{SendableTx, SendableTxErr};
 
 mod r#trait;
-pub use r#trait::{FilterPollerBuilder, Provider};
+pub use r#trait::{DefaultProvider, FilterPollerBuilder, Provider as ProviderTrait};
 
 mod wallet;
 pub use wallet::WalletProvider;
@@ -37,3 +37,43 @@ pub use subscription::GetSubscription;
 
 mod web3_signer;
 pub use web3_signer::Web3Signer;
+mod recommended {
+    use crate::{
+        fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller},
+        Identity, ProviderBuilder, RootProvider,
+    };
+    use alloy_network::AnyNetwork;
+
+    pub type AnyFillProvider = FillProvider<
+        JoinFill<
+            Identity,
+            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+        >,
+        RootProvider<AnyNetwork>,
+        AnyNetwork,
+    >;
+    pub struct Provider;
+
+    impl Provider {
+        pub async fn connect(s: &str) -> AnyFillProvider {
+            ProviderBuilder::new().network::<AnyNetwork>().connect(s).await.unwrap()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::ProviderTrait;
+        use alloy_node_bindings::Anvil;
+
+        #[tokio::test]
+        async fn test_provider() {
+            let anvil = Anvil::new().spawn();
+            let provider = Provider::connect(&anvil.endpoint()).await;
+            let block = provider.get_block_number().await.unwrap();
+            println!("block: {:?}", block);
+        }
+    }
+}
+
+pub use recommended::{AnyFillProvider, Provider};

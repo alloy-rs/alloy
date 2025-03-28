@@ -4,7 +4,7 @@ use crate::{
     fillers::{FillerControlFlow, TxFiller},
     provider::SendableTx,
     utils::Eip1559Estimation,
-    Provider,
+    ProviderTrait as Provider,
 };
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;

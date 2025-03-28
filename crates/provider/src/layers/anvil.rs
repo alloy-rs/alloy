@@ -3,7 +3,7 @@ use alloy_node_bindings::{Anvil, AnvilInstance};
 use reqwest::Url;
 use std::sync::{Arc, OnceLock};
 
-use crate::{Provider, ProviderLayer, RootProvider};
+use crate::{ProviderLayer, ProviderTrait as Provider, RootProvider};
 
 /// A layer that wraps an [`Anvil`] config.
 ///

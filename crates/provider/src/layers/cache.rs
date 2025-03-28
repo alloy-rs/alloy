@@ -1,4 +1,7 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    ParamsWithBlock, ProviderCall, ProviderLayer, ProviderTrait as Provider, RootProvider,
+    RpcWithBlock,
+};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;

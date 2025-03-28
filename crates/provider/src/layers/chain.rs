@@ -1,4 +1,4 @@
-use crate::{Provider, ProviderLayer};
+use crate::{ProviderTrait as Provider, ProviderLayer};
 use alloy_chains::NamedChain;
 use alloy_network::Network;
 use std::time::Duration;

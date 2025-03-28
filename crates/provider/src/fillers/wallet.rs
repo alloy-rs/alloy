@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{provider::SendableTx, Provider};
+use crate::{provider::SendableTx, ProviderTrait as Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkWallet, TransactionBuilder};
 use alloy_transport::TransportResult;
@@ -123,7 +123,7 @@ where
 #[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
-    use crate::{Provider, ProviderBuilder, WalletProvider};
+    use crate::{ProviderBuilder, ProviderTrait as Provider, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, U256};
     use alloy_rpc_types_eth::TransactionRequest;

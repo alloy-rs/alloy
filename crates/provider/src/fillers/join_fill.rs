@@ -1,7 +1,7 @@
 use crate::{
     fillers::{FillProvider, FillerControlFlow, TxFiller},
     provider::SendableTx,
-    Provider, ProviderLayer,
+    ProviderLayer, ProviderTrait as Provider,
 };
 use alloy_network::Network;
 use alloy_transport::TransportResult;

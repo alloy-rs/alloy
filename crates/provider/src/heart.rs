@@ -1,6 +1,6 @@
 //! Block heartbeat and pending transaction watcher.
 
-use crate::{Provider, RootProvider};
+use crate::{ProviderTrait, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};

@@ -1,11 +1,11 @@
 use crate::{
     fillers::{
-        CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
-        NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
+        BlobGasFiller, CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill,
+        NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
-    Provider, RootProvider,
+    ProviderTrait as Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, IntoWallet, Network};
@@ -171,6 +171,15 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// See [`GasFiller`] for more information.
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<Identity, GasFiller>, N> {
         self.filler(GasFiller)
+    }
+
+    /// Add blob gas estimation to the stack being built.
+    ///
+    /// See [`BlobGasFiller`] for more information.
+    pub fn with_blob_gas_estimation(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, BlobGasFiller>, N> {
+        self.filler(BlobGasFiller)
     }
 
     /// Add nonce management to the stack being built.

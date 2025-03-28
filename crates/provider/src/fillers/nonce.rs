@@ -1,7 +1,7 @@
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
     provider::SendableTx,
-    Provider,
+    ProviderTrait as Provider,
 };
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::Address;

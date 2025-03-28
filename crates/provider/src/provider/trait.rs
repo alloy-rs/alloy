@@ -8,6 +8,7 @@ use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
+    fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller},
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
@@ -41,6 +42,14 @@ use std::borrow::Cow;
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 
+pub type DefaultProvider = FillProvider<
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+    >,
+    RootProvider,
+>;
+
 /// Ethereum JSON-RPC interface.
 ///
 /// # Subscriptions
@@ -71,6 +80,14 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
 pub trait Provider<N: Network = Ethereum>: Send + Sync {
+    // #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    // async fn connect(s: &str) -> TransportResult<DefaultProvider>
+    // where
+    //     Self: Sized,
+    // {
+    //     ProviderBuilder::new().connect(s).await
+    // }
+
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<N>;
 
@@ -1281,6 +1298,11 @@ mod tests {
     use http_body_util::Full;
     #[cfg(feature = "hyper")]
     use tower::{Layer, Service};
+
+    // #[tokio::test]
+    // async fn provider_connect() {
+    //     let p = Provider::<Ethereum>::connect("http://localhost:8545").await.unwrap();
+    // }
 
     #[tokio::test]
     async fn test_provider_builder() {

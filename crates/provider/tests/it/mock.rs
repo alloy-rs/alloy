@@ -1,5 +1,5 @@
 use alloy_primitives::{bytes, Address, U256};
-use alloy_provider::{Provider, ProviderBuilder};
+use alloy_provider::{ProviderBuilder, ProviderTrait};
 use alloy_rpc_types_eth::TransactionRequest;
 use alloy_transport::mock::Asserter;
 

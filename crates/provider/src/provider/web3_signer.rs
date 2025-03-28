@@ -2,7 +2,7 @@ use alloy_eips::Decodable2718;
 use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes};
 
-use super::Provider;
+use super::ProviderTrait as Provider;
 
 /// A remote signer that leverages the underlying provider to sign transactions using
 /// `"eth_signTransaction"` requests.
@@ -72,7 +72,7 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
+    use crate::{ext::test::async_ci_only, ProviderBuilder, ProviderTrait};
     use alloy_consensus::TxEnvelope;
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{Address, U256};

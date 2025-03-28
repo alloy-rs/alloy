@@ -1,6 +1,6 @@
 use crate::{
     fillers::{FillProvider, JoinFill, TxFiller, WalletFiller},
-    Provider,
+    ProviderTrait as Provider,
 };
 use alloy_network::{Ethereum, Network, NetworkWallet};
 use alloy_primitives::Address;

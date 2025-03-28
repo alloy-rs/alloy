@@ -1,6 +1,6 @@
 use crate::{
-    bindings::IMulticall3, Caller, Provider, ProviderCall, ProviderLayer, RootProvider,
-    MULTICALL3_ADDRESS,
+    bindings::IMulticall3, Caller, ProviderCall, ProviderLayer, ProviderTrait as Provider,
+    RootProvider, MULTICALL3_ADDRESS,
 };
 use alloy_eips::BlockId;
 use alloy_network::{Ethereum, Network, TransactionBuilder};

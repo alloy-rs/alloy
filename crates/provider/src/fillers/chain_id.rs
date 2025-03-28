@@ -80,7 +80,7 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
         _tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: crate::Provider<N>,
+        P: crate::ProviderTrait<N>,
     {
         match self.0.get().copied() {
             Some(chain_id) => Ok(chain_id),
