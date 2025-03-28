@@ -1,5 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
-use crate::Provider;
+use crate::ProviderTrait as Provider;
 use alloy_eips::BlockId;
 use alloy_network::Network;
 use alloy_primitives::TxHash;

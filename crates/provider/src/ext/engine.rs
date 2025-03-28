@@ -1,4 +1,4 @@
-use crate::Provider;
+use crate::ProviderTrait as Provider;
 use alloy_network::Network;
 use alloy_primitives::{BlockHash, Bytes, B256};
 use alloy_rpc_types_engine::{

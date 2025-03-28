@@ -1,7 +1,7 @@
 use crate::Error;
 use alloy_network::Ethereum;
 use alloy_primitives::{Address, LogData, B256};
-use alloy_provider::{FilterPollerBuilder, Network, Provider};
+use alloy_provider::{FilterPollerBuilder, Network, ProviderTrait as Provider};
 use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
 use alloy_transport::TransportResult;

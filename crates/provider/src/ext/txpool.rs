@@ -1,5 +1,5 @@
 //! This modules extends the Ethereum JSON-RPC provider with the `txpool` namespace.
-use crate::Provider;
+use crate::ProviderTrait as Provider;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::Address;
 use alloy_rpc_types_txpool::{TxpoolContent, TxpoolContentFrom, TxpoolInspect, TxpoolStatus};

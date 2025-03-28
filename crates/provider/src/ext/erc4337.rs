@@ -1,4 +1,4 @@
-use crate::Provider;
+use crate::ProviderTrait as Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::erc4337::{

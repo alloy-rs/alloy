@@ -8,7 +8,7 @@ use alloy_network::{
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, U256};
-use alloy_provider::{PendingTransactionBuilder, Provider};
+use alloy_provider::{PendingTransactionBuilder, ProviderTrait as Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use std::{self, marker::PhantomData};
@@ -627,7 +627,7 @@ mod tests {
     use alloy_network::EthereumWallet;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
-    use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
+    use alloy_provider::{ProviderBuilder, ProviderTrait, WalletProvider};
     use alloy_rpc_types_eth::AccessListItem;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
@@ -678,8 +678,8 @@ mod tests {
     }
 
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    fn build_call_builder() -> CallBuilder<(), impl Provider, PhantomData<MyContract::doStuffCall>>
-    {
+    fn build_call_builder(
+    ) -> CallBuilder<(), impl ProviderTrait, PhantomData<MyContract::doStuffCall>> {
         let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();

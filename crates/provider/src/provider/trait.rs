@@ -1255,7 +1255,7 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 mod tests {
     use super::*;
     use crate::{
-        builder, ext::test::async_ci_only, Provider, ProviderBuilder, ProviderTrait, WalletProvider,
+        builder, ext::test::async_ci_only, ProviderBuilder, ProviderTrait, WalletProvider,
     };
     use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};

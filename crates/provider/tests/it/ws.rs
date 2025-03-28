@@ -1,5 +1,5 @@
 use alloy_node_bindings::Anvil;
-use alloy_provider::{Provider, ProviderBuilder};
+use alloy_provider::{ProviderBuilder, ProviderTrait as Provider};
 use alloy_rpc_client::RpcClient;
 use alloy_transport::layers::RetryBackoffLayer;
 use alloy_transport_ws::WsConnect;
@@ -72,7 +72,7 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
 
         Ok(addr)
     }
-    use alloy_provider::{Provider, ProviderBuilder};
+    use alloy_provider::{ProviderBuilder, ProviderTrait};
 
     let addr = run_server().await?;
 

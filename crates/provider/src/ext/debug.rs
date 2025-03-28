@@ -1,5 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
-use crate::Provider;
+use crate::ProviderTrait as Provider;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{hex, Bytes, TxHash, B256};

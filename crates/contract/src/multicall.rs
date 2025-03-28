@@ -6,7 +6,7 @@
 use super::SolCallBuilder;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes};
-use alloy_provider::{MulticallItem, Provider};
+use alloy_provider::{MulticallItem, ProviderTrait as Provider};
 use alloy_sol_types::SolCall;
 
 impl<T, P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder<T, P, C, N> {
@@ -25,9 +25,7 @@ impl<T, P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder
 mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
-    use alloy_provider::{
-        CallItem, CallItemBuilder, Failure, MulticallBuilder, Provider, ProviderBuilder,
-    };
+    use alloy_provider::{CallItem, CallItemBuilder, Failure, MulticallBuilder, ProviderBuilder};
     use alloy_sol_types::sol;
     use DummyThatFails::DummyThatFailsInstance;
 
@@ -55,8 +53,8 @@ mod tests {
     }
 
     async fn deploy_dummy(
-        provider: impl alloy_provider::Provider,
-    ) -> DummyThatFailsInstance<(), impl alloy_provider::Provider> {
+        provider: impl alloy_provider::ProviderTrait,
+    ) -> DummyThatFailsInstance<(), impl alloy_provider::ProviderTrait> {
         DummyThatFails::deploy(provider).await.unwrap()
     }
 
