@@ -64,6 +64,7 @@ impl TxEnvelope {
 }
 impl<T> EthereumTxEnvelope<T> {
     /// Returns a mutable reference to the transaction's input.
+    #[doc(hidden)]
     pub fn input_mut(&mut self) -> &mut Bytes
     where
         T: AsMut<TxEip4844>,
