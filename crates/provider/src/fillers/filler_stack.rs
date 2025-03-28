@@ -14,48 +14,48 @@ pub struct Empty;
 
 /// A stack of transaction fillers
 #[derive(Debug, Clone)]
-pub struct FillerStack<T, N = Ethereum> {
+pub struct Fillers<T, N = Ethereum> {
     fillers: FillerTuple<T, N>,
 }
 
-impl<N: Network> Default for FillerStack<Empty, N> {
+impl<N: Network> Default for Fillers<Empty, N> {
     fn default() -> Self {
-        FillerStack { fillers: FillerTuple::new(Empty) }
+        Fillers { fillers: FillerTuple::new(Empty) }
     }
 }
 
-// Implement methods for all FillerStack variants
-impl<T, N: Network> FillerStack<T, N> {
+// Implement methods for all Fillers variants
+impl<T, N: Network> Fillers<T, N> {
     pub fn new(filler: T) -> Self {
         Self { fillers: FillerTuple::new(filler) }
     }
 
     /// Push a new filler onto the stack
-    pub fn push<F: TxFiller<N>>(self, filler: F) -> FillerStack<T::Pushed, N>
+    pub fn push<F: TxFiller<N>>(self, filler: F) -> Fillers<T::Pushed, N>
     where
         T: TuplePush<F, N>,
         FillerTuple<T::Pushed, N>: From<(T, F)>,
     {
-        FillerStack { fillers: FillerTuple::from((self.fillers.inner, filler)) }
+        Fillers { fillers: FillerTuple::from((self.fillers.inner, filler)) }
     }
 }
 
 pub(crate) trait Pushable<F: TxFiller<N>, N: Network> {
     type Pushed;
 
-    fn push(self, filler: F) -> FillerStack<Self::Pushed, N>
+    fn push(self, filler: F) -> Fillers<Self::Pushed, N>
     where
         Self: Sized;
 }
 
-impl<T, F: TxFiller<N>, N: Network> Pushable<F, N> for FillerStack<T, N>
+impl<T, F: TxFiller<N>, N: Network> Pushable<F, N> for Fillers<T, N>
 where
     T: TuplePush<F, N>,
     FillerTuple<T::Pushed, N>: From<(T, F)>,
 {
     type Pushed = T::Pushed;
 
-    fn push(self, filler: F) -> FillerStack<Self::Pushed, N>
+    fn push(self, filler: F) -> Fillers<Self::Pushed, N>
     where
         Self: Sized,
     {
@@ -66,11 +66,11 @@ where
 impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
     type Pushed = (F,);
 
-    fn push(self, filler: F) -> FillerStack<Self::Pushed, N>
+    fn push(self, filler: F) -> Fillers<Self::Pushed, N>
     where
         Self: Sized,
     {
-        FillerStack::new((filler,))
+        Fillers::new((filler,))
     }
 }
 
@@ -98,7 +98,7 @@ impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
     type Pushed = (T,);
 }
 
-impl<T, N: Network> TxFiller<N> for FillerStack<T, N>
+impl<T, N: Network> TxFiller<N> for Fillers<T, N>
 where
     T: Clone + Debug + Send + Sync,
     FillerTuple<T, N>: TxFiller<N>,
@@ -283,7 +283,7 @@ impl<
 /// Macro to implement ProviderLayer for tuples of different sizes
 macro_rules! impl_provider_layer {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: TxFiller<N>,)+ P: Provider<N>, N: Network> ProviderLayer<P, N> for FillerStack<($($ty,)+), N> {
+        impl<$($ty: TxFiller<N>,)+ P: Provider<N>, N: Network> ProviderLayer<P, N> for Fillers<($($ty,)+), N> {
             type Provider = FillProvider<Self, P, N>;
             fn layer(&self, inner: P) -> Self::Provider {
                 FillProvider::new(inner, self.clone())
@@ -320,11 +320,9 @@ mod tests {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
-        // Type should be FillerStack<(GasFiller, NonceFiller, ChainIdFiller)>
-        let recommend: FillerStack<
-            (GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller),
-            Ethereum,
-        > = Ethereum::recommended_fillers();
+        // Type should be Fillers<(GasFiller, NonceFiller, ChainIdFiller)>
+        let recommend: Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Ethereum> =
+            Ethereum::recommended_fillers();
 
         let _full_stack = recommend.push(WalletFiller::new(EthereumWallet::from(pk)));
     }

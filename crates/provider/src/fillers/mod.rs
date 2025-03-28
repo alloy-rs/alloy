@@ -55,7 +55,7 @@ use std::marker::PhantomData;
 
 mod filler_stack;
 pub(crate) use filler_stack::Pushable;
-pub use filler_stack::{FillerStack, TuplePush, FillerTuple};
+pub use filler_stack::{Fillers, TuplePush, FillerTuple};
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
@@ -695,10 +695,10 @@ pub trait RecommendedFillers: Network {
 
 impl RecommendedFillers for Ethereum {
     type RecommendedFillers =
-        FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
+        Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        FillerStack::default()
+        Fillers::default()
             .push(GasFiller)
             .push(BlobGasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
@@ -717,10 +717,10 @@ impl RecommendedFillers for Ethereum {
 
 impl RecommendedFillers for AnyNetwork {
     type RecommendedFillers =
-        FillerStack<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
+        Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        FillerStack::default()
+        Fillers::default()
             .push(GasFiller)
             .push(BlobGasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
