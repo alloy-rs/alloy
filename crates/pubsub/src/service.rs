@@ -206,6 +206,7 @@ impl<T: PubSubConnect> PubSubService<T> {
                                 break Err(e)
                             }
                         } else if let Err(e) = self.reconnect().await {
+                            error!("Reconnect failed, shutting down: {e}");
                             break Err(e)
                         }
                     }
@@ -213,6 +214,7 @@ impl<T: PubSubConnect> PubSubService<T> {
                     _ = &mut self.handle.error => {
                         error!("Pubsub service backend error.");
                         if let Err(e) = self.reconnect().await {
+                            error!("Reconnect failed, shutting down: {e}");
                             break Err(e)
                         }
                     }

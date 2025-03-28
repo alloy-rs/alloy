@@ -1,7 +1,8 @@
 use crate::{
     error::ValueError,
     transaction::{
-        eip4844::TxEip4844Variant, PooledTransaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
+        eip4844::{TxEip4844, TxEip4844Variant},
+        PooledTransaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
     EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
@@ -58,6 +59,21 @@ impl TxEnvelope {
             Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx.into_parts().0),
             Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(tx.into_parts().0),
             Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
+        }
+    }
+}
+impl<T> EthereumTxEnvelope<T> {
+    /// Returns a mutable reference to the transaction's input.
+    pub fn input_mut(&mut self) -> &mut Bytes
+    where
+        T: AsMut<TxEip4844>,
+    {
+        match self {
+            Self::Eip1559(tx) => &mut tx.tx_mut().input,
+            Self::Eip2930(tx) => &mut tx.tx_mut().input,
+            Self::Legacy(tx) => &mut tx.tx_mut().input,
+            Self::Eip7702(tx) => &mut tx.tx_mut().input,
+            Self::Eip4844(tx) => &mut tx.tx_mut().as_mut().input,
         }
     }
 }

@@ -34,3 +34,6 @@ pub use erased::DynProvider;
 mod subscription;
 #[cfg(feature = "pubsub")]
 pub use subscription::GetSubscription;
+
+mod web3_signer;
+pub use web3_signer::Web3Signer;
