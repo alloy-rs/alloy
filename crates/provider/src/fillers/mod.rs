@@ -54,6 +54,7 @@ use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
 mod filler_stack;
+pub(crate) use filler_stack::Pushable;
 pub use filler_stack::{FillerStack, TuplePush, TupleWrapper};
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce

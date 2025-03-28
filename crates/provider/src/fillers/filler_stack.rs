@@ -14,7 +14,7 @@ pub struct Empty;
 
 /// A stack of transaction fillers
 #[derive(Debug, Clone)]
-pub struct FillerStack<T, N: Network = Ethereum> {
+pub struct FillerStack<T, N = Ethereum> {
     fillers: TupleWrapper<T, N>,
 }
 
@@ -22,30 +22,6 @@ impl<N: Network> Default for FillerStack<Empty, N> {
     fn default() -> Self {
         FillerStack { fillers: TupleWrapper::new(Empty) }
     }
-}
-
-/// A trait for tuples that can have types pushed to them
-pub trait TuplePush<T, N: Network> {
-    /// The resulting type after pushing T
-    type Pushed;
-}
-
-/// Newtype wrapper for tuple conversions
-#[derive(Debug, Clone)]
-pub struct TupleWrapper<T, N: Network> {
-    inner: T,
-    _network: PhantomData<N>,
-}
-
-impl<T, N: Network> TupleWrapper<T, N> {
-    fn new(inner: T) -> Self {
-        Self { inner, _network: PhantomData }
-    }
-}
-
-// Implement TuplePush for Empty
-impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
-    type Pushed = (T,);
 }
 
 // Implement methods for all FillerStack variants
@@ -62,6 +38,64 @@ impl<T, N: Network> FillerStack<T, N> {
     {
         FillerStack { fillers: TupleWrapper::from((self.fillers.inner, filler)) }
     }
+}
+
+pub(crate) trait Pushable<F: TxFiller<N>, N: Network> {
+    type Pushed;
+
+    fn push(self, filler: F) -> FillerStack<Self::Pushed, N>
+    where
+        Self: Sized;
+}
+
+impl<T, F: TxFiller<N>, N: Network> Pushable<F, N> for FillerStack<T, N>
+where
+    T: TuplePush<F, N>,
+    TupleWrapper<T::Pushed, N>: From<(T, F)>,
+{
+    type Pushed = T::Pushed;
+
+    fn push(self, filler: F) -> FillerStack<Self::Pushed, N>
+    where
+        Self: Sized,
+    {
+        self.push(filler)
+    }
+}
+
+impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
+    type Pushed = (F,);
+
+    fn push(self, filler: F) -> FillerStack<Self::Pushed, N>
+    where
+        Self: Sized,
+    {
+        FillerStack::new((filler,))
+    }
+}
+
+/// A trait for tuples that can have types pushed to them
+pub trait TuplePush<T, N = Ethereum> {
+    /// The resulting type after pushing T
+    type Pushed;
+}
+
+/// Newtype wrapper for tuple conversions
+#[derive(Debug, Clone)]
+pub struct TupleWrapper<T, N = Ethereum> {
+    inner: T,
+    _network: PhantomData<N>,
+}
+
+impl<T, N: Network> TupleWrapper<T, N> {
+    fn new(inner: T) -> Self {
+        Self { inner, _network: PhantomData }
+    }
+}
+
+// Implement TuplePush for Empty
+impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
+    type Pushed = (T,);
 }
 
 impl<T, N: Network> TxFiller<N> for FillerStack<T, N>
@@ -274,8 +308,11 @@ mod tests {
     use alloy_signer_local::PrivateKeySigner;
 
     use super::*;
-    use crate::fillers::{
-        BlobGasFiller, ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller,
+    use crate::{
+        fillers::{
+            BlobGasFiller, ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller,
+        },
+        ProviderBuilder,
     };
 
     #[test]
@@ -290,5 +327,17 @@ mod tests {
         > = Ethereum::recommended_fillers();
 
         let _full_stack = recommend.push(WalletFiller::new(EthereumWallet::from(pk)));
+    }
+
+    #[test]
+    fn test_provider_builder() {
+        let pk: PrivateKeySigner =
+            "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
+
+        // Basic works
+        let _provider = ProviderBuilder::new().on_anvil();
+
+        // With wallet
+        let _provider = ProviderBuilder::new().wallet(pk).on_anvil();
     }
 }

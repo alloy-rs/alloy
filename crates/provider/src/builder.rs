@@ -1,15 +1,15 @@
 use crate::{
     fillers::{
-        CachedNonceManager, ChainIdFiller, FillerControlFlow, FillerStack, GasFiller, NonceFiller,
-        NonceManager, RecommendedFillers, SimpleNonceManager, TuplePush, TupleWrapper, TxFiller,
-        WalletFiller,
+        self, CachedNonceManager, ChainIdFiller, FillerControlFlow, FillerStack, GasFiller,
+        NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager, TuplePush, TupleWrapper,
+        TxFiller, WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, IntoWallet, Network};
+use alloy_network::{Ethereum, EthereumWallet, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -439,13 +439,14 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         wallet: W,
     ) -> ProviderBuilder<L, FillerStack<F::Pushed, N>, N>
     where
-        F: TuplePush<WalletFiller<W::NetworkWallet>, N>,
-        TupleWrapper<F::Pushed, N>: From<(F, WalletFiller<W::NetworkWallet>)>,
+        F: fillers::Pushable<WalletFiller<W::NetworkWallet>, N>,
         W::NetworkWallet: Clone,
     {
+        let wallet_filler = WalletFiller::new(wallet.into_wallet());
+
         ProviderBuilder {
             layer: self.layer,
-            filler: FillerStack::new(self.filler).push(WalletFiller::new(wallet.into_wallet())),
+            filler: self.filler.push(wallet_filler),
             network: PhantomData,
         }
     }
@@ -480,7 +481,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self,
     ) -> <EthereumWalletFillerStack<F> as ProviderLayer<L::Provider>>::Provider
     where
-        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
+        F: TxFiller<Ethereum>
+            + fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>
+            + ProviderLayer<L::Provider, Ethereum>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
@@ -516,7 +519,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> AnvilProviderResult<<EthereumWalletFillerStack<F> as ProviderLayer<L::Provider>>::Provider>
     where
-        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
+        F: TxFiller<Ethereum>
+            + fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>
+            + ProviderLayer<L::Provider, Ethereum>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
