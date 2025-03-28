@@ -199,7 +199,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Attempt to reconnect with retries
     async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
         let mut retry_count = 0;
-        let result = loop {
+        loop {
             match self.reconnect().await {
                 Ok(()) => break Ok(()),
                 Err(e) => {
@@ -218,8 +218,7 @@ impl<T: PubSubConnect> PubSubService<T> {
                     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                 }
             }
-        };
-        result
+        }
     }
 
     /// Spawn the service.
@@ -237,10 +236,8 @@ impl<T: PubSubConnect> PubSubService<T> {
                             if let Err(e) = self.handle_item(item) {
                                 break Err(e)
                             }
-                        } else {
-                            if let Err(e) = self.reconnect_with_retries().await {
-                                break Err(e)
-                            }
+                        } else if let Err(e) = self.reconnect_with_retries().await {
+                            break Err(e)
                         }
                     }
 
