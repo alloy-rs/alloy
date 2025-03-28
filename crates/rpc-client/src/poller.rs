@@ -216,6 +216,11 @@ where
         }
         .instrument(span)
     }
+
+    /// Returns the [`WeakClient`] associated with the poller.
+    pub fn client(&self) -> WeakClient {
+        self.client.clone()
+    }
 }
 
 /// A channel yielding responses from a poller task.

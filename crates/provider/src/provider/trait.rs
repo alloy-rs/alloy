@@ -4,7 +4,7 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -494,6 +494,36 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes) and transforming the returned block
+    /// hashes into full blocks bodies.
+    ///
+    /// Returns the [`WatchBlocks`] type which consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of [`BlockResponse`]'s.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 full blocks:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_full_blocks().await?.full();
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(block) = stream.next().await {
+    ///   println!("new block: {block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn watch_full_blocks(&self) -> TransportResult<WatchBlocks<N::BlockResponse>> {
+        let id = self.new_block_filter().await?;
+        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
+
+        Ok(WatchBlocks::new(poller))
     }
 
     /// Watch for new pending transaction by polling the provider with
