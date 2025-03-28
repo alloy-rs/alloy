@@ -158,6 +158,19 @@ impl BuiltInConnectionString {
 
         Ok(Self::Ipc(path.to_path_buf()))
     }
+
+    /// Returns the [`url::Url`] for this connection string.
+    ///
+    /// Returns `None` if the connection string is an IPC path.
+    pub fn url(&self) -> Option<url::Url> {
+        match self {
+            #[cfg(any(feature = "reqwest", feature = "hyper"))]
+            Self::Http(url) => Some(url.clone()),
+            #[cfg(feature = "ws")]
+            Self::Ws(url, _) => Some(url.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl FromStr for BuiltInConnectionString {

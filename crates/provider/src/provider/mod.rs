@@ -44,6 +44,7 @@ mod recommended {
     };
     use alloy_network::AnyNetwork;
 
+    /// A [`FillProvider`] with recommended fillers connected to [`AnyNetwork`].
     pub type AnyFillProvider = FillProvider<
         JoinFill<
             Identity,
@@ -52,26 +53,47 @@ mod recommended {
         RootProvider<AnyNetwork>,
         AnyNetwork,
     >;
+
+    /// An [`AnyFillProvider`] initializer.
+    ///
+    /// Helper type to instantiate an [`AnyFillProvider`] using [`Provider::connect`].
+    ///
+    /// One can connect a provider in a synchronous way using the [`Provider::connect_http`] method.
+    ///
+    /// Note:
+    ///
+    /// - Connecting using this provider enables the recommended fillers.
+    /// - The resulting provider leverages the catch-all [`AnyNetwork`] type so that it can be used
+    ///   across networks.
+    ///
+    /// If you wish to have more customizability over the resulting provider, use
+    /// the [`ProviderBuilder`] directly.
+    #[derive(Debug, Clone)]
     pub struct Provider;
 
     impl Provider {
-        pub async fn connect(s: &str) -> AnyFillProvider {
-            ProviderBuilder::new().network::<AnyNetwork>().connect(s).await.unwrap()
+        /// Instantiates a new [`AnyFillProvider`] using the given RPC endpoint.
+        pub async fn connect(s: &str) -> alloy_transport::TransportResult<AnyFillProvider> {
+            ProviderBuilder::new().network::<AnyNetwork>().connect(s).await
         }
-    }
 
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use crate::ProviderTrait;
-        use alloy_node_bindings::Anvil;
+        /// Instantiates a new [`AnyFillProvider`] using the given HTTP RPC endpoint.
+        ///
+        /// For connecting using WS endpoint or IPC endpoint, enable the "ws" or "ipc" feature and
+        /// use [`Provider::connect`].
+        #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
+        pub fn connect_http(s: &str) -> alloy_transport::TransportResult<AnyFillProvider> {
+            use alloy_rpc_client::BuiltInConnectionString;
 
-        #[tokio::test]
-        async fn test_provider() {
-            let anvil = Anvil::new().spawn();
-            let provider = Provider::connect(&anvil.endpoint()).await;
-            let block = provider.get_block_number().await.unwrap();
-            println!("block: {:?}", block);
+            let conn = BuiltInConnectionString::try_as_http(s)?;
+            Ok(ProviderBuilder::new().network::<AnyNetwork>().on_http(conn.url().unwrap()))
+        }
+
+        /// Instantiates a new [`AnyFillProvider`] using the given HTTP RPC endpoint.
+        #[cfg(all(not(feature = "reqwest"), feature = "hyper"))]
+        pub fn connect_http(s: &str) -> alloy_transport::TransportResult<AnyFillProvider> {
+            let conn = BuiltInConnectionString::try_as_http(s)?;
+            Ok(ProviderBuilder::new().network::<AnyNetwork>().on_hyper_http(conn.url().unwrap()))
         }
     }
 }
