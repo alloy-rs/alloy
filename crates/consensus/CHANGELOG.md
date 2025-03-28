@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
+
+### Features
+
+- Add bincode compat for receipt envelope ([#2246](https://github.com/alloy-rs/alloy/issues/2246))
+
+### Miscellaneous Tasks
+
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
+- Propagate arbitrary feature ([#2227](https://github.com/alloy-rs/alloy/issues/2227))
+
+### Other
+
+- Added input-mut for TxEnvelope ([#2244](https://github.com/alloy-rs/alloy/issues/2244))
+
+### Testing
+
+- Fix flaky test ([#2248](https://github.com/alloy-rs/alloy/issues/2248))
+
 ## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
 
 ### Dependencies
@@ -17,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Derive `Serialize` and `Deserialize` for `Recovered<T>` ([#2204](https://github.com/alloy-rs/alloy/issues/2204))
 - Impl into_transaction TxEnvelope ([#2192](https://github.com/alloy-rs/alloy/issues/2192))
 - Add missing U8 conversion ([#2189](https://github.com/alloy-rs/alloy/issues/2189))
+
+### Miscellaneous Tasks
+
+- Release 0.12.6
 
 ### Other
 

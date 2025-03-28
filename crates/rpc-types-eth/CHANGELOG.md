@@ -5,11 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
+
+### Features
+
+- Add EIP1186AccountProofResponse::is_empty ([#2224](https://github.com/alloy-rs/alloy/issues/2224))
+
+### Miscellaneous Tasks
+
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
+- Propagate arbitrary feature ([#2227](https://github.com/alloy-rs/alloy/issues/2227))
+
+### Other
+
+- Add more details on FilterSet ([#2229](https://github.com/alloy-rs/alloy/issues/2229))
+
 ## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
 
 ### Features
 
 - Ad helper append fn ([#2186](https://github.com/alloy-rs/alloy/issues/2186))
+
+### Miscellaneous Tasks
+
+- Release 0.12.6
 
 ## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
 

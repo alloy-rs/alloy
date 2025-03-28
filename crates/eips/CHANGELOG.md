@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
+
+### Dependencies
+
+- [deps] C-kzg 2.0 ([#2240](https://github.com/alloy-rs/alloy/issues/2240))
+
+### Features
+
+- Eip7594 constants ([#2245](https://github.com/alloy-rs/alloy/issues/2245))
+
+### Miscellaneous Tasks
+
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
+
+### Other
+
+- Auto_impl(&) for Encodable2718 ([#2230](https://github.com/alloy-rs/alloy/issues/2230))
+
 ## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
 
 ### Bug Fixes
@@ -15,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [eips] Serde untagged for EIP-7685 `RequestsOrHash` ([#2216](https://github.com/alloy-rs/alloy/issues/2216))
 - Add BlobAndProofV2 ([#2202](https://github.com/alloy-rs/alloy/issues/2202))
+
+### Miscellaneous Tasks
+
+- Release 0.12.6
 
 ## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
 
