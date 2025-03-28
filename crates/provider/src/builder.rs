@@ -1,7 +1,7 @@
 use crate::{
     fillers::{
-        self, CachedNonceManager, ChainIdFiller, FillerControlFlow, FillerStack, GasFiller,
-        NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager, TuplePush, TupleWrapper,
+        self, CachedNonceManager, ChainIdFiller, FillerControlFlow, FillerStack, FillerTuple,
+        GasFiller, NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager, TuplePush,
         TxFiller, WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
@@ -243,7 +243,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     ) -> ProviderBuilder<L, FillerStack<F::Pushed, N>, N>
     where
         F: TuplePush<F2, N>,
-        TupleWrapper<<F as TuplePush<F2, N>>::Pushed, N>: From<(F, F2)>,
+        FillerTuple<<F as TuplePush<F2, N>>::Pushed, N>: From<(F, F2)>,
     {
         ProviderBuilder {
             layer: self.layer,

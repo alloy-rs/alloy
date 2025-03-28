@@ -15,28 +15,28 @@ pub struct Empty;
 /// A stack of transaction fillers
 #[derive(Debug, Clone)]
 pub struct FillerStack<T, N = Ethereum> {
-    fillers: TupleWrapper<T, N>,
+    fillers: FillerTuple<T, N>,
 }
 
 impl<N: Network> Default for FillerStack<Empty, N> {
     fn default() -> Self {
-        FillerStack { fillers: TupleWrapper::new(Empty) }
+        FillerStack { fillers: FillerTuple::new(Empty) }
     }
 }
 
 // Implement methods for all FillerStack variants
 impl<T, N: Network> FillerStack<T, N> {
     pub fn new(filler: T) -> Self {
-        Self { fillers: TupleWrapper::new(filler) }
+        Self { fillers: FillerTuple::new(filler) }
     }
 
     /// Push a new filler onto the stack
     pub fn push<F: TxFiller<N>>(self, filler: F) -> FillerStack<T::Pushed, N>
     where
         T: TuplePush<F, N>,
-        TupleWrapper<T::Pushed, N>: From<(T, F)>,
+        FillerTuple<T::Pushed, N>: From<(T, F)>,
     {
-        FillerStack { fillers: TupleWrapper::from((self.fillers.inner, filler)) }
+        FillerStack { fillers: FillerTuple::from((self.fillers.inner, filler)) }
     }
 }
 
@@ -51,7 +51,7 @@ pub(crate) trait Pushable<F: TxFiller<N>, N: Network> {
 impl<T, F: TxFiller<N>, N: Network> Pushable<F, N> for FillerStack<T, N>
 where
     T: TuplePush<F, N>,
-    TupleWrapper<T::Pushed, N>: From<(T, F)>,
+    FillerTuple<T::Pushed, N>: From<(T, F)>,
 {
     type Pushed = T::Pushed;
 
@@ -82,12 +82,12 @@ pub trait TuplePush<T, N = Ethereum> {
 
 /// Newtype wrapper for tuple conversions
 #[derive(Debug, Clone)]
-pub struct TupleWrapper<T, N = Ethereum> {
+pub struct FillerTuple<T, N = Ethereum> {
     inner: T,
     _network: PhantomData<N>,
 }
 
-impl<T, N: Network> TupleWrapper<T, N> {
+impl<T, N: Network> FillerTuple<T, N> {
     fn new(inner: T) -> Self {
         Self { inner, _network: PhantomData }
     }
@@ -101,9 +101,9 @@ impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
 impl<T, N: Network> TxFiller<N> for FillerStack<T, N>
 where
     T: Clone + Debug + Send + Sync,
-    TupleWrapper<T, N>: TxFiller<N>,
+    FillerTuple<T, N>: TxFiller<N>,
 {
-    type Fillable = <TupleWrapper<T, N> as TxFiller<N>>::Fillable;
+    type Fillable = <FillerTuple<T, N> as TxFiller<N>>::Fillable;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
         self.fillers.status(tx)
@@ -159,7 +159,7 @@ impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => 
 /// Macro to implement TxFiller for tuples of different sizes
 macro_rules! impl_tx_filler {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for TupleWrapper<($($ty,)+), N> {
+        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for FillerTuple<($($ty,)+), N> {
             type Fillable = ($(Option<$ty::Fillable>,)+);
 
             fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
@@ -232,37 +232,37 @@ impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
 // Implement From for tuple types
-impl<T: TxFiller<N>, N: Network> From<(Empty, T)> for TupleWrapper<(T,), N> {
+impl<T: TxFiller<N>, N: Network> From<(Empty, T)> for FillerTuple<(T,), N> {
     fn from((_, t): (Empty, T)) -> Self {
-        TupleWrapper::new((t,))
+        FillerTuple::new((t,))
     }
 }
 
-impl<T: TxFiller<N>, N: Network> From<((T,),)> for TupleWrapper<(T,), N> {
+impl<T: TxFiller<N>, N: Network> From<((T,),)> for FillerTuple<(T,), N> {
     fn from(value: ((T,),)) -> Self {
-        TupleWrapper::new(value.0)
+        FillerTuple::new(value.0)
     }
 }
 
-impl<L: TxFiller<N>, R: TxFiller<N>, N: Network> From<((L,), R)> for TupleWrapper<(L, R), N> {
+impl<L: TxFiller<N>, R: TxFiller<N>, N: Network> From<((L,), R)> for FillerTuple<(L, R), N> {
     fn from((l, r): ((L,), R)) -> Self {
-        TupleWrapper::new((l.0, r))
+        FillerTuple::new((l.0, r))
     }
 }
 
 impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, N: Network> From<((A, B), C)>
-    for TupleWrapper<(A, B, C), N>
+    for FillerTuple<(A, B, C), N>
 {
     fn from((ab, c): ((A, B), C)) -> Self {
-        TupleWrapper::new((ab.0, ab.1, c))
+        FillerTuple::new((ab.0, ab.1, c))
     }
 }
 
 impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, D: TxFiller<N>, N: Network>
-    From<((A, B, C), D)> for TupleWrapper<(A, B, C, D), N>
+    From<((A, B, C), D)> for FillerTuple<(A, B, C, D), N>
 {
     fn from((abc, d): ((A, B, C), D)) -> Self {
-        TupleWrapper::new((abc.0, abc.1, abc.2, d))
+        FillerTuple::new((abc.0, abc.1, abc.2, d))
     }
 }
 
@@ -273,10 +273,10 @@ impl<
         D: TxFiller<N>,
         E: TxFiller<N>,
         N: Network,
-    > From<((A, B, C, D), E)> for TupleWrapper<(A, B, C, D, E), N>
+    > From<((A, B, C, D), E)> for FillerTuple<(A, B, C, D, E), N>
 {
     fn from((abcd, e): ((A, B, C, D), E)) -> Self {
-        TupleWrapper::new((abcd.0, abcd.1, abcd.2, abcd.3, e))
+        FillerTuple::new((abcd.0, abcd.1, abcd.2, abcd.3, e))
     }
 }
 

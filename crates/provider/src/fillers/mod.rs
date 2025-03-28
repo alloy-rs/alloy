@@ -55,7 +55,7 @@ use std::marker::PhantomData;
 
 mod filler_stack;
 pub(crate) use filler_stack::Pushable;
-pub use filler_stack::{FillerStack, TuplePush, TupleWrapper};
+pub use filler_stack::{FillerStack, TuplePush, FillerTuple};
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
