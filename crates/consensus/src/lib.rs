@@ -46,7 +46,7 @@ pub use transaction::{
 pub use alloy_eips::{
     eip4844::{
         builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
-        utils, Blob, BlobTransactionSidecar, Bytes48,
+        utils, Blob, BlobTransactionSidecarEip4844, Bytes48,
     },
     Typed2718,
 };

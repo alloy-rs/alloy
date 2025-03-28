@@ -1,4 +1,4 @@
-//! Constants for PeerDAS.
+//! Types and constants for PeerDAS.
 //!
 //! See also [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594): PeerDAS - Peer Data Availability Sampling
 
@@ -12,3 +12,6 @@ pub const FIELD_ELEMENTS_PER_CELL: u64 = 64;
 
 /// The number of cells in an extended blob.
 pub const CELLS_PER_EXT_BLOB: u64 = FIELD_ELEMENTS_PER_EXT_BLOB / FIELD_ELEMENTS_PER_CELL;
+
+mod sidecar;
+pub use sidecar::*;

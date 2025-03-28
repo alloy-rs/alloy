@@ -23,7 +23,7 @@ pub use pooled::PooledTransaction;
 use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
 pub use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
-    utils as eip4844_utils, Blob, BlobTransactionSidecar, Bytes48,
+    utils as eip4844_utils, Blob, BlobTransactionSidecarEip4844, Bytes48,
 };
 #[cfg(feature = "kzg")]
 pub use eip4844::BlobTransactionValidationError;

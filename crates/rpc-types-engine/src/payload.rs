@@ -11,7 +11,7 @@ use alloy_consensus::{
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
-    eip4844::BlobTransactionSidecar,
+    eip4844::BlobTransactionSidecarEip4844,
     eip4895::{Withdrawal, Withdrawals},
     eip7685::Requests,
     BlockNumHash,
@@ -767,7 +767,7 @@ impl BlobsBundleV1 {
     /// Creates a new blob bundle from the given sidecars.
     ///
     /// This folds the sidecar fields into single commit, proof, and blob vectors.
-    pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecar>) -> Self {
+    pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecarEip4844>) -> Self {
         let (commitments, proofs, blobs) = sidecars.into_iter().fold(
             (Vec::new(), Vec::new(), Vec::new()),
             |(mut commitments, mut proofs, mut blobs), sidecar| {
@@ -806,20 +806,20 @@ impl BlobsBundleV1 {
     /// # Panics
     ///
     /// If len is more than the blobs bundle len.
-    pub fn pop_sidecar(&mut self, len: usize) -> BlobTransactionSidecar {
+    pub fn pop_sidecar(&mut self, len: usize) -> BlobTransactionSidecarEip4844 {
         let (commitments, proofs, blobs) = self.take(len);
-        BlobTransactionSidecar { commitments, proofs, blobs }
+        BlobTransactionSidecarEip4844 { commitments, proofs, blobs }
     }
 }
 
-impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
-    fn from(sidecars: Vec<BlobTransactionSidecar>) -> Self {
+impl From<Vec<BlobTransactionSidecarEip4844>> for BlobsBundleV1 {
+    fn from(sidecars: Vec<BlobTransactionSidecarEip4844>) -> Self {
         Self::new(sidecars)
     }
 }
 
-impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
-    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
+impl FromIterator<BlobTransactionSidecarEip4844> for BlobsBundleV1 {
+    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecarEip4844>>(iter: T) -> Self {
         Self::new(iter)
     }
 }
@@ -841,7 +841,7 @@ impl BlobsBundleV2 {
     /// Creates a new blob bundle from the given sidecars.
     ///
     /// This folds the sidecar fields into single commit, proof, and blob vectors.
-    pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecar>) -> Self {
+    pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecarEip4844>) -> Self {
         let (commitments, cell_proofs, blobs) = sidecars.into_iter().fold(
             (Vec::new(), Vec::new(), Vec::new()),
             |(mut commitments, mut cell_proofs, mut blobs), sidecar| {
@@ -880,20 +880,20 @@ impl BlobsBundleV2 {
     /// # Panics
     ///
     /// If len is more than the blobs bundle len.
-    pub fn pop_sidecar(&mut self, len: usize) -> BlobTransactionSidecar {
+    pub fn pop_sidecar(&mut self, len: usize) -> BlobTransactionSidecarEip4844 {
         let (commitments, cell_proofs, blobs) = self.take(len);
-        BlobTransactionSidecar { commitments, proofs: cell_proofs, blobs }
+        BlobTransactionSidecarEip4844 { commitments, proofs: cell_proofs, blobs }
     }
 }
 
-impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV2 {
-    fn from(sidecars: Vec<BlobTransactionSidecar>) -> Self {
+impl From<Vec<BlobTransactionSidecarEip4844>> for BlobsBundleV2 {
+    fn from(sidecars: Vec<BlobTransactionSidecarEip4844>) -> Self {
         Self::new(sidecars)
     }
 }
 
-impl FromIterator<BlobTransactionSidecar> for BlobsBundleV2 {
-    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
+impl FromIterator<BlobTransactionSidecarEip4844> for BlobsBundleV2 {
+    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecarEip4844>>(iter: T) -> Self {
         Self::new(iter)
     }
 }

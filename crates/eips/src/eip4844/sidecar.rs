@@ -31,8 +31,8 @@ pub struct IndexedBlobHash {
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[doc(alias = "BlobTxSidecar")]
-pub struct BlobTransactionSidecar {
+#[doc(alias = "BlobTxSidecarEip4844")]
+pub struct BlobTransactionSidecarEip4844 {
     /// The blob data.
     #[cfg_attr(
         all(debug_assertions, feature = "serde"),
@@ -45,9 +45,9 @@ pub struct BlobTransactionSidecar {
     pub proofs: Vec<Bytes48>,
 }
 
-impl core::fmt::Debug for BlobTransactionSidecar {
+impl core::fmt::Debug for BlobTransactionSidecarEip4844 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("BlobTransactionSidecar")
+        f.debug_struct("BlobTransactionSidecarEip4844")
             .field("blobs", &self.blobs.len())
             .field("commitments", &self.commitments)
             .field("proofs", &self.proofs)
@@ -55,7 +55,7 @@ impl core::fmt::Debug for BlobTransactionSidecar {
     }
 }
 
-impl BlobTransactionSidecar {
+impl BlobTransactionSidecarEip4844 {
     /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV1`]) pairs
     /// where index is the position in `versioned_hashes` that matched the versioned hash in the
     /// sidecar.
@@ -80,9 +80,9 @@ impl BlobTransactionSidecar {
     }
 }
 
-impl IntoIterator for BlobTransactionSidecar {
-    type Item = BlobTransactionSidecarItem;
-    type IntoIter = alloc::vec::IntoIter<BlobTransactionSidecarItem>;
+impl IntoIterator for BlobTransactionSidecarEip4844 {
+    type Item = BlobTransactionSidecarEip4844Item;
+    type IntoIter = alloc::vec::IntoIter<BlobTransactionSidecarEip4844Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.blobs
@@ -90,7 +90,7 @@ impl IntoIterator for BlobTransactionSidecar {
             .zip(self.commitments)
             .zip(self.proofs)
             .enumerate()
-            .map(|(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
+            .map(|(index, ((blob, commitment), proof))| BlobTransactionSidecarEip4844Item {
                 index: index as u64,
                 blob: Box::new(blob),
                 kzg_commitment: commitment,
@@ -105,8 +105,8 @@ impl IntoIterator for BlobTransactionSidecar {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlobTransactionSidecarItem {
-    /// The index of this item within the [BlobTransactionSidecar].
+pub struct BlobTransactionSidecarEip4844Item {
+    /// The index of this item within the [BlobTransactionSidecarEip4844].
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub index: u64,
     /// The blob in this sidecar item.
@@ -119,7 +119,7 @@ pub struct BlobTransactionSidecarItem {
 }
 
 #[cfg(feature = "kzg")]
-impl BlobTransactionSidecarItem {
+impl BlobTransactionSidecarEip4844Item {
     /// `VERSIONED_HASH_VERSION_KZG ++ sha256(commitment)[1..]`
     pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
         use sha2::Digest;
@@ -175,7 +175,7 @@ impl BlobTransactionSidecarItem {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
+impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecarEip4844 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
         let mut blobs = Vec::with_capacity(num_blobs);
@@ -194,8 +194,9 @@ impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     }
 }
 
-impl BlobTransactionSidecar {
-    /// Constructs a new [BlobTransactionSidecar] from a set of blobs, commitments, and proofs.
+impl BlobTransactionSidecarEip4844 {
+    /// Constructs a new [BlobTransactionSidecarEip4844] from a set of blobs, commitments, and
+    /// proofs.
     pub const fn new(blobs: Vec<Blob>, commitments: Vec<Bytes48>, proofs: Vec<Bytes48>) -> Self {
         Self { blobs, commitments, proofs }
     }
@@ -269,14 +270,13 @@ impl BlobTransactionSidecar {
 
         // SAFETY: ALL types have the same size
         let res = unsafe {
-            c_kzg::KzgProof::verify_blob_kzg_proof_batch(
+            proof_settings.verify_blob_kzg_proof_batch(
                 // blobs
                 core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
                 // commitments
                 core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
                 // proofs
                 core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
-                proof_settings,
             )
         }
         .map_err(BlobTransactionValidationError::KZGError)?;
@@ -295,7 +295,7 @@ impl BlobTransactionSidecar {
         self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
-    /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
+    /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip4844].
     #[inline]
     pub fn size(&self) -> usize {
         self.blobs.len() * BYTES_PER_BLOB + // blobs
@@ -303,7 +303,7 @@ impl BlobTransactionSidecar {
             self.proofs.len() * BYTES_PER_PROOF // proofs
     }
 
-    /// Tries to create a new [`BlobTransactionSidecar`] from the hex encoded blob str.
+    /// Tries to create a new [`BlobTransactionSidecarEip4844`] from the hex encoded blob str.
     ///
     /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
@@ -363,14 +363,15 @@ impl BlobTransactionSidecar {
         Ok(Self::from_kzg(blobs, commitments, proofs))
     }
 
-    /// Outputs the RLP length of the [BlobTransactionSidecar] fields, without
+    /// Outputs the RLP length of the [BlobTransactionSidecarEip4844] fields, without
     /// a RLP header.
     #[doc(hidden)]
     pub fn rlp_encoded_fields_length(&self) -> usize {
         self.blobs.length() + self.commitments.length() + self.proofs.length()
     }
 
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, __without__ a RLP header.
+    /// Encodes the inner [BlobTransactionSidecarEip4844] fields as RLP bytes, __without__ a RLP
+    /// header.
     ///
     /// This encodes the fields in the following order:
     /// - `blobs`
@@ -385,24 +386,24 @@ impl BlobTransactionSidecar {
         self.proofs.encode(out);
     }
 
-    /// Creates an RLP header for the [BlobTransactionSidecar].
+    /// Creates an RLP header for the [BlobTransactionSidecarEip4844].
     fn rlp_header(&self) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length() }
     }
 
-    /// Calculates the length of the [BlobTransactionSidecar] when encoded as
+    /// Calculates the length of the [BlobTransactionSidecarEip4844] when encoded as
     /// RLP.
     pub fn rlp_encoded_length(&self) -> usize {
         self.rlp_header().length() + self.rlp_encoded_fields_length()
     }
 
-    /// Encodes the [BlobTransactionSidecar] as RLP bytes.
+    /// Encodes the [BlobTransactionSidecarEip4844] as RLP bytes.
     pub fn rlp_encode(&self, out: &mut dyn BufMut) {
         self.rlp_header().encode(out);
         self.rlp_encode_fields(out);
     }
 
-    /// RLP decode the fields of a [BlobTransactionSidecar].
+    /// RLP decode the fields of a [BlobTransactionSidecarEip4844].
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
@@ -412,7 +413,7 @@ impl BlobTransactionSidecar {
         })
     }
 
-    /// Decodes the [BlobTransactionSidecar] from RLP bytes.
+    /// Decodes the [BlobTransactionSidecarEip4844] from RLP bytes.
     pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(buf)?;
         if !header.list {
@@ -432,8 +433,8 @@ impl BlobTransactionSidecar {
     }
 }
 
-impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+impl Encodable for BlobTransactionSidecarEip4844 {
+    /// Encodes the inner [BlobTransactionSidecarEip4844] fields as RLP bytes, without a RLP header.
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -443,8 +444,9 @@ impl Encodable for BlobTransactionSidecar {
     }
 }
 
-impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+impl Decodable for BlobTransactionSidecarEip4844 {
+    /// Decodes the inner [BlobTransactionSidecarEip4844] fields from RLP bytes, without a RLP
+    /// header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -466,7 +468,7 @@ where
     Ok(blobs)
 }
 
-/// An error that can occur when validating a [BlobTransactionSidecar::validate].
+/// An error that can occur when validating a [BlobTransactionSidecarEip4844::validate].
 #[derive(Debug)]
 #[cfg(feature = "kzg")]
 pub enum BlobTransactionValidationError {
@@ -526,7 +528,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn deserialize_blob() {
-        let blob = BlobTransactionSidecar {
+        let blob = BlobTransactionSidecarEip4844 {
             blobs: vec![Blob::default(), Blob::default(), Blob::default(), Blob::default()],
             commitments: vec![
                 Bytes48::default(),
@@ -543,20 +545,20 @@ mod tests {
         };
 
         let s = serde_json::to_string(&blob).unwrap();
-        let deserialized: BlobTransactionSidecar = serde_json::from_str(&s).unwrap();
+        let deserialized: BlobTransactionSidecarEip4844 = serde_json::from_str(&s).unwrap();
         assert_eq!(blob, deserialized);
     }
 
     #[test]
     fn test_arbitrary_blob() {
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured blob");
-        let _blob = BlobTransactionSidecar::arbitrary(&mut unstructured).unwrap();
+        let _blob = BlobTransactionSidecarEip4844::arbitrary(&mut unstructured).unwrap();
     }
 
     #[test]
     #[cfg(feature = "serde")]
     fn test_blob_item_serde_roundtrip() {
-        let blob_item = BlobTransactionSidecarItem {
+        let blob_item = BlobTransactionSidecarEip4844Item {
             index: 0,
             blob: Box::new(Blob::default()),
             kzg_commitment: Bytes48::default(),
@@ -564,7 +566,7 @@ mod tests {
         };
 
         let s = serde_json::to_string(&blob_item).unwrap();
-        let deserialized: BlobTransactionSidecarItem = serde_json::from_str(&s).unwrap();
+        let deserialized: BlobTransactionSidecarEip4844Item = serde_json::from_str(&s).unwrap();
         assert_eq!(blob_item, deserialized);
     }
 }

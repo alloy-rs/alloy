@@ -1,6 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
+use crate::{transaction::AccessList, BlobTransactionSidecarEip4844, Transaction, TransactionTrait};
 use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
     TxLegacy, TxType, Typed2718, TypedTransaction,
@@ -129,7 +129,7 @@ pub struct TransactionRequest {
         feature = "serde",
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
-    pub sidecar: Option<BlobTransactionSidecar>,
+    pub sidecar: Option<BlobTransactionSidecarEip4844>,
     /// Authorization list for for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
@@ -728,11 +728,11 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarEip4844> {
         self.sidecar.as_ref()
     }
 
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarEip4844) {
         self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
     }
@@ -1389,11 +1389,11 @@ mod tests {
 
         // EIP-4844 with sidecar
         {
-            use alloy_eips::eip4844::{Blob, BlobTransactionSidecar};
+            use alloy_eips::eip4844::{Blob, BlobTransactionSidecarEip4844};
 
             // Positive case
             let sidecar =
-                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+                BlobTransactionSidecarEip4844::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
             let eip4844_request = TransactionRequest {
                 to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
                 max_fee_per_gas: Some(1234),

@@ -11,7 +11,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[doc(inline)]
-pub use alloy_eips::eip4844::BlobTransactionSidecar;
+pub use alloy_eips::eip4844::BlobTransactionSidecarEip4844;
 
 #[cfg(feature = "kzg")]
 #[doc(inline)]
@@ -49,7 +49,7 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
             #[doc(alias = "transaction")]
             tx: TxEip4844,
             #[serde(flatten)]
-            sidecar: Option<BlobTransactionSidecar>,
+            sidecar: Option<BlobTransactionSidecarEip4844>,
         }
 
         let tx = TxEip4844SerdeHelper::deserialize(deserializer)?;
@@ -88,8 +88,8 @@ impl From<TxEip4844> for TxEip4844Variant {
     }
 }
 
-impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
-    fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
+impl From<(TxEip4844, BlobTransactionSidecarEip4844)> for TxEip4844Variant {
+    fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecarEip4844)) -> Self {
         TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar).into()
     }
 }
@@ -528,7 +528,7 @@ impl TxEip4844 {
     #[cfg(feature = "kzg")]
     pub fn validate_blob(
         &self,
-        sidecar: &BlobTransactionSidecar,
+        sidecar: &BlobTransactionSidecarEip4844,
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         sidecar.validate(&self.blob_versioned_hashes, proof_settings)
@@ -744,8 +744,9 @@ impl From<TxEip4844WithSidecar> for TxEip4844 {
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
 /// A transaction with blob hashes and max blob fee, which also includes the
-/// [BlobTransactionSidecar]. This is the full type sent over the network as a raw transaction. It
-/// wraps a [TxEip4844] to include the sidecar and the ability to decode it properly.
+/// [BlobTransactionSidecarEip4844]. This is the full type sent over the network as a raw
+/// transaction. It wraps a [TxEip4844] to include the sidecar and the ability to decode it
+/// properly.
 ///
 /// This is defined in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#networking) as an element
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
@@ -762,13 +763,17 @@ pub struct TxEip4844WithSidecar {
     pub tx: TxEip4844,
     /// The sidecar.
     #[cfg_attr(feature = "serde", serde(flatten))]
-    pub sidecar: BlobTransactionSidecar,
+    pub sidecar: BlobTransactionSidecarEip4844,
 }
 
 impl TxEip4844WithSidecar {
-    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a [BlobTransactionSidecar].
+    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a
+    /// [BlobTransactionSidecarEip4844].
     #[doc(alias = "from_transaction_and_sidecar")]
-    pub const fn from_tx_and_sidecar(tx: TxEip4844, sidecar: BlobTransactionSidecar) -> Self {
+    pub const fn from_tx_and_sidecar(
+        tx: TxEip4844,
+        sidecar: BlobTransactionSidecarEip4844,
+    ) -> Self {
         Self { tx, sidecar }
     }
 
@@ -795,19 +800,20 @@ impl TxEip4844WithSidecar {
         &self.tx
     }
 
-    /// Get access to the inner sidecar [BlobTransactionSidecar].
-    pub const fn sidecar(&self) -> &BlobTransactionSidecar {
+    /// Get access to the inner sidecar [BlobTransactionSidecarEip4844].
+    pub const fn sidecar(&self) -> &BlobTransactionSidecarEip4844 {
         &self.sidecar
     }
 
-    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar [BlobTransactionSidecar].
-    pub fn into_sidecar(self) -> BlobTransactionSidecar {
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar
+    /// [BlobTransactionSidecarEip4844].
+    pub fn into_sidecar(self) -> BlobTransactionSidecarEip4844 {
         self.sidecar
     }
 
     /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844] and
-    /// [BlobTransactionSidecar].
-    pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
+    /// [BlobTransactionSidecarEip4844].
+    pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecarEip4844) {
         (self.tx, self.sidecar)
     }
 
@@ -964,7 +970,7 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let tx = TxEip4844::rlp_decode(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let sidecar = BlobTransactionSidecarEip4844::rlp_decode_fields(buf)?;
         Ok(Self { tx, sidecar })
     }
 
@@ -976,7 +982,7 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
         let remaining = buf.len();
 
         let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let sidecar = BlobTransactionSidecarEip4844::rlp_decode_fields(buf)?;
 
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
@@ -988,7 +994,7 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
+    use super::{BlobTransactionSidecarEip4844, TxEip4844, TxEip4844WithSidecar};
     use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, bytes, PrimitiveSignature as Signature, U256};
@@ -1011,7 +1017,7 @@ mod tests {
             max_fee_per_blob_gas: 1,
             input: Default::default(),
         };
-        let sidecar = BlobTransactionSidecar {
+        let sidecar = BlobTransactionSidecarEip4844 {
             blobs: vec![[2; 131072].into()],
             commitments: vec![[3; 48].into()],
             proofs: vec![[4; 48].into()],
@@ -1023,7 +1029,7 @@ mod tests {
         let expected_signed = tx.clone().into_signed(signature);
 
         // change the sidecar, adding a single (blob, commitment, proof) pair
-        tx.sidecar = BlobTransactionSidecar {
+        tx.sidecar = BlobTransactionSidecarEip4844 {
             blobs: vec![[1; 131072].into()],
             commitments: vec![[1; 48].into()],
             proofs: vec![[1; 48].into()],

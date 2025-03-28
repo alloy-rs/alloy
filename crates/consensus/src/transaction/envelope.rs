@@ -1044,7 +1044,7 @@ mod tests {
     use alloc::vec::Vec;
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},
-        eip4844::BlobTransactionSidecar,
+        eip4844::BlobTransactionSidecarEip4844,
         eip7702::Authorization,
     };
     use alloy_primitives::{
@@ -1316,7 +1316,7 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let sidecar = BlobTransactionSidecar {
+        let sidecar = BlobTransactionSidecarEip4844 {
             blobs: vec![[2; 131072].into()],
             commitments: vec![[3; 48].into()],
             proofs: vec![[4; 48].into()],

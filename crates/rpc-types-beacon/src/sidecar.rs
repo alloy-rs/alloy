@@ -1,5 +1,5 @@
 use crate::header::Header;
-use alloy_eips::eip4844::{deserialize_blob, Blob, BlobTransactionSidecar, Bytes48};
+use alloy_eips::eip4844::{deserialize_blob, Blob, Bytes48, BlobTransactionSidecarEip4844};
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -67,7 +67,7 @@ impl SidecarIterator {
     }
 
     /// Returns a BlobTransactionSidecar of len num_hashes.
-    pub fn next_sidecar(&mut self, num_hashes: usize) -> Option<BlobTransactionSidecar> {
+    pub fn next_sidecar(&mut self, num_hashes: usize) -> Option<BlobTransactionSidecarEip4844> {
         let mut blobs = Vec::with_capacity(num_hashes);
         let mut commitments = Vec::with_capacity(num_hashes);
         let mut proofs = Vec::with_capacity(num_hashes);
@@ -77,7 +77,7 @@ impl SidecarIterator {
             commitments.push(next.kzg_commitment);
             proofs.push(next.kzg_proof);
         }
-        Some(BlobTransactionSidecar { blobs, commitments, proofs })
+        Some(BlobTransactionSidecarEip4844 { blobs, commitments, proofs })
     }
 }
 

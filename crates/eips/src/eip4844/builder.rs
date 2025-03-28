@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "kzg")]
 use crate::eip4844::env_settings::EnvKzgSettings;
 #[cfg(any(feature = "kzg", feature = "arbitrary"))]
-use crate::eip4844::BlobTransactionSidecar;
+use crate::eip4844::BlobTransactionSidecarEip4844;
 #[cfg(feature = "kzg")]
 use crate::eip4844::Bytes48;
 use core::cmp;
@@ -304,8 +304,8 @@ where
 #[cfg(feature = "arbitrary")]
 impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
     /// Builds an arbitrary realization for BlobTransactionSidecar.
-    pub fn build_arbitrary(&self) -> BlobTransactionSidecar {
-        <BlobTransactionSidecar as arbitrary::Arbitrary>::arbitrary(
+    pub fn build_arbitrary(&self) -> BlobTransactionSidecarEip4844 {
+        <BlobTransactionSidecarEip4844 as arbitrary::Arbitrary>::arbitrary(
             &mut arbitrary::Unstructured::new(&[]),
         )
         .unwrap()
@@ -377,7 +377,7 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     pub fn build_with_settings(
         self,
         settings: &c_kzg::KzgSettings,
-    ) -> Result<BlobTransactionSidecar, c_kzg::Error> {
+    ) -> Result<BlobTransactionSidecarEip4844, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in &self.inner.blobs {
@@ -394,13 +394,13 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
             }
         }
 
-        Ok(BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
+        Ok(BlobTransactionSidecarEip4844::new(self.inner.blobs, commitments, proofs))
     }
 
     /// Build the sidecar from the data, with default (Ethereum Mainnet)
     /// settings.
     #[cfg(feature = "kzg")]
-    pub fn build(self) -> Result<BlobTransactionSidecar, c_kzg::Error> {
+    pub fn build(self) -> Result<BlobTransactionSidecarEip4844, c_kzg::Error> {
         self.build_with_settings(EnvKzgSettings::Default.get())
     }
 

@@ -69,7 +69,7 @@ serde_json.workspace = true
 rand.workspace = true
 
 [features]
-default = ["std", "kzg-sidecar"]
+default = ["std", "kzg-sidecar", "kzg"]
 std = [
 	"alloy-primitives/std",
 	"alloy-rlp/std",
