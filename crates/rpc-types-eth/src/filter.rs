@@ -38,6 +38,14 @@ impl BloomFilter {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
+impl FilterSet<Topic> {
+    /// Extends the filter set with a value that can be converted into a Topic
+    pub fn extend<T: Into<Topic>>(mut self, value: T) -> Self {
+        self.0.insert(value.into());
+        self
+    }
+}
+
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
         Self(core::iter::once(src).collect())
@@ -1760,5 +1768,25 @@ mod tests {
         assert!(!filter.is_pending_block_filter());
         let filter_params = FilteredParams::new(Some(filter));
         assert!(!filter_params.is_pending_block_filter());
+    }
+
+    #[test]
+    fn test_filter_set_topic_extend() {
+        let mut filter_set = FilterSet::<Topic>::default();
+
+        // extending with different types that can be converted into Topic
+        filter_set = filter_set
+            .extend(U256::from(123))
+            .extend(Address::random())
+            .extend(true)
+            .extend([0u8; 32]);
+
+        assert_eq!(filter_set.0.len(), 4);
+
+        filter_set = filter_set.extend(U256::from(123));
+        assert_eq!(filter_set.0.len(), 4);
+
+        filter_set = filter_set.extend(U256::from(456));
+        assert_eq!(filter_set.0.len(), 5);
     }
 }
