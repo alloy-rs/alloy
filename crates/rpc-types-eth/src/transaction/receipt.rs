@@ -174,7 +174,7 @@ impl TransactionReceipt {
     /// Returns None, if none of the logs could be decoded to the provided log type or if there
     /// are no logs.
     pub fn decoded_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
-        self.logs().iter().find_map(|log| E::decode_log(&log.inner, false).ok())
+        self.logs().iter().find_map(|log| E::decode_log(&log.inner).ok())
     }
 }
 
