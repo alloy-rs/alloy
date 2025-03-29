@@ -152,6 +152,28 @@ impl From<U256> for Topic {
     }
 }
 
+impl From<Address> for Topic {
+    fn from(address: Address) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[12..].copy_from_slice(address.as_slice());
+        B256::from(bytes).into()
+    }
+}
+
+impl From<bool> for Topic {
+    fn from(value: bool) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[31] = if value { 1 } else { 0 };
+        B256::from(bytes).into()
+    }
+}
+
+impl From<[u8; 32]> for Topic {
+    fn from(bytes: [u8; 32]) -> Self {
+        B256::from(bytes).into()
+    }
+}
+
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum FilterBlockError {
