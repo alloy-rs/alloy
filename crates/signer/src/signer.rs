@@ -228,36 +228,24 @@ mod tests {
         }
 
         async fn test_unsized_unimplemented_signer<S: Signer + ?Sized + Send + Sync>(s: &S) {
-            assert_matches!(
-                s.sign_hash(&B256::ZERO).await,
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
-            );
+            assert_matches!(s.sign_hash(&B256::ZERO).await, Err(Error::SecurityRestriction { .. }));
 
-            assert_matches!(
-                s.sign_message(&[]).await,
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
-            );
+            assert_matches!(s.sign_message(&[]).await, Err(Error::SecurityRestriction { .. }));
 
             #[cfg(feature = "eip712")]
             assert_matches!(
                 s.sign_dynamic_typed_data(&TypedData::from_struct(&Eip712Data::default(), None))
                     .await,
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+                Err(Error::SecurityRestriction { .. })
             );
 
             assert_eq!(s.chain_id(), None);
         }
 
         fn test_unsized_unimplemented_signer_sync<S: SignerSync + ?Sized>(s: &S) {
-            assert_matches!(
-                s.sign_hash_sync(&B256::ZERO),
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
-            );
+            assert_matches!(s.sign_hash_sync(&B256::ZERO), Err(Error::SecurityRestriction { .. }));
 
-            assert_matches!(
-                s.sign_message_sync(&[]),
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
-            );
+            assert_matches!(s.sign_message_sync(&[]), Err(Error::SecurityRestriction { .. }));
 
             #[cfg(feature = "eip712")]
             assert_matches!(
@@ -265,7 +253,7 @@ mod tests {
                     &Eip712Data::default(),
                     None
                 )),
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+                Err(Error::SecurityRestriction { .. })
             );
 
             assert_eq!(s.chain_id_sync(), None);
@@ -277,7 +265,10 @@ mod tests {
         #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
         impl Signer for UnimplementedSigner {
             async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+                Err(Error::SecurityRestriction {
+                    operation: UnsupportedSignerOperation::SignHash,
+                    reason: "Blind-signing hashes is disabled".to_string(),
+                })
             }
 
             fn address(&self) -> Address {
@@ -293,7 +284,10 @@ mod tests {
 
         impl SignerSync for UnimplementedSigner {
             fn sign_hash_sync(&self, _hash: &B256) -> Result<Signature> {
-                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+                Err(Error::SecurityRestriction {
+                    operation: UnsupportedSignerOperation::SignHash,
+                    reason: "Blind-signing hashes is disabled".to_string(),
+                })
             }
 
             fn chain_id_sync(&self) -> Option<ChainId> {
