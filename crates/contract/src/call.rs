@@ -11,7 +11,7 @@ use alloy_primitives::{Address, Bytes, ChainId, PrimitiveSignature as Signature,
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::{self, marker::PhantomData, future::IntoFuture};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -562,7 +562,7 @@ impl<T, P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
     /// the address of the deployed contract after the transaction has been confirmed.
     ///
     /// Returns an error if the transaction is not a deployment transaction, or if the contract
-    /// address is not found in the deployment transaction’s receipt.
+    /// address is not found in the deployment transaction's receipt.
     ///
     /// For more fine-grained control over the deployment process, use [`send`](Self::send) instead.
     ///
@@ -617,6 +617,52 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
             .field("state", &self.state)
             .field("decoder", &self.decoder.as_debug_field())
             .finish()
+    }
+}
+
+/// Implementation of the `IntoFuture` trait for `CallBuilder`, which allows using
+/// `CallBuilder` directly in an `await` expression.
+///
+/// This is equivalent to calling `.call()` on the builder.
+///
+/// # Example
+///
+/// ```no_run
+/// # async fn example<P: alloy_provider::Provider>(provider: P) -> Result<(), Box<dyn std::error::Error>> {
+/// use alloy_contract::SolCallBuilder;
+/// use alloy_primitives::{Address, U256};
+/// use alloy_sol_types::sol;
+/// use std::future::IntoFuture;
+///
+/// sol! {
+///     #[sol(rpc)]
+///     contract MyContract {
+///         function doStuff(uint a, bool b) public returns(address c, bytes32 d);
+///     }
+/// }
+///
+/// # stringify!(
+/// let provider = ...;
+/// # );
+/// let address = Address::ZERO;
+/// let contract = MyContract::new(address, &provider);
+///
+/// let a = U256::ZERO;
+/// let b = true;
+/// let builder = contract.doStuff(a, b);
+///
+/// // These are equivalent:
+/// let result1 = builder.call().await?;
+/// let result2 = builder.await?;
+/// # Ok(())
+/// # }
+/// ```
+impl<T, P: Provider<N>, D: CallDecoder, N: Network> IntoFuture for CallBuilder<T, P, D, N> {
+    type Output = Result<D::CallOutput>;
+    type IntoFuture = EthCall<'static, D, N>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        self.call()
     }
 }
 
