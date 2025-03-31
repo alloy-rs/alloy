@@ -21,7 +21,7 @@ pub struct Fillers<T, N = Ethereum> {
 
 impl<N: Network> Default for Fillers<Empty, N> {
     fn default() -> Self {
-        Fillers { fillers: FillerTuple::new(Empty) }
+        Self { fillers: FillerTuple::new(Empty) }
     }
 }
 
@@ -341,52 +341,31 @@ impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
-// Implement From for tuple types
+/// Macro to implement From for FillerTuple of different sizes
+macro_rules! impl_filler_tuple_from {
+    ($($idx:tt => $ty:ident),+) => {
+        impl<$($ty: TxFiller<N>,)+ T: TxFiller<N>, N: Network> From<(($($ty,)+), T)> for FillerTuple<($($ty,)+ T,), N> {
+            fn from((tuple, t): (($($ty,)+), T)) -> Self {
+                FillerTuple::new(($(tuple.$idx,)+ t))
+            }
+        }
+    };
+}
+
+// Generate implementations for tuples from 1 to 8 fillers
+impl_filler_tuple_from!(0 => T1);
+impl_filler_tuple_from!(0 => T1, 1 => T2);
+impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3);
+impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
+impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
+impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
+impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
+impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
+
+// Special case for Empty
 impl<T: TxFiller<N>, N: Network> From<(Empty, T)> for FillerTuple<(T,), N> {
     fn from((_, t): (Empty, T)) -> Self {
-        FillerTuple::new((t,))
-    }
-}
-
-impl<T: TxFiller<N>, N: Network> From<((T,),)> for FillerTuple<(T,), N> {
-    fn from(value: ((T,),)) -> Self {
-        FillerTuple::new(value.0)
-    }
-}
-
-impl<L: TxFiller<N>, R: TxFiller<N>, N: Network> From<((L,), R)> for FillerTuple<(L, R), N> {
-    fn from((l, r): ((L,), R)) -> Self {
-        FillerTuple::new((l.0, r))
-    }
-}
-
-impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, N: Network> From<((A, B), C)>
-    for FillerTuple<(A, B, C), N>
-{
-    fn from((ab, c): ((A, B), C)) -> Self {
-        FillerTuple::new((ab.0, ab.1, c))
-    }
-}
-
-impl<A: TxFiller<N>, B: TxFiller<N>, C: TxFiller<N>, D: TxFiller<N>, N: Network>
-    From<((A, B, C), D)> for FillerTuple<(A, B, C, D), N>
-{
-    fn from((abc, d): ((A, B, C), D)) -> Self {
-        FillerTuple::new((abc.0, abc.1, abc.2, d))
-    }
-}
-
-impl<
-        A: TxFiller<N>,
-        B: TxFiller<N>,
-        C: TxFiller<N>,
-        D: TxFiller<N>,
-        E: TxFiller<N>,
-        N: Network,
-    > From<((A, B, C, D), E)> for FillerTuple<(A, B, C, D, E), N>
-{
-    fn from((abcd, e): ((A, B, C, D), E)) -> Self {
-        FillerTuple::new((abcd.0, abcd.1, abcd.2, abcd.3, e))
+        Self::new((t,))
     }
 }
 

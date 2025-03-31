@@ -51,8 +51,9 @@ use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
-mod filler;
-pub use filler::{FillerNetwork, FillerTuple, Fillers, Pushable, TuplePush};
+#[allow(clippy::module_inception)]
+mod fillers;
+pub use fillers::{FillerNetwork, FillerTuple, Fillers, Pushable, TuplePush};
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
