@@ -668,15 +668,6 @@ pub trait RecommendedFillers: Network {
     fn recommended_fillers() -> Self::RecommendedFillers;
 }
 
-// impl RecommendedFillers for Ethereum {
-//     type RecommendedFillers =
-//         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
-
-//     fn recommended_fillers() -> Self::RecommendedFillers {
-//         Default::default()
-//     }
-// }
-
 impl RecommendedFillers for Ethereum {
     type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
@@ -688,15 +679,6 @@ impl RecommendedFillers for Ethereum {
             .push(ChainIdFiller::default())
     }
 }
-
-// impl RecommendedFillers for AnyNetwork {
-//     type RecommendedFillers =
-//         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
-
-//     fn recommended_fillers() -> Self::RecommendedFillers {
-//         Default::default()
-//     }
-// }
 
 impl RecommendedFillers for AnyNetwork {
     type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
