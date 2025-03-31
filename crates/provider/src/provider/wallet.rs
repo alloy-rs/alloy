@@ -1,5 +1,5 @@
 use crate::{
-    fillers::{FillProvider, FillerTuple, Fillers, TxFiller, WalletFiller},
+    fillers::{FillProvider, TxFiller, WalletFiller},
     Provider,
 };
 use alloy_network::{Ethereum, Network, NetworkWallet};
