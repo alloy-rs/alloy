@@ -55,6 +55,8 @@ use std::marker::PhantomData;
 mod fillers;
 pub use fillers::{FillerNetwork, FillerTuple, Fillers, Pushable, TuplePush};
 
+mod macros;
+
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
 pub type RecommendedFiller =
