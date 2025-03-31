@@ -38,6 +38,11 @@ impl<T, N: Network> Fillers<T, N> {
     {
         Fillers { fillers: FillerTuple::from((self.fillers.inner, filler)) }
     }
+
+    /// Change the network that is associated with the fillers
+    pub fn network<Net: Network>(self) -> Fillers<T, Net> {
+        Fillers { fillers: self.fillers.network::<Net>() }
+    }
 }
 
 pub trait Pushable<F: TxFiller<N>, N: Network> {
@@ -74,6 +79,43 @@ impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
     }
 }
 
+pub trait FillerNetwork<N> {
+    type CurrentFillers;
+
+    fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net>;
+}
+
+impl<N: Network> FillerNetwork<N> for crate::Identity {
+    type CurrentFillers = Empty;
+
+    fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net> {
+        Fillers::default()
+    }
+}
+
+/// Macro to implement FillerNetwork for tuples of different sizes
+macro_rules! impl_filler_network {
+    ($($idx:tt => $ty:ident),+) => {
+        impl<$($ty,)+ N: Network> FillerNetwork<N> for Fillers<($($ty,)+), N> {
+            type CurrentFillers = ($($ty,)+);
+
+            fn network<Net: Network>(self) -> Fillers<($($ty,)+), Net> {
+                self.network::<Net>()
+            }
+        }
+    };
+}
+
+// Generate implementations for tuples from 1 to 8 fillers
+impl_filler_network!(0 => T1);
+impl_filler_network!(0 => T1, 1 => T2);
+impl_filler_network!(0 => T1, 1 => T2, 2 => T3);
+impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
+impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
+impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
+impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
+impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
+
 /// A trait for tuples that can have types pushed to them
 pub trait TuplePush<T, N = Ethereum> {
     /// The resulting type after pushing T
@@ -90,6 +132,10 @@ pub struct FillerTuple<T, N = Ethereum> {
 impl<T, N: Network> FillerTuple<T, N> {
     fn new(inner: T) -> Self {
         Self { inner, _network: PhantomData }
+    }
+
+    fn network<Net: Network>(self) -> FillerTuple<T, Net> {
+        FillerTuple { inner: self.inner, _network: PhantomData }
     }
 }
 

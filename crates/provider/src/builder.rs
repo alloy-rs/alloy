@@ -275,10 +275,13 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, Fillers<F, Net>, Net> {
+    pub fn network<Net: Network>(self) -> ProviderBuilder<L, Fillers<F::CurrentFillers, Net>, Net>
+    where
+        F: fillers::FillerNetwork<N>,
+    {
         ProviderBuilder {
             layer: self.layer,
-            filler: Fillers::<_, Net>::new(self.filler),
+            filler: self.filler.network::<Net>(),
             network: PhantomData,
         }
     }

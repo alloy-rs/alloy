@@ -1953,29 +1953,29 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // TODO: Fix .network for the Fillers stack.
-    // async fn any_network_wallet_filler() {
-    //     use alloy_serde::WithOtherFields;
-    //     let anvil = Anvil::new().spawn();
-    //     let signer: PrivateKeySigner =
-    //         "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().
-    // unwrap();     let wallet = EthereumWallet::from(signer);
+    #[tokio::test]
+    async fn any_network_wallet_filler() {
+        use alloy_serde::WithOtherFields;
+        let anvil = Anvil::new().spawn();
+        let signer: PrivateKeySigner =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
+        let wallet = EthereumWallet::from(signer);
 
-    //     let provider =
-    // ProviderBuilder::new().network::<AnyNetwork>().on_http(anvil.endpoint_url());     //
-    // .network::<AnyNetwork>()     //.wallet(wallet)
+        let provider = ProviderBuilder::new()
+            .network::<AnyNetwork>()
+            .wallet(wallet)
+            .on_http(anvil.endpoint_url());
 
-    //     let tx = TransactionRequest::default()
-    //         .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"))
-    //         .value(U256::from(325235));
+        let tx = TransactionRequest::default()
+            .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"))
+            .value(U256::from(325235));
 
-    //     let tx = WithOtherFields::new(tx);
+        let tx = WithOtherFields::new(tx);
 
-    //     let builder = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+        let builder = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
-    //     assert!(builder.status());
-    // }
+        assert!(builder.status());
+    }
     #[tokio::test]
     async fn builtin_connect_boxed() {
         let anvil = Anvil::new().spawn();

@@ -54,8 +54,8 @@ use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
 mod filler_stack;
-pub(crate) use filler_stack::Pushable;
-pub use filler_stack::{Fillers, TuplePush, FillerTuple};
+pub(crate) use filler_stack::{FillerNetwork, Pushable};
+pub use filler_stack::{FillerTuple, Fillers, TuplePush};
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
@@ -694,8 +694,7 @@ pub trait RecommendedFillers: Network {
 // }
 
 impl RecommendedFillers for Ethereum {
-    type RecommendedFillers =
-        Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
+    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Fillers::default()
@@ -716,8 +715,7 @@ impl RecommendedFillers for Ethereum {
 // }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecommendedFillers =
-        Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
+    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Fillers::default()
