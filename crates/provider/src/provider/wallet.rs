@@ -71,55 +71,6 @@ where
     }
 }
 
-/// Implement WalletProvider for FillerTuple and Fillers where the last (idx) element is a
-/// WalletProvider
-macro_rules! impl_wallet_provider_at {
-    ($idx:tt => $($other:ident),*) => {
-        impl<$($other,)* W, N> WalletProvider<N>
-            for FillerTuple<($($other,)* W,), N>
-        where
-            W: WalletProvider<N>,
-            N: Network,
-        {
-            type Wallet = W::Wallet;
-
-            #[inline(always)]
-            fn wallet(&self) -> &Self::Wallet {
-                self.inner().$idx.wallet()
-            }
-
-            #[inline(always)]
-            fn wallet_mut(&mut self) -> &mut Self::Wallet {
-                self.inner_mut().$idx.wallet_mut()
-            }
-        }
-
-        impl<$($other,)* W, N>
-            WalletProvider<N> for Fillers<($($other,)* W,), N>
-        where
-            W: WalletProvider<N>,
-            N: Network,
-        {
-            type Wallet = W::Wallet;
-
-            #[inline(always)]
-            fn wallet(&self) -> &Self::Wallet {
-                self.fillers().wallet()
-            }
-
-            #[inline(always)]
-            fn wallet_mut(&mut self) -> &mut Self::Wallet {
-                self.fillers_mut().wallet_mut()
-            }
-        }
-    };
-}
-
-impl_wallet_provider_at!(0 => ); // (W,)
-impl_wallet_provider_at!(1 => T0); // (T0, W)
-impl_wallet_provider_at!(2 => T0, T1); // (T0, T1, W)
-impl_wallet_provider_at!(3 => T0, T1, T2); // (T0, T1, T2, W)
-impl_wallet_provider_at!(4 => T0, T1, T2, T3); // (T0, T1, T2, T3, W)
 #[cfg(test)]
 mod test {
     use super::*;

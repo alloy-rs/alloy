@@ -3,7 +3,7 @@ use crate::{
         FillProvider, FillerControlFlow, FillerNetwork, FillerTuple, Fillers, TuplePush, TxFiller,
     },
     provider::Provider,
-    Identity, ProviderLayer, SendableTx,
+    Identity, ProviderLayer, SendableTx, WalletProvider,
 };
 use alloy_network::Network;
 use alloy_transport::TransportResult;
@@ -179,3 +179,57 @@ impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
 impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
 impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
+
+/// Implement [`WalletProvider`] for [`FillerTuple`] and [`Fillers`] where the last (idx) element is
+/// a [`WalletProvider].
+macro_rules! impl_wallet_provider_at {
+    ($idx:tt => $($other:ident),*) => {
+        impl<$($other,)* W, N> WalletProvider<N>
+            for FillerTuple<($($other,)* W,), N>
+        where
+            W: WalletProvider<N>,
+            N: Network,
+        {
+            type Wallet = W::Wallet;
+
+            #[inline(always)]
+            fn wallet(&self) -> &Self::Wallet {
+                self.inner().$idx.wallet()
+            }
+
+            #[inline(always)]
+            fn wallet_mut(&mut self) -> &mut Self::Wallet {
+                self.inner_mut().$idx.wallet_mut()
+            }
+        }
+
+        impl<$($other,)* W, N>
+            WalletProvider<N> for Fillers<($($other,)* W,), N>
+        where
+            W: WalletProvider<N>,
+            N: Network,
+        {
+            type Wallet = W::Wallet;
+
+            #[inline(always)]
+            fn wallet(&self) -> &Self::Wallet {
+                self.fillers().wallet()
+            }
+
+            #[inline(always)]
+            fn wallet_mut(&mut self) -> &mut Self::Wallet {
+                self.fillers_mut().wallet_mut()
+            }
+        }
+    };
+}
+
+impl_wallet_provider_at!(0 => ); // (W,)
+impl_wallet_provider_at!(1 => T0); // (T0, W)
+impl_wallet_provider_at!(2 => T0, T1); // (T0, T1, W)
+impl_wallet_provider_at!(3 => T0, T1, T2); // (T0, T1, T2, W)
+impl_wallet_provider_at!(4 => T0, T1, T2, T3); // (T0, T1, T2, T3, W)
+impl_wallet_provider_at!(5 => T0, T1, T2, T3, T4);
+impl_wallet_provider_at!(6 => T0, T1, T2, T3, T4, T5);
+impl_wallet_provider_at!(7 => T0, T1, T2, T3, T4, T5, T6);
+impl_wallet_provider_at!(8 => T0, T1, T2, T3, T4, T5, T6, T7);
