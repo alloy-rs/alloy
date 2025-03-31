@@ -14,9 +14,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -37,15 +37,16 @@ alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 # kzg
-c-kzg = { workspace = true, optional = true }
+c-kzg = { workspace = true, optional = true, features = [
+	"ethereum_kzg_settings",
+] }
 derive_more = { workspace = true, features = [
-    "as_ref",
-    "deref",
-    "deref_mut",
-    "from",
-    "into_iterator",
+	"as_ref",
+	"deref",
+	"deref_mut",
+	"from",
+	"into_iterator",
 ], default-features = false }
-once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
 sha2 = { workspace = true, optional = true }
 
 # ssz
@@ -60,9 +61,9 @@ auto_impl.workspace = true
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
-    "rand",
-    "serde",
-    "arbitrary",
+	"rand",
+	"serde",
+	"arbitrary",
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -75,7 +76,6 @@ std = [
 	"alloy-rlp/std",
 	"serde?/std",
 	"c-kzg?/std",
-	"once_cell?/std",
 	"alloy-serde?/std",
 	"alloy-eip2124/std",
 	"alloy-eip2930/std",
@@ -83,7 +83,7 @@ std = [
 	"derive_more/std",
 	"serde_json/std",
 	"sha2?/std",
-	"either/std"
+	"either/std",
 ]
 serde = [
 	"dep:alloy-serde",
@@ -94,22 +94,22 @@ serde = [
 	"alloy-eip7702/serde",
 	"alloy-eip2124/serde",
 	"either/serde",
-	"rand/serde"
+	"rand/serde",
 ]
 serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
-kzg = ["kzg-sidecar", "sha2", "dep:c-kzg", "dep:once_cell"]
+kzg = ["kzg-sidecar", "sha2", "dep:c-kzg"]
 kzg-sidecar = ["sha2"]
 k256 = ["alloy-eip7702/k256"]
 sha2 = ["dep:sha2"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive"]
 arbitrary = [
-    "std",
-    "kzg-sidecar",
-    "dep:arbitrary",
-    "alloy-primitives/arbitrary",
-    "alloy-serde?/arbitrary",
-    "alloy-eip2124/arbitrary",
-    "alloy-eip2930/arbitrary",
-    "alloy-eip7702/arbitrary",
-    "alloy-eip7702/k256",
+	"std",
+	"kzg-sidecar",
+	"dep:arbitrary",
+	"alloy-primitives/arbitrary",
+	"alloy-serde?/arbitrary",
+	"alloy-eip2124/arbitrary",
+	"alloy-eip2930/arbitrary",
+	"alloy-eip7702/arbitrary",
+	"alloy-eip7702/k256",
 ]
