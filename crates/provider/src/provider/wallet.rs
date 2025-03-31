@@ -122,12 +122,12 @@ macro_rules! impl_wallet_provider_at {
 
             #[inline(always)]
             fn wallet(&self) -> &Self::Wallet {
-                self.fillers.wallet()
+                self.fillers().wallet()
             }
 
             #[inline(always)]
             fn wallet_mut(&mut self) -> &mut Self::Wallet {
-                self.fillers.wallet_mut()
+                self.fillers_mut().wallet_mut()
             }
         }
     };

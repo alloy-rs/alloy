@@ -16,7 +16,7 @@ pub struct Empty;
 #[derive(Debug, Clone)]
 pub struct Fillers<T, N = Ethereum> {
     /// The [`FillerTuple`] stores the tuple of [`TxFiller`]s
-    pub fillers: FillerTuple<T, N>,
+    fillers: FillerTuple<T, N>,
 }
 
 impl<N: Network> Default for Fillers<Empty, N> {
@@ -43,6 +43,22 @@ impl<T, N: Network> Fillers<T, N> {
     /// Change the [`Network`] that is associated with the fillers
     pub fn network<Net: Network>(self) -> Fillers<T, Net> {
         Fillers { fillers: self.fillers.network::<Net>() }
+    }
+
+    /// Access the inner [`FillerTuple`].
+    ///
+    /// Useful for implementing custom [`Provider`]s that require access to the inner tuple.
+    /// e.g. [`crate::WalletProvider`]
+    pub fn fillers(&self) -> &FillerTuple<T, N> {
+        &self.fillers
+    }
+
+    /// Mutable access to the inner [`FillerTuple`]
+    ///
+    /// Useful for implementing custom [`Provider`]s that require mutable access to the inner tuple.
+    /// e.g. [`crate::WalletProvider`]
+    pub fn fillers_mut(&mut self) -> &mut FillerTuple<T, N> {
+        &mut self.fillers
     }
 }
 
@@ -403,9 +419,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        fillers::{
-            BlobGasFiller, ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller,
-        },
+        fillers::{ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller},
         layers::AnvilProvider,
         ProviderBuilder, RootProvider,
     };
