@@ -445,9 +445,6 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 }
 
 #[cfg(any(test, feature = "anvil-node"))]
-type EthereumWalletFillers<F> = Fillers<(F, WalletFiller<alloy_network::EthereumWallet>), Ethereum>;
-
-#[cfg(any(test, feature = "anvil-node"))]
 type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 
 // Enabled when the `anvil` feature is enabled, or when both in test and the
@@ -470,14 +467,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// use in tests.
     pub fn on_anvil_with_wallet(
         self,
-    ) -> <EthereumWalletFillers<F> as ProviderLayer<L::Provider>>::Provider
+    ) -> <Fillers<F::Pushed, Ethereum> as ProviderLayer<L::Provider>>::Provider
     where
-        F: TxFiller<Ethereum>
-            + fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>
-            + ProviderLayer<L::Provider, Ethereum>,
+        F: fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
+        Fillers<F::Pushed, Ethereum>: ProviderLayer<L::Provider> + TxFiller<Ethereum>,
     {
         self.on_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
@@ -508,14 +504,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> AnvilProviderResult<<EthereumWalletFillers<F> as ProviderLayer<L::Provider>>::Provider>
+    ) -> AnvilProviderResult<<Fillers<F::Pushed, Ethereum> as ProviderLayer<L::Provider>>::Provider>
     where
-        F: TxFiller<Ethereum>
-            + fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>
-            + ProviderLayer<L::Provider, Ethereum>,
+        F: fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<crate::provider::RootProvider>,
         >,
+        Fillers<F::Pushed, Ethereum>: ProviderLayer<L::Provider> + TxFiller<Ethereum>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
@@ -527,7 +522,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
         let rpc_client = ClientBuilder::default().http(url);
 
-        let p = self.wallet(wallet).layer(anvil_layer).on_client(rpc_client);
+        let p = self.layer(anvil_layer).wallet(wallet).on_client(rpc_client);
 
         Ok(p)
     }

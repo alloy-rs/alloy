@@ -40,7 +40,7 @@ impl<T, N: Network> Fillers<T, N> {
     }
 }
 
-pub(crate) trait Pushable<F: TxFiller<N>, N: Network> {
+pub trait Pushable<F: TxFiller<N>, N: Network> {
     type Pushed;
 
     fn push(self, filler: F) -> Fillers<Self::Pushed, N>
@@ -312,7 +312,8 @@ mod tests {
         fillers::{
             BlobGasFiller, ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller,
         },
-        ProviderBuilder,
+        layers::AnvilProvider,
+        ProviderBuilder, RootProvider,
     };
 
     #[test]
@@ -332,10 +333,31 @@ mod tests {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
+        type AnvilWalletFiller = FillProvider<
+            Fillers<
+                (
+                    GasFiller,
+                    BlobGasFiller,
+                    NonceFiller,
+                    ChainIdFiller,
+                    WalletFiller<EthereumWallet>,
+                ),
+                Ethereum,
+            >,
+            AnvilProvider<RootProvider>,
+        >;
+
         // Basic works
         let _provider = ProviderBuilder::new().on_anvil();
 
         // With wallet
-        let _provider = ProviderBuilder::new().wallet(pk).on_anvil();
+        let _provider: AnvilWalletFiller = ProviderBuilder::new().wallet(pk).on_anvil();
+
+        // With anvil wallet
+        let _provider: AnvilWalletFiller = ProviderBuilder::new().on_anvil_with_wallet();
+
+        // With anvil wallet and config
+        let _provider: AnvilWalletFiller =
+            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.block_time(1)).unwrap();
     }
 }
