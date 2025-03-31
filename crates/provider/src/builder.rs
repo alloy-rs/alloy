@@ -245,6 +245,23 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             network: PhantomData,
         }
     }
+
+    /// Add a wallet layer to the stack being built.
+    ///
+    /// See [`WalletFiller`].
+    pub fn wallet<W: IntoWallet<N>>(self, wallet: W) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
+    where
+        F: Pushable<WalletFiller<W::NetworkWallet>, N>,
+        W::NetworkWallet: Clone,
+    {
+        let wallet_filler = WalletFiller::new(wallet.into_wallet());
+
+        ProviderBuilder {
+            layer: self.layer,
+            filler: self.filler.push(wallet_filler),
+            network: PhantomData,
+        }
+    }
 }
 
 impl<L, F, N> ProviderBuilder<L, F, N> {
@@ -427,25 +444,6 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
-impl<L, F, N: Network> ProviderBuilder<L, F, N> {
-    /// Add a wallet layer to the stack being built.
-    ///
-    /// See [`WalletFiller`].
-    pub fn wallet<W: IntoWallet<N>>(self, wallet: W) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
-    where
-        F: fillers::Pushable<WalletFiller<W::NetworkWallet>, N>,
-        W::NetworkWallet: Clone,
-    {
-        let wallet_filler = WalletFiller::new(wallet.into_wallet());
-
-        ProviderBuilder {
-            layer: self.layer,
-            filler: self.filler.push(wallet_filler),
-            network: PhantomData,
-        }
-    }
-}
-
 #[cfg(any(test, feature = "anvil-node"))]
 type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 
@@ -525,9 +523,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
         let rpc_client = ClientBuilder::default().http(url);
 
-        let p = self.layer(anvil_layer).wallet(wallet).on_client(rpc_client);
-
-        Ok(p)
+        Ok(self.layer(anvil_layer).wallet(wallet).on_client(rpc_client))
     }
 }
 
