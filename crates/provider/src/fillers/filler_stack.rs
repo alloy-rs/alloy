@@ -15,7 +15,7 @@ pub struct Empty;
 /// A stack of transaction fillers
 #[derive(Debug, Clone)]
 pub struct Fillers<T, N = Ethereum> {
-    fillers: FillerTuple<T, N>,
+    pub fillers: FillerTuple<T, N>,
 }
 
 impl<N: Network> Default for Fillers<Empty, N> {
@@ -83,7 +83,7 @@ pub trait TuplePush<T, N = Ethereum> {
 /// Newtype wrapper for tuple conversions
 #[derive(Debug, Clone)]
 pub struct FillerTuple<T, N = Ethereum> {
-    inner: T,
+    pub inner: T,
     _network: PhantomData<N>,
 }
 
