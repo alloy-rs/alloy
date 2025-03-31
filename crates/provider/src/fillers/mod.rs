@@ -694,12 +694,11 @@ pub trait RecommendedFillers: Network {
 // }
 
 impl RecommendedFillers for Ethereum {
-    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
+    type RecommendedFillers = Fillers<(GasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Fillers::default()
             .push(GasFiller)
-            .push(BlobGasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
             .push(ChainIdFiller::default())
     }
@@ -715,12 +714,11 @@ impl RecommendedFillers for Ethereum {
 // }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
+    type RecommendedFillers = Fillers<(GasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Fillers::default()
             .push(GasFiller)
-            .push(BlobGasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
             .push(ChainIdFiller::default())
     }

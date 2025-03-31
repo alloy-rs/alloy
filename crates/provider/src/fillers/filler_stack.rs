@@ -367,8 +367,7 @@ mod tests {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
-        // Type should be Fillers<(GasFiller, NonceFiller, ChainIdFiller)>
-        let recommend: Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Ethereum> =
+        let recommend: Fillers<(GasFiller, NonceFiller, ChainIdFiller), Ethereum> =
             Ethereum::recommended_fillers();
 
         let _full_stack = recommend.push(WalletFiller::new(EthereumWallet::from(pk)));
@@ -380,16 +379,7 @@ mod tests {
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
         type AnvilWalletFiller = FillProvider<
-            Fillers<
-                (
-                    GasFiller,
-                    BlobGasFiller,
-                    NonceFiller,
-                    ChainIdFiller,
-                    WalletFiller<EthereumWallet>,
-                ),
-                Ethereum,
-            >,
+            Fillers<(GasFiller, NonceFiller, ChainIdFiller, WalletFiller<EthereumWallet>)>,
             AnvilProvider<RootProvider>,
         >;
 
