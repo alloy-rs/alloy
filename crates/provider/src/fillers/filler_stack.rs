@@ -15,6 +15,7 @@ pub struct Empty;
 /// A stack of transaction fillers
 #[derive(Debug, Clone)]
 pub struct Fillers<T, N = Ethereum> {
+    /// The [`FillerTuple`] stores the tuple of [`TxFiller`]s
     pub fillers: FillerTuple<T, N>,
 }
 
@@ -26,6 +27,7 @@ impl<N: Network> Default for Fillers<Empty, N> {
 
 // Implement methods for all Fillers variants
 impl<T, N: Network> Fillers<T, N> {
+    /// Instatiate a new [`Fillers`] stack with
     pub fn new(filler: T) -> Self {
         Self { fillers: FillerTuple::new(filler) }
     }
@@ -45,9 +47,25 @@ impl<T, N: Network> Fillers<T, N> {
     }
 }
 
+/// A trait that enables pushing new fillers onto a filler stack.
+///
+/// Useful for building a stack of fillers when the filler type is unknown in [`ProviderBuilder`].
+///
+/// See usage in [`ProviderBuilder::filler`] and [`ProviderBuilder::wallet`].
+///
+///
+/// [`ProviderBuilder`]: crate::builder::ProviderBuilder
+/// [`ProviderBuilder::filler`]: crate::builder::ProviderBuilder::filler
+/// [`ProviderBuilder::wallet`]: crate::builder::ProviderBuilder::wallet
 pub trait Pushable<F: TxFiller<N>, N: Network> {
+    /// The resulting type after pushing the [`TxFiller`] onto the stack
     type Pushed;
 
+    /// Push a new filler onto the stack
+    ///
+    /// ## Returns
+    ///
+    /// A [`Fillers`] instance with the pushed filler
     fn push(self, filler: F) -> Fillers<Self::Pushed, N>
     where
         Self: Sized;
@@ -79,7 +97,13 @@ impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
     }
 }
 
+/// A trait that changes the network associated with the [`Fillers`] stack.
 pub trait FillerNetwork<N> {
+    /// The current tuple of fillers in the stack.
+    ///
+    /// e.g. `(GasFiller, NonceFiller, ChainIdFiller)`
+    ///
+    /// OR in case of [`crate:Identity`]: [`Empty`]
     type CurrentFillers;
 
     fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net>;
