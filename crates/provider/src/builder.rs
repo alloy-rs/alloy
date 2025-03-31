@@ -169,7 +169,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, Fillers<(GasFiller,), N>, N> {
         ProviderBuilder {
             layer: self.layer,
-            filler: Fillers::new((GasFiller::default(),)),
+            filler: Fillers::new((GasFiller,)),
             network: PhantomData,
         }
     }
@@ -503,6 +503,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
     /// Build this provider with anvil, using the BoxTransport.
     /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    #[allow(clippy::type_complexity)]
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
