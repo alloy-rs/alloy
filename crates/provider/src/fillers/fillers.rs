@@ -1,16 +1,12 @@
 use crate::{
     fillers::{FillProvider, FillerControlFlow, TxFiller},
     provider::Provider,
-    ProviderLayer, SendableTx,
+    Identity, ProviderLayer, SendableTx,
 };
 use alloy_network::{Ethereum, Network};
 use alloy_transport::TransportResult;
 use futures::try_join;
 use std::{fmt::Debug, marker::PhantomData};
-
-/// Empty filler stack state
-#[derive(Debug, Clone)]
-pub struct Empty;
 
 /// A stack of [`TxFiller`]'s.
 #[derive(Debug, Clone)]
@@ -19,9 +15,9 @@ pub struct Fillers<T, N = Ethereum> {
     fillers: FillerTuple<T, N>,
 }
 
-impl<N: Network> Default for Fillers<Empty, N> {
+impl<N: Network> Default for Fillers<Identity, N> {
     fn default() -> Self {
-        Self { fillers: FillerTuple::new(Empty) }
+        Self { fillers: FillerTuple::new(Identity) }
     }
 }
 
@@ -131,7 +127,7 @@ pub trait FillerNetwork<N> {
 }
 
 impl<N: Network> FillerNetwork<N> for crate::Identity {
-    type CurrentFillers = Empty;
+    type CurrentFillers = Self;
 
     fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net> {
         Fillers::default()
@@ -204,7 +200,7 @@ impl<T, N: Network> FillerTuple<T, N> {
 }
 
 // Implement TuplePush for Empty
-impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Empty {
+impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Identity {
     type Pushed = (T,);
 }
 
@@ -362,9 +358,9 @@ impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
 impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
-// Special case for Empty
-impl<T: TxFiller<N>, N: Network> From<(Empty, T)> for FillerTuple<(T,), N> {
-    fn from((_, t): (Empty, T)) -> Self {
+// Special case for Identity or default filler
+impl<T: TxFiller<N>, N: Network> From<(Identity, T)> for FillerTuple<(T,), N> {
+    fn from((_, t): (Identity, T)) -> Self {
         Self::new((t,))
     }
 }
