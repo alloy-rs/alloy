@@ -1,7 +1,5 @@
 use crate::{
-    fillers::{
-        FillProvider, FillerControlFlow, FillerNetwork, FillerTuple, Fillers, TuplePush, TxFiller,
-    },
+    fillers::{FillProvider, FillerControlFlow, FillerNetwork, Fillers, TuplePush, TxFiller},
     provider::Provider,
     Identity, ProviderLayer, SendableTx, WalletProvider,
 };
@@ -12,7 +10,7 @@ use futures::try_join;
 /// Macro to implement [`TxFiller`] for tuples of different sizes
 macro_rules! impl_tx_filler {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for FillerTuple<($($ty,)+), N> {
+        impl<$($ty: TxFiller<N>,)+ N: Network> TxFiller<N> for Fillers<($($ty,)+), N> {
             type Fillable = ($(Option<$ty::Fillable>,)+);
 
             fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
@@ -110,27 +108,35 @@ macro_rules! impl_tuple {
     };
 }
 
-/// Macro to implement [`From`] for [`FillerTuple`] of different sizes
+/// Macro to implement [`From`] for [`Fillers`] of different sizes
+///
+/// This is useful in [`Fillers::push`]
 ///
 /// Implements the following
 ///
 /// ```ignore
-/// impl<T: TxFiller<N>, N: Network> From<((T1, T2), T)> for FillerTuple<(T1, T2, T), N> // `T` is the new incoming filler being added to the tuple
-/// impl<T: TxFiller<N>, N: Network> From<((T1, T2, T3), T)> for FillerTuple<(T1, T2, T3, T), N>
+/// impl<T: TxFiller<N>, N: Network> From<((T1, T2), T)> for Fillers<(T1, T2, T), N> // `T` is the new incoming filler being added to the tuple
+/// impl<T: TxFiller<N>, N: Network> From<((T1, T2, T3), T)> for Fillers<(T1, T2, T3, T), N>
 /// ```
-macro_rules! impl_filler_tuple_from {
+macro_rules! impl_from {
     ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty: TxFiller<N>,)+ T: TxFiller<N>, N: Network> From<(($($ty,)+), T)> for FillerTuple<($($ty,)+ T,), N> {
+        impl<$($ty: TxFiller<N>,)+ T: TxFiller<N>, N: Network> From<(($($ty,)+), T)> for Fillers<($($ty,)+ T,), N> {
             fn from((tuple, t): (($($ty,)+), T)) -> Self {
-                FillerTuple::new(($(tuple.$idx,)+ t))
+                Fillers::new(($(tuple.$idx,)+ t))
             }
         }
     };
 }
 
-// Special case for Identity or default filler
-impl<T: TxFiller<N>, N: Network> From<(Identity, T)> for FillerTuple<(T,), N> {
+// Special cases
+impl<T: TxFiller<N>, N: Network> From<(Identity, T)> for Fillers<(T,), N> {
     fn from((_, t): (Identity, T)) -> Self {
+        Self::new((t,))
+    }
+}
+
+impl<T: TxFiller<N>, N: Network> From<T> for Fillers<(T,), N> {
+    fn from(t: T) -> Self {
         Self::new((t,))
     }
 }
@@ -162,14 +168,14 @@ impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
 impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
-impl_filler_tuple_from!(0 => T1);
-impl_filler_tuple_from!(0 => T1, 1 => T2);
-impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3);
-impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
-impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
-impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
-impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
-impl_filler_tuple_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
+impl_from!(0 => T1);
+impl_from!(0 => T1, 1 => T2);
+impl_from!(0 => T1, 1 => T2, 2 => T3);
+impl_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
+impl_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
+impl_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
+impl_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
+impl_from!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
 impl_tuple!(0 => T1);
 impl_tuple!(0 => T1, 1 => T2);
@@ -180,12 +186,12 @@ impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
 impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
 impl_tuple!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
 
-/// Implement [`WalletProvider`] for [`FillerTuple`] and [`Fillers`] where the last (idx) element is
+/// Implement [`WalletProvider`] for [`Fillers`] where the last (idx) element is
 /// a [`WalletProvider].
 macro_rules! impl_wallet_provider_at {
     ($idx:tt => $($other:ident),*) => {
         impl<$($other,)* W, N> WalletProvider<N>
-            for FillerTuple<($($other,)* W,), N>
+            for ($($other,)* W,)
         where
             W: WalletProvider<N>,
             N: Network,
@@ -194,12 +200,12 @@ macro_rules! impl_wallet_provider_at {
 
             #[inline(always)]
             fn wallet(&self) -> &Self::Wallet {
-                self.inner().$idx.wallet()
+                self.$idx.wallet()
             }
 
             #[inline(always)]
             fn wallet_mut(&mut self) -> &mut Self::Wallet {
-                self.inner_mut().$idx.wallet_mut()
+                self.$idx.wallet_mut()
             }
         }
 
@@ -213,12 +219,12 @@ macro_rules! impl_wallet_provider_at {
 
             #[inline(always)]
             fn wallet(&self) -> &Self::Wallet {
-                self.fillers().wallet()
+                self.inner().wallet()
             }
 
             #[inline(always)]
             fn wallet_mut(&mut self) -> &mut Self::Wallet {
-                self.fillers_mut().wallet_mut()
+                self.inner_mut().wallet_mut()
             }
         }
     };

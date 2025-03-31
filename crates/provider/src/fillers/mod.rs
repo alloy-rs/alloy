@@ -53,7 +53,7 @@ use std::marker::PhantomData;
 
 #[allow(clippy::module_inception)]
 mod fillers;
-pub use fillers::{FillerNetwork, FillerTuple, Fillers, Pushable, TuplePush};
+pub use fillers::{FillerNetwork, Fillers, Pushable, TuplePush};
 
 mod macros;
 
