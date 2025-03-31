@@ -12,7 +12,7 @@ use std::{fmt::Debug, marker::PhantomData};
 #[derive(Debug, Clone)]
 pub struct Empty;
 
-/// A stack of transaction fillers
+/// A stack of [`TxFiller`]'s.
 #[derive(Debug, Clone)]
 pub struct Fillers<T, N = Ethereum> {
     /// The [`FillerTuple`] stores the tuple of [`TxFiller`]s
@@ -25,14 +25,13 @@ impl<N: Network> Default for Fillers<Empty, N> {
     }
 }
 
-// Implement methods for all Fillers variants
 impl<T, N: Network> Fillers<T, N> {
     /// Instatiate a new [`Fillers`] stack with
     pub fn new(filler: T) -> Self {
         Self { fillers: FillerTuple::new(filler) }
     }
 
-    /// Push a new filler onto the stack
+    /// Push a new [`TxFiller`] onto the stack
     pub fn push<F: TxFiller<N>>(self, filler: F) -> Fillers<T::Pushed, N>
     where
         T: TuplePush<F, N>,
@@ -41,7 +40,7 @@ impl<T, N: Network> Fillers<T, N> {
         Fillers { fillers: FillerTuple::from((self.fillers.inner, filler)) }
     }
 
-    /// Change the network that is associated with the fillers
+    /// Change the [`Network`] that is associated with the fillers
     pub fn network<Net: Network>(self) -> Fillers<T, Net> {
         Fillers { fillers: self.fillers.network::<Net>() }
     }
@@ -98,6 +97,11 @@ impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
 }
 
 /// A trait that changes the network associated with the [`Fillers`] stack.
+///
+/// Useful for changing the network of the [`Provider`] being built using
+/// [`ProviderBuilder::network`].
+///
+/// [`ProviderBuilder::network`]: crate::builder::ProviderBuilder::network
 pub trait FillerNetwork<N> {
     /// The current tuple of fillers in the stack.
     ///
@@ -106,6 +110,7 @@ pub trait FillerNetwork<N> {
     /// OR in case of [`crate:Identity`]: [`Empty`]
     type CurrentFillers;
 
+    /// Change the network associated with the [`Fillers`] stack.
     fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net>;
 }
 
@@ -146,10 +151,10 @@ pub trait TuplePush<T, N = Ethereum> {
     type Pushed;
 }
 
-/// Newtype wrapper for tuple conversions
+/// Wrapper type for a tuple of [`TxFiller`]s
 #[derive(Debug, Clone)]
 pub struct FillerTuple<T, N = Ethereum> {
-    pub inner: T,
+    inner: T,
     _network: PhantomData<N>,
 }
 
@@ -158,8 +163,27 @@ impl<T, N: Network> FillerTuple<T, N> {
         Self { inner, _network: PhantomData }
     }
 
+    /// Change the [`Network`] associated with the [`FillerTuple`] stack.
+    ///
+    /// Used in conjunction with [`Fillers::network`] to change the network of the entire stack.
     fn network<Net: Network>(self) -> FillerTuple<T, Net> {
         FillerTuple { inner: self.inner, _network: PhantomData }
+    }
+
+    /// Get a reference to the inner tuple
+    ///
+    /// This is public for use in [`Provider`] implementations that require access to the inner
+    /// tuple. e.g [`crate::WalletProvider`].
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
+
+    /// Get a mutable reference to the inner tuple
+    ///
+    /// This is public for use in [`Provider`] implementations that require mutable access to the
+    /// inner tuple. e.g [`crate::WalletProvider`].
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 
