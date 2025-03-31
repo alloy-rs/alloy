@@ -46,7 +46,7 @@ impl<T, N: Network> Fillers<T, N> {
 
     /// Access the inner tuple.
     ///
-    /// Useful for implementing custom [`Provider`]s that require access to the inner tuple.
+    /// Useful for implementing custom [`crate::Provider`]s that require access to the inner tuple.
     /// e.g. [`crate::WalletProvider`]
     pub fn inner(&self) -> &T {
         &self.inner
@@ -54,8 +54,8 @@ impl<T, N: Network> Fillers<T, N> {
 
     /// Mutable access to the inner tuple.
     ///
-    /// Useful for implementing custom [`Provider`]s that require mutable access to the inner tuple.
-    /// e.g. [`crate::WalletProvider`]
+    /// Useful for implementing custom [`crate::Provider`]s that require mutable access to the inner
+    /// tuple. e.g. [`crate::WalletProvider`]
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -113,7 +113,7 @@ impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
 
 /// A trait that changes the network associated with the [`Fillers`] stack.
 ///
-/// Useful for changing the network of the [`Provider`] being built using
+/// Useful for changing the network of the provider being built using
 /// [`ProviderBuilder::network`].
 ///
 /// [`ProviderBuilder::network`]: crate::builder::ProviderBuilder::network
@@ -121,8 +121,6 @@ pub trait FillerNetwork<N> {
     /// The current tuple of fillers in the stack.
     ///
     /// e.g. `(GasFiller, NonceFiller, ChainIdFiller)`
-    ///
-    /// OR in case of [`crate:Identity`]: [`Empty`]
     type CurrentFillers;
 
     /// Change the network associated with the [`Fillers`] stack.

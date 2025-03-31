@@ -128,7 +128,7 @@ impl ProviderBuilder<Identity, <Ethereum as RecommendedFillers>::RecommendedFill
     /// management, and chain-id fetching.
     ///
     /// Building a provider with this setting enabled will return a [`crate::fillers::FillProvider`]
-    /// with [`crate::utils::JoinedRecommendedFillers`].
+    /// with [`crate::utils::RecommendedFillers`].
     ///
     /// You can opt-out of using these fillers by using the `.disable_recommended_fillers()` method.
     pub fn new() -> Self {
