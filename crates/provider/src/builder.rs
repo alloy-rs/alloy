@@ -1,8 +1,8 @@
 use crate::{
     fillers::{
         self, CachedNonceManager, ChainIdFiller, FillerControlFlow, FillerTuple, Fillers,
-        GasFiller, NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager, TuplePush,
-        TxFiller, WalletFiller,
+        GasFiller, NonceFiller, NonceManager, Pushable, RecommendedFillers, SimpleNonceManager,
+        TuplePush, TxFiller, WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
@@ -237,12 +237,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     /// and are all joined to form the outermost layer of the stack.
     pub fn filler<F2: TxFiller<N>>(self, filler: F2) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
     where
-        F: TuplePush<F2, N>,
-        FillerTuple<<F as TuplePush<F2, N>>::Pushed, N>: From<(F, F2)>,
+        F: Pushable<F2, N>,
     {
         ProviderBuilder {
             layer: self.layer,
-            filler: Fillers::new(self.filler).push(filler),
+            filler: self.filler.push(filler),
             network: PhantomData,
         }
     }
