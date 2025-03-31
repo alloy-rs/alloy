@@ -59,7 +59,7 @@ pub use filler_stack::{FillerNetwork, FillerTuple, Fillers, Pushable, TuplePush}
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
 pub type RecommendedFiller =
-    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
+    Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Ethereum>;
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -693,11 +693,12 @@ pub trait RecommendedFillers: Network {
 // }
 
 impl RecommendedFillers for Ethereum {
-    type RecommendedFillers = Fillers<(GasFiller, NonceFiller, ChainIdFiller), Self>;
+    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Fillers::default()
             .push(GasFiller)
+            .push(BlobGasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
             .push(ChainIdFiller::default())
     }
@@ -713,11 +714,12 @@ impl RecommendedFillers for Ethereum {
 // }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecommendedFillers = Fillers<(GasFiller, NonceFiller, ChainIdFiller), Self>;
+    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
         Fillers::default()
             .push(GasFiller)
+            .push(BlobGasFiller)
             .push(NonceFiller::new(SimpleNonceManager::default()))
             .push(ChainIdFiller::default())
     }

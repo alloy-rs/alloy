@@ -419,7 +419,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        fillers::{ChainIdFiller, GasFiller, NonceFiller, RecommendedFillers, WalletFiller},
+        fillers::{
+            BlobGasFiller, ChainIdFiller, GasFiller, NonceFiller, RecommendedFiller,
+            RecommendedFillers, WalletFiller,
+        },
         layers::AnvilProvider,
         ProviderBuilder, RootProvider,
     };
@@ -429,21 +432,21 @@ mod tests {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
-        let recommend: Fillers<(GasFiller, NonceFiller, ChainIdFiller), Ethereum> =
-            Ethereum::recommended_fillers();
+        let recommend: RecommendedFiller = Ethereum::recommended_fillers();
 
         let _full_stack = recommend.push(WalletFiller::new(EthereumWallet::from(pk)));
     }
+
+    type RecommendedWalletFillers =
+        (GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller, WalletFiller<EthereumWallet>);
 
     #[test]
     fn test_provider_builder() {
         let pk: PrivateKeySigner =
             "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
 
-        type AnvilWalletFiller = FillProvider<
-            Fillers<(GasFiller, NonceFiller, ChainIdFiller, WalletFiller<EthereumWallet>)>,
-            AnvilProvider<RootProvider>,
-        >;
+        type AnvilWalletFiller =
+            FillProvider<Fillers<RecommendedWalletFillers, Ethereum>, AnvilProvider<RootProvider>>;
 
         // Basic works
         let _provider = ProviderBuilder::new().on_anvil();
