@@ -73,8 +73,6 @@ pub mod serde_bincode_compat {
     pub use super::{
         block::serde_bincode_compat::*,
         receipt::serde_bincode_compat::*,
-        transaction::{
-            envelope_serde_bincode_compat as envelope, serde_bincode_compat as transaction,
-        },
+        transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
 }
