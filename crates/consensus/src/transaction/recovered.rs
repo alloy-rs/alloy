@@ -169,7 +169,7 @@ impl<T> Recovered<T> {
         let mut out = vec![];
         self.inner.encode_2718(&mut out);
 
-        WithEncoded::new(Bytes::from(out), self)
+        self.into_encoded_with(out)
     }
 }
 
