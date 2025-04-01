@@ -1123,7 +1123,7 @@ pub mod serde_bincode_compat {
                 EthereumTypedTransaction::Eip2930(tx) => Signed::new_unhashed(tx, signature).into(),
                 EthereumTypedTransaction::Eip1559(tx) => Signed::new_unhashed(tx, signature).into(),
                 EthereumTypedTransaction::Eip4844(tx) => {
-                    super::EthereumTxEnvelope::Eip4844(Signed::new_unhashed(tx, signature))
+                    Self::Eip4844(Signed::new_unhashed(tx, signature))
                 }
                 EthereumTypedTransaction::Eip7702(tx) => Signed::new_unhashed(tx, signature).into(),
             }
