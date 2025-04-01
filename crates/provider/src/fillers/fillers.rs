@@ -61,6 +61,12 @@ impl<T, N: Network> Fillers<T, N> {
     }
 }
 
+mod private {
+
+    /// Used to seal the Pushable trait.
+    #[allow(unnameable_types)]
+    pub trait Sealed {}
+}
 /// A trait that enables pushing new fillers onto a filler stack.
 ///
 /// Useful for building a stack of fillers when the filler type is unknown in [`ProviderBuilder`].
@@ -71,7 +77,7 @@ impl<T, N: Network> Fillers<T, N> {
 /// [`ProviderBuilder`]: crate::builder::ProviderBuilder
 /// [`ProviderBuilder::filler`]: crate::builder::ProviderBuilder::filler
 /// [`ProviderBuilder::wallet`]: crate::builder::ProviderBuilder::wallet
-pub trait Pushable<F: TxFiller<N>, N: Network> {
+pub trait Pushable<F: TxFiller<N>, N: Network>: private::Sealed {
     /// The resulting type after pushing the [`TxFiller`] onto the stack
     type Pushed;
 
@@ -84,6 +90,9 @@ pub trait Pushable<F: TxFiller<N>, N: Network> {
     where
         Self: Sized;
 }
+
+impl private::Sealed for crate::Identity {}
+impl<T, N: Network> private::Sealed for Fillers<T, N> {}
 
 impl<T, F: TxFiller<N>, N: Network> Pushable<F, N> for Fillers<T, N>
 where
