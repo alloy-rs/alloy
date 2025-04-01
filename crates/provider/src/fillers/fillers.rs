@@ -255,10 +255,23 @@ mod tests {
         }
 
         // With recommended fillers
-        let _p = ProviderBuilder::new().filler(InputFiller).on_anvil();
+        let _p: FillProvider<
+            Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller, InputFiller)>,
+            _,
+        > = ProviderBuilder::new().filler(InputFiller).on_anvil();
 
         // Without recommended fillers
-        let _p =
+        let _p: FillProvider<Fillers<(InputFiller,)>, _> =
             ProviderBuilder::new().disable_recommended_fillers().filler(InputFiller).on_anvil();
+
+        // With wallet
+        let pk: PrivateKeySigner =
+            "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".parse().unwrap();
+        let _p: FillProvider<Fillers<(InputFiller, WalletFiller<EthereumWallet>)>, _> =
+            ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .filler(InputFiller)
+                .wallet(pk)
+                .on_anvil();
     }
 }
