@@ -1038,6 +1038,257 @@ mod serde_from {
     }
 }
 
+/// Bincode-compatible serde implementations for transaction types
+///
+/// This module defines borrowed representations for signed transactions and
+/// a trait for converting to/from a bincode-friendly representation
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    use crate::{
+        transaction::{
+            serde_bincode_compat::{TxEip1559, TxEip2930, TxEip7702, TxLegacy},
+            TxEnvelope,
+        },
+        Signed, TxEip4844Variant,
+    };
+    use alloc::borrow::Cow;
+    use alloy_primitives::{PrimitiveSignature as Signature, B256};
+    use serde::{Deserialize, Serialize};
+    use std::fmt::Debug;
+    /// Borrowed view of a signed legacy transaction
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct BorrowedSignedTxLegacy<'a> {
+        /// Transaction hash
+        pub hash: B256,
+        /// Transaction signature
+        pub signature: Signature,
+        /// Legacy transaction data (borrowed)
+        pub transaction: TxLegacy<'a>,
+    }
+    impl<'a> From<&'a Signed<crate::transaction::TxLegacy>> for BorrowedSignedTxLegacy<'a> {
+        fn from(owned: &'a Signed<crate::transaction::TxLegacy>) -> Self {
+            Self {
+                hash: *owned.hash(),
+                signature: *owned.signature(),
+                transaction: TxLegacy::from(owned.tx()),
+            }
+        }
+    }
+    impl<'a> From<BorrowedSignedTxLegacy<'a>> for Signed<crate::transaction::TxLegacy> {
+        fn from(borrowed: BorrowedSignedTxLegacy<'a>) -> Self {
+            Signed::new_unchecked(borrowed.transaction.into(), borrowed.signature, borrowed.hash)
+        }
+    }
+
+    /// Borrowed view of a signed EIP-2930 transaction
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct BorrowedSignedTxEip2930<'a> {
+        /// Transaction hash
+        pub hash: B256,
+        /// Transaction signature
+        pub signature: Signature,
+        /// EIP-2930 transaction data (borrowed)
+        pub transaction: TxEip2930<'a>,
+    }
+    impl<'a> From<&'a Signed<crate::transaction::TxEip2930>> for BorrowedSignedTxEip2930<'a> {
+        fn from(owned: &'a Signed<crate::transaction::TxEip2930>) -> Self {
+            Self {
+                hash: *owned.hash(),
+                signature: *owned.signature(),
+                transaction: TxEip2930::from(owned.tx()),
+            }
+        }
+    }
+    impl<'a> From<BorrowedSignedTxEip2930<'a>> for Signed<crate::transaction::TxEip2930> {
+        fn from(borrowed: BorrowedSignedTxEip2930<'a>) -> Self {
+            Signed::new_unchecked(borrowed.transaction.into(), borrowed.signature, borrowed.hash)
+        }
+    }
+
+    /// Borrowed view of a signed EIP-1559 transaction
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct BorrowedSignedTxEip1559<'a> {
+        /// Transaction hash.
+        pub hash: B256,
+        /// Transaction signature.
+        pub signature: Signature,
+        /// EIP-1559 transaction data (borrowed)
+        pub transaction: TxEip1559<'a>,
+    }
+    impl<'a> From<&'a Signed<crate::transaction::TxEip1559>> for BorrowedSignedTxEip1559<'a> {
+        fn from(owned: &'a Signed<crate::transaction::TxEip1559>) -> Self {
+            Self {
+                hash: *owned.hash(),
+                signature: *owned.signature(),
+                transaction: TxEip1559::from(owned.tx()),
+            }
+        }
+    }
+    impl<'a> From<BorrowedSignedTxEip1559<'a>> for Signed<crate::transaction::TxEip1559> {
+        fn from(borrowed: BorrowedSignedTxEip1559<'a>) -> Self {
+            Signed::new_unchecked(borrowed.transaction.into(), borrowed.signature, borrowed.hash)
+        }
+    }
+
+    /// Borrowed view of a signed EIP-7702 transaction
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct BorrowedSignedTxEip7702<'a> {
+        /// Transaction hash
+        pub hash: B256,
+        /// Transaction signature
+        pub signature: Signature,
+        /// EIP-7702 transaction data (borrowed)
+        pub transaction: TxEip7702<'a>,
+    }
+    impl<'a> From<&'a Signed<crate::transaction::TxEip7702>> for BorrowedSignedTxEip7702<'a> {
+        fn from(owned: &'a Signed<crate::transaction::TxEip7702>) -> Self {
+            Self {
+                hash: *owned.hash(),
+                signature: *owned.signature(),
+                transaction: TxEip7702::from(owned.tx()),
+            }
+        }
+    }
+    impl<'a> From<BorrowedSignedTxEip7702<'a>> for Signed<crate::transaction::TxEip7702> {
+        fn from(borrowed: BorrowedSignedTxEip7702<'a>) -> Self {
+            Signed::new_unchecked(borrowed.transaction.into(), borrowed.signature, borrowed.hash)
+        }
+    }
+
+    /// Borrowed view of a signed EIP-4844 transaction
+    /// Uses a Cow to allow borrowing large sidecar data
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct BorrowedSignedTxEip4844<'a> {
+        /// Transaction hash
+        pub hash: B256,
+        /// Transaction signature
+        pub signature: Signature,
+        /// EIP-4844 transaction data (borrowed or owned)
+        #[serde(borrow)]
+        pub transaction: Cow<'a, TxEip4844Variant>,
+    }
+    impl<'a> From<&'a Signed<crate::transaction::TxEip4844Variant>> for BorrowedSignedTxEip4844<'a> {
+        fn from(owned: &'a Signed<crate::transaction::TxEip4844Variant>) -> Self {
+            Self {
+                hash: *owned.hash(),
+                signature: *owned.signature(),
+                transaction: Cow::Borrowed(owned.tx()),
+            }
+        }
+    }
+    impl<'a> From<BorrowedSignedTxEip4844<'a>> for Signed<crate::transaction::TxEip4844Variant> {
+        fn from(borrowed: BorrowedSignedTxEip4844<'a>) -> Self {
+            Signed::new_unchecked(
+                borrowed.transaction.into_owned(),
+                borrowed.signature,
+                borrowed.hash,
+            )
+        }
+    }
+
+    /// Borrowed view of a transaction envelope
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    #[serde(bound(deserialize = "'de: 'a"))]
+    #[derive(Debug)]
+    pub enum BorrowedTxEnvelope<'a> {
+        /// Legacy transaction
+        Legacy(BorrowedSignedTxLegacy<'a>),
+        /// EIP-2930 transaction
+        Eip2930(BorrowedSignedTxEip2930<'a>),
+        /// EIP-1559 transaction
+        Eip1559(BorrowedSignedTxEip1559<'a>),
+        /// EIP-4844 transaction
+        Eip4844(BorrowedSignedTxEip4844<'a>),
+        /// EIP-7702 transaction
+        Eip7702(BorrowedSignedTxEip7702<'a>),
+    }
+    impl<'a> From<&'a TxEnvelope> for BorrowedTxEnvelope<'a> {
+        fn from(env: &'a TxEnvelope) -> Self {
+            match env {
+                TxEnvelope::Legacy(s) => Self::Legacy(BorrowedSignedTxLegacy::from(s)),
+                TxEnvelope::Eip2930(s) => Self::Eip2930(BorrowedSignedTxEip2930::from(s)),
+                TxEnvelope::Eip1559(s) => Self::Eip1559(BorrowedSignedTxEip1559::from(s)),
+                TxEnvelope::Eip4844(s) => Self::Eip4844(BorrowedSignedTxEip4844::from(s)),
+                TxEnvelope::Eip7702(s) => Self::Eip7702(BorrowedSignedTxEip7702::from(s)),
+            }
+        }
+    }
+    impl<'a> From<BorrowedTxEnvelope<'a>> for TxEnvelope {
+        fn from(env: BorrowedTxEnvelope<'a>) -> Self {
+            match env {
+                BorrowedTxEnvelope::Legacy(borrowed) => Self::Legacy(borrowed.into()),
+                BorrowedTxEnvelope::Eip2930(borrowed) => Self::Eip2930(borrowed.into()),
+                BorrowedTxEnvelope::Eip1559(borrowed) => Self::Eip1559(borrowed.into()),
+                BorrowedTxEnvelope::Eip4844(borrowed) => Self::Eip4844(borrowed.into()),
+                BorrowedTxEnvelope::Eip7702(borrowed) => Self::Eip7702(borrowed.into()),
+            }
+        }
+    }
+
+    /// Trait for converting to/from a bincode-friendly representation
+    pub trait SerdeBincodeCompat: Sized + 'static {
+        /// The borrowed bincode representation
+        type BincodeRepr<'a>: Serialize + Deserialize<'a>;
+
+        /// Returns the borrowed representation of `self`
+        fn as_repr(&self) -> Self::BincodeRepr<'_>;
+        /// Constructs `Self` from the borrowed representation
+        fn from_repr(repr: Self::BincodeRepr<'_>) -> Self;
+    }
+
+    impl SerdeBincodeCompat for TxEnvelope {
+        type BincodeRepr<'a> = BorrowedTxEnvelope<'a>;
+
+        fn as_repr(&self) -> Self::BincodeRepr<'_> {
+            BorrowedTxEnvelope::from(self)
+        }
+
+        fn from_repr(repr: Self::BincodeRepr<'_>) -> Self {
+            repr.into()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::SerdeBincodeCompat;
+        use crate::transaction::TxEnvelope;
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+
+        /// Helper struct for testing bincode roundtrip
+        #[derive(Debug, Serialize, Deserialize)]
+        #[serde(bound(deserialize = "'de: 'a"))]
+        struct Data<'a> {
+            /// Bincode representation of a TxEnvelope.
+            transaction: <TxEnvelope as SerdeBincodeCompat>::BincodeRepr<'a>,
+        }
+
+        #[test]
+        fn test_tx_envelope_bincode_roundtrip() {
+            // Fill a buffer with random data
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(&mut bytes);
+
+            // Generate a random TxEnvelope
+            let tx: TxEnvelope =
+                TxEnvelope::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+
+            // Convert to bincode representation
+            let data = Data { transaction: tx.as_repr() };
+
+            // Serialize and then deserialize
+            let encoded = bincode::serialize(&data).expect("Serialization should succeed");
+            let decoded: Data<'_> =
+                bincode::deserialize(&encoded).expect("Deserialization should succeed");
+
+            // Reconstruct and compare.
+            let tx2 = TxEnvelope::from_repr(decoded.transaction);
+            assert_eq!(tx, tx2, "Roundtrip should yield the same TxEnvelope");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

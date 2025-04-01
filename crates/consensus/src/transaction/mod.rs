@@ -15,6 +15,10 @@ pub use eip2930::TxEip2930;
 mod eip7702;
 pub use eip7702::TxEip7702;
 
+mod envelope;
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
+
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
 pub mod pooled;
@@ -32,7 +36,6 @@ pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 /// Re-export for convenience
 pub use either::Either;
 
-mod envelope;
 pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 mod legacy;
