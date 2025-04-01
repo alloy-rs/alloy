@@ -157,16 +157,16 @@ impl<T> Recovered<T> {
     }
 
     /// Returns the [`WithEncoded`] representation of [`Recovered`] with the given encoding.
-    pub fn into_encoded_with(self, encoding: impl Into<Bytes>) -> WithEncoded<Recovered<T>> {
+    pub fn into_encoded_with(self, encoding: impl Into<Bytes>) -> WithEncoded<Self> {
         WithEncoded::new(encoding.into(), self)
     }
 
     /// Encodes the inner type and returns the [`WithEncoded`] representation of [`Recovered`].
-    pub fn into_encoded(self) -> WithEncoded<Recovered<T>>
+    pub fn into_encoded(self) -> WithEncoded<Self>
     where
         T: Encodable2718,
     {
-        let mut out = vec![];
+        let mut out = alloc::vec![];
         self.inner.encode_2718(&mut out);
 
         self.into_encoded_with(out)
