@@ -255,6 +255,7 @@ mod tests {
         }
 
         // With recommended fillers
+        #[allow(clippy::type_complexity)]
         let _p: FillProvider<
             Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller, InputFiller)>,
             _,
