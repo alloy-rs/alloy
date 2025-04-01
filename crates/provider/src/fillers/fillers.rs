@@ -158,13 +158,17 @@ impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Identity {
 #[cfg(test)]
 mod tests {
 
-    use alloy_network::{Ethereum, EthereumWallet};
+    use std::str::FromStr;
+
+    use alloy_network::{Ethereum, EthereumWallet, Network, TransactionBuilder};
+    use alloy_primitives::Bytes;
     use alloy_signer_local::PrivateKeySigner;
+    use alloy_transport::TransportResult;
 
     use crate::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, Fillers, GasFiller, NonceFiller,
-            RecommendedFiller, RecommendedFillers, WalletFiller,
+            RecommendedFiller, RecommendedFillers, TxFiller, WalletFiller,
         },
         layers::AnvilProvider,
         ProviderBuilder, RootProvider,
@@ -203,5 +207,58 @@ mod tests {
         // With anvil wallet and config
         let _provider: AnvilWalletFiller =
             ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.block_time(1)).unwrap();
+    }
+
+    #[tokio::test]
+    async fn custom_filler() {
+        #[derive(Debug, Clone)]
+        struct InputFiller;
+
+        impl<N: Network> TxFiller<N> for InputFiller {
+            type Fillable = Bytes;
+
+            fn status(
+                &self,
+                tx: &<N as Network>::TransactionRequest,
+            ) -> crate::fillers::FillerControlFlow {
+                if tx.input().is_some() {
+                    crate::fillers::FillerControlFlow::Finished
+                } else {
+                    crate::fillers::FillerControlFlow::Ready
+                }
+            }
+
+            fn fill_sync(&self, tx: &mut crate::SendableTx<N>) {
+                if let Some(builder) = tx.as_mut_builder() {
+                    if builder.input().is_none() {
+                        builder.set_input(Bytes::from_str("0xdeadbeef").unwrap());
+                    }
+                }
+            }
+
+            async fn prepare<P: crate::Provider<N>>(
+                &self,
+                _provider: &P,
+                _tx: &<N as Network>::TransactionRequest,
+            ) -> TransportResult<Self::Fillable> {
+                Ok(Bytes::from_str("0xdeadbeef").unwrap())
+            }
+
+            async fn fill(
+                &self,
+                _fillable: Self::Fillable,
+                mut tx: crate::SendableTx<N>,
+            ) -> TransportResult<crate::SendableTx<N>> {
+                self.fill_sync(&mut tx);
+                Ok(tx)
+            }
+        }
+
+        // With recommended fillers
+        let _p = ProviderBuilder::new().filler(InputFiller).on_anvil();
+
+        // Without recommended fillers
+        let _p =
+            ProviderBuilder::new().disable_recommended_fillers().filler(InputFiller).on_anvil();
     }
 }
