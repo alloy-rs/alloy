@@ -81,7 +81,9 @@ impl EthereumWallet {
             self.default = address;
             Ok(())
         } else {
-            Err(alloy_signer::Error::message(format!("{address} is not a registered signer")))
+            Err(alloy_signer::Error::message(format!(
+                "{address} is not a registered signer. Use `register_default_signer`"
+            )))
         }
     }
 
