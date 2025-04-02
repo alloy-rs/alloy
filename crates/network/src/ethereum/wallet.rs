@@ -76,6 +76,8 @@ impl EthereumWallet {
     ///
     /// If you're looking to add a new signer and set it as default, use
     /// [`EthereumWallet::register_default_signer`].
+    ///
+    /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
     pub fn set_default_signer(&mut self, address: Address) -> alloy_signer::Result<()> {
         if self.signers.contains_key(&address) {
             self.default = address;
