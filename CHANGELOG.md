@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
+
+### Bug Fixes
+
+- [`pubsub`] Retry connecting to backend ([#2254](https://github.com/alloy-rs/alloy/issues/2254))
+- Use unwrap_or_else for subscribe ([#2233](https://github.com/alloy-rs/alloy/issues/2233))
+- [`pubsub`] Fix race condition in ActiveSub ([#2222](https://github.com/alloy-rs/alloy/issues/2222))
+- [pubsub] Wrap channel_size with Arc ([#2212](https://github.com/alloy-rs/alloy/issues/2212))
+
+### Dependencies
+
+- [deps] C-kzg 2.0 ([#2240](https://github.com/alloy-rs/alloy/issues/2240))
+- [ci] Bump reth and geth to latest ([#2241](https://github.com/alloy-rs/alloy/issues/2241))
+
+### Documentation
+
+- Update reference to MetaMask gas estimation ([#2232](https://github.com/alloy-rs/alloy/issues/2232))
+- Suggest running cargo-semver-checks when releasing ([#2226](https://github.com/alloy-rs/alloy/issues/2226))
+
+### Features
+
+- [`provider`] Watch_full_blocks ([#2194](https://github.com/alloy-rs/alloy/issues/2194))
+- [`signers`] `Web3Signer` ([#2238](https://github.com/alloy-rs/alloy/issues/2238))
+- Add bincode compat for receipt envelope ([#2246](https://github.com/alloy-rs/alloy/issues/2246))
+- Eip7594 constants ([#2245](https://github.com/alloy-rs/alloy/issues/2245))
+- [`provider`] Subscribe_full_blocks ([#2215](https://github.com/alloy-rs/alloy/issues/2215))
+- [`provider`] Eth_signTransaction ([#2236](https://github.com/alloy-rs/alloy/issues/2236))
+- [`provider`] Apply `GetSubscription` to trait ([#2220](https://github.com/alloy-rs/alloy/issues/2220))
+- [`provider`] `DebugApi` generic over `Network` ([#2211](https://github.com/alloy-rs/alloy/issues/2211))
+- Add EIP1186AccountProofResponse::is_empty ([#2224](https://github.com/alloy-rs/alloy/issues/2224))
+
+### Miscellaneous Tasks
+
+- Add error message for reconnect failure ([#2253](https://github.com/alloy-rs/alloy/issues/2253))
+- Add error message helper ([#2247](https://github.com/alloy-rs/alloy/issues/2247))
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
+- [`provider`] Use `WeakClient` in `GetSubscription` ([#2219](https://github.com/alloy-rs/alloy/issues/2219))
+- Propagate arbitrary feature ([#2227](https://github.com/alloy-rs/alloy/issues/2227))
+
+### Other
+
+- Added input-mut for TxEnvelope ([#2244](https://github.com/alloy-rs/alloy/issues/2244))
+- Auto_impl(&) for Encodable2718 ([#2230](https://github.com/alloy-rs/alloy/issues/2230))
+- Add more details on FilterSet ([#2229](https://github.com/alloy-rs/alloy/issues/2229))
+
+### Styling
+
+- Add test for 429 error message ([#2231](https://github.com/alloy-rs/alloy/issues/2231))
+- Fmt ([#2221](https://github.com/alloy-rs/alloy/issues/2221))
+
+### Testing
+
+- Fix flaky test ([#2248](https://github.com/alloy-rs/alloy/issues/2248))
+- Fix inference fail in test ([#2239](https://github.com/alloy-rs/alloy/issues/2239))
+
 ## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
 
 ### Bug Fixes
@@ -38,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.12.6
 - [meta] Update CODEOWNERS ([#2213](https://github.com/alloy-rs/alloy/issues/2213))
 - [provider] Remove 'latest' channel from heartbeat ([#2198](https://github.com/alloy-rs/alloy/issues/2198))
 - Export * from provider ([#2195](https://github.com/alloy-rs/alloy/issues/2195))

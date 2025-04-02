@@ -37,9 +37,8 @@ const MAX_RETRIES: usize = 3;
 /// The channel can be converted into a stream using the [`into_stream`](PollChannel::into_stream)
 /// method.
 ///
-/// Alternatively, [`into_stream`](Self::into_stream) can be used to directly return a stream of
-/// responses on the current thread. This is currently equivalent to `spawn().into_stream()`, but
-/// this may change in the future.
+/// Alternatively, [`into_stream`](Self::into_stream) on the builder can be used to directly return
+/// a stream of responses on the current thread, instead of spawning a task.
 ///
 /// # Examples
 ///
@@ -215,6 +214,11 @@ where
         }
         }
         .instrument(span)
+    }
+
+    /// Returns the [`WeakClient`] associated with the poller.
+    pub fn client(&self) -> WeakClient {
+        self.client.clone()
     }
 }
 

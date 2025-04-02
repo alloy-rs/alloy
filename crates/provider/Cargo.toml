@@ -45,6 +45,7 @@ alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport.workspace = true
+alloy-signer.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
@@ -64,6 +65,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
+either.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 parking_lot.workspace = true

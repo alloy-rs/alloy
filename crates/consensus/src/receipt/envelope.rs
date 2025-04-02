@@ -399,10 +399,13 @@ pub(crate) mod serde_bincode_compat {
 
             let mut bytes = [0u8; 1024];
             rand::thread_rng().fill(bytes.as_mut_slice());
-            let data = Data {
+            let mut data = Data {
                 transaction: ReceiptEnvelope::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
                     .unwrap(),
             };
+
+            // ensure we have proper roundtrip data
+            data.transaction.as_receipt_with_bloom_mut().unwrap().receipt.status = true.into();
 
             let encoded = bincode::serialize(&data).unwrap();
             let decoded: Data = bincode::deserialize(&encoded).unwrap();
