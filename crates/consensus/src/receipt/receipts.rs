@@ -165,6 +165,17 @@ impl<T: Decodable> Receipt<T> {
 
         Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
     }
+
+    /// RLP-decodes receipt's fields without a [`Bloom`].
+    ///
+    /// Does not expect an RLP header.
+    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let status = Decodable::decode(buf)?;
+        let cumulative_gas_used = Decodable::decode(buf)?;
+        let logs = Decodable::decode(buf)?;
+
+        Ok(Self { status, cumulative_gas_used, logs })
+    }
 }
 
 impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
@@ -183,6 +194,14 @@ impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
         }
 
         Ok(this)
+    }
+
+    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        Self::rlp_decode_fields(buf)
     }
 }
 
@@ -511,6 +530,7 @@ pub(crate) mod serde_bincode_compat {
 mod test {
     use super::*;
     use crate::ReceiptEnvelope;
+    use alloy_primitives::{Address, Bytes, LogData, B256};
     use alloy_rlp::{Decodable, Encodable};
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
@@ -575,5 +595,102 @@ mod test {
         let decoded = Receipts::<ReceiptEnvelope>::decode(&mut out).unwrap();
 
         assert_eq!(receipts, decoded);
+    }
+
+    #[test]
+    fn receipt_encodable_eip7642() {
+        let receipt = Receipt::<Log> {
+            status: Eip658Value::Eip658(true),
+            cumulative_gas_used: 1000,
+            logs: vec![
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
+                },
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
+                },
+            ],
+        };
+
+        let mut out = vec![];
+        receipt.rlp_encode(&mut out);
+
+        assert_eq!(out.len(), receipt.rlp_encoded_length());
+
+        let header = alloy_rlp::Header::decode(&mut out.as_slice()).unwrap();
+        assert!(header.list);
+    }
+
+    #[test]
+    fn receipt_decode_eip7642() {
+        let receipt = Receipt::<Log> {
+            status: Eip658Value::Eip658(true),
+            cumulative_gas_used: 0,
+            logs: Vec::new(),
+        };
+
+        let mut out = vec![];
+        receipt.rlp_encode(&mut out);
+        let mut out = out.as_slice();
+        let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
+
+        assert_eq!(receipt, decoded);
+    }
+
+    #[test]
+    fn receipt_decode_with_logs() {
+        let receipt = Receipt::<Log> {
+            status: Eip658Value::Eip658(false),
+            cumulative_gas_used: 1000,
+            logs: vec![
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
+                },
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
+                },
+            ],
+        };
+
+        let mut out = vec![];
+        receipt.rlp_encode(&mut out);
+        let mut out = out.as_slice();
+        let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
+
+        assert_eq!(receipt, decoded);
+    }
+
+    #[test]
+    fn receipt_decode_various_status() {
+        let receipts = vec![
+            Receipt::<Log> {
+                status: Eip658Value::Eip658(true),
+                cumulative_gas_used: 1000,
+                logs: vec![Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
+                }],
+            },
+            Receipt::<Log> {
+                status: Eip658Value::Eip658(false),
+                cumulative_gas_used: 2000,
+                logs: vec![Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
+                }],
+            },
+        ];
+
+        for receipt in receipts {
+            let mut out = vec![];
+            receipt.rlp_encode(&mut out);
+            let mut out = out.as_slice();
+            let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
+            assert_eq!(receipt, decoded);
+        }
     }
 }

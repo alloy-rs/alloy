@@ -103,6 +103,9 @@ pub trait RlpEncodableReceipt {
 pub trait RlpDecodableReceipt: Sized {
     /// RLP decodes receipt and [`Bloom`] into [`ReceiptWithBloom`] instance.
     fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>>;
+
+    /// RLP decodes receipt's fields without a [`Bloom`].
+    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 }
 
 /// Receipt type that knows its EIP-2718 encoding.
