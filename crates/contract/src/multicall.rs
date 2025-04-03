@@ -164,7 +164,7 @@ mod tests {
 
         let err = multicall.try_aggregate(true).await.unwrap_err();
 
-        assert!(err.to_string().contains("revert: Multicall3: call failed"));
+        assert!(err.to_string().contains("execution reverted: Multicall3: call failed"));
 
         let (t1, b1, t2, b2, failure) = multicall.try_aggregate(false).await.unwrap();
 
