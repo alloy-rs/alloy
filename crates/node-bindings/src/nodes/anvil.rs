@@ -416,21 +416,13 @@ impl Anvil {
             }
 
             if !private_keys.is_empty() {
-                let (default, remaining) = private_keys.split_first().unwrap();
-                let pks = remaining
-                    .iter()
-                    .map(|key| {
-                        let mut signer = LocalSigner::from(key.clone());
-                        signer.set_chain_id(chain_id);
-                        signer
-                    })
-                    .collect::<Vec<_>>();
-
-                let mut default_signer = LocalSigner::from(default.clone());
-                default_signer.set_chain_id(chain_id);
-                let mut w = EthereumWallet::new(default_signer);
-
-                for pk in pks {
+                let mut private_keys = private_keys.iter().map(|key| {
+                    let mut signer = LocalSigner::from(key.clone());
+                    signer.set_chain_id(chain_id);
+                    signer
+                });
+                let mut w = EthereumWallet::new(private_keys.next().unwrap());
+                for pk in private_keys {
                     w.register_signer(pk);
                 }
                 wallet = Some(w);

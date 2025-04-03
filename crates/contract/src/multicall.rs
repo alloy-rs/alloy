@@ -126,7 +126,7 @@ mod tests {
 
         let err = multicall.aggregate3().await.unwrap_err();
 
-        assert!(err.to_string().contains("revert: Multicall3: call failed"));
+        assert!(err.to_string().contains("revert: Multicall3: call failed"), "{err}");
 
         let failing_call = CallItemBuilder::new(dummy.fail()).allow_failure(true);
         let multicall = provider

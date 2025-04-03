@@ -150,6 +150,7 @@ where
     N: Network,
 {
     type Provider = FillProvider<Self, P, N>;
+
     fn layer(&self, inner: P) -> Self::Provider {
         FillProvider::new(inner, self.clone())
     }

@@ -1314,14 +1314,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_provider_builder() {
-        let provider = RootProvider::builder().with_recommended_fillers().on_anvil();
+        let provider = RootProvider::<Ethereum>::builder().with_recommended_fillers().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
 
     #[tokio::test]
     async fn test_builder_helper_fn() {
-        let provider = builder().with_recommended_fillers().on_anvil();
+        let provider = builder::<Ethereum>().with_recommended_fillers().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
