@@ -163,6 +163,7 @@ impl TxType {
         matches!(self, Self::Eip7702)
     }
 }
+
 impl fmt::Display for TxType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
