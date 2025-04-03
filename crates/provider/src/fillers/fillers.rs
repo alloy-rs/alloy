@@ -11,8 +11,8 @@ use std::marker::PhantomData;
 /// - [`Pushable`]: used to push new fillers in the tuple.
 /// - [`FillerNetwork`]: used to change the network associated with the fillers.
 /// - [`TuplePush`]: enables the pushing of new types to the tuple.
-/// - [`TxFiller`]: Enables traversing through the inner tuple of fillers
-/// and fills a transaction being sent through a provider.
+/// - [`TxFiller`]: Enables traversing through the inner tuple of fillers and filling the
+///   [`TransactionRequest`].
 /// - [`ProviderLayer`]: Enabling the fillers type to be used as a layer in the provider stack.
 ///
 /// Note:
