@@ -64,7 +64,8 @@ pub(crate) const P1_FIRST: u8 = 0x00;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types, dead_code)]
+#[expect(non_camel_case_types)]
+#[allow(dead_code)] // Some variants are only used with certain features.
 pub(crate) enum INS {
     GET_PUBLIC_KEY = 0x02,
     SIGN = 0x04,
@@ -87,7 +88,7 @@ impl fmt::Display for INS {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub(crate) enum P1 {
     NON_CONFIRM = 0x00,
     MORE = 0x80,
@@ -95,7 +96,7 @@ pub(crate) enum P1 {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub(crate) enum P2 {
     NO_CHAINCODE = 0x00,
 }

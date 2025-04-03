@@ -5,6 +5,7 @@
 use crate::alloc::vec::Vec;
 use alloy_primitives::{keccak256, Bytes, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
+use auto_impl::auto_impl;
 use core::fmt;
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
@@ -178,6 +179,7 @@ pub trait Decodable2718: Sized {
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+#[auto_impl(&)]
 pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     /// Return the type flag (if any).
     ///
@@ -224,6 +226,7 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     }
 
     /// Seal the encodable, by encoding and hashing it.
+    #[auto_impl(keep_default_for(&))]
     fn seal(self) -> Sealed<Self> {
         let hash = self.trie_hash();
         Sealed::new_unchecked(self, hash)

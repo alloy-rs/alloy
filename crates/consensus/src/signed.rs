@@ -2,28 +2,20 @@ use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTrans
 use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{PrimitiveSignature as Signature, B256};
 use alloy_rlp::BufMut;
+use core::hash::{Hash, Hasher};
 #[cfg(not(feature = "std"))]
 use once_cell::race::OnceBox as OnceLock;
 #[cfg(feature = "std")]
 use std::sync::OnceLock;
 
 /// A transaction with a signature and hash seal.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Signed<T, Sig = Signature> {
     #[doc(alias = "transaction")]
     tx: T,
     signature: Sig,
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
     hash: OnceLock<B256>,
-}
-
-impl<T: Clone, Sig: Clone> Clone for Signed<T, Sig> {
-    fn clone(&self) -> Self {
-        self.hash.get().map_or_else(
-            || Self::new_unhashed(self.tx.clone(), self.signature.clone()),
-            |hash| Self::new_unchecked(self.tx.clone(), self.signature.clone(), *hash),
-        )
-    }
 }
 
 impl<T, Sig> Signed<T, Sig> {
@@ -196,6 +188,17 @@ where
     /// Network decode the signed transaction.
     pub fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         T::network_decode(buf)
+    }
+}
+
+impl<T> Hash for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash().hash(state);
+        self.tx.hash(state);
+        self.signature.hash(state);
     }
 }
 

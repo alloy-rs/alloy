@@ -99,13 +99,12 @@ impl TxEip7702 {
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() + // input
-        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
+        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>()
+        // authorization_list
     }
 }
 
 impl RlpEcdsaEncodableTx for TxEip7702 {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
-
     /// Outputs the length of the transaction's fields, without a RLP header.
     #[doc(hidden)]
     fn rlp_encoded_fields_length(&self) -> usize {
@@ -136,6 +135,8 @@ impl RlpEcdsaEncodableTx for TxEip7702 {
 }
 
 impl RlpEcdsaDecodableTx for TxEip7702 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,

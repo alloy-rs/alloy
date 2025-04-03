@@ -175,11 +175,29 @@ impl<T: TransactionResponse> BlockTransactions<T> {
         }
     }
 
+    /// Converts `self` into `Hashes` if the given `condition` is true.
+    #[inline]
+    pub fn convert_to_hashes_if(&mut self, condition: bool) {
+        if !condition {
+            return;
+        }
+        self.convert_to_hashes();
+    }
+
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn into_hashes(mut self) -> Self {
         self.convert_to_hashes();
         self
+    }
+
+    /// Converts `self` into `Hashes` if the given `condition` is true.
+    #[inline]
+    pub fn into_hashes_if(self, condition: bool) -> Self {
+        if !condition {
+            return self;
+        }
+        self.into_hashes()
     }
 
     /// Returns an iterator over the transaction hashes.

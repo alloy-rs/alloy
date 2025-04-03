@@ -3,8 +3,8 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
         RlpEcdsaEncodableTx,
     },
-    SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy,
-    TxType,
+    EthereumTxEnvelope, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702,
+    TxLegacy, TxType,
 };
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{
@@ -103,14 +103,14 @@ impl<Eip4844> From<TxEip7702> for EthereumTypedTransaction<Eip4844> {
     }
 }
 
-impl From<TxEnvelope> for TypedTransaction {
-    fn from(envelope: TxEnvelope) -> Self {
+impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for EthereumTypedTransaction<Eip4844> {
+    fn from(envelope: EthereumTxEnvelope<Eip4844>) -> Self {
         match envelope {
-            TxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
-            TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
-            TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
-            TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
-            TxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
+            EthereumTxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
+            EthereumTxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
+            EthereumTxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
+            EthereumTxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
+            EthereumTxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
         }
     }
 }
@@ -375,8 +375,6 @@ impl<Eip4844: Typed2718> Typed2718 for EthereumTypedTransaction<Eip4844> {
 impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
     for EthereumTypedTransaction<Eip4844>
 {
-    const DEFAULT_TX_TYPE: u8 = 0;
-
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
             Self::Legacy(tx) => tx.rlp_encoded_fields_length(),
@@ -502,8 +500,11 @@ impl<Eip4844, T: From<EthereumTypedTransaction<Eip4844>>> From<EthereumTypedTran
 }
 
 #[cfg(feature = "serde")]
-impl<T: From<TxEnvelope>> From<TxEnvelope> for alloy_serde::WithOtherFields<T> {
-    fn from(value: TxEnvelope) -> Self {
+impl<Eip4844, T> From<EthereumTxEnvelope<Eip4844>> for alloy_serde::WithOtherFields<T>
+where
+    T: From<EthereumTxEnvelope<Eip4844>>,
+{
+    fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
         Self::new(value.into())
     }
 }
@@ -585,6 +586,131 @@ mod serde_from {
                 EthereumTypedTransaction::Eip4844(signed) => Self::Eip4844(signed),
                 EthereumTypedTransaction::Eip7702(signed) => Self::Eip7702(signed),
             }
+        }
+    }
+}
+
+/// Bincode-compatible [`EthereumTypedTransaction`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(crate) mod serde_bincode_compat {
+    use alloc::borrow::Cow;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::EthereumTypedTransaction`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, EthereumTypedTransaction};
+    /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+    ///     #[serde_as(as = "serde_bincode_compat::EthereumTypedTransaction<'_, T>")]
+    ///     receipt: EthereumTypedTransaction<T>,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub enum EthereumTypedTransaction<'a, Eip4844: Clone = crate::transaction::TxEip4844> {
+        /// Legacy transaction
+        Legacy(crate::serde_bincode_compat::transaction::TxLegacy<'a>),
+        /// EIP-2930 transaction
+        Eip2930(crate::serde_bincode_compat::transaction::TxEip2930<'a>),
+        /// EIP-1559 transaction
+        Eip1559(crate::serde_bincode_compat::transaction::TxEip1559<'a>),
+        /// EIP-4844 transaction
+        /// Note: assumes EIP4844 is bincode compatible, which it is because no flatten or skipped
+        /// fields.
+        Eip4844(Cow<'a, Eip4844>),
+        /// EIP-7702 transaction
+        Eip7702(crate::serde_bincode_compat::transaction::TxEip7702<'a>),
+    }
+
+    impl<'a, T: Clone> From<&'a super::EthereumTypedTransaction<T>>
+        for EthereumTypedTransaction<'a, T>
+    {
+        fn from(value: &'a super::EthereumTypedTransaction<T>) -> Self {
+            match value {
+                super::EthereumTypedTransaction::Legacy(tx) => Self::Legacy(tx.into()),
+                super::EthereumTypedTransaction::Eip2930(tx) => Self::Eip2930(tx.into()),
+                super::EthereumTypedTransaction::Eip1559(tx) => Self::Eip1559(tx.into()),
+                super::EthereumTypedTransaction::Eip4844(tx) => Self::Eip4844(Cow::Borrowed(tx)),
+                super::EthereumTypedTransaction::Eip7702(tx) => Self::Eip7702(tx.into()),
+            }
+        }
+    }
+
+    impl<'a, T: Clone> From<EthereumTypedTransaction<'a, T>> for super::EthereumTypedTransaction<T> {
+        fn from(value: EthereumTypedTransaction<'a, T>) -> Self {
+            match value {
+                EthereumTypedTransaction::Legacy(tx) => Self::Legacy(tx.into()),
+                EthereumTypedTransaction::Eip2930(tx) => Self::Eip2930(tx.into()),
+                EthereumTypedTransaction::Eip1559(tx) => Self::Eip1559(tx.into()),
+                EthereumTypedTransaction::Eip4844(tx) => Self::Eip4844(tx.into_owned()),
+                EthereumTypedTransaction::Eip7702(tx) => Self::Eip7702(tx.into()),
+            }
+        }
+    }
+
+    impl<T: Serialize + Clone> SerializeAs<super::EthereumTypedTransaction<T>>
+        for EthereumTypedTransaction<'_, T>
+    {
+        fn serialize_as<S>(
+            source: &super::EthereumTypedTransaction<T>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            EthereumTypedTransaction::<'_, T>::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de> + Clone> DeserializeAs<'de, super::EthereumTypedTransaction<T>>
+        for EthereumTypedTransaction<'de, T>
+    {
+        fn deserialize_as<D>(
+            deserializer: D,
+        ) -> Result<super::EthereumTypedTransaction<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            EthereumTypedTransaction::<'_, T>::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::{serde_bincode_compat, EthereumTypedTransaction};
+        use crate::TxEip4844;
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_typed_tx_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::EthereumTypedTransaction<'_>")]
+                transaction: EthereumTypedTransaction<TxEip4844>,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: EthereumTypedTransaction::arbitrary(
+                    &mut arbitrary::Unstructured::new(&bytes),
+                )
+                .unwrap(),
+            };
+
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
         }
     }
 }

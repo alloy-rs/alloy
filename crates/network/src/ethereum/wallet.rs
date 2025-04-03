@@ -67,6 +67,28 @@ impl EthereumWallet {
         self.register_signer(signer);
     }
 
+    /// Sets the default signer to the given address.
+    ///
+    /// The default signer is used to sign [`TransactionRequest`] and [`TypedTransaction`] objects
+    /// that do not specify a signer address in the `from` field.
+    ///
+    /// The provided address must be a registered signer otherwise an error is returned.
+    ///
+    /// If you're looking to add a new signer and set it as default, use
+    /// [`EthereumWallet::register_default_signer`].
+    ///
+    /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+    pub fn set_default_signer(&mut self, address: Address) -> alloy_signer::Result<()> {
+        if self.signers.contains_key(&address) {
+            self.default = address;
+            Ok(())
+        } else {
+            Err(alloy_signer::Error::message(format!(
+                "{address} is not a registered signer. Use `register_default_signer`"
+            )))
+        }
+    }
+
     /// Get the default signer.
     pub fn default_signer(&self) -> Arc<dyn TxSigner<Signature> + Send + Sync + 'static> {
         self.signers.get(&self.default).cloned().expect("invalid signer")

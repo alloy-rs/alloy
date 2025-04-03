@@ -7,8 +7,15 @@ use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::SubscriptionKind;
 use alloy_transport::{TransportError, TransportResult};
+use either::Either;
+use futures::{Stream, StreamExt};
 use serde_json::Value;
+use std::time::Duration;
+
+use super::FilterPollerBuilder;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
@@ -252,6 +259,194 @@ where
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
             Self::PendingBlock(call) => f.debug_tuple("PendingBlockCall").field(call).finish(),
             Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
+        }
+    }
+}
+
+/// A builder type for polling new blocks using the [`FilterPollerBuilder`].
+///
+/// By default, this polls for blocks with [`BlockTransactionsKind::Hashes`].
+///
+/// [`WatchBlocks::full`] should be used to poll for blocks with
+/// [`BlockTransactionsKind::Full`].
+///
+/// The polling stream must be consumed by calling [`WatchBlocks::into_stream`].
+#[derive(Debug)]
+#[must_use = "this builder does nothing unless you call `.into_stream`"]
+pub struct WatchBlocks<BlockResp> {
+    /// [`PollerBuilder`] for polling new block hashes.
+    ///
+    /// On every poll it returns an array of block hashes [`Vec<B256>`] as `eth_getFilterChanges`
+    /// returns an array of logs. See <https://docs.alchemy.com/reference/eth-getfilterchanges-1>.
+    ///
+    /// [`PollerBuilder`]: alloy_rpc_client::PollerBuilder
+    poller: FilterPollerBuilder<B256>,
+    /// The [`BlockTransactionsKind`] to retrieve on each poll.
+    ///
+    /// Default is [`BlockTransactionsKind::Hashes`].
+    ///
+    /// [`WatchBlocks::full`] should be used to poll for blocks with
+    /// [`BlockTransactionsKind::Full`].
+    kind: BlockTransactionsKind,
+    _pd: std::marker::PhantomData<BlockResp>,
+}
+
+impl<BlockResp> WatchBlocks<BlockResp>
+where
+    BlockResp: BlockResponse + RpcRecv,
+{
+    /// Create a new [`WatchBlocks`] instance.
+    pub(crate) fn new(poller: FilterPollerBuilder<B256>) -> Self {
+        Self { poller, kind: BlockTransactionsKind::Hashes, _pd: PhantomData }
+    }
+
+    /// Poll for blocks with full transactions i.e [`BlockTransactionsKind::Full`].
+    pub fn full(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Full;
+        self
+    }
+
+    /// Poll for blocks with just transactions hashes i.e [`BlockTransactionsKind::Hashes`].
+    pub fn hashes(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Hashes;
+        self
+    }
+
+    /// Sets the channel size for the poller task.
+    pub fn set_channel_size(&mut self, channel_size: usize) {
+        self.poller.set_channel_size(channel_size);
+    }
+
+    /// Sets a limit on the number of successful polls.
+    pub fn set_limit(&mut self, limit: Option<usize>) {
+        self.poller.set_limit(limit);
+    }
+
+    /// Sets the duration between polls.
+    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+        self.poller.set_poll_interval(poll_interval);
+    }
+
+    /// Consumes the stream of block hashes from the inner [`FilterPollerBuilder`] and maps it to a
+    /// stream of [`BlockResponse`].
+    pub fn into_stream(self) -> impl Stream<Item = TransportResult<BlockResp>> + Unpin {
+        let client = self.poller.client();
+        let kind = self.kind;
+        let stream = self
+            .poller
+            .into_stream()
+            .then(move |hashes| {
+                let client = client.clone();
+                async move { utils::hashes_to_blocks(hashes, client, kind.into()).await }
+            })
+            .flat_map(|res| {
+                futures::stream::iter(match res {
+                    Ok(blocks) => {
+                        // Ignore `None` responses.
+                        Either::Left(blocks.into_iter().filter_map(|block| block.map(Ok)))
+                    }
+                    Err(err) => Either::Right(std::iter::once(Err(err))),
+                })
+            });
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            stream.boxed()
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            stream.boxed_local()
+        }
+    }
+}
+
+/// A builder type for subscribing to full blocks i.e [`alloy_network_primitives::BlockResponse`],
+/// and not just [`alloy_network_primitives::HeaderResponse`].
+///
+/// By default this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
+/// subscribe to blocks with full transactions.
+#[derive(Debug)]
+#[must_use = "this does nothing unless you call `.into_stream`"]
+#[cfg(feature = "pubsub")]
+pub struct SubFullBlocks<N: alloy_network::Network> {
+    sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
+    client: alloy_rpc_client::WeakClient,
+    kind: BlockTransactionsKind,
+}
+
+#[cfg(feature = "pubsub")]
+impl<N: alloy_network::Network> SubFullBlocks<N> {
+    /// Create a new [`SubFullBlocks`] subscription with the given [`super::GetSubscription`].
+    ///
+    /// By default, this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
+    /// subscribe to blocks with full transactions.
+    pub fn new(
+        sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
+        client: alloy_rpc_client::WeakClient,
+    ) -> Self {
+        Self { sub, client, kind: BlockTransactionsKind::Hashes }
+    }
+
+    /// Subscribe to blocks with full transactions.
+    pub fn full(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Full;
+        self
+    }
+
+    /// Subscribe to blocks with transaction hashes only.
+    pub fn hashes(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Hashes;
+        self
+    }
+
+    /// Set the channel size
+    pub fn channel_size(mut self, size: usize) -> Self {
+        self.sub = self.sub.channel_size(size);
+        self
+    }
+
+    /// Subscribe to the inner stream of headers and map them to block responses.
+    pub async fn into_stream(
+        self,
+    ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
+        use alloy_network_primitives::HeaderResponse;
+        use futures::StreamExt;
+
+        let sub = self.sub.await?;
+
+        let stream = sub
+            .into_stream()
+            .then(move |resp| {
+                let hash = resp.hash();
+                let kind = self.kind;
+                let client_weak = self.client.clone();
+
+                async move {
+                    let client = client_weak
+                        .upgrade()
+                        .ok_or(TransportError::local_usage_str("Client dropped"))?;
+
+                    let call = client.request("eth_getBlockByHash", (hash, kind.is_full()));
+                    let resp = call.await?;
+
+                    if kind.is_hashes() {
+                        Ok(utils::convert_to_hashes(resp))
+                    } else {
+                        Ok(resp)
+                    }
+                }
+            })
+            .filter_map(|result| futures::future::ready(result.transpose()));
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Ok(stream.boxed())
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            Ok(stream.boxed_local())
         }
     }
 }

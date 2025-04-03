@@ -66,7 +66,7 @@ where
 {
     /// Creates a new `AnvilProvider` with the given inner provider and anvil
     /// instance.
-    #[allow(clippy::missing_const_for_fn)]
+    #[expect(clippy::missing_const_for_fn)]
     pub fn new(inner: P, anvil: Arc<AnvilInstance>) -> Self {
         Self { inner, anvil }
     }

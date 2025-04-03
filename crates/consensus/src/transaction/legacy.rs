@@ -112,8 +112,6 @@ impl TxLegacy {
 // Legacy transaction network and 2718 encodings are identical to the RLP
 // encoding.
 impl RlpEcdsaEncodableTx for TxLegacy {
-    const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
-
     fn rlp_encoded_fields_length(&self) -> usize {
         self.nonce.length()
             + self.gas_price.length()
@@ -179,6 +177,8 @@ impl RlpEcdsaEncodableTx for TxLegacy {
 }
 
 impl RlpEcdsaDecodableTx for TxLegacy {
+    const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             nonce: Decodable::decode(buf)?,

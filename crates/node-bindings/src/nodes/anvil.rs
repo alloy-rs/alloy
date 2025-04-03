@@ -1,6 +1,7 @@
 //! Utilities for launching an Anvil instance.
 
 use crate::NodeError;
+use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
 use alloy_signer::Signer;
@@ -244,6 +245,42 @@ impl Anvil {
     /// using an @ sign: `http://localhost:8545@1599200`
     pub fn fork<T: Into<String>>(mut self, fork: T) -> Self {
         self.fork = Some(fork.into());
+        self
+    }
+
+    /// Select the [`EthereumHardfork`] to start anvil with.
+    pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
+        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Paris`].
+    pub fn paris(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Paris);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Cancun`].
+    pub fn cancun(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Cancun);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Shanghai`].
+    pub fn shanghai(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Shanghai);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Prague`].
+    pub fn prague(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Prague);
+        self
+    }
+
+    /// Instantiate `anvil` with the `--odyssey` flag.
+    pub fn odyssey(mut self) -> Self {
+        self = self.arg("--odyssey");
         self
     }
 
