@@ -1,9 +1,9 @@
 use crate::{fillers::TxFiller, Identity};
 use alloy_network::{Ethereum, Network};
-use std::{fmt::Debug, marker::PhantomData};
+use std::marker::PhantomData;
 
 /// A stack of [`TxFiller`]'s.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Fillers<T, N = Ethereum> {
     /// Stores the tuple of [`TxFiller`]s
     ///
@@ -168,7 +168,7 @@ mod tests {
     use crate::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, Fillers, GasFiller, NonceFiller,
-            RecommendedFiller, RecommendedFillers, TxFiller, WalletFiller,
+            RecommendedFiller, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
         },
         layers::AnvilProvider,
         ProviderBuilder, RootProvider,
@@ -274,5 +274,41 @@ mod tests {
                 .filler(InputFiller)
                 .wallet(pk)
                 .on_anvil();
+    }
+
+    #[test]
+    fn upto_15_fillers() {
+        #[allow(clippy::type_complexity)]
+        let _: FillProvider<
+            Fillers<(
+                GasFiller,
+                BlobGasFiller,
+                NonceFiller,
+                ChainIdFiller,
+                GasFiller,
+                BlobGasFiller,
+                NonceFiller,
+                ChainIdFiller,
+                GasFiller,
+                BlobGasFiller,
+                NonceFiller,
+                ChainIdFiller,
+                GasFiller,
+                BlobGasFiller,
+                WalletFiller<EthereumWallet>,
+            )>,
+            _,
+        > = ProviderBuilder::new() // Adds 4.
+            .filler(GasFiller)
+            .filler(BlobGasFiller)
+            .filler(NonceFiller::new(SimpleNonceManager::default()))
+            .filler(ChainIdFiller::default())
+            .filler(GasFiller)
+            .filler(BlobGasFiller)
+            .filler(NonceFiller::new(SimpleNonceManager::default()))
+            .filler(ChainIdFiller::default())
+            .filler(GasFiller)
+            .filler(BlobGasFiller)
+            .on_anvil_with_wallet(); // Adds the 15th i.e wallet filler.
     }
 }
