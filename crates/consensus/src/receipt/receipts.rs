@@ -115,6 +115,21 @@ impl<T: Encodable> Receipt<T> {
     pub fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
     }
+
+    /// Returns RLP header for this receipt encoding without a [`Bloom`].
+    pub fn rlp_header(&self) -> Header {
+        let fields_length =
+            self.status.length() + self.cumulative_gas_used.length() + self.logs.length();
+        Header { list: true, payload_length: fields_length }
+    }
+
+    /// RLP-encodes the receipt without a [`Bloom`].
+    pub fn rlp_encode(&self, out: &mut dyn BufMut) {
+        self.rlp_header().encode(out);
+        self.status.encode(out);
+        self.cumulative_gas_used.encode(out);
+        self.logs.encode(out);
+    }
 }
 
 impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
@@ -125,6 +140,14 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
     fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.rlp_header_with_bloom(bloom).encode(out);
         self.rlp_encode_fields_with_bloom(bloom, out);
+    }
+
+    fn rlp_encoded_length(&self) -> usize {
+        self.rlp_header().length_with_payload()
+    }
+
+    fn rlp_encode(&self, out: &mut dyn BufMut) {
+        self.rlp_header().encode(out);
     }
 }
 

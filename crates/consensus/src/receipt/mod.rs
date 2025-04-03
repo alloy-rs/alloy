@@ -83,7 +83,7 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     fn logs(&self) -> &[Self::Log];
 }
 
-/// Receipt type that knows how to encode itself with a [`Bloom`] value.
+/// Receipt type that knows how to encode itself with and without a [`Bloom`] value.
 #[auto_impl::auto_impl(&)]
 pub trait RlpEncodableReceipt {
     /// Returns the length of the receipt payload with the provided bloom filter.
@@ -91,6 +91,12 @@ pub trait RlpEncodableReceipt {
 
     /// RLP encodes the receipt with the provided bloom filter.
     fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
+
+    /// Returns the length of the receipt payload without the bloom filter.
+    fn rlp_encoded_length(&self) -> usize;
+
+    /// RLP encodes the receipt without the bloom filter.
+    fn rlp_encode(&self, out: &mut dyn BufMut);
 }
 
 /// Receipt type that knows how to decode itself with a [`Bloom`] value.
@@ -111,6 +117,12 @@ pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {
 
     /// EIP-2718 encodes the receipt with the provided bloom filter.
     fn eip2718_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
+
+    /// EIP-2718 encoded length without the bloom filter.
+    fn eip2718_encoded_length(&self) -> usize;
+
+    /// EIP-2718 encodes the receipt without the bloom filter.
+    fn eip2718_encode(&self, out: &mut dyn BufMut);
 }
 
 #[cfg(test)]
