@@ -17,8 +17,8 @@ use std::marker::PhantomData;
 ///
 /// Note:
 ///
-/// This struct can accomodate up to a maximum 15 fillers in the tuple. This limitation is imposed
-/// by the underlying trait implementations.
+/// This struct can accomodate a maximum of 15 fillers in the tuple. This limitation is
+/// imposed by the underlying trait implementations.
 ///
 /// [`ProviderBuilder`]: crate::builder::ProviderBuilder
 /// [`ProviderLayer`]: crate::ProviderLayer
