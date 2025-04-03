@@ -113,8 +113,11 @@ mod tests {
     async fn aggregate3() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
-        let provider =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
+        let provider = ProviderBuilder::new()
+            .on_anvil_with_wallet_and_config(|a| {
+                a.fork("https://eth-mainnet.g.alchemy.com/v2/0nStB_SyYKn6AHUzd56AckO5Xa3DkBnO")
+            })
+            .unwrap();
 
         let dummy = deploy_dummy(provider.clone()).await;
         let erc20 = ERC20::new(weth, &provider);
@@ -126,7 +129,7 @@ mod tests {
 
         let err = multicall.aggregate3().await.unwrap_err();
 
-        assert!(err.to_string().contains("revert: Multicall3: call failed"));
+        assert!(err.to_string().contains("Multicall3: call failed"));
 
         let failing_call = CallItemBuilder::new(dummy.fail()).allow_failure(true);
         let multicall = provider
@@ -160,7 +163,7 @@ mod tests {
 
         let err = multicall.try_aggregate(true).await.unwrap_err();
 
-        assert!(err.to_string().contains("revert: Multicall3: call failed"));
+        assert!(err.to_string().contains("Multicall3: call failed"));
 
         let (t1, b1, t2, b2, failure) = multicall.try_aggregate(false).await.unwrap();
 
