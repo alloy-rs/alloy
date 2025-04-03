@@ -113,11 +113,8 @@ mod tests {
     async fn aggregate3() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
-        let provider = ProviderBuilder::new()
-            .on_anvil_with_wallet_and_config(|a| {
-                a.fork("https://eth-mainnet.g.alchemy.com/v2/0nStB_SyYKn6AHUzd56AckO5Xa3DkBnO")
-            })
-            .unwrap();
+        let provider =
+            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.fork(FORK_URL)).unwrap();
 
         let dummy = deploy_dummy(provider.clone()).await;
         let erc20 = ERC20::new(weth, &provider);
