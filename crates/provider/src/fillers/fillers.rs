@@ -2,7 +2,28 @@ use crate::{fillers::TxFiller, Identity};
 use alloy_network::{Ethereum, Network};
 use std::marker::PhantomData;
 
-/// A stack of [`TxFiller`]'s.
+/// A [`ProviderLayer`] that encapsulates a tuple of [`TxFiller`]s, and traverses through the tuple
+/// to fill a [`TransactionRequest`].
+///
+/// Usage in [`ProviderBuilder`] and [`Provider`] is facilitated by the implementation of the
+/// following traits:
+///
+/// - [`Pushable`]: used to push new fillers in the tuple.
+/// - [`FillerNetwork`]: used to change the network associated with the fillers.
+/// - [`TuplePush`]: enables the pushing of new types to the tuple.
+/// - [`TxFiller`]: Enables traversing through the inner tuple of fillers
+/// and fills a transaction being sent through a provider.
+/// - [`ProviderLayer`]: Enabling the fillers type to be used as a layer in the provider stack.
+///
+/// Note:
+///
+/// This struct can accomodate up to a maximum 15 fillers in the tuple. This limitation is imposed
+/// by the underlying trait implementations.
+///
+/// [`ProviderBuilder`]: crate::builder::ProviderBuilder
+/// [`ProviderLayer`]: crate::ProviderLayer
+/// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
+/// [`Provider`]: crate::Provider
 #[derive(Clone)]
 pub struct Fillers<T, N = Ethereum> {
     /// Stores the tuple of [`TxFiller`]s
