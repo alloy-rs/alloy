@@ -686,6 +686,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getStorageAt", (address, key)).into()
     }
 
+    /// Gets a transaction by its sender and nonce.
+    ///
+    /// Note: not supported by all clients.
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.client()
+            .request("eth_getTransactionBySenderAndNonce", (sender, U64::from(nonce)))
+            .into()
+    }
+
     /// Gets a transaction by its [TxHash].
     fn get_transaction_by_hash(
         &self,

@@ -243,6 +243,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_transaction_by_hash(hash)
     }
 
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.0.get_transaction_by_sender_nonce(sender, nonce)
+    }
+
     fn get_transaction_by_block_hash_and_index(
         &self,
         block_hash: B256,
