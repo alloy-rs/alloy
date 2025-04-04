@@ -21,5 +21,5 @@ pub struct BlobAndProofV2 {
     /// The blob data.
     pub blob: Box<Blob>,
     /// The cell proof for the blob.
-    pub cell_proof: Bytes48,
+    pub proofs: Vec<Bytes48>,
 }
