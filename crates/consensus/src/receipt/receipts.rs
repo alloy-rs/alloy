@@ -115,6 +115,21 @@ impl<T: Encodable> Receipt<T> {
     pub fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
     }
+
+    /// Returns RLP header for this receipt encoding without a [`Bloom`].
+    pub fn rlp_header(&self) -> Header {
+        let fields_length =
+            self.status.length() + self.cumulative_gas_used.length() + self.logs.length();
+        Header { list: true, payload_length: fields_length }
+    }
+
+    /// RLP-encodes the receipt without a [`Bloom`].
+    pub fn rlp_encode(&self, out: &mut dyn BufMut) {
+        self.rlp_header().encode(out);
+        self.status.encode(out);
+        self.cumulative_gas_used.encode(out);
+        self.logs.encode(out);
+    }
 }
 
 impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
@@ -125,6 +140,15 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
     fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         self.rlp_header_with_bloom(bloom).encode(out);
         self.rlp_encode_fields_with_bloom(bloom, out);
+    }
+
+    fn rlp_encoded_length(&self) -> usize {
+        self.rlp_header().length_with_payload()
+    }
+
+    fn rlp_encode(&self, out: &mut dyn BufMut) {
+        self.rlp_header().encode(out);
+        self.rlp_encode(out);
     }
 }
 
@@ -141,6 +165,17 @@ impl<T: Decodable> Receipt<T> {
         let logs = Decodable::decode(buf)?;
 
         Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
+    }
+
+    /// RLP-decodes receipt's fields without a [`Bloom`].
+    ///
+    /// Does not expect an RLP header.
+    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let status = Decodable::decode(buf)?;
+        let cumulative_gas_used = Decodable::decode(buf)?;
+        let logs = Decodable::decode(buf)?;
+
+        Ok(Self { status, cumulative_gas_used, logs })
     }
 }
 
@@ -160,6 +195,14 @@ impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
         }
 
         Ok(this)
+    }
+
+    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        Self::rlp_decode_fields(buf)
     }
 }
 
@@ -488,6 +531,7 @@ pub(crate) mod serde_bincode_compat {
 mod test {
     use super::*;
     use crate::ReceiptEnvelope;
+    use alloy_primitives::{Address, Bytes, LogData, B256};
     use alloy_rlp::{Decodable, Encodable};
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
@@ -552,5 +596,106 @@ mod test {
         let decoded = Receipts::<ReceiptEnvelope>::decode(&mut out).unwrap();
 
         assert_eq!(receipts, decoded);
+    }
+
+    #[test]
+    fn receipt_encodable_eip7642() {
+        let receipt = Receipt::<Log> {
+            status: Eip658Value::Eip658(true),
+            cumulative_gas_used: 1000,
+            logs: vec![
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
+                },
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
+                },
+            ],
+        };
+
+        let mut out = vec![];
+        receipt.rlp_encode(&mut out);
+
+        assert_eq!(out.len(), receipt.rlp_encoded_length());
+
+        let header = alloy_rlp::Header::decode(&mut out.as_slice()).unwrap();
+        assert!(header.list);
+
+        let mut out_slice = out.as_slice();
+        let decoded = Receipt::<Log>::rlp_decode(&mut out_slice).unwrap();
+        assert_eq!(receipt, decoded);
+    }
+
+    #[test]
+    fn receipt_decode_eip7642() {
+        let receipt = Receipt::<Log> {
+            status: Eip658Value::Eip658(true),
+            cumulative_gas_used: 0,
+            logs: Vec::new(),
+        };
+
+        let mut out = vec![];
+        receipt.rlp_encode(&mut out);
+        let mut out = out.as_slice();
+        let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
+
+        assert_eq!(receipt, decoded);
+    }
+
+    #[test]
+    fn receipt_decode_with_logs() {
+        let receipt = Receipt::<Log> {
+            status: Eip658Value::Eip658(false),
+            cumulative_gas_used: 1000,
+            logs: vec![
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
+                },
+                Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
+                },
+            ],
+        };
+
+        let mut out = vec![];
+        receipt.rlp_encode(&mut out);
+        let mut out = out.as_slice();
+        let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
+
+        assert_eq!(receipt, decoded);
+    }
+
+    #[test]
+    fn receipt_decode_various_status() {
+        let receipts = vec![
+            Receipt::<Log> {
+                status: Eip658Value::Eip658(true),
+                cumulative_gas_used: 1000,
+                logs: vec![Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
+                }],
+            },
+            Receipt::<Log> {
+                status: Eip658Value::Eip658(false),
+                cumulative_gas_used: 2000,
+                logs: vec![Log {
+                    address: Address::ZERO,
+                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
+                }],
+            },
+        ];
+
+        for receipt in receipts {
+            let mut out = vec![];
+            receipt.rlp_encode(&mut out);
+            let mut out = out.as_slice();
+            let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
+            assert_eq!(receipt, decoded);
+        }
     }
 }
