@@ -122,8 +122,29 @@ pub struct NonceFiller<M: NonceManager = SimpleNonceManager> {
 
 impl<M: NonceManager> NonceFiller<M> {
     /// Creates a new [`NonceFiller`] with the specified [`NonceManager`].
+    ///
+    /// To instatiate with the [`SimpleNonceManager`], use [`NonceFiller::simple()`].
+    ///
+    /// To instantiate with the [`CachedNonceManager`], use [`NonceFiller::cached()`].
     pub const fn new(nonce_manager: M) -> Self {
         Self { nonce_manager }
+    }
+
+    /// Creates a new [`NonceFiller`] with the [`SimpleNonceManager`].
+    ///
+    /// [`SimpleNonceManager`] will fetch the transaction count for any new account it sees,
+    /// resulting in frequent RPC calls.
+    pub const fn simple() -> NonceFiller<SimpleNonceManager> {
+        NonceFiller { nonce_manager: SimpleNonceManager }
+    }
+
+    /// Creates a new [`NonceFiller`] with the [`CachedNonceManager`].
+    ///
+    /// [`CachedNonceManager`] will fetch the transaction count for any new account it sees,
+    /// store it locally and increment the locally stored nonce as transactions are sent via
+    /// [`Provider::send_transaction`], reducing the number of RPC calls.
+    pub fn cached() -> NonceFiller<CachedNonceManager> {
+        NonceFiller { nonce_manager: CachedNonceManager::default() }
     }
 }
 
