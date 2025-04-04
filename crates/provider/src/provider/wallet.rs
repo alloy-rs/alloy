@@ -1,5 +1,5 @@
 use crate::{
-    fillers::{FillProvider, JoinFill, TxFiller, WalletFiller},
+    fillers::{FillProvider, TxFiller, WalletFiller},
     Provider,
 };
 use alloy_network::{Ethereum, Network, NetworkWallet};
@@ -49,24 +49,6 @@ where
     #[inline(always)]
     fn wallet_mut(&mut self) -> &mut Self::Wallet {
         self.as_mut()
-    }
-}
-
-impl<L, R, N> WalletProvider<N> for JoinFill<L, R>
-where
-    R: WalletProvider<N>,
-    N: Network,
-{
-    type Wallet = R::Wallet;
-
-    #[inline(always)]
-    fn wallet(&self) -> &Self::Wallet {
-        self.right().wallet()
-    }
-
-    #[inline(always)]
-    fn wallet_mut(&mut self) -> &mut Self::Wallet {
-        self.right_mut().wallet_mut()
     }
 }
 
