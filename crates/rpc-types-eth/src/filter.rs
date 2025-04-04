@@ -146,6 +146,14 @@ impl<T: Clone + Eq + Hash> FilterSet<T> {
 /// A single topic
 pub type Topic = FilterSet<B256>;
 
+impl Topic {
+    /// Extends the topic with a value that can be converted into a Topic
+    pub fn extend<T: Into<Self>>(mut self, value: T) -> Self {
+        self.0.extend(value.into().0);
+        self
+    }
+}
+
 impl From<U256> for Topic {
     fn from(src: U256) -> Self {
         Into::<B256>::into(src).into()
@@ -1760,5 +1768,22 @@ mod tests {
         assert!(!filter.is_pending_block_filter());
         let filter_params = FilteredParams::new(Some(filter));
         assert!(!filter_params.is_pending_block_filter());
+    }
+
+    #[test]
+    fn test_filter_set_topic_extend() {
+        let mut topic = Topic::default();
+
+        // extending with different types that can be converted into Topic
+        topic =
+            topic.extend(U256::from(123)).extend(Address::random()).extend(true).extend([0u8; 32]);
+
+        assert_eq!(topic.0.len(), 4);
+
+        topic = topic.extend(U256::from(123));
+        assert_eq!(topic.0.len(), 4);
+
+        topic = topic.extend(U256::from(456));
+        assert_eq!(topic.0.len(), 5);
     }
 }
