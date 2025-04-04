@@ -148,6 +148,7 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
 
     fn rlp_encode(&self, out: &mut dyn BufMut) {
         self.rlp_header().encode(out);
+        self.rlp_encode(out);
     }
 }
 
@@ -621,6 +622,10 @@ mod test {
 
         let header = alloy_rlp::Header::decode(&mut out.as_slice()).unwrap();
         assert!(header.list);
+
+        let mut out_slice = out.as_slice();
+        let decoded = Receipt::<Log>::rlp_decode(&mut out_slice).unwrap();
+        assert_eq!(receipt, decoded);
     }
 
     #[test]
