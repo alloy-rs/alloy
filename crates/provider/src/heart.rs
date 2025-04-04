@@ -335,6 +335,12 @@ impl PendingTransactionConfig {
     }
 }
 
+impl From<TxHash> for PendingTransactionConfig {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::new(tx_hash)
+    }
+}
+
 /// Errors which may occur in heartbeat when watching a transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum WatchTxError {
