@@ -1226,11 +1226,10 @@ mod tests {
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
+        eip7594::BlobTransactionSidecarVariant,
         eip7702::Authorization,
     };
-    use alloy_primitives::{
-        b256, hex, Address, Bytes, PrimitiveSignature as Signature, TxKind, U256,
-    };
+    use alloy_primitives::{b256, hex, Address, Bytes, PrimitiveSignature as Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]
@@ -1497,11 +1496,11 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let sidecar = BlobTransactionSidecar {
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
             blobs: vec![[2; 131072].into()],
             commitments: vec![[3; 48].into()],
             proofs: vec![[4; 48].into()],
-        };
+        });
         let tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature().with_parity(true);
 
@@ -1724,7 +1723,7 @@ mod tests {
                 blob_versioned_hashes: vec![B256::random()],
                 max_fee_per_blob_gas: 0,
             },
-            sidecar: Default::default(),
+            sidecar: BlobTransactionSidecarVariant::Eip4844(Default::default()),
         });
         test_serde_roundtrip(tx);
     }

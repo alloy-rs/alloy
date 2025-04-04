@@ -5,7 +5,7 @@ use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
     TxLegacy, TxType, Typed2718, TypedTransaction,
 };
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_eips::{eip7594::BlobTransactionSidecarVariant, eip7702::SignedAuthorization};
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use core::hash::Hash;
@@ -423,8 +423,9 @@ impl TransactionRequest {
     fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, &'static str> {
         self.populate_blob_hashes();
 
-        let sidecar =
-            self.sidecar.clone().ok_or("Missing 'sidecar' field for Eip4844 transaction.")?;
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(
+            self.sidecar.clone().ok_or("Missing 'sidecar' field for Eip4844 transaction.")?,
+        );
 
         Ok(TxEip4844WithSidecar { sidecar, tx: self.build_4844_without_sidecar()? })
     }
@@ -859,7 +860,12 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
     fn from(tx: TxEip4844WithSidecar) -> Self {
         let TxEip4844WithSidecar { tx, sidecar } = tx;
         let mut tx: Self = tx.into();
-        tx.sidecar = Some(sidecar);
+        // TODO: handle differently
+        tx.sidecar = if let BlobTransactionSidecarVariant::Eip4844(sidecar) = sidecar {
+            Some(sidecar)
+        } else {
+            None
+        };
         tx
     }
 }

@@ -55,31 +55,6 @@ impl core::fmt::Debug for BlobTransactionSidecar {
     }
 }
 
-impl BlobTransactionSidecar {
-    /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV1`]) pairs
-    /// where index is the position in `versioned_hashes` that matched the versioned hash in the
-    /// sidecar.
-    ///
-    /// This is used for the `engine_getBlobsV1` RPC endpoint of the engine API
-    pub fn match_versioned_hashes<'a>(
-        &'a self,
-        versioned_hashes: &'a [B256],
-    ) -> impl Iterator<Item = (usize, BlobAndProofV1)> + 'a {
-        self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
-            versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
-                if blob_versioned_hash == *target_hash {
-                    if let Some((blob, proof)) =
-                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
-                    {
-                        return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
-                    }
-                }
-                None
-            })
-        })
-    }
-}
-
 impl IntoIterator for BlobTransactionSidecar {
     type Item = BlobTransactionSidecarItem;
     type IntoIter = alloc::vec::IntoIter<BlobTransactionSidecarItem>;
@@ -295,6 +270,29 @@ impl BlobTransactionSidecar {
         self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
+    /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV1`]) pairs
+    /// where index is the position in `versioned_hashes` that matched the versioned hash in the
+    /// sidecar.
+    ///
+    /// This is used for the `engine_getBlobsV1` RPC endpoint of the engine API
+    pub fn match_versioned_hashes<'a>(
+        &'a self,
+        versioned_hashes: &'a [B256],
+    ) -> impl Iterator<Item = (usize, BlobAndProofV1)> + 'a {
+        self.versioned_hashes().enumerate().flat_map(move |(i, blob_versioned_hash)| {
+            versioned_hashes.iter().enumerate().filter_map(move |(j, target_hash)| {
+                if blob_versioned_hash == *target_hash {
+                    if let Some((blob, proof)) =
+                        self.blobs.get(i).copied().zip(self.proofs.get(i).copied())
+                    {
+                        return Some((j, BlobAndProofV1 { blob: Box::new(blob), proof }));
+                    }
+                }
+                None
+            })
+        })
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
     pub fn size(&self) -> usize {
@@ -452,7 +450,7 @@ impl Decodable for BlobTransactionSidecar {
 
 // Helper function to deserialize boxed blobs
 #[cfg(all(debug_assertions, feature = "serde"))]
-fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {

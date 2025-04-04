@@ -1,8 +1,8 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
-
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization, Typed2718,
+    eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7594::BlobTransactionSidecarVariant,
+    eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{
     Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
@@ -55,7 +55,11 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
         let tx = TxEip4844SerdeHelper::deserialize(deserializer)?;
 
         if let Some(sidecar) = tx.sidecar {
-            Ok(TxEip4844WithSidecar::from_tx_and_sidecar(tx.tx, sidecar).into())
+            Ok(TxEip4844WithSidecar::from_tx_and_sidecar(
+                tx.tx,
+                BlobTransactionSidecarVariant::Eip4844(sidecar),
+            )
+            .into())
         } else {
             Ok(tx.tx.into())
         }
@@ -88,8 +92,8 @@ impl From<TxEip4844> for TxEip4844Variant {
     }
 }
 
-impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
-    fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
+impl From<(TxEip4844, BlobTransactionSidecarVariant)> for TxEip4844Variant {
+    fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecarVariant)) -> Self {
         TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar).into()
     }
 }
@@ -532,9 +536,8 @@ impl TxEip4844 {
     /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
     /// derived from the KZG trusted setup.
     ///
-    /// This ensures that the blob transaction payload has the same number of blob data elements,
-    /// commitments, and proofs. Each blob data element is verified against its commitment and
-    /// proof.
+    /// This ensures that the blob transaction payload is consistent with the spec for a given
+    /// variant
     ///
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
@@ -542,7 +545,7 @@ impl TxEip4844 {
     #[cfg(feature = "kzg")]
     pub fn validate_blob(
         &self,
-        sidecar: &BlobTransactionSidecar,
+        sidecar: &BlobTransactionSidecarVariant,
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         sidecar.validate(&self.blob_versioned_hashes, proof_settings)
@@ -764,7 +767,7 @@ impl From<TxEip4844WithSidecar> for TxEip4844 {
 /// This is defined in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#networking) as an element
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
 /// through the network (eth_sendRawTransaction/eth_sendTransaction).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -776,13 +779,17 @@ pub struct TxEip4844WithSidecar {
     pub tx: TxEip4844,
     /// The sidecar.
     #[cfg_attr(feature = "serde", serde(flatten))]
-    pub sidecar: BlobTransactionSidecar,
+    pub sidecar: BlobTransactionSidecarVariant,
 }
 
 impl TxEip4844WithSidecar {
-    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a [BlobTransactionSidecar].
+    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a
+    /// [BlobTransactionSidecarVariant].
     #[doc(alias = "from_transaction_and_sidecar")]
-    pub const fn from_tx_and_sidecar(tx: TxEip4844, sidecar: BlobTransactionSidecar) -> Self {
+    pub const fn from_tx_and_sidecar(
+        tx: TxEip4844,
+        sidecar: BlobTransactionSidecarVariant,
+    ) -> Self {
         Self { tx, sidecar }
     }
 
@@ -809,19 +816,20 @@ impl TxEip4844WithSidecar {
         &self.tx
     }
 
-    /// Get access to the inner sidecar [BlobTransactionSidecar].
-    pub const fn sidecar(&self) -> &BlobTransactionSidecar {
+    /// Get access to the inner sidecar [BlobTransactionSidecarVariant].
+    pub const fn sidecar(&self) -> &BlobTransactionSidecarVariant {
         &self.sidecar
     }
 
-    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar [BlobTransactionSidecar].
-    pub fn into_sidecar(self) -> BlobTransactionSidecar {
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar
+    /// [BlobTransactionSidecarVariant].
+    pub fn into_sidecar(self) -> BlobTransactionSidecarVariant {
         self.sidecar
     }
 
     /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844] and
-    /// [BlobTransactionSidecar].
-    pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
+    /// [BlobTransactionSidecarVariant].
+    pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecarVariant) {
         (self.tx, self.sidecar)
     }
 
@@ -978,7 +986,7 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let tx = TxEip4844::rlp_decode(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let sidecar = BlobTransactionSidecarVariant::rlp_decode_fields(buf)?;
         Ok(Self { tx, sidecar })
     }
 
@@ -990,7 +998,7 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
         let remaining = buf.len();
 
         let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let sidecar = BlobTransactionSidecarVariant::rlp_decode_fields(buf)?;
 
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
@@ -1002,11 +1010,16 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
-    use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
-    use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, bytes, PrimitiveSignature as Signature, U256};
+    use super::*;
+    use crate::TxEnvelope;
+    use alloy_eips::{
+        eip2930::AccessList, eip4844::env_settings::EnvKzgSettings,
+        eip7594::BlobTransactionSidecarVariant, Encodable2718,
+    };
+    use alloy_primitives::{address, b256, bytes, hex, PrimitiveSignature as Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
+    use assert_matches::assert_matches;
+    use std::path::PathBuf;
 
     #[test]
     fn different_sidecar_same_hash() {
@@ -1025,11 +1038,11 @@ mod tests {
             max_fee_per_blob_gas: 1,
             input: Default::default(),
         };
-        let sidecar = BlobTransactionSidecar {
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
             blobs: vec![[2; 131072].into()],
             commitments: vec![[3; 48].into()],
             proofs: vec![[4; 48].into()],
-        };
+        });
         let mut tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature();
 
@@ -1037,11 +1050,11 @@ mod tests {
         let expected_signed = tx.clone().into_signed(signature);
 
         // change the sidecar, adding a single (blob, commitment, proof) pair
-        tx.sidecar = BlobTransactionSidecar {
+        tx.sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
             blobs: vec![[1; 131072].into()],
             commitments: vec![[1; 48].into()],
             proofs: vec![[1; 48].into()],
-        };
+        });
 
         // turn this transaction into_signed
         let actual_signed = tx.into_signed(signature);
@@ -1100,5 +1113,65 @@ mod tests {
             *signed.hash(),
             b256!("93fc9daaa0726c3292a2e939df60f7e773c6a6a726a61ce43f4a217c64d85e87")
         );
+    }
+
+    #[test]
+    fn decode_raw_7594_rlp() {
+        let kzg_settings = EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/7594rlp");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let tx = TxEip4844WithSidecar::eip2718_decode(&mut raw.as_ref())
+                .map_err(|err| {
+                    panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+                })
+                .unwrap();
+
+            // Test roundtrip
+            let encoded = tx.encoded_2718();
+            assert_eq!(encoded.as_slice(), &raw[..], "{:?}", entry.path());
+
+            let TxEip4844WithSidecar { tx, sidecar } = tx.tx();
+            assert_matches!(sidecar, BlobTransactionSidecarVariant::Eip7594(_));
+
+            let result = sidecar.validate(&tx.blob_versioned_hashes, kzg_settings.get());
+            assert_matches!(result, Ok(()));
+        }
+    }
+
+    #[test]
+    fn decode_raw_7594_rlp_invalid() {
+        let kzg_settings = EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/7594rlp-invalid");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+
+            // TODO: fix emptiness check
+            if entry.path().file_name().and_then(|f| f.to_str()) == Some("0.rlp") {
+                continue;
+            }
+
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let tx = TxEip4844WithSidecar::eip2718_decode(&mut raw.as_ref())
+                .map_err(|err| {
+                    panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+                })
+                .unwrap();
+
+            // Test roundtrip
+            let encoded = tx.encoded_2718();
+            assert_eq!(encoded.as_slice(), &raw[..], "{:?}", entry.path());
+
+            let TxEip4844WithSidecar { tx, sidecar } = tx.tx();
+            assert_matches!(sidecar, BlobTransactionSidecarVariant::Eip7594(_));
+
+            let result = sidecar.validate(&tx.blob_versioned_hashes, kzg_settings.get());
+            assert_matches!(result, Err(_));
+        }
     }
 }
