@@ -1,6 +1,6 @@
 use crate::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, Network, NetworkWallet, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use alloy_primitives::{map::AddressHashMap, Address, PrimitiveSignature as Signature};
+use alloy_primitives::{map::AddressHashMap, Address, Signature};
 use std::{fmt::Debug, sync::Arc};
 
 use super::Ethereum;

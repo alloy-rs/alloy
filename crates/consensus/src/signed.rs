@@ -1,6 +1,6 @@
 use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
-use alloy_primitives::{PrimitiveSignature as Signature, B256};
+use alloy_primitives::{Signature, B256};
 use alloy_rlp::BufMut;
 use core::hash::{Hash, Hasher};
 #[cfg(not(feature = "std"))]
