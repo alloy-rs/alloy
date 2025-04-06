@@ -8,8 +8,8 @@ use alloy_rpc_types_eth::Block;
 use alloy_transport::TransportResult;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait AnvilApi<N: Network>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
@@ -151,8 +151,8 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     ) -> TransportResult<TxHash>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> AnvilApi<N> for P
 where
     N: Network,

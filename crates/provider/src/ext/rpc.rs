@@ -6,15 +6,15 @@ use alloy_transport::TransportResult;
 
 /// The rpc API provides methods to get information about the RPC server itself, such as the enabled
 /// namespaces.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait RpcApi<N>: Send + Sync {
     /// Lists the enabled RPC namespaces and the versions of each.
     async fn rpc_modules(&self) -> TransportResult<RpcModules>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> RpcApi<N> for P
 where
     N: Network,

@@ -37,5 +37,5 @@ tower.workspace = true
 tracing.workspace = true
 parking_lot.workspace = true
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(target_family = "wasm")'.dependencies]
 wasmtimer.workspace = true

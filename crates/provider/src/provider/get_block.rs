@@ -335,10 +335,7 @@ where
         let stream = self
             .poller
             .into_stream()
-            .then(move |hashes| {
-                let client = client.clone();
-                async move { utils::hashes_to_blocks(hashes, client, kind.into()).await }
-            })
+            .then(move |hashes| utils::hashes_to_blocks(hashes, client.clone(), kind.into()))
             .flat_map(|res| {
                 futures::stream::iter(match res {
                     Ok(blocks) => {
@@ -348,16 +345,7 @@ where
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
-
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            stream.boxed()
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            stream.boxed_local()
-        }
+        Box::pin(stream)
     }
 }
 
@@ -439,12 +427,12 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
             })
             .filter_map(|result| futures::future::ready(result.transpose()));
 
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(target_family = "wasm"))]
         {
             Ok(stream.boxed())
         }
 
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(target_family = "wasm")]
         {
             Ok(stream.boxed_local())
         }

@@ -21,13 +21,13 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::{
     std::Instant,
     tokio::{interval, sleep_until},
 };
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use {
     std::time::Instant,
     tokio::time::{interval, sleep_until},
@@ -628,7 +628,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {
@@ -638,7 +638,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {

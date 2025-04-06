@@ -12,8 +12,8 @@ use futures::lock::Mutex;
 use std::sync::Arc;
 
 /// A trait that determines the behavior of filling nonces.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
     /// Get the next nonce for the given account.
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
@@ -32,8 +32,8 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
 #[non_exhaustive]
 pub struct SimpleNonceManager;
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for SimpleNonceManager {
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -57,8 +57,8 @@ pub struct CachedNonceManager {
     nonces: Arc<DashMap<Address, Arc<Mutex<u64>>>>,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for CachedNonceManager {
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where

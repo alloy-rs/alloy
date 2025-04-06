@@ -43,8 +43,8 @@ impl<N: Network> DynProvider<N> {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N: Network> Provider<N> for DynProvider<N> {
     fn root(&self) -> &RootProvider<N> {
         self.0.root()
