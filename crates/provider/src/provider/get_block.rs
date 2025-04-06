@@ -349,12 +349,12 @@ where
                 })
             });
 
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(target_family = "wasm"))]
         {
             stream.boxed()
         }
 
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(target_family = "wasm")]
         {
             stream.boxed_local()
         }
@@ -439,12 +439,12 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
             })
             .filter_map(|result| futures::future::ready(result.transpose()));
 
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(target_family = "wasm"))]
         {
             Ok(stream.boxed())
         }
 
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(target_family = "wasm")]
         {
             Ok(stream.boxed_local())
         }
