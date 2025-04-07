@@ -36,7 +36,7 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 }
 
-impl<T: Encodable> AnyReceiptEnvelope<T> {
+impl<T: Encodable + Send + Sync + AsRef<Log>> AnyReceiptEnvelope<T> {
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
         let length = self.inner.length();

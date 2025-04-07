@@ -2,7 +2,10 @@ use crate::receipt::{
     Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
 use alloc::{vec, vec::Vec};
-use alloy_eips::{eip2718::Encodable2718, Typed2718};
+use alloy_eips::{
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
+    Typed2718,
+};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
@@ -115,24 +118,9 @@ impl<T: Encodable> Receipt<T> {
     pub fn rlp_header_with_bloom(&self, bloom: &Bloom) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length_with_bloom(bloom) }
     }
-
-    /// Returns RLP header for this receipt encoding without a [`Bloom`].
-    pub fn rlp_header(&self) -> Header {
-        let fields_length =
-            self.status.length() + self.cumulative_gas_used.length() + self.logs.length();
-        Header { list: true, payload_length: fields_length }
-    }
-
-    /// RLP-encodes the receipt without a [`Bloom`].
-    pub fn rlp_encode(&self, out: &mut dyn BufMut) {
-        self.rlp_header().encode(out);
-        self.status.encode(out);
-        self.cumulative_gas_used.encode(out);
-        self.logs.encode(out);
-    }
 }
 
-impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
+impl<T: Encodable + Send + Sync + AsRef<Log>> RlpEncodableReceipt for Receipt<T> {
     fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize {
         self.rlp_header_with_bloom(bloom).length_with_payload()
     }
@@ -141,14 +129,35 @@ impl<T: Encodable> RlpEncodableReceipt for Receipt<T> {
         self.rlp_header_with_bloom(bloom).encode(out);
         self.rlp_encode_fields_with_bloom(bloom, out);
     }
+}
 
-    fn rlp_encoded_length(&self) -> usize {
-        self.rlp_header().length_with_payload()
+impl<T: Encodable + Send + Sync> Typed2718 for Receipt<T> {
+    fn ty(&self) -> u8 {
+        0
+    }
+}
+
+impl<T: Encodable + Send + Sync + AsRef<Log>> Encodable2718 for Receipt<T> {
+    fn encode_2718_len(&self) -> usize {
+        self.rlp_encoded_length_with_bloom(&self.bloom_slow())
     }
 
-    fn rlp_encode(&self, out: &mut dyn BufMut) {
-        self.rlp_header().encode(out);
-        self.rlp_encode(out);
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_with_bloom(&self.bloom_slow(), out);
+    }
+}
+
+impl<T: Decodable> Decodable2718 for Receipt<T> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if ty != 0 {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+        Self::fallback_decode(buf)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let receipt = Self::rlp_decode_fields_with_bloom(buf)?;
+        Ok(receipt.receipt)
     }
 }
 
@@ -165,17 +174,6 @@ impl<T: Decodable> Receipt<T> {
         let logs = Decodable::decode(buf)?;
 
         Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
-    }
-
-    /// RLP-decodes receipt's fields without a [`Bloom`].
-    ///
-    /// Does not expect an RLP header.
-    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let status = Decodable::decode(buf)?;
-        let cumulative_gas_used = Decodable::decode(buf)?;
-        let logs = Decodable::decode(buf)?;
-
-        Ok(Self { status, cumulative_gas_used, logs })
     }
 }
 
@@ -195,14 +193,6 @@ impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
         }
 
         Ok(this)
-    }
-
-    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        Self::rlp_decode_fields(buf)
     }
 }
 
@@ -531,7 +521,6 @@ pub(crate) mod serde_bincode_compat {
 mod test {
     use super::*;
     use crate::ReceiptEnvelope;
-    use alloy_primitives::{Address, Bytes, LogData, B256};
     use alloy_rlp::{Decodable, Encodable};
 
     const fn assert_tx_receipt<T: TxReceipt>() {}
@@ -596,106 +585,5 @@ mod test {
         let decoded = Receipts::<ReceiptEnvelope>::decode(&mut out).unwrap();
 
         assert_eq!(receipts, decoded);
-    }
-
-    #[test]
-    fn receipt_encodable_eip7642() {
-        let receipt = Receipt::<Log> {
-            status: Eip658Value::Eip658(true),
-            cumulative_gas_used: 1000,
-            logs: vec![
-                Log {
-                    address: Address::ZERO,
-                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
-                },
-                Log {
-                    address: Address::ZERO,
-                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
-                },
-            ],
-        };
-
-        let mut out = vec![];
-        receipt.rlp_encode(&mut out);
-
-        assert_eq!(out.len(), receipt.rlp_encoded_length());
-
-        let header = alloy_rlp::Header::decode(&mut out.as_slice()).unwrap();
-        assert!(header.list);
-
-        let mut out_slice = out.as_slice();
-        let decoded = Receipt::<Log>::rlp_decode(&mut out_slice).unwrap();
-        assert_eq!(receipt, decoded);
-    }
-
-    #[test]
-    fn receipt_decode_eip7642() {
-        let receipt = Receipt::<Log> {
-            status: Eip658Value::Eip658(true),
-            cumulative_gas_used: 0,
-            logs: Vec::new(),
-        };
-
-        let mut out = vec![];
-        receipt.rlp_encode(&mut out);
-        let mut out = out.as_slice();
-        let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
-
-        assert_eq!(receipt, decoded);
-    }
-
-    #[test]
-    fn receipt_decode_with_logs() {
-        let receipt = Receipt::<Log> {
-            status: Eip658Value::Eip658(false),
-            cumulative_gas_used: 1000,
-            logs: vec![
-                Log {
-                    address: Address::ZERO,
-                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
-                },
-                Log {
-                    address: Address::ZERO,
-                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
-                },
-            ],
-        };
-
-        let mut out = vec![];
-        receipt.rlp_encode(&mut out);
-        let mut out = out.as_slice();
-        let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
-
-        assert_eq!(receipt, decoded);
-    }
-
-    #[test]
-    fn receipt_decode_various_status() {
-        let receipts = vec![
-            Receipt::<Log> {
-                status: Eip658Value::Eip658(true),
-                cumulative_gas_used: 1000,
-                logs: vec![Log {
-                    address: Address::ZERO,
-                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[1, 2, 3])),
-                }],
-            },
-            Receipt::<Log> {
-                status: Eip658Value::Eip658(false),
-                cumulative_gas_used: 2000,
-                logs: vec![Log {
-                    address: Address::ZERO,
-                    data: LogData::new_unchecked(vec![B256::ZERO], Bytes::from_static(&[4, 5, 6])),
-                }],
-            },
-        ];
-
-        for receipt in receipts {
-            let mut out = vec![];
-            receipt.rlp_encode(&mut out);
-            let mut out = out.as_slice();
-            let decoded = Receipt::<Log>::rlp_decode(&mut out).unwrap();
-            assert_eq!(receipt, decoded);
-        }
     }
 }

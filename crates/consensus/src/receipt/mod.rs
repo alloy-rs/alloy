@@ -11,7 +11,10 @@ pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 mod status;
 pub use status::Eip658Value;
 
-use alloy_eips::Typed2718;
+use alloy_eips::{
+    eip2718::{Decodable2718, Encodable2718},
+    Typed2718,
+};
 
 /// Bincode-compatible serde implementations for receipt types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -83,29 +86,20 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     fn logs(&self) -> &[Self::Log];
 }
 
-/// Receipt type that knows how to encode itself with and without a [`Bloom`] value.
+/// Receipt type that knows how to encode itself with a [`Bloom`] value.
 #[auto_impl::auto_impl(&)]
-pub trait RlpEncodableReceipt {
+pub trait RlpEncodableReceipt: Encodable2718 {
     /// Returns the length of the receipt payload with the provided bloom filter.
     fn rlp_encoded_length_with_bloom(&self, bloom: &Bloom) -> usize;
 
     /// RLP encodes the receipt with the provided bloom filter.
     fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
-
-    /// Returns the length of the receipt payload without the bloom filter.
-    fn rlp_encoded_length(&self) -> usize;
-
-    /// RLP encodes the receipt without the bloom filter.
-    fn rlp_encode(&self, out: &mut dyn BufMut);
 }
 
 /// Receipt type that knows how to decode itself with a [`Bloom`] value.
-pub trait RlpDecodableReceipt: Sized {
+pub trait RlpDecodableReceipt: Sized + Decodable2718 {
     /// RLP decodes receipt and [`Bloom`] into [`ReceiptWithBloom`] instance.
     fn rlp_decode_with_bloom(buf: &mut &[u8]) -> alloy_rlp::Result<ReceiptWithBloom<Self>>;
-
-    /// RLP decodes receipt's fields without a [`Bloom`].
-    fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 }
 
 /// Receipt type that knows its EIP-2718 encoding.
@@ -120,12 +114,6 @@ pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {
 
     /// EIP-2718 encodes the receipt with the provided bloom filter.
     fn eip2718_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
-
-    /// EIP-2718 encoded length without the bloom filter.
-    fn eip2718_encoded_length(&self) -> usize;
-
-    /// EIP-2718 encodes the receipt without the bloom filter.
-    fn eip2718_encode(&self, out: &mut dyn BufMut);
 }
 
 #[cfg(test)]

@@ -96,14 +96,6 @@ mod tests {
             }
             self.eip2718_encode_with_bloom(bloom, out);
         }
-
-        fn rlp_encoded_length(&self) -> usize {
-            self.receipt.rlp_encoded_length() + (!self.ty.is_legacy()) as usize
-        }
-
-        fn rlp_encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-            self.receipt.rlp_encode(out);
-        }
     }
 
     impl Eip2718EncodableReceipt for TypedReceipt {
@@ -121,13 +113,15 @@ mod tests {
             }
             self.receipt.rlp_encode_with_bloom(bloom, out);
         }
+    }
 
-        fn eip2718_encoded_length(&self) -> usize {
-            self.receipt.rlp_encoded_length() + (!self.ty.is_legacy()) as usize
+    impl Encodable2718 for TypedReceipt {
+        fn encode_2718_len(&self) -> usize {
+            self.eip2718_encoded_length_with_bloom(&self.receipt.bloom_slow())
         }
 
-        fn eip2718_encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-            self.receipt.rlp_encode(out);
+        fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+            self.eip2718_encode_with_bloom(&self.receipt.bloom_slow(), out);
         }
     }
 
