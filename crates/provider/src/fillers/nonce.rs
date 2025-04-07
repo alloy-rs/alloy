@@ -78,8 +78,10 @@ impl NonceManager for CachedNonceManager {
         let mut nonce = nonce.lock().await;
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
+            trace!("fetching nonce for {address} | current nonce: {}", *nonce);
             provider.get_transaction_count(address).await?
         } else {
+            trace!("incrementing nonce for {address} | current nonce: {}", *nonce);
             *nonce + 1
         };
         *nonce = new_nonce;
@@ -116,7 +118,7 @@ impl NonceManager for CachedNonceManager {
 /// # }
 /// ```
 #[derive(Clone, Debug, Default)]
-pub struct NonceFiller<M: NonceManager = SimpleNonceManager> {
+pub struct NonceFiller<M: NonceManager = CachedNonceManager> {
     nonce_manager: M,
 }
 
