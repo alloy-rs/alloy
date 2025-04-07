@@ -36,7 +36,7 @@ pub trait Spawnable {
     fn spawn_task(self);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + Send + 'static,
@@ -46,7 +46,7 @@ where
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + 'static,

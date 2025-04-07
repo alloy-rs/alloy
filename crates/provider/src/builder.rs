@@ -188,7 +188,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// See [`SimpleNonceManager`] for more information.
     pub fn with_simple_nonce_management(
         self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
+    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<SimpleNonceManager>>, N> {
         self.with_nonce_management(SimpleNonceManager::default())
     }
 
@@ -197,7 +197,7 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// See [`CachedNonceManager`] for more information.
     pub fn with_cached_nonce_management(
         self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<CachedNonceManager>>, N> {
+    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
         self.with_nonce_management(CachedNonceManager::default())
     }
 

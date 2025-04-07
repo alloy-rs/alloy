@@ -13,6 +13,7 @@ use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
+    eip7594::CELLS_PER_EXT_BLOB,
     eip7685::Requests,
     BlockNumHash,
 };
@@ -213,6 +214,31 @@ pub struct ExecutionPayloadEnvelopeV4 {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub envelope_inner: ExecutionPayloadEnvelopeV3,
 
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+}
+
+/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
+/// V5.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#engine_getpayloadv5>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct ExecutionPayloadEnvelopeV5 {
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload. See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
     /// A list of opaque [EIP-7685][eip7685] requests.
     ///
     /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
@@ -870,7 +896,7 @@ impl BlobsBundleV2 {
     pub fn take(&mut self, len: usize) -> (Vec<Bytes48>, Vec<Bytes48>, Vec<Blob>) {
         (
             self.commitments.drain(0..len).collect(),
-            self.cell_proofs.drain(0..len).collect(),
+            self.cell_proofs.drain(0..len * CELLS_PER_EXT_BLOB as usize).collect(),
             self.blobs.drain(0..len).collect(),
         )
     }
