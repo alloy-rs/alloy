@@ -4,8 +4,8 @@ use alloy_network::Network;
 use alloy_transport::TransportResult;
 
 /// Net namespace rpc interface that provides access to network information of the node.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait NetApi<N>: Send + Sync {
     /// Returns a `bool` indicating whether or not the node is listening for network connections.
     async fn net_listening(&self) -> TransportResult<bool>;
@@ -15,8 +15,8 @@ pub trait NetApi<N>: Send + Sync {
     async fn net_version(&self) -> TransportResult<u64>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> NetApi<N> for P
 where
     N: Network,

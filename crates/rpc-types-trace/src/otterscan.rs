@@ -1,7 +1,7 @@
 //! Otterscan specific types for RPC responses.
 //!
 //! <https://www.quicknode.com/docs/ethereum/ots_getBlockTransactions>
-//! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
+//! <https://github.com/otterscan/otterscan/blob/v2.6.1/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawals};

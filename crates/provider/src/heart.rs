@@ -21,13 +21,13 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::{
     std::Instant,
     tokio::{interval, sleep_until},
 };
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use {
     std::time::Instant,
     tokio::time::{interval, sleep_until},
@@ -335,6 +335,12 @@ impl PendingTransactionConfig {
     }
 }
 
+impl From<TxHash> for PendingTransactionConfig {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::new(tx_hash)
+    }
+}
+
 /// Errors which may occur in heartbeat when watching a transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum WatchTxError {
@@ -622,7 +628,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {
@@ -632,7 +638,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {

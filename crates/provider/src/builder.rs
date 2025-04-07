@@ -240,7 +240,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Add simple nonce management to the stack being built.
     ///
     /// See [`SimpleNonceManager`] for more information.
-    pub fn with_simple_nonce_management(self) -> ProviderBuilder<L, JoinFill<F, NonceFiller>, N> {
+    pub fn with_simple_nonce_management(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<F, NonceFiller<SimpleNonceManager>>, N> {
         self.with_nonce_management(SimpleNonceManager::default())
     }
 
