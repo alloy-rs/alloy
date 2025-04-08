@@ -92,8 +92,8 @@ alloy-hardforks = "0.1.0"
 # ethereum
 ethereum_ssz_derive = "0.9"
 ethereum_ssz = "0.9"
-tree_hash = "0.9.1"
-tree_hash_derive = "0.9.1"
+tree_hash = "0.10.0"
+tree_hash_derive = "0.10.0"
 
 # crypto
 c-kzg = { version = "2.1", default-features = false }
