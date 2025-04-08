@@ -185,16 +185,16 @@ where
                     // Ref: <https://github.com/alloy-rs/alloy/issues/2117>
                     // Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
                     tracing::trace!(pending_block = ?block.to_string());
-                    if block.get("hash").map_or(true, |v| v.is_null()) {
+                    if block.get("hash").is_none_or(|v| v.is_null()) {
                         block["hash"] = Value::String(format!("{}", B256::ZERO));
                     }
 
-                    if block.get("nonce").map_or(true, |v| v.is_null()) {
+                    if block.get("nonce").is_none_or(|v| v.is_null()) {
                         block["nonce"] = Value::String(format!("{}", B64::ZERO));
                     }
 
-                    if block.get("miner").map_or(true, |v| v.is_null())
-                        || block.get("beneficiary").map_or(true, |v| v.is_null())
+                    if block.get("miner").is_none_or(|v| v.is_null())
+                        || block.get("beneficiary").is_none_or(|v| v.is_null())
                     {
                         block["miner"] = Value::String(format!("{}", Address::ZERO));
                     }

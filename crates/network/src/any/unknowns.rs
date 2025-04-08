@@ -200,7 +200,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn is_create(&self) -> bool {
-        self.fields.get("to").map_or(true, |v| v.is_null())
+        self.fields.get("to").is_none_or(|v| v.is_null())
     }
 
     #[inline]

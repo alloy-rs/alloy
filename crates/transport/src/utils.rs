@@ -21,7 +21,7 @@ where
 pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     fn _guess_local_url(url: &str) -> bool {
         url.parse::<Url>().is_ok_and(|url| {
-            url.host_str().map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+            url.host_str().is_none_or(|host| host == "localhost" || host == "127.0.0.1")
         })
     }
     _guess_local_url(s.as_ref())
