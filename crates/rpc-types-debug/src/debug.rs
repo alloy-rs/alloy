@@ -26,8 +26,8 @@ pub struct ExecutionWitness {
     ///
     /// This field is expected to be empty in the future because:
     /// - EIP-2935 (Prague) will include block hashes directly in the state
-    /// - Verkle/Delayed execution will change the block structure to contain the
-    /// pre-state root instead of the post-state root.
+    /// - Verkle/Delayed execution will change the block structure to contain the pre-state root
+    ///   instead of the post-state root.
     ///
     /// Once both of these upgrades have been implemented, this field will be empty
     /// moving forward because the data that this was proving will either be in the
