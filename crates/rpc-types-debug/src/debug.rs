@@ -25,7 +25,7 @@ pub struct ExecutionWitness {
     /// ## Why this field will be empty in the future
     ///
     /// This field is expected to be empty in the future because:
-    /// - EIP-2935 (Parague) will include block hashes directly in the state
+    /// - EIP-2935 (Prague) will include block hashes directly in the state
     /// - Verkle/Delayed execution will change the block structure to contain the
     /// pre-state root instead of the post-state root.
     ///
@@ -39,7 +39,7 @@ pub struct ExecutionWitness {
     /// which is (currently) equal to the post-state root of the previous block. We therefore
     /// need the previous block's header in order to prove that the state reads are correct.
     ///
-    /// Note: that while the pre-state root is located in the previous block, this field
+    /// Note: While the pre-state root is located in the previous block, this field
     /// will always have one or more items.
     ///
     /// ## BLOCKHASH Opcode Verification
