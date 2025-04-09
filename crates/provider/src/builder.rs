@@ -304,11 +304,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         W::NetworkWallet: Clone,
         N: Network,
     {
-        let wallet_filler = WalletFiller::new(wallet.into_wallet());
-
         ProviderBuilder {
             layer: self.layer,
-            filler: self.filler.push(wallet_filler),
+            filler: self.filler.push(WalletFiller::new(wallet.into_wallet())),
             network: PhantomData,
         }
     }
