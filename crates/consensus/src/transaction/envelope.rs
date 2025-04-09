@@ -1072,7 +1072,7 @@ mod serde_from {
 pub mod serde_bincode_compat {
     use crate::{EthereumTypedTransaction, Signed};
     use alloc::borrow::Cow;
-    use alloy_primitives::PrimitiveSignature as Signature;
+    use alloy_primitives::Signature;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
