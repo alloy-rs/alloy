@@ -686,6 +686,7 @@ pub(crate) mod serde_bincode_compat {
         use super::super::{serde_bincode_compat, EthereumTypedTransaction};
         use crate::TxEip4844;
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -708,8 +709,9 @@ pub(crate) mod serde_bincode_compat {
                 .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }

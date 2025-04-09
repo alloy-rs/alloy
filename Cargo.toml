@@ -141,6 +141,9 @@ serde = { version = "1.0", default-features = false, features = [
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = { version = "3", default-features = false, features = ["macros"] }
 
+# bincode
+bincode = "2.0"
+
 # misc
 auto_impl = "1.2"
 base64 = "0.22"
