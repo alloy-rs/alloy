@@ -160,7 +160,7 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
     ///
     ///     let my_contract = Counter::deploy(provider).await.unwrap();
     ///
@@ -202,7 +202,7 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let provider = ProviderBuilder::new().on_anvil_with_wallet();
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
     ///
     ///     let my_contract = Counter::deploy(&provider).await.unwrap();
     ///
@@ -328,7 +328,7 @@ impl<P: Provider<N>, N: Network> RawCallBuilder<P, N> {
     /// # stringify!(
     /// let provider = ...;
     /// # );
-    /// # let provider = alloy_provider::ProviderBuilder::new().on_anvil();
+    /// # let provider = alloy_provider::ProviderBuilder::new().connect_anvil();
     /// let call_builder = MyContract::deploy_builder(&provider)
     ///     .with_sol_decoder::<MyContract::constructorReturnCall>();
     /// let result = call_builder.call().await?;
@@ -635,7 +635,7 @@ mod tests {
             }
         }
 
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let call_builder = EmptyConstructor::deploy_builder(&provider);
         assert_eq!(*call_builder.calldata(), bytes!("6942"));
     }
@@ -671,9 +671,8 @@ mod tests {
     }
 
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    #[allow(clippy::type_complexity)]
     fn build_call_builder() -> CallBuilder<impl Provider, PhantomData<MyContract::doStuffCall>> {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         call_builder
@@ -738,7 +737,7 @@ mod tests {
 
     #[test]
     fn call_encoding() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let contract = MyContract::new(Address::ZERO, &&provider).with_cloned_provider();
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         assert_eq!(
@@ -756,7 +755,7 @@ mod tests {
 
     #[test]
     fn deploy_encoding() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let bytecode = &MyContract::BYTECODE[..];
         let call_builder = MyContract::deploy_builder(&provider, false);
         assert_eq!(
@@ -780,7 +779,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let expected_address = provider.default_signer_address().create(0);
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
@@ -806,7 +805,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call_with_priority() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
         let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
         let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
         let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
@@ -859,7 +858,8 @@ mod tests {
 
         let wallet = EthereumWallet::new(pk);
 
-        let wallet_provider = ProviderBuilder::new().wallet(wallet).on_http(anvil.endpoint_url());
+        let wallet_provider =
+            ProviderBuilder::new().wallet(wallet).connect_http(anvil.endpoint_url());
 
         let contract = SendMoney::deploy(wallet_provider.clone()).await.unwrap();
 
@@ -870,7 +870,7 @@ mod tests {
 
         assert!(tx.from.is_none());
 
-        let std_provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
+        let std_provider = ProviderBuilder::new().connect_http(anvil.endpoint_url());
         let should_fail = std_provider.estimate_gas(tx.clone()).await.is_err();
 
         assert!(should_fail);
@@ -897,7 +897,7 @@ mod tests {
             }
         }
 
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let contract = RetStruct::deploy(provider.clone()).await.unwrap();
 
