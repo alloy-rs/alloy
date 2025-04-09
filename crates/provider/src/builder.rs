@@ -9,7 +9,7 @@ use crate::{
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, EthereumWallet, IntoWallet, Network};
+use alloy_network::{Ethereum, EthereumWallet, IntoWallet, Network, NetworkWallet};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -162,106 +162,6 @@ impl<L, N: Network> ProviderBuilder<L, Identity, N> {
             network: PhantomData,
         }
     }
-
-    /// Add gas estimation to the stack being built.
-    ///
-    /// See [`GasFiller`] for more information.
-    pub fn with_gas_estimation(self) -> ProviderBuilder<L, Fillers<(GasFiller,), N>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: Fillers::new((GasFiller,)),
-            network: PhantomData,
-        }
-    }
-
-    /// Add nonce management to the stack being built.
-    ///
-    /// See [`NonceFiller`] for more information.
-    pub fn with_nonce_management<M: NonceManager>(
-        self,
-        nonce_manager: M,
-    ) -> ProviderBuilder<L, Fillers<(NonceFiller<M>,), N>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: Fillers::new((NonceFiller::new(nonce_manager),)),
-            network: PhantomData,
-        }
-    }
-
-    /// Add simple nonce management to the stack being built.
-    ///
-    /// See [`SimpleNonceManager`] for more information.
-    pub fn with_simple_nonce_management(self) -> ProviderBuilder<L, Fillers<(NonceFiller,), N>, N> {
-        self.with_nonce_management(SimpleNonceManager::default())
-    }
-
-    /// Add cached nonce management to the stack being built.
-    ///
-    /// See [`CachedNonceManager`] for more information.
-    pub fn with_cached_nonce_management(
-        self,
-    ) -> ProviderBuilder<L, Fillers<(NonceFiller<CachedNonceManager>,), N>, N> {
-        self.with_nonce_management(CachedNonceManager::default())
-    }
-
-    /// Add a chain ID filler to the stack being built. The filler will attempt
-    /// to fetch the chain ID from the provider using
-    /// [`Provider::get_chain_id`]. the first time a transaction is prepared,
-    /// and will cache it for future transactions.
-    pub fn fetch_chain_id(self) -> ProviderBuilder<L, Fillers<(ChainIdFiller,), N>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: Fillers::new((ChainIdFiller::default(),)),
-            network: PhantomData,
-        }
-    }
-
-    /// Add a specific chain ID to the stack being built. The filler will
-    /// fill transactions with the provided chain ID, regardless of the chain ID
-    /// that the provider reports via [`Provider::get_chain_id`].
-    pub fn with_chain_id(
-        self,
-        chain_id: ChainId,
-    ) -> ProviderBuilder<L, Fillers<(ChainIdFiller,), N>, N> {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: Fillers::new((ChainIdFiller::new(Some(chain_id)),)),
-            network: PhantomData,
-        }
-    }
-}
-
-impl<L, F, N: Network> ProviderBuilder<L, F, N> {
-    /// Add a transaction filler to the stack being built. Transaction fillers
-    /// are used to fill in missing fields on transactions before they are sent,
-    /// and are all joined to form the outermost layer of the stack.
-    pub fn filler<F2: TxFiller<N>>(self, filler: F2) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
-    where
-        F: Pushable<F2, N>,
-    {
-        ProviderBuilder {
-            layer: self.layer,
-            filler: self.filler.push(filler),
-            network: PhantomData,
-        }
-    }
-
-    /// Add a wallet layer to the stack being built.
-    ///
-    /// See [`WalletFiller`].
-    pub fn wallet<W: IntoWallet<N>>(self, wallet: W) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
-    where
-        F: Pushable<WalletFiller<W::NetworkWallet>, N>,
-        W::NetworkWallet: Clone,
-    {
-        let wallet_filler = WalletFiller::new(wallet.into_wallet());
-
-        ProviderBuilder {
-            layer: self.layer,
-            filler: self.filler.push(wallet_filler),
-            network: PhantomData,
-        }
-    }
 }
 
 impl<L, F, N> ProviderBuilder<L, F, N> {
@@ -310,6 +210,119 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     pub fn with_chain(self, chain: NamedChain) -> ProviderBuilder<Stack<ChainLayer, L>, F, N> {
         self.layer(ChainLayer::new(chain))
     }
+
+    // --- Fillers ---
+
+    /// Add gas estimation to the stack being built.
+    ///
+    /// See [`GasFiller`] for more information.
+    pub fn with_gas_estimation(self) -> ProviderBuilder<L, Fillers<(GasFiller,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: Fillers::new((GasFiller,)),
+            network: PhantomData,
+        }
+    }
+
+    /// Add nonce management to the stack being built.
+    ///
+    /// See [`NonceFiller`] for more information.
+    pub fn with_nonce_management<M: NonceManager>(
+        self,
+        nonce_manager: M,
+    ) -> ProviderBuilder<L, Fillers<(NonceFiller<M>,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: Fillers::new((NonceFiller::new(nonce_manager),)),
+            network: PhantomData,
+        }
+    }
+
+    /// Add simple nonce management to the stack being built.
+    ///
+    /// See [`SimpleNonceManager`] for more information.
+    pub fn with_simple_nonce_management(
+        self,
+    ) -> ProviderBuilder<L, Fillers<(NonceFiller<SimpleNonceManager>,), N>, N> {
+        self.with_nonce_management(SimpleNonceManager::default())
+    }
+
+    /// Add cached nonce management to the stack being built.
+    ///
+    /// See [`CachedNonceManager`] for more information.
+    pub fn with_cached_nonce_management(self) -> ProviderBuilder<L, Fillers<(NonceFiller,), N>, N> {
+        self.with_nonce_management(CachedNonceManager::default())
+    }
+
+    /// Add a chain ID filler to the stack being built. The filler will attempt
+    /// to fetch the chain ID from the provider using
+    /// [`Provider::get_chain_id`]. the first time a transaction is prepared,
+    /// and will cache it for future transactions.
+    pub fn fetch_chain_id(self) -> ProviderBuilder<L, Fillers<(ChainIdFiller,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: Fillers::new((ChainIdFiller::default(),)),
+            network: PhantomData,
+        }
+    }
+
+    /// Add a specific chain ID to the stack being built. The filler will
+    /// fill transactions with the provided chain ID, regardless of the chain ID
+    /// that the provider reports via [`Provider::get_chain_id`].
+    pub fn with_chain_id(
+        self,
+        chain_id: ChainId,
+    ) -> ProviderBuilder<L, Fillers<(ChainIdFiller,), N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: Fillers::new((ChainIdFiller::new(Some(chain_id)),)),
+            network: PhantomData,
+        }
+    }
+
+    /// Add a transaction filler to the stack being built. Transaction fillers
+    /// are used to fill in missing fields on transactions before they are sent,
+    /// and are all joined to form the outermost layer of the stack.
+    pub fn filler<F2: TxFiller<N>>(self, filler: F2) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
+    where
+        F: Pushable<F2, N>,
+        N: Network,
+    {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: self.filler.push(filler),
+            network: PhantomData,
+        }
+    }
+
+    /// Add a wallet layer to the stack being built.
+    ///
+    /// See [`WalletFiller`].
+    pub fn wallet<W: IntoWallet<N>>(self, wallet: W) -> ProviderBuilder<L, Fillers<F::Pushed, N>, N>
+    where
+        F: Pushable<WalletFiller<W::NetworkWallet>, N>,
+        W::NetworkWallet: Clone,
+        N: Network,
+    {
+        let wallet_filler = WalletFiller::new(wallet.into_wallet());
+
+        ProviderBuilder {
+            layer: self.layer,
+            filler: self.filler.push(wallet_filler),
+            network: PhantomData,
+        }
+    }
+
+    // --- Layers ---
+
+    /// Aggregate multiple `eth_call` requests into a single batch request using Multicall3.
+    ///
+    /// See [`CallBatchLayer`] for more information.
+    pub fn with_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
+        self.layer(CallBatchLayer::new())
+    }
+
+    // --- Build to Provider ---
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
     /// the final [`Provider`] type with all stack components.
@@ -416,7 +429,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     #[cfg(any(test, feature = "reqwest"))]
     pub fn on_http(self, url: reqwest::Url) -> F::Provider
     where
-        L: ProviderLayer<crate::RootProvider<N>, N>,
+        L: ProviderLayer<RootProvider<N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
         N: Network,
     {
@@ -428,68 +441,39 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> F::Provider
     where
-        L: ProviderLayer<crate::RootProvider<N>, N>,
+        L: ProviderLayer<RootProvider<N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
         N: Network,
     {
         let client = ClientBuilder::default().hyper_http(url);
         self.on_client(client)
     }
-
-    /// Aggregate multiple `eth_call` requests into a single batch request using Multicall3.
-    ///
-    /// See [`CallBatchLayer`] for more information.
-    pub fn with_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
-        self.layer(CallBatchLayer::new())
-    }
 }
 
 #[cfg(any(test, feature = "anvil-node"))]
 type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 
-// Enabled when the `anvil` feature is enabled, or when both in test and the
-// `reqwest` feature is enabled.
 #[cfg(any(test, feature = "anvil-node"))]
-impl<L, F> ProviderBuilder<L, F, Ethereum> {
-    /// Build this provider with anvil, using the BoxTransport.
+impl<L, F, N: Network> ProviderBuilder<L, F, N> {
+    /// Build this provider with a locally spawned anvil node.
     pub fn on_anvil(self) -> F::Provider
     where
-        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
-        L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<crate::provider::RootProvider>,
-        >,
+        L: ProviderLayer<crate::layers::AnvilProvider<RootProvider<N>, N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
     {
         self.on_anvil_with_config(std::convert::identity)
     }
 
-    /// Build this provider with anvil, using the BoxTransport. This
-    /// function configures a wallet backed by anvil keys, and is intended for
-    /// use in tests.
-    pub fn on_anvil_with_wallet(
-        self,
-    ) -> <Fillers<F::Pushed, Ethereum> as ProviderLayer<L::Provider>>::Provider
-    where
-        F: fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>,
-        L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<crate::provider::RootProvider>,
-        >,
-        Fillers<F::Pushed, Ethereum>: ProviderLayer<L::Provider> + TxFiller<Ethereum>,
-    {
-        self.on_anvil_with_wallet_and_config(std::convert::identity)
-            .expect("failed to build provider")
-    }
-
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance.
+    /// Build this provider with a locally spawned anvil node.
+    ///
+    /// The given function is used to configure the anvil instance.
     pub fn on_anvil_with_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> F::Provider
     where
-        F: TxFiller<Ethereum> + ProviderLayer<L::Provider, Ethereum>,
-        L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<crate::provider::RootProvider>,
-        >,
+        L: ProviderLayer<crate::layers::AnvilProvider<RootProvider<N>, N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
@@ -499,19 +483,39 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self.layer(anvil_layer).on_client(rpc_client)
     }
 
-    /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    /// Build this provider with a locally spawned anvil node.
+    ///
+    /// This function configures a wallet backed by anvil keys, and is intended for use in tests.
+    pub fn on_anvil_with_wallet(
+        self,
+    ) -> <Fillers<F::Pushed, N> as ProviderLayer<L::Provider, N>>::Provider
+    where
+        F: fillers::Pushable<WalletFiller<EthereumWallet>, N>,
+        L: crate::builder::ProviderLayer<
+            crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
+            N,
+        >,
+        Fillers<F::Pushed, N>: ProviderLayer<L::Provider, N> + TxFiller<N>,
+        EthereumWallet: NetworkWallet<N>,
+    {
+        self.on_anvil_with_wallet_and_config(std::convert::identity)
+            .expect("failed to build provider")
+    }
+
+    /// Build this provider with a locally spawned anvil node.
     #[allow(clippy::type_complexity)]
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> AnvilProviderResult<<Fillers<F::Pushed, Ethereum> as ProviderLayer<L::Provider>>::Provider>
+    ) -> AnvilProviderResult<<Fillers<F::Pushed, N> as ProviderLayer<L::Provider, N>>::Provider>
     where
-        F: fillers::Pushable<WalletFiller<EthereumWallet>, Ethereum>,
+        F: fillers::Pushable<WalletFiller<EthereumWallet>, N>,
         L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<crate::provider::RootProvider>,
+            crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
+            N,
         >,
-        Fillers<F::Pushed, Ethereum>: ProviderLayer<L::Provider> + TxFiller<Ethereum>,
+        Fillers<F::Pushed, N>: ProviderLayer<L::Provider, N> + TxFiller<N>,
+        EthereumWallet: NetworkWallet<N>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
@@ -527,28 +531,19 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     }
 }
 
-// Copyright (c) 2019 Tower Contributors
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Provider;
 
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-// DEALINGS IN THE SOFTWARE.
+    #[tokio::test]
+    async fn basic() {
+        let provider = ProviderBuilder::new()
+            .with_cached_nonce_management()
+            .with_call_batching()
+            .on_http("http://localhost:8545".parse().unwrap());
+        let _ = provider.get_account(Default::default());
+        let provider = provider.erased();
+        let _ = provider.get_account(Default::default());
+    }
+}

@@ -1,7 +1,7 @@
 //! Misc types related to the 4844
 
 use crate::eip4844::{Blob, Bytes48};
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 
 /// Blob type returned in responses to `engine_getBlobsV1`: <https://github.com/ethereum/execution-apis/pull/559>
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +20,6 @@ pub struct BlobAndProofV1 {
 pub struct BlobAndProofV2 {
     /// The blob data.
     pub blob: Box<Blob>,
-    /// The cell proof for the blob.
-    pub cell_proof: Bytes48,
+    /// The cell proofs for the blob.
+    pub proofs: Vec<Bytes48>,
 }

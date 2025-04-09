@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.13.0"
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.82"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/alloy"
@@ -140,6 +140,9 @@ serde = { version = "1.0", default-features = false, features = [
 ] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = { version = "3", default-features = false, features = ["macros"] }
+
+# bincode
+bincode = "2.0"
 
 # misc
 auto_impl = "1.2"

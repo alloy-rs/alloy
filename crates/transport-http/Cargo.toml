@@ -33,7 +33,7 @@ tower = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["json"], optional = true }
 tracing = { workspace = true, optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 http-body-util = { workspace = true, optional = true }
 hyper = { workspace = true, default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["full"], optional = true }

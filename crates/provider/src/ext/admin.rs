@@ -7,8 +7,8 @@ use alloy_rpc_types_admin::{NodeInfo, PeerInfo};
 use alloy_transport::TransportResult;
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait AdminApi<N>: Send + Sync {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
@@ -41,8 +41,8 @@ pub trait AdminApi<N>: Send + Sync {
     ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> AdminApi<N> for P
 where
     N: Network,

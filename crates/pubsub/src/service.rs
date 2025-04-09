@@ -13,6 +13,12 @@ use alloy_transport::{
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
 
+#[cfg(target_family = "wasm")]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_family = "wasm"))]
+use tokio::time::sleep;
+
 /// The service contains the backend handle, a subscription manager, and the
 /// configuration details required to reconnect.
 #[derive(Debug)]
@@ -66,7 +72,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Reconnect the backend, re-issue pending requests, and re-start active
     /// subscriptions.
     async fn reconnect(&mut self) -> TransportResult<()> {
-        info!("Reconnecting pubsub service backend.");
+        debug!("Reconnecting pubsub service backend");
 
         let mut old_handle = self.get_new_backend().await?;
 
@@ -199,23 +205,23 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Attempt to reconnect with retries
     async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
         let mut retry_count = 0;
+        let max_retries = self.retries;
         loop {
             match self.reconnect().await {
                 Ok(()) => break Ok(()),
                 Err(e) => {
                     retry_count += 1;
-                    if retry_count >= self.retries {
-                        error!(
-                            "Reconnect failed after {} attempts, shutting down: {e}",
-                            retry_count
-                        );
+                    if retry_count >= max_retries {
+                        error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
                         break Err(e);
                     }
+                    let duration = std::time::Duration::from_secs(3);
                     warn!(
-                        "Reconnection attempt {}/{} failed: {}. Retrying in 3 seconds...",
-                        retry_count, self.retries, e
+                        "Reconnection attempt {retry_count}/{max_retries} failed: {e}. \
+                         Retrying in {:.3}s...",
+                        duration.as_secs_f64(),
                     );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                    sleep(duration).await;
                 }
             }
         }

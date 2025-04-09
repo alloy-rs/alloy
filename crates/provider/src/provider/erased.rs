@@ -43,8 +43,8 @@ impl<N: Network> DynProvider<N> {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N: Network> Provider<N> for DynProvider<N> {
     fn root(&self) -> &RootProvider<N> {
         self.0.root()
@@ -241,6 +241,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         hash: TxHash,
     ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
         self.0.get_transaction_by_hash(hash)
+    }
+
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.0.get_transaction_by_sender_nonce(sender, nonce)
     }
 
     fn get_transaction_by_block_hash_and_index(

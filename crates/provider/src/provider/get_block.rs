@@ -185,16 +185,16 @@ where
                     // Ref: <https://github.com/alloy-rs/alloy/issues/2117>
                     // Geth ref: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
                     tracing::trace!(pending_block = ?block.to_string());
-                    if block.get("hash").map_or(true, |v| v.is_null()) {
+                    if block.get("hash").is_none_or(|v| v.is_null()) {
                         block["hash"] = Value::String(format!("{}", B256::ZERO));
                     }
 
-                    if block.get("nonce").map_or(true, |v| v.is_null()) {
+                    if block.get("nonce").is_none_or(|v| v.is_null()) {
                         block["nonce"] = Value::String(format!("{}", B64::ZERO));
                     }
 
-                    if block.get("miner").map_or(true, |v| v.is_null())
-                        || block.get("beneficiary").map_or(true, |v| v.is_null())
+                    if block.get("miner").is_none_or(|v| v.is_null())
+                        || block.get("beneficiary").is_none_or(|v| v.is_null())
                     {
                         block["miner"] = Value::String(format!("{}", Address::ZERO));
                     }
@@ -335,10 +335,7 @@ where
         let stream = self
             .poller
             .into_stream()
-            .then(move |hashes| {
-                let client = client.clone();
-                async move { utils::hashes_to_blocks(hashes, client, kind.into()).await }
-            })
+            .then(move |hashes| utils::hashes_to_blocks(hashes, client.clone(), kind.into()))
             .flat_map(|res| {
                 futures::stream::iter(match res {
                     Ok(blocks) => {
@@ -348,16 +345,7 @@ where
                     Err(err) => Either::Right(std::iter::once(Err(err))),
                 })
             });
-
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            stream.boxed()
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            stream.boxed_local()
-        }
+        Box::pin(stream)
     }
 }
 
@@ -439,12 +427,12 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
             })
             .filter_map(|result| futures::future::ready(result.transpose()));
 
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(target_family = "wasm"))]
         {
             Ok(stream.boxed())
         }
 
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(target_family = "wasm")]
         {
             Ok(stream.boxed_local())
         }

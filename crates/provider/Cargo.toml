@@ -67,9 +67,9 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 either.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(target_family = "wasm")'.dependencies]
 wasmtimer.workspace = true
 
 [dev-dependencies]
