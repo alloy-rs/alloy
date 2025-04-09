@@ -79,7 +79,7 @@ alloy-sol-types = { version = "1.0.0", default-features = false }
 alloy-rlp = { version = "0.3.9", default-features = false }
 alloy-trie = { version = "0.7.6", default-features = false }
 
-alloy-chains = { version = "0.1.18", default-features = false }
+alloy-chains = { version = "0.2", default-features = false }
 
 # eips
 alloy-eip2124 = { version = "0.1.0", default-features = false }
