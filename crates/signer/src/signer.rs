@@ -19,8 +19,8 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 /// Synchronous signers should implement both this trait and [`SignerSync`].
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[auto_impl(&mut, Box)]
 pub trait Signer<Sig = Signature> {
     /// Signs the given hash.
@@ -133,8 +133,8 @@ pub trait SignerSync<Sig = Signature> {
     fn chain_id_sync(&self) -> Option<ChainId>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[async_trait]
 impl<A, B, Sig> Signer<Sig> for Either<A, B>
 where
@@ -271,8 +271,8 @@ mod tests {
 
         struct UnimplementedSigner;
 
-        #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-        #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+        #[cfg_attr(target_family = "wasm", async_trait(?Send))]
+        #[cfg_attr(not(target_family = "wasm"), async_trait)]
         impl Signer for UnimplementedSigner {
             async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))

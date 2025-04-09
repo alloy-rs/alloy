@@ -35,8 +35,8 @@ impl fmt::Debug for TrezorSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for TrezorSigner {
     #[inline]
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
@@ -66,8 +66,8 @@ impl Signer for TrezorSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl alloy_network::TxSigner<Signature> for TrezorSigner {
     fn address(&self) -> Address {
         self.address

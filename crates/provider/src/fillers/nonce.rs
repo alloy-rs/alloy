@@ -12,8 +12,8 @@ use futures::lock::Mutex;
 use std::sync::Arc;
 
 /// A trait that determines the behavior of filling nonces.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
     /// Get the next nonce for the given account.
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
@@ -32,8 +32,8 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
 #[non_exhaustive]
 pub struct SimpleNonceManager;
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for SimpleNonceManager {
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -57,8 +57,8 @@ pub struct CachedNonceManager {
     nonces: Arc<DashMap<Address, Arc<Mutex<u64>>>>,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl NonceManager for CachedNonceManager {
     async fn get_next_nonce<P, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -78,8 +78,10 @@ impl NonceManager for CachedNonceManager {
         let mut nonce = nonce.lock().await;
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
+            trace!("fetching nonce for {address} | current nonce: {}", *nonce);
             provider.get_transaction_count(address).await?
         } else {
+            trace!("incrementing nonce for {address} | current nonce: {}", *nonce);
             *nonce + 1
         };
         *nonce = new_nonce;
@@ -116,14 +118,35 @@ impl NonceManager for CachedNonceManager {
 /// # }
 /// ```
 #[derive(Clone, Debug, Default)]
-pub struct NonceFiller<M: NonceManager = SimpleNonceManager> {
+pub struct NonceFiller<M: NonceManager = CachedNonceManager> {
     nonce_manager: M,
 }
 
 impl<M: NonceManager> NonceFiller<M> {
     /// Creates a new [`NonceFiller`] with the specified [`NonceManager`].
+    ///
+    /// To instatiate with the [`SimpleNonceManager`], use [`NonceFiller::simple()`].
+    ///
+    /// To instantiate with the [`CachedNonceManager`], use [`NonceFiller::cached()`].
     pub const fn new(nonce_manager: M) -> Self {
         Self { nonce_manager }
+    }
+
+    /// Creates a new [`NonceFiller`] with the [`SimpleNonceManager`].
+    ///
+    /// [`SimpleNonceManager`] will fetch the transaction count for any new account it sees,
+    /// resulting in frequent RPC calls.
+    pub const fn simple() -> NonceFiller<SimpleNonceManager> {
+        NonceFiller { nonce_manager: SimpleNonceManager }
+    }
+
+    /// Creates a new [`NonceFiller`] with the [`CachedNonceManager`].
+    ///
+    /// [`CachedNonceManager`] will fetch the transaction count for any new account it sees,
+    /// store it locally and increment the locally stored nonce as transactions are sent via
+    /// [`Provider::send_transaction`], reducing the number of RPC calls.
+    pub fn cached() -> NonceFiller<CachedNonceManager> {
+        NonceFiller { nonce_manager: CachedNonceManager::default() }
     }
 }
 

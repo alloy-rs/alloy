@@ -21,7 +21,7 @@ where
 pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     fn _guess_local_url(url: &str) -> bool {
         url.parse::<Url>().is_ok_and(|url| {
-            url.host_str().map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+            url.host_str().is_none_or(|host| host == "localhost" || host == "127.0.0.1")
         })
     }
     _guess_local_url(s.as_ref())
@@ -36,7 +36,7 @@ pub trait Spawnable {
     fn spawn_task(self);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + Send + 'static,
@@ -46,7 +46,7 @@ where
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<T> Spawnable for T
 where
     T: Future<Output = ()> + 'static,
