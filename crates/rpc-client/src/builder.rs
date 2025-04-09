@@ -62,7 +62,7 @@ impl<L> ClientBuilder<L> {
     }
 
     /// Convenience function to create a new [`RpcClient`] with a `hyper` HTTP transport.
-    #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+    #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient
     where
         L: Layer<alloy_transport_http::HyperTransport>,

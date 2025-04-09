@@ -75,10 +75,7 @@ pub struct TxEip7702 {
     /// the code referenced by `address`. These also include a `chain_id` (which
     /// can be set to zero and not evaluated) as well as an optional `nonce`.
     pub authorization_list: Vec<SignedAuthorization>,
-    /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-    /// Some). pub init: An unlimited size byte array specifying the
-    /// EVM-code for the account initialisation procedure CREATE,
-    /// data: An unlimited size byte array specifying the
+    /// An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
     pub input: Bytes,
 }
@@ -382,6 +379,7 @@ pub(super) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -404,8 +402,9 @@ pub(super) mod serde_bincode_compat {
                     .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }

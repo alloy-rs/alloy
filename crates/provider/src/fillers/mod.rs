@@ -306,8 +306,8 @@ where
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<F, P, N> Provider<N> for FillProvider<F, P, N>
 where
     F: TxFiller<N>,
@@ -487,6 +487,14 @@ where
         hash: TxHash,
     ) -> ProviderCall<(TxHash,), Option<N::TransactionResponse>> {
         self.inner.get_transaction_by_hash(hash)
+    }
+
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.inner.get_transaction_by_sender_nonce(sender, nonce)
     }
 
     fn get_transaction_by_block_hash_and_index(
@@ -672,10 +680,9 @@ impl RecommendedFillers for Ethereum {
     type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        Fillers::default()
-            .push(GasFiller)
+        Fillers::new((GasFiller,))
             .push(BlobGasFiller)
-            .push(NonceFiller::new(SimpleNonceManager::default()))
+            .push(NonceFiller::new(CachedNonceManager::default()))
             .push(ChainIdFiller::default())
     }
 }
@@ -684,10 +691,9 @@ impl RecommendedFillers for AnyNetwork {
     type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        Fillers::default()
-            .push(GasFiller)
+        Fillers::new((GasFiller,))
             .push(BlobGasFiller)
-            .push(NonceFiller::new(SimpleNonceManager::default()))
+            .push(NonceFiller::new(CachedNonceManager::default()))
             .push(ChainIdFiller::default())
     }
 }

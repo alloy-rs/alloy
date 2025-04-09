@@ -67,8 +67,8 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
 /// [`DebugApi`]: crate::ext::DebugApi
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
 pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Returns the root provider.
@@ -686,6 +686,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getStorageAt", (address, key)).into()
     }
 
+    /// Gets a transaction by its sender and nonce.
+    ///
+    /// Note: not supported by all clients.
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.client()
+            .request("eth_getTransactionBySenderAndNonce", (sender, U64::from(nonce)))
+            .into()
+    }
+
     /// Gets a transaction by its [TxHash].
     fn get_transaction_by_hash(
         &self,
@@ -1238,8 +1251,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N: Network> Provider<N> for RootProvider<N> {
     #[inline]
     fn root(&self) -> &Self {
@@ -1314,14 +1327,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_provider_builder() {
-        let provider = RootProvider::builder().with_recommended_fillers().on_anvil();
+        let provider = RootProvider::<Ethereum>::builder().with_recommended_fillers().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
 
     #[tokio::test]
     async fn test_builder_helper_fn() {
-        let provider = builder().with_recommended_fillers().on_anvil();
+        let provider = builder::<Ethereum>().with_recommended_fillers().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }

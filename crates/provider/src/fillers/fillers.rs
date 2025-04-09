@@ -39,7 +39,7 @@ impl<N: Network> Default for Fillers<Identity, N> {
     }
 }
 
-impl<T, N: Network> Fillers<T, N> {
+impl<T, N> Fillers<T, N> {
     /// Instatiate a new [`Fillers`] stack with tuple of [`TxFiller`]s
     ///
     /// ## Example
@@ -50,7 +50,9 @@ impl<T, N: Network> Fillers<T, N> {
     pub(crate) fn new(filler: T) -> Self {
         Self { inner: filler, _pd: PhantomData }
     }
+}
 
+impl<T, N: Network> Fillers<T, N> {
     /// Push a new [`TxFiller`] onto the stack
     pub fn push<F: TxFiller<N>>(self, filler: F) -> Fillers<T::Pushed, N>
     where
@@ -188,8 +190,8 @@ mod tests {
 
     use crate::{
         fillers::{
-            BlobGasFiller, ChainIdFiller, FillProvider, Fillers, GasFiller, NonceFiller,
-            RecommendedFiller, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
+            BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, Fillers, GasFiller,
+            NonceFiller, RecommendedFiller, RecommendedFillers, TxFiller, WalletFiller,
         },
         layers::AnvilProvider,
         ProviderBuilder, RootProvider,
@@ -322,11 +324,11 @@ mod tests {
         > = ProviderBuilder::new() // Adds 4.
             .filler(GasFiller)
             .filler(BlobGasFiller)
-            .filler(NonceFiller::new(SimpleNonceManager::default()))
+            .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(ChainIdFiller::default())
             .filler(GasFiller)
             .filler(BlobGasFiller)
-            .filler(NonceFiller::new(SimpleNonceManager::default()))
+            .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(ChainIdFiller::default())
             .filler(GasFiller)
             .filler(BlobGasFiller)

@@ -12,8 +12,8 @@ use alloy_rpc_types_trace::geth::{
 use alloy_transport::TransportResult;
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
@@ -262,8 +262,8 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     ) -> TransportResult<Option<Bytes>>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> DebugApi<N> for P
 where
     N: Network,

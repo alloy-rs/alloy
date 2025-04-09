@@ -11,10 +11,10 @@ use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use tokio::time::sleep;
 
 /// This is chosen somewhat arbitrarily. It should be short enough to not cause a noticeable
