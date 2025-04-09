@@ -83,7 +83,7 @@ mod tests {
         async_ci_only(|| async {
             run_with_tempdir("reth-sign-tx", |dir| async {
                 let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
                 let accounts = provider.get_accounts().await.unwrap();
                 let from = accounts[0];

@@ -592,7 +592,7 @@ mod tests {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
-            let provider = ProviderBuilder::default().with_gas_estimation().layer(cache_layer).connect_anvil_with_wallet();
+            let provider = ProviderBuilder::new().disable_recommended_fillers().with_gas_estimation().layer(cache_layer).connect_anvil_with_wallet();
 
             let path = dir.join("rpc-cache-code.txt");
             shared_cache.load_cache(path.clone()).unwrap();
