@@ -11,9 +11,7 @@ use alloy_eips::{
     eip2930::AccessList,
     Typed2718,
 };
-use alloy_primitives::{
-    Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
-};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256, U64, U8};
 use alloy_rlp::{Decodable, Encodable};
 use core::{
     fmt::{self, Debug},
@@ -1080,7 +1078,7 @@ mod serde_from {
 pub mod serde_bincode_compat {
     use crate::{EthereumTypedTransaction, Signed};
     use alloc::borrow::Cow;
-    use alloy_primitives::PrimitiveSignature as Signature;
+    use alloy_primitives::Signature;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -1195,6 +1193,7 @@ pub mod serde_bincode_compat {
         use super::super::{serde_bincode_compat, EthereumTxEnvelope};
         use crate::TxEip4844;
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -1217,8 +1216,9 @@ pub mod serde_bincode_compat {
                 .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }
@@ -1234,9 +1234,9 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    use alloy_primitives::{
-        b256, hex, Address, Bytes, PrimitiveSignature as Signature, TxKind, U256,
-    };
+    #[allow(unused_imports)]
+    use alloy_primitives::{b256, Bytes, TxKind};
+    use alloy_primitives::{hex, Address, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]

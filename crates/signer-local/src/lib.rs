@@ -8,7 +8,7 @@
 
 use alloy_consensus::SignableTransaction;
 use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
-use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_primitives::{Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};

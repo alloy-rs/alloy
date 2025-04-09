@@ -7,9 +7,7 @@ use crate::{
     TxLegacy, TxType,
 };
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{
-    bytes::BufMut, Bytes, ChainId, PrimitiveSignature as Signature, TxHash, TxKind, B256, U256,
-};
+use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
 pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
@@ -686,6 +684,7 @@ pub(crate) mod serde_bincode_compat {
         use super::super::{serde_bincode_compat, EthereumTypedTransaction};
         use crate::TxEip4844;
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -708,8 +707,9 @@ pub(crate) mod serde_bincode_compat {
                 .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }

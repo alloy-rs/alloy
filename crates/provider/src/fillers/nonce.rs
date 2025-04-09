@@ -78,10 +78,10 @@ impl NonceManager for CachedNonceManager {
         let mut nonce = nonce.lock().await;
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
-            trace!("fetching nonce for {address} | current nonce: {}", *nonce);
+            trace!(%address, "fetching nonce");
             provider.get_transaction_count(address).await?
         } else {
-            trace!("incrementing nonce for {address} | current nonce: {}", *nonce);
+            trace!(%address, current_nonce = *nonce, "incrementing nonce");
             *nonce + 1
         };
         *nonce = new_nonce;
@@ -111,7 +111,7 @@ impl NonceManager for CachedNonceManager {
 /// let provider = ProviderBuilder::<_, _, Ethereum>::default()
 ///     .with_simple_nonce_management()
 ///     .wallet(pk)
-///     .on_http(url);
+///     .connect_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())
@@ -216,7 +216,7 @@ mod tests {
     #[tokio::test]
     async fn smoke_test() {
         let filler = NonceFiller::<CachedNonceManager>::default();
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let address = Address::ZERO;
         check_nonces(&filler, &provider, address, 0).await;
 
@@ -232,7 +232,7 @@ mod tests {
     #[tokio::test]
     async fn concurrency() {
         let filler = Arc::new(NonceFiller::<CachedNonceManager>::default());
-        let provider = Arc::new(ProviderBuilder::new().on_anvil());
+        let provider = Arc::new(ProviderBuilder::new().connect_anvil());
         let address = Address::ZERO;
         let tasks = (0..5)
             .map(|_| {
@@ -260,7 +260,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_cached_nonce_management()
-            .on_anvil();
+            .connect_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -279,7 +279,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_cached_nonce_management()
-            .on_anvil_with_wallet();
+            .connect_anvil_with_wallet();
 
         let from = provider.default_signer_address();
         let tx = TransactionRequest {
@@ -315,7 +315,7 @@ mod tests {
         let cnm1 = CachedNonceManager::default();
         let cnm2 = cnm1.clone();
 
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let address = Address::ZERO;
 
         assert_eq!(cnm1.get_next_nonce(&provider, address).await.unwrap(), 0);
