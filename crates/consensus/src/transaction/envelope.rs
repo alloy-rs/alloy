@@ -166,7 +166,7 @@ impl TxType {
     /// Returns true if the transaction type has dynamic fee.
     #[inline]
     pub const fn is_dynamic_fee(&self) -> bool {
-        matches!(self,Self::Legacy | Self::Eip2930 | Self::Eip1559 | Self::Eip4844 | Self::Eip7702)
+        matches!(self, Self::Eip1559 | Self::Eip4844 | Self::Eip7702)
     }
 }
 
@@ -412,12 +412,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     #[inline]
     pub const fn is_eip7702(&self) -> bool {
         matches!(self, Self::Eip7702(_))
-    }
-
-    /// Returns true if the transaction supports dynamic fees.
-    #[inline]
-    pub const fn is_dynamic_fee(&self) -> bool {
-        matches!(self, Self::Legacy(_) | Self::Eip2930(_) | Self::Eip1559(_) | Self::Eip4844(_) | Self::Eip7702(_))
     }
 
     /// Consumes the type into a [`Signed`]
