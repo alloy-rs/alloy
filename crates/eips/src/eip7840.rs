@@ -1,6 +1,9 @@
 //! Contains constants and utility functions for [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md)
 
-use crate::{eip4844, eip4844::DATA_GAS_PER_BLOB, eip7691};
+use crate::{
+    eip4844::{self, DATA_GAS_PER_BLOB},
+    eip7594, eip7691,
+};
 
 // helpers for serde
 #[cfg(feature = "serde")]
@@ -48,6 +51,16 @@ impl BlobParams {
         Self {
             target_blob_count: eip7691::TARGET_BLOBS_PER_BLOCK_ELECTRA,
             max_blob_count: eip7691::MAX_BLOBS_PER_BLOCK_ELECTRA,
+            update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
+            min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
+        }
+    }
+
+    /// Returns [`BlobParams`] configuration activated with Osaka hardfork.
+    pub const fn osaka() -> Self {
+        Self {
+            target_blob_count: eip7594::TARGET_BLOBS_PER_BLOCK_FULU,
+            max_blob_count: eip7594::MAX_BLOBS_PER_BLOCK_FULU,
             update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
         }
