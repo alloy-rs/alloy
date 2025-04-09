@@ -265,7 +265,7 @@ impl CallBatchProviderInner {
         T: SolValue + From<<T::SolType as SolType>::RustType>,
     {
         let data = self.schedule(msg).await?;
-        T::abi_decode(&data, false).map_err(TransportErrorKind::custom)
+        T::abi_decode(&data).map_err(TransportErrorKind::custom)
     }
 }
 
@@ -344,9 +344,9 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
                 self.m3a
             )));
         }
-        let ret = IMulticall3::aggregate3Call::abi_decode_returns(&bytes, false)
+        let ret = IMulticall3::aggregate3Call::abi_decode_returns(&bytes)
             .map_err(TransportErrorKind::custom)?;
-        Ok(ret.returnData)
+        Ok(ret)
     }
 
     fn make_payload(&self) -> Vec<u8> {

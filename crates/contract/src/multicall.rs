@@ -9,11 +9,11 @@ use alloy_primitives::{Address, Bytes};
 use alloy_provider::{MulticallItem, Provider};
 use alloy_sol_types::SolCall;
 
-impl<T, P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder<T, P, C, N> {
+impl<P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder<P, C, N> {
     type Decoder = C;
 
     fn target(&self) -> Address {
-        self.request.to().expect("`to` not set for the `SolCallBuilder`")
+        self.request.to().expect("`to` not set for `SolCallBuilder`")
     }
 
     fn input(&self) -> Bytes {
@@ -56,7 +56,7 @@ mod tests {
 
     async fn deploy_dummy(
         provider: impl alloy_provider::Provider,
-    ) -> DummyThatFailsInstance<(), impl alloy_provider::Provider> {
+    ) -> DummyThatFailsInstance<impl alloy_provider::Provider> {
         DummyThatFails::deploy(provider).await.unwrap()
     }
 
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(t1, t2);
         assert_eq!(b1, b2);
         assert_eq!(
-            block_hash.blockHash,
+            block_hash,
             b256!("31be03d4fb9a280d1699f1004f340573cd6d717dae79095d382e876415cb26ba")
         );
     }
@@ -234,9 +234,9 @@ mod tests {
 
         let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
 
-        assert_eq!(c1.unwrap().counter, U256::ZERO);
+        assert_eq!(c1.unwrap(), U256::ZERO);
         assert!(inc.is_ok());
-        assert_eq!(c2.unwrap().counter, U256::from(1));
+        assert_eq!(c2.unwrap(), U256::from(1));
 
         // Allow failure - due to no value being sent
         let increment_call = CallItem::<PayableCounter::incrementCall>::new(
@@ -253,9 +253,9 @@ mod tests {
 
         let (c1, inc, c2) = multicall.aggregate3_value().await.unwrap();
 
-        assert_eq!(c1.unwrap().counter, U256::ZERO);
+        assert_eq!(c1.unwrap(), U256::ZERO);
         assert!(inc.is_err_and(|failure| matches!(failure, Failure { idx: 1, return_data: _ })));
-        assert_eq!(c2.unwrap().counter, U256::ZERO);
+        assert_eq!(c2.unwrap(), U256::ZERO);
     }
 
     #[tokio::test]
@@ -289,7 +289,7 @@ mod tests {
             .add_dynamic(erc20.totalSupply())
             .extend(vec![erc20.totalSupply(), erc20.totalSupply()]);
 
-        let res: Vec<ERC20::totalSupplyReturn> = multicall.aggregate().await.unwrap();
+        let res = multicall.aggregate().await.unwrap();
 
         assert_eq!(res.len(), 4);
         assert_eq!(res[0], res[1]);

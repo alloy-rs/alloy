@@ -4,9 +4,7 @@ use alloc::vec::Vec;
 use alloy_eips::{
     eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization, Typed2718,
 };
-use alloy_primitives::{
-    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
-};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -1005,7 +1003,7 @@ mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, bytes, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
