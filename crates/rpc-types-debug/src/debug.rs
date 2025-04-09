@@ -60,5 +60,5 @@ pub struct ExecutionWitness {
     ///
     /// The naive way to construct the headers would be to unconditionally include the last
     /// 256 block headers. However note, we may not need all 256, like in the example above.
-    pub ancestor_headers: Vec<Bytes>,
+    pub headers: Vec<Bytes>,
 }
