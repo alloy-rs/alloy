@@ -2031,7 +2031,7 @@ mod tests {
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
             .with_input(bytes!("06fdde03")); // `name()`
         let result = provider.call(req.clone()).await.unwrap();
-        assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
+        assert_eq!(String::abi_decode(&result).unwrap(), "Wrapped Ether");
 
         let result = provider.call(req).block(0.into()).await.unwrap();
         assert_eq!(result.to_string(), "0x");
