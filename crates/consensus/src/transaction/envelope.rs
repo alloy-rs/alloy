@@ -160,6 +160,12 @@ impl TxType {
     pub const fn is_eip7702(&self) -> bool {
         matches!(self, Self::Eip7702)
     }
+
+    /// Returns true if the transaction type has dynamic fee.
+    #[inline]
+    pub const fn is_dynamic_fee(&self) -> bool {
+        matches!(self, Self::Eip1559 | Self::Eip4844 | Self::Eip7702)
+    }
 }
 
 impl fmt::Display for TxType {
