@@ -11,10 +11,10 @@ use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use tokio::time::sleep;
 
 /// This is chosen somewhat arbitrarily. It should be short enough to not cause a noticeable
@@ -449,7 +449,7 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ext::AnvilApi, ProviderBuilder};
+    use crate::ProviderBuilder;
     use alloy_primitives::{address, hex};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_transport::mock::Asserter;
@@ -500,7 +500,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "anvil-api")]
     async fn basic() {
+        use crate::ext::AnvilApi;
         let provider = ProviderBuilder::new().with_call_batching().connect_anvil();
         provider.anvil_set_code(COUNTER_ADDRESS, COUNTER_DEPLOYED_CODE.into()).await.unwrap();
         provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(123)).await.unwrap();

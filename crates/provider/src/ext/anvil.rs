@@ -8,8 +8,8 @@ use alloy_rpc_types_eth::Block;
 use alloy_transport::TransportResult;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait AnvilApi<N: Network>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
@@ -151,8 +151,8 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     ) -> TransportResult<TxHash>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> AnvilApi<N> for P
 where
     N: Network,
@@ -328,7 +328,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{
+        fillers::{ChainIdFiller, GasFiller},
+        ProviderBuilder,
+    };
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
     use alloy_primitives::B256;
@@ -338,7 +341,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_impersonate_account_stop_impersonating_account() {
-        let provider = ProviderBuilder::new().connect_anvil();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_simple_nonce_management()
+            .filler(GasFiller)
+            .filler(ChainIdFiller::default())
+            .connect_anvil();
 
         let impersonate = Address::random();
         let to = Address::random();
@@ -374,7 +382,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_auto_impersonate_account() {
-        let provider = ProviderBuilder::new().connect_anvil();
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_simple_nonce_management()
+            .filler(GasFiller)
+            .filler(ChainIdFiller::default())
+            .connect_anvil();
 
         let impersonate = Address::random();
         let to = Address::random();
@@ -858,7 +871,7 @@ mod tests {
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        for (idx, _) in std::iter::repeat(()).take(10).enumerate() {
+        for (idx, _) in std::iter::repeat_n((), 10).enumerate() {
             provider.evm_mine(None).await.unwrap();
             let num = provider.get_block_number().await.unwrap();
             assert_eq!(num, start_num + idx as u64 + 1);
@@ -890,7 +903,7 @@ mod tests {
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        for (idx, _) in std::iter::repeat(()).take(10).enumerate() {
+        for (idx, _) in std::iter::repeat_n((), 10).enumerate() {
             provider.anvil_mine_detailed(None).await.unwrap();
             let num = provider.get_block_number().await.unwrap();
             assert_eq!(num, start_num + idx as u64 + 1);

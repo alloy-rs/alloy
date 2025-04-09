@@ -103,6 +103,36 @@ impl From<TxEip4844Variant> for TxEip4844 {
     }
 }
 
+impl AsRef<TxEip4844> for TxEip4844Variant {
+    fn as_ref(&self) -> &TxEip4844 {
+        match self {
+            Self::TxEip4844(tx) => tx,
+            Self::TxEip4844WithSidecar(tx) => &tx.tx,
+        }
+    }
+}
+
+impl AsMut<TxEip4844> for TxEip4844Variant {
+    fn as_mut(&mut self) -> &mut TxEip4844 {
+        match self {
+            Self::TxEip4844(tx) => tx,
+            Self::TxEip4844WithSidecar(tx) => &mut tx.tx,
+        }
+    }
+}
+
+impl AsRef<Self> for TxEip4844 {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl AsMut<Self> for TxEip4844 {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl TxEip4844Variant {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///

@@ -1,12 +1,14 @@
 //! This module extends the Ethereum JSON-RPC provider with the Admin namespace's RPC methods.
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::Provider;
 use alloy_network::Network;
 use alloy_rpc_types_admin::{NodeInfo, PeerInfo};
 use alloy_transport::TransportResult;
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait AdminApi<N>: Send + Sync {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
@@ -34,13 +36,13 @@ pub trait AdminApi<N>: Send + Sync {
 
     /// Subscribe to events received by peers over the network.
     #[cfg(feature = "pubsub")]
-    async fn subscribe_peer_events(
+    fn subscribe_peer_events(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>>;
+    ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> AdminApi<N> for P
 where
     N: Network,
@@ -71,14 +73,12 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_peer_events(
+    fn subscribe_peer_events(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>> {
-        self.root().pubsub_frontend()?;
-        let mut call = self.client().request_noparams("admin_peerEvents_subscribe");
-        call.set_is_subscription();
-        let id = call.await?;
-        self.root().get_subscription(id).await
+    ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent> {
+        let mut rpc_call = self.client().request_noparams("admin_peerEvents_subscribe");
+        rpc_call.set_is_subscription();
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 }
 

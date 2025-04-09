@@ -2,7 +2,11 @@
 
 #![allow(unknown_lints, elided_named_lifetimes)]
 
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder};
+#[cfg(feature = "pubsub")]
+use super::get_block::SubFullBlocks;
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, Eip1559Estimator},
@@ -20,6 +24,8 @@ use alloy_primitives::{
     U256, U64,
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
+#[cfg(feature = "pubsub")]
+use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
@@ -61,8 +67,8 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
 /// [`DebugApi`]: crate::ext::DebugApi
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
 pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Returns the root provider.
@@ -179,7 +185,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[doc(alias = "eth_callMany")]
     fn call_many<'req>(
         &self,
-        bundles: &'req Vec<Bundle>,
+        bundles: &'req [Bundle],
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
         EthCallMany::new(self.weak_client(), bundles)
     }
@@ -492,6 +498,36 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes) and transforming the returned block
+    /// hashes into full blocks bodies.
+    ///
+    /// Returns the [`WatchBlocks`] type which consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of [`BlockResponse`]'s.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 full blocks:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_full_blocks().await?.full();
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(block) = stream.next().await {
+    ///   println!("new block: {block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn watch_full_blocks(&self) -> TransportResult<WatchBlocks<N::BlockResponse>> {
+        let id = self.new_block_filter().await?;
+        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
+
+        Ok(WatchBlocks::new(poller))
+    }
+
     /// Watch for new pending transaction by polling the provider with
     /// [`eth_getFilterChanges`](Self::get_filter_changes).
     ///
@@ -650,6 +686,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.client().request("eth_getStorageAt", (address, key)).into()
+    }
+
+    /// Gets a transaction by its sender and nonce.
+    ///
+    /// Note: not supported by all clients.
+    fn get_transaction_by_sender_nonce(
+        &self,
+        sender: Address,
+        nonce: u64,
+    ) -> ProviderCall<(Address, U64), Option<N::TransactionResponse>> {
+        self.client()
+            .request("eth_getTransactionBySenderAndNonce", (sender, U64::from(nonce)))
+            .into()
     }
 
     /// Gets a transaction by its [TxHash].
@@ -911,6 +960,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
+    /// Signs a transaction that can be submitted to the network later using
+    /// [`Provider::send_raw_transaction`].
+    ///
+    /// The `"eth_signTransaction"` method is not supported by regular nodes.
+    async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
+        self.client().request("eth_signTransaction", (tx,)).await
+    }
+
     /// Subscribe to a stream of new block headers.
     ///
     /// # Errors
@@ -937,12 +994,37 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::HeaderResponse>> {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
-        self.root().get_subscription(id).await
+    fn subscribe_blocks(&self) -> GetSubscription<(SubscriptionKind,), N::HeaderResponse> {
+        let rpc_call = self.client().request("eth_subscribe", (SubscriptionKind::NewHeads,));
+        GetSubscription::new(self.weak_client(), rpc_call)
+    }
+
+    /// Subscribe to a stream of full block bodies.
+    ///
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_full_blocks().full().channel_size(10);
+    /// let mut stream = sub.into_stream().await?.take(5);
+    ///
+    /// while let Some(block) = stream.next().await {
+    ///   println!("{block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
+        SubFullBlocks::new(self.subscribe_blocks(), self.weak_client())
     }
 
     /// Subscribe to a stream of pending transaction hashes.
@@ -971,12 +1053,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(
-        &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", ("newPendingTransactions",)).await?;
-        self.root().get_subscription(id).await
+    fn subscribe_pending_transactions(&self) -> GetSubscription<(SubscriptionKind,), B256> {
+        let rpc_call =
+            self.client().request("eth_subscribe", (SubscriptionKind::NewPendingTransactions,));
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 
     /// Subscribe to a stream of pending transaction bodies.
@@ -1010,12 +1090,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_full_pending_transactions(
+    fn subscribe_full_pending_transactions(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", ("newPendingTransactions", true)).await?;
-        self.root().get_subscription(id).await
+    ) -> GetSubscription<(SubscriptionKind, Params), N::TransactionResponse> {
+        let rpc_call = self.client().request(
+            "eth_subscribe",
+            (SubscriptionKind::NewPendingTransactions, Params::Bool(true)),
+        );
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 
     /// Subscribe to a stream of logs matching given filter.
@@ -1049,27 +1131,25 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
-        &self,
-        filter: &Filter,
-    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", ("logs", filter)).await?;
-        self.root().get_subscription(id).await
+    fn subscribe_logs(&self, filter: &Filter) -> GetSubscription<(SubscriptionKind, Params), Log> {
+        let rpc_call = self.client().request(
+            "eth_subscribe",
+            (SubscriptionKind::Logs, Params::Logs(Box::new(filter.clone()))),
+        );
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 
     /// Subscribe to an RPC event.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
+    fn subscribe<P, R>(&self, params: P) -> GetSubscription<P, R>
     where
         P: RpcSend,
         R: RpcRecv,
         Self: Sized,
     {
-        self.root().pubsub_frontend()?;
-        let id = self.client().request("eth_subscribe", params).await?;
-        self.root().get_subscription(id).await
+        let rpc_call = self.client().request("eth_subscribe", params);
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 
     /// Cancels a subscription given the subscription ID.
@@ -1173,8 +1253,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N: Network> Provider<N> for RootProvider<N> {
     #[inline]
     fn root(&self) -> &Self {
@@ -1219,11 +1299,12 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
-    use alloy_consensus::Transaction;
+    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
+    use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::Anvil;
+    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
@@ -1248,14 +1329,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_provider_builder() {
-        let provider = RootProvider::builder().with_recommended_fillers().connect_anvil();
+        let provider =
+            RootProvider::<Ethereum>::builder().with_recommended_fillers().connect_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
 
     #[tokio::test]
     async fn test_builder_helper_fn() {
-        let provider = builder().with_recommended_fillers().connect_anvil();
+        let provider = builder::<Ethereum>().with_recommended_fillers().connect_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
@@ -1470,6 +1552,32 @@ mod tests {
                 *next += 1;
             } else {
                 next = Some(header.number + 1);
+            }
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_full_blocks() {
+        use futures::StreamExt;
+
+        let anvil = Anvil::new().block_time_f64(0.2).spawn();
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
+
+        let provider = RootProvider::<Ethereum>::new(client);
+
+        let sub = provider.subscribe_full_blocks().hashes().channel_size(10);
+
+        let mut stream = sub.into_stream().await.unwrap().take(5);
+
+        let mut next = None;
+        while let Some(Ok(block)) = stream.next().await {
+            if let Some(next) = &mut next {
+                assert_eq!(block.header().number, *next);
+                *next += 1;
+            } else {
+                next = Some(block.header().number + 1);
             }
         }
     }
@@ -2077,6 +2185,36 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn eth_sign_transaction() {
+        async_ci_only(|| async {
+            run_with_tempdir("reth-sign-tx", |dir| async {
+                let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
+
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
+
+                let tx = TransactionRequest::default()
+                    .from(from)
+                    .to(Address::random())
+                    .value(U256::from(100))
+                    .gas_limit(21000);
+
+                let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
+
+                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
+
+                let signer = tx.recover_signer().unwrap();
+
+                assert_eq!(signer, from);
+            })
+            .await
+        })
+        .await;
     }
 
     #[cfg(feature = "throttle")]

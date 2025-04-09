@@ -42,7 +42,6 @@ impl<N: Network> NewBlocks<N> {
     }
 
     #[cfg(test)]
-    #[allow(unused)]
     const fn with_next_yield(mut self, next_yield: u64) -> Self {
         self.next_yield = next_yield;
         self

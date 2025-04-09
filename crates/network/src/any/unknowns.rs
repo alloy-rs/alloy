@@ -78,7 +78,7 @@ impl From<TxType> for AnyTxType {
 /// [`AnyTxEnvelope`]: crate::AnyTxEnvelope
 /// [`AnyTypedTransaction`]: crate::AnyTypedTransaction
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub struct DeserMemo {
     pub input: OnceLock<Bytes>,
     pub access_list: OnceLock<AccessList>,
@@ -200,7 +200,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn is_create(&self) -> bool {
-        self.fields.get("to").map_or(true, |v| v.is_null())
+        self.fields.get("to").is_none_or(|v| v.is_null())
     }
 
     #[inline]

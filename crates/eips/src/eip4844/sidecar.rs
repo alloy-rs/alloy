@@ -143,7 +143,8 @@ impl BlobTransactionSidecarItem {
         let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
             .map_err(BlobTransactionValidationError::KZGError)?;
 
-        let result = c_kzg::KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
+        let result = settings
+            .verify_blob_kzg_proof(&blob, &commitment, &proof)
             .map_err(BlobTransactionValidationError::KZGError)?;
 
         result.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
@@ -269,14 +270,13 @@ impl BlobTransactionSidecar {
 
         // SAFETY: ALL types have the same size
         let res = unsafe {
-            c_kzg::KzgProof::verify_blob_kzg_proof_batch(
+            proof_settings.verify_blob_kzg_proof_batch(
                 // blobs
                 core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
                 // commitments
                 core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
                 // proofs
                 core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
-                proof_settings,
             )
         }
         .map_err(BlobTransactionValidationError::KZGError)?;
@@ -339,15 +339,13 @@ impl BlobTransactionSidecar {
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
     pub fn try_from_blobs(blobs: Vec<c_kzg::Blob>) -> Result<Self, c_kzg::Error> {
         use crate::eip4844::env_settings::EnvKzgSettings;
-        use c_kzg::{KzgCommitment, KzgProof};
 
         let kzg_settings = EnvKzgSettings::Default;
 
         let commitments = blobs
             .iter()
             .map(|blob| {
-                KzgCommitment::blob_to_kzg_commitment(&blob.clone(), kzg_settings.get())
-                    .map(|blob| blob.to_bytes())
+                kzg_settings.get().blob_to_kzg_commitment(&blob.clone()).map(|blob| blob.to_bytes())
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -355,7 +353,9 @@ impl BlobTransactionSidecar {
             .iter()
             .zip(commitments.iter())
             .map(|(blob, commitment)| {
-                KzgProof::compute_blob_kzg_proof(blob, commitment, kzg_settings.get())
+                kzg_settings
+                    .get()
+                    .compute_blob_kzg_proof(blob, commitment)
                     .map(|blob| blob.to_bytes())
             })
             .collect::<Result<Vec<_>, _>>()?;

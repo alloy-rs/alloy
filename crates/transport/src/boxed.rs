@@ -3,7 +3,7 @@ use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::{any::TypeId, fmt};
 use tower::Service;
 
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 mod private {
     pub trait Sealed {}
     impl<T: super::Transport + Clone> Sealed for T {}

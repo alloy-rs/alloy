@@ -678,7 +678,6 @@ mod tests {
     }
 
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    #[allow(clippy::type_complexity)]
     fn build_call_builder() -> CallBuilder<(), impl Provider, PhantomData<MyContract::doStuffCall>>
     {
         let provider = ProviderBuilder::new().connect_anvil();
@@ -836,14 +835,14 @@ mod tests {
             .expect("tx not included");
         assert_eq!(
             transaction.max_fee_per_gas(),
-            max_fee_per_gas.to(),
+            max_fee_per_gas.to::<u128>(),
             "max_fee_per_gas of the transaction should be set to the right value"
         );
         assert_eq!(
             transaction
                 .max_priority_fee_per_gas()
                 .expect("max_priority_fee_per_gas of the transaction should be set"),
-            max_priority_fee_per_gas.to(),
+            max_priority_fee_per_gas.to::<u128>(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"
         )
     }

@@ -55,7 +55,7 @@ fn dev_mode() {
 
 #[test]
 #[ignore = "fails on geth >=1.14"]
-#[allow(deprecated)]
+#[expect(deprecated)]
 fn clique_correctly_configured() {
     if !ci_info::is_ci() {
         return;

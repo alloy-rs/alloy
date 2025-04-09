@@ -1,5 +1,8 @@
-use alloy_eips::{eip2718::Encodable2718, Typed2718};
-use alloy_primitives::{bytes, Address, B256};
+use alloy_eips::{
+    eip2718::{Encodable2718, WithEncoded},
+    Typed2718,
+};
+use alloy_primitives::{bytes, Address, Bytes, B256};
 use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
 
@@ -151,6 +154,22 @@ impl<T> Recovered<T> {
         f: impl FnOnce(T) -> Result<Tx, E>,
     ) -> Result<Recovered<Tx>, E> {
         Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
+    }
+
+    /// Returns the [`WithEncoded`] representation of [`Recovered`] with the given encoding.
+    pub fn into_encoded_with(self, encoding: impl Into<Bytes>) -> WithEncoded<Self> {
+        WithEncoded::new(encoding.into(), self)
+    }
+
+    /// Encodes the inner type and returns the [`WithEncoded`] representation of [`Recovered`].
+    pub fn into_encoded(self) -> WithEncoded<Self>
+    where
+        T: Encodable2718,
+    {
+        let mut out = alloc::vec![];
+        self.inner.encode_2718(&mut out);
+
+        self.into_encoded_with(out)
     }
 }
 

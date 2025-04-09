@@ -15,10 +15,10 @@ use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tracing_futures::Instrument;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use tokio::time::sleep;
 
 /// The number of retries for polling a request.
@@ -37,9 +37,8 @@ const MAX_RETRIES: usize = 3;
 /// The channel can be converted into a stream using the [`into_stream`](PollChannel::into_stream)
 /// method.
 ///
-/// Alternatively, [`into_stream`](Self::into_stream) can be used to directly return a stream of
-/// responses on the current thread. This is currently equivalent to `spawn().into_stream()`, but
-/// this may change in the future.
+/// Alternatively, [`into_stream`](Self::into_stream) on the builder can be used to directly return
+/// a stream of responses on the current thread, instead of spawning a task.
 ///
 /// # Examples
 ///
@@ -215,6 +214,11 @@ where
         }
         }
         .instrument(span)
+    }
+
+    /// Returns the [`WeakClient`] associated with the poller.
+    pub fn client(&self) -> WeakClient {
+        self.client.clone()
     }
 }
 

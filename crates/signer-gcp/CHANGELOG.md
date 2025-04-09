@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump gcloud sdk ([#2218](https://github.com/alloy-rs/alloy/issues/2218))
 
+### Miscellaneous Tasks
+
+- Release 0.12.6
+
 ## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
 
 ### Miscellaneous Tasks

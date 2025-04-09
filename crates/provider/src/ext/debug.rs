@@ -1,12 +1,10 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_json_rpc::RpcRecv;
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
-use alloy_rpc_types_eth::{
-    BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
-};
+use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
     TraceResult,
@@ -14,9 +12,9 @@ use alloy_rpc_types_trace::geth::{
 use alloy_transport::TransportResult;
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait DebugApi<N>: Send + Sync {
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
+pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
 
@@ -132,7 +130,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_as<R>(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
@@ -151,7 +149,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_js(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value>;
@@ -168,7 +166,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_callframe(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame>;
@@ -216,7 +214,7 @@ pub trait DebugApi<N>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
@@ -264,8 +262,8 @@ pub trait DebugApi<N>: Send + Sync {
     ) -> TransportResult<Option<Bytes>>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> DebugApi<N> for P
 where
     N: Network,
@@ -345,7 +343,7 @@ where
 
     async fn debug_trace_call_as<R>(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<R>
@@ -357,7 +355,7 @@ where
 
     async fn debug_trace_call_js(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<serde_json::Value> {
@@ -366,7 +364,7 @@ where
 
     async fn debug_trace_call_callframe(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame> {
@@ -391,7 +389,7 @@ where
 
     async fn debug_trace_call(
         &self,
-        tx: TransactionRequest,
+        tx: N::TransactionRequest,
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
@@ -430,6 +428,7 @@ mod test {
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
+    use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
     async fn test_debug_trace_transaction() {

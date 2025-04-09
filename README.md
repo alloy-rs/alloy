@@ -109,7 +109,6 @@ This repository contains the following crates:
 [`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
 [`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
 [`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
-
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms
@@ -128,7 +127,7 @@ When updating this, also update:
 - .github/workflows/ci.yml
 -->
 
-The current MSRV (minimum supported rust version) is 1.81.
+The current MSRV (minimum supported rust version) is 1.82.
 
 Alloy will keep a rolling MSRV policy of **at least** two versions behind the
 latest stable release (so if the latest stable release is 1.58, we would

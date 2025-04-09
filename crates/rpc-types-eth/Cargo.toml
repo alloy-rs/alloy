@@ -86,11 +86,14 @@ serde = [
 	"rand/serde",
 ]
 arbitrary = [
-    "std",
-    "dep:arbitrary",
-    "alloy-primitives/arbitrary",
-    "alloy-serde?/arbitrary",
-    "alloy-eips/arbitrary",
+	"std",
+	"dep:arbitrary",
+	"alloy-consensus/arbitrary",
+	"alloy-primitives/arbitrary",
+	"alloy-serde?/arbitrary",
+	"alloy-eips/arbitrary",
+	"alloy-consensus-any/arbitrary",
+	"alloy-sol-types/arbitrary"
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
