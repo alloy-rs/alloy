@@ -328,6 +328,7 @@ mod tests {
 
     #[test]
     fn change_network() {
+        #[allow(clippy::type_complexity)]
         let _p: FillProvider<
             Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), AnyNetwork>,
             AnvilProvider<RootProvider<AnyNetwork>, AnyNetwork>,
