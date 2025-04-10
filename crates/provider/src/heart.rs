@@ -349,6 +349,7 @@ pub enum WatchTxError {
     Timeout,
 }
 
+/// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
 #[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
@@ -439,7 +440,6 @@ impl HeartbeatHandle {
     }
 }
 
-// TODO: Parameterize with `Network`
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
@@ -650,7 +650,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> He
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle) {
-        let (ix_tx, ixns) = mpsc::channel(16);
+        let (ix_tx, ixns) = mpsc::channel(64);
         (self.into_future(ixns), HeartbeatHandle { tx: ix_tx })
     }
 
