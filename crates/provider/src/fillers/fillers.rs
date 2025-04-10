@@ -1,6 +1,8 @@
-use crate::{fillers::TxFiller, Identity};
+use crate::{fillers::TxFiller, Identity, Provider, ProviderLayer};
 use alloy_network::{Ethereum, Network};
 use std::marker::PhantomData;
+
+use super::FillProvider;
 
 /// A [`ProviderLayer`] that encapsulates a tuple of [`TxFiller`]s, and traverses through the tuple
 /// to fill a [`TransactionRequest`].
@@ -187,6 +189,17 @@ pub trait TuplePush<T, N = Ethereum> {
 // Implement TuplePush for Empty
 impl<T: TxFiller<N>, N: Network> TuplePush<T, N> for Identity {
     type Pushed = (T,);
+}
+
+// Blanket impl for ProviderLayer
+impl<T, P: Provider<N>, N: Network> ProviderLayer<P, N> for Fillers<T, N>
+where
+    Self: TxFiller<N>,
+{
+    type Provider = FillProvider<Self, P, N>;
+    fn layer(&self, inner: P) -> Self::Provider {
+        FillProvider::new(inner, self.clone())
+    }
 }
 
 #[cfg(test)]

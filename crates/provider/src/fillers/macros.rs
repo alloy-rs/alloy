@@ -1,7 +1,7 @@
 use crate::{
-    fillers::{FillProvider, FillerControlFlow, Fillers, TuplePush, TxFiller},
+    fillers::{FillerControlFlow, Fillers, TuplePush, TxFiller},
     provider::Provider,
-    Identity, ProviderLayer, SendableTx, WalletProvider,
+    Identity, SendableTx, WalletProvider,
 };
 use alloy_network::Network;
 use alloy_transport::TransportResult;
@@ -72,16 +72,6 @@ macro_rules! impl_tx_filler {
     };
 }
 
-impl<T, P: Provider<N>, N: Network> ProviderLayer<P, N> for Fillers<T, N>
-where
-    Self: TxFiller<N>,
-{
-    type Provider = FillProvider<Self, P, N>;
-    fn layer(&self, inner: P) -> Self::Provider {
-        FillProvider::new(inner, self.clone())
-    }
-}
-
 /// Macro to implement [`TuplePush`] functionality for tuples of different sizes
 macro_rules! impl_tuple {
     ($($idx:tt => $ty:ident),+) => {
@@ -139,25 +129,6 @@ impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13);
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14);
 impl_tx_filler!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14, 14 => T15);
-
-// impl_provider_layer!(0 => T1);
-// impl_provider_layer!(0 => T1, 1 => T2);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 =>
-// T9); impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8,
-// 8 => T9, 9 => T10); impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6
-// => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11); impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3
-// => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12);
-// impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 =>
-// T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13); impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3
-// => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13
-// => T14); impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 =>
-// T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14, 14 => T15);
 
 impl_from!(0 => T1);
 impl_from!(0 => T1, 1 => T2);
