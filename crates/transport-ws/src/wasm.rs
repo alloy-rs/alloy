@@ -12,7 +12,7 @@ use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 #[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
-    pub url: String,
+    url: String,
 }
 
 impl WsConnect {

@@ -20,7 +20,7 @@ const KEEPALIVE: u64 = 10;
 #[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
-    pub url: String,
+    url: String,
     /// The authorization header to use.
     pub auth: Option<Authorization>,
     /// The websocket config.
