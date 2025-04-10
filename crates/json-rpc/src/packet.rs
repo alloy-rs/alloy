@@ -241,6 +241,27 @@ impl BorrowedResponsePacket<'_> {
 }
 
 impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
+    /// Returns the [`Response`] if this packet is [`ResponsePacket::Single`].
+    pub const fn as_single(&self) -> Option<&Response<Payload, ErrData>> {
+        match self {
+            Self::Single(resp) => Some(resp),
+            Self::Batch(_) => None,
+        }
+    }
+
+    /// Returns the batch of [`Response`] if this packet is [`ResponsePacket::Batch`].
+    pub fn as_batch(&self) -> Option<&[Response<Payload, ErrData>]> {
+        match self {
+            Self::Batch(resp) => Some(resp.as_slice()),
+            Self::Single(_) => None,
+        }
+    }
+
+    /// Returns the [`ResponsePayload`] if this packet is [`ResponsePacket::Single`].
+    pub fn single_payload(&self) -> Option<&ResponsePayload<Payload, ErrData>> {
+        self.as_single().map(|resp| &resp.payload)
+    }
+
     /// Returns `true` if the response payload is a success.
     ///
     /// For batch responses, this returns `true` if __all__ responses are successful.
@@ -287,6 +308,11 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// Returns an iterator over the responses' payloads.
     pub fn payloads(&self) -> impl Iterator<Item = &ResponsePayload<Payload, ErrData>> + '_ {
         self.responses().iter().map(|resp| &resp.payload)
+    }
+
+    /// Returns the first [`ResponsePayload`] in this packet.
+    pub fn first_payload(&self) -> Option<&ResponsePayload<Payload, ErrData>> {
+        self.payloads().next()
     }
 
     /// Returns an iterator over the responses' identifiers.
