@@ -47,6 +47,22 @@ impl RequestPacket {
         Self::Batch(Vec::with_capacity(capacity))
     }
 
+    /// Returns the [`SerializedRequest`] if this packet is [`ResponsePacket::Single`]
+    pub const fn as_single(&self) -> Option<&SerializedRequest> {
+        match self {
+            Self::Single(req) => Some(req),
+            Self::Batch(_) => None,
+        }
+    }
+
+    /// Returns the batch of [`SerializedRequest`] if this packet is [`ResponsePacket::Batch`]
+    pub fn as_batch(&self) -> Option<&[SerializedRequest]> {
+        match self {
+            Self::Batch(req) => Some(req.as_slice()),
+            Self::Single(_) => None,
+        }
+    }
+
     /// Serialize the packet as a boxed [`RawValue`].
     pub fn serialize(self) -> serde_json::Result<Box<RawValue>> {
         match self {
