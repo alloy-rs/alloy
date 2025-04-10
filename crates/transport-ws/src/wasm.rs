@@ -6,6 +6,7 @@ use futures::{
     stream::{Fuse, StreamExt},
 };
 use serde_json::value::RawValue;
+use std::time::Duration;
 use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 
 /// Simple connection info for the websocket.
@@ -24,7 +25,7 @@ pub struct WsConnect {
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
-        Self { url: url.into() }
+        Self { url: url.into(), max_retries: 10, retry_interval: Duration::from_secs(3) }
     }
 
     /// Sets the max number of retries before failing and exiting the connection.
