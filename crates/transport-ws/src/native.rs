@@ -22,9 +22,9 @@ pub struct WsConnect {
     /// The URL to connect to.
     url: String,
     /// The authorization header to use.
-    pub auth: Option<Authorization>,
+    auth: Option<Authorization>,
     /// The websocket config.
-    pub config: Option<WebSocketConfig>,
+    config: Option<WebSocketConfig>,
 }
 
 impl WsConnect {
@@ -46,8 +46,18 @@ impl WsConnect {
     }
 
     /// Get the URL string of the connection.
-    pub fn url(&self) -> String {
-        self.url.clone()
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Get the authorization header.
+    pub fn auth(&self) -> Option<&Authorization> {
+        self.auth.as_ref()
+    }
+
+    /// Get the websocket config.
+    pub fn config(&self) -> Option<&WebSocketConfig> {
+        self.config.as_ref()
     }
 }
 
