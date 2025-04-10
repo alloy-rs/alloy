@@ -23,7 +23,7 @@ impl WsConnect {
 
     /// Get the URL string of the connection.
     pub fn url(&self) -> &str {
-        self.url
+        &self.url
     }
 }
 
