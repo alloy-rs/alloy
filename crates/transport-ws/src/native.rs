@@ -44,6 +44,11 @@ impl WsConnect {
         self.config = Some(config);
         self
     }
+
+    /// Get the URL string of the connection.
+    pub fn url(&self) -> String {
+        self.url.clone()
+    }
 }
 
 impl IntoClientRequest for WsConnect {

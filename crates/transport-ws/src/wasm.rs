@@ -20,6 +20,11 @@ impl WsConnect {
     pub fn new<S: Into<String>>(url: S) -> Self {
         Self { url: url.into() }
     }
+
+    /// Get the URL string of the connection.
+    pub fn url(&self) -> String {
+        self.url.clone()
+    }
 }
 
 impl PubSubConnect for WsConnect {
