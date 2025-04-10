@@ -265,7 +265,7 @@ impl CallBatchProviderInner {
         T: SolValue + From<<T::SolType as SolType>::RustType>,
     {
         let data = self.schedule(msg).await?;
-        T::abi_decode(&data, false).map_err(TransportErrorKind::custom)
+        T::abi_decode(&data).map_err(TransportErrorKind::custom)
     }
 }
 
@@ -344,9 +344,9 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
                 self.m3a
             )));
         }
-        let ret = IMulticall3::aggregate3Call::abi_decode_returns(&bytes, false)
+        let ret = IMulticall3::aggregate3Call::abi_decode_returns(&bytes)
             .map_err(TransportErrorKind::custom)?;
-        Ok(ret.returnData)
+        Ok(ret)
     }
 
     fn make_payload(&self) -> Vec<u8> {
@@ -476,7 +476,7 @@ mod tests {
     async fn basic_mocked() {
         let asserter = Asserter::new();
         let provider =
-            ProviderBuilder::new().with_call_batching().on_mocked_client(asserter.clone());
+            ProviderBuilder::new().with_call_batching().connect_mocked_client(asserter.clone());
         push_m3_success(
             &asserter,
             &[
@@ -503,7 +503,7 @@ mod tests {
     #[cfg(feature = "anvil-api")]
     async fn basic() {
         use crate::ext::AnvilApi;
-        let provider = ProviderBuilder::new().with_call_batching().on_anvil();
+        let provider = ProviderBuilder::new().with_call_batching().connect_anvil();
         provider.anvil_set_code(COUNTER_ADDRESS, COUNTER_DEPLOYED_CODE.into()).await.unwrap();
         provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(123)).await.unwrap();
 

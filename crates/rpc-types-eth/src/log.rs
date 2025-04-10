@@ -79,7 +79,7 @@ impl Log<LogData> {
 
     /// Decode the log data into a typed log.
     pub fn log_decode<T: alloy_sol_types::SolEvent>(&self) -> alloy_sol_types::Result<Log<T>> {
-        let decoded = T::decode_log(&self.inner, false)?;
+        let decoded = T::decode_log(&self.inner)?;
         Ok(Log {
             inner: decoded,
             block_hash: self.block_hash,

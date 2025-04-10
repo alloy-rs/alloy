@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
+
+### Bug Fixes
+
+- Use wasmtimer sleep ([#2287](https://github.com/alloy-rs/alloy/issues/2287))
+- `BlobAndProofV2` ([#2283](https://github.com/alloy-rs/alloy/issues/2283))
+- Cell proofs in `BlobsBundleV2::take` ([#2281](https://github.com/alloy-rs/alloy/issues/2281))
+- Fix docs of input field for different tx ([#2177](https://github.com/alloy-rs/alloy/issues/2177))
+
+### Dependencies
+
+- [deps] Core 1.0 ([#2184](https://github.com/alloy-rs/alloy/issues/2184))
+- [deps] Bincode 2.0 ([#2297](https://github.com/alloy-rs/alloy/issues/2297))
+- Bump msrv to 1.82 ([#2293](https://github.com/alloy-rs/alloy/issues/2293))
+
+### Documentation
+
+- Update doc on PollerBuilder ([#2268](https://github.com/alloy-rs/alloy/issues/2268))
+- Remove outdated doc on PollerBuilder ([#2267](https://github.com/alloy-rs/alloy/issues/2267))
+
+### Features
+
+- Relax ProviderBuilder bounds ([#2276](https://github.com/alloy-rs/alloy/issues/2276))
+- Make CachedNonceManager default ([#2289](https://github.com/alloy-rs/alloy/issues/2289))
+- Add eth get transaction by sender and nonce ([#2285](https://github.com/alloy-rs/alloy/issues/2285))
+- [`provider`] Nonce filler helpers ([#2280](https://github.com/alloy-rs/alloy/issues/2280))
+- `ExecutionPayloadEnvelopeV5` ([#2284](https://github.com/alloy-rs/alloy/issues/2284))
+- Add `From<TxHash>` for `PendingTxConfig` ([#2282](https://github.com/alloy-rs/alloy/issues/2282))
+- [eip4844] Implement `AsRef` and `AsMut` for `TxEip4844` ([#2272](https://github.com/alloy-rs/alloy/issues/2272))
+- [`eth-wallet`] Set default signer helper ([#2271](https://github.com/alloy-rs/alloy/issues/2271))
+- Add conditional conversions for BlockTransactions ([#2270](https://github.com/alloy-rs/alloy/issues/2270))
+- Add bincode compat to eth typed tx ([#2269](https://github.com/alloy-rs/alloy/issues/2269))
+- [`consensus`] WithEncoded helpers ([#2266](https://github.com/alloy-rs/alloy/issues/2266))
+- Filterset topics extend ([#2258](https://github.com/alloy-rs/alloy/issues/2258))
+- Make it easier to configure non u256 topics in filterset ([#2257](https://github.com/alloy-rs/alloy/issues/2257))
+
+### Miscellaneous Tasks
+
+- Add `ancestor_headers` to `ExecutionWitness` ([#2294](https://github.com/alloy-rs/alloy/issues/2294))
+- Use target_family instead of arch for wasm cfg ([#2288](https://github.com/alloy-rs/alloy/issues/2288))
+- Fixed 404 link ([#2286](https://github.com/alloy-rs/alloy/issues/2286))
+- Port transaction envelope bincode compat function ([#2263](https://github.com/alloy-rs/alloy/issues/2263))
+- Hide input mut ([#2255](https://github.com/alloy-rs/alloy/issues/2255))
+
+### Styling
+
+- Skip flaky bsc err resp ([#2279](https://github.com/alloy-rs/alloy/issues/2279))
+- Added TxType::is_eipxxx fxns ([#2275](https://github.com/alloy-rs/alloy/issues/2275))
+
+### Testing
+
+- Update error handling ([#2277](https://github.com/alloy-rs/alloy/issues/2277))
+
 ## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
 
 ### Bug Fixes
@@ -38,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.13.0
 - Add error message for reconnect failure ([#2253](https://github.com/alloy-rs/alloy/issues/2253))
 - Add error message helper ([#2247](https://github.com/alloy-rs/alloy/issues/2247))
 - Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))

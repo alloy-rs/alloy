@@ -11,9 +11,7 @@ use alloy_eips::{
     eip2930::AccessList,
     Typed2718,
 };
-use alloy_primitives::{
-    Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
-};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256, U64, U8};
 use alloy_rlp::{Decodable, Encodable};
 use core::{
     fmt::{self, Debug},
@@ -1074,7 +1072,7 @@ mod serde_from {
 pub mod serde_bincode_compat {
     use crate::{EthereumTypedTransaction, Signed};
     use alloc::borrow::Cow;
-    use alloy_primitives::PrimitiveSignature as Signature;
+    use alloy_primitives::Signature;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -1230,9 +1228,9 @@ mod tests {
         eip4844::BlobTransactionSidecar,
         eip7702::Authorization,
     };
-    use alloy_primitives::{
-        b256, hex, Address, Bytes, PrimitiveSignature as Signature, TxKind, U256,
-    };
+    #[allow(unused_imports)]
+    use alloy_primitives::{b256, Bytes, TxKind};
+    use alloy_primitives::{hex, Address, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]

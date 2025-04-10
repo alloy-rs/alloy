@@ -219,17 +219,18 @@ mod tests {
             FillProvider<Fillers<RecommendedWalletFillers, Ethereum>, AnvilProvider<RootProvider>>;
 
         // Basic works
-        let _provider = ProviderBuilder::new().on_anvil();
+        let _provider = ProviderBuilder::new().connect_anvil();
 
         // With wallet
-        let _provider: AnvilWalletFiller = ProviderBuilder::new().wallet(pk).on_anvil();
+        let _provider: AnvilWalletFiller = ProviderBuilder::new().wallet(pk).connect_anvil();
 
         // With anvil wallet
-        let _provider: AnvilWalletFiller = ProviderBuilder::new().on_anvil_with_wallet();
+        let _provider: AnvilWalletFiller = ProviderBuilder::new().connect_anvil_with_wallet();
 
         // With anvil wallet and config
-        let _provider: AnvilWalletFiller =
-            ProviderBuilder::new().on_anvil_with_wallet_and_config(|a| a.block_time(1)).unwrap();
+        let _provider: AnvilWalletFiller = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.block_time(1))
+            .unwrap();
     }
 
     #[tokio::test]
@@ -282,11 +283,13 @@ mod tests {
         let _p: FillProvider<
             Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller, InputFiller)>,
             _,
-        > = ProviderBuilder::new().filler(InputFiller).on_anvil();
+        > = ProviderBuilder::new().filler(InputFiller).connect_anvil();
 
         // Without recommended fillers
-        let _p: FillProvider<Fillers<(InputFiller,)>, _> =
-            ProviderBuilder::new().disable_recommended_fillers().filler(InputFiller).on_anvil();
+        let _p: FillProvider<Fillers<(InputFiller,)>, _> = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .filler(InputFiller)
+            .connect_anvil();
 
         // With wallet
         let pk: PrivateKeySigner =
@@ -296,7 +299,7 @@ mod tests {
                 .disable_recommended_fillers()
                 .filler(InputFiller)
                 .wallet(pk)
-                .on_anvil();
+                .connect_anvil();
     }
 
     #[test]
@@ -332,6 +335,6 @@ mod tests {
             .filler(ChainIdFiller::default())
             .filler(GasFiller)
             .filler(BlobGasFiller)
-            .on_anvil_with_wallet(); // Adds the 15th i.e wallet filler.
+            .connect_anvil_with_wallet(); // Adds the 15th i.e wallet filler.
     }
 }
