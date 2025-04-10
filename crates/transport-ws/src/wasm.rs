@@ -12,13 +12,18 @@ use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 #[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
-    pub url: String,
+    url: String,
 }
 
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
         Self { url: url.into() }
+    }
+
+    /// Get the URL string of the connection.
+    pub fn url(&self) -> &str {
+        &self.url
     }
 }
 
