@@ -159,6 +159,17 @@ pub trait FillerNetwork<N> {
     fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net>;
 }
 
+impl<T, N: Network> FillerNetwork<N> for Fillers<T, N>
+where
+    Self: TxFiller<N>,
+{
+    type CurrentFillers = T;
+
+    fn network<Net: Network>(self) -> Fillers<T, Net> {
+        Fillers::new(self.inner)
+    }
+}
+
 impl<N: Network> FillerNetwork<N> for crate::Identity {
     type CurrentFillers = Self;
 
@@ -183,7 +194,7 @@ mod tests {
 
     use std::str::FromStr;
 
-    use alloy_network::{Ethereum, EthereumWallet, Network, TransactionBuilder};
+    use alloy_network::{AnyNetwork, Ethereum, EthereumWallet, Network, TransactionBuilder};
     use alloy_primitives::Bytes;
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::TransportResult;
@@ -300,6 +311,15 @@ mod tests {
                 .filler(InputFiller)
                 .wallet(pk)
                 .connect_anvil();
+    }
+
+    #[test]
+    fn change_network() {
+        let _p: FillProvider<
+            Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), AnyNetwork>,
+            AnvilProvider<RootProvider<AnyNetwork>, AnyNetwork>,
+            AnyNetwork,
+        > = ProviderBuilder::new().network::<AnyNetwork>().connect_anvil();
     }
 
     #[test]

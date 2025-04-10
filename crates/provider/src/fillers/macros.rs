@@ -1,5 +1,5 @@
 use crate::{
-    fillers::{FillProvider, FillerControlFlow, FillerNetwork, Fillers, TuplePush, TxFiller},
+    fillers::{FillProvider, FillerControlFlow, Fillers, TuplePush, TxFiller},
     provider::Provider,
     Identity, ProviderLayer, SendableTx, WalletProvider,
 };
@@ -84,21 +84,6 @@ macro_rules! impl_provider_layer {
     };
 }
 
-/// Macro to implement FillerNetwork for tuples of different sizes
-///
-/// This helps change the network associated with the [`Fillers`] stack.
-macro_rules! impl_filler_network {
-    ($($idx:tt => $ty:ident),+) => {
-        impl<$($ty,)+ N: Network> FillerNetwork<N> for Fillers<($($ty,)+), N> {
-            type CurrentFillers = ($($ty,)+);
-
-            fn network<Net: Network>(self) -> Fillers<($($ty,)+), Net> {
-                self.network::<Net>()
-            }
-        }
-    };
-}
-
 /// Macro to implement [`TuplePush`] functionality for tuples of different sizes
 macro_rules! impl_tuple {
     ($($idx:tt => $ty:ident),+) => {
@@ -172,22 +157,6 @@ impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => 
 impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13);
 impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14);
 impl_provider_layer!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14, 14 => T15);
-
-impl_filler_network!(0 => T1);
-impl_filler_network!(0 => T1, 1 => T2);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14);
-impl_filler_network!(0 => T1, 1 => T2, 2 => T3, 3 => T4, 4 => T5, 5 => T6, 6 => T7, 7 => T8, 8 => T9, 9 => T10, 10 => T11, 11 => T12, 12 => T13, 13 => T14, 14 => T15);
 
 impl_from!(0 => T1);
 impl_from!(0 => T1, 1 => T2);
