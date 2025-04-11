@@ -378,6 +378,22 @@ impl Geth {
         self
     }
 
+    /// Adds an argument to pass to the `geth`.
+    pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
+        self.args.push(arg.into());
+    }
+
+    /// Adds multiple arguments to pass to the `geth`.
+    pub fn extend_args<I, S>(&mut self, args: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self.push_arg(arg);
+        }
+    }
+
     /// Adds an argument to pass to `geth`.
     ///
     /// Pass any arg that is not supported by the builder.
