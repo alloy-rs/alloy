@@ -7,9 +7,9 @@
 //! If you find yourself importing this crate, and you are not implementing a
 //! JSON-RPC client or transport, you are likely at the wrong layer of
 //! abstraction. If you want to _use_ a JSON-RPC client, consider using the
-//! [`alloy-transports`] crate.
+//! [`alloy-transport`] crate.
 //!
-//! [`alloy-transports`]: https://docs.rs/alloy-transports/latest/alloy-transports
+//! [`alloy-transport`]: https://docs.rs/alloy-transport/latest/alloy_transport/
 //!
 //! ## Usage
 //!
