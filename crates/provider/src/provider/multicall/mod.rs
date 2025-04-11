@@ -177,6 +177,12 @@ where
         self
     }
 
+    /// Add a dynamic [`CallItem`] to the builder
+    pub fn add_call_dynamic(mut self, call: CallItem<D>) -> Self {
+        self.calls.push(call.to_call3_value());
+        self
+    }
+
     /// Extend the builder with a sequence of calls
     pub fn extend(
         mut self,
@@ -184,6 +190,14 @@ where
     ) -> Self {
         for item in items {
             self = self.add_dynamic(item);
+        }
+        self
+    }
+
+    /// Extend the builder with a sequence of [`CallItem`]s
+    pub fn extend_calls(mut self, calls: impl IntoIterator<Item = CallItem<D>>) -> Self {
+        for call in calls {
+            self = self.add_call_dynamic(call);
         }
         self
     }
