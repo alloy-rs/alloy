@@ -37,11 +37,6 @@ pub(crate) struct PubSubService<T> {
 
     /// The request manager.
     pub(crate) in_flights: RequestManager,
-
-    /// Number of retries. Default is 10.
-    ///
-    /// Every retry is made at an interval of 3 seconds.
-    pub(crate) retries: u32,
 }
 
 impl<T: PubSubConnect> PubSubService<T> {
@@ -56,7 +51,6 @@ impl<T: PubSubConnect> PubSubService<T> {
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: Default::default(),
-            retries: 10,
         };
         this.spawn();
         Ok(PubSubFrontend::new(tx))
@@ -205,7 +199,8 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Attempt to reconnect with retries
     async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
         let mut retry_count = 0;
-        let max_retries = self.retries;
+        let max_retries = self.handle.max_retries;
+        let interval = self.handle.retry_interval;
         loop {
             match self.reconnect().await {
                 Ok(()) => break Ok(()),
@@ -215,13 +210,12 @@ impl<T: PubSubConnect> PubSubService<T> {
                         error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
                         break Err(e);
                     }
-                    let duration = std::time::Duration::from_secs(3);
                     warn!(
                         "Reconnection attempt {retry_count}/{max_retries} failed: {e}. \
-                         Retrying in {:.3}s...",
-                        duration.as_secs_f64(),
+                         Retrying in {:?}s...",
+                        interval.as_secs_f64(),
                     );
-                    sleep(duration).await;
+                    sleep(interval).await;
                 }
             }
         }
