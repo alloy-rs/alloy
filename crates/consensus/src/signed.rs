@@ -227,6 +227,15 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
         let signer = self.recover_signer()?;
         Ok(crate::transaction::Recovered::new_unchecked(self.tx, signer))
     }
+
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] with a
+    /// reference to the transaction `Recovered<&T>`
+    pub fn try_to_recovered_ref(
+        &self,
+    ) -> Result<crate::transaction::Recovered<&T>, alloy_primitives::SignatureError> {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(&self.tx, signer))
+    }
 }
 
 #[cfg(all(any(test, feature = "arbitrary"), feature = "k256"))]
