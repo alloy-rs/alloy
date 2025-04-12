@@ -111,6 +111,16 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
         }
     }
 
+    /// Returns the error code if this a [`ResponsePayload::Failure`]
+    pub fn error_code(&self) -> Option<i64> {
+        self.as_error().map(|err| err.code)
+    }
+
+    /// Returns the error data if this a [`ResponsePayload::Failure`]
+    pub fn error_data(&self) -> Option<&ErrData> {
+        self.as_error().and_then(|err| err.data.as_ref())
+    }
+
     /// Returns `true` if the response payload is a success.
     pub const fn is_success(&self) -> bool {
         matches!(self, Self::Success(_))

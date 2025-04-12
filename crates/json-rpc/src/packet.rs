@@ -297,6 +297,21 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
         }
     }
 
+    /// Returns the first error code in this packet if it contains any error responses.
+    pub fn first_error_code(&self) -> Option<i64> {
+        self.as_error().map(|error| error.code)
+    }
+
+    /// Returns the first error message in this packet if it contains any error responses.
+    pub fn first_error_message(&self) -> Option<&str> {
+        self.as_error().map(|error| error.message.as_ref())
+    }
+
+    /// Returns the first error data in this packet if it contains any error responses.
+    pub fn first_error_data(&self) -> Option<&ErrData> {
+        self.as_error().and_then(|error| error.data.as_ref())
+    }
+
     /// Returns a all [`Response`].
     pub fn responses(&self) -> &[Response<Payload, ErrData>] {
         match self {
