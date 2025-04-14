@@ -194,4 +194,11 @@ mod tests {
         let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
         assert!(TransportError::ErrorResp(err).is_retryable());
     }
+
+    #[test]
+    fn test_retry_error_429() {
+        let err = r#"{"code":429,"event":-33200,"message":"Too Many Requests","details":"You have surpassed your allowed throughput limit. Reduce the amount of requests per second or upgrade for more capacity."}"#;
+        let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
+        assert!(TransportError::ErrorResp(err).is_retryable());
+    }
 }

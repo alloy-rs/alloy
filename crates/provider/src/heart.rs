@@ -21,13 +21,13 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::{
     std::Instant,
     tokio::{interval, sleep_until},
 };
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use {
     std::time::Instant,
     tokio::time::{interval, sleep_until},
@@ -335,6 +335,12 @@ impl PendingTransactionConfig {
     }
 }
 
+impl From<TxHash> for PendingTransactionConfig {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::new(tx_hash)
+    }
+}
+
 /// Errors which may occur in heartbeat when watching a transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum WatchTxError {
@@ -343,6 +349,7 @@ pub enum WatchTxError {
     Timeout,
 }
 
+/// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
 #[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
@@ -433,7 +440,6 @@ impl HeartbeatHandle {
     }
 }
 
-// TODO: Parameterize with `Network`
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
@@ -622,7 +628,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {
@@ -632,7 +638,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {
@@ -644,7 +650,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> He
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle) {
-        let (ix_tx, ixns) = mpsc::channel(16);
+        let (ix_tx, ixns) = mpsc::channel(64);
         (self.into_future(ixns), HeartbeatHandle { tx: ix_tx })
     }
 

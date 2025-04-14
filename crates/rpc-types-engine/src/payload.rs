@@ -13,6 +13,7 @@ use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
+    eip7594::CELLS_PER_EXT_BLOB,
     eip7685::Requests,
     BlockNumHash,
 };
@@ -213,6 +214,31 @@ pub struct ExecutionPayloadEnvelopeV4 {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub envelope_inner: ExecutionPayloadEnvelopeV3,
 
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+}
+
+/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
+/// V5.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#engine_getpayloadv5>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct ExecutionPayloadEnvelopeV5 {
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload. See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
     /// A list of opaque [EIP-7685][eip7685] requests.
     ///
     /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
@@ -819,6 +845,80 @@ impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
 }
 
 impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
+    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
+        Self::new(iter)
+    }
+}
+
+/// This includes all bundled blob related data of an executed payload.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+pub struct BlobsBundleV2 {
+    /// All commitments in the bundle.
+    pub commitments: Vec<alloy_consensus::Bytes48>,
+    /// All cell proofs in the bundle.
+    pub cell_proofs: Vec<alloy_consensus::Bytes48>,
+    /// All blobs in the bundle.
+    pub blobs: Vec<alloy_consensus::Blob>,
+}
+
+impl BlobsBundleV2 {
+    /// Creates a new blob bundle from the given sidecars.
+    ///
+    /// This folds the sidecar fields into single commit, proof, and blob vectors.
+    pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecar>) -> Self {
+        let (commitments, cell_proofs, blobs) = sidecars.into_iter().fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut commitments, mut cell_proofs, mut blobs), sidecar| {
+                commitments.extend(sidecar.commitments);
+                cell_proofs.extend(sidecar.proofs);
+                blobs.extend(sidecar.blobs);
+                (commitments, cell_proofs, blobs)
+            },
+        );
+        Self { commitments, cell_proofs, blobs }
+    }
+
+    /// Returns a new empty blobs bundle.
+    ///
+    /// This is useful for the opstack engine API that expects an empty bundle as part of the
+    /// payload for API compatibility reasons.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Take `len` blob data from the bundle.
+    ///
+    /// # Panics
+    ///
+    /// If len is more than the blobs bundle len.
+    pub fn take(&mut self, len: usize) -> (Vec<Bytes48>, Vec<Bytes48>, Vec<Blob>) {
+        (
+            self.commitments.drain(0..len).collect(),
+            self.cell_proofs.drain(0..len * CELLS_PER_EXT_BLOB as usize).collect(),
+            self.blobs.drain(0..len).collect(),
+        )
+    }
+
+    /// Returns the sidecar from the bundle
+    ///
+    /// # Panics
+    ///
+    /// If len is more than the blobs bundle len.
+    pub fn pop_sidecar(&mut self, len: usize) -> BlobTransactionSidecar {
+        let (commitments, cell_proofs, blobs) = self.take(len);
+        BlobTransactionSidecar { commitments, proofs: cell_proofs, blobs }
+    }
+}
+
+impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV2 {
+    fn from(sidecars: Vec<BlobTransactionSidecar>) -> Self {
+        Self::new(sidecars)
+    }
+}
+
+impl FromIterator<BlobTransactionSidecar> for BlobsBundleV2 {
     fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
         Self::new(iter)
     }

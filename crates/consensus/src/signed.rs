@@ -1,6 +1,6 @@
 use crate::transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction};
 use alloy_eips::eip2718::Eip2718Result;
-use alloy_primitives::{PrimitiveSignature as Signature, B256};
+use alloy_primitives::{Signature, B256};
 use alloy_rlp::BufMut;
 use core::hash::{Hash, Hasher};
 #[cfg(not(feature = "std"))]
@@ -226,6 +226,15 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     ) -> Result<crate::transaction::Recovered<T>, alloy_primitives::SignatureError> {
         let signer = self.recover_signer()?;
         Ok(crate::transaction::Recovered::new_unchecked(self.tx, signer))
+    }
+
+    /// Attempts to recover signer and constructs a [`crate::transaction::Recovered`] with a
+    /// reference to the transaction `Recovered<&T>`
+    pub fn try_to_recovered_ref(
+        &self,
+    ) -> Result<crate::transaction::Recovered<&T>, alloy_primitives::SignatureError> {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(&self.tx, signer))
     }
 }
 

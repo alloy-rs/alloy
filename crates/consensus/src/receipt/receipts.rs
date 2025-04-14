@@ -386,7 +386,7 @@ where
 
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) mod serde_bincode_compat {
-    use alloc::{borrow::Cow, vec::Vec};
+    use alloc::borrow::Cow;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -407,7 +407,7 @@ pub(crate) mod serde_bincode_compat {
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Receipt<'a, T: Clone = alloy_primitives::Log> {
-        logs: Cow<'a, Vec<T>>,
+        logs: Cow<'a, [T]>,
         status: bool,
         cumulative_gas_used: u64,
     }
@@ -456,6 +456,7 @@ pub(crate) mod serde_bincode_compat {
         use super::super::{serde_bincode_compat, Receipt};
         use alloy_primitives::Log;
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{de::DeserializeOwned, Deserialize, Serialize};
         use serde_with::serde_as;
@@ -477,8 +478,10 @@ pub(crate) mod serde_bincode_compat {
             // ensure we don't have an invalid poststate variant
             data.receipt.status = data.receipt.status.coerce_status().into();
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data<Log> = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data<Log>, _>(&encoded, config::legacy())
+                    .unwrap();
             assert_eq!(decoded, data);
         }
     }

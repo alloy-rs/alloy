@@ -4,9 +4,7 @@ use alloc::vec::Vec;
 use alloy_eips::{
     eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization, Typed2718,
 };
-use alloy_primitives::{
-    Address, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
-};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -100,6 +98,36 @@ impl From<TxEip4844Variant> for TxEip4844 {
             TxEip4844Variant::TxEip4844(tx) => tx,
             TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx,
         }
+    }
+}
+
+impl AsRef<TxEip4844> for TxEip4844Variant {
+    fn as_ref(&self) -> &TxEip4844 {
+        match self {
+            Self::TxEip4844(tx) => tx,
+            Self::TxEip4844WithSidecar(tx) => &tx.tx,
+        }
+    }
+}
+
+impl AsMut<TxEip4844> for TxEip4844Variant {
+    fn as_mut(&mut self) -> &mut TxEip4844 {
+        match self {
+            Self::TxEip4844(tx) => tx,
+            Self::TxEip4844WithSidecar(tx) => &mut tx.tx,
+        }
+    }
+}
+
+impl AsRef<Self> for TxEip4844 {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl AsMut<Self> for TxEip4844 {
+    fn as_mut(&mut self) -> &mut Self {
+        self
     }
 }
 
@@ -975,7 +1003,7 @@ mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, bytes, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]

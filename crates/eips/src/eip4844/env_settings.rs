@@ -1,9 +1,15 @@
-use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use alloc::sync::Arc;
 use core::hash::{Hash, Hasher};
 
 // Re-export for convenience
 pub use c_kzg::KzgSettings;
+
+/// Precompute value that optimizes computing cell kzg proofs.
+///
+/// Set to 0 as we do not use `compute_cells_and_kzg_proofs` or `recover_cells_and_kzg_proofs`.
+///
+/// Learn more: <https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112>
+const PRECOMPUTE: u64 = 0;
 
 /// KZG settings.
 #[derive(Clone, Debug, Default, Eq)]
@@ -43,25 +49,7 @@ impl EnvKzgSettings {
     #[inline]
     pub fn get(&self) -> &KzgSettings {
         match self {
-            Self::Default => {
-                let load = || {
-                    KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
-                        .expect("failed to load default trusted setup")
-                };
-                #[cfg(feature = "std")]
-                {
-                    use once_cell as _;
-                    use std::sync::OnceLock;
-                    static DEFAULT: OnceLock<KzgSettings> = OnceLock::new();
-                    DEFAULT.get_or_init(load)
-                }
-                #[cfg(not(feature = "std"))]
-                {
-                    use once_cell::race::OnceBox;
-                    static DEFAULT: OnceBox<KzgSettings> = OnceBox::new();
-                    DEFAULT.get_or_init(|| alloc::boxed::Box::new(load()))
-                }
-            }
+            Self::Default => c_kzg::ethereum_kzg_settings(PRECOMPUTE),
             Self::Custom(settings) => settings,
         }
     }
@@ -71,7 +59,7 @@ impl EnvKzgSettings {
     pub fn load_from_trusted_setup_file(
         trusted_setup_file: &std::path::Path,
     ) -> Result<Self, c_kzg::Error> {
-        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file)?;
+        let settings = KzgSettings::load_trusted_setup_file(trusted_setup_file, PRECOMPUTE)?;
         Ok(Self::Custom(Arc::new(settings)))
     }
 }

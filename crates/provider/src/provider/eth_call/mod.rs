@@ -21,7 +21,7 @@ pub use caller::Caller;
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
 #[derive(Debug)]
 #[doc(hidden)] // Not public API.
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 #[pin_project::pin_project]
 pub struct EthCallFut<N, Resp, Output, Map>
 where
@@ -287,7 +287,7 @@ where
     /// assert!(matches!(call.return_value, MySolCall::MyStruct { .. }));
     /// ```
     pub fn decode_resp<S: SolCall>(self) -> EthCall<N, Bytes, alloy_sol_types::Result<S::Return>> {
-        self.map_resp(|data| S::abi_decode_returns(&data, false))
+        self.map_resp(|data| S::abi_decode_returns(&data))
     }
 }
 

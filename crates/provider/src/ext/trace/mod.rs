@@ -17,8 +17,8 @@ pub use with_block::{TraceBuilder, TraceParams};
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
 
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait TraceApi<N>: Send + Sync
 where
     N: Network,
@@ -98,8 +98,8 @@ where
     ) -> TraceBuilder<BlockId, Vec<TraceResultsWithTransactionHash>>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> TraceApi<N> for P
 where
     N: Network,
@@ -175,7 +175,7 @@ mod test {
 
     #[tokio::test]
     async fn trace_block() {
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().connect_anvil();
         let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert_eq!(traces.len(), 0);
     }
@@ -186,7 +186,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
                 let tx = TransactionRequest::default()
                     .with_from(address!("0000000000000000000000000000000000000123"))
@@ -237,7 +237,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
                 let tx1 = TransactionRequest::default()
                     .with_from(address!("0000000000000000000000000000000000000123"))
@@ -326,7 +326,8 @@ mod test {
                         .unwrap();
 
                 let wallet = EthereumWallet::new(pk);
-                let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+                let provider =
+                    ProviderBuilder::new().wallet(wallet).connect_http(reth.endpoint_url());
 
                 let tx = TransactionRequest::default()
                     .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
@@ -387,7 +388,7 @@ mod test {
                         .parse()
                         .unwrap();
 
-                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
                 let tx = TransactionRequest::default()
                     .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
@@ -452,7 +453,8 @@ mod test {
                         .unwrap();
 
                 let wallet = EthereumWallet::new(pk);
-                let provider = ProviderBuilder::new().wallet(wallet).on_http(reth.endpoint_url());
+                let provider =
+                    ProviderBuilder::new().wallet(wallet).connect_http(reth.endpoint_url());
 
                 let tx = TransactionRequest::default()
                     .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))

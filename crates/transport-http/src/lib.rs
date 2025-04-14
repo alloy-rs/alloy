@@ -15,19 +15,19 @@ mod reqwest_transport;
 #[doc(inline)]
 pub use reqwest_transport::*;
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
 pub use hyper;
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
 pub use hyper_util;
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper", feature = "jwt-auth"))]
+#[cfg(all(not(target_family = "wasm"), feature = "hyper", feature = "jwt-auth"))]
 mod layers;
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper", feature = "jwt-auth"))]
+#[cfg(all(not(target_family = "wasm"), feature = "hyper", feature = "jwt-auth"))]
 pub use layers::{AuthLayer, AuthService};
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
 mod hyper_transport;
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
 #[doc(inline)]
 pub use hyper_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTransport};
 

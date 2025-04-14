@@ -4,19 +4,15 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use tokio::time::sleep;
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
 };
 
-#[cfg(target_arch = "wasm32")]
-use wasmtimer::tokio::sleep;
-
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::time::sleep;
-
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+
+pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 const KEEPALIVE: u64 = 10;
 
@@ -29,12 +25,24 @@ pub struct WsConnect {
     pub auth: Option<Authorization>,
     /// The websocket config.
     pub config: Option<WebSocketConfig>,
+    /// Max number of retries before failing and exiting the connection.
+    /// Default is 10.
+    max_retries: u32,
+    /// The interval between retries.
+    /// Default is 3 seconds.
+    retry_interval: Duration,
 }
 
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
-        Self { url: url.into(), auth: None, config: None }
+        Self {
+            url: url.into(),
+            auth: None,
+            config: None,
+            max_retries: 10,
+            retry_interval: Duration::from_secs(3),
+        }
     }
 
     /// Sets the authorization header.
@@ -46,6 +54,20 @@ impl WsConnect {
     /// Sets the websocket config.
     pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = Some(config);
+        self
+    }
+
+    /// Sets the max number of retries before failing and exiting the connection.
+    /// Default is 10.
+    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// Sets the interval between retries.
+    /// Default is 3 seconds.
+    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
+        self.retry_interval = retry_interval;
         self
     }
 }
@@ -81,13 +103,13 @@ impl PubSubConnect for WsConnect {
 
         backend.spawn();
 
-        Ok(handle)
+        Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
 }
 
 impl WsBackend<TungsteniteStream> {
     /// Handle a message from the server.
-    #[allow(clippy::result_unit_err)]
+    #[expect(clippy::result_unit_err)]
     pub fn handle(&mut self, msg: Message) -> Result<(), ()> {
         match msg {
             Message::Text(text) => self.handle_text(&text),

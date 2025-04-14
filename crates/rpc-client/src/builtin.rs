@@ -70,7 +70,7 @@ impl BuiltInConnectionString {
                 alloy_transport_http::HyperTransport::new_hyper(url.clone()),
             )),
 
-            #[cfg(all(not(target_arch = "wasm32"), feature = "ws"))]
+            #[cfg(all(not(target_family = "wasm"), feature = "ws"))]
             Self::Ws(url, Some(auth)) => alloy_transport_ws::WsConnect::new(url.clone())
                 .with_auth(auth.clone())
                 .into_service()

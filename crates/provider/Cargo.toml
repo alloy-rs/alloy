@@ -45,6 +45,7 @@ alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport.workspace = true
+alloy-signer.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
@@ -64,14 +65,15 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
+either.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(target_family = "wasm")'.dependencies]
 wasmtimer.workspace = true
 
 [dev-dependencies]
-alloy-consensus = { workspace = true, features = ["kzg"] }
+alloy-consensus = { workspace = true, features = ["kzg", "k256"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
@@ -96,6 +98,7 @@ http.workspace = true
 alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 ci_info.workspace = true
 similar-asserts.workspace = true
+jsonrpsee = { workspace = true, features = ["server"] }
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]

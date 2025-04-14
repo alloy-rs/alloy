@@ -1,5 +1,5 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_primitives::{hex, Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use gcloud_sdk::{
@@ -145,8 +145,8 @@ pub enum GcpSignerError {
     K256(#[from] ecdsa::Error),
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl alloy_network::TxSigner<Signature> for GcpSigner {
     fn address(&self) -> Address {
         self.address
@@ -162,8 +162,8 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for GcpSigner {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)]
@@ -231,7 +231,11 @@ async fn request_get_pubkey(
     client: &Client,
     kms_key_name: &str,
 ) -> Result<PublicKey, GcpSignerError> {
-    let mut request = tonic::Request::new(GetPublicKeyRequest { name: kms_key_name.to_string() });
+    let mut request = tonic::Request::new(GetPublicKeyRequest {
+        name: kms_key_name.to_string(),
+        // When not specified, the default will be used.
+        public_key_format: Default::default(),
+    });
     request
         .metadata_mut()
         .insert("x-goog-request-params", format!("name={}", &kms_key_name).parse().unwrap());

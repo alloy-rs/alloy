@@ -1,7 +1,8 @@
 use crate::{
     error::ValueError,
     transaction::{
-        eip4844::TxEip4844Variant, PooledTransaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
+        eip4844::{TxEip4844, TxEip4844Variant},
+        PooledTransaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
     EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
 };
@@ -10,9 +11,7 @@ use alloy_eips::{
     eip2930::AccessList,
     Typed2718,
 };
-use alloy_primitives::{
-    Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256, U64, U8,
-};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256, U64, U8};
 use alloy_rlp::{Decodable, Encodable};
 use core::{
     fmt::{self, Debug},
@@ -58,6 +57,22 @@ impl TxEnvelope {
             Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx.into_parts().0),
             Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(tx.into_parts().0),
             Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
+        }
+    }
+}
+impl<T> EthereumTxEnvelope<T> {
+    /// Returns a mutable reference to the transaction's input.
+    #[doc(hidden)]
+    pub fn input_mut(&mut self) -> &mut Bytes
+    where
+        T: AsMut<TxEip4844>,
+    {
+        match self {
+            Self::Eip1559(tx) => &mut tx.tx_mut().input,
+            Self::Eip2930(tx) => &mut tx.tx_mut().input,
+            Self::Legacy(tx) => &mut tx.tx_mut().input,
+            Self::Eip7702(tx) => &mut tx.tx_mut().input,
+            Self::Eip4844(tx) => &mut tx.tx_mut().as_mut().input,
         }
     }
 }
@@ -113,6 +128,43 @@ impl From<TxType> for u8 {
 impl From<TxType> for U8 {
     fn from(tx_type: TxType) -> Self {
         Self::from(u8::from(tx_type))
+    }
+}
+impl TxType {
+    /// Returns true if the transaction type is Legacy.
+    #[inline]
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy)
+    }
+
+    /// Returns true if the transaction type is EIP-2930.
+    #[inline]
+    pub const fn is_eip2930(&self) -> bool {
+        matches!(self, Self::Eip2930)
+    }
+
+    /// Returns true if the transaction type is EIP-1559.
+    #[inline]
+    pub const fn is_eip1559(&self) -> bool {
+        matches!(self, Self::Eip1559)
+    }
+
+    /// Returns true if the transaction type is EIP-4844.
+    #[inline]
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self, Self::Eip4844)
+    }
+
+    /// Returns true if the transaction type is EIP-7702.
+    #[inline]
+    pub const fn is_eip7702(&self) -> bool {
+        matches!(self, Self::Eip7702)
+    }
+
+    /// Returns true if the transaction type has dynamic fee.
+    #[inline]
+    pub const fn is_dynamic_fee(&self) -> bool {
+        matches!(self, Self::Eip1559 | Self::Eip4844 | Self::Eip7702)
     }
 }
 
@@ -459,6 +511,18 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         Ok(crate::transaction::Recovered::new_unchecked(self, signer))
     }
 
+    /// Recover the signer of the transaction and returns a `Recovered<&Self>`
+    #[cfg(feature = "k256")]
+    pub fn try_to_recovered_ref(
+        &self,
+    ) -> Result<crate::transaction::Recovered<&Self>, alloy_primitives::SignatureError>
+    where
+        Eip4844: SignableTransaction<Signature>,
+    {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
+    }
+
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256
     where
@@ -563,6 +627,51 @@ impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844>
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
+    }
+}
+
+impl<T> Typed2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Send + Sync + Typed2718,
+{
+    fn ty(&self) -> u8 {
+        self.tx().ty()
+    }
+}
+
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
+    }
+}
+
+impl<T> Decodable2718 for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != ty {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
+        Ok(decoded)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
     }
 }
 
@@ -976,6 +1085,157 @@ mod serde_from {
     }
 }
 
+/// Bincode-compatible [`EthereumTxEnvelope`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    use crate::{EthereumTypedTransaction, Signed};
+    use alloc::borrow::Cow;
+    use alloy_primitives::Signature;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::EthereumTxEnvelope`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, EthereumTxEnvelope};
+    /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+    ///     #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_, T>")]
+    ///     receipt: EthereumTxEnvelope<T>,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct EthereumTxEnvelope<'a, Eip4844: Clone = crate::transaction::TxEip4844> {
+        /// Transaction signature
+        signature: Signature,
+        /// bincode compatable transaction
+        transaction:
+            crate::serde_bincode_compat::transaction::EthereumTypedTransaction<'a, Eip4844>,
+    }
+
+    impl<'a, T: Clone> From<&'a super::EthereumTxEnvelope<T>> for EthereumTxEnvelope<'a, T> {
+        fn from(value: &'a super::EthereumTxEnvelope<T>) -> Self {
+            match value {
+                super::EthereumTxEnvelope::Legacy(tx) => Self {
+                    signature: *tx.signature(),
+                    transaction:
+                        crate::serde_bincode_compat::transaction::EthereumTypedTransaction::Legacy(
+                            tx.tx().into(),
+                        ),
+                },
+                super::EthereumTxEnvelope::Eip2930(tx) => Self {
+                    signature: *tx.signature(),
+                    transaction:
+                        crate::serde_bincode_compat::transaction::EthereumTypedTransaction::Eip2930(
+                            tx.tx().into(),
+                        ),
+                },
+                super::EthereumTxEnvelope::Eip1559(tx) => Self {
+                    signature: *tx.signature(),
+                    transaction:
+                        crate::serde_bincode_compat::transaction::EthereumTypedTransaction::Eip1559(
+                            tx.tx().into(),
+                        ),
+                },
+                super::EthereumTxEnvelope::Eip4844(tx) => Self {
+                    signature: *tx.signature(),
+                    transaction:
+                        crate::serde_bincode_compat::transaction::EthereumTypedTransaction::Eip4844(
+                            Cow::Borrowed(tx.tx()),
+                        ),
+                },
+                super::EthereumTxEnvelope::Eip7702(tx) => Self {
+                    signature: *tx.signature(),
+                    transaction:
+                        crate::serde_bincode_compat::transaction::EthereumTypedTransaction::Eip7702(
+                            tx.tx().into(),
+                        ),
+                },
+            }
+        }
+    }
+
+    impl<'a, T: Clone> From<EthereumTxEnvelope<'a, T>> for super::EthereumTxEnvelope<T> {
+        fn from(value: EthereumTxEnvelope<'a, T>) -> Self {
+            let EthereumTxEnvelope { signature, transaction } = value;
+            let transaction: crate::transaction::typed::EthereumTypedTransaction<T> =
+                transaction.into();
+            match transaction {
+                EthereumTypedTransaction::Legacy(tx) => Signed::new_unhashed(tx, signature).into(),
+                EthereumTypedTransaction::Eip2930(tx) => Signed::new_unhashed(tx, signature).into(),
+                EthereumTypedTransaction::Eip1559(tx) => Signed::new_unhashed(tx, signature).into(),
+                EthereumTypedTransaction::Eip4844(tx) => {
+                    Self::Eip4844(Signed::new_unhashed(tx, signature))
+                }
+                EthereumTypedTransaction::Eip7702(tx) => Signed::new_unhashed(tx, signature).into(),
+            }
+        }
+    }
+
+    impl<T: Serialize + Clone> SerializeAs<super::EthereumTxEnvelope<T>> for EthereumTxEnvelope<'_, T> {
+        fn serialize_as<S>(
+            source: &super::EthereumTxEnvelope<T>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            EthereumTxEnvelope::<'_, T>::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de> + Clone> DeserializeAs<'de, super::EthereumTxEnvelope<T>>
+        for EthereumTxEnvelope<'de, T>
+    {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::EthereumTxEnvelope<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            EthereumTxEnvelope::<'_, T>::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::{serde_bincode_compat, EthereumTxEnvelope};
+        use crate::TxEip4844;
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_typed_tx_envelope_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
+                transaction: EthereumTxEnvelope<TxEip4844>,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: EthereumTxEnvelope::arbitrary(&mut arbitrary::Unstructured::new(
+                    &bytes,
+                ))
+                .unwrap(),
+            };
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -988,7 +1248,7 @@ mod tests {
     };
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
-    use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, U256};
+    use alloy_primitives::{hex, Address, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]

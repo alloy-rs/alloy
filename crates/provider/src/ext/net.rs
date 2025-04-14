@@ -4,8 +4,8 @@ use alloy_network::Network;
 use alloy_transport::TransportResult;
 
 /// Net namespace rpc interface that provides access to network information of the node.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait NetApi<N>: Send + Sync {
     /// Returns a `bool` indicating whether or not the node is listening for network connections.
     async fn net_listening(&self) -> TransportResult<bool>;
@@ -15,8 +15,8 @@ pub trait NetApi<N>: Send + Sync {
     async fn net_version(&self) -> TransportResult<u64>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> NetApi<N> for P
 where
     N: Network,
@@ -46,7 +46,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let version =
                     provider.net_version().await.expect("net_version call should succeed");
@@ -62,7 +62,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let count =
                     provider.net_peer_count().await.expect("net_peerCount call should succeed");
@@ -78,7 +78,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
 
                 let listening =
                     provider.net_listening().await.expect("net_listening call should succeed");

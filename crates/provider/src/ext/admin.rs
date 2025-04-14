@@ -1,12 +1,14 @@
 //! This module extends the Ethereum JSON-RPC provider with the Admin namespace's RPC methods.
+#[cfg(feature = "pubsub")]
+use crate::GetSubscription;
 use crate::Provider;
 use alloy_network::Network;
 use alloy_rpc_types_admin::{NodeInfo, PeerInfo};
 use alloy_transport::TransportResult;
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait AdminApi<N>: Send + Sync {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
@@ -34,13 +36,13 @@ pub trait AdminApi<N>: Send + Sync {
 
     /// Subscribe to events received by peers over the network.
     #[cfg(feature = "pubsub")]
-    async fn subscribe_peer_events(
+    fn subscribe_peer_events(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>>;
+    ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent>;
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<N, P> AdminApi<N> for P
 where
     N: Network,
@@ -71,14 +73,12 @@ where
     }
 
     #[cfg(feature = "pubsub")]
-    async fn subscribe_peer_events(
+    fn subscribe_peer_events(
         &self,
-    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>> {
-        self.root().pubsub_frontend()?;
-        let mut call = self.client().request_noparams("admin_peerEvents_subscribe");
-        call.set_is_subscription();
-        let id = call.await?;
-        self.root().get_subscription(id).await
+    ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent> {
+        let mut rpc_call = self.client().request_noparams("admin_peerEvents_subscribe");
+        rpc_call.set_is_subscription();
+        GetSubscription::new(self.weak_client(), rpc_call)
     }
 }
 
@@ -93,7 +93,7 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-", |temp_dir| async move {
                 let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+                let provider = ProviderBuilder::new().connect_http(geth.endpoint_url());
                 let node_info = provider.node_info().await.unwrap();
                 assert!(node_info.enode.starts_with("enode://"));
             })
@@ -107,12 +107,17 @@ mod test {
         async_ci_only(|| async move {
             run_with_tempdir("geth-test-1", |temp_dir_1| async move {
                 run_with_tempdir("geth-test-2", |temp_dir_2| async move {
-                    let geth1 = Geth::new().disable_discovery().data_dir(&temp_dir_1).spawn();
-                    let mut geth2 =
-                        Geth::new().disable_discovery().port(0u16).data_dir(&temp_dir_2).spawn();
+                    let geth1 =
+                        Geth::new().disable_discovery().keep_stderr().data_dir(&temp_dir_1).spawn();
+                    let mut geth2 = Geth::new()
+                        .disable_discovery()
+                        .keep_stderr()
+                        .port(0u16)
+                        .data_dir(&temp_dir_2)
+                        .spawn();
 
-                    let provider1 = ProviderBuilder::new().on_http(geth1.endpoint_url());
-                    let provider2 = ProviderBuilder::new().on_http(geth2.endpoint_url());
+                    let provider1 = ProviderBuilder::new().connect_http(geth1.endpoint_url());
+                    let provider2 = ProviderBuilder::new().connect_http(geth2.endpoint_url());
                     let node1_info = provider1.node_info().await.unwrap();
                     let node1_id = node1_info.id;
                     let node1_enode = node1_info.enode;
