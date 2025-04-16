@@ -60,6 +60,25 @@ impl TxEnvelope {
         }
     }
 }
+
+impl EthereumTxEnvelope<TxEip4844> {
+    /// Attempts to convert the envelope into the pooled variant.
+    ///
+    /// Returns an error if the envelope's variant is incompatible with the pooled format:
+    /// [`crate::TxEip4844`] without the sidecar.
+    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+        match self {
+            Self::Legacy(tx) => Ok(tx.into()),
+            Self::Eip2930(tx) => Ok(tx.into()),
+            Self::Eip1559(tx) => Ok(tx.into()),
+            Self::Eip4844(tx) => {
+                Err(ValueError::new(tx.into(), "pooled transaction requires 4844 sidecar"))
+            }
+            Self::Eip7702(tx) => Ok(tx.into()),
+        }
+    }
+}
+
 impl<T> EthereumTxEnvelope<T> {
     /// Returns a mutable reference to the transaction's input.
     #[doc(hidden)]
