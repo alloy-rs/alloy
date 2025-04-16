@@ -47,18 +47,6 @@ impl TxEnvelope {
             Self::Eip7702(tx) => Ok(tx.into()),
         }
     }
-
-    /// Consumes the type, removes the signature and returns the transaction.
-    #[inline]
-    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<TxEip4844Variant> {
-        match self {
-            Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
-            Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx.into_parts().0),
-            Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx.into_parts().0),
-            Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(tx.into_parts().0),
-            Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
-        }
-    }
 }
 
 impl EthereumTxEnvelope<TxEip4844> {
@@ -89,6 +77,21 @@ impl<T> EthereumTxEnvelope<T> {
         T: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
     {
         transaction.into_signed(signature).into()
+    }
+
+    /// Consumes the type, removes the signature and returns the transaction.
+    #[inline]
+    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<T>
+    where
+        T: RlpEcdsaEncodableTx,
+    {
+        match self {
+            Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
+            Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx.into_parts().0),
+            Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx.into_parts().0),
+            Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(tx.into_parts().0),
+            Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
+        }
     }
 
     /// Returns a mutable reference to the transaction's input.
