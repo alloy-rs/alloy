@@ -80,6 +80,17 @@ impl EthereumTxEnvelope<TxEip4844> {
 }
 
 impl<T> EthereumTxEnvelope<T> {
+    /// Creates a new signed transaction from the given typed transaction and signature without the
+    /// hash.
+    ///
+    /// Note: this only calculates the hash on the first [`EthereumTxEnvelope::hash`] call.
+    pub fn new_unhashed(transaction: EthereumTypedTransaction<T>, signature: Signature) -> Self
+    where
+        T: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
+    {
+        transaction.into_signed(signature).into()
+    }
+
     /// Returns a mutable reference to the transaction's input.
     #[doc(hidden)]
     pub fn input_mut(&mut self) -> &mut Bytes
@@ -397,6 +408,15 @@ where
 {
     fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
         value.into_signed()
+    }
+}
+
+impl<Eip4844> From<(EthereumTypedTransaction<Eip4844>, Signature)> for EthereumTxEnvelope<Eip4844>
+where
+    Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
+{
+    fn from(value: (EthereumTypedTransaction<Eip4844>, Signature)) -> Self {
+        value.0.into_signed(value.1).into()
     }
 }
 
