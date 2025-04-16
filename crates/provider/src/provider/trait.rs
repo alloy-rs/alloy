@@ -2239,4 +2239,18 @@ mod tests {
         let elapsed = start.elapsed();
         assert_eq!(elapsed.as_secs_f64().round() as u32, 1);
     }
+
+    #[tokio::test]
+    #[cfg(feature = "hyper")]
+    async fn test_connect_hyper_tls() {
+        let p =
+            ProviderBuilder::new().connect("https://reth-ethereum.ithaca.xyz/rpc").await.unwrap();
+
+        let _num = p.get_block_number().await.unwrap();
+
+        let anvil = Anvil::new().spawn();
+        let p = ProviderBuilder::new().connect(&anvil.endpoint()).await.unwrap();
+
+        let _num = p.get_block_number().await.unwrap();
+    }
 }
