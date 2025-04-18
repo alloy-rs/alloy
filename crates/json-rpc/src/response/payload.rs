@@ -111,6 +111,14 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
         }
     }
 
+    /// Converts this type into a [`Result`] returning the [`ErrorPayload`] as `Err`.
+    pub fn try_into_success(self) -> Result<Payload, ErrorPayload<ErrData>> {
+        match self {
+            Self::Success(res) => Ok(res),
+            Self::Failure(error) => Err(error),
+        }
+    }
+
     /// Returns the error code if this a [`ResponsePayload::Failure`]
     pub fn error_code(&self) -> Option<i64> {
         self.as_error().map(|err| err.code)
