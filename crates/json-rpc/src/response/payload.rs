@@ -114,8 +114,8 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Converts this type into a [`Result`] returning the [`ErrorPayload`] as `Err`.
     pub fn try_into_success(self) -> Result<Payload, ErrorPayload<ErrData>> {
         match self {
-            ResponsePayload::Success(res) => Ok(res),
-            ResponsePayload::Failure(error) => Err(error),
+            Self::Success(res) => Ok(res),
+            Self::Failure(error) => Err(error),
         }
     }
 
