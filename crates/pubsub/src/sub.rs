@@ -14,9 +14,9 @@ use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 #[derive(Debug)]
 pub struct RawSubscription {
     /// The channel via which notifications are received.
-    pub(crate) rx: broadcast::Receiver<Box<RawValue>>,
+    pub rx: broadcast::Receiver<Box<RawValue>>,
     /// The local ID of the subscription.
-    pub(crate) local_id: B256,
+    pub local_id: B256,
 }
 
 impl RawSubscription {
