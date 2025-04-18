@@ -40,9 +40,10 @@ Create a simple provider to connect to an Ethereum node:
 ```rust
 use alloy_provider::ProviderBuilder;
 use alloy_primitives::Address;
+use std::error::Error;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Box<dyn Error> {
     // Connect to a node using HTTP
     let provider = ProviderBuilder::new().connect("http://localhost:8545").await?;
     
@@ -65,9 +66,10 @@ Create a provider with a wallet for signing transactions:
 use alloy_provider::ProviderBuilder;
 use alloy_primitives::{Address, U256};
 use alloy_signer::PrivateKeySigner;
+use std::error::Error;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Box<dyn Error> {
     // Create a wallet from a private key
     let private_key = "0x..."; // Your private key
     let wallet = PrivateKeySigner::from_str(private_key)?;
@@ -98,9 +100,10 @@ Customize your provider with specific features:
 ```rust
 use alloy_provider::ProviderBuilder;
 use alloy_chains::NamedChain;
+use std::error::Error;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Box<dyn Error> {
     // Create a provider with specific configuration
     let provider = ProviderBuilder::new()
         // Specify chain
@@ -122,9 +125,10 @@ Use with a local Anvil instance for development:
 
 ```rust
 use alloy_provider::ProviderBuilder;
+use std::error::Error;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Box<dyn Error> {
     // Launch an Anvil instance with a configured wallet
     let provider = ProviderBuilder::new()
         .connect_anvil_with_wallet()
