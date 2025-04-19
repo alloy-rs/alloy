@@ -184,7 +184,7 @@ where
 
 /// Parameters for a trace call.
 ///
-/// Contains optional block id and trace types to accomodate `trace_*` api calls that don't require
+/// Contains optional block id and trace types to accommodate `trace_*` api calls that don't require
 /// them.
 #[derive(Debug, Clone)]
 pub struct TraceParams<Params: RpcSend> {

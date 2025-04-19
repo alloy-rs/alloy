@@ -26,7 +26,7 @@ impl AuthLayer {
         Self { secret, latency_buffer: 5000 }
     }
 
-    /// We use this buffer to perfom an extra check on the `iat` field to prevent sending any
+    /// We use this buffer to perform an extra check on the `iat` field to prevent sending any
     /// requests with tokens that are valid now but may not be upon reaching the server.
     ///
     /// In milliseconds. Default is 5s.

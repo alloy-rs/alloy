@@ -1279,7 +1279,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 let gas_limit =
                     gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
                 let gas_used =
-                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUesd"))?;
+                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUsed"))?;
                 let timestamp =
                     timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
                 let extra_data =
