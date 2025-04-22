@@ -2,7 +2,7 @@ use alloy_consensus::{BlockHeader, Header};
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
 
 /// Block header representation with certain fields made optional to account for possible
-/// differencies in network implementations.
+/// differences in network implementations.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -224,7 +224,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
 /// A signable transaction.
 ///
 /// A transaction can have multiple signature types. This is usually
-/// [`alloy_primitives::PrimitiveSignature`], however, it may be different for future EIP-2718
+/// [`alloy_primitives::Signature`], however, it may be different for future EIP-2718
 /// transaction types, or in other networks. For example, in Optimism, the deposit transaction
 /// signature is the unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]

@@ -47,10 +47,44 @@ impl TxEnvelope {
             Self::Eip7702(tx) => Ok(tx.into()),
         }
     }
+}
+
+impl EthereumTxEnvelope<TxEip4844> {
+    /// Attempts to convert the envelope into the pooled variant.
+    ///
+    /// Returns an error if the envelope's variant is incompatible with the pooled format:
+    /// [`crate::TxEip4844`] without the sidecar.
+    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+        match self {
+            Self::Legacy(tx) => Ok(tx.into()),
+            Self::Eip2930(tx) => Ok(tx.into()),
+            Self::Eip1559(tx) => Ok(tx.into()),
+            Self::Eip4844(tx) => {
+                Err(ValueError::new(tx.into(), "pooled transaction requires 4844 sidecar"))
+            }
+            Self::Eip7702(tx) => Ok(tx.into()),
+        }
+    }
+}
+
+impl<T> EthereumTxEnvelope<T> {
+    /// Creates a new signed transaction from the given typed transaction and signature without the
+    /// hash.
+    ///
+    /// Note: this only calculates the hash on the first [`EthereumTxEnvelope::hash`] call.
+    pub fn new_unhashed(transaction: EthereumTypedTransaction<T>, signature: Signature) -> Self
+    where
+        T: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
+    {
+        transaction.into_signed(signature).into()
+    }
 
     /// Consumes the type, removes the signature and returns the transaction.
     #[inline]
-    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<TxEip4844Variant> {
+    pub fn into_typed_transaction(self) -> EthereumTypedTransaction<T>
+    where
+        T: RlpEcdsaEncodableTx,
+    {
         match self {
             Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
             Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx.into_parts().0),
@@ -59,8 +93,7 @@ impl TxEnvelope {
             Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx.into_parts().0),
         }
     }
-}
-impl<T> EthereumTxEnvelope<T> {
+
     /// Returns a mutable reference to the transaction's input.
     #[doc(hidden)]
     pub fn input_mut(&mut self) -> &mut Bytes
@@ -381,6 +414,15 @@ where
     }
 }
 
+impl<Eip4844> From<(EthereumTypedTransaction<Eip4844>, Signature)> for EthereumTxEnvelope<Eip4844>
+where
+    Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
+{
+    fn from(value: (EthereumTypedTransaction<Eip4844>, Signature)) -> Self {
+        value.0.into_signed(value.1).into()
+    }
+}
+
 impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     /// Returns true if the transaction is a legacy transaction.
     #[inline]
@@ -504,6 +546,18 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     pub fn try_into_recovered(
         self,
     ) -> Result<crate::transaction::Recovered<Self>, alloy_primitives::SignatureError>
+    where
+        Eip4844: SignableTransaction<Signature>,
+    {
+        let signer = self.recover_signer()?;
+        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
+    }
+
+    /// Recover the signer of the transaction and returns a `Recovered<&Self>`
+    #[cfg(feature = "k256")]
+    pub fn try_to_recovered_ref(
+        &self,
+    ) -> Result<crate::transaction::Recovered<&Self>, alloy_primitives::SignatureError>
     where
         Eip4844: SignableTransaction<Signature>,
     {
