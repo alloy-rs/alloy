@@ -20,11 +20,11 @@ const KEEPALIVE: u64 = 10;
 #[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
-    pub url: String,
+    url: String,
     /// The authorization header to use.
-    pub auth: Option<Authorization>,
+    auth: Option<Authorization>,
     /// The websocket config.
-    pub config: Option<WebSocketConfig>,
+    config: Option<WebSocketConfig>,
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
     max_retries: u32,
@@ -55,6 +55,21 @@ impl WsConnect {
     pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = Some(config);
         self
+    }
+
+    /// Get the URL string of the connection.
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Get the authorization header.
+    pub fn auth(&self) -> Option<&Authorization> {
+        self.auth.as_ref()
+    }
+
+    /// Get the websocket config.
+    pub fn config(&self) -> Option<&WebSocketConfig> {
+        self.config.as_ref()
     }
 
     /// Sets the max number of retries before failing and exiting the connection.

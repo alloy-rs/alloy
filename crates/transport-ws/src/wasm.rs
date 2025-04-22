@@ -13,7 +13,7 @@ use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 #[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
-    pub url: String,
+    url: String,
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
     max_retries: u32,
@@ -40,6 +40,11 @@ impl WsConnect {
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = retry_interval;
         self
+    }
+
+    /// Get the URL string of the connection.
+    pub fn url(&self) -> &str {
+        &self.url
     }
 }
 
