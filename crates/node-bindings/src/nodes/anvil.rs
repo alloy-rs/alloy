@@ -198,7 +198,7 @@ impl Anvil {
         self
     }
 
-    /// Sets the path for the the ipc server
+    /// Sets the path for the ipc server
     pub fn ipc_path(mut self, path: impl Into<String>) -> Self {
         self.ipc_path = Some(path.into());
         self
