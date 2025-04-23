@@ -129,7 +129,7 @@ pub trait RpcRecv: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
 impl<T> RpcRecv for T where T: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
-/// An object that can be received over RPC, borrowing from the the
+/// An object that can be received over RPC, borrowing from the
 /// deserialization context.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is
