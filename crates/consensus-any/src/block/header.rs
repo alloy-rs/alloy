@@ -43,7 +43,7 @@ pub struct AnyHeader {
     /// Mix Hash
     ///
     /// Before the merge this proves, combined with the nonce, that a sufficient amount of
-    /// computation has been carried out on this block: the Proof-of-Work (PoF).
+    /// computation has been carried out on this block: the Proof-of-Work (PoW).
     ///
     /// After the merge this is `prevRandao`: Randomness value for the generated payload.
     ///
