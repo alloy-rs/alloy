@@ -4,7 +4,8 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant},
         PooledTransaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
-    EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
+    EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip4844WithSidecar,
+    TxEip7702, TxLegacy,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
@@ -420,6 +421,40 @@ where
 {
     fn from(value: (EthereumTypedTransaction<Eip4844>, Signature)) -> Self {
         value.0.into_signed(value.1).into()
+    }
+}
+
+impl From<EthereumTxEnvelope<TxEip4844WithSidecar>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl From<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant> {
+    fn from(value: EthereumTxEnvelope<TxEip4844>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl<Eip4844> EthereumTxEnvelope<Eip4844> {
+    /// Converts the EIP-4844 variant of this transaction with the given closure.
+    ///
+    /// This is intended to convert between the EIP-4844 variants, specifically for stripping away
+    /// non consensus data (blob sidecar data).
+    pub fn map_eip4844<U>(self, f: impl FnMut(Eip4844) -> U) -> EthereumTxEnvelope<U> {
+        match self {
+            Self::Legacy(tx) => EthereumTxEnvelope::Legacy(tx),
+            Self::Eip2930(tx) => EthereumTxEnvelope::Eip2930(tx),
+            Self::Eip1559(tx) => EthereumTxEnvelope::Eip1559(tx),
+            Self::Eip4844(tx) => EthereumTxEnvelope::Eip4844(tx.map(f)),
+            Self::Eip7702(tx) => EthereumTxEnvelope::Eip7702(tx),
+        }
     }
 }
 
