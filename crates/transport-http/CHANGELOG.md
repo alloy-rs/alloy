@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix typos in comments and string literals ([#2329](https://github.com/alloy-rs/alloy/issues/2329))
 - [`transport`] Enable hyper-tls via hyper feature ([#2320](https://github.com/alloy-rs/alloy/issues/2320))
 
+### Miscellaneous Tasks
+
+- Release 0.15.0
+
 ## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
 
 ### Miscellaneous Tasks

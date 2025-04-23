@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix grammar typos in documentation ([#2333](https://github.com/alloy-rs/alloy/issues/2333))
 
+### Miscellaneous Tasks
+
+- Release 0.15.0
+
 ### Styling
 
 - [`provider`] Rename `on_*` to `connect_*` ([#2225](https://github.com/alloy-rs/alloy/issues/2225))

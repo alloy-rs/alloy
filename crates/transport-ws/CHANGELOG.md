@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [transport-ws] Expose Ws url ([#2301](https://github.com/alloy-rs/alloy/issues/2301))
 - [`ws`] Retry mechanism in WsConnect ([#2303](https://github.com/alloy-rs/alloy/issues/2303))
 
+### Miscellaneous Tasks
+
+- Release 0.15.0
+
 ## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
 
 ### Bug Fixes
