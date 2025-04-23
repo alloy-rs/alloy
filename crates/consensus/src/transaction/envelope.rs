@@ -1,3 +1,4 @@
+use super::SignableTransaction;
 use crate::{
     error::ValueError,
     transaction::{
@@ -10,6 +11,7 @@ use crate::{
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
+    eip4844::BlobTransactionSidecar,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256, U64, U8};
@@ -18,8 +20,6 @@ use core::{
     fmt::{self, Debug},
     hash::{Hash, Hasher},
 };
-
-use super::SignableTransaction;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
@@ -64,6 +64,22 @@ impl EthereumTxEnvelope<TxEip4844> {
                 Err(ValueError::new(tx.into(), "pooled transaction requires 4844 sidecar"))
             }
             Self::Eip7702(tx) => Ok(tx.into()),
+        }
+    }
+
+    /// Converts from an EIP-4844 transaction to a [`PooledTransaction`] with the given sidecar.
+    ///
+    /// Returns an `Err` containing the original [`EthereumTxEnvelope`] if the transaction is not an
+    /// EIP-4844 variant.
+    pub fn try_into_pooled_eip4844(
+        self,
+        sidecar: BlobTransactionSidecar,
+    ) -> Result<PooledTransaction, ValueError<Self>> {
+        match self {
+            Self::Eip4844(tx) => {
+                Ok(EthereumTxEnvelope::Eip4844(tx.map(|tx| tx.with_sidecar(sidecar))))
+            }
+            this => Err(ValueError::new_static(this, "Expected 4844 transaction")),
         }
     }
 }

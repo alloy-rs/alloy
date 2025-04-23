@@ -552,6 +552,11 @@ impl TxEip4844 {
         TxType::Eip4844
     }
 
+    /// Attaches the blob sidecar to the transaction
+    pub fn with_sidecar(self, sidecar: BlobTransactionSidecar) -> TxEip4844WithSidecar {
+        TxEip4844WithSidecar::from_tx_and_sidecar(self, sidecar)
+    }
+
     /// Calculates a heuristic for the in-memory size of the [TxEip4844Variant] transaction.
     #[inline]
     pub fn size(&self) -> usize {
