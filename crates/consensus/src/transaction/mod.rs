@@ -280,7 +280,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     }
 }
 
-// TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
+// TODO(MSRV-1.86): Remove in favor of dyn trait upcasting
 #[doc(hidden)]
 impl<S: 'static> dyn SignableTransaction<S> {
     pub fn __downcast_ref<T: any::Any>(&self) -> Option<&T> {
