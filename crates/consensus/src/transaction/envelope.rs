@@ -312,6 +312,32 @@ impl<Eip4844> EthereumTxEnvelope<Eip4844> {
             Self::Eip7702(tx) => EthereumTxEnvelope::Eip7702(tx),
         }
     }
+
+    /// Return the [`TxType`] of the inner txn.
+    #[doc(alias = "transaction_type")]
+    pub const fn tx_type(&self) -> TxType {
+        match self {
+            Self::Legacy(_) => TxType::Legacy,
+            Self::Eip2930(_) => TxType::Eip2930,
+            Self::Eip1559(_) => TxType::Eip1559,
+            Self::Eip4844(_) => TxType::Eip4844,
+            Self::Eip7702(_) => TxType::Eip7702,
+        }
+    }
+
+    /// Consumes the type into a [`Signed`]
+    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
+        match self {
+            Self::Legacy(tx) => tx.convert(),
+            Self::Eip2930(tx) => tx.convert(),
+            Self::Eip1559(tx) => tx.convert(),
+            Self::Eip4844(tx) => tx.convert(),
+            Self::Eip7702(tx) => tx.convert(),
+        }
+    }
 }
 
 impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
@@ -343,20 +369,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     #[inline]
     pub const fn is_eip7702(&self) -> bool {
         matches!(self, Self::Eip7702(_))
-    }
-
-    /// Consumes the type into a [`Signed`]
-    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
-    where
-        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
-    {
-        match self {
-            Self::Legacy(tx) => tx.convert(),
-            Self::Eip2930(tx) => tx.convert(),
-            Self::Eip1559(tx) => tx.convert(),
-            Self::Eip4844(tx) => tx.convert(),
-            Self::Eip7702(tx) => tx.convert(),
-        }
     }
 
     /// Returns true if the transaction is replay protected.
@@ -501,18 +513,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
             Self::Eip1559(tx) => tx.hash(),
             Self::Eip7702(tx) => tx.hash(),
             Self::Eip4844(tx) => tx.hash(),
-        }
-    }
-
-    /// Return the [`TxType`] of the inner txn.
-    #[doc(alias = "transaction_type")]
-    pub const fn tx_type(&self) -> TxType {
-        match self {
-            Self::Legacy(_) => TxType::Legacy,
-            Self::Eip2930(_) => TxType::Eip2930,
-            Self::Eip1559(_) => TxType::Eip1559,
-            Self::Eip4844(_) => TxType::Eip4844,
-            Self::Eip7702(_) => TxType::Eip7702,
         }
     }
 
