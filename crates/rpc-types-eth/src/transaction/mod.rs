@@ -185,8 +185,8 @@ where
 }
 
 impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
-    /// Consumes the transaction and returns it as [`Signed`] with [`TypedTransaction`] as the
-    /// transaction type.
+    /// Consumes the transaction and returns it as [`Signed`] with [`EthereumTypedTransaction`] as
+    /// the transaction type.
     pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
     where
         EthereumTypedTransaction<Eip4844>: From<Eip4844>,
@@ -194,7 +194,7 @@ impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
         self.inner.into_inner().into_signed()
     }
 
-    /// Consumes the transaction and returns it a [`Recovered`] signed [`TypedTransaction`].
+    /// Consumes the transaction and returns it a [`Recovered`] signed [`EthereumTypedTransaction`].
     pub fn into_signed_recovered(self) -> Recovered<Signed<EthereumTypedTransaction<Eip4844>>>
     where
         EthereumTypedTransaction<Eip4844>: From<Eip4844>,
