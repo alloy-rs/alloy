@@ -288,16 +288,16 @@ impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip
     }
 }
 
-impl<Eip4844> From<Transaction<EthereumTxEnvelope<Eip4844>>> for EthereumTxEnvelope<Eip4844> {
-    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+impl<Eip4844> From<Transaction<Self>> for EthereumTxEnvelope<Eip4844> {
+    fn from(tx: Transaction<Self>) -> Self {
         tx.inner.into_inner()
     }
 }
 
-impl<Eip4844> From<Transaction<EthereumTypedTransaction<Eip4844>>>
+impl<Eip4844> From<Transaction<Self>>
     for EthereumTypedTransaction<Eip4844>
 {
-    fn from(tx: Transaction<EthereumTypedTransaction<Eip4844>>) -> Self {
+    fn from(tx: Transaction<Self>) -> Self {
         tx.inner.into_inner()
     }
 }
