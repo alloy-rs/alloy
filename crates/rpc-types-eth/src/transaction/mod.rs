@@ -294,9 +294,7 @@ impl<Eip4844> From<Transaction<Self>> for EthereumTxEnvelope<Eip4844> {
     }
 }
 
-impl<Eip4844> From<Transaction<Self>>
-    for EthereumTypedTransaction<Eip4844>
-{
+impl<Eip4844> From<Transaction<Self>> for EthereumTypedTransaction<Eip4844> {
     fn from(tx: Transaction<Self>) -> Self {
         tx.inner.into_inner()
     }
