@@ -5,20 +5,20 @@ use alloy_primitives::{U64, U8};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
-/// The TxEnvelope enum represents all Ethereum transaction envelope types,
+/// The TxEnvelope enum represents all Ethereum transaction envelope types,
 /// /// Its variants correspond to specific allowed transactions:
-/// 1. Legacy (pre-EIP2718) [`TxLegacy`]
-/// 2. EIP2930 (state access lists) [`TxEip2930`]
-/// 3. EIP1559 [`TxEip1559`]
-/// 4. EIP4844 [`TxEip4844Variant`]
+/// 1. Legacy (pre-EIP2718) [`TxLegacy`](crate::TxLegacy)
+/// 2. EIP2930 (state access lists) [`TxEip2930`](crate::TxEip2930)
+/// 3. EIP1559 [`TxEip1559`](crate::TxEip1559)
+/// 4. EIP4844 [`TxEip4844Variant`](crate::TxEip4844Variant)
 ///
 /// This type is generic over Eip4844 variant to support the following cases:
 /// 1. Only-[`crate::TxEip4844`] transaction type, such transaction representation is returned by
 ///    RPC and stored by nodes internally.
 /// 2. Only-[`crate::TxEip4844WithSidecar`] transactions which are broadcasted over the network,
 ///    submitted to RPC and stored in transaction pool.
-/// 3. Dynamic [`TxEip4844Variant`] transactions to support both of the above cases via a single
-///    type.
+/// 3. Dynamic [`TxEip4844Variant`](crate::TxEip4844Variant) transactions to support both of the
+///    above cases via a single type.
 ///
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930], [4844], and
 /// [7702].
