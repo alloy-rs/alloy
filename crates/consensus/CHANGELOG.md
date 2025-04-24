@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.15.5
 - Relax rpc tx conversions ([#2345](https://github.com/alloy-rs/alloy/issues/2345))
 - Release 0.15.4
 
