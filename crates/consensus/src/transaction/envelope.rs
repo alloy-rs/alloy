@@ -85,6 +85,31 @@ impl EthereumTxEnvelope<TxEip4844> {
 }
 
 impl<T> EthereumTxEnvelope<T> {
+    /// Creates a new signed transaction from the given transaction, signature and hash.
+    ///
+    /// Caution: This assumes the given hash is the correct transaction hash.
+    pub fn new_unchecked(
+        transaction: EthereumTypedTransaction<T>,
+        signature: Signature,
+        hash: B256,
+    ) -> Self
+    where
+        T: RlpEcdsaEncodableTx,
+    {
+        Signed::new_unchecked(transaction, signature, hash).into()
+    }
+
+    /// Creates a new signed transaction from the given transaction, signature and hash.
+    ///
+    /// Caution: This assumes the given hash is the correct transaction hash.
+    #[deprecated(note = "Use new_unchecked() instead")]
+    pub fn new(transaction: EthereumTypedTransaction<T>, signature: Signature, hash: B256) -> Self
+    where
+        T: RlpEcdsaEncodableTx,
+    {
+        Self::new_unchecked(transaction, signature, hash)
+    }
+
     /// Creates a new signed transaction from the given typed transaction and signature without the
     /// hash.
     ///
