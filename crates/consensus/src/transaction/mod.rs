@@ -36,7 +36,7 @@ pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 /// Re-export for convenience
 pub use either::Either;
 
-pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
+pub use envelope::{EthereumTxEnvelope, TxEnvelope};
 
 mod legacy;
 pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
@@ -47,6 +47,9 @@ pub use rlp::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpEcdsaTx};
 
 mod typed;
 pub use typed::{EthereumTypedTransaction, TypedTransaction};
+
+mod tx_type;
+pub use tx_type::TxType;
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
