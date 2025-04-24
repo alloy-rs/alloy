@@ -438,7 +438,7 @@ mod test {
 
         let json = serde_json::to_string(&receipt).unwrap();
 
-        println!("Serialized {}", json);
+        println!("Serialized {json}");
 
         let receipt: super::ReceiptWithBloom<Receipt<()>> = serde_json::from_str(&json).unwrap();
 
