@@ -113,6 +113,40 @@ impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for EthereumTypedTransaction<Eip
     }
 }
 
+impl From<EthereumTypedTransaction<TxEip4844WithSidecar>> for EthereumTypedTransaction<TxEip4844> {
+    fn from(value: EthereumTypedTransaction<TxEip4844WithSidecar>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl From<EthereumTypedTransaction<TxEip4844Variant>> for EthereumTypedTransaction<TxEip4844> {
+    fn from(value: EthereumTypedTransaction<TxEip4844Variant>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl From<EthereumTypedTransaction<TxEip4844>> for EthereumTypedTransaction<TxEip4844Variant> {
+    fn from(value: EthereumTypedTransaction<TxEip4844>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl<Eip4844> EthereumTypedTransaction<Eip4844> {
+    /// Converts the EIP-4844 variant of this transaction with the given closure.
+    ///
+    /// This is intended to convert between the EIP-4844 variants, specifically for stripping away
+    /// non consensus data (blob sidecar data).
+    pub fn map_eip4844<U>(self, mut f: impl FnMut(Eip4844) -> U) -> EthereumTypedTransaction<U> {
+        match self {
+            Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx),
+            Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx),
+            Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx),
+            Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(f(tx)),
+            Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx),
+        }
+    }
+}
+
 impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
     /// Return the [`TxType`] of the inner txn.
     #[doc(alias = "transaction_type")]
