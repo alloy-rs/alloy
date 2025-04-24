@@ -1186,11 +1186,11 @@ mod tests {
     fn serde_tx_chain_id_field() {
         let chain_id: ChainId = 12345678;
 
-        let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
+        let chain_id_as_num = format!(r#"{{"chainId": {chain_id} }}"#);
         let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();
         assert_eq!(req1.chain_id.unwrap(), chain_id);
 
-        let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
+        let chain_id_as_hex = format!(r#"{{"chainId": "0x{chain_id:x}" }}"#);
         let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
         assert_eq!(req2.chain_id.unwrap(), chain_id);
     }
