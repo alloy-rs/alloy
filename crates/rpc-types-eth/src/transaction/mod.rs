@@ -288,8 +288,16 @@ impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip
     }
 }
 
-impl<Eip4844> From<Transaction<Self>> for EthereumTypedTransaction<Eip4844> {
-    fn from(tx: Transaction<Self>) -> Self {
+impl<Eip4844> From<Transaction<EthereumTxEnvelope<Eip4844>>> for EthereumTxEnvelope<Eip4844> {
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+        tx.inner.into_inner()
+    }
+}
+
+impl<Eip4844> From<Transaction<EthereumTypedTransaction<Eip4844>>>
+    for EthereumTypedTransaction<Eip4844>
+{
+    fn from(tx: Transaction<EthereumTypedTransaction<Eip4844>>) -> Self {
         tx.inner.into_inner()
     }
 }
@@ -499,6 +507,11 @@ mod tx_serde {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(unused)]
+    fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
+        tx.into()
+    }
 
     #[test]
     #[cfg(feature = "serde")]
