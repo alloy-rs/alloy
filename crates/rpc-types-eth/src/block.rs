@@ -155,7 +155,9 @@ impl<T, H> Block<T, H> {
         }
     }
 
-    /// Consumes the block and only returns the header.
+    /// Consumes the block and only returns the rpc header.
+    ///
+    /// To obtain the underlying [`alloy_consensus::Header`] use [`Block::into_consensus_header`].
     pub fn into_header(self) -> H {
         self.header
     }
@@ -252,18 +254,17 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
 }
 
 impl<T> Block<T> {
-
-
     /// Consumes the type and returns the sealed [`alloy_consensus::Header`].
     pub fn into_sealed_header(self) -> Sealed<alloy_consensus::Header> {
-      self.header.into_sealed()
+        self.header.into_sealed()
     }
-    
-    /// Consumes the type, strips away the rpc context from the rpc [`Header`] type and just returns the [`alloy_consensus::Header`].
+
+    /// Consumes the type, strips away the rpc context from the rpc [`Header`] type and just returns
+    /// the [`alloy_consensus::Header`].
     pub fn into_consensus_header(self) -> alloy_consensus::Header {
         self.header.into_consensus()
     }
-    
+
     /// Constructs block from a consensus block and `total_difficulty`.
     pub fn from_consensus(block: alloy_consensus::Block<T>, total_difficulty: Option<U256>) -> Self
     where
