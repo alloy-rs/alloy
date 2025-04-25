@@ -59,6 +59,7 @@ pub use alloy_primitives::{Sealable, Sealed};
 mod signed;
 pub use signed::Signed;
 
+pub mod crypto;
 pub mod error;
 
 /// Bincode-compatible serde implementations for consensus types.
