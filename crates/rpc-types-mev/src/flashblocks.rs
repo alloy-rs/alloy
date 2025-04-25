@@ -1,10 +1,8 @@
-use std::collections::BTreeMap;
-
 use alloy_consensus::Receipt;
-use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
-use alloy_rpc_types_engine::PayloadId;
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::Withdrawal;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Represents a Flashblock, a real-time block-like structure emitted by the Base L2 chain.
 ///
@@ -16,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FlashBlock {
     /// The unique payload ID as assigned by the execution engine for this block.
-    pub payload_id: PayloadId,
+    pub payload_id: B64,
     /// A sequential index that identifies the order of this Flashblock.
     pub index: u64,
     /// The execution diff representing state transitions and transactions.
@@ -61,11 +59,10 @@ pub struct Metadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn flashblock_roundtrip() {
-        let sample_json = json!({
+        let s = r#"{
             "payload_id": "0x036219efcf320dce",
             "index": 7,
             "diff": {
@@ -191,12 +188,13 @@ mod tests {
                     }
                 }
             }
-        });
+        }"#;
 
         let flash_block: FlashBlock =
-            serde_json::from_value(sample_json.clone()).expect("Failed to deserialize FlashBlock");
+            serde_json::from_str(s).expect("Failed to deserialize FlashBlock");
 
         let serialized = serde_json::to_value(&flash_block).unwrap();
+        let sample_json: serde_json::Value = serde_json::from_str(s).unwrap();
 
         assert_eq!(sample_json, serialized);
     }

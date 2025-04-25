@@ -43,6 +43,12 @@ impl core::fmt::Display for PayloadId {
     }
 }
 
+impl From<B64> for PayloadId {
+    fn from(value: B64) -> Self {
+        Self(value)
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
