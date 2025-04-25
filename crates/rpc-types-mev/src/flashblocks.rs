@@ -1,5 +1,5 @@
 use alloy_consensus::Receipt;
-use alloy_primitives::{Address, Bloom, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::Withdrawal;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -37,8 +37,8 @@ pub struct FlashBlockDiff {
     pub gas_used: u64,
     /// The hash of the block this diff is describing.
     pub block_hash: B256,
-    /// List of transaction hashes included in the block.
-    pub transactions: Vec<B256>,
+    /// List of transactions included in the block.
+    pub transactions: Vec<Bytes>,
     /// Withdrawals included in the block (relevant for post-merge Ethereum withdrawals).
     pub withdrawals: Vec<Withdrawal>,
 }
