@@ -510,6 +510,13 @@ pub mod signed_legacy_serde {
         D: serde::Deserializer<'de>,
     {
         let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
+        // Optimism pre-Bedrock (and some other L2s) injected system transactions into the chain
+        // where the signature fields (v, r, s) are all zero.
+        // These transactions do not have a valid ECDSA signature, but are valid on-chain.
+        // See: https://github.com/alloy-rs/alloy/issues/2348
+        //
+        // Here, we detect (v=0, r=0, s=0) and treat them as system transactions,
+        // bypassing EIP-155 signature validation.
         let is_fake_signature =
             signature.r.is_zero() && signature.s.is_zero() && signature.v.is_zero();
         let signature = if is_fake_signature {
