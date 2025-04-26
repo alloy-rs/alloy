@@ -510,19 +510,33 @@ pub mod signed_legacy_serde {
         D: serde::Deserializer<'de>,
     {
         let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
-        let (parity, chain_id) = from_eip155_value(signature.v.to())
-            .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
+        let is_fake_signature =
+            signature.r.is_zero() && signature.s.is_zero() && signature.v.is_zero();
+        let signature = if is_fake_signature {
+            Signature::new(U256::ZERO, U256::ZERO, false)
+        } else {
+            let (parity, chain_id) = from_eip155_value(signature.v.to()).ok_or_else(|| {
+                serde::de::Error::custom("invalid EIP-155 signature parity value")
+            })?;
 
-        // Note: some implementations always set the chain id in the response, so we only check if
-        // they differ if both are set.
-        if let Some((tx_chain_id, chain_id)) = tx.chain_id().zip(chain_id) {
-            if tx_chain_id != chain_id {
-                return Err(serde::de::Error::custom("chain id mismatch"));
+            // Note: some implementations always set the chain id in the response, so we only check
+            // if they differ if both are set.
+            if let Some((tx_chain_id, chain_id)) = tx.chain_id().zip(chain_id) {
+                if tx_chain_id != chain_id {
+                    return Err(serde::de::Error::custom("chain id mismatch"));
+                }
             }
-        }
+            Signature::new(signature.r, signature.s, parity)
+        };
         let mut tx = tx.into_owned();
-        tx.chain_id = chain_id;
-        Ok(Signed::new_unchecked(tx, Signature::new(signature.r, signature.s, parity), hash))
+        if !is_fake_signature {
+            let (_, chain_id) = from_eip155_value(signature.v().into()) // reuse v
+                .ok_or_else(|| {
+                    serde::de::Error::custom("invalid EIP-155 signature parity value")
+                })?;
+            tx.chain_id = chain_id;
+        }
+        Ok(Signed::new_unchecked(tx, signature, hash))
     }
 }
 
