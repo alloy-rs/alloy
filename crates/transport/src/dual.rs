@@ -11,7 +11,7 @@ pub trait DualTransportHandler<L, R> {
 /// A transport that dispatches requests to one of two inner transports based on a handler.
 ///
 /// This type allows RPC clients to dynamically select between two different transports
-/// at runtime depending on the request. It is [Send] + [`Sync` ] and implements [`Transport`]
+/// at runtime depending on the request. It is [Send] + [`Sync` ] and implements Transport
 /// via the [`Service`] trait.
 ///
 /// This is useful for building clients that abstract over multiple backends or protocols,
