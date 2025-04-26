@@ -9,6 +9,9 @@
 mod boxed;
 pub use boxed::{BoxTransport, IntoBoxTransport};
 
+mod dual;
+pub use dual::*;
+
 mod connect;
 pub use connect::TransportConnect;
 
