@@ -1,7 +1,7 @@
 use crate::receipt::{
     Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
-use alloc::{vec, vec::Vec};
+use alloc::{borrow::Cow, vec, vec::Vec};
 use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
@@ -276,6 +276,10 @@ where
 
     fn bloom_cheap(&self) -> Option<Bloom> {
         Some(self.logs_bloom)
+    }
+
+    fn bloom_ref(&self) -> Cow<'_, Bloom> {
+        Cow::Borrowed(&self.logs_bloom)
     }
 
     fn cumulative_gas_used(&self) -> u64 {
