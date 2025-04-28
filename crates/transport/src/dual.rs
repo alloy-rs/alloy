@@ -11,8 +11,6 @@ pub trait DualTransportHandler<L, R> {
 impl<F, L, R> DualTransportHandler<L, R> for F
 where
     F: Fn(RequestPacket, L, R) -> TransportFut<'static> + Send + Sync,
-    L: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError> + Clone,
-    R: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError> + Clone,
 {
     fn call(&self, request: RequestPacket, left: L, right: R) -> TransportFut<'static> {
         (self)(request, left, right)
@@ -45,6 +43,14 @@ impl<L, R, H> DualTransport<L, R, H> {
     /// Instantiate a new dual transport from a suitable transport.
     pub fn new(left: L, right: R, handler: H) -> Self {
         Self { left, right, handler }
+    }
+
+    /// Create a new dual transport with a function handler.
+    pub fn new_handler<F>(left: L, right: R, f: F) -> DualTransport<L, R, F>
+    where
+        F: Fn(RequestPacket, L, R) -> TransportFut<'static> + Send + Sync,
+    {
+        DualTransport { left, right, handler: f }
     }
 }
 
