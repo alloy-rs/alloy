@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt};
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Result, Encodable2718},
@@ -6,7 +7,6 @@ use alloy_eips::{
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
-use std::borrow::Cow;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
