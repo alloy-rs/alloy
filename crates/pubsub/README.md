@@ -131,6 +131,6 @@ Subscription Notification Lifecycle
 
 1. The RPC server sends a notification to the **backend**.
 1. The **backend** sends the notification to the **service**.
-1. The **service** looks up the `local_id` i1n its `SubscriptionManager`.
+1. The **service** looks up the `local_id` in its `SubscriptionManager`.
 1. If present, the **service** sends the notification to the relevant channel.
    1. Otherwise, the **service** ignores the notification.
