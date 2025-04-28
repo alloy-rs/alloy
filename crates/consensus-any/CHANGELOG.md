@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.5
+- Release 0.15.4
+
+## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.3
+
+## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.2
+
+## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.1
+
+## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
+
+### Bug Fixes
+
+- Fix Typos in Documentation Comments ([#2325](https://github.com/alloy-rs/alloy/issues/2325))
+
+### Miscellaneous Tasks
+
+- Release 0.15.0
+
+## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
+
+### Miscellaneous Tasks
+
+- Release 0.14.0
+
 ## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
 
 ### Miscellaneous Tasks
@@ -83,12 +124,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
-### Miscellaneous Tasks
-
-- Release 0.9.1
-
-## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
-
 ### Bug Fixes
 
 - Use u64 for all gas values ([#1848](https://github.com/alloy-rs/alloy/issues/1848))
@@ -97,6 +132,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [pectra] Revert EIP-7742 ([#1807](https://github.com/alloy-rs/alloy/issues/1807))
 - Add tryfrom for anyheader to header ([#1826](https://github.com/alloy-rs/alloy/issues/1826))
+
+### Miscellaneous Tasks
+
+- Release 0.9.1
 
 ## [0.8.3](https://github.com/alloy-rs/alloy/releases/tag/v0.8.3) - 2024-12-20
 
@@ -124,12 +163,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Remove `Borrow` impl for RPC receipt ([#1721](https://github.com/alloy-rs/alloy/issues/1721))
@@ -140,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28

@@ -23,7 +23,7 @@ pub struct CacheLayer {
 }
 
 impl CacheLayer {
-    /// Instantiate a new cache layer with the the maximum number of
+    /// Instantiate a new cache layer with the maximum number of
     /// items to store.
     pub fn new(max_items: u32) -> Self {
         Self { cache: SharedCache::new(max_items) }

@@ -9,7 +9,7 @@ use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
-use crate::eip4844::MAX_BLOBS_PER_BLOCK;
+use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -178,7 +178,7 @@ impl BlobTransactionSidecarItem {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
+        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK_DENCUN)?;
         let mut blobs = Vec::with_capacity(num_blobs);
         for _ in 0..num_blobs {
             blobs.push(Blob::arbitrary(u)?);

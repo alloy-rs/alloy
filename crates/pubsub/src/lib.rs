@@ -16,11 +16,13 @@ mod frontend;
 pub use frontend::PubSubFrontend;
 
 mod ix;
+pub use ix::PubSubInstruction;
 
 mod handle;
 pub use handle::{ConnectionHandle, ConnectionInterface};
 
 mod managers;
+pub use managers::InFlight;
 
 mod service;
 

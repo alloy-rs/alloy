@@ -5,11 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.5
+- Release 0.15.4
+
+## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.3
+
+## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.2
+
+## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.1
+
+## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.0
+
 ## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
 
 ### Features
 
 - Add conditional conversions for BlockTransactions ([#2270](https://github.com/alloy-rs/alloy/issues/2270))
+
+### Miscellaneous Tasks
+
+- Release 0.14.0
 
 ## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
 
@@ -102,12 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
-### Miscellaneous Tasks
-
-- Release 0.9.1
-
-## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
-
 ### Bug Fixes
 
 - Use u64 for all gas values ([#1848](https://github.com/alloy-rs/alloy/issues/1848))
@@ -116,6 +145,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add more builder style fns ([#1850](https://github.com/alloy-rs/alloy/issues/1850))
 - Add map transactions to rpc block type ([#1835](https://github.com/alloy-rs/alloy/issues/1835))
+
+### Miscellaneous Tasks
+
+- Release 0.9.1
 
 ## [0.8.3](https://github.com/alloy-rs/alloy/releases/tag/v0.8.3) - 2024-12-20
 
@@ -150,11 +183,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
-### Miscellaneous Tasks
-
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
@@ -280,11 +308,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
-
-## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
-
-### Miscellaneous Tasks
-
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13

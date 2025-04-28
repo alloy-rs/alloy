@@ -101,7 +101,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
 }
 
-/// Utility to implment IntoWallet for signer over the specified network.
+/// Utility to implement IntoWallet for signer over the specified network.
 #[macro_export]
 macro_rules! impl_into_wallet {
     ($(@[$($generics:tt)*])? $signer:ty) => {

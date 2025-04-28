@@ -191,7 +191,7 @@ impl TrezorSigner {
         let data = tx.input().to_vec();
         let chain_id = tx.chain_id();
 
-        // TODO: Uncomment once dyn trait upcasting is stable
+        // TODO(MSRV-1.86): Uncomment once dyn trait upcasting is stable
         /*
         let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
         */

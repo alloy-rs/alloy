@@ -43,6 +43,12 @@ impl core::fmt::Display for PayloadId {
     }
 }
 
+impl From<B64> for PayloadId {
+    fn from(value: B64) -> Self {
+        Self(value)
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -1279,7 +1285,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 let gas_limit =
                     gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
                 let gas_used =
-                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUesd"))?;
+                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUsed"))?;
                 let timestamp =
                     timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
                 let extra_data =

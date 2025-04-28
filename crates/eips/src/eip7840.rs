@@ -36,8 +36,8 @@ impl BlobParams {
     /// Returns [`BlobParams`] configuration activated with Cancun hardfork.
     pub const fn cancun() -> Self {
         Self {
-            target_blob_count: eip4844::TARGET_BLOBS_PER_BLOCK,
-            max_blob_count: eip4844::MAX_BLOBS_PER_BLOCK as u64,
+            target_blob_count: eip4844::TARGET_BLOBS_PER_BLOCK_DENCUN,
+            max_blob_count: eip4844::MAX_BLOBS_PER_BLOCK_DENCUN as u64,
             update_fraction: eip4844::BLOB_GASPRICE_UPDATE_FRACTION,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
         }

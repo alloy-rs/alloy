@@ -5,6 +5,98 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
+
+### Bug Fixes
+
+- Use correct type in conversion ([#2346](https://github.com/alloy-rs/alloy/issues/2346))
+
+## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
+
+### Features
+
+- Add more conversions ([#2344](https://github.com/alloy-rs/alloy/issues/2344))
+
+### Miscellaneous Tasks
+
+- Release 0.15.5
+- Relax rpc tx conversions ([#2345](https://github.com/alloy-rs/alloy/issues/2345))
+- Release 0.15.4
+- Mark 4844 constants deprecated ([#2341](https://github.com/alloy-rs/alloy/issues/2341))
+
+## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
+
+### Features
+
+- Add new_unchecked ([#2343](https://github.com/alloy-rs/alloy/issues/2343))
+
+### Miscellaneous Tasks
+
+- Release 0.15.3
+- Move txtype to dedicated mod ([#2342](https://github.com/alloy-rs/alloy/issues/2342))
+- Update upcasting TODOs ([#2340](https://github.com/alloy-rs/alloy/issues/2340))
+
+## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.2
+- More 4844 conversions ([#2339](https://github.com/alloy-rs/alloy/issues/2339))
+
+## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.1
+- More 4844 conversions ([#2338](https://github.com/alloy-rs/alloy/issues/2338))
+
+## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
+
+### Bug Fixes
+
+- Change value field in TraceEntry to Option<U256> ([#2331](https://github.com/alloy-rs/alloy/issues/2331))
+- Fix grammar typos in documentation ([#2333](https://github.com/alloy-rs/alloy/issues/2333))
+- Fix typos in comments and string literals ([#2329](https://github.com/alloy-rs/alloy/issues/2329))
+- Fix Typos in Documentation Comments ([#2325](https://github.com/alloy-rs/alloy/issues/2325))
+- [`transport`] Enable hyper-tls via hyper feature ([#2320](https://github.com/alloy-rs/alloy/issues/2320))
+- [json-rpc] Transport crate deadlinks in doc ([#2309](https://github.com/alloy-rs/alloy/issues/2309))
+
+### Documentation
+
+- Remove consecutive duplicate words ([#2337](https://github.com/alloy-rs/alloy/issues/2337))
+
+### Features
+
+- [transport-ws] Expose Ws url ([#2301](https://github.com/alloy-rs/alloy/issues/2301))
+- Add txenvelope helpers ([#2322](https://github.com/alloy-rs/alloy/issues/2322))
+- Add pooled conversion ([#2321](https://github.com/alloy-rs/alloy/issues/2321))
+- Add to recovered ref fns ([#2316](https://github.com/alloy-rs/alloy/issues/2316))
+- Add more response helpers ([#2315](https://github.com/alloy-rs/alloy/issues/2315))
+- Add mut arg setters for node bindings ([#2308](https://github.com/alloy-rs/alloy/issues/2308))
+- [`multicall`] Add `CallItem` to dynamic builder ([#2307](https://github.com/alloy-rs/alloy/issues/2307))
+- More response packet helpers ([#2305](https://github.com/alloy-rs/alloy/issues/2305))
+- [`ws`] Retry mechanism in WsConnect ([#2303](https://github.com/alloy-rs/alloy/issues/2303))
+- Requestpacket helpers ([#2304](https://github.com/alloy-rs/alloy/issues/2304))
+- Add helpers for rpc types ([#2300](https://github.com/alloy-rs/alloy/issues/2300))
+
+### Miscellaneous Tasks
+
+- Release 0.15.0
+- Fix unused warnings ([#2334](https://github.com/alloy-rs/alloy/issues/2334))
+- Add try into success ([#2328](https://github.com/alloy-rs/alloy/issues/2328))
+- Relax into typed fn ([#2323](https://github.com/alloy-rs/alloy/issues/2323))
+- Misc heartbeat ([#2302](https://github.com/alloy-rs/alloy/issues/2302))
+
+### Other
+
+- Make PubSubFrontend new public ([#2326](https://github.com/alloy-rs/alloy/issues/2326))
+- Update gcloud-sdk to 0.27 ([#2317](https://github.com/alloy-rs/alloy/issues/2317))
+
+### Styling
+
+-  Added Is_dyanamic_fee to TxType ([#2296](https://github.com/alloy-rs/alloy/issues/2296))
+- [`provider`] Rename `on_*` to `connect_*` ([#2225](https://github.com/alloy-rs/alloy/issues/2225))
+
 ## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
 
 ### Bug Fixes
@@ -43,6 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.14.0
 - Add `ancestor_headers` to `ExecutionWitness` ([#2294](https://github.com/alloy-rs/alloy/issues/2294))
 - Use target_family instead of arch for wasm cfg ([#2288](https://github.com/alloy-rs/alloy/issues/2288))
 - Fixed 404 link ([#2286](https://github.com/alloy-rs/alloy/issues/2286))
@@ -681,12 +774,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Wrong func sig ([#1742](https://github.com/alloy-rs/alloy/issues/1742))
@@ -723,6 +810,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
 - Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
 - Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))

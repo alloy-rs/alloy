@@ -1,8 +1,8 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
-    Typed2718, TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718,
 };
 use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
 use alloy_network_primitives::TransactionResponse;
@@ -184,16 +184,22 @@ where
     }
 }
 
-impl Transaction {
-    /// Consumes the transaction and returns it as [`Signed`] with [`TypedTransaction`] as the
-    /// transaction type.
-    pub fn into_signed(self) -> Signed<TypedTransaction> {
+impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
+    /// Consumes the transaction and returns it as [`Signed`] with [`EthereumTypedTransaction`] as
+    /// the transaction type.
+    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
         self.inner.into_inner().into_signed()
     }
 
-    /// Consumes the transaction and returns it a [`Recovered`] signed [`TypedTransaction`].
-    pub fn into_signed_recovered(self) -> Recovered<Signed<TypedTransaction>> {
-        self.convert().into_recovered()
+    /// Consumes the transaction and returns it a [`Recovered`] signed [`EthereumTypedTransaction`].
+    pub fn into_signed_recovered(self) -> Recovered<Signed<EthereumTypedTransaction<Eip4844>>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
+        self.inner.map(|tx| tx.into_signed())
     }
 }
 
@@ -212,34 +218,34 @@ impl<T> From<Transaction<T>> for Recovered<T> {
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxLegacy> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxLegacy> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
         match tx.inner.into_inner() {
-            TxEnvelope::Legacy(tx) => Ok(tx),
+            EthereumTxEnvelope::Legacy(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip1559> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip1559> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
         match tx.inner.into_inner() {
-            TxEnvelope::Eip1559(tx) => Ok(tx),
+            EthereumTxEnvelope::Eip1559(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Eip1559, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip2930> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip2930> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
         match tx.inner.into_inner() {
-            TxEnvelope::Eip2930(tx) => Ok(tx),
+            EthereumTxEnvelope::Eip2930(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Eip2930, got {}", tx.tx_type()))),
         }
     }
@@ -271,25 +277,35 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip7702> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip7702> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
         match tx.inner.into_inner() {
-            TxEnvelope::Eip7702(tx) => Ok(tx),
+            EthereumTxEnvelope::Eip7702(tx) => Ok(tx),
             tx => Err(ConversionError::Custom(format!("expected Eip7702, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl From<Transaction> for TxEnvelope {
-    fn from(tx: Transaction) -> Self {
+impl<Eip4844> From<Transaction<Self>> for EthereumTxEnvelope<Eip4844> {
+    fn from(tx: Transaction<Self>) -> Self {
         tx.inner.into_inner()
     }
 }
 
-impl From<Transaction> for Signed<TypedTransaction> {
-    fn from(tx: Transaction) -> Self {
+impl<Eip4844> From<Transaction<Self>> for EthereumTypedTransaction<Eip4844> {
+    fn from(tx: Transaction<Self>) -> Self {
+        tx.inner.into_inner()
+    }
+}
+
+impl<Eip4844> From<Transaction<EthereumTxEnvelope<Eip4844>>>
+    for Signed<EthereumTypedTransaction<Eip4844>>
+where
+    EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+{
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
         tx.into_signed()
     }
 }
@@ -489,6 +505,11 @@ mod tx_serde {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(unused)]
+    fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
+        tx.into()
+    }
 
     #[test]
     #[cfg(feature = "serde")]
