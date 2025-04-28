@@ -6,6 +6,7 @@ use alloy_eips::{
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
+use std::borrow::Cow;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -78,6 +79,11 @@ impl<T> AnyReceiptEnvelope<T> {
         self.inner.logs_bloom
     }
 
+    /// Return a reference to the receipt's bloom.
+    pub const fn bloom_ref(&self) -> &Bloom {
+        &self.inner.logs_bloom
+    }
+
     /// Returns the cumulative gas used at this receipt.
     pub const fn cumulative_gas_used(&self) -> u64 {
         self.inner.receipt.cumulative_gas_used
@@ -105,6 +111,10 @@ where
 
     fn bloom(&self) -> Bloom {
         self.bloom()
+    }
+
+    fn bloom_ref(&self) -> Cow<'_, Bloom> {
+        Cow::Borrowed(self.bloom_ref())
     }
 
     fn cumulative_gas_used(&self) -> u64 {
