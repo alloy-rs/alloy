@@ -315,6 +315,11 @@ impl<R> ReceiptWithBloom<R> {
     pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
     }
+
+    /// Returns a reference to the bloom.
+    pub const fn bloom_ref(&self) -> &Bloom {
+        &self.logs_bloom
+    }
 }
 
 impl<L> ReceiptWithBloom<Receipt<L>> {
