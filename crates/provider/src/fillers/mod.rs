@@ -222,7 +222,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// asyncronously
+    /// asynchronously
     fn prepare_call(
         &self,
         tx: &mut N::TransactionRequest,
