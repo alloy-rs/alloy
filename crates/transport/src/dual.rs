@@ -2,7 +2,7 @@ use crate::{TransportError, TransportFut};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use tower::Service;
 
-/// Trait for converting two transports into a dual transport.
+/// Trait that determines how to dispatch a request given two transports.
 pub trait DualTransportHandler<L, R> {
     /// The type of the future returned by the transport.
     fn call(&self, request: RequestPacket, left: L, right: R) -> TransportFut<'static>;
@@ -28,8 +28,7 @@ where
 ///
 /// All higher-level types can use  [`DualTransport`] internally to support multiple transport
 /// strategies.
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DualTransport<L, R, H> {
     /// The left transport.
     left: L,
