@@ -96,9 +96,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            // 0 is a dummy value, we don't care about the channel size here,
-            // as none of these will result in channel creation.
-            let (in_flight, _) = InFlight::new(req.clone(), 0);
+            let (in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
