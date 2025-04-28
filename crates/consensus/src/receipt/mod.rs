@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use alloy_primitives::Bloom;
 use alloy_rlp::BufMut;
 use core::fmt;
@@ -61,11 +60,6 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     /// compute.
     fn bloom_cheap(&self) -> Option<Bloom> {
         None
-    }
-
-    /// Returns the bloom filter for the logs in the receipt as a [`Cow`].
-    fn bloom_ref(&self) -> Cow<'_, Bloom> {
-        Cow::Owned(self.bloom())
     }
 
     /// Returns [`ReceiptWithBloom`] with the computed bloom filter [`Self::bloom`] and a reference
