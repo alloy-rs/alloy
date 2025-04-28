@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt};
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Result, Encodable2718},
@@ -79,11 +78,6 @@ impl<T> AnyReceiptEnvelope<T> {
         self.inner.logs_bloom
     }
 
-    /// Return a reference to the receipt's bloom.
-    pub const fn bloom_ref(&self) -> &Bloom {
-        &self.inner.logs_bloom
-    }
-
     /// Returns the cumulative gas used at this receipt.
     pub const fn cumulative_gas_used(&self) -> u64 {
         self.inner.receipt.cumulative_gas_used
@@ -111,10 +105,6 @@ where
 
     fn bloom(&self) -> Bloom {
         self.bloom()
-    }
-
-    fn bloom_ref(&self) -> Cow<'_, Bloom> {
-        Cow::Borrowed(self.bloom_ref())
     }
 
     fn cumulative_gas_used(&self) -> u64 {

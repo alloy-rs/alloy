@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use core::fmt;
 
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
@@ -173,10 +172,6 @@ where
 
     fn bloom_cheap(&self) -> Option<Bloom> {
         Some(self.bloom())
-    }
-
-    fn bloom_ref(&self) -> Cow<'_, Bloom> {
-        Cow::Borrowed(&self.as_receipt_with_bloom().unwrap().logs_bloom)
     }
 
     /// Returns the cumulative gas used at this receipt.
