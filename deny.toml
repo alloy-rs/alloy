@@ -2,10 +2,6 @@
 version = 2
 yanked = "warn"
 ignore = [
-    # https://rustsec.org/advisories/RUSTSEC-2024-0388 used by ssz, will be removed https://github.com/sigp/ethereum_ssz/pull/34
-    "RUSTSEC-2024-0388",
-    # https://rustsec.org/advisories/RUSTSEC-2025-0007
-    "RUSTSEC-2025-0007",
     # https://rustsec.org/advisories/RUSTSEC-2024-0437, trezor-client dependency, no fix available yet
     "RUSTSEC-2024-0437",
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
@@ -36,6 +32,7 @@ allow = [
     "Zlib",
     # https://github.com/briansmith/ring/issues/902
     "LicenseRef-ring",
+    "CDLA-Permissive-2.0"
 ]
 
 exceptions = [
