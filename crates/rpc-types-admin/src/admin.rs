@@ -15,7 +15,7 @@ use std::{
 /// for the source of each field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeInfo {
-    /// Unique node identifier(also the encryption key).
+    /// Unique node identifier (also the encryption key).
     pub id: String,
     /// The node's user agent, containing a client name, version, OS, and other metadata.
     pub name: String,
