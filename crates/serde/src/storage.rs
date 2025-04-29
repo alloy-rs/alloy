@@ -190,8 +190,7 @@ mod tests {
 
             assert_eq!(
                 input, output,
-                "Storage key roundtrip failed to preserve the exact hex representation for {}",
-                input
+                "Storage key roundtrip failed to preserve the exact hex representation for {input}"
             );
         }
     }

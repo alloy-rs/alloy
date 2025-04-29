@@ -496,16 +496,16 @@ impl core::fmt::Display for BlobTransactionValidationError {
         match self {
             Self::InvalidProof => f.write_str("invalid KZG proof"),
             Self::KZGError(err) => {
-                write!(f, "KZG error: {:?}", err)
+                write!(f, "KZG error: {err:?}")
             }
             Self::NotBlobTransaction(err) => {
-                write!(f, "unable to verify proof for non blob transaction: {}", err)
+                write!(f, "unable to verify proof for non blob transaction: {err}")
             }
             Self::MissingSidecar => {
                 f.write_str("eip4844 tx variant without sidecar being used for verification.")
             }
             Self::WrongVersionedHash { have, expected } => {
-                write!(f, "wrong versioned hash: have {}, expected {}", have, expected)
+                write!(f, "wrong versioned hash: have {have}, expected {expected}")
             }
         }
     }

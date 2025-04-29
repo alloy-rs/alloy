@@ -76,7 +76,7 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
 
     let addr = run_server().await?;
 
-    let ws_provider = ProviderBuilder::new().connect(format!("ws://{}", addr).as_str()).await?;
+    let ws_provider = ProviderBuilder::new().connect(format!("ws://{addr}").as_str()).await?;
     let mut request = ws_provider.client().request("subscribe_hello", ());
     // required if not eth_subscribe
     request.set_is_subscription();

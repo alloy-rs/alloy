@@ -1594,7 +1594,7 @@ mod tests {
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);
         while let Some(header) = stream.next().await {
-            println!("New block {:?}", header);
+            println!("New block {header:?}");
             assert!(header.number > 0);
         }
     }
@@ -1964,7 +1964,7 @@ mod tests {
             }
             Err(e) => {
                 assert_eq!(
-                    format!("{}",e),
+                    format!("{e}"),
                     "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually"
                 );
             }

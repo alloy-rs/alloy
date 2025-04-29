@@ -125,7 +125,7 @@ impl BuiltInConnectionString {
     #[cfg(feature = "ws")]
     pub fn try_as_ws(s: &str) -> Result<Self, TransportError> {
         let url = if s.starts_with("localhost:") || s.parse::<std::net::SocketAddr>().is_ok() {
-            let s = format!("ws://{}", s);
+            let s = format!("ws://{s}");
             url::Url::parse(&s)
         } else {
             url::Url::parse(s)
@@ -166,8 +166,7 @@ impl FromStr for BuiltInConnectionString {
     #[allow(clippy::let_and_return)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let res = Err(TransportErrorKind::custom_str(&format!(
-            "No transports enabled. Enable one of: reqwest, hyper, ws, ipc. Connection info: '{}'",
-            s
+            "No transports enabled. Enable one of: reqwest, hyper, ws, ipc. Connection info: '{s}'"
         )));
         #[cfg(any(feature = "reqwest", feature = "hyper"))]
         let res = res.or_else(|_| Self::try_as_http(s));
@@ -263,12 +262,12 @@ mod test {
         let path_str = ipc_path.to_str().unwrap();
 
         assert_eq!(
-            BuiltInConnectionString::from_str(&format!("ipc://{}", path_str)).unwrap(),
+            BuiltInConnectionString::from_str(&format!("ipc://{path_str}")).unwrap(),
             BuiltInConnectionString::Ipc(ipc_path.clone())
         );
 
         assert_eq!(
-            BuiltInConnectionString::from_str(&format!("file://{}", path_str)).unwrap(),
+            BuiltInConnectionString::from_str(&format!("file://{path_str}")).unwrap(),
             BuiltInConnectionString::Ipc(ipc_path.clone())
         );
 
