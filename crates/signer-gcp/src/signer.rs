@@ -259,7 +259,7 @@ async fn request_sign_digest(
     // Add metadata for request routing: https://cloud.google.com/kms/docs/grpc
     request
         .metadata_mut()
-        .insert("x-goog-request-params", format!("name={}", kms_key_name).parse().unwrap());
+        .insert("x-goog-request-params", format!("name={kms_key_name}").parse().unwrap());
 
     let response = client.get().asymmetric_sign(request).await?;
     let signature = response.into_inner().signature;
