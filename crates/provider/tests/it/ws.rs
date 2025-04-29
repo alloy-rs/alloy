@@ -90,7 +90,6 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-
 // <https://github.com/alloy-rs/alloy/issues/2362>
 #[tokio::test]
 async fn ws_unsubscribe() -> Result<(), Box<dyn std::error::Error>> {
@@ -117,6 +116,6 @@ async fn ws_unsubscribe() -> Result<(), Box<dyn std::error::Error>> {
     let id = sub.local_id();
 
     provider.unsubscribe(*id).unwrap();
-    
+
     Ok(())
 }
