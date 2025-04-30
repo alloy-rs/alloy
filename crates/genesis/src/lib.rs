@@ -596,7 +596,7 @@ impl ChainConfig {
 
         for (key, params) in &self.blob_schedule {
             if let Ok(timestamp) = key.parse::<u64>() {
-                schedule.scheduled.push((timestamp, params.clone()));
+                schedule.scheduled.push((timestamp, *params));
             }
         }
 
