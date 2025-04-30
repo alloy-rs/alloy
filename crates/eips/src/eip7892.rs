@@ -1,11 +1,11 @@
 //!
 
-use serde::{Deserialize, Serialize};
-
 use crate::eip7840::BlobParams;
+use alloc::vec::Vec;
 
 /// A scheduled blob parameter update entry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BlobScheduleEntry {
     /// Blob parameters for the Cancun hardfork
     Cancun(BlobParams),
