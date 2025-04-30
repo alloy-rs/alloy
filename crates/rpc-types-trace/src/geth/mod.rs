@@ -282,7 +282,7 @@ pub enum GethDebugBuiltInTracerType {
     /// The output is an object where the keys correspond to account addresses.
     #[serde(rename = "prestateTracer")]
     PreStateTracer,
-    /// This tracer is noop. It returns an empty object and is only meant for testing the setup.
+    /// This tracer is a noop. It returns an empty object and is only meant for testing the setup.
     #[serde(rename = "noopTracer")]
     NoopTracer,
     /// The mux tracer is a tracer that can run multiple tracers at once.
@@ -412,7 +412,7 @@ pub struct GethDebugTracingOptions {
     pub tracer: Option<GethDebugTracerType>,
     /// Config specific to given `tracer`.
     ///
-    /// Note default struct logger config are historically embedded in main object.
+    /// Note default struct logger config is historically embedded in main object.
     ///
     /// tracerConfig is slated for Geth v1.11.0
     /// See <https://github.com/ethereum/go-ethereum/issues/26513>
