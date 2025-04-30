@@ -9,7 +9,7 @@ const DEFAULT_BLOB_FEE_GETTER: fn() -> u128 = || eip4844::BLOB_TX_MIN_BLOB_GASPR
 const IS_DEFAULT_BLOB_FEE: fn(&u128) -> bool = |&x| x == eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 
 /// Configuration for the blob-related calculations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobParams {
     /// Target blob count for the block.

@@ -12,7 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
-use alloy_eips::eip7840::BlobParams;
+use alloy_eips::{eip7840::BlobParams, eip7892::HardforkBlobParams};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
@@ -584,6 +584,25 @@ impl ChainConfig {
     // Private function handling the comparison logic for timestamps
     fn is_active_at_timestamp(&self, config_timestamp: Option<u64>, timestamp: u64) -> bool {
         config_timestamp.is_some_and(|cb| cb <= timestamp)
+    }
+
+    /// Returns the blob schedule for the chain.
+    pub fn blob_schedule(&self) -> HardforkBlobParams {
+        let mut schedule = HardforkBlobParams {
+            cancun: self.blob_schedule.get("cancun").cloned().unwrap_or_default(),
+            prague: self.blob_schedule.get("prague").cloned().unwrap_or_default(),
+            scheduled: Vec::new(),
+        };
+
+        for (key, params) in &self.blob_schedule {
+            if let Ok(timestamp) = key.parse::<u64>() {
+                schedule.scheduled.push((timestamp, params.clone()));
+            }
+        }
+
+        schedule.scheduled.sort_by_key(|(ts, _)| *ts);
+
+        schedule
     }
 }
 
