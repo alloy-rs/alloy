@@ -108,7 +108,7 @@ impl<T: Eq + Hash> FilterSet<T> {
         self.0.is_empty()
     }
 
-    /// Returns whether the given value matches the filter. It the filter is empty
+    /// Returns whether the given value matches the filter. If the filter is empty
     /// any value matches. Otherwise, the filter must include the value
     pub fn matches(&self, value: &T) -> bool {
         self.is_empty() || self.0.contains(value)
