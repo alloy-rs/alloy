@@ -760,7 +760,7 @@ mod tests {
 
         assert_eq!(signed.signature().r(), U256::ZERO);
         assert_eq!(signed.signature().s(), U256::ZERO);
-        assert_eq!(signed.signature().v(), false);
+        assert!(!signed.signature().v());
 
         assert_eq!(
             signed.hash(),

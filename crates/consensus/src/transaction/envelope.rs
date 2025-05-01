@@ -1948,7 +1948,7 @@ mod tests {
 
         assert_eq!(tx.signature().r(), U256::ZERO);
         assert_eq!(tx.signature().s(), U256::ZERO);
-        assert_eq!(tx.signature().v(), false);
+        assert!(!tx.signature().v());
 
         assert_eq!(
             tx.hash(),
