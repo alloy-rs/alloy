@@ -585,25 +585,6 @@ impl ChainConfig {
     fn is_active_at_timestamp(&self, config_timestamp: Option<u64>, timestamp: u64) -> bool {
         config_timestamp.is_some_and(|cb| cb <= timestamp)
     }
-
-    /// Returns the blob schedule for the chain.
-    pub fn blob_schedule(&self) -> HardforkBlobParams {
-        let mut schedule = HardforkBlobParams {
-            cancun: self.blob_schedule.get("cancun").cloned().unwrap_or_default(),
-            prague: self.blob_schedule.get("prague").cloned().unwrap_or_default(),
-            scheduled: Vec::new(),
-        };
-
-        for (key, params) in &self.blob_schedule {
-            if let Ok(timestamp) = key.parse::<u64>() {
-                schedule.scheduled.push((timestamp, *params));
-            }
-        }
-
-        schedule.scheduled.sort_by_key(|(ts, _)| *ts);
-
-        schedule
-    }
 }
 
 impl Default for ChainConfig {
