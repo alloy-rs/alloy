@@ -665,8 +665,6 @@ pub(super) mod serde_bincode_compat {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use std::os::linux::raw;
-
     use super::signed_legacy_serde;
     use crate::{
         transaction::{from_eip155_value, to_eip155_value},
@@ -768,10 +766,7 @@ mod tests {
 
         assert_eq!(
             signed.hash(),
-            &B256::from_slice(
-                &hex::decode("16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06")
-                    .unwrap()
-            ),
+            &b256!("0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06"),
             "hash should match the transaction hash"
         );
     }
