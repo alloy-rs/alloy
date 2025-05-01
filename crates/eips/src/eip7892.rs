@@ -16,20 +16,34 @@ pub enum BlobScheduleEntry {
 }
 
 /// Blob parameters configuration for a chain, including scheduled updates.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct HardforkBlobParams {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlobScheduleBlobParams {
     /// Configuration for blob-related calculations for the Cancun hardfork.
-    pub cancun: Option<BlobParams>,
+    pub cancun: BlobParams,
     /// Configuration for blob-related calculations for the Prague hardfork.
-    pub prague: Option<BlobParams>,
-    /// Time-based scheduled updates to blob parameters
+    pub prague: BlobParams,
+    /// Time-based scheduled updates to blob parameters.
+    ///
+    /// These are ordered by activation timestamps in natural order.
     pub scheduled: Vec<(u64, BlobParams)>,
 }
 
-impl HardforkBlobParams {
-    /// Returns the active blob parameters at the given timestamp.
+impl BlobScheduleBlobParams {
+    /// Returns the highest active blob parameters at the given timestamp.
+    ///
+    /// Note: this does only scan the the entries scheduled by timestamp and not cancun or prague.
     pub fn active_scheduled_params_at_timestamp(&self, timestamp: u64) -> Option<&BlobParams> {
         self.scheduled.iter().rev().find(|(ts, _)| timestamp >= *ts).map(|(_, params)| params)
+    }
+
+    /// Returns the configured cancun [`BlobParams`].
+    pub const fn cancun(&self) -> &BlobParams {
+        &self.cancun
+    }
+
+    /// Returns the configured prague [`BlobParams`].
+    pub const fn prague(&self) -> &BlobParams {
+        &self.prague
     }
 
     /// Finds the active scheduled blob parameters for a given timestamp.
@@ -52,6 +66,10 @@ impl HardforkBlobParams {
 
         scheduled.sort_by_key(|(timestamp, _)| *timestamp);
 
-        Self { cancun, prague, scheduled }
+        Self {
+            cancun: cancun.unwrap_or_else(BlobParams::cancun),
+            prague: prague.unwrap_or_else(BlobParams::prague),
+            scheduled,
+        }
     }
 }
