@@ -1,7 +1,7 @@
 //! Contains constants and helper functions for [EIP-7892](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7892.md)
 
 use crate::eip7840::BlobParams;
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// A scheduled blob parameter update entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
