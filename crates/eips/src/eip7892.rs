@@ -47,18 +47,18 @@ impl BlobScheduleBlobParams {
     }
 
     /// Finds the active scheduled blob parameters for a given timestamp.
-    pub fn from_schedule(schedule: BTreeMap<String, BlobParams>) -> Self {
+    pub fn from_schedule(schedule: &BTreeMap<String, BlobParams>) -> Self {
         let mut cancun = None;
         let mut prague = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in schedule {
             match key.as_str() {
-                "cancun" => cancun = Some(params),
-                "prague" => prague = Some(params),
+                "cancun" => cancun = Some(*params),
+                "prague" => prague = Some(*params),
                 _ => {
                     if let Ok(timestamp) = key.parse::<u64>() {
-                        scheduled.push((timestamp, params));
+                        scheduled.push((timestamp, *params));
                     }
                 }
             }
