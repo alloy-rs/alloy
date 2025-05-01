@@ -11,8 +11,8 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
-use alloy_eips::{eip7840::BlobParams, eip7892::HardforkBlobParams};
+use alloc::{collections::BTreeMap, string::String};
+use alloy_eips::eip7840::BlobParams;
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
