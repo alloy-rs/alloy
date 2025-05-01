@@ -510,6 +510,8 @@ pub mod signed_legacy_serde {
         D: serde::Deserializer<'de>,
     {
         let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
+        let mut tx = tx.into_owned();
+
         // Optimism pre-Bedrock (and some other L2s) injected system transactions into the chain
         // where the signature fields (v, r, s) are all zero.
         // These transactions do not have a valid ECDSA signature, but are valid on-chain.
@@ -517,9 +519,10 @@ pub mod signed_legacy_serde {
         //
         // Here, we detect (v=0, r=0, s=0) and treat them as system transactions,
         // bypassing EIP-155 signature validation.
-        let is_fake_signature =
+        let is_fake_system_signature =
             signature.r.is_zero() && signature.s.is_zero() && signature.v.is_zero();
-        let signature = if is_fake_signature {
+
+        let signature = if is_fake_system_signature {
             Signature::new(U256::ZERO, U256::ZERO, false)
         } else {
             let (parity, chain_id) = from_eip155_value(signature.v.to()).ok_or_else(|| {
@@ -533,16 +536,12 @@ pub mod signed_legacy_serde {
                     return Err(serde::de::Error::custom("chain id mismatch"));
                 }
             }
+
+            // update the chain id from the computed eip155 value
+            tx.chain_id = chain_id;
+
             Signature::new(signature.r, signature.s, parity)
         };
-        let mut tx = tx.into_owned();
-        if !is_fake_signature {
-            let (_, chain_id) = from_eip155_value(signature.v().into()) // reuse v
-                .ok_or_else(|| {
-                    serde::de::Error::custom("invalid EIP-155 signature parity value")
-                })?;
-            tx.chain_id = chain_id;
-        }
         Ok(Signed::new_unchecked(tx, signature, hash))
     }
 }
