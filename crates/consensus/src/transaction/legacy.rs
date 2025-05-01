@@ -509,8 +509,7 @@ pub mod signed_legacy_serde {
     where
         D: serde::Deserializer<'de>,
     {
-        let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
-        let mut tx = tx.into_owned();
+        let SignedLegacy { mut tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
 
         // Optimism pre-Bedrock (and some other L2s) injected system transactions into the chain
         // where the signature fields (v, r, s) are all zero.
@@ -525,24 +524,23 @@ pub mod signed_legacy_serde {
         let signature = if is_fake_system_signature {
             Signature::new(U256::ZERO, U256::ZERO, false)
         } else {
-            let (parity, chain_id) = from_eip155_value(signature.v.to()).ok_or_else(|| {
-                serde::de::Error::custom("invalid EIP-155 signature parity value")
-            })?;
+            let (parity, chain_id) = from_eip155_value(signature.v.to())
+                .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
 
-            // Note: some implementations always set the chain id in the response, so we only check
-            // if they differ if both are set.
+            // Note: some implementations always set the chain id in the response, so we only check if
+            // they differ if both are set.
             if let Some((tx_chain_id, chain_id)) = tx.chain_id().zip(chain_id) {
                 if tx_chain_id != chain_id {
                     return Err(serde::de::Error::custom("chain id mismatch"));
                 }
             }
-
-            // update the chain id from the computed eip155 value
-            tx.chain_id = chain_id;
+            
+            // update the chain id from decoding the eip155 value
+            tx.to_mut().chain_id = chain_id;
 
             Signature::new(signature.r, signature.s, parity)
         };
-        Ok(Signed::new_unchecked(tx, signature, hash))
+        Ok(Signed::new_unchecked(tx.into_owned(), signature, hash))
     }
 }
 
