@@ -278,7 +278,7 @@ impl TransactionRequest {
     /// Panics if the hex is invalid.
     pub fn with_input_hex(mut self, hex: &str) -> Self {
         let bytes = alloy_primitives::hex::decode(hex.trim_start_matches("0x"))
-        .expect("Invalid hex string for transaction input");
+            .expect("Invalid hex string for transaction input");
         self.input = TransactionInput::new(bytes.into());
         self
     }
