@@ -130,7 +130,7 @@ pub struct TransactionRequest {
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
     pub sidecar: Option<BlobTransactionSidecar>,
-    /// Authorization list for EIP-7702 transactions.
+    /// Authorization list for for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
@@ -255,16 +255,29 @@ impl TransactionRequest {
     }
 
     /// Sets the input data for the transaction.
-    ///
-    /// This can be used to set both `input` and the `data` field, because some chains or services
-    /// still expect of the deprecated `data` field
-    ///
-    /// ```
-    /// use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
-    /// let req = TransactionRequest::default().input(TransactionInput::both(b"00".into()));
-    /// ```
     pub fn input(mut self, input: TransactionInput) -> Self {
         self.input = input;
+        self
+    }
+
+    /// Sets the transaction input from a byte vector (calldata).
+    pub fn with_input_bytes(mut self, data: Vec<u8>) -> Self {
+        self.input = TransactionInput::new(data.into());
+        self
+    }
+        
+    /// Sets the transaction input from a hex string like "0x1234".
+    /// Panics if the hex is invalid.
+    pub fn with_input_hex(mut self, hex: &str) -> Self {
+        let bytes = alloy_primitives::hex::decode(hex.trim_start_matches("0x"))
+        .expect("Invalid hex string for transaction input");
+        self.input = TransactionInput::new(bytes.into());
+        self
+    }
+        
+    /// Clears the transaction input.
+    pub fn clear_input(mut self) -> Self {
+        self.input = TransactionInput::default();
         self
     }
 
@@ -1194,11 +1207,11 @@ mod tests {
     fn serde_tx_chain_id_field() {
         let chain_id: ChainId = 12345678;
 
-        let chain_id_as_num = format!(r#"{{"chainId": {chain_id} }}"#);
+        let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
         let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();
         assert_eq!(req1.chain_id.unwrap(), chain_id);
 
-        let chain_id_as_hex = format!(r#"{{"chainId": "0x{chain_id:x}" }}"#);
+        let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
         let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
         assert_eq!(req2.chain_id.unwrap(), chain_id);
     }
