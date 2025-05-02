@@ -1,6 +1,6 @@
 //! Constants and utils for calldata cost.
 //!
-//! See also [EIP-7594](https://eips.ethereum.org/EIPS/eip-7623): Increase calldata cost
+//! See also [EIP-7623](https://eips.ethereum.org/EIPS/eip-7623): Increase calldata cost
 
 /// The standard cost of calldata token.
 pub const STANDARD_TOKEN_COST: u64 = 4;
