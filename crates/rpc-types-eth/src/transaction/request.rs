@@ -130,7 +130,7 @@ pub struct TransactionRequest {
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
     pub sidecar: Option<BlobTransactionSidecar>,
-    /// Authorization list for for EIP-7702 transactions.
+    /// Authorization list for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
@@ -255,6 +255,14 @@ impl TransactionRequest {
     }
 
     /// Sets the input data for the transaction.
+    ///
+    /// This can be used to set both `input` and the `data` field, because some chains or services
+    /// still expect of the deprecated `data` field
+    ///
+    /// ```
+    /// use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
+    /// let req = TransactionRequest::default().input(TransactionInput::both(b"00".into()));
+    /// ```
     pub fn input(mut self, input: TransactionInput) -> Self {
         self.input = input;
         self
@@ -265,7 +273,7 @@ impl TransactionRequest {
         self.input = TransactionInput::new(data.into());
         self
     }
-        
+
     /// Sets the transaction input from a hex string like "0x1234".
     /// Panics if the hex is invalid.
     pub fn with_input_hex(mut self, hex: &str) -> Self {
@@ -274,7 +282,7 @@ impl TransactionRequest {
         self.input = TransactionInput::new(bytes.into());
         self
     }
-        
+
     /// Clears the transaction input.
     pub fn clear_input(mut self) -> Self {
         self.input = TransactionInput::default();
