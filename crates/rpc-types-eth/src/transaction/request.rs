@@ -255,6 +255,14 @@ impl TransactionRequest {
     }
 
     /// Sets the input data for the transaction.
+    ///
+    /// This can be used to set both `input` and the `data` field, because some chains or services
+    /// still expect of the deprecated `data` field
+    ///
+    /// ```
+    /// use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
+    /// let req = TransactionRequest::default().input(TransactionInput::both(b"00".into()));
+    /// ```
     pub fn input(mut self, input: TransactionInput) -> Self {
         self.input = input;
         self
