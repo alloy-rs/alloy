@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add types for flashblocks ([#2354](https://github.com/alloy-rs/alloy/issues/2354))
 
+### Miscellaneous Tasks
+
+- Release 0.15.7
+
 ## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
 
 ### Miscellaneous Tasks
