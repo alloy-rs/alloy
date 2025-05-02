@@ -78,7 +78,7 @@ impl TraceCallRequest {
     }
 
     /// Inserts [`TraceType::StateDiff`]
-    pub fn with_statediff(self) -> Self {
+    pub fn with_state_diff(self) -> Self {
         self.with_trace_type(TraceType::StateDiff)
     }
 }
