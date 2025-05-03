@@ -40,6 +40,3 @@ pub use alloy_rpc_types_trace as trace;
 
 #[cfg(feature = "txpool")]
 pub use alloy_rpc_types_txpool as txpool;
-
-#[cfg(feature = "arbitrary")]
-use alloy_rpc_types_engine as _;
