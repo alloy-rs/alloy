@@ -153,12 +153,6 @@ impl<T> EthereumTxEnvelope<T> {
     }
 }
 
-impl<T: IsTyped2718> IsTyped2718 for EthereumTxEnvelope<T> {
-    fn is_type(type_id: u8) -> bool {
-        T::is_type(type_id)
-    }
-}
-
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
 /// # Note:
@@ -575,6 +569,12 @@ where
 {
     fn ty(&self) -> u8 {
         self.tx().ty()
+    }
+}
+
+impl<T: IsTyped2718> IsTyped2718 for EthereumTxEnvelope<T> {
+    fn is_type(type_id: u8) -> bool {
+        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 
