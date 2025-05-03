@@ -125,7 +125,7 @@ pub struct NonceFiller<M: NonceManager = CachedNonceManager> {
 impl<M: NonceManager> NonceFiller<M> {
     /// Creates a new [`NonceFiller`] with the specified [`NonceManager`].
     ///
-    /// To instatiate with the [`SimpleNonceManager`], use [`NonceFiller::simple()`].
+    /// To instantiate with the [`SimpleNonceManager`], use [`NonceFiller::simple()`].
     ///
     /// To instantiate with the [`CachedNonceManager`], use [`NonceFiller::cached()`].
     pub const fn new(nonce_manager: M) -> Self {
