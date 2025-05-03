@@ -44,6 +44,9 @@ ethereum_ssz = { workspace = true, optional = true }
 # jsonrpsee
 jsonrpsee-types = { version = "0.24", optional = true }
 
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+
 # jwt
 rand = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
