@@ -270,7 +270,8 @@ impl TransactionRequest {
 
     /// Sets the transaction input from a byte vector (calldata).
     pub fn with_input_bytes(mut self, data: Vec<u8>) -> Self {
-        self.input = TransactionInput::new(data.into());
+        let bytes = data.into();
+        self.input = TransactionInput::set_both(bytes);
         self
     }
 
@@ -278,14 +279,21 @@ impl TransactionRequest {
     /// Panics if the hex is invalid.
     pub fn with_input_hex(mut self, hex: &str) -> Self {
         let bytes = alloy_primitives::hex::decode(hex.trim_start_matches("0x"))
-            .expect("Invalid hex string for transaction input");
-        self.input = TransactionInput::new(bytes.into());
+            .expect("Invalid hex string")
+            .into();
+        self.input = TransactionInput::set_both(bytes);
         self
     }
 
-    /// Clears the transaction input.
+    /// Swaps `input` and `data` fields inside the inner TransactionInput.
+    pub fn swap_input_and_data(mut self) -> Self {
+        self.input = self.input.swap();
+        self
+    }
+
+    /// Clears both input and data fields.
     pub fn clear_input(mut self) -> Self {
-        self.input = TransactionInput::default();
+        self.input = TransactionInput::clear();
         self
     }
 
@@ -1118,6 +1126,28 @@ impl TransactionInput {
             }
         }
         Ok(())
+    }
+
+    /// sets both `input` and `data` to the same value.
+    pub fn set_both(bytes: Bytes) -> Self {
+        Self {
+            input: Some(bytes.clone()),
+            data: Some(bytes),
+        }
+    }
+
+    /// Swaps the values of `input` and `data`.
+    pub fn swap(mut self) -> Self {
+        std::mem::swap(&mut self.input, &mut self.data);
+        self
+    }
+
+    /// Clears both `input` and `data`.
+    pub fn clear() -> Self {
+        Self {
+            input: None,
+            data: None,
+        }
     }
 }
 
