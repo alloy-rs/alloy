@@ -76,7 +76,7 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
 
     let addr = run_server().await?;
 
-    let ws_provider = ProviderBuilder::new().connect(format!("ws://{}", addr).as_str()).await?;
+    let ws_provider = ProviderBuilder::new().connect(format!("ws://{addr}").as_str()).await?;
     let mut request = ws_provider.client().request("subscribe_hello", ());
     // required if not eth_subscribe
     request.set_is_subscription();
@@ -86,6 +86,36 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
 
     let num: usize = sub.recv().await.unwrap();
     assert_eq!(num, 0);
+
+    Ok(())
+}
+
+// <https://github.com/alloy-rs/alloy/issues/2362>
+#[tokio::test]
+async fn ws_unsubscribe() -> Result<(), Box<dyn std::error::Error>> {
+    let anvil = Anvil::new().spawn();
+    let provider_config = ProviderConfig {
+        endpoint: anvil.ws_endpoint(),
+        max_rate_limit_retries: 1,
+        initial_backoff: 50,
+        compute_units_per_second: 1600,
+    };
+
+    let ws = WsConnect::new(provider_config.endpoint);
+    let retry_layer = RetryBackoffLayer::new(
+        provider_config.max_rate_limit_retries,
+        provider_config.initial_backoff,
+        provider_config.compute_units_per_second,
+    );
+
+    let rpc_client = RpcClient::builder().layer(retry_layer).ws(ws).await?;
+
+    let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(rpc_client);
+
+    let sub = provider.subscribe_blocks().await?;
+    let id = sub.local_id();
+
+    provider.unsubscribe(*id).unwrap();
 
     Ok(())
 }

@@ -96,9 +96,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            // 0 is a dummy value, we don't care about the channel size here,
-            // as none of these will result in channel creation.
-            let (in_flight, _) = InFlight::new(req.clone(), 0);
+            let (in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
@@ -138,7 +136,8 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            let req = Request::new("eth_unsubscribe", Id::None, [server_id]);
+            // TODO: ideally we can send this with an unused id
+            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;

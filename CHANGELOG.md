@@ -5,11 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
+
+### Documentation
+
+- Add a note about transaction input ([#2380](https://github.com/alloy-rs/alloy/issues/2380))
+
+### Features
+
+- Add 7623 consts ([#2383](https://github.com/alloy-rs/alloy/issues/2383))
+- Support deserializing system signatures in legacy transactions ([#2358](https://github.com/alloy-rs/alloy/issues/2358))
+
+### Miscellaneous Tasks
+
+- Add 0x prefix to eip addresses ([#2382](https://github.com/alloy-rs/alloy/issues/2382))
+
+### Styling
+
+- Added  helpers for blob schedule format ([#2375](https://github.com/alloy-rs/alloy/issues/2375))
+
+### Testing
+
+- Make test compile ([#2377](https://github.com/alloy-rs/alloy/issues/2377))
+
+## [0.15.7](https://github.com/alloy-rs/alloy/releases/tag/v0.15.7) - 2025-04-30
+
+### Bug Fixes
+
+- Send eth_unsubscribe with id ([#2369](https://github.com/alloy-rs/alloy/issues/2369))
+- Use existing channel capacity for reconnect ([#2363](https://github.com/alloy-rs/alloy/issues/2363))
+
+### Documentation
+
+- Minor correction ([#2374](https://github.com/alloy-rs/alloy/issues/2374))
+- [refactor] Minor corrections and cleanup ([#2365](https://github.com/alloy-rs/alloy/issues/2365))
+- Clarify PoW ([#2336](https://github.com/alloy-rs/alloy/issues/2336))
+
+### Features
+
+- Add bloom_ref ([#2366](https://github.com/alloy-rs/alloy/issues/2366))
+- Added DualTransport implementation that wraps two transport ([#2357](https://github.com/alloy-rs/alloy/issues/2357))
+- Add types for flashblocks ([#2354](https://github.com/alloy-rs/alloy/issues/2354))
+- [consensus] Add `secp256k1` sender recovery ([#2352](https://github.com/alloy-rs/alloy/issues/2352))
+
+### Miscellaneous Tasks
+
+- Release 0.15.7
+- Clippy happy ([#2370](https://github.com/alloy-rs/alloy/issues/2370))
+- Add bloom_ref ([#2368](https://github.com/alloy-rs/alloy/issues/2368))
+- Update deny.toml ([#2364](https://github.com/alloy-rs/alloy/issues/2364))
+- Add helpers to rpc block type ([#2355](https://github.com/alloy-rs/alloy/issues/2355))
+
+### Other
+
+- Revert "feat: add bloom_ref" ([#2367](https://github.com/alloy-rs/alloy/issues/2367))
+- Deleted duplicate `for for` to `for` request.rs ([#2347](https://github.com/alloy-rs/alloy/issues/2347))
+
 ## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
 
 ### Bug Fixes
 
 - Use correct type in conversion ([#2346](https://github.com/alloy-rs/alloy/issues/2346))
+
+### Miscellaneous Tasks
+
+- Release 0.15.6
 
 ## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
 

@@ -356,7 +356,7 @@ impl<T: DeserializeOwned> Stream for SubAnyStream<T> {
     }
 }
 
-/// A stream of notifications from the server, identified by a local ID. This/
+/// A stream of notifications from the server, identified by a local ID. This
 /// stream will yield only the expected type, discarding any notifications of
 /// unexpected types.
 #[derive(Debug)]

@@ -206,8 +206,7 @@ where
                     rate_limit_retry_number += 1;
                     if rate_limit_retry_number > this.max_rate_limit_retries {
                         return Err(TransportErrorKind::custom_str(&format!(
-                            "Max retries exceeded {}",
-                            err
+                            "Max retries exceeded {err}"
                         )));
                     }
                     trace!(%err, "retrying request");

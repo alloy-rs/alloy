@@ -608,7 +608,7 @@ where
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 // TODO: improve this.
                 // blocked by #431
-                let message = format!("missing properties: {:?}", missing);
+                let message = format!("missing properties: {missing:?}");
                 return Err(RpcError::local_usage_str(&message));
             }
         }
