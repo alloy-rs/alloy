@@ -2,7 +2,8 @@ use crate::{SignableTransaction, Signed, Transaction, TxType};
 
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization, Typed2718,
+    eip2718::IsTyped2718, eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB,
+    eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
@@ -409,6 +410,12 @@ impl RlpEcdsaDecodableTx for TxEip4844Variant {
 impl Typed2718 for TxEip4844Variant {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
+    }
+}
+
+impl IsTyped2718 for TxEip4844 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x03)
     }
 }
 
