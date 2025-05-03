@@ -403,3 +403,9 @@ impl<L: Typed2718, R: Typed2718> Typed2718 for either::Either<L, R> {
         }
     }
 }
+
+/// Trait for checking if a transaction envelope supports a given EIP-2718 type ID.
+pub trait IsTyped2718 {
+    /// Returns true if the given type ID corresponds to a supported typed transaction.
+    fn is_type(type_id: u8) -> bool;
+}
