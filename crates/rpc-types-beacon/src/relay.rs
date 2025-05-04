@@ -175,7 +175,7 @@ pub struct SignedBidSubmissionV4 {
 /// Represents all versions of signed bid submissions (submit block requests).
 ///
 /// Note: The fields are ordered starting with the most recent version so that the
-/// untagged,transparent decoding prioritises the newest version.
+/// untagged, transparent decoding prioritises the newest version.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
