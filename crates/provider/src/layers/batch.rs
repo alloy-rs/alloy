@@ -123,15 +123,38 @@ where
 
 type CallBatchMsgTx = TransportResult<IMulticall3::Result>;
 
-struct CallBatchMsg {
-    call: IMulticall3::Call3,
+struct CallBatchMsg<N: Network> {
+    kind: CallBatchMsgKind<N>,
     tx: oneshot::Sender<CallBatchMsgTx>,
 }
 
-impl fmt::Debug for CallBatchMsg {
+impl<N: Network> Clone for CallBatchMsgKind<N>
+where
+    N::TransactionRequest: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Call(tx) => Self::Call(tx.clone()),
+            Self::BlockNumber => Self::BlockNumber,
+            Self::ChainId => Self::ChainId,
+            Self::Balance(addr) => Self::Balance(*addr),
+        }
+    }
+}
+
+// impl<N: Network> Clone for CallBatchMsg<N>
+// where
+//     CallBatchMsgKind<N>: Clone,
+// {
+//     fn clone(&self) -> Self {
+//         panic!("CallBatchMsg cannot be cloned because oneshot::Sender is not cloneable");
+//     }
+// }
+
+impl<N: Network> fmt::Debug for CallBatchMsg<N>{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("BatchProviderMessage(")?;
-        self.call.fmt(f)?;
+        self.kind.fmt(f)?;
         f.write_str(")")
     }
 }
@@ -144,13 +167,13 @@ enum CallBatchMsgKind<N: Network = Ethereum> {
     Balance(Address),
 }
 
-impl CallBatchMsg {
-    fn new<N: Network>(
+impl<N: Network> CallBatchMsg<N> {
+    fn new(
         kind: CallBatchMsgKind<N>,
-        m3a: Address,
+        //m3a: Address,
     ) -> (Self, oneshot::Receiver<CallBatchMsgTx>) {
         let (tx, rx) = oneshot::channel();
-        (Self { call: kind.into_call3(m3a), tx }, rx)
+        (Self { kind, tx }, rx)
     }
 }
 
@@ -179,7 +202,7 @@ impl<N: Network> CallBatchMsgKind<N> {
 /// See [`CallBatchLayer`] for more information.
 pub struct CallBatchProvider<P, N: Network = Ethereum> {
     provider: Arc<P>,
-    inner: CallBatchProviderInner,
+    inner: CallBatchProviderInner<N>,
     _pd: PhantomData<N>,
 }
 
@@ -210,19 +233,19 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchProvider<P, N> {
 }
 
 #[derive(Clone)]
-struct CallBatchProviderInner {
-    tx: mpsc::UnboundedSender<CallBatchMsg>,
+struct CallBatchProviderInner<N: Network> {
+    tx: mpsc::UnboundedSender<CallBatchMsg<N>>,
     m3a: Address,
 }
 
-impl CallBatchProviderInner {
+impl<N: Network> CallBatchProviderInner<N> {
     /// We only want to perform a scheduled multicall if:
     /// - The request has no block ID or state overrides,
     /// - The request has a target address,
     /// - The request has no other properties (`nonce`, `gas`, etc cannot be sent with a multicall).
     ///
     /// Ref: <https://github.com/wevm/viem/blob/ba8319f71503af8033fd3c77cfb64c7eb235c6a9/src/actions/public/call.ts#L295>
-    fn should_batch_call<N: Network>(&self, params: &crate::EthCallParams<N>) -> bool {
+    fn should_batch_call(&self, params: &crate::EthCallParams<N>) -> bool {
         // TODO: block ID is not yet implemented
         if params.block().is_some_and(|block| block != BlockId::latest()) {
             return false;
@@ -242,8 +265,8 @@ impl CallBatchProviderInner {
         true
     }
 
-    async fn schedule<N: Network>(self, msg: CallBatchMsgKind<N>) -> TransportResult<Bytes> {
-        let (msg, rx) = CallBatchMsg::new(msg, self.m3a);
+    async fn schedule(self, msg: CallBatchMsgKind<N>) -> TransportResult<Bytes> {
+        let (msg, rx) = CallBatchMsg::new(msg);
         self.tx.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
 
         let IMulticall3::Result { success, returnData: data } =
@@ -257,7 +280,7 @@ impl CallBatchProviderInner {
         Ok(data)
     }
 
-    async fn schedule_and_decode<N: Network, T>(
+    async fn schedule_and_decode<T>(
         self,
         msg: CallBatchMsgKind<N>,
     ) -> TransportResult<T>
@@ -273,13 +296,13 @@ struct CallBatchBackend<P, N: Network = Ethereum> {
     inner: Arc<P>,
     m3a: Address,
     wait: Duration,
-    rx: mpsc::UnboundedReceiver<CallBatchMsg>,
-    pending: Vec<CallBatchMsg>,
+    rx: mpsc::UnboundedReceiver<CallBatchMsg<N>>,
+    pending: Vec<CallBatchMsg<N>>,
     _pd: PhantomData<N>,
 }
 
 impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
-    fn spawn(inner: Arc<P>, layer: &CallBatchLayer) -> mpsc::UnboundedSender<CallBatchMsg> {
+    fn spawn(inner: Arc<P>, layer: &CallBatchLayer) -> mpsc::UnboundedSender<CallBatchMsg<N>> {
         let CallBatchLayer { m3a, wait } = *layer;
         let (tx, rx) = mpsc::unbounded_channel();
         let this = Self { inner, m3a, wait, rx, pending: Vec::new(), _pd: PhantomData };
@@ -311,13 +334,39 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         }
     }
 
-    fn process_msg(&mut self, msg: CallBatchMsg) {
+    fn process_msg(&mut self, msg: CallBatchMsg<N>) {
         self.pending.push(msg);
     }
 
     async fn send_batch(&mut self) {
-        let result = self.send_batch_inner().await;
+        
         let pending = std::mem::take(&mut self.pending);
+
+        if pending.len() == 1 {
+            let msg = pending.into_iter().next().unwrap();
+
+            let result = match msg.kind {
+                CallBatchMsgKind::Call(tx) => self.inner.call(tx).await,
+                CallBatchMsgKind::Balance(addr) => {
+                    self.inner.get_balance(addr).into_future().await
+                        .map(|val| alloy_primitives::Bytes::from(alloy_rlp::encode(&val)))
+                },
+                CallBatchMsgKind::BlockNumber => {
+                    self.inner.get_block_number().into_future().await
+                        .map(|val| alloy_primitives::Bytes::from(alloy_rlp::encode(&val)))
+                },
+                CallBatchMsgKind::ChainId => {
+                    self.inner.get_chain_id().into_future().await
+                        .map(|val| alloy_primitives::Bytes::from(alloy_rlp::encode(&val)))
+                },
+            }.map_err(TransportErrorKind::custom);
+
+            let _ = msg.tx.send(result);
+            return;
+        }
+        
+
+        let result = self.send_batch_inner(&pending).await;
         match result {
             Ok(results) => {
                 debug_assert_eq!(results.len(), pending.len());
@@ -333,28 +382,32 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         }
     }
 
-    async fn send_batch_inner(&mut self) -> TransportResult<Vec<IMulticall3::Result>> {
-        debug_assert!(!self.pending.is_empty());
-        debug!(len = self.pending.len(), "sending multicall");
-        let tx = N::TransactionRequest::default().with_to(self.m3a).with_input(self.make_payload());
+    async fn send_batch_inner(&self, pending: &[CallBatchMsg<N>]) -> TransportResult<Vec<IMulticall3::Result>> {
+        let call3s: Vec<_> = pending
+            .iter()
+            .map(|msg| msg.kind.clone().into_call3(self.m3a))
+            .collect();
+
+        let tx = N::TransactionRequest::default()
+            .with_to(self.m3a)
+            .with_input(IMulticall3::aggregate3Call { calls: call3s }.abi_encode());
+    
         let bytes = self.inner.call(tx).await?;
         if bytes.is_empty() {
-            return Err(TransportErrorKind::custom_str(&format!(
-                "Multicall3 not deployed at {}",
-                self.m3a
-            )));
+            return Err(TransportErrorKind::custom_str(&format!("Multicall3 not deployed at {}", self.m3a)));
         }
+    
         let ret = IMulticall3::aggregate3Call::abi_decode_returns(&bytes)
             .map_err(TransportErrorKind::custom)?;
         Ok(ret)
-    }
+    }    
 
-    fn make_payload(&self) -> Vec<u8> {
-        IMulticall3::aggregate3Call {
-            calls: self.pending.iter().map(|msg| msg.call.clone()).collect(),
-        }
-        .abi_encode()
-    }
+    // fn make_payload(&self) -> Vec<u8> {
+    //     IMulticall3::aggregate3Call {
+    //         calls: self.pending.iter().map(|msg| msg.call.clone()).collect(),
+    //     }
+    //     .abi_encode()
+    // }
 }
 
 impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, N> {
@@ -374,7 +427,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::BlockNumber,
     > {
         crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule_and_decode::<N, u64>(CallBatchMsgKind::BlockNumber),
+            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::BlockNumber),
         ))
     }
 
@@ -386,7 +439,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::ChainId,
     > {
         crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule_and_decode::<N, u64>(CallBatchMsgKind::ChainId),
+            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::ChainId),
         ))
     }
 
@@ -399,25 +452,25 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
                 ProviderCall::BoxedFuture(Box::pin(
                     this.inner
                         .clone()
-                        .schedule_and_decode::<N, U256>(CallBatchMsgKind::Balance(address)),
+                        .schedule_and_decode::<U256>(CallBatchMsgKind::Balance(address)),
                 ))
             }
         })
     }
 }
 
-struct CallBatchCaller {
-    inner: CallBatchProviderInner,
+struct CallBatchCaller<N: Network> {
+    inner: CallBatchProviderInner<N>,
     weak: WeakClient,
 }
 
-impl CallBatchCaller {
-    fn new<P: Provider<N>, N: Network>(provider: &CallBatchProvider<P, N>) -> Self {
+impl<N:Network> CallBatchCaller<N> {
+    fn new<P: Provider<N>>(provider: &CallBatchProvider<P, N>) -> Self {
         Self { inner: provider.inner.clone(), weak: provider.provider.weak_client() }
     }
 }
 
-impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
+impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
     fn call(
         &self,
         params: crate::EthCallParams<N>,
@@ -427,7 +480,7 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
         }
 
         Ok(crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule::<N>(CallBatchMsgKind::Call(params.into_data())),
+            self.inner.clone().schedule(CallBatchMsgKind::Call(params.into_data())),
         )))
     }
 
