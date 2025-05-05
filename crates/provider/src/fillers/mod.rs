@@ -166,7 +166,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     /// properties.
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 
-    /// Returns `true` if the filler is should continue filling.
+    /// Returns `true` if the filler should continue filling.
     fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
         tx.as_builder().is_some_and(|tx| self.status(tx).is_ready())
     }
@@ -233,7 +233,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// syncronously
+    /// synchronously
     fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         let _ = tx;
         // No-op default

@@ -40,7 +40,7 @@ impl BlobScheduleBlobParams {
 
     /// Returns the highest active blob parameters at the given timestamp.
     ///
-    /// Note: this does only scan the the entries scheduled by timestamp and not cancun or prague.
+    /// Note: this does only scan the entries scheduled by timestamp and not cancun or prague.
     pub fn active_scheduled_params_at_timestamp(&self, timestamp: u64) -> Option<&BlobParams> {
         self.scheduled.iter().rev().find(|(ts, _)| timestamp >= *ts).map(|(_, params)| params)
     }
