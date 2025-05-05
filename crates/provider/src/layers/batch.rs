@@ -8,7 +8,7 @@ use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_client::WeakClient;
 use alloy_sol_types::{SolCall, SolType, SolValue};
 use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
-use std::{ fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
+use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(target_family = "wasm")]
@@ -347,7 +347,6 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     }
 
     async fn send_batch(&mut self) {
-
         let pending = std::mem::take(&mut self.pending);
 
         if pending.len() == 1 {
@@ -415,7 +414,6 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
             .map_err(TransportErrorKind::custom)?;
         Ok(ret)
     }
-
 }
 
 impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, N> {
@@ -506,4 +504,3 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
         Caller::<N, Bytes>::call_many(&self.weak, params)
     }
 }
-
