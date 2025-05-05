@@ -5,11 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
+
+### Features
+
+- Add more IsTyped2718 impls ([#2396](https://github.com/alloy-rs/alloy/issues/2396))
+- Add IsTyped2718  ([#2394](https://github.com/alloy-rs/alloy/issues/2394))
+
 ## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
 
 ### Features
 
 - Support deserializing system signatures in legacy transactions ([#2358](https://github.com/alloy-rs/alloy/issues/2358))
+
+### Miscellaneous Tasks
+
+- Release 0.15.8
 
 ### Testing
 
