@@ -2,6 +2,7 @@
 
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
+use alloc::vec::Vec;
 
 /// Represents the execution witness of a block. Contains an optional map of state preimages.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
