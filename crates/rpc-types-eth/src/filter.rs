@@ -208,7 +208,8 @@ pub type Topic = FilterSet<B256>;
 impl Topic {
     /// Extends the topic with a value that can be converted into a Topic
     pub fn extend<T: Into<Self>>(mut self, value: T) -> Self {
-        self.0.extend(value.into().0);
+        self.unseal();
+        self.set.extend(value.into());
         self
     }
 }
