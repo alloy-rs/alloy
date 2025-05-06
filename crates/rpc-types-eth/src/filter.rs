@@ -710,6 +710,25 @@ impl Filter {
         self.matches_block_range(block.number) || self.matches_block_hash(block.hash)
     }
 
+    /// Returns `true` if either of the following is true:
+    /// - the filter and log are both pending
+    /// - the filter matches the block in the log. I.e. [`Self::matches_block`] returns true when
+    ///   called with the block number and hash from the log.
+    pub fn matches_log_block<T>(&self, log: &crate::Log<T>) -> bool {
+        if self.is_pending_block_filter() {
+            // We skip checking block_hash, as a mismatch here would indicate
+            // invalid log data
+            return log.block_number.is_none();
+        }
+
+        // If the data is invalid, we'll shortcut return false
+        let Some(number) = log.block_number else { return false };
+        let Some(hash) = log.block_hash else { return false };
+        let num_hash = BlockNumHash { number, hash };
+
+        self.matches_block(&num_hash)
+    }
+
     /// Check if a [`Log`] matches the filter. This will check topics and
     /// address.
     ///
@@ -737,12 +756,7 @@ impl Filter {
     /// - For parsed [`crate::Log<T>`]s (e.g. those returned by a contract), see
     ///   [`Self::rpc_matches`].
     pub fn rpc_matches(&self, log: &crate::Log) -> bool {
-        let Some(number) = log.block_number else { return false };
-        let Some(hash) = log.block_hash else { return false };
-
-        let num_hash = BlockNumHash { number, hash };
-
-        self.matches(log.as_ref()) && self.matches_block(&num_hash)
+        self.matches_log_block(log) && self.matches(&log.inner)
     }
 
     /// Check if a parsed [`Log<T>`] matches the filter. This will check
@@ -780,16 +794,11 @@ impl Filter {
     /// - For un-parsed RPC logs [`crate::Log<LogData>`] see [`Self::rpc_matches`].
     ///
     /// [`SolEvent`]: alloy_sol_types::SolEvent
-    pub fn rpc_matches_parsed<U>(&self, log: &crate::Log<alloy_primitives::Log<U>>) -> bool
+    pub fn rpc_matches_parsed<U>(&self, log: &crate::Log<U>) -> bool
     where
         for<'a> &'a U: Into<LogData>,
     {
-        let Some(number) = log.block_number else { return false };
-        let Some(hash) = log.block_hash else { return false };
-
-        let num_hash = BlockNumHash { number, hash };
-
-        self.matches_parsed(log) && self.matches_block(&num_hash)
+        self.matches_log_block(log) && self.matches_parsed(log)
     }
 }
 
