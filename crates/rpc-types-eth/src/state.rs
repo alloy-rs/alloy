@@ -7,7 +7,7 @@ use alloy_primitives::{
     Address, Bytes, B256, U256,
 };
 
-/// A StateOverride builder.
+/// A builder type for [`StateOverride`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StateOverridesBuilder {
     overrides: StateOverride,
@@ -19,10 +19,35 @@ impl StateOverridesBuilder {
         Self { overrides: map }
     }
 
+    /// Creates a new [`StateOverridesBuilder`] with the given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::new(StateOverride::with_capacity_and_hasher(capacity, Default::default()))
+    }
+
     /// Adds an account override for a specific address.
     pub fn append(mut self, address: Address, account_override: AccountOverride) -> Self {
         self.overrides.insert(address, account_override);
         self
+    }
+
+    /// Helper `append` function that appends an optional override.
+    pub fn append_opt<F>(self, f: F) -> Self
+    where
+        F: FnOnce() -> Option<(Address, AccountOverride)>,
+    {
+        if let Some((add, acc)) = f() {
+            self.append(add, acc)
+        } else {
+            self
+        }
+    }
+
+    /// Apply a function to the builder, returning the modified builder.
+    pub fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
     }
 
     /// Adds multiple account overrides from an iterator.
@@ -75,6 +100,12 @@ impl StateOverridesBuilder {
     ) -> Self {
         self.overrides.entry(address).or_default().set_state_diff(state_diff);
         self
+    }
+}
+
+impl FromIterator<(Address, AccountOverride)> for StateOverridesBuilder {
+    fn from_iter<T: IntoIterator<Item = (Address, AccountOverride)>>(iter: T) -> Self {
+        Self::new(StateOverride::from_iter(iter))
     }
 }
 

@@ -3,7 +3,10 @@ use alloy_primitives::hex;
 use core::fmt;
 use derive_more::{AsMut, AsRef, Deref, DerefMut};
 
-pub use c_kzg::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};
+pub use c_kzg::{BYTES_PER_COMMITMENT as BYTES_PER_G1_POINT, FIELD_ELEMENTS_PER_BLOB};
+
+/// Bytes per G2 point.
+pub const BYTES_PER_G2_POINT: usize = 96;
 
 /// Number of G1 Points.
 pub const NUM_G1_POINTS: usize = 4096;
@@ -32,20 +35,6 @@ impl Default for G2Points {
         Self([[0; BYTES_PER_G2_POINT]; NUM_G2_POINTS])
     }
 }
-
-/// Default G1 points.
-pub const G1_POINTS: &G1Points = {
-    const BYTES: &[u8] = include_bytes!("./g1_points.bin");
-    assert!(BYTES.len() == core::mem::size_of::<G1Points>());
-    unsafe { &*BYTES.as_ptr().cast::<G1Points>() }
-};
-
-/// Default G2 points.
-pub const G2_POINTS: &G2Points = {
-    const BYTES: &[u8] = include_bytes!("./g2_points.bin");
-    assert!(BYTES.len() == core::mem::size_of::<G2Points>());
-    unsafe { &*BYTES.as_ptr().cast::<G2Points>() }
-};
 
 /// Parses the contents of a KZG trusted setup file into a list of G1 and G2 points.
 ///

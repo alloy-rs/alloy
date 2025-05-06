@@ -43,6 +43,11 @@ where
         &self.data
     }
 
+    /// Consumes the `EthCallParams` and returns the transaction data.
+    pub fn into_data(self) -> N::TransactionRequest {
+        self.data
+    }
+
     /// Returns the block.
     pub const fn block(&self) -> Option<BlockId> {
         self.block
@@ -70,14 +75,14 @@ impl<N: Network> serde::Serialize for EthCallParams<N> {
 /// The parameters for an `"eth_callMany"` RPC request.
 #[derive(Clone, Debug)]
 pub struct EthCallManyParams<'req> {
-    bundles: Cow<'req, Vec<Bundle>>,
+    bundles: Cow<'req, [Bundle]>,
     context: Option<StateContext>,
     overrides: Option<Cow<'req, StateOverride>>,
 }
 
 impl<'req> EthCallManyParams<'req> {
     /// Instantiates a new `EthCallManyParams` with the given bundles.
-    pub const fn new(bundles: &'req Vec<Bundle>) -> Self {
+    pub fn new(bundles: &'req [Bundle]) -> Self {
         Self { bundles: Cow::Borrowed(bundles), context: None, overrides: None }
     }
 

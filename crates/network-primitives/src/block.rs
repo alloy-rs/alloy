@@ -133,8 +133,8 @@ impl<T> BlockTransactions<T> {
     pub fn try_into_transactions(self) -> Result<Vec<T>, ValueError<Self>> {
         match self {
             Self::Full(txs) => Ok(txs),
-            txs @ Self::Hashes(_) => Err(ValueError::new(txs, "Unexpected hashes variant")),
-            txs @ Self::Uncle => Err(ValueError::new(txs, "Unexpected uncle variant")),
+            txs @ Self::Hashes(_) => Err(ValueError::new_static(txs, "Unexpected hashes variant")),
+            txs @ Self::Uncle => Err(ValueError::new_static(txs, "Unexpected uncle variant")),
         }
     }
 
@@ -175,11 +175,29 @@ impl<T: TransactionResponse> BlockTransactions<T> {
         }
     }
 
+    /// Converts `self` into `Hashes` if the given `condition` is true.
+    #[inline]
+    pub fn convert_to_hashes_if(&mut self, condition: bool) {
+        if !condition {
+            return;
+        }
+        self.convert_to_hashes();
+    }
+
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn into_hashes(mut self) -> Self {
         self.convert_to_hashes();
         self
+    }
+
+    /// Converts `self` into `Hashes` if the given `condition` is true.
+    #[inline]
+    pub fn into_hashes_if(self, condition: bool) -> Self {
+        if !condition {
+            return self;
+        }
+        self.into_hashes()
     }
 
     /// Returns an iterator over the transaction hashes.

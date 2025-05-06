@@ -1,8 +1,8 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
-    Typed2718, TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718,
 };
 use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
 use alloy_network_primitives::TransactionResponse;
@@ -32,7 +32,7 @@ pub use request::{TransactionInput, TransactionRequest};
 ///
 /// This represents a transaction in RPC format (`eth_getTransactionByHash`) and contains the full
 /// transaction object and additional block metadata if the transaction has been mined.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(
@@ -46,7 +46,7 @@ pub use request::{TransactionInput, TransactionRequest};
 #[doc(alias = "Tx")]
 pub struct Transaction<T = TxEnvelope> {
     /// The inner transaction object
-    pub inner: T,
+    pub inner: Recovered<T>,
 
     /// Hash of block where transaction was included, `None` if pending
     pub block_hash: Option<BlockHash>,
@@ -59,25 +59,37 @@ pub struct Transaction<T = TxEnvelope> {
 
     /// Deprecated effective gas price value.
     pub effective_gas_price: Option<u128>,
+}
 
-    /// Sender
-    pub from: Address,
+impl<T> Default for Transaction<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self {
+            inner: Recovered::new_unchecked(Default::default(), Default::default()),
+            block_hash: Default::default(),
+            block_number: Default::default(),
+            transaction_index: Default::default(),
+            effective_gas_price: Default::default(),
+        }
+    }
 }
 
 impl<T> Transaction<T> {
     /// Consumes the type and returns the wrapped transaction.
     pub fn into_inner(self) -> T {
-        self.inner
+        self.inner.into_inner()
     }
 
     /// Consumes the type and returns a [`Recovered`] transaction with the sender
     pub fn into_recovered(self) -> Recovered<T> {
-        Recovered::new_unchecked(self.inner, self.from)
+        self.inner
     }
 
     /// Returns a `Recovered<&T>` with the transaction and the sender.
     pub fn as_recovered(&self) -> Recovered<&T> {
-        Recovered::new_unchecked(&self.inner, self.from)
+        self.inner.as_recovered_ref()
     }
 
     /// Converts the transaction type to the given alternative that is `From<T>`
@@ -100,29 +112,25 @@ impl<T> Transaction<T> {
 
     /// Applies the given closure to the inner transaction type.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
-        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
-            self;
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Transaction {
-            inner: f(inner),
+            inner: inner.map(f),
             block_hash,
             block_number,
             transaction_index,
             effective_gas_price,
-            from,
         }
     }
 
     /// Applies the given fallible closure to the inner transactions.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
-        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price, from } =
-            self;
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Ok(Transaction {
-            inner: f(inner)?,
+            inner: inner.try_map(f)?,
             block_hash,
             block_number,
             transaction_index,
             effective_gas_price,
-            from,
         })
     }
 }
@@ -172,20 +180,26 @@ where
     /// During this conversion data for [TransactionRequest::sidecar] is not
     /// populated as it is not part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
-        self.inner.into()
+        self.inner.into_inner().into()
     }
 }
 
-impl Transaction {
-    /// Consumes the transaction and returns it as [`Signed`] with [`TypedTransaction`] as the
-    /// transaction type.
-    pub fn into_signed(self) -> Signed<TypedTransaction> {
-        self.inner.into_signed()
+impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
+    /// Consumes the transaction and returns it as [`Signed`] with [`EthereumTypedTransaction`] as
+    /// the transaction type.
+    pub fn into_signed(self) -> Signed<EthereumTypedTransaction<Eip4844>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
+        self.inner.into_inner().into_signed()
     }
 
-    /// Consumes the transaction and returns it a [`Recovered`] signed [`TypedTransaction`].
-    pub fn into_signed_recovered(self) -> Recovered<Signed<TypedTransaction>> {
-        self.convert().into_recovered()
+    /// Consumes the transaction and returns it a [`Recovered`] signed [`EthereumTypedTransaction`].
+    pub fn into_signed_recovered(self) -> Recovered<Signed<EthereumTypedTransaction<Eip4844>>>
+    where
+        EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+    {
+        self.inner.map(|tx| tx.into_signed())
     }
 }
 
@@ -204,43 +218,35 @@ impl<T> From<Transaction<T>> for Recovered<T> {
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxLegacy> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxLegacy> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Legacy(tx) => Ok(tx),
-            _ => {
-                Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.inner.tx_type())))
-            }
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Legacy(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Legacy, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip1559> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip1559> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Eip1559(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
-                "expected Eip1559, got {}",
-                tx.inner.tx_type()
-            ))),
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Eip1559(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Eip1559, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip2930> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip2930> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Eip2930(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
-                "expected Eip2930, got {}",
-                tx.inner.tx_type()
-            ))),
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Eip2930(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Eip2930, got {}", tx.tx_type()))),
         }
     }
 }
@@ -261,38 +267,45 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
+        match tx.inner.into_inner() {
             TxEnvelope::Eip4844(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
+            tx => Err(ConversionError::Custom(format!(
                 "expected TxEip4844Variant, got {}",
-                tx.inner.tx_type()
+                tx.tx_type()
             ))),
         }
     }
 }
 
-impl TryFrom<Transaction> for Signed<TxEip7702> {
+impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip7702> {
     type Error = ConversionError;
 
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.inner {
-            TxEnvelope::Eip7702(tx) => Ok(tx),
-            _ => Err(ConversionError::Custom(format!(
-                "expected Eip7702, got {}",
-                tx.inner.tx_type()
-            ))),
+    fn try_from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Result<Self, Self::Error> {
+        match tx.inner.into_inner() {
+            EthereumTxEnvelope::Eip7702(tx) => Ok(tx),
+            tx => Err(ConversionError::Custom(format!("expected Eip7702, got {}", tx.tx_type()))),
         }
     }
 }
 
-impl From<Transaction> for TxEnvelope {
-    fn from(tx: Transaction) -> Self {
-        tx.inner
+impl<Eip4844> From<Transaction<Self>> for EthereumTxEnvelope<Eip4844> {
+    fn from(tx: Transaction<Self>) -> Self {
+        tx.inner.into_inner()
     }
 }
 
-impl From<Transaction> for Signed<TypedTransaction> {
-    fn from(tx: Transaction) -> Self {
+impl<Eip4844> From<Transaction<Self>> for EthereumTypedTransaction<Eip4844> {
+    fn from(tx: Transaction<Self>) -> Self {
+        tx.inner.into_inner()
+    }
+}
+
+impl<Eip4844> From<Transaction<EthereumTxEnvelope<Eip4844>>>
+    for Signed<EthereumTypedTransaction<Eip4844>>
+where
+    EthereumTypedTransaction<Eip4844>: From<Eip4844>,
+{
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
         tx.into_signed()
     }
 }
@@ -385,7 +398,7 @@ impl<T: TransactionTrait + Encodable2718> TransactionResponse for Transaction<T>
     }
 
     fn from(&self) -> Address {
-        self.from
+        self.inner.signer()
     }
 }
 
@@ -443,8 +456,9 @@ mod tx_serde {
                 block_number,
                 transaction_index,
                 effective_gas_price,
-                from,
             } = value;
+
+            let (inner, from) = inner.into_parts();
 
             // if inner transaction has its own `gasPrice` don't serialize it in this struct.
             let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
@@ -478,11 +492,10 @@ mod tx_serde {
             let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
 
             Ok(Self {
-                inner,
+                inner: Recovered::new_unchecked(inner, from),
                 block_hash,
                 block_number,
                 transaction_index,
-                from,
                 effective_gas_price,
             })
         }
@@ -492,6 +505,11 @@ mod tx_serde {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(unused)]
+    fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
+        tx.into()
+    }
 
     #[test]
     #[cfg(feature = "serde")]

@@ -8,7 +8,7 @@
 
 use alloy_consensus::SignableTransaction;
 use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
-use alloy_primitives::{Address, ChainId, PrimitiveSignature as Signature, B256};
+use alloy_primitives::{Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
@@ -91,8 +91,8 @@ pub struct LocalSigner<C> {
     pub(crate) chain_id: Option<ChainId>,
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for LocalSigner<C> {
     #[inline]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
@@ -173,8 +173,8 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigne
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<C> TxSigner<Signature> for LocalSigner<C>
 where
     C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,

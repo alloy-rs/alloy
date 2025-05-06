@@ -2,10 +2,10 @@
 version = 2
 yanked = "warn"
 ignore = [
-    # https://rustsec.org/advisories/RUSTSEC-2024-0388 used by ssz, will be removed https://github.com/sigp/ethereum_ssz/pull/34
-    "RUSTSEC-2024-0388",
-    # https://rustsec.org/advisories/RUSTSEC-2025-0007
-    "RUSTSEC-2025-0007"
+    # https://rustsec.org/advisories/RUSTSEC-2024-0437, trezor-client dependency, no fix available yet
+    "RUSTSEC-2024-0437",
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
 ]
 
 [bans]
@@ -32,6 +32,7 @@ allow = [
     "Zlib",
     # https://github.com/briansmith/ring/issues/902
     "LicenseRef-ring",
+    "CDLA-Permissive-2.0"
 ]
 
 exceptions = [
@@ -40,6 +41,8 @@ exceptions = [
     # https://tldrlegal.com/license/creative-commons-cc0-1.0-universal
     { allow = ["CC0-1.0"], name = "tiny-keccak" },
     { allow = ["CC0-1.0"], name = "trezor-client" },
+    { allow = ["CC0-1.0"], name = "secp256k1" },
+    { allow = ["CC0-1.0"], name = "secp256k1-sys" },
     { allow = ["BSD-2-Clause"], name = "zerocopy" },
 ]
 

@@ -52,7 +52,7 @@ pub struct EventTransactionLog {
 /// SSE event type of the event history endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 pub struct EventHistoryInfo {
     pub count: u64,
     pub min_block: u64,
@@ -76,7 +76,7 @@ pub struct EventHistory {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 pub struct Hint {
     #[serde(with = "null_sequence")]
     pub txs: Vec<EventTransaction>,
@@ -92,7 +92,7 @@ pub struct Hint {
 /// Query params for the `history` endpoint
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 pub struct EventHistoryParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_start: Option<u64>,
@@ -108,7 +108,7 @@ pub struct EventHistoryParams {
     pub offset: Option<u64>,
 }
 
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 impl EventHistoryParams {
     pub const fn with_block_start(mut self, block_start: u64) -> Self {
         self.block_start = Some(block_start);
@@ -183,8 +183,7 @@ impl<'de> Deserialize<'de> for FunctionSelector {
         let s = hex_str.strip_prefix("0x").unwrap_or(&hex_str);
         if s.len() != 8 {
             return Err(serde::de::Error::custom(format!(
-                "Expected 4 byte function selector: {}",
-                hex_str
+                "Expected 4 byte function selector: {hex_str}"
             )));
         }
 

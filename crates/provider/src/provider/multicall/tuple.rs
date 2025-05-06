@@ -7,14 +7,14 @@ use alloy_sol_types::SolCall;
 
 /// Sealed trait to prevent external implementations
 mod private {
-    #[allow(unnameable_types)]
+    #[expect(unnameable_types)]
     pub trait Sealed {}
 }
 use private::Sealed;
 
 /// A trait for tuples that can have types pushed to them
 #[doc(hidden)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub trait TuplePush<T> {
     /// The resulting type after pushing T
     type Pushed;
@@ -135,7 +135,7 @@ macro_rules! impl_tuple {
                 }
 
                 // Decode each return value in order
-                Ok(($($ty::abi_decode_returns(&data[$idx], false).map_err(MulticallError::DecodeError)?,)+))
+                Ok(($($ty::abi_decode_returns(&data[$idx]).map_err(MulticallError::DecodeError)?,)+))
             }
 
             fn decode_return_results(results: &[MulticallResult]) -> Result<Self::Returns> {
@@ -145,7 +145,7 @@ macro_rules! impl_tuple {
 
                 Ok(($(
                     match &results[$idx].success {
-                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData, false).map_err(MulticallError::DecodeError)?),
+                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData).map_err(MulticallError::DecodeError)?),
                         false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
                     },
                 )+))

@@ -18,16 +18,16 @@ use std::{
 };
 use tokio::{
     select,
-    sync::{mpsc, oneshot, watch},
+    sync::{mpsc, oneshot},
 };
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::{
     std::Instant,
     tokio::{interval, sleep_until},
 };
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use {
     std::time::Instant,
     tokio::time::{interval, sleep_until},
@@ -44,7 +44,7 @@ pub enum PendingTransactionError {
     #[error(transparent)]
     TransportError(#[from] TransportError),
 
-    /// Error occured while getting response from the heartbeat.
+    /// Error occurred while getting response from the heartbeat.
     #[error(transparent)]
     Recv(#[from] oneshot::error::RecvError),
 
@@ -335,6 +335,12 @@ impl PendingTransactionConfig {
     }
 }
 
+impl From<TxHash> for PendingTransactionConfig {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::new(tx_hash)
+    }
+}
+
 /// Errors which may occur in heartbeat when watching a transaction.
 #[derive(Debug, thiserror::Error)]
 pub enum WatchTxError {
@@ -343,6 +349,7 @@ pub enum WatchTxError {
     Timeout,
 }
 
+/// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
 #[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
@@ -412,12 +419,11 @@ impl Future for PendingTransaction {
 
 /// A handle to the heartbeat task.
 #[derive(Clone, Debug)]
-pub(crate) struct HeartbeatHandle<N: Network> {
+pub(crate) struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
-    latest: watch::Receiver<Option<N::BlockResponse>>,
 }
 
-impl<N: Network> HeartbeatHandle<N> {
+impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
     #[doc(alias = "watch_transaction")]
     pub(crate) async fn watch_tx(
@@ -432,15 +438,8 @@ impl<N: Network> HeartbeatHandle<N> {
             Err(e) => Err(e.0.config),
         }
     }
-
-    /// Returns a watcher that always sees the latest block.
-    #[allow(dead_code)]
-    pub(crate) const fn latest(&self) -> &watch::Receiver<Option<N::BlockResponse>> {
-        &self.latest
-    }
 }
 
-// TODO: Parameterize with `Network`
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
@@ -574,13 +573,9 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Handle a new block by checking if any of the transactions we're
     /// watching are in it, and if so, notifying the watcher. Also updates
     /// the latest block.
-    fn handle_new_block(
-        &mut self,
-        block: N::BlockResponse,
-        latest: &watch::Sender<Option<N::BlockResponse>>,
-    ) {
-        // Blocks without numbers are ignored, as they're not part of the chain.
+    fn handle_new_block(&mut self, block: N::BlockResponse) {
         let block_height = block.header().as_ref().number();
+        debug!(%block_height, "handling block");
 
         // Add the block the lookbehind.
         // The value is chosen arbitrarily to not have a huge memory footprint but still
@@ -630,29 +625,23 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
 
         self.check_confirmations(block_height);
-
-        // Update the latest block. We use `send_replace` here to ensure the
-        // latest block is always up to date, even if no receivers exist.
-        // C.f. https://docs.rs/tokio/latest/tokio/sync/watch/struct.Sender.html#method.send
-        debug!(%block_height, "updating latest block");
-        let _ = latest.send_replace(Some(block));
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle<N> {
+    pub(crate) fn spawn(self) -> HeartbeatHandle {
         let (task, handle) = self.consume();
         task.spawn_task();
         handle
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle<N> {
+    pub(crate) fn spawn(self) -> HeartbeatHandle {
         let (task, handle) = self.consume();
         task.spawn_task();
         handle
@@ -660,17 +649,12 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> He
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
-    fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle<N>) {
-        let (latest, latest_rx) = watch::channel(None::<N::BlockResponse>);
-        let (ix_tx, ixns) = mpsc::channel(16);
-        (self.into_future(latest, ixns), HeartbeatHandle { tx: ix_tx, latest: latest_rx })
+    fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle) {
+        let (ix_tx, ixns) = mpsc::channel(64);
+        (self.into_future(ixns), HeartbeatHandle { tx: ix_tx })
     }
 
-    async fn into_future(
-        mut self,
-        latest: watch::Sender<Option<N::BlockResponse>>,
-        mut ixns: mpsc::Receiver<TxWatcher>,
-    ) {
+    async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
         'shutdown: loop {
             {
                 let next_reap = self.next_reap();
@@ -689,7 +673,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
                     // Wake up to handle new blocks.
                     Some(block) = self.stream.next() => {
-                        self.handle_new_block(block, &latest);
+                        self.handle_new_block(block);
                     },
 
                     // This arm ensures we always wake up to reap timeouts,

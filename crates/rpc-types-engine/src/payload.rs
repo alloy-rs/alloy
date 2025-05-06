@@ -13,6 +13,7 @@ use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
+    eip7594::CELLS_PER_EXT_BLOB,
     eip7685::Requests,
     BlockNumHash,
 };
@@ -25,6 +26,7 @@ pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 /// And 8-byte identifier for an execution payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct PayloadId(pub B64);
 
 // === impl PayloadId ===
@@ -42,6 +44,12 @@ impl core::fmt::Display for PayloadId {
     }
 }
 
+impl From<B64> for PayloadId {
+    fn from(value: B64) -> Self {
+        Self(value)
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -56,6 +64,7 @@ impl core::fmt::Display for PayloadId {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum ExecutionPayloadFieldV2 {
     /// V1 payload
     V1(ExecutionPayloadV1),
@@ -122,6 +131,7 @@ impl ExecutionPayloadFieldV2 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadInputV2 {
     /// The V1 execution payload
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -158,6 +168,7 @@ impl From<ExecutionPayloadInputV2> for ExecutionPayload {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV2 {
     /// Execution payload, which could be either V1 or V2
     ///
@@ -186,6 +197,7 @@ impl ExecutionPayloadEnvelopeV2 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV3 {
     /// Execution payload V3
     pub execution_payload: ExecutionPayloadV3,
@@ -206,6 +218,7 @@ pub struct ExecutionPayloadEnvelopeV3 {
 #[derive(Clone, Debug, PartialEq, Eq, derive_more::Deref, derive_more::DerefMut)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadEnvelopeV4 {
     /// Inner [`ExecutionPayloadEnvelopeV3`].
     #[deref]
@@ -219,6 +232,32 @@ pub struct ExecutionPayloadEnvelopeV4 {
     pub execution_requests: Requests,
 }
 
+/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
+/// V5.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#engine_getpayloadv5>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadEnvelopeV5 {
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload. See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+}
+
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
@@ -226,6 +265,7 @@ pub struct ExecutionPayloadEnvelopeV4 {
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadV1 {
     /// The parent hash of the block.
     pub parent_hash: B256,
@@ -387,6 +427,7 @@ impl<T: Decodable2718> TryFrom<ExecutionPayloadV1> for Block<T> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadV2 {
     /// Inner V1 payload
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -574,6 +615,7 @@ impl ssz::Encode for ExecutionPayloadV2 {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadV3 {
     /// Inner V2 payload
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -754,6 +796,7 @@ impl ssz::Encode for ExecutionPayloadV3 {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlobsBundleV1 {
     /// All commitments in the bundle.
     pub commitments: Vec<alloy_consensus::Bytes48>,
@@ -824,11 +867,87 @@ impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
     }
 }
 
+/// This includes all bundled blob related data of an executed payload.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct BlobsBundleV2 {
+    /// All commitments in the bundle.
+    pub commitments: Vec<alloy_consensus::Bytes48>,
+    /// All cell proofs in the bundle.
+    pub cell_proofs: Vec<alloy_consensus::Bytes48>,
+    /// All blobs in the bundle.
+    pub blobs: Vec<alloy_consensus::Blob>,
+}
+
+impl BlobsBundleV2 {
+    /// Creates a new blob bundle from the given sidecars.
+    ///
+    /// This folds the sidecar fields into single commit, proof, and blob vectors.
+    pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecar>) -> Self {
+        let (commitments, cell_proofs, blobs) = sidecars.into_iter().fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut commitments, mut cell_proofs, mut blobs), sidecar| {
+                commitments.extend(sidecar.commitments);
+                cell_proofs.extend(sidecar.proofs);
+                blobs.extend(sidecar.blobs);
+                (commitments, cell_proofs, blobs)
+            },
+        );
+        Self { commitments, cell_proofs, blobs }
+    }
+
+    /// Returns a new empty blobs bundle.
+    ///
+    /// This is useful for the opstack engine API that expects an empty bundle as part of the
+    /// payload for API compatibility reasons.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Take `len` blob data from the bundle.
+    ///
+    /// # Panics
+    ///
+    /// If len is more than the blobs bundle len.
+    pub fn take(&mut self, len: usize) -> (Vec<Bytes48>, Vec<Bytes48>, Vec<Blob>) {
+        (
+            self.commitments.drain(0..len).collect(),
+            self.cell_proofs.drain(0..len * CELLS_PER_EXT_BLOB as usize).collect(),
+            self.blobs.drain(0..len).collect(),
+        )
+    }
+
+    /// Returns the sidecar from the bundle
+    ///
+    /// # Panics
+    ///
+    /// If len is more than the blobs bundle len.
+    pub fn pop_sidecar(&mut self, len: usize) -> BlobTransactionSidecar {
+        let (commitments, cell_proofs, blobs) = self.take(len);
+        BlobTransactionSidecar { commitments, proofs: cell_proofs, blobs }
+    }
+}
+
+impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV2 {
+    fn from(sidecars: Vec<BlobTransactionSidecar>) -> Self {
+        Self::new(sidecars)
+    }
+}
+
+impl FromIterator<BlobTransactionSidecar> for BlobsBundleV2 {
+    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
+        Self::new(iter)
+    }
+}
+
 /// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2], or
 /// [ExecutionPayloadV3].
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum ExecutionPayload {
     /// V1 payload
     V1(ExecutionPayloadV1),
@@ -1179,7 +1298,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 let gas_limit =
                     gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
                 let gas_used =
-                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUesd"))?;
+                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUsed"))?;
                 let timestamp =
                     timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
                 let extra_data =
@@ -1263,6 +1382,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
 /// See also: <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/shanghai.md#executionpayloadbodyv1>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadBodyV1 {
     /// Enveloped encoded transactions.
     pub transactions: Vec<Bytes>,
@@ -1304,6 +1424,7 @@ impl<T: Encodable2718, H> From<Block<T, H>> for ExecutionPayloadBodyV1 {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct PayloadAttributes {
     /// Value for the `timestamp` field of the new payload
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
@@ -1327,6 +1448,7 @@ pub struct PayloadAttributes {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct PayloadStatus {
     /// The status of the payload.
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -1409,6 +1531,7 @@ impl From<PayloadError> for PayloadStatusEnum {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "status", rename_all = "SCREAMING_SNAKE_CASE"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum PayloadStatusEnum {
     /// VALID is returned by the engine API in the following calls:
     ///   - newPayload:       if the payload was already known or was just validated and executed
@@ -1486,6 +1609,7 @@ impl core::fmt::Display for PayloadStatusEnum {
 /// complete payload supplied for execution.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionData {
     /// Execution payload.
     pub payload: ExecutionPayload,

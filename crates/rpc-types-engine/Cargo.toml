@@ -44,6 +44,9 @@ ethereum_ssz = { workspace = true, optional = true }
 # jsonrpsee
 jsonrpsee-types = { version = "0.24", optional = true }
 
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+
 # jwt
 rand = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
@@ -55,18 +58,25 @@ std = [
 	"derive_more/std",
 	"strum/std",
 	"alloy-eips/std",
-	"alloy-serde?/std"
+	"alloy-serde?/std",
+	"alloy-primitives/std",
+	"alloy-rlp/std",
+	"serde?/std",
+	"serde_json/std"
 ]
 serde = [
 	"dep:serde",
 	"dep:alloy-serde",
 	"alloy-consensus/serde",
-	"alloy-eips/serde"
+	"alloy-eips/serde",
+	"alloy-primitives/serde",
+	"rand?/serde",
 ]
 jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
+arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [

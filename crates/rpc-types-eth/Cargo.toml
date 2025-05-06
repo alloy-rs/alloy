@@ -68,7 +68,12 @@ std = [
 	"alloy-eips/std",
 	"alloy-consensus-any/std",
 	"alloy-network-primitives/std",
-	"alloy-serde?/std"
+	"alloy-serde?/std",
+	"alloy-rlp/std",
+	"alloy-sol-types/std",
+	"serde?/std",
+	"serde_json?/std",
+	"thiserror/std"
 ]
 serde = [
 	"dep:serde",
@@ -77,14 +82,18 @@ serde = [
 	"alloy-primitives/serde",
 	"alloy-consensus/serde",
 	"alloy-eips/serde",
-	"alloy-consensus-any/serde"
+	"alloy-consensus-any/serde",
+	"rand/serde",
 ]
 arbitrary = [
-    "std",
-    "dep:arbitrary",
-    "alloy-primitives/arbitrary",
-    "alloy-serde?/arbitrary",
-    "alloy-eips/arbitrary",
+	"std",
+	"dep:arbitrary",
+	"alloy-consensus/arbitrary",
+	"alloy-primitives/arbitrary",
+	"alloy-serde?/arbitrary",
+	"alloy-eips/arbitrary",
+	"alloy-consensus-any/arbitrary",
+	"alloy-sol-types/arbitrary"
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]

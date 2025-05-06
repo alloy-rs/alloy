@@ -13,6 +13,12 @@ use alloy_transport::{
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
 
+#[cfg(target_family = "wasm")]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_family = "wasm"))]
+use tokio::time::sleep;
+
 /// The service contains the backend handle, a subscription manager, and the
 /// configuration details required to reconnect.
 #[derive(Debug)]
@@ -60,7 +66,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Reconnect the backend, re-issue pending requests, and re-start active
     /// subscriptions.
     async fn reconnect(&mut self) -> TransportResult<()> {
-        info!("Reconnecting pubsub service backend.");
+        debug!("Reconnecting pubsub service backend");
 
         let mut old_handle = self.get_new_backend().await?;
 
@@ -90,9 +96,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            // 0 is a dummy value, we don't care about the channel size here,
-            // as none of these will result in channel creation.
-            let (in_flight, _) = InFlight::new(req.clone(), 0);
+            let (in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
@@ -132,7 +136,8 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            let req = Request::new("eth_unsubscribe", Id::None, [server_id]);
+            // TODO: ideally we can send this with an unused id
+            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;
@@ -190,6 +195,31 @@ impl<T: PubSubConnect> PubSubService<T> {
         Ok(())
     }
 
+    /// Attempt to reconnect with retries
+    async fn reconnect_with_retries(&mut self) -> TransportResult<()> {
+        let mut retry_count = 0;
+        let max_retries = self.handle.max_retries;
+        let interval = self.handle.retry_interval;
+        loop {
+            match self.reconnect().await {
+                Ok(()) => break Ok(()),
+                Err(e) => {
+                    retry_count += 1;
+                    if retry_count >= max_retries {
+                        error!("Reconnect failed after {max_retries} attempts, shutting down: {e}");
+                        break Err(e);
+                    }
+                    warn!(
+                        "Reconnection attempt {retry_count}/{max_retries} failed: {e}. \
+                         Retrying in {:?}s...",
+                        interval.as_secs_f64(),
+                    );
+                    sleep(interval).await;
+                }
+            }
+        }
+    }
+
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
@@ -205,14 +235,14 @@ impl<T: PubSubConnect> PubSubService<T> {
                             if let Err(e) = self.handle_item(item) {
                                 break Err(e)
                             }
-                        } else if let Err(e) = self.reconnect().await {
+                        } else if let Err(e) = self.reconnect_with_retries().await {
                             break Err(e)
                         }
                     }
 
                     _ = &mut self.handle.error => {
                         error!("Pubsub service backend error.");
-                        if let Err(e) = self.reconnect().await {
+                        if let Err(e) = self.reconnect_with_retries().await {
                             break Err(e)
                         }
                     }

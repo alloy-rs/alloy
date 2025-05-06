@@ -130,7 +130,7 @@ pub struct TransactionRequest {
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
     pub sidecar: Option<BlobTransactionSidecar>,
-    /// Authorization list for for EIP-7702 transactions.
+    /// Authorization list for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
@@ -255,8 +255,55 @@ impl TransactionRequest {
     }
 
     /// Sets the input data for the transaction.
+    ///
+    /// This can be used to set both `input` and the `data` field, because some chains or services
+    /// still expect of the deprecated `data` field
+    ///
+    /// ```
+    /// use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
+    /// let req = TransactionRequest::default().input(TransactionInput::both(b"00".into()));
+    /// ```
     pub fn input(mut self, input: TransactionInput) -> Self {
         self.input = input;
+        self
+    }
+
+    /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
+    ///
+    /// This removes `data` the data field.
+    pub fn normalize_input(&mut self) {
+        self.input.normalize_input()
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_input`] applied
+    pub fn normalized_input(mut self) -> Self {
+        self.normalize_input();
+        self
+    }
+
+    /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
+    ///
+    /// This removes `input` the data field.
+    pub fn normalize_data(&mut self) {
+        self.input.normalize_data();
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_data`] applied
+    pub fn normalized_data(mut self) -> Self {
+        self.normalize_data();
+        self
+    }
+
+    /// If only one field is set, this also sets the other field by with that value.
+    ///
+    /// This is a noop if both fields are already set.
+    pub fn set_input_and_data(&mut self) {
+        self.input.set_both();
+    }
+
+    /// Consumes the type and returns it with [`Self::set_input_and_data`] applied.
+    pub fn with_input_and_data(mut self) -> Self {
+        self.set_input_and_data();
         self
     }
 
@@ -1060,6 +1107,57 @@ impl TransactionInput {
         self.input.or(self.data)
     }
 
+    /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
+    ///
+    /// This removes `data` the data field.
+    pub fn normalize_input(&mut self) {
+        let data = self.data.take();
+        // If input is None but data has a value, copy data to input
+        if self.input.is_none() && data.is_some() {
+            self.input = data;
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_input`] applied
+    pub fn normalized_input(mut self) -> Self {
+        self.normalize_input();
+        self
+    }
+
+    /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
+    ///
+    /// This removes `input` the data field.
+    pub fn normalize_data(&mut self) {
+        let input = self.input.take();
+        if self.data.is_none() && input.is_some() {
+            self.data = input;
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_data`] applied
+    pub fn normalized_data(mut self) -> Self {
+        self.normalize_data();
+        self
+    }
+
+    /// If only one field is set, this also sets the other field by with that value.
+    ///
+    /// This is a noop if both fields are already set.
+    pub fn set_both(&mut self) {
+        if self.input.is_none() {
+            self.input = self.data.clone();
+        }
+        if self.data.is_none() {
+            self.data = self.input.clone();
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::set_both`] applied.
+    pub fn with_both(mut self) -> Self {
+        self.set_both();
+        self
+    }
+
     /// Consumes the type and returns the optional input data.
     ///
     /// Returns an error if both `data` and `input` fields are set and not equal.
@@ -1187,11 +1285,11 @@ mod tests {
     fn serde_tx_chain_id_field() {
         let chain_id: ChainId = 12345678;
 
-        let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
+        let chain_id_as_num = format!(r#"{{"chainId": {chain_id} }}"#);
         let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();
         assert_eq!(req1.chain_id.unwrap(), chain_id);
 
-        let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
+        let chain_id_as_hex = format!(r#"{{"chainId": "0x{chain_id:x}" }}"#);
         let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
         assert_eq!(req2.chain_id.unwrap(), chain_id);
     }

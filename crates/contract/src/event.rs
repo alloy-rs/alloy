@@ -11,15 +11,15 @@ use std::{fmt, marker::PhantomData};
 
 /// Helper for managing the event filter before querying or streaming its logs
 #[must_use = "event filters do nothing unless you `query`, `watch`, or `stream` them"]
-pub struct Event<T, P, E, N = Ethereum> {
+pub struct Event<P, E, N = Ethereum> {
     /// The provider to use for querying or streaming logs.
     pub provider: P,
     /// The filter to use for querying or streaming logs.
     pub filter: Filter,
-    _phantom: PhantomData<(T, E, N)>,
+    _phantom: PhantomData<(E, N)>,
 }
 
-impl<T, P: fmt::Debug, E, N> fmt::Debug for Event<T, P, E, N> {
+impl<P: fmt::Debug, E, N> fmt::Debug for Event<P, E, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Event")
             .field("provider", &self.provider)
@@ -30,9 +30,7 @@ impl<T, P: fmt::Debug, E, N> fmt::Debug for Event<T, P, E, N> {
 }
 
 #[doc(hidden)]
-impl<'a, T: crate::private::Transport, P: Provider<N>, E: SolEvent, N: Network>
-    Event<T, &'a P, E, N>
-{
+impl<'a, P: Provider<N>, E: SolEvent, N: Network> Event<&'a P, E, N> {
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address) -> Self {
@@ -46,7 +44,7 @@ impl<'a, T: crate::private::Transport, P: Provider<N>, E: SolEvent, N: Network>
     }
 }
 
-impl<T, P: Provider<N>, E: SolEvent, N: Network> Event<T, P, E, N> {
+impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
     /// Creates a new event with the provided provider and filter.
     pub const fn new(provider: P, filter: Filter) -> Self {
         Self { provider, filter, _phantom: PhantomData }
@@ -163,9 +161,9 @@ impl<T, P: Provider<N>, E: SolEvent, N: Network> Event<T, P, E, N> {
     }
 }
 
-impl<T, P: Clone, E, N> Event<T, &P, E, N> {
+impl<P: Clone, E, N> Event<&P, E, N> {
     /// Clones the provider and returns a new event with the cloned provider.
-    pub fn with_cloned_provider(self) -> Event<T, P, E, N> {
+    pub fn with_cloned_provider(self) -> Event<P, E, N> {
         Event { provider: self.provider.clone(), filter: self.filter, _phantom: PhantomData }
     }
 }
@@ -223,7 +221,7 @@ impl<E: SolEvent> EventPoller<E> {
 fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
     let log_data: &LogData = log.as_ref();
 
-    E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data, false)
+    E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data)
 }
 
 #[cfg(feature = "pubsub")]
@@ -317,12 +315,12 @@ mod tests {
         let wallet = EthereumWallet::from(pk);
         let provider = alloy_provider::ProviderBuilder::new()
             .wallet(wallet.clone())
-            .on_http(anvil.endpoint_url());
+            .connect_http(anvil.endpoint_url());
 
         // let from = address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
 
@@ -425,11 +423,11 @@ mod tests {
         let wallet = EthereumWallet::from(pk);
         let provider = alloy_provider::ProviderBuilder::new()
             .wallet(wallet.clone())
-            .on_http(anvil.endpoint_url());
+            .connect_http(anvil.endpoint_url());
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
+        let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
             .address(*contract.address())
             .event_signature(MyContract::MyEvent::SIGNATURE_HASH);
         let all = event.query().await.unwrap();
@@ -486,7 +484,7 @@ mod tests {
                 .unwrap();
 
             let contract = MyContract::new(*contract.address(), &provider);
-            let event: Event<(), _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
+            let event: Event<_, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
                 .address(*contract.address())
                 .event_signature(MyContract::MyEvent::SIGNATURE_HASH);
 

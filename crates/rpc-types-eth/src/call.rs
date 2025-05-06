@@ -119,8 +119,7 @@ impl<'de> serde::Deserialize<'de> for TransactionIndex {
         match isize::deserialize(deserializer)? {
             -1 => Ok(Self::All),
             idx if idx < -1 => Err(serde::de::Error::custom(format!(
-                "Invalid transaction index, expected -1 or positive integer, got {}",
-                idx
+                "Invalid transaction index, expected -1 or positive integer, got {idx}"
             ))),
             idx => Ok(Self::Index(idx as usize)),
         }

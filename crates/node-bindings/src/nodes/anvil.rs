@@ -1,6 +1,7 @@
 //! Utilities for launching an Anvil instance.
 
 use crate::NodeError;
+use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
 use alloy_signer::Signer;
@@ -197,7 +198,7 @@ impl Anvil {
         self
     }
 
-    /// Sets the path for the the ipc server
+    /// Sets the path for the ipc server
     pub fn ipc_path(mut self, path: impl Into<String>) -> Self {
         self.ipc_path = Some(path.into());
         self
@@ -245,6 +246,58 @@ impl Anvil {
     pub fn fork<T: Into<String>>(mut self, fork: T) -> Self {
         self.fork = Some(fork.into());
         self
+    }
+
+    /// Select the [`EthereumHardfork`] to start anvil with.
+    pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
+        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Paris`].
+    pub fn paris(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Paris);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Cancun`].
+    pub fn cancun(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Cancun);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Shanghai`].
+    pub fn shanghai(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Shanghai);
+        self
+    }
+
+    /// Set the [`EthereumHardfork`] to [`EthereumHardfork::Prague`].
+    pub fn prague(mut self) -> Self {
+        self = self.hardfork(EthereumHardfork::Prague);
+        self
+    }
+
+    /// Instantiate `anvil` with the `--odyssey` flag.
+    pub fn odyssey(mut self) -> Self {
+        self = self.arg("--odyssey");
+        self
+    }
+
+    /// Adds an argument to pass to the `anvil`.
+    pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
+        self.args.push(arg.into());
+    }
+
+    /// Adds multiple arguments to pass to the `anvil`.
+    pub fn extend_args<I, S>(&mut self, args: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self.push_arg(arg);
+        }
     }
 
     /// Adds an argument to pass to the `anvil`.
@@ -379,21 +432,13 @@ impl Anvil {
             }
 
             if !private_keys.is_empty() {
-                let (default, remaining) = private_keys.split_first().unwrap();
-                let pks = remaining
-                    .iter()
-                    .map(|key| {
-                        let mut signer = LocalSigner::from(key.clone());
-                        signer.set_chain_id(chain_id);
-                        signer
-                    })
-                    .collect::<Vec<_>>();
-
-                let mut default_signer = LocalSigner::from(default.clone());
-                default_signer.set_chain_id(chain_id);
-                let mut w = EthereumWallet::new(default_signer);
-
-                for pk in pks {
+                let mut private_keys = private_keys.iter().map(|key| {
+                    let mut signer = LocalSigner::from(key.clone());
+                    signer.set_chain_id(chain_id);
+                    signer
+                });
+                let mut w = EthereumWallet::new(private_keys.next().unwrap());
+                for pk in private_keys {
                     w.register_signer(pk);
                 }
                 wallet = Some(w);

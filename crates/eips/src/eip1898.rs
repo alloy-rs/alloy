@@ -542,7 +542,7 @@ impl<'de> serde::Deserialize<'de> for BlockId {
                     }
                 }
 
-                #[allow(clippy::option_if_let_else)]
+                #[expect(clippy::option_if_let_else)]
                 if let Some(number) = number {
                     Ok(number.into())
                 } else if let Some(block_hash) = block_hash {
@@ -794,8 +794,8 @@ impl Decodable for HashOrNumber {
 impl fmt::Display for HashOrNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Hash(hash) => write!(f, "{}", hash),
-            Self::Number(num) => write!(f, "{}", num),
+            Self::Hash(hash) => write!(f, "{hash}"),
+            Self::Number(num) => write!(f, "{num}"),
         }
     }
 }

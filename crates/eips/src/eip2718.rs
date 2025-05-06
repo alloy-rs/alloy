@@ -5,6 +5,7 @@
 use crate::alloc::vec::Vec;
 use alloy_primitives::{keccak256, Bytes, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
+use auto_impl::auto_impl;
 use core::fmt;
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
@@ -82,7 +83,7 @@ impl core::error::Error for Eip2718Error {}
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Decodable2718: Sized {
     /// Extract the type byte from the buffer, if any. The type byte is the
-    /// first byte, provided that that first byte is 0x7f or lower.
+    /// first byte, provided that first byte is 0x7f or lower.
     fn extract_type_byte(buf: &mut &[u8]) -> Option<u8> {
         buf.first().copied().filter(|b| *b <= TX_TYPE_BYTE_MAX)
     }
@@ -178,6 +179,7 @@ pub trait Decodable2718: Sized {
 /// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+#[auto_impl(&)]
 pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     /// Return the type flag (if any).
     ///
@@ -224,6 +226,7 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     }
 
     /// Seal the encodable, by encoding and hashing it.
+    #[auto_impl(keep_default_for(&))]
     fn seal(self) -> Sealed<Self> {
         let hash = self.trie_hash();
         Sealed::new_unchecked(self, hash)
@@ -399,4 +402,10 @@ impl<L: Typed2718, R: Typed2718> Typed2718 for either::Either<L, R> {
             Self::Right(r) => r.ty(),
         }
     }
+}
+
+/// Trait for checking if a transaction envelope supports a given EIP-2718 type ID.
+pub trait IsTyped2718 {
+    /// Returns true if the given type ID corresponds to a supported typed transaction.
+    fn is_type(type_id: u8) -> bool;
 }

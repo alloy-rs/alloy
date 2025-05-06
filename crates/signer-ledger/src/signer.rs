@@ -2,9 +2,7 @@
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{
-    hex, normalize_v, Address, ChainId, PrimitiveSignature as Signature, SignatureError, B256,
-};
+use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
@@ -33,13 +31,13 @@ pub struct LedgerSigner {
 }
 
 // Required for IntoSigner
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 unsafe impl Send for LedgerSigner {}
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 unsafe impl Sync for LedgerSigner {}
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl alloy_network::TxSigner<Signature> for LedgerSigner {
     fn address(&self) -> Address {
         self.address
@@ -85,8 +83,8 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for LedgerSigner {
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(

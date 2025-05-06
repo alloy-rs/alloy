@@ -25,6 +25,7 @@ workspace = true
 [dependencies]
 alloy-network.workspace = true
 alloy-network-primitives.workspace = true
+alloy-consensus.workspace = true
 alloy-provider.workspace = true
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-transport.workspace = true
@@ -41,7 +42,6 @@ thiserror.workspace = true
 alloy-pubsub = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-consensus.workspace = true
 alloy-rpc-client = { workspace = true, features = ["pubsub", "ws"] }
 alloy-transport-http.workspace = true
 alloy-node-bindings.workspace = true

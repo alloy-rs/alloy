@@ -1,8 +1,7 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_consensus::{SignableTransaction, TxEip1559};
 use alloy_primitives::{
-    hex, normalize_v, Address, ChainId, PrimitiveSignature as Signature, SignatureError, TxKind,
-    B256, U256,
+    hex, normalize_v, Address, ChainId, Signature, SignatureError, TxKind, B256, U256,
 };
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
@@ -36,8 +35,8 @@ impl fmt::Debug for TrezorSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for TrezorSigner {
     #[inline]
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
@@ -67,8 +66,8 @@ impl Signer for TrezorSigner {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl alloy_network::TxSigner<Signature> for TrezorSigner {
     fn address(&self) -> Address {
         self.address
@@ -192,7 +191,7 @@ impl TrezorSigner {
         let data = tx.input().to_vec();
         let chain_id = tx.chain_id();
 
-        // TODO: Uncomment once dyn trait upcasting is stable
+        // TODO(MSRV-1.86): Uncomment once dyn trait upcasting is stable
         /*
         let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
         */

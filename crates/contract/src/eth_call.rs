@@ -14,7 +14,7 @@ use alloy_sol_types::SolCall;
 /// Raw coder.
 const RAW_CODER: () = ();
 
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Function {}
@@ -70,7 +70,7 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub fn overrides(mut self, overrides: StateOverride) -> Self {
+    pub fn overrides(mut self, overrides: impl Into<StateOverride>) -> Self {
         self.inner = self.inner.overrides(overrides);
         self
     }
@@ -86,7 +86,7 @@ where
         self.inner = self.inner.account_override(address, account_overrides);
         self
     }
-    /// Extends the the given [AccountOverride] to the state override.
+    /// Extends the given [AccountOverride] to the state override.
     ///
     /// Creates a new [`StateOverride`] if none has been set yet.
     pub fn account_overrides(
@@ -131,7 +131,7 @@ where
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub struct EthCallFut<'coder, D, N>
 where
     N: Network,
@@ -156,7 +156,7 @@ where
         let pin = std::pin::pin!(&mut this.inner);
         match pin.poll(cx) {
             std::task::Poll::Ready(Ok(data)) => {
-                std::task::Poll::Ready(this.decoder.abi_decode_output(data, false))
+                std::task::Poll::Ready(this.decoder.abi_decode_output(data))
             }
             std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Err(e.into())),
             std::task::Poll::Pending => std::task::Poll::Pending,
@@ -179,7 +179,7 @@ pub trait CallDecoder: private::Sealed {
 
     /// Decodes the output of a contract function.
     #[doc(hidden)]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput>;
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput>;
 
     #[doc(hidden)]
     fn as_debug_field(&self) -> impl std::fmt::Debug;
@@ -189,9 +189,8 @@ impl CallDecoder for Function {
     type CallOutput = Vec<DynSolValue>;
 
     #[inline]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
-        FunctionExt::abi_decode_output(self, &data, validate)
-            .map_err(|e| Error::decode(&self.name, &data, e))
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput> {
+        FunctionExt::abi_decode_output(self, &data).map_err(|e| Error::decode(&self.name, &data, e))
     }
 
     #[inline]
@@ -204,9 +203,8 @@ impl<C: SolCall> CallDecoder for PhantomData<C> {
     type CallOutput = C::Return;
 
     #[inline]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
-        C::abi_decode_returns(&data, validate)
-            .map_err(|e| Error::decode(C::SIGNATURE, &data, e.into()))
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput> {
+        C::abi_decode_returns(&data).map_err(|e| Error::decode(C::SIGNATURE, &data, e.into()))
     }
 
     #[inline]
@@ -219,7 +217,7 @@ impl CallDecoder for () {
     type CallOutput = Bytes;
 
     #[inline]
-    fn abi_decode_output(&self, data: Bytes, _validate: bool) -> Result<Self::CallOutput> {
+    fn abi_decode_output(&self, data: Bytes) -> Result<Self::CallOutput> {
         Ok(data)
     }
 

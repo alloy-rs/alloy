@@ -14,10 +14,10 @@ use std::{
 use tower::{Layer, Service};
 use tracing::trace;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 use tokio::time::sleep;
 
 /// The default average cost of a request in compute units (CU).
@@ -206,8 +206,7 @@ where
                     rate_limit_retry_number += 1;
                     if rate_limit_retry_number > this.max_rate_limit_retries {
                         return Err(TransportErrorKind::custom_str(&format!(
-                            "Max retries exceeded {}",
-                            err
+                            "Max retries exceeded {err}"
                         )));
                     }
                     trace!(%err, "retrying request");

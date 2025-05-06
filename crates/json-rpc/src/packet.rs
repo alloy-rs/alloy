@@ -1,4 +1,4 @@
-use crate::{ErrorPayload, Id, Response, SerializedRequest};
+use crate::{ErrorPayload, Id, Response, ResponsePayload, SerializedRequest};
 use alloy_primitives::map::HashSet;
 use serde::{
     de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
@@ -45,6 +45,22 @@ impl RequestPacket {
     /// Create a new empty packet with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self::Batch(Vec::with_capacity(capacity))
+    }
+
+    /// Returns the [`SerializedRequest`] if this packet is [`ResponsePacket::Single`]
+    pub const fn as_single(&self) -> Option<&SerializedRequest> {
+        match self {
+            Self::Single(req) => Some(req),
+            Self::Batch(_) => None,
+        }
+    }
+
+    /// Returns the batch of [`SerializedRequest`] if this packet is [`ResponsePacket::Batch`]
+    pub fn as_batch(&self) -> Option<&[SerializedRequest]> {
+        match self {
+            Self::Batch(req) => Some(req.as_slice()),
+            Self::Single(_) => None,
+        }
     }
 
     /// Serialize the packet as a boxed [`RawValue`].
@@ -95,6 +111,19 @@ impl RequestPacket {
                 self.push(req);
             }
         }
+    }
+
+    /// Returns a all [`SerializedRequest`].
+    pub fn requests(&self) -> &[SerializedRequest] {
+        match self {
+            Self::Single(req) => std::slice::from_ref(req),
+            Self::Batch(req) => req.as_slice(),
+        }
+    }
+
+    /// Returns an iterator over the requests' method names
+    pub fn method_names(&self) -> impl Iterator<Item = &str> + '_ {
+        self.requests().iter().map(|req| req.method())
     }
 }
 
@@ -212,6 +241,27 @@ impl BorrowedResponsePacket<'_> {
 }
 
 impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
+    /// Returns the [`Response`] if this packet is [`ResponsePacket::Single`].
+    pub const fn as_single(&self) -> Option<&Response<Payload, ErrData>> {
+        match self {
+            Self::Single(resp) => Some(resp),
+            Self::Batch(_) => None,
+        }
+    }
+
+    /// Returns the batch of [`Response`] if this packet is [`ResponsePacket::Batch`].
+    pub fn as_batch(&self) -> Option<&[Response<Payload, ErrData>]> {
+        match self {
+            Self::Batch(resp) => Some(resp.as_slice()),
+            Self::Single(_) => None,
+        }
+    }
+
+    /// Returns the [`ResponsePayload`] if this packet is [`ResponsePacket::Single`].
+    pub fn single_payload(&self) -> Option<&ResponsePayload<Payload, ErrData>> {
+        self.as_single().map(|resp| &resp.payload)
+    }
+
     /// Returns `true` if the response payload is a success.
     ///
     /// For batch responses, this returns `true` if __all__ responses are successful.
@@ -245,6 +295,44 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
             Self::Single(single) => ResponsePacketErrorsIter::Single(Some(single)),
             Self::Batch(batch) => ResponsePacketErrorsIter::Batch(batch.iter()),
         }
+    }
+
+    /// Returns the first error code in this packet if it contains any error responses.
+    pub fn first_error_code(&self) -> Option<i64> {
+        self.as_error().map(|error| error.code)
+    }
+
+    /// Returns the first error message in this packet if it contains any error responses.
+    pub fn first_error_message(&self) -> Option<&str> {
+        self.as_error().map(|error| error.message.as_ref())
+    }
+
+    /// Returns the first error data in this packet if it contains any error responses.
+    pub fn first_error_data(&self) -> Option<&ErrData> {
+        self.as_error().and_then(|error| error.data.as_ref())
+    }
+
+    /// Returns a all [`Response`].
+    pub fn responses(&self) -> &[Response<Payload, ErrData>] {
+        match self {
+            Self::Single(req) => std::slice::from_ref(req),
+            Self::Batch(req) => req.as_slice(),
+        }
+    }
+
+    /// Returns an iterator over the responses' payloads.
+    pub fn payloads(&self) -> impl Iterator<Item = &ResponsePayload<Payload, ErrData>> + '_ {
+        self.responses().iter().map(|resp| &resp.payload)
+    }
+
+    /// Returns the first [`ResponsePayload`] in this packet.
+    pub fn first_payload(&self) -> Option<&ResponsePayload<Payload, ErrData>> {
+        self.payloads().next()
+    }
+
+    /// Returns an iterator over the responses' identifiers.
+    pub fn response_ids(&self) -> impl Iterator<Item = &Id> + '_ {
+        self.responses().iter().map(|resp| &resp.id)
     }
 
     /// Find responses by a list of IDs.

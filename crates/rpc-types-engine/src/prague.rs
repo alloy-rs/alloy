@@ -8,6 +8,7 @@ use alloy_primitives::B256;
 /// object.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct PraguePayloadFields {
     /// EIP-7685 requests.
     pub requests: RequestsOrHash,
@@ -23,6 +24,7 @@ impl PraguePayloadFields {
 /// A container type for [PraguePayloadFields] that may or may not be present.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct MaybePraguePayloadFields {
     fields: Option<PraguePayloadFields>,
 }

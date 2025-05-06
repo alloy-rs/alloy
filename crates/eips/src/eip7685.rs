@@ -92,7 +92,17 @@ impl Requests {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
 
-        let mut requests: Vec<_> = self.0.iter().filter(|req| !req.is_empty()).collect();
+        let mut requests: Vec<_> = self
+            .0
+            .iter()
+            .filter(|req| {
+                // filter out all requests that are empty or only have the type byte
+                // <type-id> <data>
+                req.len() > 1
+            })
+            .collect();
+
+        // requests should only contain unique types: `id [r1,r2,..]`
         requests.sort_unstable_by_key(|req| {
             // SAFETY: only includes non-empty requests
             req[0]
@@ -119,6 +129,8 @@ impl Requests {
 /// needed to simulate the presence of requests without holding actual data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum RequestsOrHash {
     /// Stores a list of requests, allowing for dynamic requests hash calculation.
     Requests(Requests),
@@ -152,6 +164,16 @@ impl RequestsOrHash {
             Self::Requests(requests) => Some(requests),
             Self::Hash(_) => None,
         }
+    }
+
+    /// Returns `true` if the variant is a list of requests.
+    pub const fn is_requests(&self) -> bool {
+        matches!(self, Self::Requests(_))
+    }
+
+    /// Returns `true` if the variant is a precomputed hash.
+    pub const fn is_hash(&self) -> bool {
+        matches!(self, Self::Hash(_))
     }
 }
 

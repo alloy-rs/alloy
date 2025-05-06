@@ -7,9 +7,9 @@
 //! If you find yourself importing this crate, and you are not implementing a
 //! JSON-RPC client or transport, you are likely at the wrong layer of
 //! abstraction. If you want to _use_ a JSON-RPC client, consider using the
-//! [`alloy-transports`] crate.
+//! [`alloy-transport`] crate.
 //!
-//! [`alloy-transports`]: https://docs.rs/alloy-transports/latest/alloy-transports
+//! [`alloy-transport`]: https://docs.rs/alloy-transport/latest/alloy_transport/
 //!
 //! ## Usage
 //!
@@ -129,7 +129,7 @@ pub trait RpcRecv: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
 impl<T> RpcRecv for T where T: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
-/// An object that can be received over RPC, borrowing from the the
+/// An object that can be received over RPC, borrowing from the
 /// deserialization context.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is

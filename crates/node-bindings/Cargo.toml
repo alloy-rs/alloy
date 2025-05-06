@@ -28,6 +28,7 @@ alloy-genesis.workspace = true
 alloy-network.workspace = true
 alloy-signer-local.workspace = true
 alloy-signer.workspace = true
+alloy-hardforks.workspace = true
 k256.workspace = true
 rand.workspace = true
 serde_json = { workspace = true, features = ["std"] }
@@ -35,6 +36,7 @@ tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 url.workspace = true
+
 
 [dev-dependencies]
 ci_info.workspace = true

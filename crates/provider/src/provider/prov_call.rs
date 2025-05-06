@@ -11,11 +11,11 @@ use std::{
 };
 use tokio::sync::oneshot;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_family = "wasm"))]
 /// Boxed future type used in [`ProviderCall`] for non-wasm targets.
 pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 /// Boxed future type used in [`ProviderCall`] for wasm targets.
 pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>>>>;
 /// The primary future type for the [`Provider`].

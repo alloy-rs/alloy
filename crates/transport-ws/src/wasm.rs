@@ -6,19 +6,45 @@ use futures::{
     stream::{Fuse, StreamExt},
 };
 use serde_json::value::RawValue;
+use std::time::Duration;
 use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 
 /// Simple connection info for the websocket.
 #[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
-    pub url: String,
+    url: String,
+    /// Max number of retries before failing and exiting the connection.
+    /// Default is 10.
+    max_retries: u32,
+    /// The interval between retries.
+    /// Default is 3 seconds.
+    retry_interval: Duration,
 }
 
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
-        Self { url: url.into() }
+        Self { url: url.into(), max_retries: 10, retry_interval: Duration::from_secs(3) }
+    }
+
+    /// Sets the max number of retries before failing and exiting the connection.
+    /// Default is 10.
+    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// Sets the interval between retries.
+    /// Default is 3 seconds.
+    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
+        self.retry_interval = retry_interval;
+        self
+    }
+
+    /// Get the URL string of the connection.
+    pub fn url(&self) -> &str {
+        &self.url
     }
 }
 
@@ -36,13 +62,13 @@ impl PubSubConnect for WsConnect {
 
         backend.spawn();
 
-        Ok(handle)
+        Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
     }
 }
 
 impl WsBackend<Fuse<WsStream>> {
     /// Handle a message from the websocket.
-    #[allow(clippy::result_unit_err)]
+    #[expect(clippy::result_unit_err)]
     pub fn handle(&mut self, item: WsMessage) -> Result<(), ()> {
         match item {
             WsMessage::Text(text) => self.handle_text(&text),

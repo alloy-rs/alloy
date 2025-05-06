@@ -315,6 +315,11 @@ impl<R> ReceiptWithBloom<R> {
     pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
     }
+
+    /// Returns a reference to the bloom.
+    pub const fn bloom_ref(&self) -> &Bloom {
+        &self.logs_bloom
+    }
 }
 
 impl<L> ReceiptWithBloom<Receipt<L>> {
@@ -381,6 +386,109 @@ where
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self { receipt: R::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
+    }
+}
+
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(crate) mod serde_bincode_compat {
+    use alloc::borrow::Cow;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::Receipt`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, Receipt};
+    /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+    ///     #[serde_as(as = "serde_bincode_compat::Receipt<'_, T>")]
+    ///     receipt: Receipt<T>,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct Receipt<'a, T: Clone = alloy_primitives::Log> {
+        logs: Cow<'a, [T]>,
+        status: bool,
+        cumulative_gas_used: u64,
+    }
+
+    impl<'a, T: Clone> From<&'a super::Receipt<T>> for Receipt<'a, T> {
+        fn from(value: &'a super::Receipt<T>) -> Self {
+            Self {
+                logs: Cow::Borrowed(&value.logs),
+                // OP has no post state root variant
+                status: value.status.coerce_status(),
+                cumulative_gas_used: value.cumulative_gas_used,
+            }
+        }
+    }
+
+    impl<'a, T: Clone> From<Receipt<'a, T>> for super::Receipt<T> {
+        fn from(value: Receipt<'a, T>) -> Self {
+            Self {
+                status: value.status.into(),
+                cumulative_gas_used: value.cumulative_gas_used,
+                logs: value.logs.into_owned(),
+            }
+        }
+    }
+
+    impl<T: Serialize + Clone> SerializeAs<super::Receipt<T>> for Receipt<'_, T> {
+        fn serialize_as<S>(source: &super::Receipt<T>, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Receipt::<'_, T>::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de, T: Deserialize<'de> + Clone> DeserializeAs<'de, super::Receipt<T>> for Receipt<'de, T> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::Receipt<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Receipt::<'_, T>::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::{serde_bincode_compat, Receipt};
+        use alloy_primitives::Log;
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::Rng;
+        use serde::{de::DeserializeOwned, Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_receipt_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data<T: Serialize + DeserializeOwned + Clone + 'static> {
+                #[serde_as(as = "serde_bincode_compat::Receipt<'_,T>")]
+                receipt: Receipt<T>,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut data = Data {
+                receipt: Receipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
+            };
+            // ensure we don't have an invalid poststate variant
+            data.receipt.status = data.receipt.status.coerce_status().into();
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data<Log>, _>(&encoded, config::legacy())
+                    .unwrap();
+            assert_eq!(decoded, data);
+        }
     }
 }
 

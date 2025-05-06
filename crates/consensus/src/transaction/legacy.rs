@@ -1,9 +1,12 @@
-use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
-use alloc::vec::Vec;
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
-use alloy_primitives::{
-    keccak256, Bytes, ChainId, PrimitiveSignature as Signature, TxKind, B256, U256,
+use crate::{
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
+    SignableTransaction, Signed, Transaction, TxType,
 };
+use alloc::vec::Vec;
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
@@ -55,8 +58,8 @@ pub struct TxLegacy {
     /// in the case of contract creation, as an endowment
     /// to the newly created account; formally Tv.
     pub value: U256,
-    /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-    /// Some). pub init: An unlimited size byte array specifying the
+    /// Input has two uses depending if `to` field is Create or Call.
+    /// pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
     /// data: An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
@@ -108,9 +111,7 @@ impl TxLegacy {
 
 // Legacy transaction network and 2718 encodings are identical to the RLP
 // encoding.
-impl RlpEcdsaTx for TxLegacy {
-    const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
-
+impl RlpEcdsaEncodableTx for TxLegacy {
     fn rlp_encoded_fields_length(&self) -> usize {
         self.nonce.length()
             + self.gas_price.length()
@@ -168,6 +169,16 @@ impl RlpEcdsaTx for TxLegacy {
         self.rlp_encode_signed(signature, out);
     }
 
+    fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
+        let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
+        self.rlp_encode_signed(signature, &mut buf);
+        keccak256(&buf)
+    }
+}
+
+impl RlpEcdsaDecodableTx for TxLegacy {
+    const DEFAULT_TX_TYPE: u8 = { Self::TX_TYPE as u8 };
+
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             nonce: Decodable::decode(buf)?,
@@ -222,12 +233,6 @@ impl RlpEcdsaTx for TxLegacy {
         _ty: u8,
     ) -> alloy_eips::eip2718::Eip2718Result<Signed<Self>> {
         Self::rlp_decode_signed(buf).map_err(Into::into)
-    }
-
-    fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
-        let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
-        self.rlp_encode_signed(signature, &mut buf);
-        keccak256(&buf)
     }
 }
 
@@ -337,16 +342,17 @@ impl SignableTransaction<Signature> for TxLegacy {
         // 'header length' + 'payload length'
         Header { list: true, payload_length }.length_with_payload()
     }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let hash = self.tx_hash(&signature);
-        Signed::new_unchecked(self, signature, hash)
-    }
 }
 
 impl Typed2718 for TxLegacy {
     fn ty(&self) -> u8 {
         TxType::Legacy as u8
+    }
+}
+
+impl IsTyped2718 for TxLegacy {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x00)
     }
 }
 
@@ -511,20 +517,39 @@ pub mod signed_legacy_serde {
     where
         D: serde::Deserializer<'de>,
     {
-        let SignedLegacy { tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
-        let (parity, chain_id) = from_eip155_value(signature.v.to())
-            .ok_or_else(|| serde::de::Error::custom("invalid EIP-155 signature parity value"))?;
+        let SignedLegacy { mut tx, signature, hash } = SignedLegacy::deserialize(deserializer)?;
 
-        // Note: some implementations always set the chain id in the response, so we only check if
-        // they differ if both are set.
-        if let Some((tx_chain_id, chain_id)) = tx.chain_id().zip(chain_id) {
-            if tx_chain_id != chain_id {
-                return Err(serde::de::Error::custom("chain id mismatch"));
+        // Optimism pre-Bedrock (and some other L2s) injected system transactions into the chain
+        // where the signature fields (v, r, s) are all zero.
+        // These transactions do not have a valid ECDSA signature, but are valid on-chain.
+        // See: https://github.com/alloy-rs/alloy/issues/2348
+        //
+        // Here, we detect (v=0, r=0, s=0) and treat them as system transactions,
+        // bypassing EIP-155 signature validation.
+        let is_fake_system_signature =
+            signature.r.is_zero() && signature.s.is_zero() && signature.v.is_zero();
+
+        let signature = if is_fake_system_signature {
+            Signature::new(U256::ZERO, U256::ZERO, false)
+        } else {
+            let (parity, chain_id) = from_eip155_value(signature.v.to()).ok_or_else(|| {
+                serde::de::Error::custom("invalid EIP-155 signature parity value")
+            })?;
+
+            // Note: some implementations always set the chain id in the response, so we only check
+            // if they differ if both are set.
+            if let Some((tx_chain_id, chain_id)) = tx.chain_id().zip(chain_id) {
+                if tx_chain_id != chain_id {
+                    return Err(serde::de::Error::custom("chain id mismatch"));
+                }
             }
-        }
-        let mut tx = tx.into_owned();
-        tx.chain_id = chain_id;
-        Ok(Signed::new_unchecked(tx, Signature::new(signature.r, signature.s, parity), hash))
+
+            // update the chain id from decoding the eip155 value
+            tx.to_mut().chain_id = chain_id;
+
+            Signature::new(signature.r, signature.s, parity)
+        };
+        Ok(Signed::new_unchecked(tx.into_owned(), signature, hash))
     }
 }
 
@@ -613,6 +638,7 @@ pub(super) mod serde_bincode_compat {
     #[cfg(test)]
     mod tests {
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -635,8 +661,9 @@ pub(super) mod serde_bincode_compat {
                     .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }
@@ -644,13 +671,12 @@ pub(super) mod serde_bincode_compat {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
+    use super::signed_legacy_serde;
     use crate::{
         transaction::{from_eip155_value, to_eip155_value},
         SignableTransaction, TxLegacy,
     };
-    use alloy_primitives::{
-        address, b256, hex, Address, PrimitiveSignature as Signature, TxKind, B256, U256,
-    };
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
 
     #[test]
     fn recover_signer_legacy() {
@@ -683,7 +709,7 @@ mod tests {
     #[test]
     // Test vector from https://github.com/alloy-rs/alloy/issues/125
     fn decode_legacy_and_recover_signer() {
-        use crate::transaction::RlpEcdsaTx;
+        use crate::transaction::RlpEcdsaDecodableTx;
         let raw_tx = alloy_primitives::bytes!("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8");
 
         let tx = TxLegacy::rlp_decode_signed(&mut raw_tx.as_ref()).unwrap();
@@ -710,5 +736,44 @@ mod tests {
                 Some((true, Some(chain_id)))
             );
         }
+    }
+
+    #[test]
+    fn can_deserialize_system_transaction_with_zero_signature() {
+        let raw_tx = serde_json::json!({
+            "blockHash": "0x5307b5c812a067f8bc1ed1cc89d319ae6f9a0c9693848bd25c36b5191de60b85",
+            "blockNumber": "0x45a59bb",
+            "from": "0x0000000000000000000000000000000000000000",
+            "gas": "0x1e8480",
+            "gasPrice": "0x0",
+            "hash": "0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06",
+            "input": "0xcbd4ece900000000000000000000000032155c9d39084f040ba17890fe8134dbe2a0453f0000000000000000000000004a0126ee88018393b1ad2455060bc350ead9908a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000469f700000000000000000000000000000000000000000000000000000000000000644ff746f60000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002043e908a4e862aebb10e7e27db0b892b58a7e32af11d64387a414dabc327b00e200000000000000000000000000000000000000000000000000000000",
+            "nonce": "0x469f7",
+            "to": "0x4200000000000000000000000000000000000007",
+            "transactionIndex": "0x0",
+            "value": "0x0",
+            "v": "0x0",
+            "r": "0x0",
+            "s": "0x0",
+            "queueOrigin": "l1",
+            "l1TxOrigin": "0x36bde71c97b33cc4729cf772ae268934f7ab70b2",
+            "l1BlockNumber": "0xfd1a6c",
+            "l1Timestamp": "0x63e434ff",
+            "index": "0x45a59ba",
+            "queueIndex": "0x469f7",
+            "rawTransaction": "0xcbd4ece900000000000000000000000032155c9d39084f040ba17890fe8134dbe2a0453f0000000000000000000000004a0126ee88018393b1ad2455060bc350ead9908a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000469f700000000000000000000000000000000000000000000000000000000000000644ff746f60000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002043e908a4e862aebb10e7e27db0b892b58a7e32af11d64387a414dabc327b00e200000000000000000000000000000000000000000000000000000000"
+        });
+
+        let signed: crate::Signed<TxLegacy> = signed_legacy_serde::deserialize(raw_tx).unwrap();
+
+        assert_eq!(signed.signature().r(), U256::ZERO);
+        assert_eq!(signed.signature().s(), U256::ZERO);
+        assert!(!signed.signature().v());
+
+        assert_eq!(
+            signed.hash(),
+            &b256!("0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06"),
+            "hash should match the transaction hash"
+        );
     }
 }

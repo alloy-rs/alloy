@@ -12,13 +12,14 @@ workflows:
         # Check that `A` activates the features of `B`.
         "propagate-feature",
         # These are the features to check:
-        "--features=std,serde,ssz",
+        "--features=arbitrary,std,serde,ssz",
         # Do not try to add a new section into `[features]` of `A` only because `B` expose that feature. There are edge-cases where this is still needed, but we can add them manually.
         "--left-side-feature-missing=ignore",
         # Ignore the case that `A` it outside of the workspace. Otherwise it will report errors in external dependencies that we have no influence on.
         "--left-side-outside-workspace=ignore",
-        # limit to the workspace
-        "--workspace",
+        # Only check normal dependencies. 
+        # Propagating to dev-dependencies leads to compilation issues: https://github.com/alloy-rs/alloy/pull/2144#issuecomment-2702291349
+        "--dep-kinds=normal:check,dev:ignore",
         "--show-path",
         "--quiet",
       ]

@@ -1,19 +1,14 @@
 use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcObject, RpcSend};
+use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
-use alloy_primitives::{
-    keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256,
-};
-use alloy_rpc_types_eth::{
-    BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
-};
+use alloy_primitives::{keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256};
+use alloy_rpc_types_eth::{BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{io::BufReader, marker::PhantomData, num::NonZero, path::PathBuf, sync::Arc};
-
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
 /// In order to initialize the caching layer, the path to the cache file is provided along with the
@@ -28,7 +23,7 @@ pub struct CacheLayer {
 }
 
 impl CacheLayer {
-    /// Instantiate a new cache layer with the the maximum number of
+    /// Instantiate a new cache layer with the maximum number of
     /// items to store.
     pub fn new(max_items: u32) -> Self {
         Self { cache: SharedCache::new(max_items) }
@@ -138,8 +133,8 @@ macro_rules! cache_rpc_call_with_block {
     }};
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 impl<P, N> Provider<N> for CacheProvider<P, N>
 where
     P: Provider<N>,
@@ -150,44 +145,13 @@ where
         self.inner.root()
     }
 
-    async fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let req = RequestType::new("eth_getBlockByHash", (hash, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_hash(hash, kind)).await
-    }
-
-    async fn get_block_by_number(
-        &self,
-        number: BlockNumberOrTag,
-        kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<N::BlockResponse>> {
-        let full = match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        };
-
-        let req = RequestType::new("eth_getBlockByNumber", (number, full));
-
-        cache_get_or_fetch(&self.cache, req, self.inner.get_block_by_number(number, kind)).await
-    }
-
     fn get_block_receipts(
         &self,
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,));
 
-        let redirect =
-            !matches!(block, BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)));
+        let redirect = req.has_block_tag();
 
         if !redirect {
             let params_hash = req.params_hash().ok();
@@ -497,107 +461,14 @@ impl SharedCache {
     }
 }
 
-/// Attempts to fetch the response from the cache by using the hash of the
-/// request params.
-///
-/// In case of a cache miss, fetches from the RPC and saves the response to the
-/// cache.
-///
-/// This helps overriding [`Provider`] methods that return [`TransportResult<T>`].
-async fn cache_get_or_fetch<Params: RpcSend, Resp: RpcObject>(
-    cache: &SharedCache,
-    req: RequestType<Params>,
-    fetch_fn: impl std::future::Future<Output = TransportResult<Option<Resp>>>,
-) -> TransportResult<Option<Resp>> {
-    let hash = req.params_hash()?;
-    if let Some(cached) = cache.get_deserialized(&hash)? {
-        return Ok(Some(cached));
-    }
-
-    let result = fetch_fn.await?;
-    if let Some(ref data) = result {
-        let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
-        let _ = cache.put(hash, json_str)?;
-    }
-
-    Ok(result)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_network::{AnyNetwork, TransactionBuilder};
+    use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{bytes, hex, Bytes, FixedBytes};
     use alloy_rpc_types_eth::{BlockId, TransactionRequest};
-
-    #[tokio::test]
-    async fn test_get_block() {
-        run_with_tempdir("get-block", |dir| async move {
-            let cache_layer = CacheLayer::new(100);
-            let shared_cache = cache_layer.cache();
-            let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
-
-            let path = dir.join("rpc-cache-block.txt");
-            shared_cache.load_cache(path.clone()).unwrap();
-
-            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
-            assert_eq!(block, block2);
-
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            let latest_block =
-                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let latest_hash = latest_block.unwrap().header.hash;
-
-            let block3 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block4 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
-            assert_eq!(block3, block4);
-
-            shared_cache.save_cache(path).unwrap();
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn test_get_block_any_network() {
-        run_with_tempdir("get-block", |dir| async move {
-            let cache_layer = CacheLayer::new(100);
-            let shared_cache = cache_layer.cache();
-            let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new()
-                .network::<AnyNetwork>()
-                .layer(cache_layer)
-                .on_http(anvil.endpoint_url());
-
-            let path = dir.join("rpc-cache-block.txt");
-            shared_cache.load_cache(path.clone()).unwrap();
-
-            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
-            assert_eq!(block, block2);
-
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            let latest_block =
-                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let latest_hash = latest_block.unwrap().header.hash;
-
-            let block3 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-            let block4 =
-                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
-            assert_eq!(block3, block4);
-
-            shared_cache.save_cache(path).unwrap();
-        })
-        .await;
-    }
 
     #[tokio::test]
     async fn test_get_proof() {
@@ -605,7 +476,7 @@ mod tests {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).connect_http(anvil.endpoint_url());
 
             let from = anvil.addresses()[0];
             let path = dir.join("rpc-cache-proof.txt");
@@ -653,7 +524,7 @@ mod tests {
             let provider = ProviderBuilder::new()
                 .disable_recommended_fillers()
                 .layer(cache_layer)
-                .on_http(anvil.endpoint_url());
+                .connect_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-tx.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -687,7 +558,7 @@ mod tests {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).connect_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-block-receipts.txt");
             shared_cache.load_cache(path.clone()).unwrap();
@@ -721,7 +592,7 @@ mod tests {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
-            let provider = ProviderBuilder::default().with_gas_estimation().layer(cache_layer).on_anvil_with_wallet();
+            let provider = ProviderBuilder::new().disable_recommended_fillers().with_gas_estimation().layer(cache_layer).connect_anvil_with_wallet();
 
             let path = dir.join("rpc-cache-code.txt");
             shared_cache.load_cache(path.clone()).unwrap();

@@ -16,7 +16,7 @@ use crate::provider::multicall::bindings::IMulticall3::{
     aggregate3Call, aggregate3ValueCall, aggregateCall, getBasefeeCall, getBlockHashCall,
     getBlockNumberCall, getChainIdCall, getCurrentBlockCoinbaseCall, getCurrentBlockDifficultyCall,
     getCurrentBlockGasLimitCall, getCurrentBlockTimestampCall, getEthBalanceCall,
-    getLastBlockHashCall, tryAggregateCall, tryAggregateReturn,
+    getLastBlockHashCall, tryAggregateCall,
 };
 
 mod inner_types;
@@ -30,7 +30,7 @@ use tuple::TuplePush;
 pub use tuple::{CallTuple, Empty};
 
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
-pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a173976CA11");
+pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE2a173976CA11");
 
 /// A Multicall3 builder
 ///
@@ -57,7 +57,7 @@ pub const MULTICALL3_ADDRESS: Address = address!("cA11bde05977b3631167028862bE2a
 /// #[tokio::main]
 /// async fn main() {
 ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
 ///     let erc20 = ERC20::new(weth, &provider);
 ///
 ///     let ts_call = erc20.totalSupply();
@@ -137,7 +137,7 @@ where
     ///    let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
     ///    let usdc = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
     ///     
-    ///    let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///    let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///    let weth = ERC20::new(weth, &provider);
     ///    let usdc = ERC20::new(usdc, &provider);
     ///
@@ -177,6 +177,12 @@ where
         self
     }
 
+    /// Add a dynamic [`CallItem`] to the builder
+    pub fn add_call_dynamic(mut self, call: CallItem<D>) -> Self {
+        self.calls.push(call.to_call3_value());
+        self
+    }
+
     /// Extend the builder with a sequence of calls
     pub fn extend(
         mut self,
@@ -184,6 +190,14 @@ where
     ) -> Self {
         for item in items {
             self = self.add_dynamic(item);
+        }
+        self
+    }
+
+    /// Extend the builder with a sequence of [`CallItem`]s
+    pub fn extend_calls(mut self, calls: impl IntoIterator<Item = CallItem<D>>) -> Self {
+        for call in calls {
+            self = self.add_call_dynamic(call);
         }
         self
     }
@@ -229,13 +243,13 @@ where
     }
 
     /// Set the state overrides for the call.
-    pub fn overrides(mut self, state_override: StateOverride) -> Self {
-        self.state_override = Some(state_override);
+    pub fn overrides(mut self, state_override: impl Into<StateOverride>) -> Self {
+        self.state_override = Some(state_override.into());
         self
     }
 
     /// Appends a [`SolCall`] to the stack.
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn add<Item: MulticallItem>(self, item: Item) -> MulticallBuilder<T::Pushed, P, N>
     where
         Item::Decoder: 'static,
@@ -306,7 +320,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///     let erc20 = ERC20::new(weth, &provider);
     ///
     ///     let ts_call = erc20.totalSupply();
@@ -369,7 +383,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    ///     let provider = ProviderBuilder::new().on_http("https://eth.merkle.io".parse().unwrap());
+    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
     ///     let erc20 = ERC20::new(weth, &provider);
     ///
     ///     let ts_call = erc20.totalSupply();
@@ -391,8 +405,7 @@ where
             .collect::<Vec<_>>();
         let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
-        let tryAggregateReturn { returnData } = output;
-        T::decode_return_results(&returnData)
+        T::decode_return_results(&output)
     }
 
     /// Call the `aggregate3` function
@@ -432,7 +445,7 @@ where
             .collect::<Vec<_>>();
         let call = aggregate3Call { calls: calls.to_vec() };
         let output = self.build_and_call(call, None).await?;
-        T::decode_return_results(&output.returnData)
+        T::decode_return_results(&output)
     }
 
     /// Call the `aggregate3Value` function
@@ -466,7 +479,7 @@ where
         let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
         let call = aggregate3ValueCall { calls: self.calls.to_vec() };
         let output = self.build_and_call(call, Some(total_value)).await?;
-        T::decode_return_results(&output.returnData)
+        T::decode_return_results(&output)
     }
 
     /// Call the `blockAndAggregate` function
@@ -531,7 +544,7 @@ where
         }
 
         let res = eth_call.await.map_err(MulticallError::TransportError)?;
-        M::abi_decode_returns(&res, false).map_err(MulticallError::DecodeError)
+        M::abi_decode_returns(&res).map_err(MulticallError::DecodeError)
     }
 
     /// Add a call to get the block hash from a block number

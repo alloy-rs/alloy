@@ -24,6 +24,7 @@ workspace = true
 
 [dependencies]
 alloy-json-rpc.workspace = true
+alloy-primitives.workspace = true
 
 base64.workspace = true
 futures-utils-wasm.workspace = true
@@ -33,15 +34,23 @@ thiserror = { workspace = true, features = ["std"] }
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
+governor = { version = "0.8.1", default-features = false, features = [
+    "std",
+    "quanta",
+], optional = true }
+futures.workspace = true
+parking_lot.workspace = true
+derive_more.workspace = true
 
 # non-WASM only
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { workspace = true, features = ["rt", "time"] }
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { workspace = true, features = ["rt", "time","sync","macros"] }
 
 # WASM only
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
 wasmtimer.workspace = true
 
 [features]
 wasm-bindgen = ["dep:wasm-bindgen-futures"]
+throttle = ["dep:governor"]

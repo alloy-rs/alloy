@@ -9,6 +9,9 @@
 mod eth_calls;
 pub use eth_calls::*;
 
+mod flashblocks;
+pub use flashblocks::*;
+
 mod mev_calls;
 pub use mev_calls::*;
 

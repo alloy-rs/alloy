@@ -41,5 +41,6 @@ std = [
 	"alloy-serde/std",
 	"serde/std",
 	"alloy-trie/std",
-	"alloy-eips/std"
+	"alloy-eips/std",
+	"serde_json/std"
 ]
