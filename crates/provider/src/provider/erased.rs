@@ -134,7 +134,10 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_gas_price()
     }
 
-    fn get_account_info(&self, address: Address) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
         self.0.get_account_info(address)
     }
 

@@ -348,9 +348,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
-    /// Retrieves account information ([Account](alloy_rpc_types_eth::Account)) for the given [Address]
-    /// at the particular [BlockId].
-    fn get_account_info(&self, address: Address) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+    /// Retrieves account information ([Account](alloy_rpc_types_eth::Account)) for the given
+    /// [Address] at the particular [BlockId].
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
         self.client().request("eth_getAccountInfo", address).into()
     }
 
@@ -1299,11 +1302,12 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
-    use alloy_consensus::Transaction;
+    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
+    use alloy_consensus::{Transaction, TxEnvelope};
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::Anvil;
+    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
