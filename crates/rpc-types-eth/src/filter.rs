@@ -18,6 +18,7 @@ use itertools::{
 /// FilterSet is a set of values that will be used to filter logs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(from = "HashSet<T>"))]
 pub struct FilterSet<T: Eq + Hash> {
     set: HashSet<T>,
 
