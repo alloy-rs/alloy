@@ -392,8 +392,8 @@ where
         self.inner.get_gas_price()
     }
 
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
-        self.inner.get_account(address)
+    fn get_account_info(&self, address: Address) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+        self.inner.get_account_info(address)
     }
 
     fn get_balance(&self, address: Address) -> RpcWithBlock<Address, U256, U256> {

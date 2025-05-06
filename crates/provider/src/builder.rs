@@ -706,8 +706,8 @@ mod tests {
             .with_cached_nonce_management()
             .with_call_batching()
             .connect_http("http://localhost:8545".parse().unwrap());
-        let _ = provider.get_account(Default::default());
+        let _ = provider.get_account_info(Default::default());
         let provider = provider.erased();
-        let _ = provider.get_account(Default::default());
+        let _ = provider.get_account_info(Default::default());
     }
 }

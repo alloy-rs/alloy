@@ -10,8 +10,12 @@ pub use alloy_consensus::Account;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountInfo {
-    /// Account name
-    pub name: String,
+    /// Account balance
+    pub balance: U256,
+    /// Account nonce
+    pub nonce: u64,
+    /// Account code
+    pub code: Bytes,
 }
 
 /// Data structure with proof for one single storage-entry
