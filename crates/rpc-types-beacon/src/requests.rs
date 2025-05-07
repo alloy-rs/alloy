@@ -36,7 +36,7 @@ impl<'de> Deserialize<'de> for ExecutionRequestsV4 {
 
         let helper = Helper::deserialize(deserializer)?;
 
-        Ok(ExecutionRequestsV4 {
+        Ok(Self {
             deposits: helper.deposits.unwrap_or_default(),
             withdrawals: helper.withdrawals.unwrap_or_default(),
             consolidations: helper.consolidations.unwrap_or_default(),
