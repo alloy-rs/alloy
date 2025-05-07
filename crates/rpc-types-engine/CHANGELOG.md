@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Arbitrary Support for payload types ([#2392](https://github.com/alloy-rs/alloy/issues/2392))
 
+### Miscellaneous Tasks
+
+- Release 0.15.9
+
 ## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
 
 ### Miscellaneous Tasks

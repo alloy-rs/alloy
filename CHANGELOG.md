@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
+
+### Bug Fixes
+
+- Requests deserde nullable fields ([#2408](https://github.com/alloy-rs/alloy/issues/2408))
+
+### Documentation
+
+- Fix deprecated note ([#2403](https://github.com/alloy-rs/alloy/issues/2403))
+
+### Features
+
+- Add PendingTransactionBuilder::inspect ([#2405](https://github.com/alloy-rs/alloy/issues/2405))
+
+### Miscellaneous Tasks
+
+- Add `alloy-rpc-types-debug` to check_no_std ([#2401](https://github.com/alloy-rs/alloy/issues/2401))
+
+### Other
+
+- Propagate arb feature ([#2407](https://github.com/alloy-rs/alloy/issues/2407))
+
+### Styling
+
+- Introducing eth_getAccountInfo ([#2402](https://github.com/alloy-rs/alloy/issues/2402))
+- Make `alloy-rpc-types-debug` `no_std` compatible ([#2400](https://github.com/alloy-rs/alloy/issues/2400))
+- Chore : fix typos ([#2398](https://github.com/alloy-rs/alloy/issues/2398))
+
 ## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
 
 ### Documentation
@@ -20,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.15.9
 - SubmitBlockRequest enum ([#2391](https://github.com/alloy-rs/alloy/issues/2391))
 - Add default to blob schedule ([#2389](https://github.com/alloy-rs/alloy/issues/2389))
 
