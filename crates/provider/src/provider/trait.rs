@@ -350,6 +350,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Retrieves account information ([Account](alloy_rpc_types_eth::Account)) for the given
     /// [Address] at the particular [BlockId].
+    ///
+    /// Note: This is slightly different than `eth_getAccount` and not all clients support this
+    /// endpoint.
     fn get_account_info(
         &self,
         address: Address,
