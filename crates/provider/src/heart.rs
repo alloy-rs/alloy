@@ -125,6 +125,12 @@ impl<N: Network> PendingTransactionBuilder<N> {
         (self.provider, self.config)
     }
 
+    /// Calls a function with a reference to the value.
+    pub fn inspect<F: FnOnce(&Self)>(self, f: F) -> Self {
+        f(&self);
+        self
+    }
+
     /// Returns the transaction hash.
     #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &TxHash {
