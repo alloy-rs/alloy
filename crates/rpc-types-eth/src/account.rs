@@ -8,7 +8,6 @@ pub use alloy_consensus::Account;
 
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg(feature = "serde")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccountInfo {
