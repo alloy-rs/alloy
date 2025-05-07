@@ -29,9 +29,18 @@ pub struct BlobScheduleBlobParams {
 }
 
 impl BlobScheduleBlobParams {
+    /// Returns the blob schedule for the ethereum mainnet.
+    pub fn mainnet() -> Self {
+        Self {
+            cancun: BlobParams::cancun(),
+            prague: BlobParams::prague(),
+            scheduled: Default::default(),
+        }
+    }
+
     /// Returns the highest active blob parameters at the given timestamp.
     ///
-    /// Note: this does only scan the the entries scheduled by timestamp and not cancun or prague.
+    /// Note: this does only scan the entries scheduled by timestamp and not cancun or prague.
     pub fn active_scheduled_params_at_timestamp(&self, timestamp: u64) -> Option<&BlobParams> {
         self.scheduled.iter().rev().find(|(ts, _)| timestamp >= *ts).map(|(_, params)| params)
     }
@@ -71,5 +80,11 @@ impl BlobScheduleBlobParams {
             prague: prague.unwrap_or_else(BlobParams::prague),
             scheduled,
         }
+    }
+}
+
+impl Default for BlobScheduleBlobParams {
+    fn default() -> Self {
+        Self::mainnet()
     }
 }

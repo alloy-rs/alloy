@@ -6,7 +6,9 @@ use crate::{
     EthereumTxEnvelope, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702,
     TxLegacy, TxType,
 };
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
 use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
@@ -401,6 +403,12 @@ impl<Eip4844: Typed2718> Typed2718 for EthereumTypedTransaction<Eip4844> {
             Self::Eip4844(tx) => tx.ty(),
             Self::Eip7702(tx) => tx.ty(),
         }
+    }
+}
+
+impl<T> IsTyped2718 for EthereumTypedTransaction<T> {
+    fn is_type(type_id: u8) -> bool {
+        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 

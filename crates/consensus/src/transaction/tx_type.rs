@@ -1,6 +1,9 @@
 //! Contains the Ethereum transaction type identifier.
 
-use alloy_eips::{eip2718::Eip2718Error, Typed2718};
+use alloy_eips::{
+    eip2718::{Eip2718Error, IsTyped2718},
+    Typed2718,
+};
 use alloy_primitives::{U64, U8};
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
@@ -94,6 +97,12 @@ impl TxType {
     #[inline]
     pub const fn is_dynamic_fee(&self) -> bool {
         matches!(self, Self::Eip1559 | Self::Eip4844 | Self::Eip7702)
+    }
+}
+
+impl IsTyped2718 for TxType {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x0..=0x04)
     }
 }
 
