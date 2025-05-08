@@ -166,7 +166,7 @@ impl<N: Network> CallBatchMsg<N> {
 }
 
 impl<N: Network> CallBatchMsgKind<N> {
-    fn into_call3(self, m3a: Address) -> IMulticall3::Call3 {
+    fn to_call3(&self, m3a: Address) -> IMulticall3::Call3 {
         let m3a_call = |data: Vec<u8>| IMulticall3::Call3 {
             target: m3a,
             allowFailure: true,
@@ -180,7 +180,7 @@ impl<N: Network> CallBatchMsgKind<N> {
             },
             Self::BlockNumber => m3a_call(IMulticall3::getBlockNumberCall {}.abi_encode()),
             Self::ChainId => m3a_call(IMulticall3::getChainIdCall {}.abi_encode()),
-            Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr }.abi_encode()),
+            Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr: *addr }.abi_encode()),
         }
     }
 }
@@ -333,6 +333,8 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     async fn send_batch(&mut self) {
         let pending = std::mem::take(&mut self.pending);
 
+        // If there's only a single call, avoid batching and perform the request directly.
+        // Instead, execute the call directly and wrap the result in a Multicall3-style response.
         if pending.len() == 1 {
             let msg = pending.into_iter().next().unwrap();
 
@@ -385,7 +387,7 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         pending: &[CallBatchMsg<N>],
     ) -> TransportResult<Vec<IMulticall3::Result>> {
         let call3s: Vec<_> =
-            pending.iter().map(|msg| msg.kind.clone().into_call3(self.m3a)).collect();
+            pending.iter().map(|msg| msg.kind.to_call3(self.m3a)).collect();
 
         let tx = N::TransactionRequest::default()
             .with_to(self.m3a)
