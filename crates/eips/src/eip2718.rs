@@ -409,3 +409,35 @@ pub trait IsTyped2718 {
     /// Returns true if the given type ID corresponds to a supported typed transaction.
     fn is_type(type_id: u8) -> bool;
 }
+
+impl<L, R> IsTyped2718 for either::Either<L, R>
+where
+    L: IsTyped2718,
+    R: IsTyped2718,
+{
+    fn is_type(type_id: u8) -> bool {
+        L::is_type(type_id) || R::is_type(type_id)
+    }
+}
+
+impl<L, R> Decodable2718 for either::Either<L, R>
+where
+    L: Decodable2718 + IsTyped2718,
+    R: Decodable2718,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if L::is_type(ty) {
+            let envelope = L::typed_decode(ty, buf)?;
+            Ok(Self::Left(envelope))
+        } else {
+            let other = R::typed_decode(ty, buf)?;
+            Ok(Self::Right(other))
+        }
+    }
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if buf.is_empty() {
+            return Err(Eip2718Error::RlpError(alloy_rlp::Error::InputTooShort));
+        }
+        L::fallback_decode(buf).map(Self::Left)
+    }
+}
