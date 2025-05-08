@@ -1588,7 +1588,7 @@ mod tests {
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
                 eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip7702(_)));
-            
+
             // as create tx
             let eip4844_request = TransactionRequest {
                 to: Some(TxKind::Create),
