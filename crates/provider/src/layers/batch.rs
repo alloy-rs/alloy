@@ -180,7 +180,9 @@ impl<N: Network> CallBatchMsgKind<N> {
             },
             Self::BlockNumber => m3a_call(IMulticall3::getBlockNumberCall {}.abi_encode()),
             Self::ChainId => m3a_call(IMulticall3::getChainIdCall {}.abi_encode()),
-            Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr: *addr }.abi_encode()),
+            Self::Balance(addr) => {
+                m3a_call(IMulticall3::getEthBalanceCall { addr: *addr }.abi_encode())
+            }
         }
     }
 }
@@ -386,8 +388,7 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         &self,
         pending: &[CallBatchMsg<N>],
     ) -> TransportResult<Vec<IMulticall3::Result>> {
-        let call3s: Vec<_> =
-            pending.iter().map(|msg| msg.kind.to_call3(self.m3a)).collect();
+        let call3s: Vec<_> = pending.iter().map(|msg| msg.kind.to_call3(self.m3a)).collect();
 
         let tx = N::TransactionRequest::default()
             .with_to(self.m3a)
