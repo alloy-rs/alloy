@@ -342,7 +342,7 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
                     .call(tx)
                     .await
                     .map(|res| IMulticall3::Result { success: true, returnData: res }),
-                    CallBatchMsgKind::BlockNumber => {
+                CallBatchMsgKind::BlockNumber => {
                     self.inner.get_block_number().into_future().await.map(|res| {
                         IMulticall3::Result { success: true, returnData: res.abi_encode().into() }
                     })
@@ -555,7 +555,7 @@ mod tests {
         provider.anvil_set_code(COUNTER_ADDRESS, COUNTER_DEPLOYED_CODE.into()).await.unwrap();
         provider.anvil_set_balance(COUNTER_ADDRESS, U256::from(123)).await.unwrap();
 
-        let do_calls = || async {	
+        let do_calls = || async {
             tokio::join!(
                 provider.call(
                     TransactionRequest::default()
