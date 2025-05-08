@@ -200,6 +200,19 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
 
+    /// Fills in the transaction request and try to convert it to an envelope.
+    fn fill_envelope(
+        &self,
+        fillable: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> impl_future!(<Output = TransportResult<N::TxEnvelope>>) {
+        async move {
+            let tx = self.fill(fillable, tx).await?;
+            let envelope = tx.try_into_envelope().map_err(/* Not sure where to create the new error type */)?;
+            Ok(envelope)
+        }
+    }
+
     /// Prepares and fills the transaction request with the fillable properties.
     fn prepare_and_fill<P>(
         &self,
