@@ -108,7 +108,7 @@ pub trait Decodable2718: Sized {
     /// decoder.
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self>;
 
-    /// Encode the transaction according to [EIP-2718] rules. First a 1-byte
+    /// Decode the transaction according to [EIP-2718] rules. First a 1-byte
     /// type flag in the range 0x0-0x7f, then the body of the transaction.
     ///
     /// [EIP-2718] inner encodings are unspecified, and produce an opaque
