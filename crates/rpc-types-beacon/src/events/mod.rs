@@ -89,7 +89,7 @@ pub struct PayloadAttributesEvent {
 /// compute_start_slot_at_epoch(epoch) - 1)`. Both dependent roots use the genesis block root in the
 /// case of underflow.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeadEvent {
     /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
@@ -112,7 +112,7 @@ pub struct HeadEvent {
 ///
 /// The node has received a valid block (from P2P or API)
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockEvent {
     /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
@@ -150,7 +150,7 @@ pub struct VoluntaryExitEvent {
 
 /// Represents a voluntary exit message in the beacon chain.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoluntaryExitMessage {
     /// The epoch of the voluntary exit, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
@@ -188,7 +188,7 @@ pub struct BlsToExecutionChangeMessage {
 ///
 /// Finalized checkpoint has been updated
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedCheckpointEvent {
     /// The block associated with the event.
     pub block: B256,
@@ -205,7 +205,7 @@ pub struct FinalizedCheckpointEvent {
 ///
 /// The node has reorganized its chain
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainReorgEvent {
     /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]

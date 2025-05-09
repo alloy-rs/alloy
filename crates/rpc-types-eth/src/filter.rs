@@ -183,7 +183,7 @@ impl From<[u8; 32]> for Topic {
 }
 
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum FilterBlockError {
     /// Error indicating that the `from_block` is greater than the `to_block`.
     #[error("`from_block` ({from}) is greater than `to_block` ({to})")]

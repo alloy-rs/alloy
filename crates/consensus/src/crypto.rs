@@ -1,7 +1,7 @@
 //! Cryptographic algorithms
 
 /// Opaque error type for sender recovery.
-#[derive(Debug, Default, thiserror::Error)]
+#[derive(Debug, Clone, Copy, Default, thiserror::Error)]
 #[error("Failed to recover the signer")]
 pub struct RecoveryError;
 

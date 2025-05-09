@@ -13,12 +13,13 @@ repository = "https://github.com/alloy-rs/alloy"
 exclude = ["benches/", "tests/"]
 
 [workspace.lints.rust]
+missing_copy_implementations = "warn"
 missing-debug-implementations = "warn"
 missing-docs = "warn"
-unreachable-pub = "warn"
-unused-must-use = "deny"
 rust-2018-idioms = "deny"
 unnameable-types = "warn"
+unreachable-pub = "warn"
+unused-must-use = "deny"
 
 [workspace.lints.rustdoc]
 all = "warn"

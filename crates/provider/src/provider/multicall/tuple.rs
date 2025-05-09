@@ -87,7 +87,7 @@ pub trait CallTuple: Sealed {
 }
 
 /// Type indicating that the [`MulticallBuilder`](crate::MulticallBuilder) is empty.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Empty;
 
 impl Sealed for Empty {}

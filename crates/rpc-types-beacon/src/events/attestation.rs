@@ -5,7 +5,7 @@ use serde_with::{serde_as, DisplayFromStr};
 /// Contains data related to an attestation, including slot, index, beacon block root,
 /// source, and target information.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestationData {
     /// The slot number in which the attestation was included, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
@@ -23,7 +23,7 @@ pub struct AttestationData {
 
 /// Represents the source checkpoint of an attestation.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Source {
     /// The epoch number of the source checkpoint, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
@@ -34,7 +34,7 @@ pub struct Source {
 
 /// Represents the target checkpoint of an attestation.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Target {
     /// The epoch number of the target checkpoint, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]

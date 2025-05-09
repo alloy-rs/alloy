@@ -4,7 +4,7 @@ use crate::eip7840::BlobParams;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// A scheduled blob parameter update entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BlobScheduleEntry {
     /// Blob parameters for the Cancun hardfork

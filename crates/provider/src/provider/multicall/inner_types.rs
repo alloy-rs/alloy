@@ -34,7 +34,7 @@ pub trait MulticallItem {
 }
 
 /// Helper type to build a [`CallItem`]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CallItemBuilder;
 
 impl CallItemBuilder {

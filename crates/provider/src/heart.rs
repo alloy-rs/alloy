@@ -258,7 +258,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
 /// This type can be used to create a [`PendingTransactionBuilder`], but in general it is only used
 /// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[doc(alias = "PendingTxConfig", alias = "TxPendingConfig")]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
@@ -348,7 +348,7 @@ impl From<TxHash> for PendingTransactionConfig {
 }
 
 /// Errors which may occur in heartbeat when watching a transaction.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
 pub enum WatchTxError {
     /// Transaction was not confirmed after configured timeout.
     #[error("transaction was not confirmed within the timeout")]

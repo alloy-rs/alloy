@@ -179,7 +179,7 @@ impl Default for HeapBlob {
 }
 
 /// Error indicating that the blob length is invalid.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct InvalidBlobLength(usize);
 impl core::fmt::Display for InvalidBlobLength {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

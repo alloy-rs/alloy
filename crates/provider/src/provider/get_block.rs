@@ -20,7 +20,7 @@ use super::FilterPollerBuilder;
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
 /// Default is "latest" block with transaction hashes.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct EthGetBlockParams {
     block: BlockId,
     kind: BlockTransactionsKind,

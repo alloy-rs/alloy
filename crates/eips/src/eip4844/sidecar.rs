@@ -16,7 +16,7 @@ use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
 pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
 /// A Blob hash
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndexedBlobHash {
     /// The index of the blob

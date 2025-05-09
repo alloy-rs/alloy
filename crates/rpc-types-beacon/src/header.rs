@@ -56,7 +56,7 @@ pub struct Header {
 
 /// The header of a beacon block.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct BeaconBlockHeader {
     /// The slot to which this block corresponds.
     #[serde_as(as = "DisplayFromStr")]

@@ -18,7 +18,7 @@ pub struct LightClientOptimisticData {
 }
 
 /// Contains the [`BeaconBlockHeader`] that was attested.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestedHeader {
     /// The [`BeaconBlockHeader`] object from the CL spec.
     pub beacon: BeaconBlockHeader,

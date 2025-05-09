@@ -14,7 +14,7 @@ use tower::{Layer, Service};
 /// in the requests.
 ///
 /// The generated token is inserted into the [`AUTHORIZATION`] header of the request.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct AuthLayer {
     secret: JwtSecret,
     latency_buffer: u64,

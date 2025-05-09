@@ -215,7 +215,7 @@ pub struct CancelBundleRequest {
 }
 
 /// Request for `eth_cancelPrivateTransaction`
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CancelPrivateTransactionRequest {
     /// Transaction hash of the transaction to be canceled
@@ -281,7 +281,7 @@ impl EthSendBundle {
 }
 
 /// Response from the matchmaker after sending a bundle.
-#[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EthBundleHash {
     /// Hash of the bundle bodies.
@@ -289,7 +289,7 @@ pub struct EthBundleHash {
 }
 
 /// Response from the matchmaker after sending a bundle.
-#[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SendBundleResponse {
     /// Hash of the bundle bodies.

@@ -99,7 +99,7 @@ pub struct StatsSimulated {
 /// Response for `flashbots_getUserStatsV2` represents stats for a searcher.
 ///
 /// Note: this is V2: <https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint#flashbots_getuserstatsv2>
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserStats {
     /// Represents whether this searcher has a high enough reputation to be in the high priority

@@ -47,7 +47,7 @@ impl SendBundleRequest {
 }
 
 /// Data used by block builders to check if the bundle should be considered for inclusion.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Inclusion {
     /// The first block the bundle is valid for.

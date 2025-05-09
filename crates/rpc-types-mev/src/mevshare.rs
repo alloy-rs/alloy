@@ -50,7 +50,7 @@ pub struct EventTransactionLog {
 }
 
 /// SSE event type of the event history endpoint.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[expect(missing_docs)]
 pub struct EventHistoryInfo {
@@ -90,7 +90,7 @@ pub struct Hint {
 }
 
 /// Query params for the `history` endpoint
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 #[expect(missing_docs)]
 pub struct EventHistoryParams {
@@ -154,7 +154,7 @@ impl EventHistoryParams {
 }
 
 /// 4-byte-function selector
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionSelector(pub [u8; 4]);
 
 // === impl FunctionSelector ===

@@ -2,7 +2,7 @@ use alloy_primitives::Address;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 
 /// The version of the MEV-share API to use.
-#[derive(Deserialize, Debug, Serialize, Clone, Default, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Serialize, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ProtocolVersion {
     #[default]
     #[serde(rename = "beta-1")]
@@ -89,7 +89,7 @@ impl Privacy {
 }
 
 /// Hints on what data should be shared about the bundle and its transactions
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PrivacyHint {
     /// The calldata of the bundle's transactions should be shared.
     pub calldata: bool,
@@ -250,7 +250,7 @@ impl<'de> Deserialize<'de> for PrivacyHint {
 ///
 /// Related endpoint: `mev_sendBundle`, `mev_simBundle`, `eth_sendPrivateTransaction`,
 /// `eth_sendPrivateRawTransaction`
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Refund {
     /// The index of the transaction in the bundle.
@@ -263,7 +263,7 @@ pub struct Refund {
 
 /// Specifies what addresses should receive what percent of the overall refund for this bundle,
 /// if it is enveloped by another bundle (eg. a searcher backrun).
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RefundConfig {
     /// The address to refund.

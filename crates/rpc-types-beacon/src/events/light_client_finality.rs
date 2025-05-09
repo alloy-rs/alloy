@@ -21,7 +21,7 @@ pub struct LightClientFinalityData {
 }
 
 /// Contains the `Beacon` header that was attested.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestedHeader {
     /// The `Beacon` object representing the block header.
     pub beacon: Beacon,
@@ -29,7 +29,7 @@ pub struct AttestedHeader {
 
 /// Represents the header of a beacon block.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Beacon {
     /// The slot number of the beacon block, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
@@ -46,7 +46,7 @@ pub struct Beacon {
 }
 
 /// Contains the `Beacon2` header that was finalized.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedHeader {
     /// The `Beacon2` object representing the block header.
     pub beacon: Beacon2,
@@ -54,7 +54,7 @@ pub struct FinalizedHeader {
 
 /// Represents the header of a finalized beacon block.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Beacon2 {
     /// The slot number of the beacon block, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]

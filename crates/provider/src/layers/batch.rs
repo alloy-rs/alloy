@@ -69,7 +69,7 @@ const DEFAULT_WAIT: Duration = Duration::from_millis(1);
 /// ```
 ///
 /// [Multicall3]: https://github.com/mds1/multicall3
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CallBatchLayer {
     m3a: Address,
     wait: Duration,

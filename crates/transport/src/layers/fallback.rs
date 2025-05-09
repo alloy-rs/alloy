@@ -193,7 +193,7 @@ where
 /// - Latency (response time) is weighted at 30%
 /// - The `active_transport_count` parameter controls how many transports are queried at any one
 ///   time.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FallbackLayer {
     /// The maximum number of transports to use in parallel
     active_transport_count: usize,

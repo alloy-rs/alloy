@@ -12,7 +12,7 @@ use serde_with::{serde_as, DisplayFromStr};
 
 /// Represents an entry of the `/relay/v1/builder/validators` endpoint
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Validator {
     /// The slot number for the validator entry.
     #[serde_as(as = "DisplayFromStr")]
@@ -25,7 +25,7 @@ pub struct Validator {
 }
 
 /// Details of a validator registration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidatorRegistration {
     /// The registration message.
     pub message: ValidatorRegistrationMessage,
@@ -35,7 +35,7 @@ pub struct ValidatorRegistration {
 
 /// Represents the message of a validator registration.
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidatorRegistrationMessage {
     /// The fee recipient's address.
     pub fee_recipient: Address,
@@ -58,7 +58,7 @@ pub struct ValidatorRegistrationMessage {
 /// Depending on the context, value might represent the claimed value by a builder (not necessarily
 /// a value confirmed by the relay).
 #[serde_as]
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(feature = "ssz", derive(tree_hash_derive::TreeHash))]
 pub struct BidTrace {
@@ -242,7 +242,7 @@ impl From<SignedBidSubmissionV4> for SubmitBlockRequest {
 
 /// Query for the `/relay/v1/builder/blocks` endpoint
 #[serde_as]
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubmitBlockRequestQuery {
     /// If set to 1, opt into bid cancellations.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -318,7 +318,7 @@ pub struct BuilderBlockValidationRequestV4 {
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///
 /// Provides [BidTrace]s for payloads that were delivered to proposers.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposerPayloadsDeliveredQuery {
     /// A specific slot
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -417,7 +417,7 @@ pub enum OrderBy {
 /// Query for the GET `/relay/v1/data/bidtraces/builder_blocks_received` endpoint.
 /// This endpoint provides BidTraces for builder block submissions that match the query and were
 /// verified successfully.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuilderBlocksReceivedQuery {
     /// A specific slot
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -474,7 +474,7 @@ pub mod error {
 
     /// Error thrown by the `validateBuilderSubmission` endpoints if the message differs from
     /// payload.
-    #[derive(Debug, thiserror::Error)]
+    #[derive(Debug, Clone, Copy, thiserror::Error)]
     pub enum ValidateBuilderSubmissionEqualityError {
         /// Thrown if parent hash mismatches
         #[error("incorrect ParentHash {actual}, expected {expected}")]
