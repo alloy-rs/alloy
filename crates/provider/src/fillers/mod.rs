@@ -47,7 +47,7 @@ use alloy_rpc_types_eth::{
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
     FilterChanges, Log,
 };
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::{TransportError, TransportErrorKind, TransportResult};
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
@@ -208,7 +208,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     ) -> impl_future!(<Output = TransportResult<N::TxEnvelope>>) {
         async move {
             let tx = self.fill(fillable, tx).await?;
-            let envelope = tx.try_into_envelope().map_err(/* Not sure where to create the new error type */)?;
+            let envelope = tx.try_into_envelope().map_err(|_err| TransportErrorKind::not_ready())?;
             Ok(envelope)
         }
     }
