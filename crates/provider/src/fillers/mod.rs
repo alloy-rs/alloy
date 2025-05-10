@@ -61,14 +61,14 @@ pub type RecommendedFiller =
 
 /// Error type for failures in the `fill_envelope` function.
 #[derive(Debug, thiserror::Error)]
-pub enum FillEnvelopeError<N: Network> {
+pub enum FillEnvelopeError<T> {
     /// A transport error occurred during the filling process.
     #[error("transport error during filling: {0}")]
     Transport(TransportError),
 
     /// The transaction is not ready to be converted to an envelope.
     #[error("transaction not ready: {0}")]
-    NotReady(SendableTxErr<N::TransactionRequest>),
+    NotReady(SendableTxErr<T>),
 }
 
 /// The control flow for a filler.
@@ -218,7 +218,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         &self,
         fillable: Self::Fillable,
         tx: SendableTx<N>,
-    ) -> impl_future!(<Output = Result<N::TxEnvelope, FillEnvelopeError<N>>>) {
+    ) -> impl_future!(<Output = Result<N::TxEnvelope, FillEnvelopeError<N::TransactionRequest>>>) {
         async move {
             let tx = self.fill(fillable, tx).await.map_err(FillEnvelopeError::Transport)?;
             let envelope = tx.try_into_envelope().map_err(FillEnvelopeError::NotReady)?;
