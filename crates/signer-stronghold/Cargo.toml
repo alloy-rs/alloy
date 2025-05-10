@@ -1,0 +1,28 @@
+[package]
+name = "alloy-signer-stronghold"
+description = "An Ethereum signer for a Stronghold"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-consensus.workspace = true
+alloy-network.workspace = true 
+alloy-primitives = { workspace = true, features = ["k256"] }
+alloy-signer.workspace = true 
+async-trait.workspace = true 
+iota_stronghold = "2.1.0"
+k256 = { version = "0.13.4", features = ["ecdsa"] }
+thiserror.workspace = true 
+
+[dev-dependencies]
+alloy = { workspace = true, features = ["node-bindings", "providers"] }
+alloy-network.workspace = true 
+alloy-provider = { workspace = true, features = ["anvil-api", "debug-api"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
