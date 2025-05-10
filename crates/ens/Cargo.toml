@@ -1,0 +1,31 @@
+[package]
+name = "alloy-ens"
+description = "Ethereum Name Service utilities"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-contract.workspace = true
+alloy-primitives.workspace = true
+alloy-provider.workspace = true
+alloy-sol-types.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
