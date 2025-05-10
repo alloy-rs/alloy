@@ -1,24 +1,28 @@
 [package]
-name = "signer-stronghold"
-version = "0.1.0"
-edition = "2021"
+name = "alloy-signer-stronghold"
 description = "An Ethereum signer for a Stronghold"
-repository = "https://github.com/tuddman/signer-stronghold"
-license-file= "LICENSE-MIT"
 
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
 
 [dependencies]
-alloy-consensus = "0.14.0"
-alloy-network = "0.14.0"
-alloy-primitives = { version = "1.0.0", features = ["k256"] }
-alloy-signer = "0.14.0"
-async-trait = "0.1.88"
+alloy-consensus.workspace = true
+alloy-network.workspace = true 
+alloy-primitives = { workspace = true, features = ["k256"] }
+alloy-signer.workspace = true 
+async-trait.workspace = true 
 iota_stronghold = "2.1.0"
 k256 = { version = "0.13.4", features = ["ecdsa"] }
-thiserror = "2.0"
+thiserror.workspace = true 
 
 [dev-dependencies]
-alloy = { version = "0.14.0", features = ["node-bindings", "providers"] }
-alloy-network = "0.14.0"
-alloy-provider = { version = "0.14.0", features = ["anvil-api", "debug-api"] }
-tokio = { version = "1.44.2", features = ["rt", "rt-multi-thread"] }
+alloy = { workspace = true, features = ["node-bindings", "providers"] }
+alloy-network.workspace = true 
+alloy-provider = { workspace = true, features = ["anvil-api", "debug-api"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
