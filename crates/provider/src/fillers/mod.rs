@@ -218,7 +218,8 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         &self,
         fillable: Self::Fillable,
         tx: SendableTx<N>,
-    ) -> impl_future!(<Output = Result<N::TxEnvelope, FillEnvelopeError<N::TransactionRequest>>>) {
+    ) -> impl_future!(<Output = Result<N::TxEnvelope, FillEnvelopeError<N::TransactionRequest>>>)
+    {
         async move {
             let tx = self.fill(fillable, tx).await.map_err(FillEnvelopeError::Transport)?;
             let envelope = tx.try_into_envelope().map_err(FillEnvelopeError::NotReady)?;
