@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
+
+### Other
+
+- Propagate arb feature ([#2407](https://github.com/alloy-rs/alloy/issues/2407))
+
+### Styling
+
+- Chore : fix typos ([#2398](https://github.com/alloy-rs/alloy/issues/2398))
+
+## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
+
+### Features
+
+- Add more IsTyped2718 impls ([#2396](https://github.com/alloy-rs/alloy/issues/2396))
+- Add IsTyped2718  ([#2394](https://github.com/alloy-rs/alloy/issues/2394))
+
+### Miscellaneous Tasks
+
+- Release 0.15.9
+
+## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
+
+### Features
+
+- Support deserializing system signatures in legacy transactions ([#2358](https://github.com/alloy-rs/alloy/issues/2358))
+
+### Miscellaneous Tasks
+
+- Release 0.15.8
+
+### Testing
+
+- Make test compile ([#2377](https://github.com/alloy-rs/alloy/issues/2377))
+
+## [0.15.7](https://github.com/alloy-rs/alloy/releases/tag/v0.15.7) - 2025-04-30
+
+### Features
+
+- Add bloom_ref ([#2366](https://github.com/alloy-rs/alloy/issues/2366))
+- [consensus] Add `secp256k1` sender recovery ([#2352](https://github.com/alloy-rs/alloy/issues/2352))
+
+### Miscellaneous Tasks
+
+- Release 0.15.7
+- Add bloom_ref ([#2368](https://github.com/alloy-rs/alloy/issues/2368))
+
+### Other
+
+- Revert "feat: add bloom_ref" ([#2367](https://github.com/alloy-rs/alloy/issues/2367))
+
+## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.6
+
 ## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
 
 ### Features

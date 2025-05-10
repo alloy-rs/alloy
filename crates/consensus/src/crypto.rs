@@ -54,10 +54,10 @@ pub mod secp256k1 {
     }
 
     /// Recover signer address from message hash. This ensures that the signature S value is
-    /// greater than `secp256k1n / 2`, as specified in
+    /// lower than `secp256k1n / 2`, as specified in
     /// [EIP-2](https://eips.ethereum.org/EIPS/eip-2).
     ///
-    /// If the S value is too large, then this will return `None`
+    /// If the S value is too large, then this will return a `RecoveryError`
     pub fn recover_signer(signature: &Signature, hash: B256) -> Result<Address, RecoveryError> {
         if signature.s() > SECP256K1N_HALF {
             return Err(RecoveryError);
@@ -68,13 +68,12 @@ pub mod secp256k1 {
 
 #[cfg(any(test, feature = "secp256k1"))]
 mod impl_secp256k1 {
-    use super::*;
     pub(crate) use ::secp256k1::Error;
     use ::secp256k1::{
         ecdsa::{RecoverableSignature, RecoveryId},
         Message, PublicKey, SecretKey, SECP256K1,
     };
-    use alloy_primitives::{keccak256, Address, B256, U256};
+    use alloy_primitives::{keccak256, Address, Signature, B256, U256};
 
     /// Recovers the address of the sender using secp256k1 pubkey recovery.
     ///
@@ -169,18 +168,18 @@ mod impl_k256 {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::{keccak256, B256};
 
     #[cfg(feature = "secp256k1")]
     #[test]
     fn sanity_ecrecover_call_secp256k1() {
         use super::impl_secp256k1::*;
+        use alloy_primitives::B256;
 
         let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
         let signer = public_key_to_address(public);
 
         let message = b"hello world";
-        let hash = keccak256(message);
+        let hash = alloy_primitives::keccak256(message);
         let signature =
             sign_message(B256::from_slice(&secret.secret_bytes()[..]), hash).expect("sign message");
 
@@ -196,13 +195,14 @@ mod tests {
     #[test]
     fn sanity_ecrecover_call_k256() {
         use super::impl_k256::*;
+        use alloy_primitives::B256;
 
         let secret = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
         let public = *secret.verifying_key();
         let signer = public_key_to_address(public);
 
         let message = b"hello world";
-        let hash = keccak256(message);
+        let hash = alloy_primitives::keccak256(message);
         let signature =
             sign_message(B256::from_slice(&secret.to_bytes()[..]), hash).expect("sign message");
 
@@ -215,8 +215,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "secp256k1", feature = "k256"))]
     fn sanity_secp256k1_k256_compat() {
         use super::{impl_k256, impl_secp256k1};
+        use alloy_primitives::B256;
 
         let (secp256k1_secret, secp256k1_public) =
             secp256k1::generate_keypair(&mut rand::thread_rng());
@@ -229,7 +231,7 @@ mod tests {
         assert_eq!(secp256k1_signer, k256_signer);
 
         let message = b"hello world";
-        let hash = keccak256(message);
+        let hash = alloy_primitives::keccak256(message);
 
         let secp256k1_signature = impl_secp256k1::sign_message(
             B256::from_slice(&secp256k1_secret.secret_bytes()[..]),

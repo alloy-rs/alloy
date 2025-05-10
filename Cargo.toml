@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.15.6"
+version = "0.15.10"
 edition = "2021"
 rust-version = "1.82"
 authors = ["Alloy Contributors"]
@@ -96,7 +96,7 @@ tree_hash = "0.10.0"
 tree_hash_derive = "0.10.0"
 
 # crypto
-c-kzg = { version = "2.1", default-features = false }
+c-kzg = { version = "2.1.1", default-features = false }
 elliptic-curve = { version = "0.13", default-features = false }
 k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 sha2 = { version = "0.10", default-features = false }

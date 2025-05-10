@@ -10,7 +10,7 @@ use crate::{
     TxEip7702, TxLegacy,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
     eip4844::BlobTransactionSidecar,
     Typed2718,
@@ -569,6 +569,12 @@ where
 {
     fn ty(&self) -> u8 {
         self.tx().ty()
+    }
+}
+
+impl<T> IsTyped2718 for EthereumTxEnvelope<T> {
+    fn is_type(type_id: u8) -> bool {
+        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 
@@ -1916,5 +1922,44 @@ mod tests {
         let raw = hex!("f8aa0285018ef61d0a832dc6c094cb33aa5b38d79e3d9fa8b10aff38aa201399a7e380b844af7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce800000000000000000000000000000000000000000000000000000000000000641ca05e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664a02353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4");
         let tx = TxEnvelope::decode_2718(&mut raw.as_ref()).unwrap();
         assert!(tx.chain_id().is_none());
+    }
+
+    #[test]
+    fn can_deserialize_system_transaction_with_zero_signature_envelope() {
+        let raw_tx = r#"{
+            "blockHash": "0x5307b5c812a067f8bc1ed1cc89d319ae6f9a0c9693848bd25c36b5191de60b85",
+            "blockNumber": "0x45a59bb",
+            "from": "0x0000000000000000000000000000000000000000",
+            "gas": "0x1e8480",
+            "gasPrice": "0x0",
+            "hash": "0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06",
+            "input": "0xcbd4ece900000000000000000000000032155c9d39084f040ba17890fe8134dbe2a0453f0000000000000000000000004a0126ee88018393b1ad2455060bc350ead9908a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000469f700000000000000000000000000000000000000000000000000000000000000644ff746f60000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002043e908a4e862aebb10e7e27db0b892b58a7e32af11d64387a414dabc327b00e200000000000000000000000000000000000000000000000000000000",
+            "nonce": "0x469f7",
+            "to": "0x4200000000000000000000000000000000000007",
+            "transactionIndex": "0x0",
+            "value": "0x0",
+            "v": "0x0",
+            "r": "0x0",
+            "s": "0x0",
+            "queueOrigin": "l1",
+            "l1TxOrigin": "0x36bde71c97b33cc4729cf772ae268934f7ab70b2",
+            "l1BlockNumber": "0xfd1a6c",
+            "l1Timestamp": "0x63e434ff",
+            "index": "0x45a59ba",
+            "queueIndex": "0x469f7",
+            "rawTransaction": "0xcbd4ece900000000000000000000000032155c9d39084f040ba17890fe8134dbe2a0453f0000000000000000000000004a0126ee88018393b1ad2455060bc350ead9908a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000469f700000000000000000000000000000000000000000000000000000000000000644ff746f60000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002043e908a4e862aebb10e7e27db0b892b58a7e32af11d64387a414dabc327b00e200000000000000000000000000000000000000000000000000000000"
+        }"#;
+
+        let tx = serde_json::from_str::<TxEnvelope>(raw_tx).unwrap();
+
+        assert_eq!(tx.signature().r(), U256::ZERO);
+        assert_eq!(tx.signature().s(), U256::ZERO);
+        assert!(!tx.signature().v());
+
+        assert_eq!(
+            tx.hash(),
+            &b256!("0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06"),
+            "hash should match the transaction hash"
+        );
     }
 }

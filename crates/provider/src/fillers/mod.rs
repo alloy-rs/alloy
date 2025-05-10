@@ -166,7 +166,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     /// properties.
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 
-    /// Returns `true` if the filler is should continue filling.
+    /// Returns `true` if the filler should continue filling.
     fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
         tx.as_builder().is_some_and(|tx| self.status(tx).is_ready())
     }
@@ -222,7 +222,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// asyncronously
+    /// asynchronously
     fn prepare_call(
         &self,
         tx: &mut N::TransactionRequest,
@@ -233,7 +233,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// syncronously
+    /// synchronously
     fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         let _ = tx;
         // No-op default
@@ -390,6 +390,13 @@ where
 
     fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
         self.inner.get_gas_price()
+    }
+
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+        self.inner.get_account_info(address)
     }
 
     fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {

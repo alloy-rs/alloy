@@ -375,7 +375,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// This is a convenience function for
     /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
-    #[deprecated(since = "0.12.6", note = "use `on_mocked_client` instead")]
+    #[deprecated(since = "0.12.6", note = "use `connect_mocked_client` instead")]
     pub fn on_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
