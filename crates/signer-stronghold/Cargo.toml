@@ -1,0 +1,24 @@
+[package]
+name = "signer-stronghold"
+version = "0.1.0"
+edition = "2021"
+description = "An Ethereum signer for a Stronghold"
+repository = "https://github.com/tuddman/signer-stronghold"
+license-file= "LICENSE-MIT"
+
+
+[dependencies]
+alloy-consensus = "0.14.0"
+alloy-network = "0.14.0"
+alloy-primitives = { version = "1.0.0", features = ["k256"] }
+alloy-signer = "0.14.0"
+async-trait = "0.1.88"
+iota_stronghold = "2.1.0"
+k256 = { version = "0.13.4", features = ["ecdsa"] }
+thiserror = "2.0"
+
+[dev-dependencies]
+alloy = { version = "0.14.0", features = ["node-bindings", "providers"] }
+alloy-network = "0.14.0"
+alloy-provider = { version = "0.14.0", features = ["anvil-api", "debug-api"] }
+tokio = { version = "1.44.2", features = ["rt", "rt-multi-thread"] }
