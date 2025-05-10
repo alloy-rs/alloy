@@ -349,13 +349,12 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip4844);
-        assert_eq!(errors.len(), 7);
+        assert_eq!(errors.len(), 6);
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"max_priority_fee_per_gas"));
         assert!(errors.contains(&"max_fee_per_gas"));
-        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"max_fee_per_blob_gas"));
     }
 
