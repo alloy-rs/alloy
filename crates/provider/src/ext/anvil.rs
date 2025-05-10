@@ -149,6 +149,12 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         &self,
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash>;
+
+    /// Sets impersonated transaction
+    async fn anvil_send_impersonated_transaction(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<TxHash>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -322,6 +328,12 @@ where
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash> {
         self.client().request("eth_sendUnsignedTransaction", (request,)).await
+    }
+    async fn anvil_send_impersonated_transaction(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<TxHash> {
+        self.client().request("eth_sendTransaction", (request,)).await
     }
 }
 
