@@ -27,7 +27,7 @@ where
     Map: Fn(Resp) -> Output + Clone,
 {
     /// Create a new [`TraceBuilder`] from a [`RpcCall`].
-    pub fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
+    pub const fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self { inner: WithBlockInner::RpcCall(inner), block_id: None, trace_types: None }
     }
 

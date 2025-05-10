@@ -49,7 +49,7 @@ impl serde::Serialize for EthGetBlockParams {
 
 impl EthGetBlockParams {
     /// Instantiate [`EthGetBlockParams`] with the given block and kind.
-    pub fn new(block: BlockId, kind: BlockTransactionsKind) -> Self {
+    pub const fn new(block: BlockId, kind: BlockTransactionsKind) -> Self {
         Self { block, kind }
     }
 }
@@ -130,19 +130,19 @@ where
     }
 
     /// Set the [`BlockTransactionsKind`] for the request.
-    pub fn kind(mut self, kind: BlockTransactionsKind) -> Self {
+    pub const fn kind(mut self, kind: BlockTransactionsKind) -> Self {
         self.kind = kind;
         self
     }
 
     /// Set the [`BlockTransactionsKind`] to [`BlockTransactionsKind::Full`].
-    pub fn full(mut self) -> Self {
+    pub const fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
         self
     }
 
     /// Set the [`BlockTransactionsKind`] to [`BlockTransactionsKind::Hashes`].
-    pub fn hashes(mut self) -> Self {
+    pub const fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
     }
@@ -296,18 +296,18 @@ where
     BlockResp: BlockResponse + RpcRecv,
 {
     /// Create a new [`WatchBlocks`] instance.
-    pub(crate) fn new(poller: FilterPollerBuilder<B256>) -> Self {
+    pub(crate) const fn new(poller: FilterPollerBuilder<B256>) -> Self {
         Self { poller, kind: BlockTransactionsKind::Hashes, _pd: PhantomData }
     }
 
     /// Poll for blocks with full transactions i.e [`BlockTransactionsKind::Full`].
-    pub fn full(mut self) -> Self {
+    pub const fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
         self
     }
 
     /// Poll for blocks with just transactions hashes i.e [`BlockTransactionsKind::Hashes`].
-    pub fn hashes(mut self) -> Self {
+    pub const fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
     }
@@ -369,7 +369,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     ///
     /// By default, this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
     /// subscribe to blocks with full transactions.
-    pub fn new(
+    pub const fn new(
         sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
         client: alloy_rpc_client::WeakClient,
     ) -> Self {
@@ -377,13 +377,13 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     }
 
     /// Subscribe to blocks with full transactions.
-    pub fn full(mut self) -> Self {
+    pub const fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
         self
     }
 
     /// Subscribe to blocks with transaction hashes only.
-    pub fn hashes(mut self) -> Self {
+    pub const fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
     }

@@ -99,12 +99,12 @@ pub struct MockTransport {
 
 impl MockTransport {
     /// Create a new [`MockTransport`] with the given [`Asserter`].
-    pub fn new(asserter: Asserter) -> Self {
+    pub const fn new(asserter: Asserter) -> Self {
         Self { asserter }
     }
 
     /// Return a reference to the associated [`Asserter`].
-    pub fn asserter(&self) -> &Asserter {
+    pub const fn asserter(&self) -> &Asserter {
         &self.asserter
     }
 

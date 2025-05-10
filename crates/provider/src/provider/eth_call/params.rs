@@ -34,12 +34,12 @@ where
     }
 
     /// Returns a reference to the state overrides if set.
-    pub fn overrides(&self) -> Option<&StateOverride> {
+    pub const fn overrides(&self) -> Option<&StateOverride> {
         self.overrides.as_ref()
     }
 
     /// Returns a reference to the transaction data.
-    pub fn data(&self) -> &N::TransactionRequest {
+    pub const fn data(&self) -> &N::TransactionRequest {
         &self.data
     }
 
@@ -82,7 +82,7 @@ pub struct EthCallManyParams<'req> {
 
 impl<'req> EthCallManyParams<'req> {
     /// Instantiates a new `EthCallManyParams` with the given bundles.
-    pub fn new(bundles: &'req [Bundle]) -> Self {
+    pub const fn new(bundles: &'req [Bundle]) -> Self {
         Self { bundles: Cow::Borrowed(bundles), context: None, overrides: None }
     }
 

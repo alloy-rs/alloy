@@ -15,7 +15,7 @@ pub struct StateOverridesBuilder {
 
 impl StateOverridesBuilder {
     /// Create a new StateOverridesBuilder.
-    pub fn new(map: AddressHashMap<AccountOverride>) -> Self {
+    pub const fn new(map: AddressHashMap<AccountOverride>) -> Self {
         Self { overrides: map }
     }
 
@@ -181,13 +181,13 @@ impl AccountOverride {
     }
 
     /// Configures the balance override
-    pub fn with_balance(mut self, balance: U256) -> Self {
+    pub const fn with_balance(mut self, balance: U256) -> Self {
         self.balance = Some(balance);
         self
     }
 
     /// Configures the nonce override
-    pub fn with_nonce(mut self, nonce: u64) -> Self {
+    pub const fn with_nonce(mut self, nonce: u64) -> Self {
         self.nonce = Some(nonce);
         self
     }
@@ -231,7 +231,7 @@ impl AccountOverride {
     }
 
     /// Conditionally sets the balance override and returns self.
-    pub fn with_balance_opt(mut self, balance: Option<U256>) -> Self {
+    pub const fn with_balance_opt(mut self, balance: Option<U256>) -> Self {
         if let Some(balance) = balance {
             self.balance = Some(balance);
         }
@@ -239,7 +239,7 @@ impl AccountOverride {
     }
 
     /// Conditionally sets the nonce override and returns self.
-    pub fn with_nonce_opt(mut self, nonce: Option<u64>) -> Self {
+    pub const fn with_nonce_opt(mut self, nonce: Option<u64>) -> Self {
         if let Some(nonce) = nonce {
             self.nonce = Some(nonce);
         }
@@ -247,7 +247,7 @@ impl AccountOverride {
     }
 
     /// Conditionally sets the move precompile address and returns self.
-    pub fn with_move_precompile_to_opt(mut self, address: Option<Address>) -> Self {
+    pub const fn with_move_precompile_to_opt(mut self, address: Option<Address>) -> Self {
         if let Some(address) = address {
             self.move_precompile_to = Some(address);
         }

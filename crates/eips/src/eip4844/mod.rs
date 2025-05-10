@@ -167,7 +167,7 @@ impl HeapBlob {
     }
 
     /// Get the inner
-    pub fn inner(&self) -> &Bytes {
+    pub const fn inner(&self) -> &Bytes {
         &self.0
     }
 }

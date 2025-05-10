@@ -83,7 +83,7 @@ impl Default for CallBatchLayer {
 
 impl CallBatchLayer {
     /// Create a new `CallBatchLayer` with a default wait of 1ms.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { m3a: MULTICALL3_ADDRESS, wait: DEFAULT_WAIT }
     }
 
@@ -95,7 +95,7 @@ impl CallBatchLayer {
     /// This means that every request has a maximum delay of `wait` before being sent.
     ///
     /// The default is 1ms.
-    pub fn wait(mut self, wait: Duration) -> Self {
+    pub const fn wait(mut self, wait: Duration) -> Self {
         self.wait = wait;
         self
     }
@@ -103,7 +103,7 @@ impl CallBatchLayer {
     /// Set the multicall3 address.
     ///
     /// The default is [`MULTICALL3_ADDRESS`].
-    pub fn multicall3_address(mut self, m3a: Address) -> Self {
+    pub const fn multicall3_address(mut self, m3a: Address) -> Self {
         self.m3a = m3a;
         self
     }

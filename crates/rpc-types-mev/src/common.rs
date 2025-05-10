@@ -76,7 +76,7 @@ pub struct Privacy {
 
 impl Privacy {
     /// Sets hints
-    pub fn with_hints(mut self, hints: Option<PrivacyHint>) -> Self {
+    pub const fn with_hints(mut self, hints: Option<PrivacyHint>) -> Self {
         self.hints = hints;
         self
     }

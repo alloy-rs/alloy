@@ -30,7 +30,7 @@ where
     }
 
     /// Set the channel_size for the subscription stream.
-    pub fn channel_size(mut self, size: usize) -> Self {
+    pub const fn channel_size(mut self, size: usize) -> Self {
         self.channel_size = Some(size);
         self
     }

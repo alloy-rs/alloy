@@ -18,7 +18,7 @@ pub struct ParamsWithBlock<Params: RpcSend> {
 
 impl<Params: RpcSend> ParamsWithBlock<Params> {
     /// Create a new instance of `ParamsWithBlock`.
-    pub fn new(params: Params, block_id: BlockId) -> Self {
+    pub const fn new(params: Params, block_id: BlockId) -> Self {
         Self { params, block_id }
     }
 }

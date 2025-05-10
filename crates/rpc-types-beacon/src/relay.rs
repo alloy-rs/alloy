@@ -191,7 +191,7 @@ pub enum SubmitBlockRequest {
 
 impl SubmitBlockRequest {
     /// Returns the [`SignedBidSubmissionV2`] if this is [`Self::Capella`]
-    pub fn as_capella(&self) -> Option<&SignedBidSubmissionV2> {
+    pub const fn as_capella(&self) -> Option<&SignedBidSubmissionV2> {
         match self {
             Self::Capella(submission) => Some(submission),
             _ => None,
@@ -199,7 +199,7 @@ impl SubmitBlockRequest {
     }
 
     /// Returns the [`SignedBidSubmissionV3`] if this is [`Self::Deneb`]
-    pub fn as_deneb(&self) -> Option<&SignedBidSubmissionV3> {
+    pub const fn as_deneb(&self) -> Option<&SignedBidSubmissionV3> {
         match self {
             Self::Deneb(submission) => Some(submission),
             _ => None,
@@ -207,7 +207,7 @@ impl SubmitBlockRequest {
     }
 
     /// Returns the [`SignedBidSubmissionV4`] if this is [`Self::Electra`]
-    pub fn as_electra(&self) -> Option<&SignedBidSubmissionV4> {
+    pub const fn as_electra(&self) -> Option<&SignedBidSubmissionV4> {
         match self {
             Self::Electra(submission) => Some(submission),
             _ => None,
@@ -215,7 +215,7 @@ impl SubmitBlockRequest {
     }
 
     /// Returns the underlying [`BidTrace`].
-    pub fn bid_trace(&self) -> &BidTrace {
+    pub const fn bid_trace(&self) -> &BidTrace {
         match self {
             Self::Capella(req) => &req.message,
             Self::Deneb(req) => &req.message,

@@ -1624,17 +1624,17 @@ impl ExecutionData {
     }
 
     /// Returns the parent hash of the block.
-    pub fn parent_hash(&self) -> B256 {
+    pub const fn parent_hash(&self) -> B256 {
         self.payload.parent_hash()
     }
 
     /// Returns the hash of the block.
-    pub fn block_hash(&self) -> B256 {
+    pub const fn block_hash(&self) -> B256 {
         self.payload.block_hash()
     }
 
     /// Returns the number of the block.
-    pub fn block_number(&self) -> u64 {
+    pub const fn block_number(&self) -> u64 {
         self.payload.block_number()
     }
 
@@ -1644,7 +1644,7 @@ impl ExecutionData {
     }
 
     /// Return the withdrawals for the payload or attributes.
-    pub fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
+    pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
         self.payload.withdrawals()
     }
 

@@ -62,13 +62,13 @@ impl ConnectionHandle {
 
     /// Set the max number of retries before failing and exiting the connection.
     /// Default is 10.
-    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
+    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self
     }
 
     /// Set the interval between retries.
-    pub fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
+    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = retry_interval;
         self
     }

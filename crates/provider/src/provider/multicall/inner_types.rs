@@ -69,18 +69,18 @@ impl<D: SolCall> Debug for CallItem<D> {
 
 impl<D: SolCall> CallItem<D> {
     /// Create a new [`CallItem`] instance.
-    pub fn new(target: Address, input: Bytes) -> Self {
+    pub const fn new(target: Address, input: Bytes) -> Self {
         Self { target, input, allow_failure: false, value: U256::ZERO, decoder: PhantomData }
     }
 
     /// Set whether the call should be allowed to fail or not.
-    pub fn allow_failure(mut self, allow_failure: bool) -> Self {
+    pub const fn allow_failure(mut self, allow_failure: bool) -> Self {
         self.allow_failure = allow_failure;
         self
     }
 
     /// Set the value to send with the call.
-    pub fn value(mut self, value: U256) -> Self {
+    pub const fn value(mut self, value: U256) -> Self {
         self.value = value;
         self
     }

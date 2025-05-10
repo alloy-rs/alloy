@@ -369,7 +369,7 @@ impl PrivateTransactionPreferences {
     }
 
     /// Sets the `fast` option to true
-    pub fn into_fast(self) -> Self {
+    pub const fn into_fast(self) -> Self {
         self.with_fast_mode(true)
     }
 

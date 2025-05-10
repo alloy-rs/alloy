@@ -69,7 +69,7 @@ impl<P: Provider<N>, N: Network> AnvilProvider<P, N> {
     }
 
     /// Expose inner anvil instance.
-    pub fn anvil(&self) -> &Arc<AnvilInstance> {
+    pub const fn anvil(&self) -> &Arc<AnvilInstance> {
         &self.anvil
     }
 }
