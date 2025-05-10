@@ -37,6 +37,7 @@ use crate::{
     provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    SendableTxErr,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -47,7 +48,7 @@ use alloy_rpc_types_eth::{
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
     FilterChanges, Log,
 };
-use alloy_transport::{TransportError, TransportErrorKind, TransportResult};
+use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
@@ -57,6 +58,18 @@ use std::marker::PhantomData;
 /// management, and chain-id fetching.
 pub type RecommendedFiller =
     JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
+
+/// Error type for failures in the `fill_envelope` function.
+#[derive(Debug, thiserror::Error)]
+pub enum FillEnvelopeError<N: Network> {
+    /// A transport error occurred during the filling process.
+    #[error("transport error during filling: {0}")]
+    Transport(TransportError),
+
+    /// The transaction is not ready to be converted to an envelope.
+    #[error("transaction not ready: {0}")]
+    NotReady(SendableTxErr<N::TransactionRequest>),
+}
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -205,11 +218,10 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         &self,
         fillable: Self::Fillable,
         tx: SendableTx<N>,
-    ) -> impl_future!(<Output = TransportResult<N::TxEnvelope>>) {
+    ) -> impl_future!(<Output = Result<N::TxEnvelope, FillEnvelopeError<N>>>) {
         async move {
-            let tx = self.fill(fillable, tx).await?;
-            let envelope =
-                tx.try_into_envelope().map_err(|_err| TransportErrorKind::not_ready())?;
+            let tx = self.fill(fillable, tx).await.map_err(FillEnvelopeError::Transport)?;
+            let envelope = tx.try_into_envelope().map_err(FillEnvelopeError::NotReady)?;
             Ok(envelope)
         }
     }

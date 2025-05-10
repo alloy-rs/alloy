@@ -39,14 +39,6 @@ pub enum TransportErrorKind {
     /// Custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
-
-    /// Transaction filling error.
-    #[error("transaction filling error: {0}")]
-    FillError(String),
-
-    /// Transaction not ready: still a builder.
-    #[error("transaction not ready: still a builder")]
-    NotReady,
 }
 
 impl TransportErrorKind {
@@ -99,20 +91,8 @@ impl TransportErrorKind {
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
             }
-            Self::FillError(_) => false,
-            Self::NotReady => false,
             _ => false,
         }
-    }
-
-    /// Instantiate a new `TransportError::FillError`.
-    pub fn fill_error(msg: impl Into<String>) -> TransportError {
-        RpcError::Transport(Self::FillError(msg.into()))
-    }
-
-    /// Instantiate a new `TransportError::NotReady`.
-    pub const fn not_ready() -> TransportError {
-        RpcError::Transport(Self::NotReady)
     }
 }
 
