@@ -24,7 +24,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 alloy-network.workspace = true 
-alloy-provider = { workspace = true, features = ["anvil-api", "debug-api"] }
+alloy-provider = { workspace = true, features = ["anvil-api", "debug-api", "hyper"] }
 alloy-node-bindings = { workspace = true }
 alloy-rpc-types = { workspace = true, features = ["eth"] }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
