@@ -497,7 +497,7 @@ mod tests {
             .await
             .unwrap();
 
-        println!("Sent transaction: {tx_hash}");
+        tracing::info!("Sent transaction: {tx_hash}");
 
         cleanup_test_env();
     }
