@@ -282,10 +282,9 @@ impl StrongholdSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::primitives::Address;
     use alloy_consensus::{TxEnvelope, TxLegacy};
     use alloy_network::TxSigner;
-    use alloy_primitives::{bytes, U256};
+    use alloy_primitives::{Address, bytes, U256};
     use alloy_signer::Signer;
     use std::env;
     use std::fs;
@@ -363,7 +362,7 @@ mod tests {
         let signer = setup_test_env(Some(1));
 
         let message = b"hello world";
-        let hash = alloy::primitives::keccak256(message);
+        let hash = alloy_primitives::keccak256(message);
         let signature = signer.sign_hash(&hash).await;
 
         assert!(
@@ -382,7 +381,7 @@ mod tests {
         let to: Address = to.parse().unwrap();
 
         let mut tx = TxLegacy {
-            to: alloy::primitives::TxKind::Call(to),
+            to: alloy_primitives::TxKind::Call(to),
             value: U256::from(100),
             gas_price: 1,
             gas_limit: 21000,
@@ -456,11 +455,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_end_to_end_transaction_with_anvil() {
-        use alloy::network::EthereumWallet;
-        use alloy::node_bindings::Anvil;
-        use alloy::primitives::address;
-        use alloy::providers::{ext::AnvilApi, Provider, ProviderBuilder};
-        use alloy::rpc::types::TransactionRequest;
+        use alloy_network::EthereumWallet;
+        use alloy_node_bindings::Anvil;
+        use alloy_primitives::address;
+        use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
+        use alloy_rpc_types::TransactionRequest;
         use alloy_network::TransactionBuilder;
         use alloy_primitives::U256;
 
@@ -474,7 +473,7 @@ mod tests {
 
         let provider = ProviderBuilder::new()
             .wallet(wallet)
-            .on_http(anvil.endpoint_url());
+            .connect(&anvil.endpoint()).await.unwrap();
 
         // Fund the signer's address (Anvil starts with prefunded accounts)
         provider

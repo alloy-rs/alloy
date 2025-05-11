@@ -20,9 +20,11 @@ async-trait.workspace = true
 iota_stronghold = "2.1.0"
 k256 = { version = "0.13.4", features = ["ecdsa"] }
 thiserror.workspace = true 
+tracing.workspace = true
 
 [dev-dependencies]
-alloy = { workspace = true, features = ["node-bindings", "providers"] }
 alloy-network.workspace = true 
 alloy-provider = { workspace = true, features = ["anvil-api", "debug-api"] }
+alloy-node-bindings = { workspace = true }
+alloy-rpc-types = { workspace = true, features = ["eth"] }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
