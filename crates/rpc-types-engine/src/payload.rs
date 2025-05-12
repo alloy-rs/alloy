@@ -914,7 +914,7 @@ impl BlobsBundleV2 {
     pub fn take(&mut self, len: usize) -> (Vec<Bytes48>, Vec<Bytes48>, Vec<Blob>) {
         (
             self.commitments.drain(0..len).collect(),
-            self.cell_proofs.drain(0..len * CELLS_PER_EXT_BLOB as usize).collect(),
+            self.cell_proofs.drain(0..len * CELLS_PER_EXT_BLOB).collect(),
             self.blobs.drain(0..len).collect(),
         )
     }
