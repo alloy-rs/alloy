@@ -22,6 +22,8 @@ pub struct BlobScheduleBlobParams {
     pub cancun: BlobParams,
     /// Configuration for blob-related calculations for the Prague hardfork.
     pub prague: BlobParams,
+    /// Configuration for blob-related calculations for the Osaka hardfork.
+    pub osaka: BlobParams,
     /// Time-based scheduled updates to blob parameters.
     ///
     /// These are ordered by activation timestamps in natural order.
@@ -34,6 +36,7 @@ impl BlobScheduleBlobParams {
         Self {
             cancun: BlobParams::cancun(),
             prague: BlobParams::prague(),
+            osaka: BlobParams::osaka(),
             scheduled: Default::default(),
         }
     }
@@ -45,14 +48,19 @@ impl BlobScheduleBlobParams {
         self.scheduled.iter().rev().find(|(ts, _)| timestamp >= *ts).map(|(_, params)| params)
     }
 
-    /// Returns the configured cancun [`BlobParams`].
+    /// Returns the configured Cancun [`BlobParams`].
     pub const fn cancun(&self) -> &BlobParams {
         &self.cancun
     }
 
-    /// Returns the configured prague [`BlobParams`].
+    /// Returns the configured Prague [`BlobParams`].
     pub const fn prague(&self) -> &BlobParams {
         &self.prague
+    }
+
+    /// Returns the configured Osaka [`BlobParams`].
+    pub const fn osaka(&self) -> &BlobParams {
+        &self.osaka
     }
 
     /// Finds the active scheduled blob parameters for a given timestamp.
