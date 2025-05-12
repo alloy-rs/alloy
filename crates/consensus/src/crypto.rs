@@ -75,7 +75,7 @@ pub mod secp256k1 {
 
         // NOTE: we are removing error from underlying crypto library as it will restrain primitive
         // errors and we care only if recovery is passing or not.
-        imp::recover_signer_unchecked(&sig, &hash.0).map_err(RecoveryError::from_source)
+        imp::recover_signer_unchecked(&sig, &hash.0).map_err(|_| RecoveryError::new())
     }
 
     /// Recover signer address from message hash. This ensures that the signature S value is
