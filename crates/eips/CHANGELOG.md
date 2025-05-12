@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
+
+### Documentation
+
+- Should be decoded ([#2414](https://github.com/alloy-rs/alloy/issues/2414))
+
+### Features
+
+- Add some either impls ([#2409](https://github.com/alloy-rs/alloy/issues/2409))
+
+## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
+
+### Miscellaneous Tasks
+
+- Release 0.15.10
+
+### Other
+
+- Propagate arb feature ([#2407](https://github.com/alloy-rs/alloy/issues/2407))
+
+### Styling
+
+- Chore : fix typos ([#2398](https://github.com/alloy-rs/alloy/issues/2398))
+
 ## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
 
 ### Features
@@ -14,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.15.9
 - Add default to blob schedule ([#2389](https://github.com/alloy-rs/alloy/issues/2389))
 
 ## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02

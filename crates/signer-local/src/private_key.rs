@@ -165,6 +165,12 @@ impl From<K256SecretKey> for LocalSigner<SigningKey> {
     }
 }
 
+impl From<&K256SecretKey> for LocalSigner<SigningKey> {
+    fn from(value: &K256SecretKey) -> Self {
+        Self::from_signing_key(value.into())
+    }
+}
+
 impl FromStr for LocalSigner<SigningKey> {
     type Err = LocalSignerError;
 
