@@ -186,6 +186,11 @@ impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
             Cow::Owned(self.make_bloom())
         }
     }
+
+    /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
+    fn to_bloom_filter(&self) -> BloomFilter {
+        vec![self.bloom().into_owned()].into()
+    }
 }
 
 impl<T: Clone + Eq + Hash> FilterSet<T> {
@@ -1293,6 +1298,154 @@ impl<'a> serde::Deserialize<'a> for PendingTransactionFilterKind {
             Some(true) => Ok(Self::Full),
             _ => Ok(Self::Hashes),
         }
+    }
+}
+
+/// Helper type to represent a bloom filter used for matching logs.
+#[derive(Debug, Default)]
+pub struct BloomFilter(Vec<Bloom>);
+
+impl From<Vec<Bloom>> for BloomFilter {
+    fn from(src: Vec<Bloom>) -> Self {
+        Self(src)
+    }
+}
+
+impl BloomFilter {
+    /// Returns whether the given bloom matches the list of Blooms in the current filter.
+    /// If the filter is empty (the list is empty), then any bloom matches
+    /// Otherwise, there must be at least one match for the BloomFilter to match.
+    pub fn matches(&self, bloom: Bloom) -> bool {
+        self.0.is_empty() || self.0.iter().any(|a| bloom.contains(a))
+    }
+}
+
+/// Support for matching [Filter]s
+#[derive(Debug, Default)]
+pub struct FilteredParams {
+    /// The original filter, if any
+    pub filter: Option<Filter>,
+}
+
+impl FilteredParams {
+    /// Creates a new wrapper type for a [Filter], if any with flattened topics, that can be used
+    /// for matching
+    pub fn new(filter: Option<Filter>) -> Self {
+        filter.map_or_else(Default::default, |filter| Self { filter: Some(filter) })
+    }
+
+    /// Returns the [BloomFilter] for the given address
+    pub fn address_filter(address: &FilterSet<Address>) -> BloomFilter {
+        address.to_bloom_filter()
+    }
+
+    /// Returns the [BloomFilter] for the given topics
+    pub fn topics_filter(topics: &[FilterSet<B256>]) -> Vec<BloomFilter> {
+        topics.iter().map(|t| t.to_bloom_filter()).collect()
+    }
+
+    /// Returns `true` if the bloom matches the topics
+    pub fn matches_topics(bloom: Bloom, topic_filters: &[BloomFilter]) -> bool {
+        if topic_filters.is_empty() {
+            return true;
+        }
+
+        // for each filter, iterate through the list of filter blooms. for each set of filter
+        // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
+        // empty (no filters).
+        for filter in topic_filters {
+            if !filter.matches(bloom) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns `true` if the bloom contains one of the address blooms, or the address blooms
+    /// list is empty (thus, no filters)
+    pub fn matches_address(bloom: Bloom, address_filter: &BloomFilter) -> bool {
+        address_filter.matches(bloom)
+    }
+
+    /// Returns true if the filter matches the given block number
+    pub fn filter_block_range(&self, block_number: u64) -> bool {
+        if self.filter.is_none() {
+            return true;
+        }
+        let filter = self.filter.as_ref().unwrap();
+        let mut res = true;
+
+        if let Some(BlockNumberOrTag::Number(num)) = filter.block_option.get_from_block() {
+            if *num > block_number {
+                res = false;
+            }
+        }
+
+        if let Some(to) = filter.block_option.get_to_block() {
+            match to {
+                BlockNumberOrTag::Number(num) => {
+                    if *num < block_number {
+                        res = false;
+                    }
+                }
+                BlockNumberOrTag::Earliest => {
+                    res = false;
+                }
+                _ => {}
+            }
+        }
+        res
+    }
+
+    /// Returns `true` if the filter matches the given block hash.
+    pub fn filter_block_hash(&self, block_hash: B256) -> bool {
+        if let Some(h) = self.filter.as_ref().and_then(|f| f.get_block_hash()) {
+            if h != block_hash {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Return `true` if the filter configured to match pending block.
+    /// This means that both from_block and to_block are set to the pending tag.
+    /// It calls [`Filter::is_pending_block_filter`] undercover.
+    pub fn is_pending_block_filter(&self) -> bool {
+        self.filter.as_ref().is_some_and(|f| f.is_pending_block_filter())
+    }
+
+    /// Returns `true` if the filter matches the given address.
+    pub fn filter_address(&self, address: &Address) -> bool {
+        self.filter.as_ref().map(|f| f.address.matches(address)).unwrap_or(true)
+    }
+
+    /// Returns `true` if the log matches the given topics
+    pub fn filter_topics(&self, log_topics: &[B256]) -> bool {
+        let topics = match self.filter.as_ref() {
+            None => return true,
+            Some(f) => &f.topics,
+        };
+        for topic_tuple in topics.iter().zip_longest(log_topics.iter()) {
+            match topic_tuple {
+                // We exhausted the `log.topics`, so if there's a filter set for
+                // this topic index, there is no match. Otherwise (empty filter), continue.
+                Left(filter_topic) => {
+                    if !filter_topic.is_empty() {
+                        return false;
+                    }
+                }
+                // We exhausted the filter topics, therefore any subsequent log topic
+                // will match.
+                Right(_) => return true,
+                // Check that `log_topic` is included in `filter_topic`
+                Both(filter_topic, log_topic) => {
+                    if !filter_topic.matches(log_topic) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 }
 
