@@ -120,18 +120,18 @@ impl BlobTransactionSidecarEip7594 {
             }
         }
 
+        // Repeat cell ranges for each blob.
+        let cell_indices =
+            Vec::from_iter((0..blobs_len).flat_map(|_| 0..CELLS_PER_EXT_BLOB as u64));
+
+        // Repeat commitments for each cell.
+        let mut commitments = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
+        for commitment in &self.commitments {
+            commitments.extend((0..CELLS_PER_EXT_BLOB).map(|_| *commitment));
+        }
+
         // SAFETY: ALL types have the same size
         let res = unsafe {
-            // Repeat commitments for each cell.
-            let mut commitments = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
-            for commitment in &self.commitments {
-                commitments.extend((0..CELLS_PER_EXT_BLOB).map(|_| *commitment));
-            }
-
-            // Repeat cell ranges for each blob.
-            let cell_indices =
-                Vec::from_iter((0..blobs_len).flat_map(|_| 0..CELLS_PER_EXT_BLOB as u64));
-
             let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
             for blob in &self.blobs {
                 let blob = core::mem::transmute::<&Blob, &c_kzg::Blob>(blob);
