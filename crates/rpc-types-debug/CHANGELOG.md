@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
 
+### Miscellaneous Tasks
+
+- Release 0.15.10
+
 ### Styling
 
 - Make `alloy-rpc-types-debug` `no_std` compatible ([#2400](https://github.com/alloy-rs/alloy/issues/2400))
