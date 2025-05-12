@@ -75,7 +75,7 @@ pub mod secp256k1 {
 
         // NOTE: we are removing error from underlying crypto library as it will restrain primitive
         // errors and we care only if recovery is passing or not.
-        imp::recover_signer_unchecked(&sig, &hash.0).map_err(|_| RecoveryError)
+        imp::recover_signer_unchecked(&sig, &hash.0).map_err(RecoveryError::from_source)
     }
 
     /// Recover signer address from message hash. This ensures that the signature S value is
@@ -85,7 +85,7 @@ pub mod secp256k1 {
     /// If the S value is too large, then this will return a `RecoveryError`
     pub fn recover_signer(signature: &Signature, hash: B256) -> Result<Address, RecoveryError> {
         if signature.s() > SECP256K1N_HALF {
-            return Err(RecoveryError);
+            return Err(RecoveryError::new());
         }
         recover_signer_unchecked(signature, hash)
     }
