@@ -127,7 +127,7 @@ impl BlobTransactionSidecarEip7594 {
         // Repeat commitments for each cell.
         let mut commitments = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
         for commitment in &self.commitments {
-            commitments.extend((0..CELLS_PER_EXT_BLOB).map(|_| *commitment));
+            commitments.extend(std::iter::repeat_n(*commitment, CELLS_PER_EXT_BLOB));
         }
 
         // SAFETY: ALL types have the same size
