@@ -876,7 +876,7 @@ pub struct BlobsBundleV2 {
     /// All commitments in the bundle.
     pub commitments: Vec<alloy_consensus::Bytes48>,
     /// All cell proofs in the bundle.
-    pub cell_proofs: Vec<alloy_consensus::Bytes48>,
+    pub proofs: Vec<alloy_consensus::Bytes48>,
     /// All blobs in the bundle.
     pub blobs: Vec<alloy_consensus::Blob>,
 }
@@ -886,16 +886,16 @@ impl BlobsBundleV2 {
     ///
     /// This folds the sidecar fields into single commit, proof, and blob vectors.
     pub fn new(sidecars: impl IntoIterator<Item = BlobTransactionSidecar>) -> Self {
-        let (commitments, cell_proofs, blobs) = sidecars.into_iter().fold(
+        let (commitments, proofs, blobs) = sidecars.into_iter().fold(
             (Vec::new(), Vec::new(), Vec::new()),
-            |(mut commitments, mut cell_proofs, mut blobs), sidecar| {
+            |(mut commitments, mut proofs, mut blobs), sidecar| {
                 commitments.extend(sidecar.commitments);
-                cell_proofs.extend(sidecar.proofs);
+                proofs.extend(sidecar.proofs);
                 blobs.extend(sidecar.blobs);
-                (commitments, cell_proofs, blobs)
+                (commitments, proofs, blobs)
             },
         );
-        Self { commitments, cell_proofs, blobs }
+        Self { commitments, proofs, blobs }
     }
 
     /// Returns a new empty blobs bundle.
@@ -914,7 +914,7 @@ impl BlobsBundleV2 {
     pub fn take(&mut self, len: usize) -> (Vec<Bytes48>, Vec<Bytes48>, Vec<Blob>) {
         (
             self.commitments.drain(0..len).collect(),
-            self.cell_proofs.drain(0..len * CELLS_PER_EXT_BLOB).collect(),
+            self.proofs.drain(0..len * CELLS_PER_EXT_BLOB).collect(),
             self.blobs.drain(0..len).collect(),
         )
     }
