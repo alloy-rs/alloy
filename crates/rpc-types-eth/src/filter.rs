@@ -189,7 +189,7 @@ impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
 
     /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
     fn to_bloom_filter(&self) -> BloomFilter {
-        vec![*self.bloom_ref()].into()
+        vec![self.bloom().into_owned()].into()
     }
 }
 
