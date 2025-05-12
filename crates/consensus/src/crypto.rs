@@ -1,14 +1,39 @@
 //! Cryptographic algorithms
 
-/// Opaque error type for sender recovery.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("Failed to recover the signer")]
-pub struct RecoveryError;
-
+use alloc::boxed::Box;
 use alloy_primitives::U256;
 
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
 use alloy_primitives::Signature;
+
+/// Opaque error type for sender recovery.
+#[derive(Debug, Default, thiserror::Error)]
+#[error("Failed to recover the signer")]
+pub struct RecoveryError {
+    #[source]
+    source: Option<Box<dyn core::error::Error + Send + Sync + 'static>>,
+}
+
+impl RecoveryError {
+    /// Create a new error with no associated source
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new error with an associated source.
+    ///
+    /// **NOTE:** The "source" should **NOT** be used to propagate cryptographic
+    /// errors e.g. signature parsing or verification errors.
+    pub fn from_source<E: core::error::Error + Send + Sync + 'static>(err: E) -> Self {
+        Self { source: Some(Box::new(err)) }
+    }
+}
+
+impl From<alloy_primitives::SignatureError> for RecoveryError {
+    fn from(err: alloy_primitives::SignatureError) -> Self {
+        Self::from_source(err)
+    }
+}
 
 /// The order of the secp256k1 curve, divided by two. Signatures that should be checked according
 /// to EIP-2 should have an S value less than or equal to this.
