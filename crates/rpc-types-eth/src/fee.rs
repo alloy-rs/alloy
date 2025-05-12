@@ -151,6 +151,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_fee_hist_null_gas_used_ratio() {
         let json = r#"{"oldestBlock": "0x0", "gasUsedRatio": null}"#;
         let _actual = serde_json::from_str::<FeeHistory>(json).unwrap();
