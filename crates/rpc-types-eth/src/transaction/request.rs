@@ -436,7 +436,7 @@ impl TransactionRequest {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip4844 transaction.")?;
 
         let to_address = match checked_to {
-            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
+            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."),
             TxKind::Call(to) => to,
         };
 
@@ -483,7 +483,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")?;
+        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.")?;
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
@@ -501,6 +501,17 @@ impl TransactionRequest {
             access_list: self.access_list.unwrap_or_default(),
             authorization_list: self.authorization_list.unwrap_or_default(),
         })
+    }
+
+    /// Ensures `to` field is set to an address which is required by:
+    /// - EIP 7702
+    /// - EIP 4844
+    fn ensure_mandatory_to(&self) -> Result<(), ()> {
+        if !matches!(self.to, Some(TxKind::Call(_))) {
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 
     fn check_reqd_fields(&self) -> Vec<&'static str> {
@@ -627,7 +638,7 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
-        if self.to.is_none() {
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
             missing.push("to");
         }
 
@@ -680,6 +691,10 @@ impl TransactionRequest {
     pub fn complete_7702(&self) -> Result<(), Vec<&'static str>> {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
+
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
+            missing.push("to");
+        }
 
         if self.authorization_list.is_none() {
             missing.push("authorization_list");
@@ -1227,6 +1242,7 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Authorization;
     use alloy_primitives::b256;
     #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
@@ -1501,7 +1517,7 @@ mod tests {
                 gas: Some(123456),
                 max_fee_per_blob_gas: Some(13579),
                 blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
-                sidecar: Some(sidecar.clone()),
+                sidecar: Some(sidecar),
                 ..Default::default()
             };
 
@@ -1510,6 +1526,25 @@ mod tests {
             assert_matches!(maybe_eip4844_tx,
             Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
             sidecar, .. }))) if sidecar == sidecar);
+
+            // with create to
+            let sidecar =
+                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.clone()),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
 
             // Negative case
             let eip4844_request_incorrect_to = TransactionRequest {
@@ -1526,6 +1561,58 @@ mod tests {
 
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
                 eip4844_request_incorrect_to.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
+        }
+
+        // EIP-7702
+        {
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip7702(_)));
+
+            // as create tx
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
     }
