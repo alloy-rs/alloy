@@ -1,6 +1,7 @@
 //! Types and constants for PeerDAS.
 //!
 //! See also [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594): PeerDAS - Peer Data Availability Sampling
+
 use crate::eip4844::{FIELD_ELEMENTS_PER_BLOB, FIELD_ELEMENT_BYTES};
 use alloy_primitives::FixedBytes;
 
