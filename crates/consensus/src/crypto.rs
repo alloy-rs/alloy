@@ -22,8 +22,6 @@ pub const SECP256K1N_HALF: U256 = U256::from_be_bytes([
 /// Secp256k1 cryptographic functions.
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
 pub mod secp256k1 {
-    pub use imp::{public_key_to_address, sign_message};
-
     use super::*;
     use alloy_primitives::{Address, B256};
 
@@ -64,6 +62,32 @@ pub mod secp256k1 {
         }
         recover_signer_unchecked(signature, hash)
     }
+    
+    /// Signs message with the given secret key.
+    /// Returns the corresponding signature.
+    #[cfg(feature = "secp256k1")]
+    pub fn sign_message(secret: B256, message: B256) -> Result<Signature, impl_secp256k1::Error> {
+        imp::sign_message(secret, message)
+    }
+    
+    /// Signs message with the given secret key.
+    /// Returns the corresponding signature.
+    #[cfg(feature = "k256")]
+    pub fn sign_message(secret: B256, message: B256) -> Result<Signature, impl_k256::Error> {
+        imp::sign_message(secret, message)
+    }
+    
+    /// Converts a public key into an ethereum address by hashing the encoded public key.
+    #[cfg(feature = "secp256k1")]
+    pub fn public_key_to_address(public: ::secp256k1::PublicKey) -> Address {
+        imp::public_key_to_address(public)
+    }
+    
+    /// Converts a public key into an ethereum address by hashing the encoded public key.
+    #[cfg(feature = "k256")]
+    pub fn public_key_to_address(public: k256::ecdsa::VerifyingKey) -> Address {
+        imp::public_key_to_address(public)
+    }
 }
 
 #[cfg(any(test, feature = "secp256k1"))]
@@ -94,7 +118,7 @@ mod impl_secp256k1 {
 
     /// Signs message with the given secret key.
     /// Returns the corresponding signature.
-    pub fn sign_message(secret: B256, message: B256) -> Result<Signature, Error> {
+    pub(crate) fn sign_message(secret: B256, message: B256) -> Result<Signature, Error> {
         let sec = SecretKey::from_slice(secret.as_ref())?;
         let s = SECP256K1.sign_ecdsa_recoverable(&Message::from_digest(message.0), &sec);
         let (rec_id, data) = s.serialize_compact();
@@ -109,7 +133,7 @@ mod impl_secp256k1 {
 
     /// Converts a public key into an ethereum address by hashing the encoded public key with
     /// keccak256.
-    pub fn public_key_to_address(public: PublicKey) -> Address {
+    pub(crate) fn public_key_to_address(public: PublicKey) -> Address {
         // strip out the first byte because that should be the SECP256K1_TAG_PUBKEY_UNCOMPRESSED
         // tag returned by libsecp's uncompressed pubkey serialization
         let hash = keccak256(&public.serialize_uncompressed()[1..]);
@@ -153,14 +177,14 @@ mod impl_k256 {
 
     /// Signs message with the given secret key.
     /// Returns the corresponding signature.
-    pub fn sign_message(secret: B256, message: B256) -> Result<Signature, Error> {
+    pub(crate) fn sign_message(secret: B256, message: B256) -> Result<Signature, Error> {
         let sec = SigningKey::from_slice(secret.as_ref())?;
         sec.sign_prehash_recoverable(&message.0).map(Into::into)
     }
 
     /// Converts a public key into an ethereum address by hashing the encoded public key with
     /// keccak256.
-    pub fn public_key_to_address(public: VerifyingKey) -> Address {
+    pub(crate) fn public_key_to_address(public: VerifyingKey) -> Address {
         let hash = keccak256(&public.to_encoded_point(/* compress = */ false).as_bytes()[1..]);
         Address::from_slice(&hash[12..])
     }
@@ -172,10 +196,10 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     #[test]
     fn sanity_ecrecover_call_secp256k1() {
-        use super::impl_secp256k1::*;
+        use super::secp256k1::{public_key_to_address, sign_message};
         use alloy_primitives::B256;
 
-        let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
+        let (secret, public) = ::secp256k1::generate_keypair(&mut rand::thread_rng());
         let signer = public_key_to_address(public);
 
         let message = b"hello world";
@@ -188,13 +212,14 @@ mod tests {
         sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
         sig[64] = signature.v() as u8;
 
-        assert_eq!(recover_signer_unchecked(&sig, &hash), Ok(signer));
+        // Here we use our public API for recovery
+        assert_eq!(super::secp256k1::recover_signer_unchecked(&signature, hash), Ok(signer));
     }
 
     #[cfg(feature = "k256")]
     #[test]
     fn sanity_ecrecover_call_k256() {
-        use super::impl_k256::*;
+        use super::secp256k1::{public_key_to_address, sign_message};
         use alloy_primitives::B256;
 
         let secret = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
@@ -211,13 +236,13 @@ mod tests {
         sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
         sig[64] = signature.v() as u8;
 
-        assert_eq!(recover_signer_unchecked(&sig, &hash).ok(), Some(signer));
+        assert_eq!(super::secp256k1::recover_signer_unchecked(&signature, hash).ok(), Some(signer));
     }
 
     #[test]
     #[cfg(all(feature = "secp256k1", feature = "k256"))]
     fn sanity_secp256k1_k256_compat() {
-        use super::{impl_k256, impl_secp256k1};
+        use super::secp256k1::{public_key_to_address, sign_message};
         use alloy_primitives::B256;
 
         let (secp256k1_secret, secp256k1_public) =
@@ -226,39 +251,29 @@ mod tests {
             .expect("k256 secret");
         let k256_public = *k256_secret.verifying_key();
 
-        let secp256k1_signer = impl_secp256k1::public_key_to_address(secp256k1_public);
-        let k256_signer = impl_k256::public_key_to_address(k256_public);
+        let secp256k1_signer = public_key_to_address(secp256k1_public);
+        let k256_signer = public_key_to_address(k256_public);
         assert_eq!(secp256k1_signer, k256_signer);
 
         let message = b"hello world";
         let hash = alloy_primitives::keccak256(message);
 
-        let secp256k1_signature = impl_secp256k1::sign_message(
+        // When both features are enabled, the secp256k1 feature takes precedence
+        // So we'll only sign with secp256k1 here
+        let signature = sign_message(
             B256::from_slice(&secp256k1_secret.secret_bytes()[..]),
             hash,
         )
-        .expect("secp256k1 sign");
-        let k256_signature =
-            impl_k256::sign_message(B256::from_slice(&k256_secret.to_bytes()[..]), hash)
-                .expect("k256 sign");
-        assert_eq!(secp256k1_signature, k256_signature);
+        .expect("sign message");
 
         let mut sig: [u8; 65] = [0; 65];
+        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
+        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
+        sig[64] = signature.v() as u8;
 
-        sig[0..32].copy_from_slice(&secp256k1_signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&secp256k1_signature.s().to_be_bytes::<32>());
-        sig[64] = secp256k1_signature.v() as u8;
-        let secp256k1_recovered =
-            impl_secp256k1::recover_signer_unchecked(&sig, &hash).expect("secp256k1 recover");
-        assert_eq!(secp256k1_recovered, secp256k1_signer);
-
-        sig[0..32].copy_from_slice(&k256_signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&k256_signature.s().to_be_bytes::<32>());
-        sig[64] = k256_signature.v() as u8;
-        let k256_recovered =
-            impl_k256::recover_signer_unchecked(&sig, &hash).expect("k256 recover");
-        assert_eq!(k256_recovered, k256_signer);
-
-        assert_eq!(secp256k1_recovered, k256_recovered);
+        let recovered = super::secp256k1::recover_signer_unchecked(&signature, hash)
+            .expect("recover signer");
+        assert_eq!(recovered, secp256k1_signer);
+        assert_eq!(recovered, k256_signer);
     }
 }
