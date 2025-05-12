@@ -67,12 +67,14 @@ impl BlobScheduleBlobParams {
     pub fn from_schedule(schedule: &BTreeMap<String, BlobParams>) -> Self {
         let mut cancun = None;
         let mut prague = None;
+        let mut osaka = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in schedule {
             match key.as_str() {
                 "cancun" => cancun = Some(*params),
                 "prague" => prague = Some(*params),
+                "osaka" => osaka = Some(*params),
                 _ => {
                     if let Ok(timestamp) = key.parse::<u64>() {
                         scheduled.push((timestamp, *params));
@@ -86,6 +88,7 @@ impl BlobScheduleBlobParams {
         Self {
             cancun: cancun.unwrap_or_else(BlobParams::cancun),
             prague: prague.unwrap_or_else(BlobParams::prague),
+            osaka: osaka.unwrap_or_else(BlobParams::osaka),
             scheduled,
         }
     }
