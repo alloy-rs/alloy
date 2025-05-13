@@ -173,10 +173,10 @@ where
 }
 
 impl<N: Network> FillerNetwork<N> for crate::Identity {
-    type NewFillers<Net: Network> = Identity;
+    type NewFillers<Net: Network> = Self;
 
     fn network<Net: Network>(self) -> Self::NewFillers<Net> {
-        Identity
+        Self
     }
 }
 
@@ -205,7 +205,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::{marker::PhantomData, str::FromStr};
+    use std::str::FromStr;
 
     use alloy_network::{AnyNetwork, Ethereum, EthereumWallet, Network, TransactionBuilder};
     use alloy_primitives::Bytes;
@@ -218,7 +218,7 @@ mod tests {
             NonceFiller, RecommendedFiller, RecommendedFillers, TxFiller, WalletFiller,
         },
         layers::AnvilProvider,
-        Provider, ProviderBuilder, RootProvider,
+        ProviderBuilder, RootProvider,
     };
 
     #[test]
