@@ -165,7 +165,7 @@ semver = "1.0"
 strum = { version = "0.27", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 url = "2.5"
-jsonrpsee = { version = "0.24", default-features = false }
+jsonrpsee = { version = "0.25", default-features = false }
 
 # misc-testing
 arbitrary = "1.3"
