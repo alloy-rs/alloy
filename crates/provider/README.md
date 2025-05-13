@@ -35,7 +35,7 @@ The `ProviderBuilder` struct can quickly create a stacked provider, similar to
 
 ## Usage
 
-```rust
+```rust,norun
 use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 use alloy_network::Ethereum;
 use alloy_primitives::address;
@@ -44,7 +44,7 @@ use std::str::FromStr;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a basic HTTP provider
-    let provider = RootProvider::new_http("https://reth-ethereum.ithaca.xyz/rpc".parse()?);
+    let provider = RootProvider::<Ethereum>::new_http("https://reth-ethereum.ithaca.xyz/rpc".parse()?);
 
     // Get the latest block number
     let block_number = provider.get_block_number().await?;
