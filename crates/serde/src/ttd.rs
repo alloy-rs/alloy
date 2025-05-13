@@ -33,7 +33,7 @@ where
     }
 }
 
-/// Deserializes an optional TTD value from a 128-bit JSON number.
+/// Deserializes an optional TTD value from JSON number or string.
 pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
 where
     D: Deserializer<'de>,
@@ -46,7 +46,8 @@ where
     }
 }
 
-/// Supports parsing the TTD as `Option<u128>`, which is sufficient for the mainnet TTD (5.875e22).
+/// Supports parsing the TTD as an `Option<u64>`, or `Option<f64>` specifically for the mainnet TTD
+/// (5.875e22).
 pub fn deserialize_json_ttd_opt<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
 where
     D: Deserializer<'de>,
@@ -73,18 +74,9 @@ where
         // are arbitrary precision in JSON, so this is valid JSON. This number is also
         // greater than a `u64`.
         //
-        // Unfortunately, serde_json only supports parsing up to `u64`, resorting to `f64`
-        // once `u64` overflows:
-        // <https://github.com/serde-rs/json/blob/4bc1eaa03a6160593575bc9bc60c94dba4cab1e3/src/de.rs#L1411-L1415>
-        // <https://github.com/serde-rs/json/blob/4bc1eaa03a6160593575bc9bc60c94dba4cab1e3/src/de.rs#L479-L484>
-        // <https://github.com/serde-rs/json/blob/4bc1eaa03a6160593575bc9bc60c94dba4cab1e3/src/de.rs#L102-L108>
-        //
-        // serde_json does have an arbitrary precision feature, but this breaks untagged
-        // enums in serde:
-        // <https://github.com/serde-rs/serde/issues/2230>
-        // <https://github.com/serde-rs/serde/issues/1183>
-        //
-        // To solve this, we use the captured float and return the TTD as a U256 if it's equal.
+        // Unfortunately, sometimes when parsing the JSON with serde or other tools, numbers larger
+        // than u64 will be represented as floating point numbers. To solve this, we use the
+        // captured float and return the TTD as a U256 if it's equal.
         if value == 5.875e22 {
             U256::from(58750000000000000000000u128)
         } else {
@@ -117,7 +109,7 @@ mod tests {
         struct Ttd(#[serde(with = "super")] Option<U256>);
 
         let deserialized: Vec<Ttd> = serde_json::from_str(
-            r#"["",0,"0","0x0","58750000000000000000000",58750000000000000000000]"#,
+            r#"["",0,"0","0x0",18446744073709551615,"58750000000000000000000",58750000000000000000000]"#,
         )
         .unwrap();
         assert_eq!(
@@ -127,6 +119,7 @@ mod tests {
                 Ttd(Some(U256::ZERO)),
                 Ttd(Some(U256::ZERO)),
                 Ttd(Some(U256::ZERO)),
+                Ttd(Some(U256::from(18446744073709551615u64))),
                 Ttd(Some(U256::from(58750000000000000000000u128))),
                 Ttd(Some(U256::from(58750000000000000000000u128))),
             ]
