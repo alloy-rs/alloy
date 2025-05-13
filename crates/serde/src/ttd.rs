@@ -44,6 +44,14 @@ where
     }
 }
 
+/// Supports parsing the TTD as `Option<u128>`, which is sufficient for the mainnet TTD (5.875e22).
+pub fn deserialize_json_ttd_opt<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize(deserializer)
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(not(feature = "std"))]
