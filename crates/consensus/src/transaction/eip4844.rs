@@ -1,22 +1,19 @@
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, TxEip4844Sidecar};
 use crate::{SignableTransaction, Signed, Transaction, TxType};
-
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip2718::IsTyped2718, eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB,
-    eip7702::SignedAuthorization, Typed2718,
+    eip2718::IsTyped2718,
+    eip2930::AccessList,
+    eip4844::{BlobTransactionSidecar, DATA_GAS_PER_BLOB},
+    eip7702::SignedAuthorization,
+    Typed2718,
 };
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
-#[doc(inline)]
-pub use alloy_eips::eip4844::BlobTransactionSidecar;
-
 #[cfg(feature = "kzg")]
-#[doc(inline)]
-pub use alloy_eips::eip4844::BlobTransactionValidationError;
-
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
+use alloy_eips::eip4844::BlobTransactionValidationError;
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -545,9 +542,9 @@ impl TxEip4844 {
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
     #[cfg(feature = "kzg")]
-    pub fn validate_blob(
+    pub fn validate_blob<T: TxEip4844Sidecar>(
         &self,
-        sidecar: &BlobTransactionSidecar,
+        sidecar: &T,
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         sidecar.validate(&self.blob_versioned_hashes, proof_settings)
@@ -779,32 +776,21 @@ impl From<TxEip4844WithSidecar> for TxEip4844 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
-pub struct TxEip4844WithSidecar {
+pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
     /// The actual transaction.
     #[cfg_attr(feature = "serde", serde(flatten))]
     #[doc(alias = "transaction")]
     pub tx: TxEip4844,
     /// The sidecar.
     #[cfg_attr(feature = "serde", serde(flatten))]
-    pub sidecar: BlobTransactionSidecar,
+    pub sidecar: T,
 }
 
-impl TxEip4844WithSidecar {
-    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a [BlobTransactionSidecar].
+impl<T> TxEip4844WithSidecar<T> {
+    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a sidecar.
     #[doc(alias = "from_transaction_and_sidecar")]
-    pub const fn from_tx_and_sidecar(tx: TxEip4844, sidecar: BlobTransactionSidecar) -> Self {
+    pub const fn from_tx_and_sidecar(tx: TxEip4844, sidecar: T) -> Self {
         Self { tx, sidecar }
-    }
-
-    /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
-    ///
-    /// See also [TxEip4844::validate_blob]
-    #[cfg(feature = "kzg")]
-    pub fn validate_blob(
-        &self,
-        proof_settings: &c_kzg::KzgSettings,
-    ) -> Result<(), BlobTransactionValidationError> {
-        self.tx.validate_blob(&self.sidecar, proof_settings)
     }
 
     /// Get the transaction type.
@@ -819,20 +805,32 @@ impl TxEip4844WithSidecar {
         &self.tx
     }
 
-    /// Get access to the inner sidecar [BlobTransactionSidecar].
-    pub const fn sidecar(&self) -> &BlobTransactionSidecar {
+    /// Get access to the inner sidecar.
+    pub const fn sidecar(&self) -> &T {
         &self.sidecar
     }
 
-    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar [BlobTransactionSidecar].
-    pub fn into_sidecar(self) -> BlobTransactionSidecar {
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar.
+    pub fn into_sidecar(self) -> T {
         self.sidecar
     }
 
-    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844] and
-    /// [BlobTransactionSidecar].
-    pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844] and a sidecar.
+    pub fn into_parts(self) -> (TxEip4844, T) {
         (self.tx, self.sidecar)
+    }
+}
+
+impl<T: TxEip4844Sidecar> TxEip4844WithSidecar<T> {
+    /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
+    ///
+    /// See also [TxEip4844::validate_blob]
+    #[cfg(feature = "kzg")]
+    pub fn validate_blob(
+        &self,
+        proof_settings: &c_kzg::KzgSettings,
+    ) -> Result<(), BlobTransactionValidationError> {
+        self.tx.validate_blob(&self.sidecar, proof_settings)
     }
 
     /// Calculates a heuristic for the in-memory size of the [TxEip4844WithSidecar] transaction.
