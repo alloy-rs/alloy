@@ -38,24 +38,28 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
         let v = Value::deserialize(deserializer)?;
 
         // Extract shared fields
-        let blobs: Vec<Blob> = serde_json::from_value(v.get("blobs").cloned().ok_or_else(|| D::Error::missing_field("blobs"))?)
-            .map_err(D::Error::custom)?;
-        let commitments: Vec<Bytes48> = serde_json::from_value(v.get("commitments").cloned().ok_or_else(|| D::Error::missing_field("commitments"))?)
-            .map_err(D::Error::custom)?;
+        let blobs: Vec<Blob> = serde_json::from_value(
+            v.get("blobs").cloned().ok_or_else(|| D::Error::missing_field("blobs"))?,
+        )
+        .map_err(D::Error::custom)?;
+        let commitments: Vec<Bytes48> = serde_json::from_value(
+            v.get("commitments").cloned().ok_or_else(|| D::Error::missing_field("commitments"))?,
+        )
+        .map_err(D::Error::custom)?;
 
         // Distinguish by presence of `cell_proofs` or `proofs`
         if let Some(cell_proofs_val) = v.get("cell_proofs") {
-            let cell_proofs: Vec<Bytes48> = serde_json::from_value(cell_proofs_val.clone())
-                .map_err(D::Error::custom)?;
-            Ok(BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
+            let cell_proofs: Vec<Bytes48> =
+                serde_json::from_value(cell_proofs_val.clone()).map_err(D::Error::custom)?;
+            Ok(Self::Eip7594(BlobTransactionSidecarEip7594 {
                 blobs,
                 commitments,
                 cell_proofs,
             }))
         } else if let Some(proofs_val) = v.get("proofs") {
-            let proofs: Vec<Bytes48> = serde_json::from_value(proofs_val.clone())
-                .map_err(D::Error::custom)?;
-            Ok(BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+            let proofs: Vec<Bytes48> =
+                serde_json::from_value(proofs_val.clone()).map_err(D::Error::custom)?;
+            Ok(Self::Eip4844(BlobTransactionSidecar {
                 blobs,
                 commitments,
                 proofs,
