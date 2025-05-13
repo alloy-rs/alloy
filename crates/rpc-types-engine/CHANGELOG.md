@@ -5,10 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0](https://github.com/alloy-rs/alloy/releases/tag/v1.0.0) - 2025-05-13
+
+### Bug Fixes
+
+- [rpc-types-engine] Use 7594 sidecar in `BlobsBundleV2` ([#2433](https://github.com/alloy-rs/alloy/issues/2433))
+- [eips] `proofs` field name in `BlobsBundleV2` ([#2426](https://github.com/alloy-rs/alloy/issues/2426))
+
+### Dependencies
+
+- Bump jsonrpsee types ([#2439](https://github.com/alloy-rs/alloy/issues/2439))
+
+### Features
+
+- [eips] Add more EIP-7594 constants ([#2425](https://github.com/alloy-rs/alloy/issues/2425))
+
 ## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
 
 ### Miscellaneous Tasks
 
+- Release 0.15.11
 - Fix clippy ([#2422](https://github.com/alloy-rs/alloy/issues/2422))
 
 ## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07

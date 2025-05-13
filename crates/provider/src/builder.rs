@@ -9,7 +9,7 @@ use crate::{
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, EthereumWallet, IntoWallet, Network, NetworkWallet};
+use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -591,9 +591,9 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        F: Pushable<WalletFiller<EthereumWallet>, N>,
+        F: Pushable<WalletFiller<alloy_network::EthereumWallet>, N>,
         Fillers<F::Pushed, N>: ProviderLayer<L::Provider, N> + TxFiller<N>,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         self.connect_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
@@ -607,13 +607,13 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self,
     ) -> <Fillers<F::Pushed, N> as ProviderLayer<L::Provider, N>>::Provider
     where
-        F: Pushable<WalletFiller<EthereumWallet>, N>,
+        F: Pushable<WalletFiller<alloy_network::EthereumWallet>, N>,
         L: crate::builder::ProviderLayer<
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
         Fillers<F::Pushed, N>: ProviderLayer<L::Provider, N> + TxFiller<N>,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         self.connect_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
@@ -671,9 +671,9 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        F: Pushable<WalletFiller<EthereumWallet>, N>,
+        F: Pushable<WalletFiller<alloy_network::EthereumWallet>, N>,
         Fillers<F::Pushed, N>: ProviderLayer<L::Provider, N> + TxFiller<N>,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
@@ -701,9 +701,9 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        F: Pushable<WalletFiller<EthereumWallet>, N>,
+        F: Pushable<WalletFiller<alloy_network::EthereumWallet>, N>,
         Fillers<F::Pushed, N>: ProviderLayer<L::Provider, N> + TxFiller<N>,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();

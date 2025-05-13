@@ -25,7 +25,7 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["map"] }
 alloy-json-rpc.workspace = true
-alloy-transport-http.workspace = true
+alloy-transport-http = { workspace = true, optional = true }
 alloy-transport.workspace = true
 
 async-stream.workspace = true
