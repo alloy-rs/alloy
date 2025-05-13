@@ -51,19 +51,11 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
         if let Some(cell_proofs_val) = v.get("cell_proofs") {
             let cell_proofs: Vec<Bytes48> =
                 serde_json::from_value(cell_proofs_val.clone()).map_err(D::Error::custom)?;
-            Ok(Self::Eip7594(BlobTransactionSidecarEip7594 {
-                blobs,
-                commitments,
-                cell_proofs,
-            }))
+            Ok(Self::Eip7594(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs }))
         } else if let Some(proofs_val) = v.get("proofs") {
             let proofs: Vec<Bytes48> =
                 serde_json::from_value(proofs_val.clone()).map_err(D::Error::custom)?;
-            Ok(Self::Eip4844(BlobTransactionSidecar {
-                blobs,
-                commitments,
-                proofs,
-            }))
+            Ok(Self::Eip4844(BlobTransactionSidecar { blobs, commitments, proofs }))
         } else {
             Err(D::Error::custom("Missing both 'cell_proofs' and 'proofs' fields"))
         }
