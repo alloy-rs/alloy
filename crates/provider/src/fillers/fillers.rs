@@ -152,31 +152,31 @@ impl<F: TxFiller<N>, N: Network> Pushable<F, N> for crate::Identity {
 ///
 /// [`ProviderBuilder::network`]: crate::builder::ProviderBuilder::network
 pub trait FillerNetwork<N> {
-    /// The current tuple of fillers in the stack.
+    /// The current tuple of fillers in the stack with the new network.
     ///
-    /// e.g. `(GasFiller, NonceFiller, ChainIdFiller)`
-    type CurrentFillers;
+    /// e.g. `Filler<(GasFiller, NonceFiller, ChainIdFiller), Net>`
+    type NewFillers<Net: Network>;
 
     /// Change the network associated with the [`Fillers`] stack.
-    fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net>;
+    fn network<Net: Network>(self) -> Self::NewFillers<Net>;
 }
 
 impl<T, N: Network> FillerNetwork<N> for Fillers<T, N>
 where
     Self: TxFiller<N>,
 {
-    type CurrentFillers = T;
+    type NewFillers<Net: Network> = Fillers<T, Net>;
 
-    fn network<Net: Network>(self) -> Fillers<T, Net> {
+    fn network<Net: Network>(self) -> Self::NewFillers<Net> {
         Fillers::new(self.inner)
     }
 }
 
 impl<N: Network> FillerNetwork<N> for crate::Identity {
-    type CurrentFillers = Self;
+    type NewFillers<Net: Network> = Identity;
 
-    fn network<Net: Network>(self) -> Fillers<Self::CurrentFillers, Net> {
-        Fillers::default()
+    fn network<Net: Network>(self) -> Self::NewFillers<Net> {
+        Identity
     }
 }
 
@@ -205,7 +205,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::str::FromStr;
+    use std::{marker::PhantomData, str::FromStr};
 
     use alloy_network::{AnyNetwork, Ethereum, EthereumWallet, Network, TransactionBuilder};
     use alloy_primitives::Bytes;
@@ -218,7 +218,7 @@ mod tests {
             NonceFiller, RecommendedFiller, RecommendedFillers, TxFiller, WalletFiller,
         },
         layers::AnvilProvider,
-        ProviderBuilder, RootProvider,
+        Provider, ProviderBuilder, RootProvider,
     };
 
     #[test]
@@ -370,5 +370,23 @@ mod tests {
             .filler(GasFiller)
             .filler(BlobGasFiller)
             .connect_anvil_with_wallet(); // Adds the 15th i.e wallet filler.
+    }
+
+    #[tokio::test]
+    async fn compile_tests() {
+        let _p: RootProvider<AnyNetwork> = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .network::<AnyNetwork>()
+            .connect_http("http://localhost:8545".parse().unwrap());
+
+        let _p: FillProvider<
+            Fillers<(ChainIdFiller,), AnyNetwork>,
+            RootProvider<AnyNetwork>,
+            AnyNetwork,
+        > = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .network::<AnyNetwork>()
+            .with_chain_id(1)
+            .connect_http("http://localhost:8545".parse().unwrap());
     }
 }
