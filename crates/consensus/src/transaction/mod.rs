@@ -2,7 +2,7 @@
 
 use crate::Signed;
 use alloc::vec::Vec;
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxKind, B256, U256};
 use core::{any, fmt};
 
@@ -18,25 +18,28 @@ pub use eip7702::TxEip7702;
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
+pub use envelope::{EthereumTxEnvelope, TxEnvelope};
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
-pub mod pooled;
-pub use pooled::PooledTransaction;
+pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
-use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
+mod eip4844_sidecar;
+#[cfg(feature = "kzg")]
+pub use eip4844_sidecar::BlobTransactionValidationError;
+pub use eip4844_sidecar::TxEip4844Sidecar;
+
+// Re-export 4844 helpers.
 pub use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
     utils as eip4844_utils, Blob, BlobTransactionSidecar, Bytes48,
 };
-#[cfg(feature = "kzg")]
-pub use eip4844::BlobTransactionValidationError;
-pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
+
+pub mod pooled;
+pub use pooled::PooledTransaction;
 
 /// Re-export for convenience
 pub use either::Either;
-
-pub use envelope::{EthereumTxEnvelope, TxEnvelope};
 
 mod legacy;
 pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
