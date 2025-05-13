@@ -3,7 +3,7 @@ use core::fmt;
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::{
     eip2718::{
-        Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, EIP1559_TX_TYPE_ID,
+        Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718, EIP1559_TX_TYPE_ID,
         EIP2930_TX_TYPE_ID, EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID, LEGACY_TX_TYPE_ID,
     },
     Typed2718,
@@ -227,6 +227,12 @@ impl Typed2718 for ReceiptEnvelope {
             Self::Eip4844(_) => EIP4844_TX_TYPE_ID,
             Self::Eip7702(_) => EIP7702_TX_TYPE_ID,
         }
+    }
+}
+
+impl IsTyped2718 for ReceiptEnvelope {
+    fn is_type(type_id: u8) -> bool {
+        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 

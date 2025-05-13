@@ -114,6 +114,8 @@ pub struct SignedBidSubmissionV1 {
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Capella).
 ///
+/// Also known as `CapellaSubmitBlockRequest`.
+///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/capella/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -129,6 +131,8 @@ pub struct SignedBidSubmissionV2 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Deneb).
+///
+/// Also known as `DenebSubmitBlockRequest`.
 ///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -147,6 +151,9 @@ pub struct SignedBidSubmissionV3 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Electra).
+///
+///
+/// Also known as `ElectraSubmitBlockRequest`.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -163,6 +170,74 @@ pub struct SignedBidSubmissionV4 {
     pub execution_requests: ExecutionRequestsV4,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
+}
+
+/// Represents all versions of signed bid submissions (submit block requests).
+///
+/// Note: The fields are ordered starting with the most recent version so that the
+/// untagged, transparent decoding prioritises the newest version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
+#[cfg_attr(feature = "ssz", ssz(enum_behaviour = "transparent"))]
+pub enum SubmitBlockRequest {
+    /// Electra [`SignedBidSubmissionV4`].
+    Electra(SignedBidSubmissionV4),
+    /// Deneb [`SignedBidSubmissionV3`].
+    Deneb(SignedBidSubmissionV3),
+    /// Capella [`SignedBidSubmissionV2`].
+    Capella(SignedBidSubmissionV2),
+}
+
+impl SubmitBlockRequest {
+    /// Returns the [`SignedBidSubmissionV2`] if this is [`Self::Capella`]
+    pub fn as_capella(&self) -> Option<&SignedBidSubmissionV2> {
+        match self {
+            Self::Capella(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`SignedBidSubmissionV3`] if this is [`Self::Deneb`]
+    pub fn as_deneb(&self) -> Option<&SignedBidSubmissionV3> {
+        match self {
+            Self::Deneb(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`SignedBidSubmissionV4`] if this is [`Self::Electra`]
+    pub fn as_electra(&self) -> Option<&SignedBidSubmissionV4> {
+        match self {
+            Self::Electra(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
+    /// Returns the underlying [`BidTrace`].
+    pub fn bid_trace(&self) -> &BidTrace {
+        match self {
+            Self::Capella(req) => &req.message,
+            Self::Deneb(req) => &req.message,
+            Self::Electra(req) => &req.message,
+        }
+    }
+}
+
+impl From<SignedBidSubmissionV2> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV2) -> Self {
+        Self::Capella(value)
+    }
+}
+impl From<SignedBidSubmissionV3> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV3) -> Self {
+        Self::Deneb(value)
+    }
+}
+impl From<SignedBidSubmissionV4> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV4) -> Self {
+        Self::Electra(value)
+    }
 }
 
 /// Query for the `/relay/v1/builder/blocks` endpoint

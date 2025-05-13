@@ -10,7 +10,7 @@ use crate::{
     TxEip7702, TxLegacy,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
     eip4844::BlobTransactionSidecar,
     Typed2718,
@@ -528,6 +528,24 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     }
 }
 
+#[cfg(any(feature = "secp256k1", feature = "k256"))]
+impl<Eip4844> crate::transaction::SignerRecoverable for EthereumTxEnvelope<Eip4844>
+where
+    Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
+{
+    fn recover_signer(&self) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+    }
+
+    fn recover_signer_unchecked(
+        &self,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+}
+
 impl<Eip4844> Encodable for EthereumTxEnvelope<Eip4844>
 where
     Self: Encodable2718,
@@ -569,6 +587,12 @@ where
 {
     fn ty(&self) -> u8 {
         self.tx().ty()
+    }
+}
+
+impl<T> IsTyped2718 for EthereumTxEnvelope<T> {
+    fn is_type(type_id: u8) -> bool {
+        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 

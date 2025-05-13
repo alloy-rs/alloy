@@ -91,13 +91,14 @@ k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 secp256k1 = ["dep:secp256k1"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
-    "std",
-    "dep:rand",
-    "dep:arbitrary",
-    "alloy-eips/arbitrary",
-    "alloy-primitives/arbitrary",
-    "alloy-serde?/arbitrary",
-    "alloy-trie/arbitrary"
+	"std",
+	"dep:rand",
+	"dep:arbitrary",
+	"alloy-eips/arbitrary",
+	"alloy-primitives/arbitrary",
+	"alloy-serde?/arbitrary",
+	"alloy-trie/arbitrary",
+	"c-kzg?/arbitrary"
 ]
 serde = [
     "dep:serde",

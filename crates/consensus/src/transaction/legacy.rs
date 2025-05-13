@@ -3,7 +3,9 @@ use crate::{
     SignableTransaction, Signed, Transaction, TxType,
 };
 use alloc::vec::Vec;
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
@@ -345,6 +347,12 @@ impl SignableTransaction<Signature> for TxLegacy {
 impl Typed2718 for TxLegacy {
     fn ty(&self) -> u8 {
         TxType::Legacy as u8
+    }
+}
+
+impl IsTyped2718 for TxLegacy {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x00)
     }
 }
 

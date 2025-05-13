@@ -63,7 +63,8 @@ txpool = ["dep:alloy-rpc-types-txpool"]
 arbitrary = [
 	"alloy-rpc-types-eth?/arbitrary",
 	"alloy-serde/arbitrary",
-	"alloy-primitives/arbitrary"
+	"alloy-primitives/arbitrary",
+    "alloy-rpc-types-engine?/arbitrary"
 ]
 jsonrpsee-types = [
     "alloy-rpc-types-eth?/jsonrpsee-types",

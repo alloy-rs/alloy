@@ -1209,6 +1209,7 @@ mod tests {
 
     // <https://github.com/succinctlabs/kona/issues/31>
     #[test]
+    #[cfg(feature = "serde")]
     fn deserde_tenderly_block() {
         let s = include_str!("../testdata/tenderly.sepolia.json");
         let _block: Block = serde_json::from_str(s).unwrap();
