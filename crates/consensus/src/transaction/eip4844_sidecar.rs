@@ -8,7 +8,6 @@ use alloy_eips::{
 pub use alloy_eips::eip4844::BlobTransactionValidationError;
 
 /// An EIP-4844 transaction sidecar.
-
 pub trait TxEip4844Sidecar {
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
