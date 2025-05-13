@@ -34,8 +34,7 @@ use crate::GetSubscription;
 use crate::{
     provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
-    SendableTxErr,
+    PendingTransactionError, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTxErr,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
