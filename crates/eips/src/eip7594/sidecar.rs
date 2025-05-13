@@ -47,7 +47,8 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
             type Value = BlobTransactionSidecarVariant;
 
             fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                formatter.write_str("a valid blob transaction sidecar (EIP-4844 or EIP-7594 variant)")
+                formatter
+                    .write_str("a valid blob transaction sidecar (EIP-4844 or EIP-7594 variant)")
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
@@ -69,24 +70,27 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
                 }
 
                 let blobs = blobs.ok_or_else(|| serde::de::Error::missing_field("blobs"))?;
-                let commitments = commitments.ok_or_else(|| serde::de::Error::missing_field("commitments"))?;
+                let commitments =
+                    commitments.ok_or_else(|| serde::de::Error::missing_field("commitments"))?;
 
                 match (cell_proofs, proofs) {
-                    (Some(cp), None) => Ok(BlobTransactionSidecarVariant::Eip7594(
-                        BlobTransactionSidecarEip7594 {
+                    (Some(cp), None) => {
+                        Ok(BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
                             blobs,
                             commitments,
                             cell_proofs: cp,
-                        },
-                    )),
-                    (None, Some(pf)) => Ok(BlobTransactionSidecarVariant::Eip4844(
-                        BlobTransactionSidecar {
+                        }))
+                    }
+                    (None, Some(pf)) => {
+                        Ok(BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
                             blobs,
                             commitments,
                             proofs: pf,
-                        },
-                    )),
-                    (None, None) => Err(serde::de::Error::custom("Missing 'cell_proofs' or 'proofs'")),
+                        }))
+                    }
+                    (None, None) => {
+                        Err(serde::de::Error::custom("Missing 'cell_proofs' or 'proofs'"))
+                    }
                     (Some(_), Some(_)) => Err(serde::de::Error::custom(
                         "Both 'cell_proofs' and 'proofs' cannot be present",
                     )),
