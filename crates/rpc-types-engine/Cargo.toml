@@ -42,7 +42,7 @@ ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.24", optional = true }
+jsonrpsee-types = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
