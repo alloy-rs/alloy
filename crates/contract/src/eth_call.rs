@@ -86,7 +86,7 @@ where
         self.inner = self.inner.account_override(address, account_overrides);
         self
     }
-    /// Extends the the given [AccountOverride] to the state override.
+    /// Extends the given [AccountOverride] to the state override.
     ///
     /// Creates a new [`StateOverride`] if none has been set yet.
     pub fn account_overrides(

@@ -348,6 +348,18 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
+    /// Retrieves account information ([Account](alloy_rpc_types_eth::Account)) for the given
+    /// [Address] at the particular [BlockId].
+    ///
+    /// Note: This is slightly different than `eth_getAccount` and not all clients support this
+    /// endpoint.
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+        self.client().request("eth_getAccountInfo", address).into()
+    }
+
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
     /// at the particular [BlockId].
     fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
@@ -1594,7 +1606,7 @@ mod tests {
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);
         while let Some(header) = stream.next().await {
-            println!("New block {:?}", header);
+            println!("New block {header:?}");
             assert!(header.number > 0);
         }
     }
@@ -1964,7 +1976,7 @@ mod tests {
             }
             Err(e) => {
                 assert_eq!(
-                    format!("{}",e),
+                    format!("{e}"),
                     "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually"
                 );
             }
@@ -2238,5 +2250,19 @@ mod tests {
 
         let elapsed = start.elapsed();
         assert_eq!(elapsed.as_secs_f64().round() as u32, 1);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "hyper")]
+    async fn test_connect_hyper_tls() {
+        let p =
+            ProviderBuilder::new().connect("https://reth-ethereum.ithaca.xyz/rpc").await.unwrap();
+
+        let _num = p.get_block_number().await.unwrap();
+
+        let anvil = Anvil::new().spawn();
+        let p = ProviderBuilder::new().connect(&anvil.endpoint()).await.unwrap();
+
+        let _num = p.get_block_number().await.unwrap();
     }
 }

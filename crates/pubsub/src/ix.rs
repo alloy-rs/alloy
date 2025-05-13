@@ -4,7 +4,7 @@ use std::fmt;
 use tokio::sync::oneshot;
 
 /// Instructions for the pubsub service.
-pub(crate) enum PubSubInstruction {
+pub enum PubSubInstruction {
     /// Send a request.
     Request(InFlight),
     /// Get the subscription ID for a local ID.

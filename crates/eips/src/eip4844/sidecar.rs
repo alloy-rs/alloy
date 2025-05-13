@@ -9,7 +9,7 @@ use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
 #[cfg(any(test, feature = "arbitrary"))]
-use crate::eip4844::MAX_BLOBS_PER_BLOCK;
+use crate::eip4844::MAX_BLOBS_PER_BLOCK_DENCUN;
 
 /// The versioned hash version for KZG.
 #[cfg(feature = "kzg")]
@@ -178,7 +178,7 @@ impl BlobTransactionSidecarItem {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
+        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK_DENCUN)?;
         let mut blobs = Vec::with_capacity(num_blobs);
         for _ in 0..num_blobs {
             blobs.push(Blob::arbitrary(u)?);
@@ -452,7 +452,7 @@ impl Decodable for BlobTransactionSidecar {
 
 // Helper function to deserialize boxed blobs
 #[cfg(all(debug_assertions, feature = "serde"))]
-fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
@@ -496,16 +496,16 @@ impl core::fmt::Display for BlobTransactionValidationError {
         match self {
             Self::InvalidProof => f.write_str("invalid KZG proof"),
             Self::KZGError(err) => {
-                write!(f, "KZG error: {:?}", err)
+                write!(f, "KZG error: {err:?}")
             }
             Self::NotBlobTransaction(err) => {
-                write!(f, "unable to verify proof for non blob transaction: {}", err)
+                write!(f, "unable to verify proof for non blob transaction: {err}")
             }
             Self::MissingSidecar => {
                 f.write_str("eip4844 tx variant without sidecar being used for verification.")
             }
             Self::WrongVersionedHash { have, expected } => {
-                write!(f, "wrong versioned hash: have {}, expected {}", have, expected)
+                write!(f, "wrong versioned hash: have {have}, expected {expected}")
             }
         }
     }

@@ -152,10 +152,12 @@ Because these crates are primarily network-focused, we do not intend to support
 
 The following crates support `no_std`:
 
-- alloy-eips
-- alloy-genesis
-- alloy-serde
-- alloy-consensus
+| Crate               | Version Badge                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **alloy-eips**      | [![Crates.io](https://img.shields.io/crates/v/alloy-eips.svg)](https://crates.io/crates/alloy-eips)           |
+| **alloy-genesis**   | [![Crates.io](https://img.shields.io/crates/v/alloy-genesis.svg)](https://crates.io/crates/alloy-genesis)     |
+| **alloy-serde**     | [![Crates.io](https://img.shields.io/crates/v/alloy-serde.svg)](https://crates.io/crates/alloy-serde)         |
+| **alloy-consensus** | [![Crates.io](https://img.shields.io/crates/v/alloy-consensus.svg)](https://crates.io/crates/alloy-consensus) |
 
 If you would like to add `no_std` support to a crate, please make sure to update
 `scripts/check_no_std.sh` as well.

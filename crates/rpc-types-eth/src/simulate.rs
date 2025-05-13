@@ -156,6 +156,7 @@ pub struct SimulateError {
 mod tests {
     use super::*;
     use alloy_primitives::{Address, TxKind};
+    #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
 

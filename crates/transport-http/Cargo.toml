@@ -60,6 +60,7 @@ hyper = [
     "dep:serde_json",
     "dep:tower",
     "dep:tracing",
+    "hyper-tls",
 ]
 hyper-tls = ["hyper", "dep:hyper-tls"]
 jwt-auth = [

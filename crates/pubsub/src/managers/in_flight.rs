@@ -7,15 +7,15 @@ use tokio::sync::oneshot;
 ///
 /// This struct contains the request that was sent, as well as a channel to
 /// receive the response on.
-pub(crate) struct InFlight {
+pub struct InFlight {
     /// The request
-    pub(crate) request: SerializedRequest,
+    pub request: SerializedRequest,
 
     /// The number of items to buffer in the subscription channel.
-    pub(crate) channel_size: usize,
+    pub channel_size: usize,
 
     /// The channel to send the response on.
-    pub(crate) tx: oneshot::Sender<TransportResult<Response>>,
+    pub tx: oneshot::Sender<TransportResult<Response>>,
 }
 
 impl fmt::Debug for InFlight {
@@ -30,7 +30,7 @@ impl fmt::Debug for InFlight {
 
 impl InFlight {
     /// Create a new in-flight request.
-    pub(crate) fn new(
+    pub fn new(
         request: SerializedRequest,
         channel_size: usize,
     ) -> (Self, oneshot::Receiver<TransportResult<Response>>) {
@@ -40,21 +40,21 @@ impl InFlight {
     }
 
     /// Check if the request is a subscription.
-    pub(crate) fn is_subscription(&self) -> bool {
+    pub fn is_subscription(&self) -> bool {
         self.request.is_subscription()
     }
 
     /// Get a reference to the serialized request.
     ///
     /// This is used to (re-)send the request over the transport.
-    pub(crate) const fn request(&self) -> &SerializedRequest {
+    pub const fn request(&self) -> &SerializedRequest {
         &self.request
     }
 
     /// Fulfill the request with a response. This consumes the in-flight
     /// request. If the request is a subscription and the response is not an
     /// error, the subscription ID and the in-flight request are returned.
-    pub(crate) fn fulfill(self, resp: Response) -> Option<(SubId, Self)> {
+    pub fn fulfill(self, resp: Response) -> Option<(SubId, Self)> {
         if self.is_subscription() {
             if let ResponsePayload::Success(val) = resp.payload {
                 let sub_id: serde_json::Result<SubId> = serde_json::from_str(val.get());

@@ -8,7 +8,7 @@ use crate::{
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
-use alloy_network::{Ethereum, EthereumWallet, IntoWallet, Network, NetworkWallet};
+use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
@@ -140,7 +140,8 @@ impl
         ProviderBuilder::default().with_recommended_fillers()
     }
 
-    /// Opt-out of the recommended fillers by reseting the fillers stack in the [`ProviderBuilder`].
+    /// Opt-out of the recommended fillers by resetting the fillers stack in the
+    /// [`ProviderBuilder`].
     ///
     /// This is equivalent to creating the builder using `ProviderBuilder::default()`.
     pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
@@ -374,7 +375,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// This is a convenience function for
     /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
-    #[deprecated(since = "0.12.6", note = "use `on_mocked_client` instead")]
+    #[deprecated(since = "0.12.6", note = "use `connect_mocked_client` instead")]
     pub fn on_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,
@@ -569,7 +570,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         self.connect_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
@@ -588,7 +589,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         self.connect_anvil_with_wallet_and_config(std::convert::identity)
             .expect("failed to build provider")
@@ -648,7 +649,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
@@ -678,7 +679,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
             crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
             N,
         >,
-        EthereumWallet: NetworkWallet<N>,
+        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
     {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();

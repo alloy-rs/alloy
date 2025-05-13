@@ -498,7 +498,7 @@ mod tests {
     fn provided_file_is_a_directory() {
         let dir = tempdir().unwrap();
         let result = JwtSecret::from_file(dir.path());
-        assert_matches!(result, Err(JwtError::Read {source: _,path}) if path == dir.into_path());
+        assert_matches!(result, Err(JwtError::Read {source: _,path}) if path == dir.path());
     }
 
     #[cfg(feature = "std")]

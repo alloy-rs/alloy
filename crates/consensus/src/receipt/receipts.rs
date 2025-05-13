@@ -40,14 +40,14 @@ impl<T> Receipt<T>
 where
     T: AsRef<Log>,
 {
-    /// Calculates [`Log`]'s bloom filter. this is slow operation and [ReceiptWithBloom] can
-    /// be used to cache this value.
+    /// Calculates [`Log`]'s bloom filter. This is slow operation and
+    /// [`ReceiptWithBloom`] can be used to cache this value.
     pub fn bloom_slow(&self) -> Bloom {
         self.logs.iter().map(AsRef::as_ref).collect()
     }
 
-    /// Calculates the bloom filter for the receipt and returns the [ReceiptWithBloom] container
-    /// type.
+    /// Calculates the bloom filter for the receipt and returns the
+    /// [`ReceiptWithBloom`] container type.
     pub fn with_bloom(self) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom: self.bloom_slow(), receipt: self }
     }
@@ -314,6 +314,11 @@ impl<R> ReceiptWithBloom<R> {
     /// Consume the structure, returning the receipt and the bloom filter
     pub fn into_components(self) -> (R, Bloom) {
         (self.receipt, self.logs_bloom)
+    }
+
+    /// Returns a reference to the bloom.
+    pub const fn bloom_ref(&self) -> &Bloom {
+        &self.logs_bloom
     }
 }
 

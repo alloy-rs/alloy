@@ -44,7 +44,7 @@ pub enum PendingTransactionError {
     #[error(transparent)]
     TransportError(#[from] TransportError),
 
-    /// Error occured while getting response from the heartbeat.
+    /// Error occurred while getting response from the heartbeat.
     #[error(transparent)]
     Recv(#[from] oneshot::error::RecvError),
 
@@ -123,6 +123,12 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// Consumes this builder, returning the provider and the configuration.
     pub fn split(self) -> (RootProvider<N>, PendingTransactionConfig) {
         (self.provider, self.config)
+    }
+
+    /// Calls a function with a reference to the value.
+    pub fn inspect<F: FnOnce(&Self)>(self, f: F) -> Self {
+        f(&self);
+        self
     }
 
     /// Returns the transaction hash.

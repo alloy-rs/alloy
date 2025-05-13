@@ -55,6 +55,21 @@ impl AnvilInstance {
         &self.private_keys
     }
 
+    /// Convenience function that returns the first key.
+    ///
+    /// # Panics
+    ///
+    /// If this instance does not contain any keys
+    #[track_caller]
+    pub fn first_key(&self) -> &K256SecretKey {
+        self.private_keys.first().unwrap()
+    }
+
+    /// Returns the private key for the given index.
+    pub fn nth_key(&self, idx: usize) -> Option<&K256SecretKey> {
+        self.private_keys.get(idx)
+    }
+
     /// Returns the addresses used to instantiate this instance
     pub fn addresses(&self) -> &[Address] {
         &self.addresses
@@ -198,7 +213,7 @@ impl Anvil {
         self
     }
 
-    /// Sets the path for the the ipc server
+    /// Sets the path for the ipc server
     pub fn ipc_path(mut self, path: impl Into<String>) -> Self {
         self.ipc_path = Some(path.into());
         self

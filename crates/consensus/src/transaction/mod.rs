@@ -2,7 +2,7 @@
 
 use crate::Signed;
 use alloc::vec::Vec;
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxKind, B256, U256};
 use core::{any, fmt};
 
@@ -18,25 +18,28 @@ pub use eip7702::TxEip7702;
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
+pub use envelope::{EthereumTxEnvelope, TxEnvelope};
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
-pub mod pooled;
-pub use pooled::PooledTransaction;
+pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
-use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
+mod eip4844_sidecar;
+#[cfg(feature = "kzg")]
+pub use eip4844_sidecar::BlobTransactionValidationError;
+pub use eip4844_sidecar::TxEip4844Sidecar;
+
+// Re-export 4844 helpers.
 pub use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
     utils as eip4844_utils, Blob, BlobTransactionSidecar, Bytes48,
 };
-#[cfg(feature = "kzg")]
-pub use eip4844::BlobTransactionValidationError;
-pub use eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
+
+pub mod pooled;
+pub use pooled::PooledTransaction;
 
 /// Re-export for convenience
 pub use either::Either;
-
-pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 mod legacy;
 pub use legacy::{from_eip155_value, to_eip155_value, TxLegacy};
@@ -47,6 +50,9 @@ pub use rlp::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, RlpEcdsaTx};
 
 mod typed;
 pub use typed::{EthereumTypedTransaction, TypedTransaction};
+
+mod tx_type;
+pub use tx_type::TxType;
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
@@ -224,7 +230,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
 /// A signable transaction.
 ///
 /// A transaction can have multiple signature types. This is usually
-/// [`alloy_primitives::PrimitiveSignature`], however, it may be different for future EIP-2718
+/// [`alloy_primitives::Signature`], however, it may be different for future EIP-2718
 /// transaction types, or in other networks. For example, in Optimism, the deposit transaction
 /// signature is the unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]
@@ -280,7 +286,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     }
 }
 
-// TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
+// TODO(MSRV-1.86): Remove in favor of dyn trait upcasting
 #[doc(hidden)]
 impl<S: 'static> dyn SignableTransaction<S> {
     pub fn __downcast_ref<T: any::Any>(&self) -> Option<&T> {

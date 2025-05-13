@@ -1,3 +1,4 @@
+use crate::crypto::RecoveryError;
 use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
@@ -239,11 +240,45 @@ pub trait SignerRecoverable {
     /// This can fail for some early ethereum mainnet transactions pre EIP-2, use
     /// [`Self::recover_signer_unchecked`] if you want to recover the signer without ensuring that
     /// the signature has a low `s` value.
-    fn recover_signer(&self) -> Result<Address, alloy_primitives::SignatureError>;
+    fn recover_signer(&self) -> Result<Address, RecoveryError>;
 
     /// Recover signer from signature and hash _without ensuring that the signature has a low `s`
     /// value_.
     ///
     /// Returns an error if the transaction's signature is invalid.
-    fn recover_signer_unchecked(&self) -> Result<Address, alloy_primitives::SignatureError>;
+    fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError>;
+
+    /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
+    /// `Recovered<Self>`
+    fn try_into_recovered(self) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.recover_signer()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    /// Recover the signer via [`SignerRecoverable::recover_signer_unchecked`] and returns a
+    /// `Recovered<&Self>`
+    fn try_into_recovered_unchecked(self) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.recover_signer_unchecked()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
+    /// `Recovered<&Self>`
+    fn try_to_recovered_ref(&self) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.recover_signer()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    /// Recover the signer via [`SignerRecoverable::recover_signer_unchecked`] and returns a
+    /// `Recovered<&Self>`
+    fn try_to_recovered_ref_unchecked(&self) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.recover_signer_unchecked()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
 }
