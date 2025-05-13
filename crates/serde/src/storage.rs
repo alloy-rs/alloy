@@ -125,18 +125,22 @@ pub fn deserialize_storage_map<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let map = Option::<BTreeMap<Bytes, Bytes>>::deserialize(deserializer)?;
-    match map {
-        Some(map) => {
-            let mut res_map = BTreeMap::new();
-            for (k, v) in map {
-                let k_deserialized = from_bytes_to_b256::<'de, D>(k)?;
-                let v_deserialized = from_bytes_to_b256::<'de, D>(v)?;
-                res_map.insert(k_deserialized, v_deserialized);
+    if deserializer.is_human_readable() {
+        let map = Option::<BTreeMap<Bytes, Bytes>>::deserialize(deserializer)?;
+        match map {
+            Some(map) => {
+                let mut res_map = BTreeMap::new();
+                for (k, v) in map {
+                    let k_deserialized = from_bytes_to_b256::<'de, D>(k)?;
+                    let v_deserialized = from_bytes_to_b256::<'de, D>(v)?;
+                    res_map.insert(k_deserialized, v_deserialized);
+                }
+                Ok(Some(res_map))
             }
-            Ok(Some(res_map))
+            None => Ok(None),
         }
-        None => Ok(None),
+    } else {
+        Option::<BTreeMap<B256, B256>>::deserialize(deserializer)
     }
 }
 
