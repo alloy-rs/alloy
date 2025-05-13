@@ -30,11 +30,11 @@ impl TxEip4844Sidecar for BlobTransactionSidecar {
         blob_versioned_hashes: &[alloy_primitives::B256],
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
-        BlobTransactionSidecar::validate(self, blob_versioned_hashes, proof_settings)
+        Self::validate(self, blob_versioned_hashes, proof_settings)
     }
 
     fn size(&self) -> usize {
-        BlobTransactionSidecar::size(self)
+        Self::size(self)
     }
 }
 
@@ -45,11 +45,11 @@ impl TxEip4844Sidecar for BlobTransactionSidecarEip7594 {
         blob_versioned_hashes: &[alloy_primitives::B256],
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
-        BlobTransactionSidecarEip7594::validate(&self, blob_versioned_hashes, proof_settings)
+        Self::validate(&self, blob_versioned_hashes, proof_settings)
     }
 
     fn size(&self) -> usize {
-        BlobTransactionSidecarEip7594::size(&self)
+        Self::size(&self)
     }
 }
 
@@ -60,10 +60,10 @@ impl TxEip4844Sidecar for BlobTransactionSidecarVariant {
         blob_versioned_hashes: &[alloy_primitives::B256],
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
-        BlobTransactionSidecarVariant::validate(&self, blob_versioned_hashes, proof_settings)
+        Self::validate(&self, blob_versioned_hashes, proof_settings)
     }
 
     fn size(&self) -> usize {
-        BlobTransactionSidecarVariant::size(&self)
+        Self::size(&self)
     }
 }
