@@ -30,7 +30,7 @@ impl fmt::Debug for StrongholdSigner {
 
 #[derive(Debug, thiserror::Error)]
 pub enum StrongholdSignerError {
-    /// [`hex`] error.
+    /// hex error.
     #[error(transparent)]
     Hex(#[from] hex::FromHexError),
     /// [`iota_stronghold::types::ClientError`] error.
