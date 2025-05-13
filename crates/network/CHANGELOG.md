@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Ensure mandatory to field ([#2412](https://github.com/alloy-rs/alloy/issues/2412))
 
+### Miscellaneous Tasks
+
+- Release 0.15.11
+
 ## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
 
 ### Miscellaneous Tasks
