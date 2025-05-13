@@ -31,6 +31,7 @@ alloy-eip7702.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 either.workspace = true
+serde_json.workspace = true
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -66,7 +67,6 @@ alloy-primitives = { workspace = true, features = [
 	"arbitrary",
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
 rand.workspace = true
 
 [features]

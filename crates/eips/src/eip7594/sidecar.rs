@@ -17,8 +17,7 @@ use crate::eip4844::BlobTransactionValidationError;
 ///
 /// This type encodes and decodes the fields without an rlp header.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum BlobTransactionSidecarVariant {
     /// EIP-4844 style blob transaction sidecar.
@@ -26,6 +25,47 @@ pub enum BlobTransactionSidecarVariant {
     /// EIP-7594 style blob transaction sidecar with cell proofs.
     Eip7594(BlobTransactionSidecarEip7594),
 }
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde_json::Value;
+
+        let v = Value::deserialize(deserializer)?;
+
+        // Extract shared fields
+        let blobs: Vec<Blob> = serde_json::from_value(v.get("blobs").cloned().ok_or_else(|| D::Error::missing_field("blobs"))?)
+            .map_err(D::Error::custom)?;
+        let commitments: Vec<Bytes48> = serde_json::from_value(v.get("commitments").cloned().ok_or_else(|| D::Error::missing_field("commitments"))?)
+            .map_err(D::Error::custom)?;
+
+        // Distinguish by presence of `cell_proofs` or `proofs`
+        if let Some(cell_proofs_val) = v.get("cell_proofs") {
+            let cell_proofs: Vec<Bytes48> = serde_json::from_value(cell_proofs_val.clone())
+                .map_err(D::Error::custom)?;
+            Ok(BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
+                blobs,
+                commitments,
+                cell_proofs,
+            }))
+        } else if let Some(proofs_val) = v.get("proofs") {
+            let proofs: Vec<Bytes48> = serde_json::from_value(proofs_val.clone())
+                .map_err(D::Error::custom)?;
+            Ok(BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+                blobs,
+                commitments,
+                proofs,
+            }))
+        } else {
+            Err(D::Error::custom("Missing both 'cell_proofs' and 'proofs' fields"))
+        }
+    }
+}
+
 
 impl BlobTransactionSidecarVariant {
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarVariant].
