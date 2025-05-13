@@ -1,16 +1,131 @@
 use crate::{
     eip4844::{
-        kzg_to_versioned_hash, Blob, BlobAndProofV2, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
-        BYTES_PER_PROOF,
+        kzg_to_versioned_hash, Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48,
+        BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
     },
     eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
 #[cfg(feature = "kzg")]
 use crate::eip4844::BlobTransactionValidationError;
+
+/// This represents a set of blobs, and its corresponding commitments and proofs.
+/// Proof type depends on the sidecar variant.
+///
+/// This type encodes and decodes the fields without an rlp header.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub enum BlobTransactionSidecarVariant {
+    /// EIP-4844 style blob transaction sidecar.
+    Eip4844(BlobTransactionSidecar),
+    /// EIP-7594 style blob transaction sidecar with cell proofs.
+    Eip7594(BlobTransactionSidecarEip7594),
+}
+
+impl BlobTransactionSidecarVariant {
+    /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarVariant].
+    #[inline]
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.size(),
+            Self::Eip7594(sidecar) => sidecar.size(),
+        }
+    }
+
+    /// Verifies that the sidecar is valid. See relevant methods for each variant for more info.
+    #[cfg(feature = "kzg")]
+    pub fn validate(
+        &self,
+        blob_versioned_hashes: &[B256],
+        proof_settings: &c_kzg::KzgSettings,
+    ) -> Result<(), BlobTransactionValidationError> {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.validate(blob_versioned_hashes, proof_settings),
+            Self::Eip7594(sidecar) => sidecar.validate(blob_versioned_hashes, proof_settings),
+        }
+    }
+
+    /// Returns an iterator over the versioned hashes of the commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.versioned_hashes().collect(),
+            Self::Eip7594(sidecar) => sidecar.versioned_hashes().collect(),
+        }
+    }
+
+    /// Outputs the RLP length of the [BlobTransactionSidecarVariant] fields, without a RLP header.
+    #[doc(hidden)]
+    pub fn rlp_encoded_fields_length(&self) -> usize {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.rlp_encoded_fields_length(),
+            Self::Eip7594(sidecar) => sidecar.rlp_encoded_fields_length(),
+        }
+    }
+
+    /// Encodes the inner [BlobTransactionSidecarVariant] fields as RLP bytes, __without__ a RLP
+    /// header.
+    #[inline]
+    #[doc(hidden)]
+    pub fn rlp_encode_fields(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.rlp_encode_fields(out),
+            Self::Eip7594(sidecar) => sidecar.rlp_encode_fields(out),
+        }
+    }
+
+    /// RLP decode the fields of a [BlobTransactionSidecarVariant] based on the wrapper version.
+    #[doc(hidden)]
+    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        if buf.first() == Some(&EIP_7594_WRAPPER_VERSION) {
+            buf.advance(1);
+            Ok(Self::Eip7594(BlobTransactionSidecarEip7594::rlp_decode_fields(buf)?))
+        } else {
+            Ok(Self::Eip4844(BlobTransactionSidecar::rlp_decode_fields(buf)?))
+        }
+    }
+}
+
+impl Encodable for BlobTransactionSidecarVariant {
+    /// Encodes the [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
+    fn encode(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.encode(out),
+            Self::Eip7594(sidecar) => sidecar.encode(out),
+        }
+    }
+
+    fn length(&self) -> usize {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.rlp_encoded_length(),
+            Self::Eip7594(sidecar) => sidecar.rlp_encoded_length(),
+        }
+    }
+}
+
+impl Decodable for BlobTransactionSidecarVariant {
+    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        if buf.len() < header.payload_length {
+            return Err(alloy_rlp::Error::InputTooShort);
+        }
+        let remaining = buf.len();
+        let this = Self::rlp_decode_fields(buf)?;
+        if buf.len() + header.payload_length != remaining {
+            return Err(alloy_rlp::Error::UnexpectedLength);
+        }
+
+        Ok(this)
+    }
+}
 
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
@@ -204,8 +319,8 @@ impl BlobTransactionSidecarEip7594 {
     #[inline]
     #[doc(hidden)]
     pub fn rlp_encode_fields(&self, out: &mut dyn BufMut) {
-        // Encode version byte.
-        EIP_7594_WRAPPER_VERSION.encode(out);
+        // Put version byte.
+        out.put_u8(EIP_7594_WRAPPER_VERSION);
         // Encode the blobs, commitments, and cell proofs
         self.blobs.encode(out);
         self.commitments.encode(out);
@@ -281,5 +396,53 @@ impl Decodable for BlobTransactionSidecarEip7594 {
     /// header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sidecar_variant_rlp_roundtrip() {
+        let mut encoded = Vec::new();
+
+        // 4844
+        let empty_sidecar_4844 =
+            BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar::default());
+        empty_sidecar_4844.encode(&mut encoded);
+        assert_eq!(
+            empty_sidecar_4844,
+            BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap()
+        );
+
+        let sidecar_4844 = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar::new(
+            vec![Blob::default()],
+            vec![Bytes48::ZERO],
+            vec![Bytes48::ZERO],
+        ));
+        encoded.clear();
+        sidecar_4844.encode(&mut encoded);
+        assert_eq!(sidecar_4844, BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap());
+
+        // 7594
+        let empty_sidecar_7594 =
+            BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594::default());
+        encoded.clear();
+        empty_sidecar_7594.encode(&mut encoded);
+        assert_eq!(
+            empty_sidecar_7594,
+            BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap()
+        );
+
+        let sidecar_7594 =
+            BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594::new(
+                vec![Blob::default()],
+                vec![Bytes48::ZERO],
+                core::iter::repeat_n(Bytes48::ZERO, CELLS_PER_EXT_BLOB).collect(),
+            ));
+        encoded.clear();
+        sidecar_7594.encode(&mut encoded);
+        assert_eq!(sidecar_7594, BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap());
     }
 }

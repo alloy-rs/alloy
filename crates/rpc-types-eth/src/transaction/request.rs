@@ -315,6 +315,23 @@ impl TransactionRequest {
         self.gas_price.or(self.max_fee_per_gas)
     }
 
+    /// Returns true if _any_ of the EIP-4844 fields are set:
+    /// - blob sidecar
+    /// - blob versioned hashes
+    /// - max fee per blob gas
+    pub fn has_eip4844_fields(&self) -> bool {
+        self.sidecar.is_some()
+            || self.blob_versioned_hashes.is_some()
+            || self.max_fee_per_blob_gas.is_some()
+    }
+
+    /// Returns true if _any_ of the EIP-1559 fee fields are set:
+    /// - max fee per gas
+    /// - max priority fee per gas
+    pub fn has_eip1559_fields(&self) -> bool {
+        self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
+    }
+
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
     /// effect otherwise.
     pub fn populate_blob_hashes(&mut self) {

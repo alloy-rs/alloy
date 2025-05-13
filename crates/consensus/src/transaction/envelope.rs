@@ -444,30 +444,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Recover the signer of the transaction.
-    #[cfg(feature = "k256")]
-    pub fn try_into_recovered(
-        self,
-    ) -> Result<crate::transaction::Recovered<Self>, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        let signer = self.recover_signer()?;
-        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
-    }
-
-    /// Recover the signer of the transaction and returns a `Recovered<&Self>`
-    #[cfg(feature = "k256")]
-    pub fn try_to_recovered_ref(
-        &self,
-    ) -> Result<crate::transaction::Recovered<&Self>, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        let signer = self.recover_signer()?;
-        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
-    }
-
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256
     where
