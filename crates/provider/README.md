@@ -45,20 +45,19 @@ use std::str::FromStr;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a basic HTTP provider
     let provider = RootProvider::new_http("https://reth-ethereum.ithaca.xyz/rpc".parse()?);
-    
+
     // Get the latest block number
     let block_number = provider.get_block_number().await?;
     println!("Latest block number: {block_number}");
-    
+
     // Get balance of an address
     let address = address!("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
-    let balance = provider.get_balance(address, None).await?;
+    let balance = provider.get_balance(address).await?;
     println!("Balance: {balance}");
-    
+
     // Use the builder pattern to create a provider with recommended fillers
-    let provider = ProviderBuilder::new().connect_http("https://reth-ethereum.ithaca.xyz/rpc");
-    
+    let provider = ProviderBuilder::new().connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse()?);
+
     Ok(())
 }
 ```
-
