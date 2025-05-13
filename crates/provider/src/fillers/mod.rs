@@ -27,17 +27,14 @@ pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManage
 mod gas;
 pub use gas::{BlobGasFiller, GasFillable, GasFiller};
 
-mod join_fill;
-pub use join_fill::JoinFill;
 use tracing::error;
 
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
+    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
-    SendableTxErr,
+    PendingTransactionError, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTxErr,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -54,10 +51,16 @@ use futures_utils_wasm::impl_future;
 use serde_json::value::RawValue;
 use std::marker::PhantomData;
 
+#[allow(clippy::module_inception)]
+mod fillers;
+pub use fillers::{FillerNetwork, Fillers, Pushable, TuplePush};
+
+mod macros;
+
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
 pub type RecommendedFiller =
-    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
+    Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Ethereum>;
 
 /// Error type for failures in the `fill_envelope` function.
 #[derive(Debug, thiserror::Error)]
@@ -165,14 +168,6 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     /// The properties that this filler retrieves from the RPC. to fill in the
     /// TransactionRequest.
     type Fillable: Send + Sync + 'static;
-
-    /// Joins this filler with another filler to compose multiple fillers.
-    fn join_with<T>(self, other: T) -> JoinFill<Self, T>
-    where
-        T: TxFiller<N>,
-    {
-        JoinFill::new(self, other)
-    }
 
     /// Return a control-flow enum indicating whether the filler is ready to
     /// fill in the transaction request, or if it is missing required
@@ -300,14 +295,6 @@ where
     /// Creates a new `FillProvider` with the given filler and inner provider.
     pub fn new(inner: P, filler: F) -> Self {
         Self { inner, filler, _pd: PhantomData }
-    }
-
-    /// Joins a filler to this provider
-    pub fn join_with<Other: TxFiller<N>>(
-        self,
-        other: Other,
-    ) -> FillProvider<JoinFill<F, Other>, P, N> {
-        self.filler.join_with(other).layer(self.inner)
     }
 
     async fn fill_inner(&self, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
@@ -723,19 +710,25 @@ pub trait RecommendedFillers: Network {
 }
 
 impl RecommendedFillers for Ethereum {
-    type RecommendedFillers =
-        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        Default::default()
+        Fillers::default()
+            .push(GasFiller)
+            .push(BlobGasFiller)
+            .push(NonceFiller::new(CachedNonceManager::default()))
+            .push(ChainIdFiller::default())
     }
 }
 
 impl RecommendedFillers for AnyNetwork {
-    type RecommendedFillers =
-        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
+    type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Self>;
 
     fn recommended_fillers() -> Self::RecommendedFillers {
-        Default::default()
+        Fillers::default()
+            .push(GasFiller)
+            .push(BlobGasFiller)
+            .push(NonceFiller::new(CachedNonceManager::default()))
+            .push(ChainIdFiller::default())
     }
 }
