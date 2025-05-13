@@ -96,7 +96,7 @@ mod tests {
         for test in tests {
             let str = serde_json::to_string(&test).unwrap();
             // should be serialized as a decimal number and not a quoted string
-            let num = u128::from_str_radix(&str, 10).unwrap();
+            let num = str.parse::<u128>().unwrap();
             assert!(matches!(test, Ttd(Some(ttd)) if ttd == U256::from(num)));
         }
     }
@@ -106,15 +106,15 @@ mod tests {
     fn deserialize_ttd_untagged_enum() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         enum Ttd {
-            TTD(#[serde(with = "super")] Option<U256>),
+            Ttd(#[serde(with = "super")] Option<U256>),
         }
-        let test = Ttd::TTD(Some(U256::from(58750000000000000000000u128)));
+        let test = Ttd::Ttd(Some(U256::from(58750000000000000000000u128)));
         let str = serde_json::to_string(&test).unwrap();
         // should not be serialized as a quoted string
         assert!(str.ends_with("}") && !str.ends_with("\"}"));
 
         let deserialized: Ttd =
-            serde_json::from_value(json!({"TTD": 58750000000000000000000u128})).unwrap();
+            serde_json::from_value(json!({"Ttd": 58750000000000000000000u128})).unwrap();
         assert_eq!(deserialized, test);
     }
 
