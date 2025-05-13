@@ -12,7 +12,7 @@ use crate::{
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
-    eip4844::BlobTransactionSidecar,
+    eip7594::BlobTransactionSidecarVariant,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -74,7 +74,7 @@ impl EthereumTxEnvelope<TxEip4844> {
     /// EIP-4844 variant.
     pub fn try_into_pooled_eip4844(
         self,
-        sidecar: BlobTransactionSidecar,
+        sidecar: BlobTransactionSidecarVariant,
     ) -> Result<PooledTransaction, ValueError<Self>> {
         match self {
             Self::Eip4844(tx) => {
@@ -1201,11 +1201,10 @@ mod tests {
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
+        eip7594::BlobTransactionSidecarVariant,
         eip7702::Authorization,
     };
-    #[allow(unused_imports)]
-    use alloy_primitives::{b256, Bytes, TxKind};
-    use alloy_primitives::{hex, Address, Signature, U256};
+    use alloy_primitives::{b256, hex, Address, Bytes, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]
@@ -1463,11 +1462,11 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let sidecar = BlobTransactionSidecar {
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
             blobs: vec![[2; 131072].into()],
             commitments: vec![[3; 48].into()],
             proofs: vec![[4; 48].into()],
-        };
+        });
         let tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature().with_parity(true);
 
@@ -1690,7 +1689,7 @@ mod tests {
                 blob_versioned_hashes: vec![B256::random()],
                 max_fee_per_blob_gas: 0,
             },
-            sidecar: Default::default(),
+            sidecar: BlobTransactionSidecarVariant::Eip4844(Default::default()),
         });
         test_serde_roundtrip(tx);
     }
