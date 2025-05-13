@@ -39,10 +39,8 @@ where
     D: Deserializer<'de>,
 {
     if deserializer.is_human_readable() {
-        match Option::<Value>::deserialize(deserializer)? {
-            Some(value) => ttd_from_value::<D>(value).map(Some),
-            None => Ok(None),
-        }
+        Option::<Value>::deserialize(deserializer)?
+            .map_or_else(|| Ok(None), |value| ttd_from_value::<D>(value).map(Some))
     } else {
         Option::<U256>::deserialize(deserializer)
     }
