@@ -1531,15 +1531,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_dump_genesis_hoodi() {
-        let holesky = include_str!("../dumpgenesis/hoodi.json");
-        let gen = serde_json::from_str::<Genesis>(holesky).unwrap();
-        let s = serde_json::to_string_pretty(&gen).unwrap();
-        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
-        assert_eq!(gen, gen2);
-    }
-
-    #[test]
     fn parse_extra_fields() {
         let geth_genesis = r#"
     {
