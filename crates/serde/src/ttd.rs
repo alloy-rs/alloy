@@ -74,9 +74,18 @@ where
         // are arbitrary precision in JSON, so this is valid JSON. This number is also
         // greater than a `u64`.
         //
-        // Unfortunately, sometimes when parsing the JSON with serde or other tools, numbers larger
-        // than u64 will be represented as floating point numbers. To solve this, we use the
-        // captured float and return the TTD as a U256 if it's equal.
+        // Unfortunately, serde_json only supports parsing up to `u64`, resorting to `f64`
+        // once `u64` overflows:
+        // <https://github.com/serde-rs/json/blob/4bc1eaa03a6160593575bc9bc60c94dba4cab1e3/src/de.rs#L1411-L1415>
+        // <https://github.com/serde-rs/json/blob/4bc1eaa03a6160593575bc9bc60c94dba4cab1e3/src/de.rs#L479-L484>
+        // <https://github.com/serde-rs/json/blob/4bc1eaa03a6160593575bc9bc60c94dba4cab1e3/src/de.rs#L102-L108>
+        //
+        // serde_json does have an arbitrary precision feature, but this breaks untagged
+        // enums in serde:
+        // <https://github.com/serde-rs/serde/issues/2230>
+        // <https://github.com/serde-rs/serde/issues/1183>
+        //
+        // To solve this, we use the captured float and return the TTD as a U256 if it's equal.
         if value == 5.875e22 {
             U256::from(58750000000000000000000u128)
         } else {
@@ -146,7 +155,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "serde_json does not handle untagged enums correctly: https://github.com/serde-rs/serde/issues/2230"]
     fn deserialize_ttd_untagged_enum() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         enum Ttd {
@@ -154,11 +162,10 @@ mod tests {
         }
         let test = Ttd::Ttd(Some(U256::from(58750000000000000000000u128)));
         let str = serde_json::to_string(&test).unwrap();
-        // should not be serialized as a quoted string
-        assert!(str.ends_with("}") && !str.ends_with("\"}"));
+        // should be serialized as an integer, not a float or a quoted string
+        assert_eq!(str, r#"{"Ttd":58750000000000000000000}"#);
 
-        let deserialized: Ttd =
-            serde_json::from_value(json!({"Ttd": 58750000000000000000000u128})).unwrap();
+        let deserialized: Ttd = serde_json::from_str(&str).unwrap();
         assert_eq!(deserialized, test);
     }
 
