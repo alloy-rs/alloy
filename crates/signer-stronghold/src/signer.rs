@@ -1,5 +1,4 @@
-use std::fmt;
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, utils::eip191_message, Address, ChainId, Signature, B256};
@@ -13,7 +12,6 @@ const VAULT_PATH: &[u8] = b"vault-path";
 const RECORD_PATH: &[u8] = b"record-path-0";
 
 /// StrongholdSigner uses the Stronghold vault as the secure backing for an Ethereum Signer.
-///
 #[derive(Clone)]
 pub struct StrongholdSigner {
     address: Address,
@@ -97,9 +95,7 @@ impl Signer for StrongholdSigner {
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         let prefixed_msg = eip191_message(message);
-        let sig = self
-            .sign_using_stronghold(prefixed_msg)
-            .map_err(alloy_signer::Error::other)?;
+        let sig = self.sign_using_stronghold(prefixed_msg).map_err(alloy_signer::Error::other)?;
         Ok(sig)
     }
 
@@ -128,7 +124,6 @@ impl StrongholdSigner {
     /// This passphrase should be treated with the same level of security as a private key.
     ///
     /// If the stronghold snapshot file doesn't exist, it will create a new key.
-    ///
     pub fn new(chain_id: Option<ChainId>) -> Result<Self, StrongholdSignerError> {
         let passphrase = std::env::var("PASSPHRASE")?.as_bytes().to_vec();
         Self::initialize(&STRONGHOLD_PATH.into(), passphrase, chain_id)
@@ -140,7 +135,6 @@ impl StrongholdSigner {
     /// This passphrase should be treated with the same level of security as a private key.
     ///
     /// If the stronghold snapshot file doesn't exist, it will create a new key.
-    ///
     pub fn new_from_path(
         stronghold_path: PathBuf,
         chain_id: Option<ChainId>,
@@ -149,7 +143,8 @@ impl StrongholdSigner {
         Self::initialize(&stronghold_path, passphrase, chain_id)
     }
 
-    /// Helper method to initialize a StrongholdSigner with the given path, passphrase, and chain ID.
+    /// Helper method to initialize a StrongholdSigner with the given path, passphrase, and chain
+    /// ID.
     fn initialize(
         stronghold_path: &PathBuf,
         passphrase: Vec<u8>,
@@ -184,25 +179,18 @@ impl StrongholdSigner {
             _ => Self::get_evm_address(&stronghold)?,
         };
 
-        Ok(Self {
-            address,
-            chain_id,
-            stronghold,
-        })
+        Ok(Self { address, chain_id, stronghold })
     }
 
-    /// Creates a new StrongholdSigner from an existing Stronghold instance with the key already in place.
+    /// Creates a new StrongholdSigner from an existing Stronghold instance with the key already in
+    /// place.
     pub fn from_stronghold(
         stronghold: Stronghold,
         chain_id: Option<ChainId>,
     ) -> Result<Self, StrongholdSignerError> {
         stronghold.get_client(CLIENT_PATH)?;
         let address = Self::get_evm_address(&stronghold)?;
-        Ok(Self {
-            address,
-            chain_id,
-            stronghold,
-        })
+        Ok(Self { address, chain_id, stronghold })
     }
 
     /// Creates a key if it doesn't already exist in the stronghold vault
@@ -255,7 +243,6 @@ impl StrongholdSigner {
     /// The private key is never exposed outside of Stronghold's secure enclave.
     ///
     /// This returns an alloy_primitives::Signature with the correct format.
-    ///
     fn sign_using_stronghold(&self, msg: Vec<u8>) -> Result<Signature, StrongholdSignerError> {
         let client = self.stronghold.get_client(CLIENT_PATH)?;
         let location = Location::const_generic(VAULT_PATH.to_vec(), RECORD_PATH.to_vec());
@@ -270,9 +257,8 @@ impl StrongholdSigner {
 
         let sig = k256::ecdsa::Signature::from_slice(&result_bytes[..64])
             .map_err(StrongholdSignerError::K256Error)?;
-        let rid = k256::ecdsa::RecoveryId::from_byte(result_bytes[64]).ok_or(
-            StrongholdSignerError::InvalidSignatureBytes(hex::encode(result_bytes)),
-        )?;
+        let rid = k256::ecdsa::RecoveryId::from_byte(result_bytes[64])
+            .ok_or(StrongholdSignerError::InvalidSignatureBytes(hex::encode(result_bytes)))?;
 
         let signature = Signature::from((sig, rid));
         Ok(signature)
@@ -284,10 +270,9 @@ mod tests {
     use super::*;
     use alloy_consensus::{TxEnvelope, TxLegacy};
     use alloy_network::TxSigner;
-    use alloy_primitives::{Address, bytes, U256};
+    use alloy_primitives::{bytes, Address, U256};
     use alloy_signer::Signer;
-    use std::env;
-    use std::fs;
+    use std::{env, fs};
 
     // Helper to setup test environment and return a StrongholdSigner
     fn setup_test_env(chain_id: Option<ChainId>) -> StrongholdSigner {
@@ -343,15 +328,11 @@ mod tests {
 
         let signer_address = alloy_network::TxSigner::address(&signer);
         let message = b"hello world";
-        let signature = signer
-            .sign_message(message)
-            .await
-            .expect("Failed to sign message");
+        let signature = signer.sign_message(message).await.expect("Failed to sign message");
 
         // Recover address from the signature
-        let recovered = signature
-            .recover_address_from_msg(message)
-            .expect("Failed to recover address");
+        let recovered =
+            signature.recover_address_from_msg(message).expect("Failed to recover address");
         assert_eq!(signer_address, recovered);
 
         cleanup_test_env();
@@ -365,10 +346,7 @@ mod tests {
         let hash = alloy_primitives::keccak256(message);
         let signature = signer.sign_hash(&hash).await;
 
-        assert!(
-            signature.is_err(),
-            "Should return UnsupportedOperation error"
-        );
+        assert!(signature.is_err(), "Should return UnsupportedOperation error");
 
         cleanup_test_env();
     }
@@ -455,13 +433,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_end_to_end_transaction_with_anvil() {
-        use alloy_network::EthereumWallet;
+        use alloy_network::{EthereumWallet, TransactionBuilder};
         use alloy_node_bindings::Anvil;
-        use alloy_primitives::address;
+        use alloy_primitives::{address, U256};
         use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
         use alloy_rpc_types::TransactionRequest;
-        use alloy_network::TransactionBuilder;
-        use alloy_primitives::U256;
 
         let anvil = Anvil::new().spawn();
         let chain_id = anvil.chain_id();
@@ -471,9 +447,8 @@ mod tests {
         let mut wallet = EthereumWallet::from(signer.clone());
         wallet.register_signer(signer);
 
-        let provider = ProviderBuilder::new()
-            .wallet(wallet)
-            .connect(&anvil.endpoint()).await.unwrap();
+        let provider =
+            ProviderBuilder::new().wallet(wallet).connect(&anvil.endpoint()).await.unwrap();
 
         // Fund the signer's address (Anvil starts with prefunded accounts)
         provider
@@ -488,13 +463,7 @@ mod tests {
             .with_value(U256::from(100));
 
         // Send the transaction and wait for inclusion.
-        let tx_hash = provider
-            .send_transaction(tx)
-            .await
-            .unwrap()
-            .watch()
-            .await
-            .unwrap();
+        let tx_hash = provider.send_transaction(tx).await.unwrap().watch().await.unwrap();
 
         tracing::info!("Sent transaction: {tx_hash}");
 
