@@ -44,7 +44,7 @@ pub enum PendingTransactionError {
     #[error(transparent)]
     TransportError(#[from] TransportError),
 
-    /// Error occured while getting response from the heartbeat.
+    /// Error occurred while getting response from the heartbeat.
     #[error(transparent)]
     Recv(#[from] oneshot::error::RecvError),
 
@@ -123,6 +123,12 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// Consumes this builder, returning the provider and the configuration.
     pub fn split(self) -> (RootProvider<N>, PendingTransactionConfig) {
         (self.provider, self.config)
+    }
+
+    /// Calls a function with a reference to the value.
+    pub fn inspect<F: FnOnce(&Self)>(self, f: F) -> Self {
+        f(&self);
+        self
     }
 
     /// Returns the transaction hash.
@@ -349,6 +355,7 @@ pub enum WatchTxError {
     Timeout,
 }
 
+/// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
 #[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
@@ -439,7 +446,6 @@ impl HeartbeatHandle {
     }
 }
 
-// TODO: Parameterize with `Network`
 /// A heartbeat task that receives blocks and watches for transactions.
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
@@ -650,7 +656,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> He
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle) {
-        let (ix_tx, ixns) = mpsc::channel(16);
+        let (ix_tx, ixns) = mpsc::channel(64);
         (self.into_future(ixns), HeartbeatHandle { tx: ix_tx })
     }
 

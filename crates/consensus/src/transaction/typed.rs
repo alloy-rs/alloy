@@ -6,7 +6,9 @@ use crate::{
     EthereumTxEnvelope, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702,
     TxLegacy, TxType,
 };
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
 use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
@@ -109,6 +111,40 @@ impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for EthereumTypedTransaction<Eip
             EthereumTxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
             EthereumTxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
             EthereumTxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
+        }
+    }
+}
+
+impl From<EthereumTypedTransaction<TxEip4844WithSidecar>> for EthereumTypedTransaction<TxEip4844> {
+    fn from(value: EthereumTypedTransaction<TxEip4844WithSidecar>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl From<EthereumTypedTransaction<TxEip4844Variant>> for EthereumTypedTransaction<TxEip4844> {
+    fn from(value: EthereumTypedTransaction<TxEip4844Variant>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl From<EthereumTypedTransaction<TxEip4844>> for EthereumTypedTransaction<TxEip4844Variant> {
+    fn from(value: EthereumTypedTransaction<TxEip4844>) -> Self {
+        value.map_eip4844(|eip4844| eip4844.into())
+    }
+}
+
+impl<Eip4844> EthereumTypedTransaction<Eip4844> {
+    /// Converts the EIP-4844 variant of this transaction with the given closure.
+    ///
+    /// This is intended to convert between the EIP-4844 variants, specifically for stripping away
+    /// non consensus data (blob sidecar data).
+    pub fn map_eip4844<U>(self, mut f: impl FnMut(Eip4844) -> U) -> EthereumTypedTransaction<U> {
+        match self {
+            Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx),
+            Self::Eip2930(tx) => EthereumTypedTransaction::Eip2930(tx),
+            Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx),
+            Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(f(tx)),
+            Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx),
         }
     }
 }
@@ -367,6 +403,12 @@ impl<Eip4844: Typed2718> Typed2718 for EthereumTypedTransaction<Eip4844> {
             Self::Eip4844(tx) => tx.ty(),
             Self::Eip7702(tx) => tx.ty(),
         }
+    }
+}
+
+impl<T> IsTyped2718 for EthereumTypedTransaction<T> {
+    fn is_type(type_id: u8) -> bool {
+        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 

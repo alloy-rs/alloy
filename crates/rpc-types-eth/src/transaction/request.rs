@@ -130,7 +130,7 @@ pub struct TransactionRequest {
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
     pub sidecar: Option<BlobTransactionSidecar>,
-    /// Authorization list for for EIP-7702 transactions.
+    /// Authorization list for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
@@ -255,8 +255,55 @@ impl TransactionRequest {
     }
 
     /// Sets the input data for the transaction.
+    ///
+    /// This can be used to set both `input` and the `data` field, because some chains or services
+    /// still expect of the deprecated `data` field
+    ///
+    /// ```
+    /// use alloy_rpc_types_eth::{TransactionInput, TransactionRequest};
+    /// let req = TransactionRequest::default().input(TransactionInput::both(b"00".into()));
+    /// ```
     pub fn input(mut self, input: TransactionInput) -> Self {
         self.input = input;
+        self
+    }
+
+    /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
+    ///
+    /// This removes `data` the data field.
+    pub fn normalize_input(&mut self) {
+        self.input.normalize_input()
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_input`] applied
+    pub fn normalized_input(mut self) -> Self {
+        self.normalize_input();
+        self
+    }
+
+    /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
+    ///
+    /// This removes `input` the data field.
+    pub fn normalize_data(&mut self) {
+        self.input.normalize_data();
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_data`] applied
+    pub fn normalized_data(mut self) -> Self {
+        self.normalize_data();
+        self
+    }
+
+    /// If only one field is set, this also sets the other field by with that value.
+    ///
+    /// This is a noop if both fields are already set.
+    pub fn set_input_and_data(&mut self) {
+        self.input.set_both();
+    }
+
+    /// Consumes the type and returns it with [`Self::set_input_and_data`] applied.
+    pub fn with_input_and_data(mut self) -> Self {
+        self.set_input_and_data();
         self
     }
 
@@ -266,6 +313,23 @@ impl TransactionRequest {
     #[inline]
     pub fn fee_cap(&self) -> Option<u128> {
         self.gas_price.or(self.max_fee_per_gas)
+    }
+
+    /// Returns true if _any_ of the EIP-4844 fields are set:
+    /// - blob sidecar
+    /// - blob versioned hashes
+    /// - max fee per blob gas
+    pub fn has_eip4844_fields(&self) -> bool {
+        self.sidecar.is_some()
+            || self.blob_versioned_hashes.is_some()
+            || self.max_fee_per_blob_gas.is_some()
+    }
+
+    /// Returns true if _any_ of the EIP-1559 fee fields are set:
+    /// - max fee per gas
+    /// - max priority fee per gas
+    pub fn has_eip1559_fields(&self) -> bool {
+        self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
     }
 
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
@@ -389,7 +453,7 @@ impl TransactionRequest {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip4844 transaction.")?;
 
         let to_address = match checked_to {
-            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
+            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."),
             TxKind::Call(to) => to,
         };
 
@@ -436,7 +500,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")?;
+        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.")?;
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
@@ -454,6 +518,17 @@ impl TransactionRequest {
             access_list: self.access_list.unwrap_or_default(),
             authorization_list: self.authorization_list.unwrap_or_default(),
         })
+    }
+
+    /// Ensures `to` field is set to an address which is required by:
+    /// - EIP 7702
+    /// - EIP 4844
+    fn ensure_mandatory_to(&self) -> Result<(), ()> {
+        if !matches!(self.to, Some(TxKind::Call(_))) {
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 
     fn check_reqd_fields(&self) -> Vec<&'static str> {
@@ -580,7 +655,7 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
-        if self.to.is_none() {
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
             missing.push("to");
         }
 
@@ -633,6 +708,10 @@ impl TransactionRequest {
     pub fn complete_7702(&self) -> Result<(), Vec<&'static str>> {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
+
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
+            missing.push("to");
+        }
 
         if self.authorization_list.is_none() {
             missing.push("authorization_list");
@@ -1060,6 +1139,57 @@ impl TransactionInput {
         self.input.or(self.data)
     }
 
+    /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
+    ///
+    /// This removes `data` the data field.
+    pub fn normalize_input(&mut self) {
+        let data = self.data.take();
+        // If input is None but data has a value, copy data to input
+        if self.input.is_none() && data.is_some() {
+            self.input = data;
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_input`] applied
+    pub fn normalized_input(mut self) -> Self {
+        self.normalize_input();
+        self
+    }
+
+    /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
+    ///
+    /// This removes `input` the data field.
+    pub fn normalize_data(&mut self) {
+        let input = self.input.take();
+        if self.data.is_none() && input.is_some() {
+            self.data = input;
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::normalize_data`] applied
+    pub fn normalized_data(mut self) -> Self {
+        self.normalize_data();
+        self
+    }
+
+    /// If only one field is set, this also sets the other field by with that value.
+    ///
+    /// This is a noop if both fields are already set.
+    pub fn set_both(&mut self) {
+        if self.input.is_none() {
+            self.input = self.data.clone();
+        }
+        if self.data.is_none() {
+            self.data = self.input.clone();
+        }
+    }
+
+    /// Consumes the type and returns it with [`Self::set_both`] applied.
+    pub fn with_both(mut self) -> Self {
+        self.set_both();
+        self
+    }
+
     /// Consumes the type and returns the optional input data.
     ///
     /// Returns an error if both `data` and `input` fields are set and not equal.
@@ -1129,7 +1259,9 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Authorization;
     use alloy_primitives::b256;
+    #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
     use assert_matches::assert_matches;
     use similar_asserts::assert_eq;
@@ -1186,11 +1318,11 @@ mod tests {
     fn serde_tx_chain_id_field() {
         let chain_id: ChainId = 12345678;
 
-        let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
+        let chain_id_as_num = format!(r#"{{"chainId": {chain_id} }}"#);
         let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();
         assert_eq!(req1.chain_id.unwrap(), chain_id);
 
-        let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
+        let chain_id_as_hex = format!(r#"{{"chainId": "0x{chain_id:x}" }}"#);
         let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
         assert_eq!(req2.chain_id.unwrap(), chain_id);
     }
@@ -1402,7 +1534,7 @@ mod tests {
                 gas: Some(123456),
                 max_fee_per_blob_gas: Some(13579),
                 blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
-                sidecar: Some(sidecar.clone()),
+                sidecar: Some(sidecar),
                 ..Default::default()
             };
 
@@ -1411,6 +1543,25 @@ mod tests {
             assert_matches!(maybe_eip4844_tx,
             Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
             sidecar, .. }))) if sidecar == sidecar);
+
+            // with create to
+            let sidecar =
+                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.clone()),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
 
             // Negative case
             let eip4844_request_incorrect_to = TransactionRequest {
@@ -1427,6 +1578,58 @@ mod tests {
 
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
                 eip4844_request_incorrect_to.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
+        }
+
+        // EIP-7702
+        {
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip7702(_)));
+
+            // as create tx
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
     }

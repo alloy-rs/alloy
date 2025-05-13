@@ -61,16 +61,45 @@ pub const DATA_GAS_PER_BLOB: u64 = 131_072u64; // 32*4096 = 131072 == 2^17 == 0x
 pub const BYTES_PER_BLOB: usize = 131_072;
 
 /// Maximum data gas for data blobs in a single block.
-pub const MAX_DATA_GAS_PER_BLOCK: u64 = 786_432u64; // 0xC0000 = 6 * 0x20000
+#[deprecated(
+    since = "0.15.3",
+    note = "use hardfork specific MAX_DATA_GAS_PER_BLOCK_DENCUN constant or `BlobParams::max_blob_gas_per_block`"
+)]
+pub const MAX_DATA_GAS_PER_BLOCK: u64 = MAX_DATA_GAS_PER_BLOCK_DENCUN;
+
+/// Maximum data gas for data blobs in a single block.
+pub const MAX_DATA_GAS_PER_BLOCK_DENCUN: u64 = 786_432u64; // 0xC0000 = 6 * 0x20000
 
 /// Target data gas for data blobs in a single block.
-pub const TARGET_DATA_GAS_PER_BLOCK: u64 = 393_216u64; // 0x60000 = 3 * 0x20000
+#[deprecated(
+    since = "0.15.3",
+    note = "use hardfork specific TARGET_DATA_GAS_PER_BLOCK_DENCUN constant or `BlobParams::target_blob_gas_per_block`"
+)]
+pub const TARGET_DATA_GAS_PER_BLOCK: u64 = TARGET_DATA_GAS_PER_BLOCK_DENCUN;
+
+/// Target data gas for data blobs in a single block.
+pub const TARGET_DATA_GAS_PER_BLOCK_DENCUN: u64 = 393_216u64; // 0x60000 = 3 * 0x20000
 
 /// Maximum number of data blobs in a single block.
-pub const MAX_BLOBS_PER_BLOCK: usize = (MAX_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) as usize; // 786432 / 131072  = 6
+#[deprecated(
+    since = "0.15.3",
+    note = "use hardfork specific MAX_BLOBS_PER_BLOCK_DENCUN constant or `BlobParams.max_blob_count`"
+)]
+pub const MAX_BLOBS_PER_BLOCK: usize = MAX_BLOBS_PER_BLOCK_DENCUN; // 786432 / 131072  = 6
+
+/// Maximum number of data blobs in a single block.
+pub const MAX_BLOBS_PER_BLOCK_DENCUN: usize =
+    (MAX_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) as usize; // 786432 / 131072  = 6
 
 /// Target number of data blobs in a single block.
-pub const TARGET_BLOBS_PER_BLOCK: u64 = TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB; // 393216 / 131072 = 3
+#[deprecated(
+    since = "0.15.3",
+    note = "use hardfork specific TARGET_BLOBS_PER_BLOCK_DENCUN constant or `BlobParams.target_blob_count`"
+)]
+pub const TARGET_BLOBS_PER_BLOCK: u64 = TARGET_BLOBS_PER_BLOCK_DENCUN; // 393216 / 131072 = 3
+
+/// Target number of data blobs in a single block.
+pub const TARGET_BLOBS_PER_BLOCK_DENCUN: u64 = TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB; // 393216 / 131072 = 3
 
 /// Determines the maximum rate of change for blob fee
 pub const BLOB_GASPRICE_UPDATE_FRACTION: u128 = 3_338_477u128; // 3338477
@@ -276,30 +305,34 @@ mod tests {
             // slots are below - or equal - to the target.
             (0, 0, 0),
             (0, 1, 0),
-            (0, TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB, 0),
+            (0, TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB, 0),
             // If the target blob gas is exceeded, the excessBlobGas should increase
             // by however much it was overshot
-            (0, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB),
-            (1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB + 1),
-            (1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) + 2, 2 * DATA_GAS_PER_BLOB + 1),
+            (0, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB),
+            (1, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 1, DATA_GAS_PER_BLOB + 1),
+            (
+                1,
+                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) + 2,
+                2 * DATA_GAS_PER_BLOB + 1,
+            ),
             // The excess blob gas should decrease by however much the target was
             // under-shot, capped at zero.
             (
-                TARGET_DATA_GAS_PER_BLOCK,
-                TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB,
-                TARGET_DATA_GAS_PER_BLOCK,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
             ),
             (
-                TARGET_DATA_GAS_PER_BLOCK,
-                (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1,
-                TARGET_DATA_GAS_PER_BLOCK - DATA_GAS_PER_BLOB,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN - DATA_GAS_PER_BLOB,
             ),
             (
-                TARGET_DATA_GAS_PER_BLOCK,
-                (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 2,
-                TARGET_DATA_GAS_PER_BLOCK - (2 * DATA_GAS_PER_BLOB),
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN,
+                (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 2,
+                TARGET_DATA_GAS_PER_BLOCK_DENCUN - (2 * DATA_GAS_PER_BLOB),
             ),
-            (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1, 0),
+            (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) - 1, 0),
         ] {
             let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
             assert_eq!(actual, expected, "test: {t:?}");

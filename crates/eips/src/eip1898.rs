@@ -794,8 +794,8 @@ impl Decodable for HashOrNumber {
 impl fmt::Display for HashOrNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Hash(hash) => write!(f, "{}", hash),
-            Self::Number(num) => write!(f, "{}", num),
+            Self::Hash(hash) => write!(f, "{hash}"),
+            Self::Number(num) => write!(f, "{num}"),
         }
     }
 }

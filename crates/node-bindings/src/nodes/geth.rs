@@ -378,6 +378,22 @@ impl Geth {
         self
     }
 
+    /// Adds an argument to pass to the `geth`.
+    pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
+        self.args.push(arg.into());
+    }
+
+    /// Adds multiple arguments to pass to the `geth`.
+    pub fn extend_args<I, S>(&mut self, args: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self.push_arg(arg);
+        }
+    }
+
     /// Adds an argument to pass to `geth`.
     ///
     /// Pass any arg that is not supported by the builder.
@@ -499,7 +515,7 @@ impl Geth {
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.into_path();
+            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.keep();
 
             // create a temp dir to store the genesis file
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");

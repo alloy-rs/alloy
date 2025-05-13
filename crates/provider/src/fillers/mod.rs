@@ -34,7 +34,8 @@ use crate::GetSubscription;
 use crate::{
     provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    PendingTransactionError, Provider, ProviderCall, RootProvider, RpcWithBlock,
+    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+    SendableTxErr,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -61,6 +62,18 @@ mod macros;
 /// management, and chain-id fetching.
 pub type RecommendedFiller =
     Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller), Ethereum>;
+
+/// Error type for failures in the `fill_envelope` function.
+#[derive(Debug, thiserror::Error)]
+pub enum FillEnvelopeError<T> {
+    /// A transport error occurred during the filling process.
+    #[error("transport error during filling: {0}")]
+    Transport(TransportError),
+
+    /// The transaction is not ready to be converted to an envelope.
+    #[error("transaction not ready: {0}")]
+    NotReady(SendableTxErr<T>),
+}
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -162,7 +175,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     /// properties.
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 
-    /// Returns `true` if the filler is should continue filling.
+    /// Returns `true` if the filler should continue filling.
     fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
         tx.as_builder().is_some_and(|tx| self.status(tx).is_ready())
     }
@@ -196,6 +209,20 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
 
+    /// Fills in the transaction request and try to convert it to an envelope.
+    fn fill_envelope(
+        &self,
+        fillable: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> impl_future!(<Output = Result<N::TxEnvelope, FillEnvelopeError<N::TransactionRequest>>>)
+    {
+        async move {
+            let tx = self.fill(fillable, tx).await.map_err(FillEnvelopeError::Transport)?;
+            let envelope = tx.try_into_envelope().map_err(FillEnvelopeError::NotReady)?;
+            Ok(envelope)
+        }
+    }
+
     /// Prepares and fills the transaction request with the fillable properties.
     fn prepare_and_fill<P>(
         &self,
@@ -218,7 +245,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// asyncronously
+    /// asynchronously
     fn prepare_call(
         &self,
         tx: &mut N::TransactionRequest,
@@ -229,7 +256,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     }
 
     /// Prepares transaction request with necessary fillers required for eth_call operations
-    /// syncronously
+    /// synchronously
     fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         let _ = tx;
         // No-op default
@@ -378,6 +405,13 @@ where
 
     fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
         self.inner.get_gas_price()
+    }
+
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+        self.inner.get_account_info(address)
     }
 
     fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
@@ -596,7 +630,7 @@ where
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 // TODO: improve this.
                 // blocked by #431
-                let message = format!("missing properties: {:?}", missing);
+                let message = format!("missing properties: {missing:?}");
                 return Err(RpcError::local_usage_str(&message));
             }
         }

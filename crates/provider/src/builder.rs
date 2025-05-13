@@ -135,7 +135,8 @@ impl ProviderBuilder<Identity, <Ethereum as RecommendedFillers>::RecommendedFill
         ProviderBuilder::default().with_recommended_fillers()
     }
 
-    /// Opt-out of the recommended fillers by reseting the fillers stack in the [`ProviderBuilder`].
+    /// Opt-out of the recommended fillers by resetting the fillers stack in the
+    /// [`ProviderBuilder`].
     ///
     /// This is equivalent to creating the builder using `ProviderBuilder::default()`.
     pub fn disable_recommended_fillers(self) -> ProviderBuilder<Identity, Identity, Ethereum> {
@@ -399,7 +400,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// This is a convenience function for
     /// `ProviderBuilder::on_client(RpcClient::mocked(asserter))`.
-    #[deprecated(since = "0.12.6", note = "use `on_mocked_client` instead")]
+    #[deprecated(since = "0.12.6", note = "use `connect_mocked_client` instead")]
     pub fn on_mocked_client(self, asserter: alloy_transport::mock::Asserter) -> F::Provider
     where
         L: ProviderLayer<RootProvider<N>, N>,

@@ -24,6 +24,7 @@ workspace = true
 
 [dependencies]
 alloy-json-rpc.workspace = true
+alloy-primitives.workspace = true
 
 base64.workspace = true
 futures-utils-wasm.workspace = true
@@ -43,7 +44,7 @@ derive_more.workspace = true
 
 # non-WASM only
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-tokio = { workspace = true, features = ["rt", "time"] }
+tokio = { workspace = true, features = ["rt", "time","sync","macros"] }
 
 # WASM only
 [target.'cfg(target_family = "wasm")'.dependencies]

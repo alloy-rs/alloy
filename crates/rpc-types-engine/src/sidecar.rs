@@ -12,6 +12,7 @@ use alloy_primitives::B256;
 /// in the `ExecutionPayload` object itself.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ExecutionPayloadSidecar {
     /// Cancun request params introduced in `engine_newPayloadV3` that are not present in the
     /// `ExecutionPayload`.

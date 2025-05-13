@@ -84,6 +84,7 @@ impl<'a> serde::Deserialize<'a> for Index {
 mod tests {
     use super::*;
     use rand::{thread_rng, Rng};
+    #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
 

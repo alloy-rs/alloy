@@ -183,8 +183,7 @@ impl<'de> Deserialize<'de> for FunctionSelector {
         let s = hex_str.strip_prefix("0x").unwrap_or(&hex_str);
         if s.len() != 8 {
             return Err(serde::de::Error::custom(format!(
-                "Expected 4 byte function selector: {}",
-                hex_str
+                "Expected 4 byte function selector: {hex_str}"
             )));
         }
 

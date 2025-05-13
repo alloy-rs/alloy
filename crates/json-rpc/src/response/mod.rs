@@ -82,6 +82,11 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
         }
     }
 
+    /// Returns the payload of this response
+    pub const fn payload(&self) -> &ResponsePayload<Payload, ErrData> {
+        &self.payload
+    }
+
     /// Create a new error response for an internal error with additional data.
     pub const fn internal_error_with_obj(id: Id, data: ErrData) -> Self
     where
@@ -116,6 +121,11 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
     /// Returns `true` if the response is an error.
     pub const fn is_error(&self) -> bool {
         self.payload.is_error()
+    }
+
+    /// Returns the error code if the payload of this response is an [`ErrorPayload`].
+    pub fn error_code(&self) -> Option<i64> {
+        self.payload().error_code()
     }
 }
 

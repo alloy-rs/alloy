@@ -82,7 +82,7 @@ pub struct TraceEntry {
     /// The address to which the trace is directed.
     pub to: Address,
     /// The value transferred in the trace.
-    pub value: U256,
+    pub value: Option<U256>,
     /// The input data for the trace.
     pub input: Bytes,
     /// The output data for the trace.

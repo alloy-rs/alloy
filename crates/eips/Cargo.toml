@@ -112,4 +112,5 @@ arbitrary = [
 	"alloy-eip2930/arbitrary",
 	"alloy-eip7702/arbitrary",
 	"alloy-eip7702/k256",
+	"c-kzg?/arbitrary"
 ]

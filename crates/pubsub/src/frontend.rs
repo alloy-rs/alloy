@@ -27,7 +27,7 @@ pub struct PubSubFrontend {
 
 impl PubSubFrontend {
     /// Create a new frontend.
-    pub(crate) fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
+    pub fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
         Self { tx, channel_size: Arc::new(AtomicUsize::new(16)) }
     }
 
