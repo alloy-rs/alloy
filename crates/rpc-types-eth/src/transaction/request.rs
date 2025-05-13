@@ -325,7 +325,7 @@ impl TransactionRequest {
             || self.max_fee_per_blob_gas.is_some()
     }
 
-    /// Returns true if _any_ for the EIP-1559 fee fields are set:
+    /// Returns true if _any_ of the EIP-1559 fee fields are set:
     /// - max fee per gas
     /// - max priority fee per gas
     pub fn has_eip1559_fields(&self) -> bool {
