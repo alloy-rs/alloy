@@ -35,7 +35,7 @@ The `ProviderBuilder` struct can quickly create a stacked provider, similar to
 
 ## Usage
 
-```rust,norun
+```rust,no_run
 use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 use alloy_network::Ethereum;
 use alloy_primitives::address;
