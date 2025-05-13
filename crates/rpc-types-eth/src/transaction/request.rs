@@ -315,7 +315,7 @@ impl TransactionRequest {
         self.gas_price.or(self.max_fee_per_gas)
     }
 
-    /// Returns true if _any_ for the EIP-4844 fields are set:
+    /// Returns true if _any_ of the EIP-4844 fields are set:
     /// - blob sidecar
     /// - blob versioned hashes
     /// - max fee per blob gas
