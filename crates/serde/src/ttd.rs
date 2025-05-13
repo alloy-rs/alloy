@@ -157,13 +157,14 @@ mod tests {
     #[test]
     fn deserialize_ttd_untagged_enum() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        #[serde(untagged)]
         enum Ttd {
             Ttd(#[serde(with = "super")] Option<U256>),
         }
         let test = Ttd::Ttd(Some(U256::from(58750000000000000000000u128)));
         let str = serde_json::to_string(&test).unwrap();
         // should be serialized as an integer, not a float or a quoted string
-        assert_eq!(str, r#"{"Ttd":58750000000000000000000}"#);
+        assert_eq!(str, r#"58750000000000000000000"#);
 
         let deserialized: Ttd = serde_json::from_str(&str).unwrap();
         assert_eq!(deserialized, test);
