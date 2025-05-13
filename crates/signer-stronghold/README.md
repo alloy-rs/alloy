@@ -26,31 +26,41 @@ export PASSPHRASE=$(openssl rand -hex 48) # or whatever you want
 
 ### Basic Usage
 
-```rust
-use signer_stronghold::StrongholdSigner;
-
-let chain_id = Some(1);
-let signer = StrongholdSigner::new(chain_id).unwrap();
-
-let message = vec![0, 1, 2, 3];
-
-let sig = signer.sign_message(&message).await.unwrap();
-assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
+```rust,no_run
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use alloy_signer_stronghold::StrongholdSigner;
+    use alloy_signer::Signer;
+    
+    let chain_id = Some(1);
+    let signer = StrongholdSigner::new(chain_id).unwrap();
+    
+    let message = vec![0, 1, 2, 3];
+    
+    let sig = signer.sign_message(&message).await.unwrap();
+    assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
+    Ok(())
+}
 ```
 
 ### With Custom Path
 
-```rust
-use signer_stronghold::StrongholdSigner;
-use std::path::PathBuf;
-
-let chain_id = Some(1);
-let custom_path = PathBuf::from("/path/to/my_custom.stronghold");
-let signer = StrongholdSigner::new_from_path(custom_path, chain_id).unwrap();
-
-// Use signer just like the default one
-let message = vec![0, 1, 2, 3];
-let sig = signer.sign_message(&message).await.unwrap();
+```rust,no_run
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use alloy_signer_stronghold::StrongholdSigner;
+    use alloy_signer::Signer;
+    use std::path::PathBuf;
+    
+    let chain_id = Some(1);
+    let custom_path = PathBuf::from("/path/to/my_custom.stronghold");
+    let signer = StrongholdSigner::new_from_path(custom_path, chain_id).unwrap();
+    
+    // Use signer just like the default one
+    let message = vec![0, 1, 2, 3];
+    let sig = signer.sign_message(&message).await.unwrap();
+    Ok(())
+}
 ```
 
 ## License

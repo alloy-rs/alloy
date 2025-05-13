@@ -101,7 +101,8 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-local \
             --exclude alloy-signer-trezor \
-            --exclude alloy-transport-ipc
+            --exclude alloy-transport-ipc \
+            --exclude alloy-signer-stronghold 
 
   wasm-wasi:
     runs-on: ubuntu-latest
