@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Requests deserde nullable fields ([#2408](https://github.com/alloy-rs/alloy/issues/2408))
 
+### Miscellaneous Tasks
+
+- Release 0.15.10
+
 ## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
 
 ### Miscellaneous Tasks

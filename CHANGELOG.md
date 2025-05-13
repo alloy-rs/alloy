@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
+
+### Bug Fixes
+
+- Ensure mandatory to field ([#2412](https://github.com/alloy-rs/alloy/issues/2412))
+
+### Documentation
+
+- Docs (README.md): integrating crates.io badges ([#2419](https://github.com/alloy-rs/alloy/issues/2419))
+- Should be decoded ([#2414](https://github.com/alloy-rs/alloy/issues/2414))
+- Update docs ([#2413](https://github.com/alloy-rs/alloy/issues/2413))
+
+### Features
+
+- Impl Signerrecoverable trait ([#2423](https://github.com/alloy-rs/alloy/issues/2423))
+- Add fn `fill_envelope` ([#2411](https://github.com/alloy-rs/alloy/issues/2411))
+- Some covenience signer impls ([#2410](https://github.com/alloy-rs/alloy/issues/2410))
+- Add some either impls ([#2409](https://github.com/alloy-rs/alloy/issues/2409))
+
+### Miscellaneous Tasks
+
+- Fix clippy ([#2422](https://github.com/alloy-rs/alloy/issues/2422))
+- Add back filteredparams ([#2421](https://github.com/alloy-rs/alloy/issues/2421))
+
+### Other
+
+- Added  anvil_send_impersonated_transaction ([#2417](https://github.com/alloy-rs/alloy/issues/2417))
+
+### Refactor
+
+- Improve and simplify event filters ([#2140](https://github.com/alloy-rs/alloy/issues/2140))
+
 ## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
 
 ### Bug Fixes
@@ -21,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.15.10
 - Add `alloy-rpc-types-debug` to check_no_std ([#2401](https://github.com/alloy-rs/alloy/issues/2401))
 
 ### Other
