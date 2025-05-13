@@ -319,8 +319,8 @@ impl BlobTransactionSidecarEip7594 {
     #[inline]
     #[doc(hidden)]
     pub fn rlp_encode_fields(&self, out: &mut dyn BufMut) {
-        // Encode version byte.
-        EIP_7594_WRAPPER_VERSION.encode(out);
+        // Put version byte.
+        out.put_u8(EIP_7594_WRAPPER_VERSION);
         // Encode the blobs, commitments, and cell proofs
         self.blobs.encode(out);
         self.commitments.encode(out);
