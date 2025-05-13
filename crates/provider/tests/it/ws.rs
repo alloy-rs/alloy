@@ -55,7 +55,8 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
                     let sub = pending.accept().await.unwrap();
 
                     for i in 0..usize::MAX {
-                        let msg = SubscriptionMessage::from_json(&i).unwrap();
+                        let raw = serde_json::value::to_raw_value(&i).unwrap();
+                        let msg = SubscriptionMessage::from(raw);
                         sub.send(msg).await.unwrap();
                         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     }
