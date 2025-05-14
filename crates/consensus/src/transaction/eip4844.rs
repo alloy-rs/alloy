@@ -1023,10 +1023,8 @@ mod tests {
         SignableTransaction, TxEnvelope,
     };
     use alloy_eips::{
-        eip2930::AccessList,
-        eip4844::env_settings::EnvKzgSettings,
-        eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant},
-        Encodable2718 as _,
+        eip2930::AccessList, eip4844::env_settings::EnvKzgSettings,
+        eip7594::BlobTransactionSidecarVariant, Encodable2718 as _,
     };
     use alloy_primitives::{address, b256, bytes, hex, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
