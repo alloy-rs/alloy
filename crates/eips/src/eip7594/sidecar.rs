@@ -7,10 +7,12 @@ use crate::{
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
-use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
 #[cfg(feature = "kzg")]
 use crate::eip4844::BlobTransactionValidationError;
+
+use super::{Decodable7594, Encodable7594};
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -97,12 +99,7 @@ impl BlobTransactionSidecarVariant {
     /// RLP decode the fields of a [BlobTransactionSidecarVariant] based on the wrapper version.
     #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        if buf.first() == Some(&EIP_7594_WRAPPER_VERSION) {
-            buf.advance(1);
-            Ok(Self::Eip7594(BlobTransactionSidecarEip7594::rlp_decode_fields(buf)?))
-        } else {
-            Ok(Self::Eip4844(BlobTransactionSidecar::rlp_decode_fields(buf)?))
-        }
+        Self::decode_7594(buf)
     }
 }
 
@@ -140,6 +137,26 @@ impl Decodable for BlobTransactionSidecarVariant {
         }
 
         Ok(this)
+    }
+}
+
+impl Encodable7594 for BlobTransactionSidecarVariant {
+    fn encode_7594_len(&self) -> usize {
+        self.rlp_encoded_fields_length()
+    }
+
+    fn encode_7594(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_fields(out);
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecarVariant {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        if buf.first() == Some(&EIP_7594_WRAPPER_VERSION) {
+            Ok(Self::Eip7594(Decodable7594::decode_7594(buf)?))
+        } else {
+            Ok(Self::Eip4844(Decodable7594::decode_7594(buf)?))
+        }
     }
 }
 
@@ -381,13 +398,7 @@ impl BlobTransactionSidecarEip7594 {
         }
         let remaining = buf.len();
 
-        let wrapper_version: u8 = Decodable::decode(buf)?;
-        if wrapper_version != EIP_7594_WRAPPER_VERSION {
-            return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
-        }
-
-        let this = Self::rlp_decode_fields(buf)?;
-
+        let this = Self::decode_7594(buf)?;
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
         }
@@ -412,6 +423,26 @@ impl Decodable for BlobTransactionSidecarEip7594 {
     /// header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
+    }
+}
+
+impl Encodable7594 for BlobTransactionSidecarEip7594 {
+    fn encode_7594_len(&self) -> usize {
+        self.rlp_encoded_fields_length()
+    }
+
+    fn encode_7594(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_fields(out);
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecarEip7594 {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let wrapper_version: u8 = Decodable::decode(buf)?;
+        if wrapper_version != EIP_7594_WRAPPER_VERSION {
+            return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
+        }
+        Self::rlp_decode_fields(buf)
     }
 }
 
@@ -460,5 +491,31 @@ mod tests {
         encoded.clear();
         sidecar_7594.encode(&mut encoded);
         assert_eq!(sidecar_7594, BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap());
+    }
+
+    #[test]
+    fn rlp_7594_roundtrip() {
+        let mut encoded = Vec::new();
+
+        let sidecar_4844 = BlobTransactionSidecar::default();
+        sidecar_4844.encode_7594(&mut encoded);
+        assert_eq!(sidecar_4844, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+
+        let sidecar_variant_4844 = BlobTransactionSidecarVariant::Eip4844(sidecar_4844);
+        assert_eq!(sidecar_variant_4844, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+        encoded.clear();
+        sidecar_variant_4844.encode_7594(&mut encoded);
+        assert_eq!(sidecar_variant_4844, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+
+        let sidecar_7594 = BlobTransactionSidecarEip7594::default();
+        encoded.clear();
+        sidecar_7594.encode_7594(&mut encoded);
+        assert_eq!(sidecar_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+
+        let sidecar_variant_7594 = BlobTransactionSidecarVariant::Eip7594(sidecar_7594);
+        assert_eq!(sidecar_variant_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+        encoded.clear();
+        sidecar_variant_7594.encode_7594(&mut encoded);
+        assert_eq!(sidecar_variant_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
     }
 }
