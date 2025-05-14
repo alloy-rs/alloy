@@ -16,7 +16,7 @@ use crate::eip4844::BlobTransactionValidationError;
 /// Proof type depends on the sidecar variant.
 ///
 /// This type encodes and decodes the fields without an rlp header.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -28,6 +28,22 @@ pub enum BlobTransactionSidecarVariant {
 }
 
 impl BlobTransactionSidecarVariant {
+    /// Returns the EIP-4844 sidecar if it is [`Self::Eip4844`].
+    pub const fn as_eip4844(&self) -> Option<&BlobTransactionSidecar> {
+        match self {
+            Self::Eip4844(sidecar) => Some(sidecar),
+            _ => None,
+        }
+    }
+
+    /// Returns the EIP-4844 sidecar if it is [`Self::Eip7594`].
+    pub const fn as_eip7594(&self) -> Option<&BlobTransactionSidecarEip7594> {
+        match self {
+            Self::Eip7594(sidecar) => Some(sidecar),
+            _ => None,
+        }
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarVariant].
     #[inline]
     pub fn size(&self) -> usize {
