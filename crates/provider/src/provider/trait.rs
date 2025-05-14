@@ -2006,6 +2006,7 @@ mod tests {
 
         assert!(builder.status());
     }
+
     #[tokio::test]
     async fn builtin_connect_boxed() {
         let anvil = Anvil::new().spawn();

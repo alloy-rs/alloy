@@ -1,6 +1,9 @@
 //! Provider-related utilities.
 
-use crate::fillers::{BlobGasFiller, ChainIdFiller, Fillers, GasFiller, NonceFiller};
+use crate::{
+    fillers::{BlobGasFiller, ChainIdFiller, GasFiller, JoinFill, NonceFiller},
+    Identity,
+};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::BlockResponse;
 use alloy_primitives::{B256, U128, U64};
@@ -157,7 +160,10 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
 
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],
 /// [`BlobGasFiller`], [`NonceFiller`], and [`ChainIdFiller`].
-pub type RecommendedFillers = Fillers<(GasFiller, BlobGasFiller, NonceFiller, ChainIdFiller)>;
+pub type JoinedRecommendedFillers = JoinFill<
+    Identity,
+    JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+>;
 
 #[cfg(test)]
 mod tests {
