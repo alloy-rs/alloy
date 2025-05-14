@@ -319,7 +319,7 @@ impl TransactionRequest {
     /// - blob sidecar
     /// - blob versioned hashes
     /// - max fee per blob gas
-    pub fn has_eip4844_fields(&self) -> bool {
+    pub const fn has_eip4844_fields(&self) -> bool {
         self.sidecar.is_some()
             || self.blob_versioned_hashes.is_some()
             || self.max_fee_per_blob_gas.is_some()
@@ -328,7 +328,7 @@ impl TransactionRequest {
     /// Returns true if _any_ of the EIP-1559 fee fields are set:
     /// - max fee per gas
     /// - max priority fee per gas
-    pub fn has_eip1559_fields(&self) -> bool {
+    pub const fn has_eip1559_fields(&self) -> bool {
         self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
     }
 
@@ -615,7 +615,7 @@ impl TransactionRequest {
     pub const fn preferred_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
+        } else if self.has_eip4844_fields() {
             TxType::Eip4844
         } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
