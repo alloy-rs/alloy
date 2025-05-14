@@ -10,7 +10,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
-use core::mem;
+use core::{fmt, mem};
 
 #[cfg(feature = "kzg")]
 use alloy_eips::eip4844::BlobTransactionValidationError;
@@ -840,7 +840,10 @@ impl<T: TxEip4844Sidecar> TxEip4844WithSidecar<T> {
     }
 }
 
-impl SignableTransaction<Signature> for TxEip4844WithSidecar {
+impl<T> SignableTransaction<Signature> for TxEip4844WithSidecar<T>
+where
+    T: fmt::Debug + Send + Sync + 'static,
+{
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.tx.chain_id = chain_id;
     }
@@ -861,7 +864,10 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
     }
 }
 
-impl Transaction for TxEip4844WithSidecar {
+impl<T> Transaction for TxEip4844WithSidecar<T>
+where
+    T: fmt::Debug + Send + Sync + 'static,
+{
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         self.tx.chain_id()
@@ -947,13 +953,13 @@ impl Transaction for TxEip4844WithSidecar {
     }
 }
 
-impl Typed2718 for TxEip4844WithSidecar {
+impl<T> Typed2718 for TxEip4844WithSidecar<T> {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
 }
 
-impl RlpEcdsaEncodableTx for TxEip4844WithSidecar {
+impl<T: TxEip4844Sidecar> RlpEcdsaEncodableTx for TxEip4844WithSidecar<T> {
     fn rlp_encoded_fields_length(&self) -> usize {
         self.sidecar.rlp_encoded_fields_length() + self.tx.rlp_encoded_length()
     }
@@ -981,12 +987,12 @@ impl RlpEcdsaEncodableTx for TxEip4844WithSidecar {
     }
 }
 
-impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
+impl<T: TxEip4844Sidecar> RlpEcdsaDecodableTx for TxEip4844WithSidecar<T> {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let tx = TxEip4844::rlp_decode(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let sidecar = T::rlp_decode_fields(buf)?;
         Ok(Self { tx, sidecar })
     }
 
@@ -998,7 +1004,7 @@ impl RlpEcdsaDecodableTx for TxEip4844WithSidecar {
         let remaining = buf.len();
 
         let (tx, signature) = TxEip4844::rlp_decode_with_signature(buf)?;
-        let sidecar = BlobTransactionSidecar::rlp_decode_fields(buf)?;
+        let sidecar = T::rlp_decode_fields(buf)?;
 
         if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::UnexpectedLength);
