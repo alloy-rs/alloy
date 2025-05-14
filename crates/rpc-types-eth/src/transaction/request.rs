@@ -332,6 +332,28 @@ impl TransactionRequest {
         self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
     }
 
+    /// Returns the transaction type based on the fields that are set.
+    ///
+    /// The type is determined in the following order:
+    /// - EIP-7702 if authorization_list is set
+    /// - EIP-4844 if any EIP-4844 fields are set (sidecar, blob hashes, max blob fee)
+    /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
+    /// - EIP-2930 if access_list is set
+    /// - Legacy otherwise
+    pub const fn tx_type(&self) -> TxType {
+        if self.authorization_list.is_some() {
+            TxType::Eip7702
+        } else if self.has_eip4844_fields() {
+            TxType::Eip4844
+        } else if self.has_eip1559_fields() {
+            TxType::Eip1559
+        } else if self.access_list.is_some() {
+            TxType::Eip2930
+        } else {
+            TxType::Legacy
+        }
+    }
+
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
     /// effect otherwise.
     pub fn populate_blob_hashes(&mut self) {
