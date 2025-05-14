@@ -67,6 +67,10 @@ pub struct TxEip1559 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
+    // Deserialize with `alloy_serde::null_as_default` to also accept a `null` value
+    // instead of an (empty) array. This is due to certain RPC providers (e.g., Filecoin's)
+    // sometimes returning `null` instead of an empty array `[]`.
+    // More details in <https://github.com/alloy-rs/alloy/pull/2450>.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub access_list: AccessList,
     /// Input has two uses depending if `to` field is Create or Call.
