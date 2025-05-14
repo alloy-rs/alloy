@@ -604,6 +604,39 @@ impl TransactionRequest {
         }
     }
 
+    /// Returns the minimal transaction type this request can be converted into based on the fields
+    /// that are set.
+    ///
+    /// Compared to [`Self::preferred_type`] which is intended for building and eventually signing
+    /// transactions and which prefers [`TxType::Eip1559`] if no conflicting fields are set, this
+    /// function is intended for deriving the minimal transaction type (legacy).
+    ///
+    /// [`Self::minimal_tx_type`] is mostly relevant for the server-side, for example executing
+    /// `eth_calls` against historic state (pre [`TxType::Eip1559`]) and is used to configure the
+    /// EVM's transaction environment with the minimal settings.
+    /// Whereas [`Self::preferred_type`] is recommend for using client-side (filling a
+    /// [`TransactionRequest`] and signing the transaction [`TransactionRequest::build_typed_tx`]).
+    ///
+    /// The type is determined in the following order:
+    /// - EIP-7702 if authorization_list is set
+    /// - EIP-4844 if any EIP-4844 fields are set (sidecar, blob hashes, max blob fee)
+    /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
+    /// - EIP-2930 if access_list is set
+    /// - Legacy otherwise
+    pub const fn minimal_tx_type(&self) -> TxType {
+        if self.authorization_list.is_some() {
+            TxType::Eip7702
+        } else if self.has_eip4844_fields() {
+            TxType::Eip4844
+        } else if self.has_eip1559_fields() {
+            TxType::Eip1559
+        } else if self.access_list.is_some() {
+            TxType::Eip2930
+        } else {
+            TxType::Legacy
+        }
+    }
+
     /// Check this builder's preferred type, based on the fields that are set.
     ///
     /// Types are preferred as follows:
