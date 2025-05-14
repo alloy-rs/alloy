@@ -67,6 +67,7 @@ pub struct TxEip1559 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub access_list: AccessList,
     /// Input has two uses depending if `to` field is Create or Call.
     /// pub init: An unlimited size byte array specifying the
