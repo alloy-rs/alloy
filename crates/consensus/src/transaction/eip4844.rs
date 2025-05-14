@@ -1018,10 +1018,18 @@ impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844WithSide
 #[cfg(test)]
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
-    use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
-    use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, bytes, Signature, U256};
+    use crate::{
+        transaction::{eip4844::TxEip4844Variant, RlpEcdsaDecodableTx},
+        SignableTransaction, TxEnvelope,
+    };
+    use alloy_eips::{
+        eip2930::AccessList, eip4844::env_settings::EnvKzgSettings,
+        eip7594::BlobTransactionSidecarVariant, Encodable2718 as _,
+    };
+    use alloy_primitives::{address, b256, bytes, hex, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
+    use assert_matches::assert_matches;
+    use std::path::PathBuf;
 
     #[test]
     fn different_sidecar_same_hash() {
@@ -1115,5 +1123,68 @@ mod tests {
             *signed.hash(),
             b256!("93fc9daaa0726c3292a2e939df60f7e773c6a6a726a61ce43f4a217c64d85e87")
         );
+    }
+
+    #[test]
+    fn decode_raw_7594_rlp() {
+        let kzg_settings = EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/7594rlp");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let tx = TxEip4844WithSidecar::<BlobTransactionSidecarVariant>::eip2718_decode(
+                &mut raw.as_ref(),
+            )
+            .map_err(|err| {
+                panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+            })
+            .unwrap();
+
+            // Test roundtrip
+            let encoded = tx.encoded_2718();
+            assert_eq!(encoded.as_slice(), &raw[..], "{:?}", entry.path());
+
+            let TxEip4844WithSidecar { tx, sidecar } = tx.tx();
+            assert_matches!(sidecar, BlobTransactionSidecarVariant::Eip7594(_));
+
+            let result = sidecar.validate(&tx.blob_versioned_hashes, kzg_settings.get());
+            assert_matches!(result, Ok(()));
+        }
+    }
+
+    #[test]
+    fn decode_raw_7594_rlp_invalid() {
+        let kzg_settings = EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/7594rlp-invalid");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+
+            if entry.path().file_name().and_then(|f| f.to_str()) == Some("0.rlp") {
+                continue;
+            }
+
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let tx = TxEip4844WithSidecar::<BlobTransactionSidecarVariant>::eip2718_decode(
+                &mut raw.as_ref(),
+            )
+            .map_err(|err| {
+                panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+            })
+            .unwrap();
+
+            // Test roundtrip
+            let encoded = tx.encoded_2718();
+            assert_eq!(encoded.as_slice(), &raw[..], "{:?}", entry.path());
+
+            let TxEip4844WithSidecar { tx, sidecar } = tx.tx();
+            assert_matches!(sidecar, BlobTransactionSidecarVariant::Eip7594(_));
+
+            let result = sidecar.validate(&tx.blob_versioned_hashes, kzg_settings.get());
+            assert_matches!(result, Err(_));
+        }
     }
 }
