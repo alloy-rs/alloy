@@ -276,6 +276,7 @@ mod tests {
 
     // Helper to setup test environment and return a StrongholdSigner
     fn setup_test_env(chain_id: Option<ChainId>) -> StrongholdSigner {
+        iota_stronghold::engine::snapshot::try_set_encrypt_work_factor(0).unwrap();
         env::set_var("PASSPHRASE", "test_passphrase_of_sufficient_length");
 
         // Create a new signer directly
