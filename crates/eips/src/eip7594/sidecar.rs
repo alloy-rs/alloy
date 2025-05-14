@@ -522,3 +522,45 @@ mod tests {
         assert_eq!(sidecar_7594, BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap());
     }
 }
+
+    #[test]
+    fn sidecar_variant_json_deserialize_sanity() {
+        use serde_json::json;
+
+        // EIP-4844: Has `proofs`
+        let json_4844 = json!({
+            "blobs": ["0x0000"],
+            "commitments": ["0x0001"],
+            "proofs": ["0x0002"]
+        });
+
+        let parsed_4844: BlobTransactionSidecarVariant =
+            serde_json::from_value(json_4844).expect("Should deserialize as Eip4844");
+
+        match parsed_4844 {
+            BlobTransactionSidecarVariant::Eip4844(inner) => {
+                assert_eq!(inner.blobs.len(), 1);
+                assert_eq!(inner.commitments.len(), 1);
+                assert_eq!(inner.proofs.len(), 1);
+            }
+            _ => panic!("Expected Eip4844 variant"),
+        }
+
+        let json_7594 = json!({
+            "blobs": ["0x0000"],
+            "commitments": ["0x0001"],
+            "cell_proofs": ["0x0002"]
+        });
+
+        let parsed_7594: BlobTransactionSidecarVariant =
+            serde_json::from_value(json_7594).expect("Should deserialize as Eip7594");
+
+        match parsed_7594 {
+            BlobTransactionSidecarVariant::Eip7594(inner) => {
+                assert_eq!(inner.blobs.len(), 1);
+                assert_eq!(inner.commitments.len(), 1);
+                assert_eq!(inner.cell_proofs.len(), 1);
+            }
+            _ => panic!("Expected Eip7594 variant"),
+        }
+    }
