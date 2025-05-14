@@ -1,15 +1,19 @@
 //! Serde functions for encoding the TTD using a Geth compatible format.
 //!
-//! In Go `big.Int`s are marshalled as a JSON number without quotes. Numbers
-//! are arbitrary precision in JSON, so this is valid JSON, but by default a
-//! `U256` use hex encoding.
-//! These functions encode the TTD as an `u128`, which is sufficient even for
-//! the Ethereum mainnet TTD.
+//! In Go `big.Int` is marshalled as a JSON number without quotes. Numbers are arbitrary
+//! precision in JSON, so this is valid JSON.
 //!
-//! This is only enabled for human-readable [`serde`] implementations.
+//! These functions serialize the TTD as a JSON number, if the value fits within `u128`.
+//!
+//! The TTD is parsed from:
+//!   - JSON numbers: direct `u64` values, or the specific Ethereum mainnet TTD (e.g., `5.875e22` if
+//!     represented as a float). Other floats or negative numbers will error.
+//!   - JSON strings: these are parsed as `U256` (allowing hex or decimal strings).
+//!
+//! For non-human-readable formats, the default `serde` behavior for `Option<U256>` is used.
 
 use alloy_primitives::U256;
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 /// Serializes an optional TTD as a JSON number.
@@ -22,9 +26,11 @@ where
     if serializer.is_human_readable() {
         match value {
             Some(value) => {
-                // convert into an u128 when possible
-                let number = value.try_into().map_err(ser::Error::custom)?;
-                serializer.serialize_u128(number)
+                // serialize as an u128 when possible, otherwise as a hex string
+                match value.try_into() {
+                    Ok(value) => serializer.serialize_u128(value),
+                    Err(_) => value.serialize(serializer),
+                }
             }
             None => serializer.serialize_none(),
         }
@@ -118,7 +124,7 @@ mod tests {
         struct Ttd(#[serde(with = "super")] Option<U256>);
 
         let deserialized: Vec<Ttd> = serde_json::from_str(
-            r#"["",0,"0","0x0",18446744073709551615,"58750000000000000000000",58750000000000000000000]"#,
+            r#"["",0,"0","0x0",18446744073709551615,58750000000000000000000,"58750000000000000000000","0xC70D808A128D7380000"]"#,
         )
         .unwrap();
         assert_eq!(
@@ -129,6 +135,7 @@ mod tests {
                 Ttd(Some(U256::ZERO)),
                 Ttd(Some(U256::ZERO)),
                 Ttd(Some(U256::from(18446744073709551615u64))),
+                Ttd(Some(U256::from(58750000000000000000000u128))),
                 Ttd(Some(U256::from(58750000000000000000000u128))),
                 Ttd(Some(U256::from(58750000000000000000000u128))),
             ]
@@ -144,6 +151,7 @@ mod tests {
             Ttd(Some(U256::ZERO)),
             Ttd(Some(U256::from(17000000000000000u64))),
             Ttd(Some(U256::from(58750000000000000000000u128))),
+            Ttd(Some(U256::from(u128::MAX))),
         ];
 
         for test in tests {
