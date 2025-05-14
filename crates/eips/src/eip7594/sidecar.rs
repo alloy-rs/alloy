@@ -492,4 +492,30 @@ mod tests {
         sidecar_7594.encode(&mut encoded);
         assert_eq!(sidecar_7594, BlobTransactionSidecarVariant::decode(&mut &encoded[..]).unwrap());
     }
+
+    #[test]
+    fn rlp_7594_roundtrip() {
+        let mut encoded = Vec::new();
+
+        let sidecar_4844 = BlobTransactionSidecar::default();
+        sidecar_4844.encode_7594(&mut encoded);
+        assert_eq!(sidecar_4844, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+
+        let sidecar_variant_4844 = BlobTransactionSidecarVariant::Eip4844(sidecar_4844);
+        assert_eq!(sidecar_variant_4844, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+        encoded.clear();
+        sidecar_variant_4844.encode_7594(&mut encoded);
+        assert_eq!(sidecar_variant_4844, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+
+        let sidecar_7594 = BlobTransactionSidecarEip7594::default();
+        encoded.clear();
+        sidecar_7594.encode_7594(&mut encoded);
+        assert_eq!(sidecar_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+
+        let sidecar_variant_7594 = BlobTransactionSidecarVariant::Eip7594(sidecar_7594);
+        assert_eq!(sidecar_variant_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+        encoded.clear();
+        sidecar_variant_7594.encode_7594(&mut encoded);
+        assert_eq!(sidecar_variant_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+    }
 }
