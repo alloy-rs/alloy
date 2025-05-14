@@ -442,7 +442,7 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
         if wrapper_version != EIP_7594_WRAPPER_VERSION {
             return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
         }
-        Ok(Self::rlp_decode_fields(buf)?)
+        Self::rlp_decode_fields(buf)
     }
 }
 
