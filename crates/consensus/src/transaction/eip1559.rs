@@ -493,4 +493,38 @@ mod tests {
         assert_eq!(decoded, tx.into_signed(sig));
         assert_eq!(*decoded.hash(), hash);
     }
+
+    #[test]
+    fn json_decode_eip1559_null_access_list() {
+        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
+
+        let tx_json = r#"
+        {
+            "chainId": "0x1",
+            "nonce": "0x42",
+            "gas": "0xad62",
+            "to": "0x6069a6c32cf691f5982febae4faf8a6f3ab2f0f6",
+            "value": "0x0",
+            "input": "0xa22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000",
+            "maxFeePerGas": "0x4a817c800",
+            "maxPriorityFeePerGas": "0x3b9aca00",
+            "accessList": null
+        }
+        "#;
+        // Make sure that we can decode a `null` accessList
+        let tx: TxEip1559 = serde_json::from_str(tx_json).unwrap();
+        assert_eq!(tx.access_list, AccessList::default());
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        );
+
+        let mut buf = vec![];
+        tx.rlp_encode_signed(&sig, &mut buf);
+        let decoded = TxEip1559::rlp_decode_signed(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+        assert_eq!(*decoded.hash(), hash);
+    }
 }
