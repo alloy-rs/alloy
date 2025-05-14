@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_rlp::BufMut;
 
 /// A helper trait for encoding [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594) sidecars.
