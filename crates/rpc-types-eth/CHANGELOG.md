@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add helpers to check set fields ([#2431](https://github.com/alloy-rs/alloy/issues/2431))
 
+### Miscellaneous Tasks
+
+- Release 1.0.0
+
 ## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
 
 ### Bug Fixes
@@ -263,6 +267,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
+### Miscellaneous Tasks
+
+- Release 0.9.1
+
+## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
+
 ### Bug Fixes
 
 - Use u64 for all gas values ([#1848](https://github.com/alloy-rs/alloy/issues/1848))
@@ -279,7 +289,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.9.1
 - Make clippy happy ([#1849](https://github.com/alloy-rs/alloy/issues/1849))
 - Rm non exhaustive from ReceiptEnvelope ([#1843](https://github.com/alloy-rs/alloy/issues/1843))
 - Rm non exhaustive for envelope ([#1842](https://github.com/alloy-rs/alloy/issues/1842))
@@ -345,6 +354,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
+### Miscellaneous Tasks
+
+- Release 0.7.3
+
+## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
+
 ### Bug Fixes
 
 - Remove `Borrow` impl for RPC receipt ([#1721](https://github.com/alloy-rs/alloy/issues/1721))
@@ -359,7 +374,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.7.3
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
@@ -572,6 +586,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Miscellaneous Tasks
+
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
@@ -700,26 +719,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add helper to set both input and data fields ([#1019](https://github.com/alloy-rs/alloy/issues/1019))
 - [rpc-types-eth] Add more utils to `TransactionIndex` ([#1007](https://github.com/alloy-rs/alloy/issues/1007))
 - Add into transactions iterator ([#984](https://github.com/alloy-rs/alloy/issues/984))
-- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
-- [contract] Implement Filter's builder methods on Event ([#960](https://github.com/alloy-rs/alloy/issues/960))
 
 ### Miscellaneous Tasks
 
 - Release 0.1.4
 - Convert rcp-types-eth block Header to consensus Header ([#1014](https://github.com/alloy-rs/alloy/issues/1014))
 - Make wrapped index value pub ([#988](https://github.com/alloy-rs/alloy/issues/988))
-- Release 0.1.3
-- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
 
 ### Other
 
 - Add range test in `FilterBlockOption` ([#939](https://github.com/alloy-rs/alloy/issues/939))
 
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Features
+
+- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
+- [contract] Implement Filter's builder methods on Event ([#960](https://github.com/alloy-rs/alloy/issues/960))
+
+### Miscellaneous Tasks
+
+- Release 0.1.3
+- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
-
-### Dependencies
-
-- [deps] Bump all ([#864](https://github.com/alloy-rs/alloy/issues/864))
 
 ### Documentation
 
@@ -731,10 +754,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `is_` and `as_` utils for `FilterBlockOption` ([#927](https://github.com/alloy-rs/alloy/issues/927))
 - Add utils to `ValueOrArray` ([#924](https://github.com/alloy-rs/alloy/issues/924))
 - Add `is_` utils to `FilterChanges` ([#923](https://github.com/alloy-rs/alloy/issues/923))
-- Integrate `EvmOverrides` to rpc types ([#906](https://github.com/alloy-rs/alloy/issues/906))
-- Add getter methods for `FilterChanges` ([#899](https://github.com/alloy-rs/alloy/issues/899))
-- Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
-- [rpc] Split off `eth` namespace in `alloy-rpc-types` to `alloy-rpc-types-eth` ([#847](https://github.com/alloy-rs/alloy/issues/847))
 
 ### Miscellaneous Tasks
 
@@ -742,6 +761,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc-types] Remove duplicate `Index` definition in `rpc-types-anvil` in favor of the one in `rpc-types-eth` ([#943](https://github.com/alloy-rs/alloy/issues/943))
 - Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
 - Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
+
+### Dependencies
+
+- [deps] Bump all ([#864](https://github.com/alloy-rs/alloy/issues/864))
+
+### Features
+
+- Integrate `EvmOverrides` to rpc types ([#906](https://github.com/alloy-rs/alloy/issues/906))
+- Add getter methods for `FilterChanges` ([#899](https://github.com/alloy-rs/alloy/issues/899))
+- Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
+- [rpc] Split off `eth` namespace in `alloy-rpc-types` to `alloy-rpc-types-eth` ([#847](https://github.com/alloy-rs/alloy/issues/847))
+
+### Miscellaneous Tasks
+
 - Rm unused txtype mod ([#879](https://github.com/alloy-rs/alloy/issues/879))
 - [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
 - [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))

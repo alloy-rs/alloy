@@ -1,8 +1,11 @@
 //! EIP-4844 sidecar type
 
-use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
-    BYTES_PER_PROOF,
+use crate::{
+    eip4844::{
+        kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
+        BYTES_PER_PROOF,
+    },
+    eip7594::{Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -447,6 +450,22 @@ impl Decodable for BlobTransactionSidecar {
     /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
+    }
+}
+
+impl Encodable7594 for BlobTransactionSidecar {
+    fn encode_7594_len(&self) -> usize {
+        self.rlp_encoded_fields_length()
+    }
+
+    fn encode_7594(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_fields(out);
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecar {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode_fields(buf)
     }
 }
 

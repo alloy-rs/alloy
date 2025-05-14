@@ -28,6 +28,9 @@ pub const TARGET_BLOBS_PER_BLOCK_FULU: u64 = 48;
 /// CL-enforced maximum blobs per block after Fusaka hardfork activation.
 pub const MAX_BLOBS_PER_BLOCK_FULU: u64 = 64;
 
+mod rlp;
+pub use rlp::*;
+
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
