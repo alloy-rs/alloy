@@ -465,11 +465,7 @@ impl Encodable7594 for BlobTransactionSidecar {
 
 impl Decodable7594 for BlobTransactionSidecar {
     fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            proofs: Decodable::decode(buf)?,
-        })
+        Self::rlp_decode_fields(buf)
     }
 }
 
