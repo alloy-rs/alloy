@@ -10,7 +10,7 @@ authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/alloy"
 repository = "https://github.com/alloy-rs/alloy"
-exclude = ["benches/", "tests/"]
+exclude = ["benches/", "tests/", "testdata/"]
 
 [workspace.lints.rust]
 missing-debug-implementations = "warn"
