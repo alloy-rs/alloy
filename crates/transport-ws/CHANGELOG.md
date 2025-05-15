@@ -5,124 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2](https://github.com/alloy-rs/alloy/releases/tag/v1.0.2) - 2025-05-15
-
-### Features
-
-- Add with_auth_opt ([#2447](https://github.com/alloy-rs/alloy/issues/2447))
-
-## [1.0.1](https://github.com/alloy-rs/alloy/releases/tag/v1.0.1) - 2025-05-13
-
-### Miscellaneous Tasks
-
-- Release 1.0.1
-
-## [1.0.0](https://github.com/alloy-rs/alloy/releases/tag/v1.0.0) - 2025-05-13
-
-### Miscellaneous Tasks
-
-- Release 1.0.0
-
-## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
-
-### Miscellaneous Tasks
-
-- Release 0.15.11
-
-## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
-
-### Miscellaneous Tasks
-
-- Release 0.15.10
-
-## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
-
-### Miscellaneous Tasks
-
-- Release 0.15.9
-
-## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
-
-### Miscellaneous Tasks
-
-- Release 0.15.8
-
-## [0.15.7](https://github.com/alloy-rs/alloy/releases/tag/v0.15.7) - 2025-04-30
-
-### Miscellaneous Tasks
-
-- Release 0.15.7
-
-## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.6
-
-## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.5
-- Release 0.15.4
-
-## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.3
-
-## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.2
-
-## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.1
-
-## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
-
-### Features
-
-- [transport-ws] Expose Ws url ([#2301](https://github.com/alloy-rs/alloy/issues/2301))
-- [`ws`] Retry mechanism in WsConnect ([#2303](https://github.com/alloy-rs/alloy/issues/2303))
-
-### Miscellaneous Tasks
-
-- Release 0.15.0
-
-## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
+## [1.0.3](https://github.com/alloy-rs/alloy/releases/tag/v1.0.3) - 2025-05-15
 
 ### Bug Fixes
 
 - Use wasmtimer sleep ([#2287](https://github.com/alloy-rs/alloy/issues/2287))
 
+### Features
+
+- Add with_auth_opt ([#2447](https://github.com/alloy-rs/alloy/issues/2447))
+- [transport-ws] Expose Ws url ([#2301](https://github.com/alloy-rs/alloy/issues/2301))
+- [`ws`] Retry mechanism in WsConnect ([#2303](https://github.com/alloy-rs/alloy/issues/2303))
+
 ### Miscellaneous Tasks
 
+- Release 1.0.2
+- Release 1.0.1
+- Release 1.0.0
+- Release 0.15.11
+- Release 0.15.10
+- Release 0.15.9
+- Release 0.15.8
+- Release 0.15.7
+- Release 0.15.6
+- Release 0.15.5
+- Release 0.15.4
+- Release 0.15.3
+- Release 0.15.2
+- Release 0.15.1
+- Release 0.15.0
 - Release 0.14.0
 - Use target_family instead of arch for wasm cfg ([#2288](https://github.com/alloy-rs/alloy/issues/2288))
-
-## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
-
-### Miscellaneous Tasks
-
 - Release 0.13.0
 - Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
-
-## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
-
-### Miscellaneous Tasks
-
 - Release 0.12.6
-
-## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
-
-### Miscellaneous Tasks
-
 - Release 0.12.5
 
 ## [0.12.4](https://github.com/alloy-rs/alloy/releases/tag/v0.12.4) - 2025-03-07
@@ -210,11 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.8.1
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Miscellaneous Tasks
-
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05

@@ -5,134 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1](https://github.com/alloy-rs/alloy/releases/tag/v1.0.1) - 2025-05-13
-
-### Miscellaneous Tasks
-
-- Release 1.0.1
-
-## [1.0.0](https://github.com/alloy-rs/alloy/releases/tag/v1.0.0) - 2025-05-13
-
-### Miscellaneous Tasks
-
-- Release 1.0.0
-
-## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
-
-### Features
-
-- Some covenience signer impls ([#2410](https://github.com/alloy-rs/alloy/issues/2410))
-
-### Miscellaneous Tasks
-
-- Release 0.15.11
-- Fix clippy ([#2422](https://github.com/alloy-rs/alloy/issues/2422))
-
-## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
-
-### Miscellaneous Tasks
-
-- Release 0.15.10
-
-## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
-
-### Miscellaneous Tasks
-
-- Release 0.15.9
-
-## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
-
-### Miscellaneous Tasks
-
-- Release 0.15.8
-
-## [0.15.7](https://github.com/alloy-rs/alloy/releases/tag/v0.15.7) - 2025-04-30
-
-### Miscellaneous Tasks
-
-- Release 0.15.7
-- Clippy happy ([#2370](https://github.com/alloy-rs/alloy/issues/2370))
-
-## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.6
-
-## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.5
-- Release 0.15.4
-
-## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.3
-
-## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.2
-
-## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.1
-
-## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
+## [1.0.3](https://github.com/alloy-rs/alloy/releases/tag/v1.0.3) - 2025-05-15
 
 ### Bug Fixes
 
 - Fix grammar typos in documentation ([#2333](https://github.com/alloy-rs/alloy/issues/2333))
-
-### Features
-
-- Add mut arg setters for node bindings ([#2308](https://github.com/alloy-rs/alloy/issues/2308))
-
-### Miscellaneous Tasks
-
-- Release 0.15.0
-
-## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
-
-### Features
-
-- Relax ProviderBuilder bounds ([#2276](https://github.com/alloy-rs/alloy/issues/2276))
-
-### Miscellaneous Tasks
-
-- Release 0.14.0
-
-## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
-
-### Miscellaneous Tasks
-
-- Release 0.13.0
-- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
-
-## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
-
-### Bug Fixes
-
 - Drop geth's stderr handle ([#2104](https://github.com/alloy-rs/alloy/issues/2104))
 
 ### Features
 
+- Some covenience signer impls ([#2410](https://github.com/alloy-rs/alloy/issues/2410))
+- Add mut arg setters for node bindings ([#2308](https://github.com/alloy-rs/alloy/issues/2308))
+- Relax ProviderBuilder bounds ([#2276](https://github.com/alloy-rs/alloy/issues/2276))
 - [`node-bindings`] Anvil typed hardforks ([#2207](https://github.com/alloy-rs/alloy/issues/2207))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.2
+- Release 1.0.1
+- Release 1.0.0
+- Release 0.15.11
+- Fix clippy ([#2422](https://github.com/alloy-rs/alloy/issues/2422))
+- Release 0.15.10
+- Release 0.15.9
+- Release 0.15.8
+- Release 0.15.7
+- Clippy happy ([#2370](https://github.com/alloy-rs/alloy/issues/2370))
+- Release 0.15.6
+- Release 0.15.5
+- Release 0.15.4
+- Release 0.15.3
+- Release 0.15.2
+- Release 0.15.1
+- Release 0.15.0
+- Release 0.14.0
+- Release 0.13.0
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
 - Release 0.12.6
-
-## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
-
-### Miscellaneous Tasks
-
 - Release 0.12.5
 
 ## [0.12.4](https://github.com/alloy-rs/alloy/releases/tag/v0.12.4) - 2025-03-07
@@ -237,11 +146,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.8.1
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Miscellaneous Tasks
-
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
