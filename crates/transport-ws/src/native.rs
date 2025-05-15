@@ -51,6 +51,14 @@ impl WsConnect {
         self
     }
 
+    /// Sets the optional authorization header.
+    ///
+    /// This replaces the current [`Authorization`].
+    pub fn with_auth_opt(mut self, auth: Option<Authorization>) -> Self {
+        self.auth = auth;
+        self
+    }
+
     /// Sets the websocket config.
     pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = Some(config);
