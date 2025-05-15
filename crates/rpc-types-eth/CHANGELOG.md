@@ -5,183 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2](https://github.com/alloy-rs/alloy/releases/tag/v1.0.2) - 2025-05-15
-
-### Miscellaneous Tasks
-
-- Add a new fn for TxType derivation ([#2451](https://github.com/alloy-rs/alloy/issues/2451))
-- Use has_eip4884 fields ([#2448](https://github.com/alloy-rs/alloy/issues/2448))
-
-## [1.0.1](https://github.com/alloy-rs/alloy/releases/tag/v1.0.1) - 2025-05-13
-
-### Miscellaneous Tasks
-
-- Release 1.0.1
-
-## [1.0.0](https://github.com/alloy-rs/alloy/releases/tag/v1.0.0) - 2025-05-13
-
-### Dependencies
-
-- Bump jsonrpsee types ([#2439](https://github.com/alloy-rs/alloy/issues/2439))
-
-### Features
-
-- Add helpers to check set fields ([#2431](https://github.com/alloy-rs/alloy/issues/2431))
-
-### Miscellaneous Tasks
-
-- Release 1.0.0
-
-## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
+## [1.0.3](https://github.com/alloy-rs/alloy/releases/tag/v1.0.3) - 2025-05-15
 
 ### Bug Fixes
 
 - Ensure mandatory to field ([#2412](https://github.com/alloy-rs/alloy/issues/2412))
+- Use correct type in conversion ([#2346](https://github.com/alloy-rs/alloy/issues/2346))
+
+### Dependencies
+
+- Bump jsonrpsee types ([#2439](https://github.com/alloy-rs/alloy/issues/2439))
+- [deps] Core 1.0 ([#2184](https://github.com/alloy-rs/alloy/issues/2184))
+
+### Documentation
+
+- Add a note about transaction input ([#2380](https://github.com/alloy-rs/alloy/issues/2380))
+- Minor correction ([#2374](https://github.com/alloy-rs/alloy/issues/2374))
+
+### Features
+
+- Add helpers to check set fields ([#2431](https://github.com/alloy-rs/alloy/issues/2431))
+- Add input data helpers ([#2393](https://github.com/alloy-rs/alloy/issues/2393))
+- Filterset topics extend ([#2258](https://github.com/alloy-rs/alloy/issues/2258))
+- Make it easier to configure non u256 topics in filterset ([#2257](https://github.com/alloy-rs/alloy/issues/2257))
+- Add EIP1186AccountProofResponse::is_empty ([#2224](https://github.com/alloy-rs/alloy/issues/2224))
+- Ad helper append fn ([#2186](https://github.com/alloy-rs/alloy/issues/2186))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.2
+- Add a new fn for TxType derivation ([#2451](https://github.com/alloy-rs/alloy/issues/2451))
+- Use has_eip4884 fields ([#2448](https://github.com/alloy-rs/alloy/issues/2448))
+- Release 1.0.1
+- Release 1.0.0
 - Release 0.15.11
 - Add back filteredparams ([#2421](https://github.com/alloy-rs/alloy/issues/2421))
+- Release 0.15.10
+- Release 0.15.9
+- Release 0.15.8
+- Release 0.15.7
+- Add helpers to rpc block type ([#2355](https://github.com/alloy-rs/alloy/issues/2355))
+- Release 0.15.6
+- Release 0.15.5
+- Relax rpc tx conversions ([#2345](https://github.com/alloy-rs/alloy/issues/2345))
+- Release 0.15.4
+- Release 0.15.3
+- Release 0.15.2
+- Release 0.15.1
+- Release 0.15.0
+- Release 0.14.0
+- Release 0.13.0
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
+- Propagate arbitrary feature ([#2227](https://github.com/alloy-rs/alloy/issues/2227))
+- Release 0.12.6
+- Release 0.12.5
+- Add fromiter helper for stateoverridesbuilder ([#2182](https://github.com/alloy-rs/alloy/issues/2182))
+- Add with capacity helper ([#2183](https://github.com/alloy-rs/alloy/issues/2183))
+
+### Other
+
+- Deleted duplicate `for for` to `for` request.rs ([#2347](https://github.com/alloy-rs/alloy/issues/2347))
+- Add more details on FilterSet ([#2229](https://github.com/alloy-rs/alloy/issues/2229))
 
 ### Refactor
 
 - Improve and simplify event filters ([#2140](https://github.com/alloy-rs/alloy/issues/2140))
 
-## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
-
-### Miscellaneous Tasks
-
-- Release 0.15.10
-
 ### Styling
 
 - Introducing eth_getAccountInfo ([#2402](https://github.com/alloy-rs/alloy/issues/2402))
-
-## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
-
-### Features
-
-- Add input data helpers ([#2393](https://github.com/alloy-rs/alloy/issues/2393))
-
-### Miscellaneous Tasks
-
-- Release 0.15.9
-
-## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
-
-### Documentation
-
-- Add a note about transaction input ([#2380](https://github.com/alloy-rs/alloy/issues/2380))
-
-### Miscellaneous Tasks
-
-- Release 0.15.8
-
-## [0.15.7](https://github.com/alloy-rs/alloy/releases/tag/v0.15.7) - 2025-04-30
-
-### Documentation
-
-- Minor correction ([#2374](https://github.com/alloy-rs/alloy/issues/2374))
-
-### Miscellaneous Tasks
-
-- Release 0.15.7
-- Add helpers to rpc block type ([#2355](https://github.com/alloy-rs/alloy/issues/2355))
-
-### Other
-
-- Deleted duplicate `for for` to `for` request.rs ([#2347](https://github.com/alloy-rs/alloy/issues/2347))
-
-## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
-
-### Bug Fixes
-
-- Use correct type in conversion ([#2346](https://github.com/alloy-rs/alloy/issues/2346))
-
-### Miscellaneous Tasks
-
-- Release 0.15.6
-
-## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.5
-- Relax rpc tx conversions ([#2345](https://github.com/alloy-rs/alloy/issues/2345))
-- Release 0.15.4
-
-## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
-
-### Miscellaneous Tasks
-
-- Release 0.15.3
-
-## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.2
-
-## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.1
-
-## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
-
-### Miscellaneous Tasks
-
-- Release 0.15.0
-
-## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
-
-### Dependencies
-
-- [deps] Core 1.0 ([#2184](https://github.com/alloy-rs/alloy/issues/2184))
-
-### Features
-
-- Filterset topics extend ([#2258](https://github.com/alloy-rs/alloy/issues/2258))
-- Make it easier to configure non u256 topics in filterset ([#2257](https://github.com/alloy-rs/alloy/issues/2257))
-
-### Miscellaneous Tasks
-
-- Release 0.14.0
-
-## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
-
-### Features
-
-- Add EIP1186AccountProofResponse::is_empty ([#2224](https://github.com/alloy-rs/alloy/issues/2224))
-
-### Miscellaneous Tasks
-
-- Release 0.13.0
-- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
-- Propagate arbitrary feature ([#2227](https://github.com/alloy-rs/alloy/issues/2227))
-
-### Other
-
-- Add more details on FilterSet ([#2229](https://github.com/alloy-rs/alloy/issues/2229))
-
-## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
-
-### Features
-
-- Ad helper append fn ([#2186](https://github.com/alloy-rs/alloy/issues/2186))
-
-### Miscellaneous Tasks
-
-- Release 0.12.6
-
-## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
-
-### Miscellaneous Tasks
-
-- Release 0.12.5
-- Add fromiter helper for stateoverridesbuilder ([#2182](https://github.com/alloy-rs/alloy/issues/2182))
-- Add with capacity helper ([#2183](https://github.com/alloy-rs/alloy/issues/2183))
 
 ## [0.12.4](https://github.com/alloy-rs/alloy/releases/tag/v0.12.4) - 2025-03-07
 
@@ -323,6 +215,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
+### Bug Fixes
+
+- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
+
 ### Documentation
 
 - Add note about deprecated total difficulty ([#1784](https://github.com/alloy-rs/alloy/issues/1784))
@@ -330,33 +226,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Add info tx types ([#1793](https://github.com/alloy-rs/alloy/issues/1793))
-
-### Miscellaneous Tasks
-
-- Release 0.8.1
-
-### Other
-
-- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
-- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
-
-### Features
-
 - [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
 - Relax RPC `Block` bounds ([#1757](https://github.com/alloy-rs/alloy/issues/1757))
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 - Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ### Other
 
+- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
 - Reapply "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1773](https://github.com/alloy-rs/alloy/issues/1773))
 - Revert "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1772](https://github.com/alloy-rs/alloy/issues/1772))
 
