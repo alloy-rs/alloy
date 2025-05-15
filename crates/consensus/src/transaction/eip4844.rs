@@ -756,9 +756,9 @@ impl Decodable for TxEip4844 {
     }
 }
 
-impl From<TxEip4844WithSidecar> for TxEip4844 {
+impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
     /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844].
-    fn from(tx_with_sidecar: TxEip4844WithSidecar) -> Self {
+    fn from(tx_with_sidecar: TxEip4844WithSidecar<T>) -> Self {
         tx_with_sidecar.tx
     }
 }
