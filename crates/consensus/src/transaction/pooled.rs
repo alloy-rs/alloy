@@ -5,7 +5,6 @@ use super::EthereumTxEnvelope;
 use crate::{
     error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope,
 };
-use alloy_eips::{eip4844::BlobTransactionSidecar, eip7594::Encodable7594};
 
 /// All possible transactions that can be included in a response to `GetPooledTransactions`.
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
@@ -14,12 +13,11 @@ use alloy_eips::{eip4844::BlobTransactionSidecar, eip7594::Encodable7594};
 /// The difference between this and the [`TxEnvelope`] is that this type always requires the
 /// [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only be propagated with the
 /// sidecar over p2p.
-pub type PooledTransaction<T = BlobTransactionSidecar> =
-    EthereumTxEnvelope<TxEip4844WithSidecar<T>>;
+pub type PooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
 
-impl<T: Encodable7594> PooledTransaction<T> {
+impl PooledTransaction {
     /// Converts the transaction into [`TxEnvelope`].
-    pub fn into_envelope(self) -> TxEnvelope<T> {
+    pub fn into_envelope(self) -> TxEnvelope {
         match self {
             Self::Legacy(tx) => tx.into(),
             Self::Eip2930(tx) => tx.into(),
@@ -30,10 +28,10 @@ impl<T: Encodable7594> PooledTransaction<T> {
     }
 }
 
-impl<T: Encodable7594> TryFrom<Signed<TxEip4844Variant<T>>> for PooledTransaction<T> {
-    type Error = ValueError<Signed<TxEip4844Variant<T>>>;
+impl TryFrom<Signed<TxEip4844Variant>> for PooledTransaction {
+    type Error = ValueError<Signed<TxEip4844Variant>>;
 
-    fn try_from(value: Signed<TxEip4844Variant<T>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Signed<TxEip4844Variant>) -> Result<Self, Self::Error> {
         let (value, signature, hash) = value.into_parts();
         match value {
             tx @ TxEip4844Variant::TxEip4844(_) => Err(ValueError::new_static(
@@ -47,10 +45,10 @@ impl<T: Encodable7594> TryFrom<Signed<TxEip4844Variant<T>>> for PooledTransactio
     }
 }
 
-impl<T: Encodable7594> TryFrom<TxEnvelope<T>> for PooledTransaction<T> {
-    type Error = ValueError<TxEnvelope<T>>;
+impl TryFrom<TxEnvelope> for PooledTransaction {
+    type Error = ValueError<TxEnvelope>;
 
-    fn try_from(value: TxEnvelope<T>) -> Result<Self, Self::Error> {
+    fn try_from(value: TxEnvelope) -> Result<Self, Self::Error> {
         value.try_into_pooled()
     }
 }
@@ -63,8 +61,8 @@ impl TryFrom<EthereumTxEnvelope<TxEip4844>> for PooledTransaction {
     }
 }
 
-impl<T: Encodable7594> From<PooledTransaction<T>> for TxEnvelope<T> {
-    fn from(tx: PooledTransaction<T>) -> Self {
+impl From<PooledTransaction> for TxEnvelope {
+    fn from(tx: PooledTransaction) -> Self {
         tx.into_envelope()
     }
 }

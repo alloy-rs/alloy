@@ -13,7 +13,6 @@ use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
     eip4844::BlobTransactionSidecar,
-    eip7594::Encodable7594,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -34,14 +33,14 @@ use core::{
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub type TxEnvelope<T = BlobTransactionSidecar> = EthereumTxEnvelope<TxEip4844Variant<T>>;
+pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
 
-impl<T: Encodable7594> TxEnvelope<T> {
+impl TxEnvelope {
     /// Attempts to convert the envelope into the pooled variant.
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
     /// [`crate::TxEip4844`] without the sidecar.
-    pub fn try_into_pooled(self) -> Result<PooledTransaction<T>, ValueError<Self>> {
+    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
             Self::Eip2930(tx) => Ok(tx.into()),
