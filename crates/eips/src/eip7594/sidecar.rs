@@ -1,22 +1,21 @@
+#[cfg(feature = "kzg")]
+use crate::eip4844::BlobTransactionValidationError;
 use crate::{
     eip4844::{
         kzg_to_versioned_hash, Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48,
         BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
     },
-    eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
+    eip7594::{Decodable7594, Encodable7594, CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
-#[cfg(feature = "kzg")]
-use crate::eip4844::BlobTransactionValidationError;
-
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
 ///
 /// This type encodes and decodes the fields without an rlp header.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum BlobTransactionSidecarVariant {
@@ -100,6 +99,52 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 
         const FIELDS: &[&str] = &["blobs", "commitments", "proofs", "cell_proofs"];
         deserializer.deserialize_struct("BlobTransactionSidecarVariant", FIELDS, VariantVisitor)
+    }
+}
+
+impl Encodable7594 for BlobTransactionSidecarEip7594 {
+    fn encode_7594_len(&self) -> usize {
+        self.rlp_encoded_fields_length()
+    }
+
+    fn encode_7594(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_fields(out);
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecarEip7594 {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode_fields(buf)
+    }
+}
+
+impl Encodable7594 for BlobTransactionSidecarVariant {
+    fn encode_7594_len(&self) -> usize {
+        match self {
+            Self::Eip4844(inner) => inner.encode_7594_len(),
+            Self::Eip7594(inner) => inner.encode_7594_len(),
+        }
+    }
+
+    fn encode_7594(&self, out: &mut dyn alloy_rlp::BufMut) {
+        match self {
+            Self::Eip4844(inner) => inner.encode_7594(out),
+            Self::Eip7594(inner) => inner.encode_7594(out),
+        }
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecarVariant {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let mut clone = *buf;
+
+        if let Ok(eip7594) = BlobTransactionSidecarEip7594::decode_7594(&mut clone) {
+            *buf = clone;
+            return Ok(Self::Eip7594(eip7594));
+        }
+
+        let eip4844 = BlobTransactionSidecar::decode_7594(buf)?;
+        Ok(Self::Eip4844(eip4844))
     }
 }
 
@@ -556,7 +601,6 @@ mod tests {
             _ => panic!("Expected Eip4844 variant"),
         }
 
-        // Test EIP-7594 variant
         let json_7594 = format!(
             r#"{{
                 "blobs": ["{}"],
