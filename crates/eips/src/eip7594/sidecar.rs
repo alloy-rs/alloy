@@ -525,14 +525,7 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn hex_48() -> &'static str {
-        "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-    }
-    fn big_blob() -> String {
-        let bytes = vec![0u8; 131072];
-        format!("0x{}", alloy_primitives::hex::encode(bytes))
-    }
+    use serde_json::{from_value, json};
 
     #[test]
     fn sidecar_variant_rlp_roundtrip() {
@@ -579,30 +572,33 @@ mod tests {
 
     #[test]
     fn sidecar_variant_json_deserialize_sanity() {
-        use serde_json::from_str;
+        fn big_blob() -> String {
+            let blob = vec![0u8; 131072];
+            format!("0x{}", alloy_primitives::hex::encode(blob))
+        }
 
-        let long_blob = big_blob();
+        fn hex_48() -> &'static str {
+            "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        }
 
-        let json_4844 = format!(
-            r#"{{
-            "blobs": ["{}"],
-            "commitments": ["{}"],
-            "proofs": ["{}"]
-        }}"#,
-            long_blob,
-            hex_48(),
-            hex_48()
-        );
+        let blob = big_blob();
+
+        let json_4844 = json!({
+            "blobs": [blob],
+            "commitments": [hex_48()],
+            "proofs": [hex_48()]
+        });
 
         let parsed_4844: BlobTransactionSidecarVariant =
-            from_str(&json_4844).expect("Should deserialize as Eip4844");
+            from_value(json_4844).expect("Should deserialize as Eip4844");
 
-        if let BlobTransactionSidecarVariant::Eip4844(inner) = parsed_4844 {
-            assert_eq!(inner.blobs.len(), 1);
-            assert_eq!(inner.commitments.len(), 1);
-            assert_eq!(inner.proofs.len(), 1);
-        } else {
-            panic!("Expected Eip4844 variant");
+        match parsed_4844 {
+            BlobTransactionSidecarVariant::Eip4844(inner) => {
+                assert_eq!(inner.blobs.len(), 1);
+                assert_eq!(inner.commitments.len(), 1);
+                assert_eq!(inner.proofs.len(), 1);
+            }
+            _ => panic!("Expected Eip4844 variant"),
         }
     }
 
