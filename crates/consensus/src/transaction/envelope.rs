@@ -280,8 +280,8 @@ where
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844WithSidecar>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
