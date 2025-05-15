@@ -27,29 +27,29 @@ use alloy_eips::eip4844::BlobTransactionValidationError;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[doc(alias = "Eip4844TransactionVariant")]
-pub enum TxEip4844Variant {
+pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
     /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
-    TxEip4844WithSidecar(TxEip4844WithSidecar),
+    TxEip4844WithSidecar(TxEip4844WithSidecar<T>),
 }
 
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for TxEip4844Variant<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         #[derive(serde::Deserialize)]
-        struct TxEip4844SerdeHelper {
+        struct TxEip4844SerdeHelper<Sidecar> {
             #[serde(flatten)]
             #[doc(alias = "transaction")]
             tx: TxEip4844,
             #[serde(flatten)]
-            sidecar: Option<BlobTransactionSidecar>,
+            sidecar: Option<Sidecar>,
         }
 
-        let tx = TxEip4844SerdeHelper::deserialize(deserializer)?;
+        let tx = TxEip4844SerdeHelper::<T>::deserialize(deserializer)?;
 
         if let Some(sidecar) = tx.sidecar {
             Ok(TxEip4844WithSidecar::from_tx_and_sidecar(tx.tx, sidecar).into())
@@ -59,40 +59,40 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
     }
 }
 
-impl From<Signed<TxEip4844>> for Signed<TxEip4844Variant> {
+impl<T> From<Signed<TxEip4844>> for Signed<TxEip4844Variant<T>> {
     fn from(value: Signed<TxEip4844>) -> Self {
         let (tx, signature, hash) = value.into_parts();
         Self::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash)
     }
 }
 
-impl From<Signed<TxEip4844WithSidecar>> for Signed<TxEip4844Variant> {
-    fn from(value: Signed<TxEip4844WithSidecar>) -> Self {
+impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip4844Variant<T>> {
+    fn from(value: Signed<TxEip4844WithSidecar<T>>) -> Self {
         let (tx, signature, hash) = value.into_parts();
         Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
     }
 }
 
-impl From<TxEip4844WithSidecar> for TxEip4844Variant {
-    fn from(tx: TxEip4844WithSidecar) -> Self {
+impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844Variant<T> {
+    fn from(tx: TxEip4844WithSidecar<T>) -> Self {
         Self::TxEip4844WithSidecar(tx)
     }
 }
 
-impl From<TxEip4844> for TxEip4844Variant {
+impl<T> From<TxEip4844> for TxEip4844Variant<T> {
     fn from(tx: TxEip4844) -> Self {
         Self::TxEip4844(tx)
     }
 }
 
-impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
+impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant<BlobTransactionSidecar> {
     fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
         TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar).into()
     }
 }
 
-impl From<TxEip4844Variant> for TxEip4844 {
-    fn from(tx: TxEip4844Variant) -> Self {
+impl<T> From<TxEip4844Variant<T>> for TxEip4844 {
+    fn from(tx: TxEip4844Variant<T>) -> Self {
         match tx {
             TxEip4844Variant::TxEip4844(tx) => tx,
             TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx,
@@ -100,7 +100,7 @@ impl From<TxEip4844Variant> for TxEip4844 {
     }
 }
 
-impl AsRef<TxEip4844> for TxEip4844Variant {
+impl<T> AsRef<TxEip4844> for TxEip4844Variant<T> {
     fn as_ref(&self) -> &TxEip4844 {
         match self {
             Self::TxEip4844(tx) => tx,
@@ -109,7 +109,7 @@ impl AsRef<TxEip4844> for TxEip4844Variant {
     }
 }
 
-impl AsMut<TxEip4844> for TxEip4844Variant {
+impl<T> AsMut<TxEip4844> for TxEip4844Variant<T> {
     fn as_mut(&mut self) -> &mut TxEip4844 {
         match self {
             Self::TxEip4844(tx) => tx,
@@ -130,21 +130,7 @@ impl AsMut<Self> for TxEip4844 {
     }
 }
 
-impl TxEip4844Variant {
-    /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
-    ///
-    /// See also [TxEip4844::validate_blob]
-    #[cfg(feature = "kzg")]
-    pub fn validate(
-        &self,
-        proof_settings: &c_kzg::KzgSettings,
-    ) -> Result<(), BlobTransactionValidationError> {
-        match self {
-            Self::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
-            Self::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
-        }
-    }
-
+impl<T> TxEip4844Variant<T> {
     /// Get the transaction type.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type() -> TxType {
@@ -160,6 +146,31 @@ impl TxEip4844Variant {
         }
     }
 
+    /// Tries to unwrap the [`TxEip4844WithSidecar`] returns the transaction as error if it is not a
+    /// [`TxEip4844WithSidecar`]
+    pub fn try_into_4844_with_sidecar(self) -> Result<TxEip4844WithSidecar<T>, Self> {
+        match self {
+            Self::TxEip4844WithSidecar(tx) => Ok(tx),
+            _ => Err(self),
+        }
+    }
+}
+
+impl<T: TxEip4844Sidecar> TxEip4844Variant<T> {
+    /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
+    ///
+    /// See also [TxEip4844::validate_blob]
+    #[cfg(feature = "kzg")]
+    pub fn validate(
+        &self,
+        proof_settings: &c_kzg::KzgSettings,
+    ) -> Result<(), BlobTransactionValidationError> {
+        match self {
+            Self::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
+            Self::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
+        }
+    }
+
     /// Calculates a heuristic for the in-memory size of the [TxEip4844Variant] transaction.
     #[inline]
     pub fn size(&self) -> usize {
@@ -168,18 +179,12 @@ impl TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => tx.size(),
         }
     }
-
-    /// Tries to unwrap the [`TxEip4844WithSidecar`] returns the transaction as error if it is not a
-    /// [`TxEip4844WithSidecar`]
-    pub fn try_into_4844_with_sidecar(self) -> Result<TxEip4844WithSidecar, Self> {
-        match self {
-            Self::TxEip4844WithSidecar(tx) => Ok(tx),
-            _ => Err(self),
-        }
-    }
 }
 
-impl Transaction for TxEip4844Variant {
+impl<T> Transaction for TxEip4844Variant<T>
+where
+    T: fmt::Debug + Send + Sync + 'static,
+{
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         match self {
@@ -313,7 +318,7 @@ impl Typed2718 for TxEip4844 {
     }
 }
 
-impl RlpEcdsaEncodableTx for TxEip4844Variant {
+impl<T: Encodable7594> RlpEcdsaEncodableTx for TxEip4844Variant<T> {
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
             Self::TxEip4844(inner) => inner.rlp_encoded_fields_length(),
@@ -350,7 +355,7 @@ impl RlpEcdsaEncodableTx for TxEip4844Variant {
     }
 }
 
-impl RlpEcdsaDecodableTx for TxEip4844Variant {
+impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844Variant<T> {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
@@ -405,7 +410,7 @@ impl RlpEcdsaDecodableTx for TxEip4844Variant {
     }
 }
 
-impl Typed2718 for TxEip4844Variant {
+impl<T> Typed2718 for TxEip4844Variant<T> {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
@@ -417,7 +422,10 @@ impl IsTyped2718 for TxEip4844 {
     }
 }
 
-impl SignableTransaction<Signature> for TxEip4844Variant {
+impl<T> SignableTransaction<Signature> for TxEip4844Variant<T>
+where
+    T: fmt::Debug + Send + Sync + 'static,
+{
     fn set_chain_id(&mut self, chain_id: ChainId) {
         match self {
             Self::TxEip4844(inner) => {

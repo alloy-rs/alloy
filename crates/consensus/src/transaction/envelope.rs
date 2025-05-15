@@ -13,6 +13,7 @@ use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
     eip4844::BlobTransactionSidecar,
+    eip7594::Encodable7594,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -33,14 +34,14 @@ use core::{
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
+pub type TxEnvelope<T = BlobTransactionSidecar> = EthereumTxEnvelope<TxEip4844Variant<T>>;
 
-impl TxEnvelope {
+impl<T: Encodable7594> TxEnvelope<T> {
     /// Attempts to convert the envelope into the pooled variant.
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
     /// [`crate::TxEip4844`] without the sidecar.
-    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+    pub fn try_into_pooled(self) -> Result<PooledTransaction<T>, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
             Self::Eip2930(tx) => Ok(tx.into()),
@@ -286,13 +287,13 @@ impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for EthereumTxEnvelope
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844Variant<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844Variant<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant> {
+impl<T> From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant<T>> {
     fn from(value: EthereumTxEnvelope<TxEip4844>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
