@@ -1688,7 +1688,8 @@ mod tests {
         }"#;
 
         let req: TransactionRequest = serde_json::from_str(s).unwrap();
-        dbg!(&req.authorization_list);
-        assert_eq!(req.authorization_list.unwrap().len(), 1)
+        let auths = req.authorization_list.unwrap();
+        assert_eq!(auths.len(), 1);
+        assert_eq!(auths[0].y_parity(), 0);
     }
 }
