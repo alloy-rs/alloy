@@ -1154,7 +1154,10 @@ pub mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{transaction::SignableTransaction, TxEip4844, TxEip4844WithSidecar};
+    use crate::{
+        transaction::{recovered::SignerRecoverable, SignableTransaction},
+        TxEip4844, TxEip4844WithSidecar,
+    };
     use alloc::vec::Vec;
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},
