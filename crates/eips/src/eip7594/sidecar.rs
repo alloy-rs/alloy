@@ -20,6 +20,7 @@ use super::{Decodable7594, Encodable7594};
 /// This type encodes and decodes the fields without an rlp header.
 #[derive(Clone, PartialEq, Eq, Hash, Debug, derive_more::From)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum BlobTransactionSidecarVariant {
     /// EIP-4844 style blob transaction sidecar.
@@ -603,11 +604,15 @@ mod tests {
         let json = serde_json::to_string(&eip4844).unwrap();
         let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
         assert!(variant.is_eip4844());
+        let jsonvariant = serde_json::to_string(&variant).unwrap();
+        assert_eq!(json, jsonvariant);
 
         let eip7594 = BlobTransactionSidecarEip7594::default();
         let json = serde_json::to_string(&eip7594).unwrap();
         let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
         assert!(variant.is_eip7594());
+        let jsonvariant = serde_json::to_string(&variant).unwrap();
+        assert_eq!(json, jsonvariant);
     }
 
     #[test]
