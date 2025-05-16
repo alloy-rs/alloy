@@ -28,84 +28,17 @@ pub enum BlobTransactionSidecarVariant {
     Eip7594(BlobTransactionSidecarEip7594),
 }
 
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        #[serde(field_identifier, rename_all = "camelCase")]
-        enum Field {
-            Blobs,
-            Commitments,
-            Proofs,
-            CellProofs,
-        }
-
-        struct VariantVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for VariantVisitor {
-            type Value = BlobTransactionSidecarVariant;
-
-            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                formatter
-                    .write_str("a valid blob transaction sidecar (EIP-4844 or EIP-7594 variant)")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
-            where
-                M: serde::de::MapAccess<'de>,
-            {
-                let mut blobs = None;
-                let mut commitments = None;
-                let mut proofs = None;
-                let mut cell_proofs = None;
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Blobs => blobs = Some(map.next_value()?),
-                        Field::Commitments => commitments = Some(map.next_value()?),
-                        Field::Proofs => proofs = Some(map.next_value()?),
-                        Field::CellProofs => cell_proofs = Some(map.next_value()?),
-                    }
-                }
-
-                let blobs = blobs.ok_or_else(|| serde::de::Error::missing_field("blobs"))?;
-                let commitments =
-                    commitments.ok_or_else(|| serde::de::Error::missing_field("commitments"))?;
-
-                match (cell_proofs, proofs) {
-                    (Some(cp), None) => {
-                        Ok(BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
-                            blobs,
-                            commitments,
-                            cell_proofs: cp,
-                        }))
-                    }
-                    (None, Some(pf)) => {
-                        Ok(BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
-                            blobs,
-                            commitments,
-                            proofs: pf,
-                        }))
-                    }
-                    (None, None) => {
-                        Err(serde::de::Error::custom("Missing 'cell_proofs' or 'proofs'"))
-                    }
-                    (Some(_), Some(_)) => Err(serde::de::Error::custom(
-                        "Both 'cellProofs' and 'proofs' cannot be present",
-                    )),
-                }
-            }
-        }
-
-        const FIELDS: &[&str] = &["blobs", "commitments", "proofs", "cell_proofs"];
-        deserializer.deserialize_struct("BlobTransactionSidecarVariant", FIELDS, VariantVisitor)
-    }
-}
-
 impl BlobTransactionSidecarVariant {
+    /// Returns true if this is a [`BlobTransactionSidecarVariant::Eip4844`].
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self, Self::Eip4844(_))
+    }
+
+    /// Returns true if this is a [`BlobTransactionSidecarVariant::Eip7594`].
+    pub const fn is_eip7594(&self) -> bool {
+        matches!(self, Self::Eip7594(_))
+    }
+
     /// Returns the EIP-4844 sidecar if it is [`Self::Eip4844`].
     pub const fn as_eip4844(&self) -> Option<&BlobTransactionSidecar> {
         match self {
@@ -252,12 +185,90 @@ impl Decodable7594 for BlobTransactionSidecarVariant {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(field_identifier, rename_all = "camelCase")]
+        enum Field {
+            Blobs,
+            Commitments,
+            Proofs,
+            CellProofs,
+        }
+
+        struct VariantVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for VariantVisitor {
+            type Value = BlobTransactionSidecarVariant;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                formatter
+                    .write_str("a valid blob transaction sidecar (EIP-4844 or EIP-7594 variant)")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: serde::de::MapAccess<'de>,
+            {
+                let mut blobs = None;
+                let mut commitments = None;
+                let mut proofs = None;
+                let mut cell_proofs = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Blobs => blobs = Some(map.next_value()?),
+                        Field::Commitments => commitments = Some(map.next_value()?),
+                        Field::Proofs => proofs = Some(map.next_value()?),
+                        Field::CellProofs => cell_proofs = Some(map.next_value()?),
+                    }
+                }
+
+                let blobs = blobs.ok_or_else(|| serde::de::Error::missing_field("blobs"))?;
+                let commitments =
+                    commitments.ok_or_else(|| serde::de::Error::missing_field("commitments"))?;
+
+                match (cell_proofs, proofs) {
+                    (Some(cp), None) => {
+                        Ok(BlobTransactionSidecarVariant::Eip7594(BlobTransactionSidecarEip7594 {
+                            blobs,
+                            commitments,
+                            cell_proofs: cp,
+                        }))
+                    }
+                    (None, Some(pf)) => {
+                        Ok(BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
+                            blobs,
+                            commitments,
+                            proofs: pf,
+                        }))
+                    }
+                    (None, None) => {
+                        Err(serde::de::Error::custom("Missing 'cellProofs' or 'proofs'"))
+                    }
+                    (Some(_), Some(_)) => Err(serde::de::Error::custom(
+                        "Both 'cellProofs' and 'proofs' cannot be present",
+                    )),
+                }
+            }
+        }
+
+        const FIELDS: &[&str] = &["blobs", "commitments", "proofs", "cellProofs"];
+        deserializer.deserialize_struct("BlobTransactionSidecarVariant", FIELDS, VariantVisitor)
+    }
+}
+
 /// This represents a set of blobs, and its corresponding commitments and cell proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BlobTransactionSidecarEip7594 {
     /// The blob data.
     #[cfg_attr(
@@ -541,7 +552,6 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{from_value, json};
 
     #[test]
     fn sidecar_variant_rlp_roundtrip() {
@@ -587,35 +597,17 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn sidecar_variant_json_deserialize_sanity() {
-        fn big_blob() -> String {
-            let blob = vec![0u8; 131072];
-            format!("0x{}", alloy_primitives::hex::encode(blob))
-        }
+        let eip4844 = BlobTransactionSidecar::default();
+        let json = serde_json::to_string(&eip4844).unwrap();
+        let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
+        assert!(variant.is_eip4844());
 
-        fn hex_48() -> &'static str {
-            "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-        }
-
-        let blob = big_blob();
-
-        let json_4844 = json!({
-            "blobs": [blob],
-            "commitments": [hex_48()],
-            "proofs": [hex_48()]
-        });
-
-        let parsed_4844: BlobTransactionSidecarVariant =
-            from_value(json_4844).expect("Should deserialize as Eip4844");
-
-        match parsed_4844 {
-            BlobTransactionSidecarVariant::Eip4844(inner) => {
-                assert_eq!(inner.blobs.len(), 1);
-                assert_eq!(inner.commitments.len(), 1);
-                assert_eq!(inner.proofs.len(), 1);
-            }
-            _ => panic!("Expected Eip4844 variant"),
-        }
+        let eip7594 = BlobTransactionSidecarEip7594::default();
+        let json = serde_json::to_string(&eip7594).unwrap();
+        let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
+        assert!(variant.is_eip7594());
     }
 
     #[test]
