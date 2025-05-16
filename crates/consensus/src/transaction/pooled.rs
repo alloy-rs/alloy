@@ -5,6 +5,7 @@ use super::EthereumTxEnvelope;
 use crate::{
     error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope,
 };
+use alloy_eips::{eip4844::BlobTransactionSidecar, eip7594::Encodable7594};
 
 /// All possible transactions that can be included in a response to `GetPooledTransactions`.
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
@@ -13,11 +14,12 @@ use crate::{
 /// The difference between this and the [`TxEnvelope`] is that this type always requires the
 /// [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only be propagated with the
 /// sidecar over p2p.
-pub type PooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+pub type PooledTransaction<T = BlobTransactionSidecar> =
+    EthereumTxEnvelope<TxEip4844WithSidecar<T>>;
 
-impl PooledTransaction {
+impl<T: Encodable7594> PooledTransaction<T> {
     /// Converts the transaction into [`TxEnvelope`].
-    pub fn into_envelope(self) -> TxEnvelope {
+    pub fn into_envelope(self) -> TxEnvelope<T> {
         match self {
             Self::Legacy(tx) => tx.into(),
             Self::Eip2930(tx) => tx.into(),
@@ -28,10 +30,10 @@ impl PooledTransaction {
     }
 }
 
-impl TryFrom<Signed<TxEip4844Variant>> for PooledTransaction {
-    type Error = ValueError<Signed<TxEip4844Variant>>;
+impl<T: Encodable7594> TryFrom<Signed<TxEip4844Variant<T>>> for PooledTransaction<T> {
+    type Error = ValueError<Signed<TxEip4844Variant<T>>>;
 
-    fn try_from(value: Signed<TxEip4844Variant>) -> Result<Self, Self::Error> {
+    fn try_from(value: Signed<TxEip4844Variant<T>>) -> Result<Self, Self::Error> {
         let (value, signature, hash) = value.into_parts();
         match value {
             tx @ TxEip4844Variant::TxEip4844(_) => Err(ValueError::new_static(
@@ -45,10 +47,10 @@ impl TryFrom<Signed<TxEip4844Variant>> for PooledTransaction {
     }
 }
 
-impl TryFrom<TxEnvelope> for PooledTransaction {
-    type Error = ValueError<TxEnvelope>;
+impl<T: Encodable7594> TryFrom<TxEnvelope<T>> for PooledTransaction<T> {
+    type Error = ValueError<TxEnvelope<T>>;
 
-    fn try_from(value: TxEnvelope) -> Result<Self, Self::Error> {
+    fn try_from(value: TxEnvelope<T>) -> Result<Self, Self::Error> {
         value.try_into_pooled()
     }
 }
@@ -61,8 +63,8 @@ impl TryFrom<EthereumTxEnvelope<TxEip4844>> for PooledTransaction {
     }
 }
 
-impl From<PooledTransaction> for TxEnvelope {
-    fn from(tx: PooledTransaction) -> Self {
+impl<T: Encodable7594> From<PooledTransaction<T>> for TxEnvelope<T> {
+    fn from(tx: PooledTransaction<T>) -> Self {
         tx.into_envelope()
     }
 }
@@ -97,7 +99,7 @@ mod tests {
 
         for hex_data in &input_too_short {
             let input_rlp = &mut &hex_data[..];
-            let res = PooledTransaction::decode(input_rlp);
+            let res = PooledTransaction::<BlobTransactionSidecar>::decode(input_rlp);
 
             assert!(
                 res.is_err(),
@@ -107,7 +109,7 @@ mod tests {
 
             // this is a legacy tx so we can attempt the same test with decode_enveloped
             let input_rlp = &mut &hex_data[..];
-            let res = PooledTransaction::decode_2718(input_rlp);
+            let res = PooledTransaction::<BlobTransactionSidecar>::decode_2718(input_rlp);
 
             assert!(
                 res.is_err(),
@@ -120,10 +122,11 @@ mod tests {
     // <https://holesky.etherscan.io/tx/0x7f60faf8a410a80d95f7ffda301d5ab983545913d3d789615df3346579f6c849>
     #[test]
     fn decode_eip1559_enveloped() {
-        let data = hex!("02f903d382426882ba09832dc6c0848674742682ed9694714b6a4ea9b94a8a7d9fd362ed72630688c8898c80b90364492d24749189822d8512430d3f3ff7a2ede675ac08265c08e2c56ff6fdaa66dae1cdbe4a5d1d7809f3e99272d067364e597542ac0c369d69e22a6399c3e9bee5da4b07e3f3fdc34c32c3d88aa2268785f3e3f8086df0934b10ef92cfffc2e7f3d90f5e83302e31382e302d64657600000000000000000000000000000000000000000000569e75fc77c1a856f6daaf9e69d8a9566ca34aa47f9133711ce065a571af0cfd000000000000000000000000e1e210594771824dad216568b91c9cb4ceed361c00000000000000000000000000000000000000000000000000000000000546e00000000000000000000000000000000000000000000000000000000000e4e1c00000000000000000000000000000000000000000000000000000000065d6750c00000000000000000000000000000000000000000000000000000000000f288000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002cf600000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000000f1628e56fa6d8c50e5b984a58c0df14de31c7b857ce7ba499945b99252976a93d06dcda6776fc42167fbe71cb59f978f5ef5b12577a90b132d14d9c6efa528076f0161d7bf03643cfc5490ec5084f4a041db7f06c50bd97efa08907ba79ddcac8b890f24d12d8db31abbaaf18985d54f400449ee0559a4452afe53de5853ce090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000003e800000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000c080a01428023fc54a27544abc421d5d017b9a7c5936ad501cbdecd0d9d12d04c1a033a0753104bbf1c87634d6ff3f0ffa0982710612306003eb022363b57994bdef445a"
-);
+        let data = hex!(
+            "02f903d382426882ba09832dc6c0848674742682ed9694714b6a4ea9b94a8a7d9fd362ed72630688c8898c80b90364492d24749189822d8512430d3f3ff7a2ede675ac08265c08e2c56ff6fdaa66dae1cdbe4a5d1d7809f3e99272d067364e597542ac0c369d69e22a6399c3e9bee5da4b07e3f3fdc34c32c3d88aa2268785f3e3f8086df0934b10ef92cfffc2e7f3d90f5e83302e31382e302d64657600000000000000000000000000000000000000000000569e75fc77c1a856f6daaf9e69d8a9566ca34aa47f9133711ce065a571af0cfd000000000000000000000000e1e210594771824dad216568b91c9cb4ceed361c00000000000000000000000000000000000000000000000000000000000546e00000000000000000000000000000000000000000000000000000000000e4e1c00000000000000000000000000000000000000000000000000000000065d6750c00000000000000000000000000000000000000000000000000000000000f288000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002cf600000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000000f1628e56fa6d8c50e5b984a58c0df14de31c7b857ce7ba499945b99252976a93d06dcda6776fc42167fbe71cb59f978f5ef5b12577a90b132d14d9c6efa528076f0161d7bf03643cfc5490ec5084f4a041db7f06c50bd97efa08907ba79ddcac8b890f24d12d8db31abbaaf18985d54f400449ee0559a4452afe53de5853ce090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000003e800000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000c080a01428023fc54a27544abc421d5d017b9a7c5936ad501cbdecd0d9d12d04c1a033a0753104bbf1c87634d6ff3f0ffa0982710612306003eb022363b57994bdef445a"
+        );
 
-        let res = PooledTransaction::decode_2718(&mut &data[..]).unwrap();
+        let res = PooledTransaction::<BlobTransactionSidecar>::decode_2718(&mut &data[..]).unwrap();
         assert_eq!(res.to(), Some(address!("714b6a4ea9b94a8a7d9fd362ed72630688c8898c")));
     }
 
@@ -142,12 +145,12 @@ mod tests {
         let data = &hex!("d30b02808083c5cdeb8783c5acfd9e407c565656")[..];
 
         let input_rlp = &mut &data[..];
-        let res = PooledTransaction::decode(input_rlp);
+        let res = PooledTransaction::<BlobTransactionSidecar>::decode(input_rlp);
         assert!(res.is_ok());
         assert!(input_rlp.is_empty());
 
         // we can also decode_enveloped
-        let res = PooledTransaction::decode_2718(&mut &data[..]);
+        let res = PooledTransaction::<BlobTransactionSidecar>::decode_2718(&mut &data[..]);
         assert!(res.is_ok());
     }
 
@@ -159,7 +162,7 @@ mod tests {
             let entry = entry.unwrap();
             let content = std::fs::read_to_string(entry.path()).unwrap();
             let raw = hex::decode(content.trim()).unwrap();
-            let tx = PooledTransaction::decode_2718(&mut raw.as_ref())
+            let tx = PooledTransaction::<BlobTransactionSidecar>::decode_2718(&mut raw.as_ref())
                 .map_err(|err| {
                     panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
                 })

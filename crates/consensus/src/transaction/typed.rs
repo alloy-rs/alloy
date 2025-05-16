@@ -7,12 +7,14 @@ use crate::{
     TxLegacy, TxType,
 };
 use alloy_eips::{
-    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+    eip2718::IsTyped2718, eip2930::AccessList, eip4844::BlobTransactionSidecar,
+    eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
-pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
+pub type TypedTransaction<T = BlobTransactionSidecar> =
+    EthereumTypedTransaction<TxEip4844Variant<T>>;
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
 ///

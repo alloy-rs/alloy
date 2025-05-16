@@ -259,6 +259,7 @@ impl Decodable for TxEip2930 {
 mod tests {
     use super::*;
     use crate::{SignableTransaction, TxEnvelope};
+    use alloy_eips::eip4844::BlobTransactionSidecar;
     use alloy_primitives::{Address, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
@@ -301,7 +302,7 @@ mod tests {
 
         let tx = request.into_signed(signature);
 
-        let envelope = TxEnvelope::Eip2930(tx);
+        let envelope = TxEnvelope::<BlobTransactionSidecar>::Eip2930(tx);
 
         let mut encoded = Vec::new();
         envelope.encode(&mut encoded);
