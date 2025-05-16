@@ -12,7 +12,6 @@ use crate::{
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
-    eip4844::BlobTransactionSidecar,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -72,10 +71,10 @@ impl EthereumTxEnvelope<TxEip4844> {
     ///
     /// Returns an `Err` containing the original [`EthereumTxEnvelope`] if the transaction is not an
     /// EIP-4844 variant.
-    pub fn try_into_pooled_eip4844(
+    pub fn try_into_pooled_eip4844<T>(
         self,
-        sidecar: BlobTransactionSidecar,
-    ) -> Result<PooledTransaction, ValueError<Self>> {
+        sidecar: T,
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
         match self {
             Self::Eip4844(tx) => {
                 Ok(EthereumTxEnvelope::Eip4844(tx.map(|tx| tx.with_sidecar(sidecar))))

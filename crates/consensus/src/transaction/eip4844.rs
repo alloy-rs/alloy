@@ -566,7 +566,7 @@ impl TxEip4844 {
     }
 
     /// Attaches the blob sidecar to the transaction
-    pub fn with_sidecar(self, sidecar: BlobTransactionSidecar) -> TxEip4844WithSidecar {
+    pub fn with_sidecar<T>(self, sidecar: T) -> TxEip4844WithSidecar<T> {
         TxEip4844WithSidecar::from_tx_and_sidecar(self, sidecar)
     }
 
