@@ -2202,6 +2202,8 @@ mod tests {
     #[tokio::test]
     #[cfg(not(windows))]
     async fn eth_sign_transaction() {
+        use alloy_consensus::BlobTransactionSidecar;
+
         async_ci_only(|| async {
             run_with_tempdir("reth-sign-tx", |dir| async {
                 let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
@@ -2218,7 +2220,8 @@ mod tests {
 
                 let signed_tx = provider.sign_transaction(tx).await.unwrap().to_vec();
 
-                let tx = TxEnvelope::decode(&mut signed_tx.as_slice()).unwrap();
+                let tx = TxEnvelope::<BlobTransactionSidecar>::decode(&mut signed_tx.as_slice())
+                    .unwrap();
 
                 let signer = tx.recover_signer().unwrap();
 
