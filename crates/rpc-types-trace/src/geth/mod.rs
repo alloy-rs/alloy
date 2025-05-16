@@ -303,7 +303,6 @@ pub enum GethDebugTracerType {
 }
 
 impl GethDebugTracerType {
-    
     /// Returns true if this a [`GethDebugTracerType::JsTracer`] variant.
     pub const fn is_js(&self) -> bool {
         matches!(self, Self::JsTracer(_))
@@ -857,7 +856,7 @@ mod tests {
         assert!(inner.is_err());
         assert!(matches!(inner, Err(UnexpectedTracerError(_))));
     }
-    
+
     // <https://github.com/paradigmxyz/reth/issues/16289>
     #[test]
     fn test_deserde_json_debug_trace_call_json_tracer() {
