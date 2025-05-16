@@ -84,7 +84,7 @@ alloy-chains = { version = "0.2", default-features = false }
 # eips
 alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.0", default-features = false }
-alloy-eip7702 = { version = "0.6.0", default-features = false }
+alloy-eip7702 = { version = "0.6.1", default-features = false }
 
 # hardforks
 alloy-hardforks = "0.2.0"
