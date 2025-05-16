@@ -94,7 +94,7 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
                         Err(serde::de::Error::custom("Missing 'cell_proofs' or 'proofs'"))
                     }
                     (Some(_), Some(_)) => Err(serde::de::Error::custom(
-                        "Both 'cell_proofs' and 'proofs' cannot be present",
+                        "Both 'cellProofs' and 'proofs' cannot be present",
                     )),
                 }
             }
