@@ -286,13 +286,13 @@ impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for EthereumTxEnvelope
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844Variant<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844Variant<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant> {
+impl<T> From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant<T>> {
     fn from(value: EthereumTxEnvelope<TxEip4844>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
