@@ -426,23 +426,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Recover the signer of the transaction.
-    #[cfg(feature = "k256")]
-    pub fn recover_signer(
-        &self,
-    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        match self {
-            Self::Legacy(tx) => tx.recover_signer(),
-            Self::Eip2930(tx) => tx.recover_signer(),
-            Self::Eip1559(tx) => tx.recover_signer(),
-            Self::Eip4844(tx) => tx.recover_signer(),
-            Self::Eip7702(tx) => tx.recover_signer(),
-        }
-    }
-
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256
     where
