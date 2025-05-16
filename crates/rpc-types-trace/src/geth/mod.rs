@@ -302,6 +302,13 @@ pub enum GethDebugTracerType {
     JsTracer(String),
 }
 
+impl GethDebugTracerType {
+    /// Returns true if this a [`GethDebugTracerType::JsTracer`] variant.
+    pub const fn is_js(&self) -> bool {
+        matches!(self, Self::JsTracer(_))
+    }
+}
+
 impl From<GethDebugBuiltInTracerType> for GethDebugTracerType {
     fn from(value: GethDebugBuiltInTracerType) -> Self {
         Self::BuiltInTracer(value)
@@ -848,5 +855,13 @@ mod tests {
         let inner = geth_trace.try_into_call_frame();
         assert!(inner.is_err());
         assert!(matches!(inner, Err(UnexpectedTracerError(_))));
+    }
+
+    // <https://github.com/paradigmxyz/reth/issues/16289>
+    #[test]
+    fn test_deserde_json_debug_trace_call_json_tracer() {
+        let s = include_str!("../../test_data/call_tracer/json-call-tracer16289.json");
+        let opts: GethDebugTracingCallOptions = serde_json::from_str(s).unwrap();
+        assert!(opts.tracing_options.tracer.unwrap().is_js());
     }
 }
