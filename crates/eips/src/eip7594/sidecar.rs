@@ -38,8 +38,24 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
-    /// Returns the EIP-4844 sidecar if it is [`Self::Eip7594`].
+    /// Returns the EIP-7594 sidecar if it is [`Self::Eip7594`].
     pub const fn as_eip7594(&self) -> Option<&BlobTransactionSidecarEip7594> {
+        match self {
+            Self::Eip7594(sidecar) => Some(sidecar),
+            _ => None,
+        }
+    }
+
+    /// Converts into EIP-4844 sidecar if it is [`Self::Eip4844`].
+    pub fn into_eip4844(self) -> Option<BlobTransactionSidecar> {
+        match self {
+            Self::Eip4844(sidecar) => Some(sidecar),
+            _ => None,
+        }
+    }
+
+    /// Converts the EIP-7594 sidecar if it is [`Self::Eip7594`].
+    pub fn into_eip7594(self) -> Option<BlobTransactionSidecarEip7594> {
         match self {
             Self::Eip7594(sidecar) => Some(sidecar),
             _ => None,
