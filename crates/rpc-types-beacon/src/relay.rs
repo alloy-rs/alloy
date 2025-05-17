@@ -315,6 +315,39 @@ pub struct BuilderBlockValidationRequestV4 {
     pub parent_beacon_block_root: B256,
 }
 
+/// Response type for the GET `/relay/v1/data/bidtraces/builder_blocks_received`
+///
+/// Provides [BidTrace]s for payloads that were delivered to proposers.
+/// Only submissions that were successfully verified.
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
+pub struct BuilderBlockReceived {
+    #[serde_as(as = "DisplayFromStr")]
+    pub slot: u64,
+    pub parent_hash: B256,
+    pub block_hash: B256,
+    pub builder_pubkey: BlsPublicKey,
+    pub proposer_pubkey: BlsPublicKey,
+    pub proposer_fee_recipient: Address,
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_limit: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_used: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub value: U256,
+    #[serde_as(as = "DisplayFromStr")]
+    pub num_tx: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub block_number: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub timestamp: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub timestamp_ms: u64,
+    #[serde(default)]
+    pub optimistic_submission: bool,
+}
+
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///
 /// Provides [BidTrace]s for payloads that were delivered to proposers.
@@ -606,6 +639,29 @@ mod tests {
         let bytes = include_bytes!("examples/relay_signed_bid_submission_capella.ssz").to_vec();
         let bid = SignedBidSubmissionV2::from_ssz_bytes(&bytes).unwrap();
         assert_eq!(bytes, bid.as_ssz_bytes());
+    }
+
+    #[test]
+    fn serde_builder_block_received() {
+        let s = r#"{
+    "slot": "1",
+    "parent_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "block_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "builder_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_fee_recipient": "0xabcf8e0d4e9587369b2301d0790347320302cc09",
+    "gas_limit": "1",
+    "gas_used": "1",
+    "value": "1",
+    "block_number": "1",
+    "num_tx": "1",
+    "timestamp": "1",
+    "timestamp_ms": "1"
+  }"#;
+        let block: BuilderBlockReceived = serde_json::from_str(s).unwrap();
+        let to_json: serde_json::Value = serde_json::to_value(block.clone()).unwrap();
+        let block2: BuilderBlockReceived = serde_json::from_value(to_json).unwrap();
+        assert_eq!(block, block2);
     }
 
     #[test]
