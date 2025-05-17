@@ -32,7 +32,8 @@ allow = [
     "Zlib",
     # https://github.com/briansmith/ring/issues/902
     "LicenseRef-ring",
-    "CDLA-Permissive-2.0"
+    "CDLA-Permissive-2.0",
+    "CC0-1.0"
 ]
 
 exceptions = [
