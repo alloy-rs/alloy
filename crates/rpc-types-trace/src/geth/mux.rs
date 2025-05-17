@@ -1,17 +1,17 @@
 //! Geth `muxTracer` types.
 
-use crate::geth::{GethDebugBuiltInTracerType, GethDebugTracerConfig, GethTrace};
+use crate::geth::{GethDebugTracerConfig, GethDebugTracerType, GethTrace};
 use alloy_primitives::map::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// A `muxTracer` config that contains the configuration for running multiple tracers in one go.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MuxConfig(pub HashMap<GethDebugBuiltInTracerType, Option<GethDebugTracerConfig>>);
+pub struct MuxConfig(pub HashMap<GethDebugTracerType, Option<GethDebugTracerConfig>>);
 
 /// A `muxTracer` frame response that contains the results of multiple tracers
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MuxFrame(pub HashMap<GethDebugBuiltInTracerType, GethTrace>);
+pub struct MuxFrame(pub HashMap<GethDebugTracerType, GethTrace>);
 
 #[cfg(test)]
 mod tests {
@@ -63,32 +63,44 @@ mod tests {
         let prestate_config = PreStateConfig { diff_mode: Some(true), ..Default::default() };
 
         opts.tracing_options.tracer_config = MuxConfig(HashMap::from_iter([
-            (GethDebugBuiltInTracerType::FourByteTracer, None),
-            (GethDebugBuiltInTracerType::CallTracer, Some(call_config.into())),
-            (GethDebugBuiltInTracerType::PreStateTracer, Some(prestate_config.into())),
+            (GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::FourByteTracer), None),
+            (
+                GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::CallTracer),
+                Some(call_config.into()),
+            ),
+            (
+                GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer),
+                Some(prestate_config.into()),
+            ),
+            (GethDebugTracerType::JsTracer("{ js_tracer_code }".into()), None),
         ]))
         .into();
 
         assert_eq!(
             serde_json::to_string(&opts).unwrap(),
-            r#"{"tracer":"muxTracer","tracerConfig":{"4byteTracer":null,"callTracer":{"onlyTopCall":true,"withLog":true},"prestateTracer":{"diffMode":true}}}"#,
+            r#"{"tracer":"muxTracer","tracerConfig":{"4byteTracer":null,"callTracer":{"onlyTopCall":true,"withLog":true},"prestateTracer":{"diffMode":true},"{ js_tracer_code }":null}}"#,
         );
     }
 
     #[test]
     fn test_deserialize_mux_frame() {
+        let js_tracer_code = "{ js_tracer_code }".to_string();
         let expected = HashMap::from([
             (
-                GethDebugBuiltInTracerType::FourByteTracer,
+                GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::FourByteTracer),
                 GethTrace::FourByteTracer(serde_json::from_str(FOUR_BYTE_FRAME).unwrap()),
             ),
             (
-                GethDebugBuiltInTracerType::CallTracer,
+                GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::CallTracer),
                 GethTrace::CallTracer(serde_json::from_str(CALL_FRAME_WITH_LOG).unwrap()),
             ),
             (
-                GethDebugBuiltInTracerType::PreStateTracer,
+                GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer),
                 GethTrace::PreStateTracer(serde_json::from_str(PRESTATE_FRAME).unwrap()),
+            ),
+            (
+                GethDebugTracerType::JsTracer(js_tracer_code.clone()),
+                GethTrace::JS("{js_tracer_result}".into()),
             ),
         ]);
 
@@ -96,16 +108,24 @@ mod tests {
         let trace: MuxFrame = serde_json::from_str(&raw_frame).unwrap();
 
         assert_eq!(
-            trace.0[&GethDebugBuiltInTracerType::FourByteTracer],
-            expected[&GethDebugBuiltInTracerType::FourByteTracer]
+            trace.0
+                [&GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::FourByteTracer)],
+            expected
+                [&GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::FourByteTracer)]
         );
         assert_eq!(
-            trace.0[&GethDebugBuiltInTracerType::CallTracer],
-            expected[&GethDebugBuiltInTracerType::CallTracer]
+            trace.0[&GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::CallTracer)],
+            expected[&GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::CallTracer)]
         );
         assert_eq!(
-            trace.0[&GethDebugBuiltInTracerType::PreStateTracer],
-            expected[&GethDebugBuiltInTracerType::PreStateTracer]
+            trace.0
+                [&GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer)],
+            expected
+                [&GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer)]
+        );
+        assert_eq!(
+            trace.0[&GethDebugTracerType::JsTracer(js_tracer_code.clone())],
+            expected[&GethDebugTracerType::JsTracer(js_tracer_code)]
         );
     }
 }
