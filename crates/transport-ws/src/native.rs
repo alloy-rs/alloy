@@ -71,12 +71,12 @@ impl WsConnect {
     }
 
     /// Get the authorization header.
-    pub fn auth(&self) -> Option<&Authorization> {
+    pub const fn auth(&self) -> Option<&Authorization> {
         self.auth.as_ref()
     }
 
     /// Get the websocket config.
-    pub fn config(&self) -> Option<&WebSocketConfig> {
+    pub const fn config(&self) -> Option<&WebSocketConfig> {
         self.config.as_ref()
     }
 

@@ -231,13 +231,13 @@ where
     /// Set the address of the multicall3 contract
     ///
     /// Default is [`MULTICALL3_ADDRESS`].
-    pub fn address(mut self, address: Address) -> Self {
+    pub const fn address(mut self, address: Address) -> Self {
         self.address = address;
         self
     }
 
     /// Sets the block to be used for the call.
-    pub fn block(mut self, block: BlockId) -> Self {
+    pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }

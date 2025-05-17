@@ -523,7 +523,7 @@ impl TransactionRequest {
     /// Ensures `to` field is set to an address which is required by:
     /// - EIP 7702
     /// - EIP 4844
-    fn ensure_mandatory_to(&self) -> Result<(), ()> {
+    const fn ensure_mandatory_to(&self) -> Result<(), ()> {
         if !matches!(self.to, Some(TxKind::Call(_))) {
             Err(())
         } else {
