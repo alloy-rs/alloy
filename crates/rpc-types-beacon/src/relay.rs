@@ -397,6 +397,42 @@ impl ProposerPayloadsDeliveredQuery {
     }
 }
 
+/// Response for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
+///
+/// Represents a payload that was delivered to proposers
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ProposerPayloadDelivered {
+    /// The slot this payload belongs to.
+    #[serde_as(as = "DisplayFromStr")]
+    pub slot: u64,
+    /// Parent hash of the payload.
+    pub parent_hash: B256,
+    /// Hash of the payload..
+    pub block_hash: B256,
+    /// Builder's pubkey.
+    pub builder_pubkey: BlsPublicKey,
+    /// Proposer's BLS pubkey.
+    pub proposer_pubkey: BlsPublicKey,
+    /// The fee recipient of the payload.
+    pub proposer_fee_recipient: Address,
+    /// Gas limit used by the payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_limit: u64,
+    /// Gas used by the payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_used: u64,
+    /// The payload's value.
+    #[serde_as(as = "DisplayFromStr")]
+    pub value: U256,
+    /// The block number of that payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub block_number: u64,
+    /// The number of transactions in that payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub num_tx: u64,
+}
+
 /// Sort results in either ascending or descending values.
 ///
 /// - `-value` - descending value (highest value first)
@@ -578,5 +614,26 @@ mod tests {
 
         let _validation_request_body: BuilderBlockValidationRequest =
             serde_json::from_str(VALIDATION_REQUEST_BODY).unwrap();
+    }
+
+    #[test]
+    fn test_serde_proposer_payload_delivered() {
+        let s = r#"{
+    "slot": "1",
+    "parent_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "block_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "builder_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_fee_recipient": "0xabcf8e0d4e9587369b2301d0790347320302cc09",
+    "gas_limit": "1",
+    "gas_used": "1",
+    "value": "1",
+    "block_number": "1",
+    "num_tx": "1"
+  }"#;
+        let payload: ProposerPayloadDelivered = serde_json::from_str(s).unwrap();
+        let json: serde_json::Value = serde_json::from_str(s).unwrap();
+        let to_json: serde_json::Value = serde_json::to_value(payload).unwrap();
+        assert_eq!(json, to_json);
     }
 }
