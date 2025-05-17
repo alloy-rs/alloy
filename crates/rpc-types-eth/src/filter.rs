@@ -676,7 +676,7 @@ impl Filter {
     }
 
     /// Returns `true` if the block matches the filter.
-    pub fn matches_block_range(&self, block_number: u64) -> bool {
+    pub const fn matches_block_range(&self, block_number: u64) -> bool {
         let mut res = true;
 
         if let Some(BlockNumberOrTag::Number(num)) = self.block_option.get_from_block() {
