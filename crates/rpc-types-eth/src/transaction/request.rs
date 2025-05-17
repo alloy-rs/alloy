@@ -315,6 +315,23 @@ impl TransactionRequest {
         self.gas_price.or(self.max_fee_per_gas)
     }
 
+    /// Returns true if _any_ of the EIP-4844 fields are set:
+    /// - blob sidecar
+    /// - blob versioned hashes
+    /// - max fee per blob gas
+    pub const fn has_eip4844_fields(&self) -> bool {
+        self.sidecar.is_some()
+            || self.blob_versioned_hashes.is_some()
+            || self.max_fee_per_blob_gas.is_some()
+    }
+
+    /// Returns true if _any_ of the EIP-1559 fee fields are set:
+    /// - max fee per gas
+    /// - max priority fee per gas
+    pub const fn has_eip1559_fields(&self) -> bool {
+        self.max_fee_per_gas.is_some() || self.max_priority_fee_per_gas.is_some()
+    }
+
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
     /// effect otherwise.
     pub fn populate_blob_hashes(&mut self) {
@@ -436,7 +453,7 @@ impl TransactionRequest {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip4844 transaction.")?;
 
         let to_address = match checked_to {
-            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
+            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."),
             TxKind::Call(to) => to,
         };
 
@@ -483,7 +500,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")?;
+        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.")?;
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
@@ -501,6 +518,17 @@ impl TransactionRequest {
             access_list: self.access_list.unwrap_or_default(),
             authorization_list: self.authorization_list.unwrap_or_default(),
         })
+    }
+
+    /// Ensures `to` field is set to an address which is required by:
+    /// - EIP 7702
+    /// - EIP 4844
+    fn ensure_mandatory_to(&self) -> Result<(), ()> {
+        if !matches!(self.to, Some(TxKind::Call(_))) {
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 
     fn check_reqd_fields(&self) -> Vec<&'static str> {
@@ -576,6 +604,39 @@ impl TransactionRequest {
         }
     }
 
+    /// Returns the minimal transaction type this request can be converted into based on the fields
+    /// that are set.
+    ///
+    /// Compared to [`Self::preferred_type`] which is intended for building and eventually signing
+    /// transactions and which prefers [`TxType::Eip1559`] if no conflicting fields are set, this
+    /// function is intended for deriving the minimal transaction type (legacy).
+    ///
+    /// [`Self::minimal_tx_type`] is mostly relevant for the server-side, for example executing
+    /// `eth_calls` against historic state (pre [`TxType::Eip1559`]) and is used to configure the
+    /// EVM's transaction environment with the minimal settings.
+    /// Whereas [`Self::preferred_type`] is recommend for using client-side (filling a
+    /// [`TransactionRequest`] and signing the transaction [`TransactionRequest::build_typed_tx`]).
+    ///
+    /// The type is determined in the following order:
+    /// - EIP-7702 if authorization_list is set
+    /// - EIP-4844 if any EIP-4844 fields are set (sidecar, blob hashes, max blob fee)
+    /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
+    /// - EIP-2930 if access_list is set
+    /// - Legacy otherwise
+    pub const fn minimal_tx_type(&self) -> TxType {
+        if self.authorization_list.is_some() {
+            TxType::Eip7702
+        } else if self.has_eip4844_fields() {
+            TxType::Eip4844
+        } else if self.has_eip1559_fields() {
+            TxType::Eip1559
+        } else if self.access_list.is_some() {
+            TxType::Eip2930
+        } else {
+            TxType::Legacy
+        }
+    }
+
     /// Check this builder's preferred type, based on the fields that are set.
     ///
     /// Types are preferred as follows:
@@ -587,7 +648,7 @@ impl TransactionRequest {
     pub const fn preferred_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
+        } else if self.has_eip4844_fields() {
             TxType::Eip4844
         } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
@@ -627,7 +688,7 @@ impl TransactionRequest {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
 
-        if self.to.is_none() {
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
             missing.push("to");
         }
 
@@ -680,6 +741,10 @@ impl TransactionRequest {
     pub fn complete_7702(&self) -> Result<(), Vec<&'static str>> {
         let mut missing = self.check_reqd_fields();
         self.check_1559_fields(&mut missing);
+
+        if self.to.is_some() && self.ensure_mandatory_to().is_err() {
+            missing.push("to");
+        }
 
         if self.authorization_list.is_none() {
             missing.push("authorization_list");
@@ -1227,7 +1292,9 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Authorization;
     use alloy_primitives::b256;
+    #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
     use assert_matches::assert_matches;
     use similar_asserts::assert_eq;
@@ -1500,7 +1567,7 @@ mod tests {
                 gas: Some(123456),
                 max_fee_per_blob_gas: Some(13579),
                 blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
-                sidecar: Some(sidecar.clone()),
+                sidecar: Some(sidecar),
                 ..Default::default()
             };
 
@@ -1509,6 +1576,25 @@ mod tests {
             assert_matches!(maybe_eip4844_tx,
             Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
             sidecar, .. }))) if sidecar == sidecar);
+
+            // with create to
+            let sidecar =
+                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.clone()),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
 
             // Negative case
             let eip4844_request_incorrect_to = TransactionRequest {
@@ -1527,5 +1613,83 @@ mod tests {
                 eip4844_request_incorrect_to.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
+
+        // EIP-7702
+        {
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip7702(_)));
+
+            // as create tx
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Create),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                authorization_list: Some(vec![SignedAuthorization::new_unchecked(
+                    Authorization {
+                        chain_id: Default::default(),
+                        address: Default::default(),
+                        nonce: 0,
+                    },
+                    0,
+                    U256::ZERO,
+                    U256::ZERO,
+                )]),
+                ..Default::default()
+            };
+
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
+            assert_matches!(maybe_eip4844_tx, Err(..));
+        }
+    }
+
+    #[test]
+    fn deserde_auth_request() {
+        let s = r#"        {
+            "to": "0xE854C84cD68fC434cB3B0042c29235D452cAD977",
+            "value": "0x2386f26fc10000",
+            "data": "0x97b2dcb9000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000b187803a4ac9c5a498e470aab82de203f5870ab872cfa6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000249f000000000000000000000000000014c0800000000000000000000000000000000000000000000000000000000000154b4000000000000000000000000002cf2770000000000000000000000000000003200000000000000000000000000000000000000000000000000000000000002600000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e4e9ae5c53000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000078833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000a9059cbb0000000000000000000000009c2a029612a98264e34ecf3ad8811c4e4a48316f0000000000000000000000000000000000000000000000000000000000001b9b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000074e854c84cd68fc434cb3b0042c29235d452cad97700000000000000000000000000004e2000000000000000000000000000004e200000000000000000000000000000000000000000000000000000000000043238000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000164177eee00b973503b11a308c1588a727a359c4709fec51aa9177502497da881f7c2b1a4b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006825c11f00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000001cff5e8e759c0aebbd4480700377fa5b3fc836d646b6882e2b20df2eb9dfed80e0000000000000000000000000000000000000000000000000000000000000041bb5fa08fdd3834010b589ee27c0918fb37271ee0825c81ab7559b5b97632bc1e14d81ce5cb28e53a6c602bc76c707794a43e5beeba5eb32903f81deb06cbbac61b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "from": "0x4b19129EA58431A06D01054f69AcAe5de50633b6",
+            "authorizationList": [
+                {
+                    "chainId": "0x2105",
+                    "address": "0x000000004F43C49e93C970E84001853a70923B03",
+                    "nonce": "0x0",
+                    "r": "0xb3fdb76993ec6787313ab8b54129200032dfb9ce683fa9f7693129421e6a3185",
+                    "s": "0x210b3350107a5687b532a346a90e7cc9a799b995743e2b79698bedba7bd779ae",
+                    "v": "0x1b",
+                    "yParity": "0x0"
+                }
+            ]
+        }"#;
+
+        let req: TransactionRequest = serde_json::from_str(s).unwrap();
+        let auths = req.authorization_list.unwrap();
+        assert_eq!(auths.len(), 1);
+        assert_eq!(auths[0].y_parity(), 0);
     }
 }

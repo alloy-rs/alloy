@@ -12,7 +12,6 @@ use crate::{
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
-    eip4844::BlobTransactionSidecar,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -72,10 +71,10 @@ impl EthereumTxEnvelope<TxEip4844> {
     ///
     /// Returns an `Err` containing the original [`EthereumTxEnvelope`] if the transaction is not an
     /// EIP-4844 variant.
-    pub fn try_into_pooled_eip4844(
+    pub fn try_into_pooled_eip4844<T>(
         self,
-        sidecar: BlobTransactionSidecar,
-    ) -> Result<PooledTransaction, ValueError<Self>> {
+        sidecar: T,
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
         match self {
             Self::Eip4844(tx) => {
                 Ok(EthereumTxEnvelope::Eip4844(tx.map(|tx| tx.with_sidecar(sidecar))))
@@ -280,19 +279,19 @@ where
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844WithSidecar>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844Variant<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844Variant<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant> {
+impl<T> From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant<T>> {
     fn from(value: EthereumTxEnvelope<TxEip4844>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
@@ -427,47 +426,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Recover the signer of the transaction.
-    #[cfg(feature = "k256")]
-    pub fn recover_signer(
-        &self,
-    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        match self {
-            Self::Legacy(tx) => tx.recover_signer(),
-            Self::Eip2930(tx) => tx.recover_signer(),
-            Self::Eip1559(tx) => tx.recover_signer(),
-            Self::Eip4844(tx) => tx.recover_signer(),
-            Self::Eip7702(tx) => tx.recover_signer(),
-        }
-    }
-
-    /// Recover the signer of the transaction.
-    #[cfg(feature = "k256")]
-    pub fn try_into_recovered(
-        self,
-    ) -> Result<crate::transaction::Recovered<Self>, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        let signer = self.recover_signer()?;
-        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
-    }
-
-    /// Recover the signer of the transaction and returns a `Recovered<&Self>`
-    #[cfg(feature = "k256")]
-    pub fn try_to_recovered_ref(
-        &self,
-    ) -> Result<crate::transaction::Recovered<&Self>, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        let signer = self.recover_signer()?;
-        Ok(crate::transaction::Recovered::new_unchecked(self, signer))
-    }
-
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256
     where
@@ -525,6 +483,24 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
             Self::Eip4844(t) => t.eip2718_encoded_length(),
             Self::Eip7702(t) => t.eip2718_encoded_length(),
         }
+    }
+}
+
+#[cfg(any(feature = "secp256k1", feature = "k256"))]
+impl<Eip4844> crate::transaction::SignerRecoverable for EthereumTxEnvelope<Eip4844>
+where
+    Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
+{
+    fn recover_signer(&self) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+    }
+
+    fn recover_signer_unchecked(
+        &self,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
     }
 }
 
@@ -1178,7 +1154,10 @@ pub mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{transaction::SignableTransaction, TxEip4844, TxEip4844WithSidecar};
+    use crate::{
+        transaction::{recovered::SignerRecoverable, SignableTransaction},
+        TxEip4844, TxEip4844WithSidecar,
+    };
     use alloc::vec::Vec;
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},

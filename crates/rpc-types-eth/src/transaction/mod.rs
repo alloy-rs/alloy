@@ -538,6 +538,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_from_contract_mod() {
         let rpc_tx = r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":"0x6e4e53d1de650d5a5ebed19b38321db369ef1dc357904284ecf4d89b8834969c","blockNumber":"0x2","transactionIndex":"0x0","from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#;
 
@@ -546,6 +547,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_gas_price_present() {
         let blob_rpc_tx = r#"{"blockHash":"0x1732a5fe86d54098c431fa4fea34387b650e41dbff65ca554370028172fcdb6a","blockNumber":"0x3","from":"0x7435ed30a8b4aeb0877cef0c6e8cffe834eb865f","gas":"0x186a0","gasPrice":"0x281d620e","maxFeePerGas":"0x281d620e","maxPriorityFeePerGas":"0x1","maxFeePerBlobGas":"0x20000","hash":"0xb0ebf0d8fca6724d5111d0be9ac61f0e7bf174208e0fafcb653f337c72465b83","input":"0xdc4c8669df128318656d6974","nonce":"0x8","to":"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df","transactionIndex":"0x0","value":"0x3","type":"0x3","accessList":[{"address":"0x7dcd17433742f4c0ca53122ab541d0ba67fc27df","storageKeys":["0x0000000000000000000000000000000000000000000000000000000000000000","0x462708a3c1cd03b21605715d090136df64e227f7e7792f74bb1bd7a8288f8801"]}],"chainId":"0xc72dd9d5e883e","blobVersionedHashes":["0x015a4cab4911426699ed34483de6640cf55a568afc5c5edffdcbd8bcd4452f68"],"v":"0x0","r":"0x478385a47075dd6ba56300b623038052a6e4bb03f8cfc53f367712f1c1d3e7de","s":"0x2f79ed9b154b0af2c97ddfc1f4f76e6c17725713b6d44ea922ca4c6bbc20775c","yParity":"0x0"}"#;
         let legacy_rpc_tx = r#"{"blockHash":"0x7e5d03caac4eb2b613ae9c919ef3afcc8ed0e384f31ee746381d3c8739475d2a","blockNumber":"0x4","from":"0x7435ed30a8b4aeb0877cef0c6e8cffe834eb865f","gas":"0x5208","gasPrice":"0x23237dee","hash":"0x3f38cdc805c02e152bfed34471a3a13a786fed436b3aec0c3eca35d23e2cdd2c","input":"0x","nonce":"0xc","to":"0x4dde844b71bcdf95512fb4dc94e84fb67b512ed8","transactionIndex":"0x0","value":"0x1","type":"0x0","chainId":"0xc72dd9d5e883e","v":"0x18e5bb3abd10a0","r":"0x3d61f5d7e93eecd0669a31eb640ab3349e9e5868a44c2be1337c90a893b51990","s":"0xc55f44ba123af37d0e73ed75e578647c3f473805349936f64ea902ea9e03bc7"}"#;
@@ -561,6 +563,7 @@ mod tests {
 
     // <https://github.com/alloy-rs/alloy/issues/1643>
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_7702_v() {
         let raw = r#"{"blockHash":"0xb14eac260f0cb7c3bbf4c9ff56034defa4f566780ed3e44b7a79b6365d02887c","blockNumber":"0xb022","from":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","gas":"0xf8ac","gasPrice":"0xe07899f","maxFeePerGas":"0xe0789a0","maxPriorityFeePerGas":"0xe078998","hash":"0xadc3f24d05f05f1065debccb1c4b033eaa35917b69b343d88d9062cdf8ecad83","input":"0x","nonce":"0x1a","to":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","transactionIndex":"0x0","value":"0x0","type":"0x4","accessList":[],"chainId":"0x1a5ee289c","authorizationList":[{"chainId":"0x1a5ee289c","address":"0x529f773125642b12a44bd543005650989eceaa2a","nonce":"0x1a","v":"0x0","r":"0x9b3de20cf8bd07f3c5c55c38c920c146f081bc5ab4580d0c87786b256cdab3c2","s":"0x74841956f4832bace3c02aed34b8f0a2812450da3728752edbb5b5e1da04497"}],"v":"0x1","r":"0xb3bf7d6877864913bba04d6f93d98009a5af16ee9c12295cd634962a2346b67c","s":"0x31ca4a874afa964ec7643e58c6b56b35b1bcc7698eb1b5e15e61e78b353bd42d","yParity":"0x1"}"#;
         let tx = serde_json::from_str::<Transaction>(raw).unwrap();
