@@ -282,3 +282,42 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
 }
+
+impl<T> SignerRecoverable for WithEncoded<T>
+where
+    T: SignerRecoverable,
+{
+    fn recover_signer(&self) -> Result<Address, RecoveryError> {
+        self.1.recover_signer()
+    }
+
+    fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
+        self.1.recover_signer_unchecked()
+    }
+
+    fn try_into_recovered(self) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.1.recover_signer()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    fn try_into_recovered_unchecked(self) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.1.recover_signer_unchecked()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    fn try_to_recovered_ref(&self) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.1.recover_signer()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    fn try_to_recovered_ref_unchecked(&self) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.1.recover_signer_unchecked()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+}
