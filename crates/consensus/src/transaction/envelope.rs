@@ -1028,7 +1028,7 @@ pub mod serde_bincode_compat {
     pub struct EthereumTxEnvelope<'a, Eip4844: Clone = crate::transaction::TxEip4844> {
         /// Transaction signature
         signature: Signature,
-        /// bincode compatable transaction
+        /// bincode compatible transaction
         transaction:
             crate::serde_bincode_compat::transaction::EthereumTypedTransaction<'a, Eip4844>,
     }
