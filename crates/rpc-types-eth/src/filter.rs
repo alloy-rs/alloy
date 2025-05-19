@@ -657,8 +657,10 @@ impl Filter {
     /// Check whether the provided bloom contains all topics and the address we
     /// wish to filter on.
     pub fn matches_bloom(&self, bloom: Bloom) -> bool {
-        bloom.contains(&self.address_bloom())
-            && self.topics_bloom().iter().all(|topic_bloom| bloom.contains(topic_bloom))
+        let blooms =
+            self.address.iter().map(|a| BloomInput::Raw(a.as_ref()).into()).collect::<Vec<Bloom>>();
+        let matches = blooms.is_empty() || blooms.iter().any(|a| bloom.contains(a));
+        matches && self.topics_bloom().iter().all(|topic_bloom| bloom.contains(topic_bloom))
     }
 
     /// Returns `true` if the filter matches the given topics.
