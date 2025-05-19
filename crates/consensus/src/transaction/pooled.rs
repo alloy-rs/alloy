@@ -9,13 +9,13 @@ use alloy_eips::eip7594::Encodable7594;
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
 /// non-4844 signed transaction.
 ///
-/// The difference between this and the [`TxEnvelope`] is that this type always requires the
-/// [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only be propagated with the
-/// sidecar over p2p.
+/// The difference between this and the [`EthereumTxEnvelope<TxEip4844Variant<T>>`] is that this
+/// type always requires the [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only
+/// be propagated with the sidecar over p2p.
 pub type PooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
 
 impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
-    /// Converts the transaction into [`TxEnvelope`].
+    /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant<T>>`].
     pub fn into_envelope(self) -> EthereumTxEnvelope<TxEip4844Variant<T>> {
         match self {
             Self::Legacy(tx) => tx.into(),

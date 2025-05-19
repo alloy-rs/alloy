@@ -72,7 +72,8 @@ impl EthereumTxEnvelope<TxEip4844> {
         }
     }
 
-    /// Converts from an EIP-4844 transaction to a [`PooledTransaction`] with the given sidecar.
+    /// Converts from an EIP-4844 transaction to a [`EthereumTxEnvelope<TxEip4844WithSidecar<T>>`]
+    /// with the given sidecar.
     ///
     /// Returns an `Err` containing the original [`EthereumTxEnvelope`] if the transaction is not an
     /// EIP-4844 variant.
