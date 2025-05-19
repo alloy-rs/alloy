@@ -155,6 +155,19 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     }
 }
 
+impl ProviderBuilder<Identity, Identity, Ethereum> {
+    /// Create a new [`ProviderBuilder`] with the [`RecommendedFillers`] for the provided
+    /// [`Network`].
+    pub fn new_with_network<Net: RecommendedFillers>(
+    ) -> ProviderBuilder<Identity, JoinFill<Identity, Net::RecommendedFillers>, Net> {
+        ProviderBuilder {
+            layer: Identity,
+            filler: JoinFill::new(Identity, Net::recommended_fillers()),
+            network: PhantomData,
+        }
+    }
+}
+
 impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
