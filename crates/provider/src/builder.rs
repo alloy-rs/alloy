@@ -712,6 +712,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 mod tests {
     use super::*;
     use crate::Provider;
+    use alloy_network::AnyNetwork;
 
     #[tokio::test]
     async fn basic() {
@@ -722,5 +723,10 @@ mod tests {
         let _ = provider.get_account(Default::default());
         let provider = provider.erased();
         let _ = provider.get_account(Default::default());
+    }
+
+    #[test]
+    fn compile_with_network() {
+        let _ = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
     }
 }
