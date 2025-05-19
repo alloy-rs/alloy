@@ -201,7 +201,7 @@ pub struct FallbackLayer {
 
 impl FallbackLayer {
     /// Set the number of active transports to use (must be greater than 0)
-    pub fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
+    pub const fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
         self.active_transport_count = count.get();
         self
     }

@@ -26,6 +26,6 @@ pub fn tokens_in_calldata(input: &[u8]) -> u64 {
 ///
 /// Any transaction with a gas limit below this value is considered invalid.
 #[inline]
-pub fn transaction_floor_cost(tokens_in_calldata: u64) -> u64 {
+pub const fn transaction_floor_cost(tokens_in_calldata: u64) -> u64 {
     21_000 + TOTAL_COST_FLOOR_PER_TOKEN * tokens_in_calldata
 }

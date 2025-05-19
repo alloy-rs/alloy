@@ -89,7 +89,7 @@ pub struct AnyRpcBlock(pub WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader
 
 impl AnyRpcBlock {
     /// Create a new [`AnyRpcBlock`].
-    pub fn new(inner: WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>) -> Self {
+    pub const fn new(inner: WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>) -> Self {
         Self(inner)
     }
 
@@ -183,7 +183,7 @@ pub struct AnyRpcTransaction(pub WithOtherFields<Transaction<AnyTxEnvelope>>);
 
 impl AnyRpcTransaction {
     /// Create a new [`AnyRpcTransaction`].
-    pub fn new(inner: WithOtherFields<Transaction<AnyTxEnvelope>>) -> Self {
+    pub const fn new(inner: WithOtherFields<Transaction<AnyTxEnvelope>>) -> Self {
         Self(inner)
     }
 

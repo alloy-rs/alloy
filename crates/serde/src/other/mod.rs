@@ -219,7 +219,7 @@ impl<T> WithOtherFields<T> {
     }
 
     /// Returns the wrapped value.
-    pub fn inner(&self) -> &T {
+    pub const fn inner(&self) -> &T {
         &self.inner
     }
 }

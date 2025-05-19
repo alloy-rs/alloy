@@ -4,7 +4,7 @@ use crate::{
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
         tx_type::TxType,
-        PooledTransaction, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
+        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
     EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip4844WithSidecar,
     TxEip7702, TxLegacy,
@@ -12,7 +12,7 @@ use crate::{
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
     eip2930::AccessList,
-    eip4844::BlobTransactionSidecar,
+    eip7594::Encodable7594,
     Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
@@ -35,17 +35,19 @@ use core::{
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
 
-impl TxEnvelope {
+impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844Variant<T>> {
     /// Attempts to convert the envelope into the pooled variant.
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
     /// [`crate::TxEip4844`] without the sidecar.
-    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+    pub fn try_into_pooled(
+        self,
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
             Self::Eip2930(tx) => Ok(tx.into()),
             Self::Eip1559(tx) => Ok(tx.into()),
-            Self::Eip4844(tx) => PooledTransaction::try_from(tx).map_err(ValueError::convert),
+            Self::Eip4844(tx) => EthereumTxEnvelope::try_from(tx).map_err(ValueError::convert),
             Self::Eip7702(tx) => Ok(tx.into()),
         }
     }
@@ -56,7 +58,9 @@ impl EthereumTxEnvelope<TxEip4844> {
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
     /// [`crate::TxEip4844`] without the sidecar.
-    pub fn try_into_pooled(self) -> Result<PooledTransaction, ValueError<Self>> {
+    pub fn try_into_pooled<T>(
+        self,
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
             Self::Eip2930(tx) => Ok(tx.into()),
@@ -68,14 +72,15 @@ impl EthereumTxEnvelope<TxEip4844> {
         }
     }
 
-    /// Converts from an EIP-4844 transaction to a [`PooledTransaction`] with the given sidecar.
+    /// Converts from an EIP-4844 transaction to a [`EthereumTxEnvelope<TxEip4844WithSidecar<T>>`]
+    /// with the given sidecar.
     ///
     /// Returns an `Err` containing the original [`EthereumTxEnvelope`] if the transaction is not an
     /// EIP-4844 variant.
-    pub fn try_into_pooled_eip4844(
+    pub fn try_into_pooled_eip4844<T>(
         self,
-        sidecar: BlobTransactionSidecar,
-    ) -> Result<PooledTransaction, ValueError<Self>> {
+        sidecar: T,
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
         match self {
             Self::Eip4844(tx) => {
                 Ok(EthereumTxEnvelope::Eip4844(tx.map(|tx| tx.with_sidecar(sidecar))))
@@ -280,19 +285,19 @@ where
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844WithSidecar>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Self {
+impl<T> From<EthereumTxEnvelope<TxEip4844Variant<T>>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844Variant<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant> {
+impl<T> From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant<T>> {
     fn from(value: EthereumTxEnvelope<TxEip4844>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
@@ -424,23 +429,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         match self {
             Self::Eip7702(tx) => Some(tx),
             _ => None,
-        }
-    }
-
-    /// Recover the signer of the transaction.
-    #[cfg(feature = "k256")]
-    pub fn recover_signer(
-        &self,
-    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError>
-    where
-        Eip4844: SignableTransaction<Signature>,
-    {
-        match self {
-            Self::Legacy(tx) => tx.recover_signer(),
-            Self::Eip2930(tx) => tx.recover_signer(),
-            Self::Eip1559(tx) => tx.recover_signer(),
-            Self::Eip4844(tx) => tx.recover_signer(),
-            Self::Eip7702(tx) => tx.recover_signer(),
         }
     }
 
@@ -1046,7 +1034,7 @@ pub mod serde_bincode_compat {
     pub struct EthereumTxEnvelope<'a, Eip4844: Clone = crate::transaction::TxEip4844> {
         /// Transaction signature
         signature: Signature,
-        /// bincode compatable transaction
+        /// bincode compatible transaction
         transaction:
             crate::serde_bincode_compat::transaction::EthereumTypedTransaction<'a, Eip4844>,
     }
@@ -1172,7 +1160,10 @@ pub mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{transaction::SignableTransaction, TxEip4844, TxEip4844WithSidecar};
+    use crate::{
+        transaction::{recovered::SignerRecoverable, SignableTransaction},
+        TxEip4844, TxEip4844WithSidecar,
+    };
     use alloc::vec::Vec;
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},

@@ -3,14 +3,14 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "1.0.1"
+version = "1.0.3"
 edition = "2021"
 rust-version = "1.82"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/alloy"
 repository = "https://github.com/alloy-rs/alloy"
-exclude = ["benches/", "tests/"]
+exclude = ["benches/", "tests/", "testdata/"]
 
 [workspace.lints.rust]
 missing-debug-implementations = "warn"
@@ -25,7 +25,7 @@ all = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
-missing-const-for-fn = "allow"          # TODO: https://github.com/rust-lang/rust-clippy/issues/14020
+missing-const-for-fn = "warn"
 use-self = "warn"
 option-if-let-else = "warn"
 redundant-clone = "warn"
@@ -85,7 +85,7 @@ alloy-chains = { version = "0.2", default-features = false }
 # eips
 alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.0", default-features = false }
-alloy-eip7702 = { version = "0.6.0", default-features = false }
+alloy-eip7702 = { version = "0.6.1", default-features = false }
 
 # hardforks
 alloy-hardforks = "0.2.0"
@@ -175,5 +175,5 @@ assert_matches = "1.5"
 ci_info = "0.14.14"
 serial_test = "3.0"
 similar-asserts = "1.5"
-tempfile = "3.10"
+tempfile = "3.20"
 tower-http = "0.6.1"
