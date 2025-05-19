@@ -5,75 +5,208 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4](https://github.com/alloy-rs/alloy/releases/tag/v1.0.4) - 2025-05-19
+
+### Features
+
+- [eips] Sidecar conversion methods ([#2464](https://github.com/alloy-rs/alloy/issues/2464))
+
+### Miscellaneous Tasks
+
+- Warn missing-const-for-fn ([#2418](https://github.com/alloy-rs/alloy/issues/2418))
+
+### Styling
+
+- Introducing manual deserde for BlobTransactionSidecarVariant ([#2440](https://github.com/alloy-rs/alloy/issues/2440))
+
 ## [1.0.3](https://github.com/alloy-rs/alloy/releases/tag/v1.0.3) - 2025-05-15
+
+### Features
+
+- [consensus] Relax `TxEip4844WithSidecar` trait implementations ([#2446](https://github.com/alloy-rs/alloy/issues/2446))
+
+### Miscellaneous Tasks
+
+- Release 1.0.3 ([#2460](https://github.com/alloy-rs/alloy/issues/2460))
+- Release 1.0.2
+- Add sidecar helpers ([#2445](https://github.com/alloy-rs/alloy/issues/2445))
+
+## [1.0.1](https://github.com/alloy-rs/alloy/releases/tag/v1.0.1) - 2025-05-13
+
+### Miscellaneous Tasks
+
+- Release 1.0.1
+
+## [1.0.0](https://github.com/alloy-rs/alloy/releases/tag/v1.0.0) - 2025-05-13
+
+### Features
+
+- [eips] Add `BlobTransactionSidecarVariant` ([#2430](https://github.com/alloy-rs/alloy/issues/2430))
+- [eips] `BlobTransactionSidecarEip7594` ([#2428](https://github.com/alloy-rs/alloy/issues/2428))
+- [eips] Osaka blob params ([#2427](https://github.com/alloy-rs/alloy/issues/2427))
+- [eips] Add more EIP-7594 constants ([#2425](https://github.com/alloy-rs/alloy/issues/2425))
+
+### Miscellaneous Tasks
+
+- Release 1.0.0
+
+## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
+
+### Documentation
+
+- Should be decoded ([#2414](https://github.com/alloy-rs/alloy/issues/2414))
+
+### Features
+
+- Add some either impls ([#2409](https://github.com/alloy-rs/alloy/issues/2409))
+
+### Miscellaneous Tasks
+
+- Release 0.15.11
+
+## [0.15.10](https://github.com/alloy-rs/alloy/releases/tag/v0.15.10) - 2025-05-07
+
+### Miscellaneous Tasks
+
+- Release 0.15.10
+
+### Other
+
+- Propagate arb feature ([#2407](https://github.com/alloy-rs/alloy/issues/2407))
+
+### Styling
+
+- Chore : fix typos ([#2398](https://github.com/alloy-rs/alloy/issues/2398))
+
+## [0.15.9](https://github.com/alloy-rs/alloy/releases/tag/v0.15.9) - 2025-05-05
+
+### Features
+
+- Add Arbitrary Support for payload types ([#2392](https://github.com/alloy-rs/alloy/issues/2392))
+- Add IsTyped2718  ([#2394](https://github.com/alloy-rs/alloy/issues/2394))
+
+### Miscellaneous Tasks
+
+- Release 0.15.9
+- Add default to blob schedule ([#2389](https://github.com/alloy-rs/alloy/issues/2389))
+
+## [0.15.8](https://github.com/alloy-rs/alloy/releases/tag/v0.15.8) - 2025-05-02
+
+### Features
+
+- Add 7623 consts ([#2383](https://github.com/alloy-rs/alloy/issues/2383))
+
+### Miscellaneous Tasks
+
+- Release 0.15.8
+- Add 0x prefix to eip addresses ([#2382](https://github.com/alloy-rs/alloy/issues/2382))
+
+### Styling
+
+- Added  helpers for blob schedule format ([#2375](https://github.com/alloy-rs/alloy/issues/2375))
+
+## [0.15.7](https://github.com/alloy-rs/alloy/releases/tag/v0.15.7) - 2025-04-30
+
+### Miscellaneous Tasks
+
+- Release 0.15.7
+- Clippy happy ([#2370](https://github.com/alloy-rs/alloy/issues/2370))
+
+## [0.15.6](https://github.com/alloy-rs/alloy/releases/tag/v0.15.6) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.6
+
+## [0.15.5](https://github.com/alloy-rs/alloy/releases/tag/v0.15.5) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.5
+- Release 0.15.4
+- Mark 4844 constants deprecated ([#2341](https://github.com/alloy-rs/alloy/issues/2341))
+
+## [0.15.3](https://github.com/alloy-rs/alloy/releases/tag/v0.15.3) - 2025-04-24
+
+### Miscellaneous Tasks
+
+- Release 0.15.3
+
+## [0.15.2](https://github.com/alloy-rs/alloy/releases/tag/v0.15.2) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.2
+
+## [0.15.1](https://github.com/alloy-rs/alloy/releases/tag/v0.15.1) - 2025-04-23
+
+### Miscellaneous Tasks
+
+- Release 0.15.1
+
+## [0.15.0](https://github.com/alloy-rs/alloy/releases/tag/v0.15.0) - 2025-04-23
+
+### Documentation
+
+- Remove consecutive duplicate words ([#2337](https://github.com/alloy-rs/alloy/issues/2337))
+
+### Miscellaneous Tasks
+
+- Release 0.15.0
+
+## [0.14.0](https://github.com/alloy-rs/alloy/releases/tag/v0.14.0) - 2025-04-09
 
 ### Bug Fixes
 
 - `BlobAndProofV2` ([#2283](https://github.com/alloy-rs/alloy/issues/2283))
-- Broken links `eip1559/constants.rs` ([#2190](https://github.com/alloy-rs/alloy/issues/2190))
-- Filter out requests with len 1 ([#2167](https://github.com/alloy-rs/alloy/issues/2167))
+
+### Miscellaneous Tasks
+
+- Release 0.14.0
+
+## [0.13.0](https://github.com/alloy-rs/alloy/releases/tag/v0.13.0) - 2025-03-28
 
 ### Dependencies
 
 - [deps] C-kzg 2.0 ([#2240](https://github.com/alloy-rs/alloy/issues/2240))
 
-### Documentation
+### Features
 
-- Should be decoded ([#2414](https://github.com/alloy-rs/alloy/issues/2414))
-- Remove consecutive duplicate words ([#2337](https://github.com/alloy-rs/alloy/issues/2337))
+- Eip7594 constants ([#2245](https://github.com/alloy-rs/alloy/issues/2245))
+
+### Miscellaneous Tasks
+
+- Release 0.13.0
+- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
+
+### Other
+
+- Auto_impl(&) for Encodable2718 ([#2230](https://github.com/alloy-rs/alloy/issues/2230))
+
+## [0.12.6](https://github.com/alloy-rs/alloy/releases/tag/v0.12.6) - 2025-03-18
+
+### Bug Fixes
+
+- Broken links `eip1559/constants.rs` ([#2190](https://github.com/alloy-rs/alloy/issues/2190))
 
 ### Features
 
-- [consensus] Relax `TxEip4844WithSidecar` trait implementations ([#2446](https://github.com/alloy-rs/alloy/issues/2446))
-- [eips] Add `BlobTransactionSidecarVariant` ([#2430](https://github.com/alloy-rs/alloy/issues/2430))
-- [eips] `BlobTransactionSidecarEip7594` ([#2428](https://github.com/alloy-rs/alloy/issues/2428))
-- [eips] Osaka blob params ([#2427](https://github.com/alloy-rs/alloy/issues/2427))
-- [eips] Add more EIP-7594 constants ([#2425](https://github.com/alloy-rs/alloy/issues/2425))
-- Add some either impls ([#2409](https://github.com/alloy-rs/alloy/issues/2409))
-- Add Arbitrary Support for payload types ([#2392](https://github.com/alloy-rs/alloy/issues/2392))
-- Add IsTyped2718  ([#2394](https://github.com/alloy-rs/alloy/issues/2394))
-- Add 7623 consts ([#2383](https://github.com/alloy-rs/alloy/issues/2383))
-- Eip7594 constants ([#2245](https://github.com/alloy-rs/alloy/issues/2245))
 - [eips] Serde untagged for EIP-7685 `RequestsOrHash` ([#2216](https://github.com/alloy-rs/alloy/issues/2216))
 - Add BlobAndProofV2 ([#2202](https://github.com/alloy-rs/alloy/issues/2202))
 
 ### Miscellaneous Tasks
 
-- Release 1.0.2
-- Add sidecar helpers ([#2445](https://github.com/alloy-rs/alloy/issues/2445))
-- Release 1.0.1
-- Release 1.0.0
-- Release 0.15.11
-- Release 0.15.10
-- Release 0.15.9
-- Add default to blob schedule ([#2389](https://github.com/alloy-rs/alloy/issues/2389))
-- Release 0.15.8
-- Add 0x prefix to eip addresses ([#2382](https://github.com/alloy-rs/alloy/issues/2382))
-- Release 0.15.7
-- Clippy happy ([#2370](https://github.com/alloy-rs/alloy/issues/2370))
-- Release 0.15.6
-- Release 0.15.5
-- Release 0.15.4
-- Mark 4844 constants deprecated ([#2341](https://github.com/alloy-rs/alloy/issues/2341))
-- Release 0.15.3
-- Release 0.15.2
-- Release 0.15.1
-- Release 0.15.0
-- Release 0.14.0
-- Release 0.13.0
-- Expect instead of allow ([#2228](https://github.com/alloy-rs/alloy/issues/2228))
 - Release 0.12.6
+
+## [0.12.5](https://github.com/alloy-rs/alloy/releases/tag/v0.12.5) - 2025-03-12
+
+### Bug Fixes
+
+- Filter out requests with len 1 ([#2167](https://github.com/alloy-rs/alloy/issues/2167))
+
+### Miscellaneous Tasks
+
 - Release 0.12.5
-
-### Other
-
-- Propagate arb feature ([#2407](https://github.com/alloy-rs/alloy/issues/2407))
-- Auto_impl(&) for Encodable2718 ([#2230](https://github.com/alloy-rs/alloy/issues/2230))
-
-### Styling
-
-- Chore : fix typos ([#2398](https://github.com/alloy-rs/alloy/issues/2398))
-- Added  helpers for blob schedule format ([#2375](https://github.com/alloy-rs/alloy/issues/2375))
 
 ## [0.12.4](https://github.com/alloy-rs/alloy/releases/tag/v0.12.4) - 2025-03-07
 
@@ -228,21 +361,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [relay] ExecutionRequestsV4 with eip7685::Requests conversion ([#1787](https://github.com/alloy-rs/alloy/issues/1787))
 - Add requests with capacity ([#1794](https://github.com/alloy-rs/alloy/issues/1794))
-- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
-- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
 
 ### Miscellaneous Tasks
 
 - Release 0.8.1
 - Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
 - Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
-- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
-- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
-- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ### Other
 
 - Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
+
+## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
+
+### Features
+
+- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
+- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
+
+### Miscellaneous Tasks
+
+- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
+- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
+- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
