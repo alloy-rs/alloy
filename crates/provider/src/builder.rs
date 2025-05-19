@@ -725,8 +725,10 @@ mod tests {
         let _ = provider.get_account(Default::default());
     }
 
-    #[test]
-    fn compile_with_network() {
-        let _ = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
+    #[tokio::test]
+    async fn compile_with_network() {
+        let p = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
+        let num = p.get_block_number().await.unwrap();
+        assert_eq!(num, 0);
     }
 }
