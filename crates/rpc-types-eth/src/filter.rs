@@ -24,7 +24,7 @@ pub struct FilterSet<T: Eq + Hash> {
 
     #[cfg(feature = "std")]
     #[cfg_attr(feature = "serde", serde(skip, default))]
-    bloom: std::sync::OnceLock<Bloom>,
+    bloom_filter: std::sync::OnceLock<BloomFilter>,
 }
 
 impl<T: Eq + Hash> Default for FilterSet<T> {
@@ -32,7 +32,7 @@ impl<T: Eq + Hash> Default for FilterSet<T> {
         Self {
             set: Default::default(),
             #[cfg(feature = "std")]
-            bloom: Default::default(),
+            bloom_filter: Default::default(),
         }
     }
 }
@@ -139,7 +139,7 @@ impl<T: Eq + Hash> FilterSet<T> {
     /// method taking `&mut self`.
     fn unseal(&mut self) {
         #[cfg(feature = "std")]
-        self.bloom.take();
+        self.bloom_filter.take();
     }
 
     /// Insert a value into the filter
@@ -160,36 +160,28 @@ impl<T: Eq + Hash> FilterSet<T> {
 }
 
 impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
-    /// Create a bloom filter from the set of values.
-    fn make_bloom(&self) -> Bloom {
-        self.set.iter().fold(Bloom::default(), |mut acc, set| {
-            acc.accrue(BloomInput::Raw(set.as_ref()));
-            acc
-        })
-    }
-
     /// Get a reference to the BloomFilter.
     #[cfg(feature = "std")]
-    pub fn bloom_ref(&self) -> &Bloom {
-        self.bloom.get_or_init(|| self.make_bloom())
+    pub fn bloom_filter_ref(&self) -> &BloomFilter {
+        self.bloom_filter.get_or_init(|| self.make_bloom_filter())
     }
 
     /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
-    pub fn bloom(&self) -> Cow<'_, Bloom> {
+    pub fn bloom_filter(&self) -> Cow<'_, BloomFilter> {
         #[cfg(feature = "std")]
         {
-            Cow::Borrowed(self.bloom_ref())
+            Cow::Borrowed(self.bloom_filter_ref())
         }
 
         #[cfg(not(feature = "std"))]
         {
-            Cow::Owned(self.make_bloom())
+            Cow::Owned(self.make_bloom_filter())
         }
     }
 
     /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
-    fn to_bloom_filter(&self) -> BloomFilter {
-        vec![self.bloom().into_owned()].into()
+    fn make_bloom_filter(&self) -> BloomFilter {
+        self.set.iter().map(|a| BloomInput::Raw(a.as_ref()).into()).collect::<Vec<Bloom>>().into()
     }
 }
 
@@ -644,21 +636,21 @@ impl Filter {
         self.topics.iter().any(|t| !t.is_empty())
     }
 
-    /// Create the [`Bloom`] for the addresses.
-    pub fn address_bloom(&self) -> Cow<'_, Bloom> {
-        self.address.bloom()
+    /// Create the [`BloomFilter`] for the addresses.
+    pub fn address_bloom_filter(&self) -> Cow<'_, BloomFilter> {
+        self.address.bloom_filter()
     }
 
-    /// Create a [`Bloom`] for each topic filter.
-    pub fn topics_bloom(&self) -> [Cow<'_, Bloom>; 4] {
-        self.topics.each_ref().map(|t| t.bloom())
+    /// Create a [`BloomFilter`] for each topic filter.
+    pub fn topics_bloom_filter(&self) -> [Cow<'_, BloomFilter>; 4] {
+        self.topics.each_ref().map(|t| t.bloom_filter())
     }
 
     /// Check whether the provided bloom contains all topics and the address we
     /// wish to filter on.
     pub fn matches_bloom(&self, bloom: Bloom) -> bool {
-        bloom.contains(&self.address_bloom())
-            && self.topics_bloom().iter().all(|topic_bloom| bloom.contains(topic_bloom))
+        self.address_bloom_filter().matches(bloom)
+            && self.topics_bloom_filter().iter().all(|topic_bloom| topic_bloom.matches(bloom))
     }
 
     /// Returns `true` if the filter matches the given topics.
@@ -1302,7 +1294,7 @@ impl<'a> serde::Deserialize<'a> for PendingTransactionFilterKind {
 }
 
 /// Helper type to represent a bloom filter used for matching logs.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct BloomFilter(Vec<Bloom>);
 
 impl From<Vec<Bloom>> for BloomFilter {
@@ -1336,12 +1328,12 @@ impl FilteredParams {
 
     /// Returns the [BloomFilter] for the given address
     pub fn address_filter(address: &FilterSet<Address>) -> BloomFilter {
-        address.to_bloom_filter()
+        address.make_bloom_filter()
     }
 
     /// Returns the [BloomFilter] for the given topics
     pub fn topics_filter(topics: &[FilterSet<B256>]) -> Vec<BloomFilter> {
-        topics.iter().map(|t| t.to_bloom_filter()).collect()
+        topics.iter().map(|t| t.make_bloom_filter()).collect()
     }
 
     /// Returns `true` if the bloom matches the topics
@@ -1452,7 +1444,7 @@ impl FilteredParams {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::LogData;
+    use alloy_primitives::{bloom, LogData};
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -1460,6 +1452,29 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")
+    }
+
+    // <https://hoodi.etherscan.io/block/400001>
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_any_addresses() {
+        let s = r#"{
+            "fromBlock": "0x61A80",
+            "toBlock": "0x61B48",
+            "address": [
+                "0x8CBabC07717038DA6fAf1bC477a39F1627988a3a",
+                "0x927F9c03d1Ac6e2630d31E614F226b5Ed028d443"
+            ]
+        }"#;
+        let filter = serde_json::from_str::<Filter>(s).unwrap();
+
+        // <https://hoodi.etherscan.io/block/400001>
+        let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
+        assert!(filter.matches_bloom(bloom));
+
+        // <https://hoodi.etherscan.io/block/400002>
+        let bloom = bloom!("0x10000000000010000000000000000200000002000000000000400000000000000000000400100000000900000000000000000000000000000000000000000000000000000000000000000008400000000000000080000000000080000000000000000000000000000000000000000000000000000002000000000010000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000002000000000000000000000000000000000000002000000000000000000000000000000000000000000000000100000000000000000000000000000004000000000000000000000000000000000000000");
+        assert!(filter.matches_bloom(bloom));
     }
 
     #[test]
