@@ -165,7 +165,7 @@ impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
     pub fn bloom_filter_ref(&self) -> &BloomFilter {
         self.bloom_filter.get_or_init(|| self.make_bloom_filter())
     }
-    
+
     /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
     pub fn bloom_filter(&self) -> Cow<'_, BloomFilter> {
         #[cfg(feature = "std")]
@@ -649,7 +649,8 @@ impl Filter {
     /// Check whether the provided bloom contains all topics and the address we
     /// wish to filter on.
     pub fn matches_bloom(&self, bloom: Bloom) -> bool {
-        self.address_bloom_filter().matches(bloom) && self.topics_bloom_filter().iter().all(|topic_bloom| topic_bloom.matches(bloom))
+        self.address_bloom_filter().matches(bloom)
+            && self.topics_bloom_filter().iter().all(|topic_bloom| topic_bloom.matches(bloom))
     }
 
     /// Returns `true` if the filter matches the given topics.
