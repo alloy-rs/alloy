@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.4
 - Warn missing-const-for-fn ([#2418](https://github.com/alloy-rs/alloy/issues/2418))
 - Rm leftover recovery impl ([#2467](https://github.com/alloy-rs/alloy/issues/2467))
 - [consensus] Relax 4844 with sidecar creation ([#2465](https://github.com/alloy-rs/alloy/issues/2465))
