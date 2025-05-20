@@ -641,7 +641,7 @@ impl Filter {
         self.address.bloom_filter()
     }
 
-    /// Create a [`Bloom`] for each topic filter.
+    /// Create a [`BloomFilter`] for each topic filter.
     pub fn topics_bloom_filter(&self) -> [Cow<'_, BloomFilter>; 4] {
         self.topics.each_ref().map(|t| t.bloom_filter())
     }
