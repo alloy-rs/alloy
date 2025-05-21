@@ -5,12 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
+
+### Bug Fixes
+
+- Correctly handle websocket subscription to new blocks ([#2482](https://github.com/alloy-rs/alloy/issues/2482))
+
+### Documentation
+
+- [network] Refined Core Model in README based on real traits and … ([#2473](https://github.com/alloy-rs/alloy/issues/2473))
+
+### Miscellaneous Tasks
+
+- Rm redundant commitment copy ([#2484](https://github.com/alloy-rs/alloy/issues/2484))
+
+### Refactor
+
+- Create VersionedHashIter to remove unnecessary collect() ([#2483](https://github.com/alloy-rs/alloy/issues/2483))
+
 ## [1.0.5](https://github.com/alloy-rs/alloy/releases/tag/v1.0.5) - 2025-05-20
 
 ### Bug Fixes
 
 - Check each bloom ([#2480](https://github.com/alloy-rs/alloy/issues/2480))
 - [`provider`] Introduce `new_with_network` constructor ([#2479](https://github.com/alloy-rs/alloy/issues/2479))
+
+### Miscellaneous Tasks
+
+- Release 1.0.5
 
 ## [1.0.4](https://github.com/alloy-rs/alloy/releases/tag/v1.0.4) - 2025-05-19
 
