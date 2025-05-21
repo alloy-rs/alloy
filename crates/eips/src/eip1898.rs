@@ -232,6 +232,85 @@ impl fmt::Debug for BlockNumberOrTag {
     }
 }
 
+/// A module that deserializes either a BlockNumberOrTag, or a simple number.
+pub mod lenient_block_number_or_tag {
+    use crate::BlockNumberOrTag;
+    use serde::{
+        de::{self, Visitor},
+        Deserialize, Deserializer,
+    };
+    use std::fmt;
+
+    /// Following the spec the block parameter is either:
+    ///
+    /// > HEX String - an integer block number
+    /// > String "latest" - for the latest mined block
+    /// > String "finalized" - for the finalized block
+    /// > String "safe" - for the safe head block
+    /// > String "earliest" for the earliest/genesis block
+    /// > String "pending" - for the pending state/transactions
+    ///
+    /// and with EIP-1898:
+    /// > blockNumber: QUANTITY - a block number
+    /// > blockHash: DATA - a block hash
+    ///
+    /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
+    ///
+    /// EIP-1898 does not all calls that use `BlockNumber` like `eth_getBlockByNumber` and doesn't
+    /// list raw integers as supported.
+    pub fn lenient_block_number<'de, D>(deserializer: D) -> Result<BlockNumberOrTag, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        LenientBlockNumberOrTag::deserialize(deserializer).map(Into::into)
+    }
+
+    /// Various block number representations, See [`lenient_block_number()`]
+    #[derive(Clone, Copy, Debug)]
+    pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
+
+    impl<'de> Deserialize<'de> for LenientBlockNumberOrTag {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct LenientBlockNumberVisitor;
+
+            impl<'de> Visitor<'de> for LenientBlockNumberVisitor {
+                type Value = LenientBlockNumberOrTag;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    formatter.write_str("a block number or tag, or a u64")
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(LenientBlockNumberOrTag(v.into()))
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    BlockNumberOrTag::deserialize(de::value::StrDeserializer::<E>::new(v))
+                        .map(LenientBlockNumberOrTag)
+                        .map_err(de::Error::custom)
+                }
+            }
+
+            deserializer.deserialize_any(LenientBlockNumberVisitor)
+        }
+    }
+
+    impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
+        fn from(value: LenientBlockNumberOrTag) -> Self {
+            value.0
+        }
+    }
+}
+
 /// Error thrown when parsing a [BlockNumberOrTag] from a string.
 #[derive(Debug)]
 pub enum ParseBlockNumberError {
