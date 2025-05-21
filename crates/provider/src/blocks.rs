@@ -71,6 +71,8 @@ impl<N: Network> NewBlocks<N> {
     async fn into_subscription_stream(
         self,
     ) -> Option<impl Stream<Item = N::BlockResponse> + 'static> {
+        use alloy_consensus::BlockHeader;
+
         let Some(client) = self.client.upgrade() else {
             debug!("client dropped");
             return None;
@@ -93,13 +95,26 @@ impl<N: Network> NewBlocks<N> {
                 return None;
             }
         };
-        Some(sub.into_typed::<N::BlockResponse>().into_stream())
+        let stream =
+            sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
+        Some(self.into_block_stream(stream))
     }
 
-    fn into_poll_stream(mut self) -> impl Stream<Item = N::BlockResponse> + 'static {
-        stream! {
+    fn into_poll_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
         // Spawned lazily on the first `poll`.
-        let mut poller = PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", []).into_stream();
+        let stream =
+            PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", [])
+                .into_stream()
+                .map(|n| n.to());
+
+        self.into_block_stream(stream)
+    }
+
+    fn into_block_stream(
+        mut self,
+        mut numbers_stream: impl Stream<Item = u64> + Unpin + 'static,
+    ) -> impl Stream<Item = N::BlockResponse> + 'static {
+        stream! {
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
@@ -109,11 +124,10 @@ impl<N: Network> NewBlocks<N> {
             }
 
             // Get the tip.
-            let Some(block_number) = poller.next().await else {
+            let Some(block_number) = numbers_stream.next().await else {
                 debug!("polling stream ended");
                 break 'task;
             };
-            let block_number = block_number.to::<u64>();
             trace!(%block_number, "got block number");
             if self.next_yield == NO_BLOCK_NUMBER {
                 assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
