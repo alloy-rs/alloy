@@ -286,8 +286,8 @@ impl BlobTransactionSidecar {
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(&self.commitments)
     }
 
     /// Returns the versioned hash for the blob at the given index, if it
@@ -532,6 +532,29 @@ impl core::fmt::Display for BlobTransactionValidationError {
 impl From<c_kzg::Error> for BlobTransactionValidationError {
     fn from(source: c_kzg::Error) -> Self {
         Self::KZGError(source)
+    }
+}
+
+/// Iterator that returns versioned hashes from commitments.
+#[derive(Debug, Clone)]
+pub struct VersionedHashIter<'a> {
+    /// The iterator over KZG commitments from which versioned hashes are generated.
+    commitments: core::slice::Iter<'a, Bytes48>,
+}
+
+impl<'a> Iterator for VersionedHashIter<'a> {
+    type Item = B256;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.commitments.next().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+}
+
+// Constructor method for VersionedHashIter
+impl<'a> VersionedHashIter<'a> {
+    /// Creates a new iterator over commitments to generate versioned hashes.
+    pub fn new(commitments: &'a [Bytes48]) -> Self {
+        Self { commitments: commitments.iter() }
     }
 }
 

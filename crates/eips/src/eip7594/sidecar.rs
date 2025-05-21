@@ -1,7 +1,7 @@
 use crate::{
     eip4844::{
-        kzg_to_versioned_hash, Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48,
-        BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+        Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48, BYTES_PER_BLOB,
+        BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
     },
     eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
@@ -9,10 +9,10 @@ use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::B256;
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 
+use super::{Decodable7594, Encodable7594};
 #[cfg(feature = "kzg")]
 use crate::eip4844::BlobTransactionValidationError;
-
-use super::{Decodable7594, Encodable7594};
+use crate::eip4844::VersionedHashIter;
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
@@ -94,12 +94,17 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
-    /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> Vec<B256> {
+    /// Returns the commitments of the sidecar.
+    pub fn commitments(&self) -> &[Bytes48] {
         match self {
-            Self::Eip4844(sidecar) => sidecar.versioned_hashes().collect(),
-            Self::Eip7594(sidecar) => sidecar.versioned_hashes().collect(),
+            Self::Eip4844(sidecar) => &sidecar.commitments,
+            Self::Eip7594(sidecar) => &sidecar.commitments,
         }
+    }
+
+    /// Returns an iterator over the versioned hashes of the commitments.
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(self.commitments())
     }
 
     /// Outputs the RLP length of the [BlobTransactionSidecarVariant] fields, without a RLP header.
@@ -361,7 +366,8 @@ impl BlobTransactionSidecarEip7594 {
             blob_versioned_hashes.iter().zip(self.commitments.iter())
         {
             // calculate & verify versioned hash
-            let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
+            let calculated_versioned_hash =
+                crate::eip4844::kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
                 return Err(BlobTransactionValidationError::WrongVersionedHash {
                     have: *versioned_hash,
@@ -404,8 +410,8 @@ impl BlobTransactionSidecarEip7594 {
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(&self.commitments)
     }
 
     /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV2`]) pairs
