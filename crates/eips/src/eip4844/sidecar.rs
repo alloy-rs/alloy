@@ -5,7 +5,7 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594, VersionedHashIter},
+    eip7594::{Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -534,6 +534,29 @@ impl core::fmt::Display for BlobTransactionValidationError {
 impl From<c_kzg::Error> for BlobTransactionValidationError {
     fn from(source: c_kzg::Error) -> Self {
         Self::KZGError(source)
+    }
+}
+
+/// Iterator that returns versioned hashes from commitments.
+#[derive(Debug, Clone)]
+pub struct VersionedHashIter<'a> {
+    /// The iterator over KZG commitments from which versioned hashes are generated.
+    commitments: core::slice::Iter<'a, Bytes48>,
+}
+
+impl<'a> Iterator for VersionedHashIter<'a> {
+    type Item = B256;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.commitments.next().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+}
+
+// Constructor method for VersionedHashIter
+impl<'a> VersionedHashIter<'a> {
+    /// Creates a new iterator over commitments to generate versioned hashes.
+    pub fn new(commitments: &'a [Bytes48]) -> Self {
+        Self { commitments: commitments.iter() }
     }
 }
 
