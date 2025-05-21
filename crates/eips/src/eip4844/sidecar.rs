@@ -5,7 +5,7 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594},
+    eip7594::{Decodable7594, Encodable7594, VersionedHashIter},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -288,8 +288,8 @@ impl BlobTransactionSidecar {
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(&self.commitments)
     }
 
     /// Returns the versioned hash for the blob at the given index, if it

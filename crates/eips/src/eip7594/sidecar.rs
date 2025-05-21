@@ -14,6 +14,29 @@ use crate::eip4844::BlobTransactionValidationError;
 
 use super::{Decodable7594, Encodable7594};
 
+/// Iterator that returns versioned hashes from commitments.
+#[derive(Debug)]
+pub struct VersionedHashIter<'a> {
+    /// The iterator over KZG commitments from which versioned hashes are generated.
+    pub commitments: core::slice::Iter<'a, Bytes48>,
+}
+
+impl<'a> Iterator for VersionedHashIter<'a> {
+    type Item = B256;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.commitments.next().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+}
+
+// Constructor method for VersionedHashIter
+impl<'a> VersionedHashIter<'a> {
+    /// Creates a new iterator over commitments to generate versioned hashes.
+    pub fn new(commitments: &'a [Bytes48]) -> Self {
+        Self { commitments: commitments.iter() }
+    }
+}
+
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 /// Proof type depends on the sidecar variant.
 ///
@@ -95,10 +118,10 @@ impl BlobTransactionSidecarVariant {
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> Vec<B256> {
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
         match self {
-            Self::Eip4844(sidecar) => sidecar.versioned_hashes().collect(),
-            Self::Eip7594(sidecar) => sidecar.versioned_hashes().collect(),
+            Self::Eip4844(sidecar) => VersionedHashIter::new(&sidecar.commitments),
+            Self::Eip7594(sidecar) => VersionedHashIter::new(&sidecar.commitments),
         }
     }
 
@@ -406,8 +429,8 @@ impl BlobTransactionSidecarEip7594 {
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(&self.commitments)
     }
 
     /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV2`]) pairs
