@@ -232,9 +232,13 @@ impl fmt::Debug for BlockNumberOrTag {
     }
 }
 
-/// This is a helper
-/// Various block number representations
-#[derive(Clone, Copy, Debug, Default)]
+/// This is a helper type to allow for lenient parsing of block numbers.
+///
+/// The eth json-rpc spec requires quantities to be hex encoded, which [`BlockNumberOrTag`] strictly
+/// enforces.
+///
+/// This type can be used if you want to allow for lenient parsing of block numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
 
 impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
@@ -247,15 +251,16 @@ impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
 #[cfg(feature = "serde")]
 pub mod lenient_block_number_or_tag {
     use super::{BlockNumberOrTag, LenientBlockNumberOrTag};
+    use core::fmt;
     use serde::{
         de::{self, Visitor},
         Deserialize, Deserializer,
     };
-    use core::fmt;
 
     /// Following the spec the block parameter is either:
     ///
     /// > HEX String - an integer block number
+    /// > Integer - a block number
     /// > String "latest" - for the latest mined block
     /// > String "finalized" - for the finalized block
     /// > String "safe" - for the safe head block
@@ -931,74 +936,8 @@ mod tests {
     use super::*;
     use alloc::{string::ToString, vec::Vec};
     use alloy_primitives::b256;
-    use lenient_block_number_or_tag::LenientBlockNumberOrTag;
-    use serde::Deserialize;
 
     const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
-
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct TestLenientStruct {
-        #[serde(deserialize_with = "lenient_block_number_or_tag::lenient_block_number_or_tag")]
-        block: BlockNumberOrTag,
-    }
-
-    #[test]
-    fn test_lenient_block_number_or_tag() {
-        // Test parsing numeric strings
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "0x1"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(1));
-
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "123"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
-
-        // Test parsing tags
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "latest"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Latest);
-
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "finalized"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Finalized);
-
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "safe"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Safe);
-
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "earliest"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Earliest);
-
-        let lenient_struct: TestLenientStruct =
-            serde_json::from_str(r#"{"block": "pending"}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Pending);
-
-        // Test parsing raw numbers (not strings)
-        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 123}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
-
-        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 0}"#).unwrap();
-        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(0));
-
-        // Test invalid inputs
-        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": "invalid"}"#).is_err());
-        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": null}"#).is_err());
-        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
-    }
-
-    #[test]
-    fn test_lenient_block_number_or_tag_wrapper() {
-        // Test the LenientBlockNumberOrTag wrapper directly
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Latest);
-
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
-
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
-    }
 
     #[test]
     fn block_id_from_str() {
@@ -1757,5 +1696,71 @@ mod tests {
         let s = "\"2\"";
         let err = serde_json::from_str::<BlockNumberOrTag>(s).unwrap_err();
         assert_eq!(err.to_string(), HexStringMissingPrefixError::default().to_string());
+    }
+
+    #[cfg(feature = "serde")]
+    #[derive(Debug, serde::Deserialize, PartialEq)]
+    struct TestLenientStruct {
+        #[serde(deserialize_with = "super::lenient_block_number_or_tag::deserialize")]
+        block: BlockNumberOrTag,
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_lenient_block_number_or_tag() {
+        // Test parsing numeric strings
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "0x1"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(1));
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "123"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
+
+        // Test parsing tags
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "latest"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Latest);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "finalized"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Finalized);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "safe"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Safe);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "earliest"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Earliest);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "pending"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Pending);
+
+        // Test parsing raw numbers (not strings)
+        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 123}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
+
+        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 0}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(0));
+
+        // Test invalid inputs
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": "invalid"}"#).is_err());
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": null}"#).is_err());
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
+    }
+
+    #[test]
+    fn test_lenient_block_number_or_tag_wrapper() {
+        // Test the LenientBlockNumberOrTag wrapper directly
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Latest);
+
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
+
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
     }
 }
