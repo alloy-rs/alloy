@@ -4,7 +4,7 @@ use crate::{
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
+use alloy_rpc_types_eth::{request::TransactionRequest, AccessList, TransactionInputKind};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
@@ -163,6 +163,18 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         wallet: &W,
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
         Ok(wallet.sign_request(self).await?)
+    }
+
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+        match kind {
+            TransactionInputKind::Input => self.input.input = Some(input.into()),
+            TransactionInputKind::Data => self.input.data = Some(input.into()),
+            TransactionInputKind::Both => {
+                let bytes = input.into();
+                self.input.input = Some(bytes.clone());
+                self.input.data = Some(bytes);
+            }
+        }
     }
 }
 
