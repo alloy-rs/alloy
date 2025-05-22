@@ -634,13 +634,13 @@ pub struct BlockOverrides {
 impl BlockOverrides {
     /// Sets the block number override
     pub fn with_number(mut self, number: U256) -> Self {
-        self.number = Some(number.into());
+        self.number = Some(number);
         self
     }
 
     /// Sets the difficulty override
     pub fn with_difficulty(mut self, difficulty: U256) -> Self {
-        self.difficulty = Some(difficulty.into());
+        self.difficulty = Some(difficulty);
         self
     }
 
@@ -658,26 +658,26 @@ impl BlockOverrides {
 
     /// Sets the coinbase (fee recipient) override
     pub fn with_coinbase(mut self, coinbase: Address) -> Self {
-        self.coinbase = Some(coinbase.into());
+        self.coinbase = Some(coinbase);
         self
     }
 
     /// Sets the randomness (prevRandao) override
     pub fn with_random(mut self, random: B256) -> Self {
-        self.random = Some(random.into());
+        self.random = Some(random);
         self
     }
 
     /// Sets the base fee override
     pub fn with_base_fee(mut self, base_fee: U256) -> Self {
-        self.base_fee = Some(base_fee.into());
+        self.base_fee = Some(base_fee);
         self
     }
 
     /// Adds a block hash override for a specific block number
     pub fn append_block_hash(mut self, block_number: u64, hash: B256) -> Self {
         let hash_map = self.block_hash.get_or_insert_with(Default::default);
-        hash_map.insert(block_number, hash.into());
+        hash_map.insert(block_number, hash);
         self
     }
 
