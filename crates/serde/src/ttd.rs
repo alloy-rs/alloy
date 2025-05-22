@@ -119,6 +119,31 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn jsonu256_deserialize() {
+        let deserialized: Vec<U256> =
+            serde_json::from_str(r#"["","0", "0x","10",10,"0x10"]"#).unwrap();
+        assert_eq!(
+            deserialized,
+            vec![
+                U256::ZERO,
+                U256::ZERO,
+                U256::ZERO,
+                U256::from(10),
+                U256::from(10),
+                U256::from(16),
+            ]
+        );
+    }
+
+    #[test]
+    fn jsonu256_serialize() {
+        let data = U256::from(16);
+        let serialized = serde_json::to_string(&data).unwrap();
+
+        assert_eq!(serialized, r#""0x10""#);
+    }
+
+    #[test]
     fn deserialize_ttd() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Ttd(#[serde(with = "super")] Option<U256>);
