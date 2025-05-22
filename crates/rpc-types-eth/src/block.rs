@@ -645,13 +645,13 @@ impl BlockOverrides {
     }
 
     /// Sets the timestamp override
-    pub fn with_time(mut self, time: u64) -> Self {
+    pub const fn with_time(mut self, time: u64) -> Self {
         self.time = Some(time);
         self
     }
 
     /// Sets the gas limit override
-    pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = Some(gas_limit);
         self
     }
