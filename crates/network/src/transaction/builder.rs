@@ -1,7 +1,7 @@
 use super::signer::NetworkWallet;
 use crate::Network;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types_eth::AccessList;
+use alloy_rpc_types_eth::{AccessList, TransactionInputKind};
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 
@@ -350,4 +350,16 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self,
         wallet: &W,
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
+
+    /// Set the input data for the transaction, respecting the input kind
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, _: TransactionInputKind) {
+        // forward all to input by default
+        self.set_input(input);
+    }
+
+    /// Builder-pattern method for setting the input data, respecting the input kind
+    fn with_input_kind<T: Into<Bytes>>(mut self, input: T, kind: TransactionInputKind) -> Self {
+        self.set_input_kind(input, kind);
+        self
+    }
 }
