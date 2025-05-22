@@ -283,46 +283,6 @@ impl From<GenesisAccount> for TrieAccount {
     }
 }
 
-/// Custom deserialization function for the private key.
-///
-/// This function allows the private key to be deserialized from a string or a `null` value.
-///
-/// We need a custom function here especially to handle the case where the private key is `0x` and
-/// should be deserialized as `None`.
-fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    if deserializer.is_human_readable() {
-        match Option::<String>::deserialize(deserializer)? {
-            Some(ref s) => {
-                if s == "0x" {
-                    return Ok(None);
-                }
-                B256::from_str(s).map(Some).map_err(D::Error::custom)
-            }
-            None => Ok(None),
-        }
-    } else {
-        Option::<B256>::deserialize(deserializer)
-    }
-}
-
-/// Custom deserialization function for `Option<u64>`.
-///
-/// This function allows it to be deserialized form a number or a "quantity" hex string.
-/// We need a custom function as this should only be used for non-human-readable formats.
-fn deserialize_u64_opt<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    if deserializer.is_human_readable() {
-        alloy_serde::quantity::opt::deserialize(deserializer)
-    } else {
-        Option::<u64>::deserialize(deserializer)
-    }
-}
-
 /// Defines core blockchain settings per block.
 ///
 /// Tailors unique settings for each network based on its genesis block.
@@ -617,6 +577,46 @@ pub struct ParliaConfig {
     /// Epoch length to update validator set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epoch: Option<u64>,
+}
+
+/// Custom deserialization function for the private key.
+///
+/// This function allows the private key to be deserialized from a string or a `null` value.
+///
+/// We need a custom function here especially to handle the case where the private key is `0x` and
+/// should be deserialized as `None`.
+fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        match Option::<String>::deserialize(deserializer)? {
+            Some(ref s) => {
+                if s == "0x" {
+                    return Ok(None);
+                }
+                B256::from_str(s).map(Some).map_err(D::Error::custom)
+            }
+            None => Ok(None),
+        }
+    } else {
+        Option::<B256>::deserialize(deserializer)
+    }
+}
+
+/// Custom deserialization function for `Option<u64>`.
+///
+/// This function allows it to be deserialized form a number or a "quantity" hex string.
+/// We need a custom function as this should only be used for non-human-readable formats.
+fn deserialize_u64_opt<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        alloy_serde::quantity::opt::deserialize(deserializer)
+    } else {
+        Option::<u64>::deserialize(deserializer)
+    }
 }
 
 #[cfg(test)]
