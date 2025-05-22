@@ -145,4 +145,12 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
         Ok(wallet.sign_request(self).await?)
     }
+
+    fn data(&self) -> Option<&Bytes> {
+        self.deref().data()
+    }
+
+    fn set_data<T: Into<Bytes>>(&mut self, data: T) {
+        self.deref_mut().set_data(data);
+    }
 }

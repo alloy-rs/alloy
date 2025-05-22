@@ -164,6 +164,14 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
         Ok(wallet.sign_request(self).await?)
     }
+
+    fn data(&self) -> Option<&Bytes> {
+        self.input.input()
+    }
+
+    fn set_data<T: Into<Bytes>>(&mut self, data: T) {
+        self.input.input = Some(data.into());
+    }
 }
 
 #[cfg(test)]

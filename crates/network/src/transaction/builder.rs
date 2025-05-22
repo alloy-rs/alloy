@@ -56,6 +56,17 @@ impl<N: Network> TransactionBuilderError<N> {
     }
 }
 
+/// Represents how a transaction handles input/data values
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransactionInputKind {
+    /// Only supports 'input' field
+    Input,
+    /// Only supports 'data' field
+    Data,
+    /// Supports both 'input' and 'data' fields
+    Both,
+}
+
 /// A Transaction builder for a network.
 ///
 /// Transaction builders are primarily used to construct typed transactions that can be signed with
@@ -350,4 +361,39 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self,
         wallet: &W,
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
+
+    /// Set the input data for the transaction, respecting the input kind
+    fn set_input_respecting_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+        match kind {
+            TransactionInputKind::Input => self.set_input(input),
+            TransactionInputKind::Data => self.set_data(input),
+            TransactionInputKind::Both => {
+                let bytes = input.into();
+                self.set_input(bytes.clone());
+                self.set_data(bytes);
+            }
+        }
+    }
+
+    /// Builder-pattern method for setting the input data, respecting the input kind
+    fn with_input_respecting_kind<T: Into<Bytes>>(
+        mut self,
+        input: T,
+        kind: TransactionInputKind,
+    ) -> Self {
+        self.set_input_respecting_kind(input, kind);
+        self
+    }
+
+    /// Get the data for the transaction.
+    fn data(&self) -> Option<&Bytes>;
+
+    /// Set the data for the transaction.
+    fn set_data<T: Into<Bytes>>(&mut self, data: T);
+
+    /// Builder-pattern method for setting the data.
+    fn with_data<T: Into<Bytes>>(mut self, data: T) -> Self {
+        self.set_data(data);
+        self
+    }
 }
