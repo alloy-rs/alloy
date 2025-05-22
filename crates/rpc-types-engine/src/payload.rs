@@ -10,7 +10,7 @@ use alloy_consensus::{
     Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Encodable2718},
+    eip2718::{Decodable2718, Encodable2718, WithEncoded},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
@@ -309,13 +309,7 @@ impl ExecutionPayloadV1 {
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
-            return Err(PayloadError::ExtraData(self.extra_data));
-        }
-
-        if self.base_fee_per_gas.is_zero() {
-            return Err(PayloadError::BaseFee(self.base_fee_per_gas));
-        }
+        self.validate_payload()?;
 
         let transactions = self
             .transactions
@@ -332,8 +326,52 @@ impl ExecutionPayloadV1 {
                 Ok(tx)
             })
             .collect::<Result<Vec<_>, _>>()?;
+        Ok(self.build_block(transactions)?)
+    }
 
+    /// Converts [`ExecutionPayloadV1`] to [`Block<WithEncoded<T>>`].
+    /// This keeps both the decoded transaction and its original RLP bytes.
+    pub fn try_into_block_with_encoded<T: Decodable2718>(
+        self,
+    ) -> Result<Block<WithEncoded<T>>, PayloadError> {
+        self.validate_payload()?;
+
+        let transactions = self
+            .transactions
+            .iter()
+            .map(|tx| {
+                let original = tx.as_ref();
+                let mut buf = original;
+
+                let decoded = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
+
+                if !buf.is_empty() {
+                    return Err(alloy_rlp::Error::UnexpectedLength);
+                }
+                Ok(WithEncoded::new(original.to_vec().into(), decoded))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(self.build_block(transactions)?)
+    }
+
+    /// Validates basic payload constraints like extra data length and non-zero base fee.
+    fn validate_payload(&self) -> Result<(), PayloadError> {
+        if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
+            return Err(PayloadError::ExtraData(self.extra_data.clone()));
+        }
+
+        if self.base_fee_per_gas.is_zero() {
+            return Err(PayloadError::BaseFee(self.base_fee_per_gas));
+        }
+
+        Ok(())
+    }
+
+    /// Constructs a `Block<T>` using the payload data and provided transactions.
+    fn build_block<T>(self, transactions: Vec<T>) -> Result<Block<T>, PayloadError> {
         // Reuse the encoded bytes for root calculation
+
         let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
             &self.transactions,
             |item, buf| buf.put_slice(item),
