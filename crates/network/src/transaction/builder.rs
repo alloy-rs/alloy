@@ -1,7 +1,7 @@
 use super::signer::NetworkWallet;
 use crate::Network;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types_eth::AccessList;
+use alloy_rpc_types_eth::{AccessList, TransactionInputKind};
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 
@@ -54,17 +54,6 @@ impl<N: Network> TransactionBuilderError<N> {
     pub const fn into_unbuilt(self, request: N::TransactionRequest) -> UnbuiltTransactionError<N> {
         UnbuiltTransactionError { request, error: self }
     }
-}
-
-/// Represents how a transaction handles input/data values
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransactionInputKind {
-    /// Only supports 'input' field
-    Input,
-    /// Only supports 'data' field
-    Data,
-    /// Supports both 'input' and 'data' fields
-    Both,
 }
 
 /// A Transaction builder for a network.
@@ -363,37 +352,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
 
     /// Set the input data for the transaction, respecting the input kind
-    fn set_input_respecting_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
-        match kind {
-            TransactionInputKind::Input => self.set_input(input),
-            TransactionInputKind::Data => self.set_data(input),
-            TransactionInputKind::Both => {
-                let bytes = input.into();
-                self.set_input(bytes.clone());
-                self.set_data(bytes);
-            }
-        }
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, _: TransactionInputKind) {
+        // forward all to input by default
+        self.set_input(input);
     }
 
     /// Builder-pattern method for setting the input data, respecting the input kind
-    fn with_input_respecting_kind<T: Into<Bytes>>(
-        mut self,
-        input: T,
-        kind: TransactionInputKind,
-    ) -> Self {
-        self.set_input_respecting_kind(input, kind);
-        self
-    }
-
-    /// Get the data for the transaction.
-    fn data(&self) -> Option<&Bytes>;
-
-    /// Set the data for the transaction.
-    fn set_data<T: Into<Bytes>>(&mut self, data: T);
-
-    /// Builder-pattern method for setting the data.
-    fn with_data<T: Into<Bytes>>(mut self, data: T) -> Self {
-        self.set_data(data);
+    fn with_input_kind<T: Into<Bytes>>(mut self, input: T, kind: TransactionInputKind) -> Self {
+        self.set_input_kind(input, kind);
         self
     }
 }

@@ -26,7 +26,7 @@ mod receipt;
 pub use receipt::TransactionReceipt;
 
 pub mod request;
-pub use request::{TransactionInput, TransactionRequest};
+pub use request::{TransactionInput, TransactionInputKind, TransactionRequest};
 
 /// Transaction object used in RPC.
 ///

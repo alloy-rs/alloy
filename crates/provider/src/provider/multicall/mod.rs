@@ -1,9 +1,9 @@
 //! A Multicall Builder
 
 use crate::Provider;
-use alloy_network::{Network, TransactionBuilder, TransactionInputKind};
+use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
-use alloy_rpc_types_eth::{state::StateOverride, BlockId};
+use alloy_rpc_types_eth::{state::StateOverride, BlockId, TransactionInputKind};
 use alloy_sol_types::SolCall;
 use bindings::IMulticall3::{
     blockAndAggregateCall, blockAndAggregateReturn, tryBlockAndAggregateCall,
@@ -104,7 +104,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
-            input_kind: TransactionInputKind::Input,
+            input_kind: TransactionInputKind::default(),
         }
     }
 }
@@ -165,7 +165,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
-            input_kind: TransactionInputKind::Input,
+            input_kind: TransactionInputKind::default(),
             _pd: Default::default(),
         }
     }
@@ -221,7 +221,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
-            input_kind: TransactionInputKind::Input,
+            input_kind: TransactionInputKind::default(),
             _pd: Default::default(),
         }
     }
@@ -533,7 +533,7 @@ where
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
             .with_to(self.address)
-            .with_input_respecting_kind(Bytes::from_iter(call), self.input_kind);
+            .with_input_kind(Bytes::from_iter(call), self.input_kind);
 
         if let Some(value) = value {
             tx.set_value(value);
