@@ -1121,6 +1121,18 @@ impl From<TxEnvelope> for TransactionRequest {
     }
 }
 
+/// Represents how a [`TransactionRequest`] handles input/data fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TransactionInputKind {
+    /// Only supports 'input' field
+    #[default]
+    Input,
+    /// Only supports 'data' field
+    Data,
+    /// Supports both 'input' and 'data' fields
+    Both,
+}
+
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.
 ///
 /// This is done for compatibility reasons where older implementations used `data` instead of the
