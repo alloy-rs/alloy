@@ -631,6 +631,57 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
+impl BlockOverrides {
+    /// Sets the block number override
+    pub fn with_number(mut self, number: impl Into<U256>) -> Self {
+        self.number = Some(number.into());
+        self
+    }
+
+    /// Sets the difficulty override
+    pub fn with_difficulty(mut self, difficulty: impl Into<U256>) -> Self {
+        self.difficulty = Some(difficulty.into());
+        self
+    }
+
+    /// Sets the timestamp override
+    pub fn with_time(mut self, time: u64) -> Self {
+        self.time = Some(time);
+        self
+    }
+
+    /// Sets the gas limit override
+    pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+        self.gas_limit = Some(gas_limit);
+        self
+    }
+
+    /// Sets the coinbase (fee recipient) override
+    pub fn with_coinbase(mut self, coinbase: impl Into<Address>) -> Self {
+        self.coinbase = Some(coinbase.into());
+        self
+    }
+
+    /// Sets the randomness (prevRandao) override
+    pub fn with_random(mut self, random: impl Into<B256>) -> Self {
+        self.random = Some(random.into());
+        self
+    }
+
+    /// Sets the base fee override
+    pub fn with_base_fee(mut self, base_fee: impl Into<U256>) -> Self {
+        self.base_fee = Some(base_fee.into());
+        self
+    }
+
+    /// Adds a block hash override for a specific block number
+    pub fn with_block_hash(mut self, block_number: u64, hash: impl Into<B256>) -> Self {
+        let hash_map = self.block_hash.get_or_insert_with(Default::default);
+        hash_map.insert(block_number, hash.into());
+        self
+    }
+}
+
 impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
     type Header = H;
     type Transaction = T;
