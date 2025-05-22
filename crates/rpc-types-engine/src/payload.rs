@@ -326,7 +326,7 @@ impl ExecutionPayloadV1 {
                 Ok(tx)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(self.build_block(transactions)?)
+        self.build_block(transactions)
     }
 
     /// Converts [`ExecutionPayloadV1`] to [`Block<WithEncoded<T>>`].
@@ -352,7 +352,7 @@ impl ExecutionPayloadV1 {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(self.build_block(transactions)?)
+        self.build_block(transactions)
     }
 
     /// Validates basic payload constraints like extra data length and non-zero base fee.
