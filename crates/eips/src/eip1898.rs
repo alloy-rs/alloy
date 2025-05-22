@@ -241,6 +241,18 @@ impl fmt::Debug for BlockNumberOrTag {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
 
+impl LenientBlockNumberOrTag {
+    /// Creates a new [`LenientBlockNumberOrTag`] from a [`BlockNumberOrTag`].
+    pub const fn new(block_number_or_tag: BlockNumberOrTag) -> Self {
+        Self(block_number_or_tag)
+    }
+
+    /// Returns the inner [`BlockNumberOrTag`].
+    pub const fn into_inner(self) -> BlockNumberOrTag {
+        self.0
+    }
+}
+
 impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
     fn from(value: LenientBlockNumberOrTag) -> Self {
         value.0
