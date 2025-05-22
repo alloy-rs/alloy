@@ -70,25 +70,27 @@ where
 
 impl<N: Network> serde::Serialize for EthCallParams<N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = match (self.block_overrides(), self.overrides()) {
-            (Some(_), Some(_)) => 4,
-            (Some(_), None) => 3,
-            (None, Some(_)) => 3,
-            (None, None) => 2,
+        let len = if self.block_overrides().is_some() {
+            4
+        } else if self.overrides().is_some() {
+            3
+        } else {
+            2
         };
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&self.data())?;
 
-        if let Some(block_overrides) = self.block_overrides() {
-            seq.serialize_element(block_overrides)?;
+        if self.block_overrides().is_some() || self.overrides().is_some() {
             seq.serialize_element(&self.block().unwrap_or_default())?;
+
             if let Some(state_overrides) = self.overrides() {
                 seq.serialize_element(state_overrides)?;
             }
-        } else if let Some(state_overrides) = self.overrides() {
-            seq.serialize_element(&self.block().unwrap_or_default())?;
-            seq.serialize_element(state_overrides)?;
+
+            if let Some(block_overrides) = self.block_overrides() {
+                seq.serialize_element(block_overrides)?;
+            }
         } else if let Some(block) = self.block() {
             seq.serialize_element(&block)?;
         }
