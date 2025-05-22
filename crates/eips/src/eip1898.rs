@@ -232,6 +232,109 @@ impl fmt::Debug for BlockNumberOrTag {
     }
 }
 
+/// This is a helper type to allow for lenient parsing of block numbers.
+///
+/// The eth json-rpc spec requires quantities to be hex encoded, which [`BlockNumberOrTag`] strictly
+/// enforces.
+///
+/// This type can be used if you want to allow for lenient parsing of block numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
+
+impl LenientBlockNumberOrTag {
+    /// Creates a new [`LenientBlockNumberOrTag`] from a [`BlockNumberOrTag`].
+    pub const fn new(block_number_or_tag: BlockNumberOrTag) -> Self {
+        Self(block_number_or_tag)
+    }
+
+    /// Returns the inner [`BlockNumberOrTag`].
+    pub const fn into_inner(self) -> BlockNumberOrTag {
+        self.0
+    }
+}
+
+impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
+    fn from(value: LenientBlockNumberOrTag) -> Self {
+        value.0
+    }
+}
+
+/// A module that deserializes either a BlockNumberOrTag, or a simple number.
+#[cfg(feature = "serde")]
+pub mod lenient_block_number_or_tag {
+    use super::{BlockNumberOrTag, LenientBlockNumberOrTag};
+    use core::fmt;
+    use serde::{
+        de::{self, Visitor},
+        Deserialize, Deserializer,
+    };
+
+    /// Following the spec the block parameter is either:
+    ///
+    /// > HEX String - an integer block number
+    /// > Integer - a block number
+    /// > String "latest" - for the latest mined block
+    /// > String "finalized" - for the finalized block
+    /// > String "safe" - for the safe head block
+    /// > String "earliest" for the earliest/genesis block
+    /// > String "pending" - for the pending state/transactions
+    ///
+    /// and with EIP-1898:
+    /// > blockNumber: QUANTITY - a block number
+    /// > blockHash: DATA - a block hash
+    ///
+    /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
+    ///
+    /// EIP-1898 does not all calls that use `BlockNumber` like `eth_getBlockByNumber` and doesn't
+    /// list raw integers as supported.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<BlockNumberOrTag, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        LenientBlockNumberOrTag::deserialize(deserializer).map(Into::into)
+    }
+
+    impl<'de> Deserialize<'de> for LenientBlockNumberOrTag {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct LenientBlockNumberVisitor;
+
+            impl<'de> Visitor<'de> for LenientBlockNumberVisitor {
+                type Value = LenientBlockNumberOrTag;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    formatter.write_str("a block number or tag, or a u64")
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(LenientBlockNumberOrTag(v.into()))
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    // Attempt to parse as a numeric string
+                    if let Ok(num) = v.parse::<u64>() {
+                        return Ok(LenientBlockNumberOrTag(BlockNumberOrTag::Number(num)));
+                    }
+
+                    BlockNumberOrTag::deserialize(de::value::StrDeserializer::<E>::new(v))
+                        .map(LenientBlockNumberOrTag)
+                        .map_err(de::Error::custom)
+                }
+            }
+
+            deserializer.deserialize_any(LenientBlockNumberVisitor)
+        }
+    }
+}
+
 /// Error thrown when parsing a [BlockNumberOrTag] from a string.
 #[derive(Debug)]
 pub enum ParseBlockNumberError {
@@ -1605,5 +1708,71 @@ mod tests {
         let s = "\"2\"";
         let err = serde_json::from_str::<BlockNumberOrTag>(s).unwrap_err();
         assert_eq!(err.to_string(), HexStringMissingPrefixError::default().to_string());
+    }
+
+    #[cfg(feature = "serde")]
+    #[derive(Debug, serde::Deserialize, PartialEq)]
+    struct TestLenientStruct {
+        #[serde(deserialize_with = "super::lenient_block_number_or_tag::deserialize")]
+        block: BlockNumberOrTag,
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_lenient_block_number_or_tag() {
+        // Test parsing numeric strings
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "0x1"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(1));
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "123"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
+
+        // Test parsing tags
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "latest"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Latest);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "finalized"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Finalized);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "safe"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Safe);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "earliest"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Earliest);
+
+        let lenient_struct: TestLenientStruct =
+            serde_json::from_str(r#"{"block": "pending"}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Pending);
+
+        // Test parsing raw numbers (not strings)
+        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 123}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(123));
+
+        let lenient_struct: TestLenientStruct = serde_json::from_str(r#"{"block": 0}"#).unwrap();
+        assert_eq!(lenient_struct.block, BlockNumberOrTag::Number(0));
+
+        // Test invalid inputs
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": "invalid"}"#).is_err());
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": null}"#).is_err());
+        assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
+    }
+
+    #[test]
+    fn test_lenient_block_number_or_tag_wrapper() {
+        // Test the LenientBlockNumberOrTag wrapper directly
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Latest);
+
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
+
+        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
+        assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
     }
 }
