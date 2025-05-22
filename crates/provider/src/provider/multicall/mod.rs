@@ -3,7 +3,7 @@
 use crate::Provider;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
-use alloy_rpc_types_eth::{state::StateOverride, BlockId};
+use alloy_rpc_types_eth::{state::StateOverride, BlockId, TransactionInputKind};
 use alloy_sol_types::SolCall;
 use bindings::IMulticall3::{
     blockAndAggregateCall, blockAndAggregateReturn, tryBlockAndAggregateCall,
@@ -85,6 +85,8 @@ pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     ///
     /// By default it is set to [`MULTICALL3_ADDRESS`].
     address: Address,
+    /// The input kind supported by this builder
+    input_kind: TransactionInputKind,
     _pd: std::marker::PhantomData<(T, N)>,
 }
 
@@ -102,6 +104,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
+            input_kind: TransactionInputKind::default(),
         }
     }
 }
@@ -162,6 +165,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
+            input_kind: TransactionInputKind::default(),
             _pd: Default::default(),
         }
     }
@@ -217,6 +221,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
+            input_kind: TransactionInputKind::default(),
             _pd: Default::default(),
         }
     }
@@ -278,6 +283,7 @@ where
             block: self.block,
             state_override: self.state_override,
             address: self.address,
+            input_kind: self.input_kind,
             _pd: Default::default(),
         }
     }
@@ -527,7 +533,7 @@ where
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
             .with_to(self.address)
-            .with_input(Bytes::from_iter(call));
+            .with_input_kind(Bytes::from_iter(call), self.input_kind);
 
         if let Some(value) = value {
             tx.set_value(value);
@@ -683,6 +689,7 @@ where
             block: self.block,
             state_override: self.state_override,
             address: self.address,
+            input_kind: self.input_kind,
             _pd: Default::default(),
         }
     }
@@ -695,5 +702,16 @@ where
     /// Check if the builder is empty
     pub fn is_empty(&self) -> bool {
         self.calls.is_empty()
+    }
+
+    /// Set the input kind for this builder
+    pub const fn with_input_kind(mut self, input_kind: TransactionInputKind) -> Self {
+        self.input_kind = input_kind;
+        self
+    }
+
+    /// Get the input kind for this builder
+    pub const fn input_kind(&self) -> TransactionInputKind {
+        self.input_kind
     }
 }
