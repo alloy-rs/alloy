@@ -84,14 +84,11 @@ impl<N: Network> serde::Serialize for EthCallParams<N> {
         if self.block_overrides().is_some() || self.overrides().is_some() {
             seq.serialize_element(&self.block().unwrap_or_default())?;
 
-            if let Some(state_overrides) = self.overrides() {
-                seq.serialize_element(state_overrides)?;
-            }
+            seq.serialize_element(self.overrides().unwrap_or(&StateOverride::default()))?;
 
-            if let Some(block_overrides) = self.block_overrides() {
-                seq.serialize_element(block_overrides)?;
-            }
+            seq.serialize_element(self.block_overrides().as_ref().unwrap())?;
         } else if let Some(block) = self.block() {
+            // Only block is present
             seq.serialize_element(&block)?;
         }
 
