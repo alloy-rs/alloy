@@ -232,14 +232,26 @@ impl fmt::Debug for BlockNumberOrTag {
     }
 }
 
+/// This is a helper
+/// Various block number representations
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
+
+impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
+    fn from(value: LenientBlockNumberOrTag) -> Self {
+        value.0
+    }
+}
+
 /// A module that deserializes either a BlockNumberOrTag, or a simple number.
+#[cfg(feature = "serde")]
 pub mod lenient_block_number_or_tag {
-    use crate::BlockNumberOrTag;
+    use super::{BlockNumberOrTag, LenientBlockNumberOrTag};
     use serde::{
         de::{self, Visitor},
         Deserialize, Deserializer,
     };
-    use std::fmt;
+    use core::fmt;
 
     /// Following the spec the block parameter is either:
     ///
@@ -258,18 +270,12 @@ pub mod lenient_block_number_or_tag {
     ///
     /// EIP-1898 does not all calls that use `BlockNumber` like `eth_getBlockByNumber` and doesn't
     /// list raw integers as supported.
-    pub fn lenient_block_number_or_tag<'de, D>(
-        deserializer: D,
-    ) -> Result<BlockNumberOrTag, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<BlockNumberOrTag, D::Error>
     where
         D: Deserializer<'de>,
     {
         LenientBlockNumberOrTag::deserialize(deserializer).map(Into::into)
     }
-
-    /// Various block number representations, See [`lenient_block_number_or_tag()`]
-    #[derive(Clone, Copy, Debug)]
-    pub struct LenientBlockNumberOrTag(pub BlockNumberOrTag);
 
     impl<'de> Deserialize<'de> for LenientBlockNumberOrTag {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -308,12 +314,6 @@ pub mod lenient_block_number_or_tag {
             }
 
             deserializer.deserialize_any(LenientBlockNumberVisitor)
-        }
-    }
-
-    impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
-        fn from(value: LenientBlockNumberOrTag) -> Self {
-            value.0
         }
     }
 }
