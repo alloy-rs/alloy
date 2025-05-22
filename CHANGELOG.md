@@ -5,7 +5,108 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
+
+### Bug Fixes
+
+- Correctly handle websocket subscription to new blocks ([#2482](https://github.com/alloy-rs/alloy/issues/2482))
+
+### Documentation
+
+- [network] Refined Core Model in README based on real traits and … ([#2473](https://github.com/alloy-rs/alloy/issues/2473))
+
+### Miscellaneous Tasks
+
+- Rm redundant commitment copy ([#2484](https://github.com/alloy-rs/alloy/issues/2484))
+
+### Refactor
+
+- Create VersionedHashIter to remove unnecessary collect() ([#2483](https://github.com/alloy-rs/alloy/issues/2483))
+
+## [1.0.5](https://github.com/alloy-rs/alloy/releases/tag/v1.0.5) - 2025-05-20
+
+### Bug Fixes
+
+- Check each bloom ([#2480](https://github.com/alloy-rs/alloy/issues/2480))
+- [`provider`] Introduce `new_with_network` constructor ([#2479](https://github.com/alloy-rs/alloy/issues/2479))
+
+### Miscellaneous Tasks
+
+- Release 1.0.5
+
+## [1.0.4](https://github.com/alloy-rs/alloy/releases/tag/v1.0.4) - 2025-05-19
+
+### Dependencies
+
+- Add auth deserde test ([#2468](https://github.com/alloy-rs/alloy/issues/2468))
+
+### Documentation
+
+- Fix typos and improve documentation clarity in serde-related modules ([#2475](https://github.com/alloy-rs/alloy/issues/2475))
+
+### Features
+
+- [consensus] Sidecar generic (round 2) ([#2466](https://github.com/alloy-rs/alloy/issues/2466))
+- Add BuilderBlockReceived ([#2471](https://github.com/alloy-rs/alloy/issues/2471))
+- Add ProposerPayloadDelivered ([#2470](https://github.com/alloy-rs/alloy/issues/2470))
+- [eips] Sidecar conversion methods ([#2464](https://github.com/alloy-rs/alloy/issues/2464))
+- [consensus] `TxEip4844Variant` generic over sidecar ([#2461](https://github.com/alloy-rs/alloy/issues/2461))
+
+### Miscellaneous Tasks
+
+- Release 1.0.4
+- Warn missing-const-for-fn ([#2418](https://github.com/alloy-rs/alloy/issues/2418))
+- Rm leftover recovery impl ([#2467](https://github.com/alloy-rs/alloy/issues/2467))
+- [consensus] Relax 4844 with sidecar creation ([#2465](https://github.com/alloy-rs/alloy/issues/2465))
+
+### Other
+
+- SignerRecoverable for WithEncoded<T> ([#2474](https://github.com/alloy-rs/alloy/issues/2474))
+
+### Styling
+
+- Introducing manual deserde for BlobTransactionSidecarVariant ([#2440](https://github.com/alloy-rs/alloy/issues/2440))
+
+### Testing
+
+- Add js tracer test ([#2462](https://github.com/alloy-rs/alloy/issues/2462))
+
+## [1.0.3](https://github.com/alloy-rs/alloy/releases/tag/v1.0.3) - 2025-05-15
+
+### Bug Fixes
+
+- [`consensus`] Allow `"accessList": null` when deserializing EIP-1559 transactions. ([#2450](https://github.com/alloy-rs/alloy/issues/2450))
+
+### Dependencies
+
+- Bump tempfile ([#2457](https://github.com/alloy-rs/alloy/issues/2457))
+
+### Features
+
+- Add with_auth_opt ([#2447](https://github.com/alloy-rs/alloy/issues/2447))
+- [consensus] Relax `TxEip4844WithSidecar` trait implementations ([#2446](https://github.com/alloy-rs/alloy/issues/2446))
+
+### Miscellaneous Tasks
+
+- Release 1.0.3 ([#2460](https://github.com/alloy-rs/alloy/issues/2460))
+- Exclude testdata for publishing ([#2458](https://github.com/alloy-rs/alloy/issues/2458))
+- Release 1.0.2
+- Relax some conversions ([#2456](https://github.com/alloy-rs/alloy/issues/2456))
+- Add a new fn for TxType derivation ([#2451](https://github.com/alloy-rs/alloy/issues/2451))
+- Update release checklist ([#2453](https://github.com/alloy-rs/alloy/issues/2453))
+- Update readme ([#2452](https://github.com/alloy-rs/alloy/issues/2452))
+- Use has_eip4884 fields ([#2448](https://github.com/alloy-rs/alloy/issues/2448))
+- Add sidecar helpers ([#2445](https://github.com/alloy-rs/alloy/issues/2445))
+
+### Testing
+
+- [eips] Add tests for EIP-7594 sidecar ([#2449](https://github.com/alloy-rs/alloy/issues/2449))
+
 ## [1.0.1](https://github.com/alloy-rs/alloy/releases/tag/v1.0.1) - 2025-05-13
+
+### Miscellaneous Tasks
+
+- Release 1.0.1
 
 ### Other
 
@@ -957,12 +1058,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Wrong func sig ([#1742](https://github.com/alloy-rs/alloy/issues/1742))
@@ -999,6 +1094,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
 - Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
 - Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))

@@ -12,12 +12,12 @@ pub struct ChainLayer(NamedChain);
 
 impl ChainLayer {
     /// Create a new `ChainLayer` from the given chain.
-    pub fn new(chain: NamedChain) -> Self {
+    pub const fn new(chain: NamedChain) -> Self {
         Self(chain)
     }
 
     /// Get the chain's average blocktime, if applicable.
-    pub fn average_blocktime_hint(&self) -> Option<Duration> {
+    pub const fn average_blocktime_hint(&self) -> Option<Duration> {
         self.0.average_blocktime_hint()
     }
 }

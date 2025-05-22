@@ -11,7 +11,7 @@ pub(crate) use header::serde_bincode_compat;
 
 use crate::Transaction;
 use alloc::vec::Vec;
-use alloy_eips::{eip4895::Withdrawals, Typed2718};
+use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
 use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
@@ -118,6 +118,15 @@ impl<T, H> Block<T, H> {
                 withdrawals: self.body.withdrawals,
             },
         })
+    }
+
+    /// Converts the transactions in the block's body to `WithEncoded<T>` by encoding them via
+    /// [`Encodable2718`]
+    pub fn into_with_encoded2718(self) -> Block<WithEncoded<T>, H>
+    where
+        T: Encodable2718,
+    {
+        self.map_transactions(|tx| tx.into_encoded())
     }
 
     /// Returns the RLP encoded length of the block's header and body.

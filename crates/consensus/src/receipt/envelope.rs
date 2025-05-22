@@ -396,7 +396,7 @@ pub(crate) mod serde_bincode_compat {
         use serde_with::serde_as;
 
         #[test]
-        fn test_receipt_evelope_bincode_roundtrip() {
+        fn test_receipt_envelope_bincode_roundtrip() {
             #[serde_as]
             #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
             struct Data {

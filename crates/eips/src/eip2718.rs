@@ -232,6 +232,15 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
         Sealed::new_unchecked(self, hash)
     }
 
+    /// A convenience function that encodes the value in the 2718 format and wraps it in a
+    /// [`WithEncoded`] wrapper.
+    ///
+    /// See also [`WithEncoded::from_2718_encodable`].
+    #[auto_impl(keep_default_for(&))]
+    fn into_encoded(self) -> WithEncoded<Self> {
+        WithEncoded::from_2718_encodable(self)
+    }
+
     /// The length of the 2718 encoded envelope in network format. This is the
     /// length of the header + the length of the type flag and inner encoding.
     fn network_len(&self) -> usize {

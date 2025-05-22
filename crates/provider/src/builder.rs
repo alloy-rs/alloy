@@ -155,6 +155,19 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     }
 }
 
+impl ProviderBuilder<Identity, Identity, Ethereum> {
+    /// Create a new [`ProviderBuilder`] with the [`RecommendedFillers`] for the provided
+    /// [`Network`].
+    pub fn new_with_network<Net: RecommendedFillers>(
+    ) -> ProviderBuilder<Identity, JoinFill<Identity, Net::RecommendedFillers>, Net> {
+        ProviderBuilder {
+            layer: Identity,
+            filler: JoinFill::new(Identity, Net::recommended_fillers()),
+            network: PhantomData,
+        }
+    }
+}
+
 impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
@@ -699,6 +712,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 mod tests {
     use super::*;
     use crate::Provider;
+    use alloy_network::AnyNetwork;
 
     #[tokio::test]
     async fn basic() {
@@ -709,5 +723,12 @@ mod tests {
         let _ = provider.get_account(Default::default());
         let provider = provider.erased();
         let _ = provider.get_account(Default::default());
+    }
+
+    #[tokio::test]
+    async fn compile_with_network() {
+        let p = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
+        let num = p.get_block_number().await.unwrap();
+        assert_eq!(num, 0);
     }
 }

@@ -88,7 +88,7 @@ impl<T> Transaction<T> {
     }
 
     /// Returns a `Recovered<&T>` with the transaction and the sender.
-    pub fn as_recovered(&self) -> Recovered<&T> {
+    pub const fn as_recovered(&self) -> Recovered<&T> {
         self.inner.as_recovered_ref()
     }
 

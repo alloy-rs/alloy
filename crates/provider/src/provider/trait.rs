@@ -1324,6 +1324,7 @@ mod tests {
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
+    use alloy_consensus::transaction::SignerRecoverable;
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
         hyper,

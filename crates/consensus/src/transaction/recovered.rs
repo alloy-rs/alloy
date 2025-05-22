@@ -282,3 +282,16 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
 }
+
+impl<T> SignerRecoverable for WithEncoded<T>
+where
+    T: SignerRecoverable,
+{
+    fn recover_signer(&self) -> Result<Address, RecoveryError> {
+        self.1.recover_signer()
+    }
+
+    fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
+        self.1.recover_signer_unchecked()
+    }
+}

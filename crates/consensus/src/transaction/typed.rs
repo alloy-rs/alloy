@@ -83,16 +83,18 @@ impl<Eip4844: From<TxEip4844>> From<TxEip4844> for EthereumTypedTransaction<Eip4
     }
 }
 
-impl<Eip4844: From<TxEip4844WithSidecar>> From<TxEip4844WithSidecar>
+impl<T, Eip4844: From<TxEip4844WithSidecar<T>>> From<TxEip4844WithSidecar<T>>
     for EthereumTypedTransaction<Eip4844>
 {
-    fn from(tx: TxEip4844WithSidecar) -> Self {
+    fn from(tx: TxEip4844WithSidecar<T>) -> Self {
         Self::Eip4844(tx.into())
     }
 }
 
-impl<Eip4844: From<TxEip4844Variant>> From<TxEip4844Variant> for EthereumTypedTransaction<Eip4844> {
-    fn from(tx: TxEip4844Variant) -> Self {
+impl<Sidecar, Eip4844: From<TxEip4844Variant<Sidecar>>> From<TxEip4844Variant<Sidecar>>
+    for EthereumTypedTransaction<Eip4844>
+{
+    fn from(tx: TxEip4844Variant<Sidecar>) -> Self {
         Self::Eip4844(tx.into())
     }
 }
@@ -115,19 +117,25 @@ impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for EthereumTypedTransaction<Eip
     }
 }
 
-impl From<EthereumTypedTransaction<TxEip4844WithSidecar>> for EthereumTypedTransaction<TxEip4844> {
-    fn from(value: EthereumTypedTransaction<TxEip4844WithSidecar>) -> Self {
+impl<T> From<EthereumTypedTransaction<TxEip4844WithSidecar<T>>>
+    for EthereumTypedTransaction<TxEip4844>
+{
+    fn from(value: EthereumTypedTransaction<TxEip4844WithSidecar<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTypedTransaction<TxEip4844Variant>> for EthereumTypedTransaction<TxEip4844> {
-    fn from(value: EthereumTypedTransaction<TxEip4844Variant>) -> Self {
+impl<T> From<EthereumTypedTransaction<TxEip4844Variant<T>>>
+    for EthereumTypedTransaction<TxEip4844>
+{
+    fn from(value: EthereumTypedTransaction<TxEip4844Variant<T>>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl From<EthereumTypedTransaction<TxEip4844>> for EthereumTypedTransaction<TxEip4844Variant> {
+impl<T> From<EthereumTypedTransaction<TxEip4844>>
+    for EthereumTypedTransaction<TxEip4844Variant<T>>
+{
     fn from(value: EthereumTypedTransaction<TxEip4844>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }

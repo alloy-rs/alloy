@@ -46,6 +46,7 @@ impl PartialSidecar {
     }
 
     /// Get a reference to the blobs currently in the builder.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn blobs(&self) -> &[Blob] {
         &self.blobs
     }
