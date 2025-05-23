@@ -9,6 +9,8 @@
 #[macro_use]
 extern crate tracing;
 
+mod utils;
+use rlp as _;
 mod signer;
 pub use signer::LedgerSigner;
 
