@@ -1,7 +1,8 @@
+#[cfg(feature = "serde")]
+use alloc::string::String;
 use alloy_consensus::{BlockHeader, Header};
 #[cfg(feature = "serde")]
 use alloy_primitives::hex;
-
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
 #[cfg(feature = "serde")]
 use serde::{de::Error, Deserialize, Deserializer};

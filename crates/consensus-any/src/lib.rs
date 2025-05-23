@@ -12,3 +12,5 @@ pub use block::AnyHeader;
 
 mod receipt;
 pub use receipt::AnyReceiptEnvelope;
+
+extern crate alloc;
