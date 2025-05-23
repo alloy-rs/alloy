@@ -1,5 +1,9 @@
 use alloy_consensus::{BlockHeader, Header};
-use alloy_primitives::{hex, Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+#[cfg(feature = "serde")]
+use alloy_primitives::hex;
+
+use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+#[cfg(feature = "serde")]
 use serde::{de::Error, Deserialize, Deserializer};
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
@@ -17,7 +21,7 @@ pub struct AnyHeader {
     #[cfg_attr(feature = "serde", serde(rename = "miner"))]
     pub beneficiary: Address,
     /// State root hash
-    #[serde(deserialize_with = "deserialize_state_root")]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_state_root"))]
     pub state_root: B256,
     /// Transactions root hash
     pub transactions_root: B256,
@@ -98,7 +102,8 @@ pub struct AnyHeader {
     pub requests_hash: Option<B256>,
 }
 
-/// Custom deserializer for `state_root` that treats `"0x"` or empty as `B256::ZERO`.
+/// Custom deserializer for `state_root` that treats `"0x"` or empty as `B256::ZERO`
+#[cfg(feature = "serde")]
 fn deserialize_state_root<'de, D>(deserializer: D) -> Result<B256, D::Error>
 where
     D: Deserializer<'de>,
