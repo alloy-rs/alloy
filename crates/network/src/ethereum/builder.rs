@@ -31,6 +31,18 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.input.input = Some(input.into());
     }
 
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+        match kind {
+            TransactionInputKind::Input => self.input.input = Some(input.into()),
+            TransactionInputKind::Data => self.input.data = Some(input.into()),
+            TransactionInputKind::Both => {
+                let bytes = input.into();
+                self.input.input = Some(bytes.clone());
+                self.input.data = Some(bytes);
+            }
+        }
+    }
+
     fn from(&self) -> Option<Address> {
         self.from
     }
@@ -163,18 +175,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         wallet: &W,
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
         Ok(wallet.sign_request(self).await?)
-    }
-
-    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
-        match kind {
-            TransactionInputKind::Input => self.input.input = Some(input.into()),
-            TransactionInputKind::Data => self.input.data = Some(input.into()),
-            TransactionInputKind::Both => {
-                let bytes = input.into();
-                self.input.input = Some(bytes.clone());
-                self.input.data = Some(bytes);
-            }
-        }
     }
 }
 
