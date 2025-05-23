@@ -1,7 +1,6 @@
 use alloy_consensus::{BlockHeader, Header};
-use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
-use alloy_serde::deserialize_state_root;
-
+use alloy_primitives::{hex, Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+use serde::{de::Error, Deserialize, Deserializer};
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -97,6 +96,30 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+}
+
+/// Custom deserializer for `state_root` that treats `"0x"` or empty as `B256::ZERO`.
+fn deserialize_state_root<'de, D>(deserializer: D) -> Result<B256, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    let s = s.trim();
+
+    if s == "0x" || s.is_empty() {
+        return Ok(B256::ZERO);
+    }
+
+    let hex = s.strip_prefix("0x").unwrap_or(s);
+    let bytes = hex::decode(hex).map_err(D::Error::custom)?;
+
+    if bytes.len() != 32 {
+        return Err(D::Error::custom("stateRoot must be exactly 32 bytes"));
+    }
+
+    let mut buf = [0u8; 32];
+    buf.copy_from_slice(&bytes);
+    Ok(B256::from(buf))
 }
 
 impl AnyHeader {
@@ -358,5 +381,34 @@ impl TryFrom<AnyHeader> for Header {
 
     fn try_from(value: AnyHeader) -> Result<Self, Self::Error> {
         value.try_into_header()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::B256;
+    use serde_json::json;
+
+    #[test]
+    fn deserializes_tron_state_root_in_header() {
+        let input = json!({
+            "stateRoot": "0x",
+            "number": "0x1",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "miner": "0x0000000000000000000000000000000000000000",
+            "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "logsBloom": format!("0x{}", "00".repeat(256)),
+            "difficulty": "0x1",
+            "gasLimit": "0x0",
+            "gasUsed": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x"
+        });
+
+        let header: AnyHeader = serde_json::from_value(input).unwrap();
+        assert_eq!(header.state_root, B256::ZERO);
     }
 }

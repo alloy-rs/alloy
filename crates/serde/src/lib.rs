@@ -11,8 +11,7 @@ extern crate alloc;
 
 use alloc::format;
 use alloy_primitives::{hex, B256};
-use serde::{de::Error, Deserialize, Deserializer, Serializer};
-use std::str::FromStr;
+use serde::Serializer;
 
 pub mod displayfromstr;
 
@@ -48,18 +47,4 @@ where
     S: Serializer,
 {
     s.serialize_str(&format!("{x:x}"))
-}
-
-/// Custom deserializer for `state_root` that treats `"0x"` or empty as `B256::ZERO`.
-pub fn deserialize_state_root<'de, D>(deserializer: D) -> Result<B256, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &str = Deserialize::deserialize(deserializer)?;
-
-    if s == "0x" || s == "0x0" || s.trim().is_empty() {
-        return Ok(B256::ZERO);
-    }
-
-    B256::from_str(s).map_err(D::Error::custom)
 }
