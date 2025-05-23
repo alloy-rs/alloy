@@ -62,6 +62,8 @@ pub use signed::Signed;
 pub mod crypto;
 pub mod error;
 
+pub mod extended;
+
 /// Bincode-compatible serde implementations for consensus types.
 ///
 /// `bincode` crate doesn't work well with optionally serializable serde fields, but some of the
