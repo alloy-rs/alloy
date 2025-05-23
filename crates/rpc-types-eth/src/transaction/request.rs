@@ -860,6 +860,13 @@ impl TransactionBuilder7702 for TransactionRequest {
     }
 }
 
+#[cfg(feature = "serde")]
+impl From<TransactionRequest> for alloy_serde::WithOtherFields<TransactionRequest> {
+    fn from(tx: TransactionRequest) -> Self {
+        Self::new(tx)
+    }
+}
+
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
         tx.into_request()
