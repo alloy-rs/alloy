@@ -1,5 +1,6 @@
 use alloy_consensus::{BlockHeader, Header};
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+use alloy_serde::deserialize_state_root;
 
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
@@ -17,6 +18,7 @@ pub struct AnyHeader {
     #[cfg_attr(feature = "serde", serde(rename = "miner"))]
     pub beneficiary: Address,
     /// State root hash
+    #[serde(deserialize_with = "deserialize_state_root")]
     pub state_root: B256,
     /// Transactions root hash
     pub transactions_root: B256,
