@@ -102,6 +102,18 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Set the input data for the transaction, respecting the input kind
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, _: TransactionInputKind) {
+        // forward all to input by default
+        self.set_input(input);
+    }
+
+    /// Builder-pattern method for setting the input data, respecting the input kind
+    fn with_input_kind<T: Into<Bytes>>(mut self, input: T, kind: TransactionInputKind) -> Self {
+        self.set_input_kind(input, kind);
+        self
+    }
+
     /// Get the sender for the transaction.
     fn from(&self) -> Option<Address>;
 
@@ -350,16 +362,4 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self,
         wallet: &W,
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
-
-    /// Set the input data for the transaction, respecting the input kind
-    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, _: TransactionInputKind) {
-        // forward all to input by default
-        self.set_input(input);
-    }
-
-    /// Builder-pattern method for setting the input data, respecting the input kind
-    fn with_input_kind<T: Into<Bytes>>(mut self, input: T, kind: TransactionInputKind) -> Self {
-        self.set_input_kind(input, kind);
-        self
-    }
 }
