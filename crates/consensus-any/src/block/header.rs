@@ -368,6 +368,7 @@ fn lenient_state_root<'de, D>(deserializer: D) -> Result<B256, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
+    use alloc::string::String;
     use core::str::FromStr;
     use serde::de::Error;
 
