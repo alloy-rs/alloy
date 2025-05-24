@@ -498,10 +498,10 @@ pub struct TxEip4844 {
     /// This is also known as `GasTipCap`
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_priority_fee_per_gas: u128,
-    /// The 160-bit address of the message call’s recipient.
+    /// The 160-bit address of the message call's recipient.
     pub to: Address,
     /// A scalar value equal to the number of Wei to
-    /// be transferred to the message call’s recipient or,
+    /// be transferred to the message call's recipient or,
     /// in the case of contract creation, as an endowment
     /// to the newly created account; formally Tv.
     pub value: U256,
@@ -510,6 +510,7 @@ pub struct TxEip4844 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
+    #[cfg_attr(feature = "serde", serde(default))]
     pub access_list: AccessList,
 
     /// It contains a vector of fixed size hash(32 bytes)
