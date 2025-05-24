@@ -26,6 +26,7 @@ workspace = true
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
+rlp = "0.5"
 
 async-trait.workspace = true
 coins-ledger = { version = "0.12", default-features = false }
@@ -48,6 +49,7 @@ tracing-subscriber.workspace = true
 
 [features]
 eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types", "dep:alloy-dyn-abi"]
+eip7702 = []
 
 # WASM support
 browser = ["coins-ledger/browser"]

@@ -1,6 +1,6 @@
 //! Ledger Ethereum app wrapper.
 
-use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
+use crate::types::{DerivationType, LedgerError, INS, P1_FIRST_0, P1_FIRST_1, P1, P2};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
@@ -15,6 +15,9 @@ use futures_util::lock::Mutex;
 use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
+
+#[cfg(feature = "eip7702")]
+use crate::utils::make_eip7702_tlv;
 
 /// A Ledger Ethereum signer.
 ///
@@ -278,19 +281,49 @@ impl LedgerSigner {
         self.sign_typed_data_with_separator(hash_struct, &domain.separator()).await
     }
 
+    // / Sign “auth data” per EIP-7702:
+    // / msg = keccak256(0x05 ‖ rlp([chain_id, address, nonce]))
+    #[cfg(feature = "eip7702")]
+    pub async fn sign_auth(
+    &self,
+    chain_id: ChainId,
+    delegate: Address,
+    nonce: u64,
+) -> Result<Signature, LedgerError> {
+    let path_bytes = Self::path_to_bytes(&self.derivation);
+    let tlv_payload = make_eip7702_tlv(chain_id.into(), &delegate, nonce);
+
+    let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
+
+    let mut payload = Vec::with_capacity(path_bytes.len() + 2 + tlv_payload.len());
+    payload.extend_from_slice(&path_bytes);
+    payload.extend_from_slice(&tlv_length); 
+    payload.extend_from_slice(&tlv_payload);
+
+    self.sign_payload(INS::SIGN_EIP7702_AUTHORIZATION, &payload).await
+}
+
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
     #[instrument(err, skip_all, fields(command = %command, payload = hex::encode(payload)))]
     async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
+        // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the header or continuations. 
+        // @note We need to mention the starter chunk first.
+        let p1_first = if command == INS::SIGN_EIP7702_AUTHORIZATION {
+            P1_FIRST_1
+        } else {
+            P1_FIRST_0
+        };
         let transport = self.transport.lock().await;
         let mut command = APDUCommand {
             cla: 0xe0,
             ins: command as u8,
-            p1: P1_FIRST,
+            p1: p1_first,
             p2: P2::NO_CHAINCODE as u8,
             data: APDUData::new(&[]),
             response_len: None,
         };
+
 
         let mut answer = None;
         // workaround for https://github.com/LedgerHQ/app-ethereum/issues/409
@@ -357,6 +390,11 @@ mod tests {
     use alloy_rlp::Decodable;
     use serial_test::serial;
     use std::sync::OnceLock;
+
+    #[cfg(feature = "eip7702")]
+    use alloy_primitives::keccak256;
+    #[cfg(feature = "eip7702")]
+    use rlp::RlpStream;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
 
@@ -466,5 +504,38 @@ mod tests {
         let addr = ledger.get_address().await.unwrap();
         assert_eq!(addr, my_address());
         assert_eq!(sig.recover_address_from_msg(message.as_bytes()).unwrap(), my_address());
+    }
+
+    #[tokio::test]
+    #[serial]
+    #[ignore]
+    #[cfg(feature = "eip7702")]
+    async fn test_sign_auth() {
+        let ledger = init_ledger().await;
+        let chain_id: ChainId = 11155111;
+        let delegate: Address = address!("0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9");
+        let nonce: u64 = 72;
+        let sig = ledger.sign_auth(chain_id, delegate, nonce).await
+            .expect("sign_auth should succeed");
+
+
+        let mut rlp_stream = RlpStream::new_list(3);
+        let cid: u64 = chain_id.into();
+        rlp_stream.append(&cid);
+
+        let raw: [u8; 20] = delegate.into();
+        rlp_stream.append(&raw.to_vec());
+
+        rlp_stream.append(&nonce);
+
+        let rlp_data = rlp_stream.out();
+        let mut to_hash = Vec::with_capacity(1 + rlp_data.len());
+        to_hash.push(0x05);
+        to_hash.extend_from_slice(&rlp_data);
+
+        let prehash = keccak256(&to_hash);
+
+        let addr = ledger.get_address().await.unwrap();
+        assert_eq!(sig.recover_address_from_prehash(&prehash).unwrap(), addr);
     }
 }
