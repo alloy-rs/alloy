@@ -243,6 +243,18 @@ impl Action {
             Self::Reward(_) => ActionType::Reward,
         }
     }
+
+    /// Returns true if this action contains the given address.
+    pub fn contains_address(&self, address: Address) -> bool {
+        match self {
+            Self::Call(CallAction { from, to, .. }) => *from == address || *to == address,
+            Self::Create(CreateAction { from, .. }) => *from == address,
+            Self::Reward(RewardAction { author, .. }) => *author == address,
+            Self::Selfdestruct(SelfdestructAction { address: destroyed, .. }) => {
+                *destroyed == address
+            }
+        }
+    }
 }
 
 /// An external action type.
@@ -424,6 +436,27 @@ impl TraceOutput {
         }
     }
 
+    /// Returns the [`CallOutput`] if it is [`TraceOutput::Call`]
+    pub const fn as_call(&self) -> Option<&CallOutput> {
+        match self {
+            Self::Call(output) => Some(output),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`CreateOutput`] if it is [`TraceOutput::Create`]
+    pub const fn as_create(&self) -> Option<&CreateOutput> {
+        match self {
+            Self::Create(output) => Some(output),
+            _ => None,
+        }
+    }
+
+    /// Returns the address of the created contract if this is a CREATE trace.
+    pub fn created_contract(&self) -> Option<Address> {
+        self.as_create().map(|create| create.address)
+    }
+
     /// Consumes the output of this trace.
     pub fn into_output(self) -> Bytes {
         match self {
@@ -472,6 +505,19 @@ pub struct TransactionTrace {
     pub trace_address: Vec<usize>,
 }
 
+impl TransactionTrace {
+    /// Returns true if this trace contains the given address in its action or result.
+    pub fn contains_address(&self, address: Address) -> bool {
+        if self.action.contains_address(address) {
+            return true;
+        }
+
+        let Some(out) = &self.result else { return false };
+
+        out.created_contract() == Some(address)
+    }
+}
+
 /// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -505,6 +551,11 @@ impl LocalizedTransactionTrace {
         if let Some(res) = self.trace.result.as_mut() {
             res.set_gas_used(gas_used);
         }
+    }
+
+    /// Returns true if this trace contains the given address in its action or result.
+    pub fn contains_address(&self, address: Address) -> bool {
+        self.trace.contains_address(address)
     }
 }
 
