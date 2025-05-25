@@ -6,7 +6,7 @@ use alloy_network::Network;
 /// without changing the user-facing API.
 ///
 /// Users should NOT use this type directly. It should only be used as an
-/// implementation detail of [`Provider::send_transaction_internal`].
+/// implementation detail of [`Provider::send_transaction_internal`](crate::Provider).
 #[doc(alias = "SendableTransaction")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SendableTx<N: Network> {
