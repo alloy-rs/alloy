@@ -11,7 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 ///
 /// Currently unix socket only, due to use of namedtempfile.
 ///
-/// ## Example:
+/// # Examples:
 ///
 /// ```
 /// use alloy_transport_ipc::MockIpcServer;
