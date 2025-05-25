@@ -107,6 +107,19 @@ where
             input_kind: TransactionInputKind::default(),
         }
     }
+
+    /// Converts an empty [`MulticallBuilder`] into a dynamic one
+    pub fn dynamic<D: SolCall + 'static>(self) -> MulticallBuilder<Dynamic<D>, P, N> {
+        MulticallBuilder {
+            calls: self.calls,
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            address: self.address,
+            input_kind: self.input_kind,
+            _pd: Default::default(),
+        }
+    }
 }
 
 impl<D: SolCall + 'static, P, N> MulticallBuilder<Dynamic<D>, P, N>
@@ -159,15 +172,7 @@ where
     ///    println!("WETH Balance: {:?}, USDC Balance: {:?}", weth_bal, usdc_bal);
     /// }
     pub fn new_dynamic(provider: P) -> Self {
-        Self {
-            calls: Vec::new(),
-            provider,
-            block: None,
-            state_override: None,
-            address: MULTICALL3_ADDRESS,
-            input_kind: TransactionInputKind::default(),
-            _pd: Default::default(),
-        }
+        MulticallBuilder::new(provider).dynamic()
     }
 
     /// Add a dynamic call to the builder
