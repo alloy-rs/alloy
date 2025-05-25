@@ -74,7 +74,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<N>;
 
-    /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
+    /// Returns the [`ProviderBuilder`] to build on.
     fn builder() -> ProviderBuilder<Identity, Identity, N>
     where
         Self: Sized,
