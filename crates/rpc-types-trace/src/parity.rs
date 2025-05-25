@@ -281,6 +281,19 @@ pub enum CallType {
     AuthCall,
 }
 
+impl core::fmt::Display for CallType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::None => write!(f, "NONE"),
+            Self::Call => write!(f, "CALL"),
+            Self::CallCode => write!(f, "CALLCODE"),
+            Self::DelegateCall => write!(f, "DELEGATECALL"),
+            Self::StaticCall => write!(f, "STATICCALL"),
+            Self::AuthCall => write!(f, "AUTHCALL"),
+        }
+    }
+}
+
 /// Represents a certain [CallType] of a _call_ or message transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
