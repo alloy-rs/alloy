@@ -7,7 +7,7 @@ use alloy_network::Network;
 ///
 /// Users should NOT use this type directly. It should only be used as an
 /// implementation detail of [`Provider::send_transaction_internal`].
-#[doc(hidden, alias = "SendableTransaction")]
+#[doc(alias = "SendableTransaction")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SendableTx<N: Network> {
     /// A transaction that is not yet signed.
