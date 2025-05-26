@@ -1,8 +1,11 @@
 //! EIP-4844 sidecar type
 
-use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
-    BYTES_PER_PROOF,
+use crate::{
+    eip4844::{
+        kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
+        BYTES_PER_PROOF,
+    },
+    eip7594::{Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -256,8 +259,6 @@ impl BlobTransactionSidecar {
         for (versioned_hash, commitment) in
             blob_versioned_hashes.iter().zip(self.commitments.iter())
         {
-            let commitment = c_kzg::KzgCommitment::from(commitment.0);
-
             // calculate & verify versioned hash
             let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
@@ -285,8 +286,8 @@ impl BlobTransactionSidecar {
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
+        VersionedHashIter::new(&self.commitments)
     }
 
     /// Returns the versioned hash for the blob at the given index, if it
@@ -450,9 +451,25 @@ impl Decodable for BlobTransactionSidecar {
     }
 }
 
+impl Encodable7594 for BlobTransactionSidecar {
+    fn encode_7594_len(&self) -> usize {
+        self.rlp_encoded_fields_length()
+    }
+
+    fn encode_7594(&self, out: &mut dyn BufMut) {
+        self.rlp_encode_fields(out);
+    }
+}
+
+impl Decodable7594 for BlobTransactionSidecar {
+    fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode_fields(buf)
+    }
+}
+
 // Helper function to deserialize boxed blobs
 #[cfg(all(debug_assertions, feature = "serde"))]
-fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
@@ -496,16 +513,16 @@ impl core::fmt::Display for BlobTransactionValidationError {
         match self {
             Self::InvalidProof => f.write_str("invalid KZG proof"),
             Self::KZGError(err) => {
-                write!(f, "KZG error: {:?}", err)
+                write!(f, "KZG error: {err:?}")
             }
             Self::NotBlobTransaction(err) => {
-                write!(f, "unable to verify proof for non blob transaction: {}", err)
+                write!(f, "unable to verify proof for non blob transaction: {err}")
             }
             Self::MissingSidecar => {
                 f.write_str("eip4844 tx variant without sidecar being used for verification.")
             }
             Self::WrongVersionedHash { have, expected } => {
-                write!(f, "wrong versioned hash: have {}, expected {}", have, expected)
+                write!(f, "wrong versioned hash: have {have}, expected {expected}")
             }
         }
     }
@@ -515,6 +532,29 @@ impl core::fmt::Display for BlobTransactionValidationError {
 impl From<c_kzg::Error> for BlobTransactionValidationError {
     fn from(source: c_kzg::Error) -> Self {
         Self::KZGError(source)
+    }
+}
+
+/// Iterator that returns versioned hashes from commitments.
+#[derive(Debug, Clone)]
+pub struct VersionedHashIter<'a> {
+    /// The iterator over KZG commitments from which versioned hashes are generated.
+    commitments: core::slice::Iter<'a, Bytes48>,
+}
+
+impl<'a> Iterator for VersionedHashIter<'a> {
+    type Item = B256;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.commitments.next().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+}
+
+// Constructor method for VersionedHashIter
+impl<'a> VersionedHashIter<'a> {
+    /// Creates a new iterator over commitments to generate versioned hashes.
+    pub fn new(commitments: &'a [Bytes48]) -> Self {
+        Self { commitments: commitments.iter() }
     }
 }
 

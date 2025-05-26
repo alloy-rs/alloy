@@ -37,9 +37,9 @@ use std::ops::{Deref, DerefMut};
 /// should be aware of the following:
 ///
 /// - The implementation of [`Decodable2718`] for [`AnyTxEnvelope`] will not work for non-Ethereum
-///   transaction types. It will succesfully decode an Ethereum [`TxEnvelope`], but will decode only
-///   the type for any unknown transaction type. It will also leave the buffer unconsumed, which
-///   will cause further deserialization to produce erroneous results.
+///   transaction types. It will successfully decode an Ethereum [`TxEnvelope`], but will decode
+///   only the type for any unknown transaction type. It will also leave the buffer unconsumed,
+///   which will cause further deserialization to produce erroneous results.
 /// - The implementation of [`Encodable2718`] for [`AnyTypedTransaction`] will not work for
 ///   non-Ethereum transaction types. It will encode the type for any unknown transaction type, but
 ///   will not encode any other fields. This is symmetric with the decoding behavior, but still
@@ -89,7 +89,7 @@ pub struct AnyRpcBlock(pub WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader
 
 impl AnyRpcBlock {
     /// Create a new [`AnyRpcBlock`].
-    pub fn new(inner: WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>) -> Self {
+    pub const fn new(inner: WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>>) -> Self {
         Self(inner)
     }
 
@@ -183,7 +183,7 @@ pub struct AnyRpcTransaction(pub WithOtherFields<Transaction<AnyTxEnvelope>>);
 
 impl AnyRpcTransaction {
     /// Create a new [`AnyRpcTransaction`].
-    pub fn new(inner: WithOtherFields<Transaction<AnyTxEnvelope>>) -> Self {
+    pub const fn new(inner: WithOtherFields<Transaction<AnyTxEnvelope>>) -> Self {
         Self(inner)
     }
 

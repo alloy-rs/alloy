@@ -6,7 +6,7 @@ use alloy_eips::{
 use serde::{Deserialize, Serialize};
 
 /// An Electra-compatible execution requests payload.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
@@ -17,6 +17,31 @@ pub struct ExecutionRequestsV4 {
     pub withdrawals: Vec<WithdrawalRequest>,
     /// The requested consolidations.
     pub consolidations: Vec<ConsolidationRequest>,
+}
+
+impl<'de> Deserialize<'de> for ExecutionRequestsV4 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Helper {
+            #[serde(default)]
+            deposits: Option<Vec<DepositRequest>>,
+            #[serde(default)]
+            withdrawals: Option<Vec<WithdrawalRequest>>,
+            #[serde(default)]
+            consolidations: Option<Vec<ConsolidationRequest>>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+
+        Ok(Self {
+            deposits: helper.deposits.unwrap_or_default(),
+            withdrawals: helper.withdrawals.unwrap_or_default(),
+            consolidations: helper.consolidations.unwrap_or_default(),
+        })
+    }
 }
 
 impl ExecutionRequestsV4 {
@@ -188,5 +213,25 @@ mod ssz_requests_conversions {
             assert_eq!(original, round_trip);
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserde_requests_v4() {
+        let s = r#"{"deposits":null,"withdrawals":null,"consolidations":null}"#;
+        let requests: ExecutionRequestsV4 = serde_json::from_str(s).unwrap();
+        assert_eq!(requests, ExecutionRequestsV4::default());
+
+        let s = r#"{"deposits":null,"withdrawals":null}"#;
+        let requests: ExecutionRequestsV4 = serde_json::from_str(s).unwrap();
+        assert_eq!(requests, ExecutionRequestsV4::default());
+
+        let s = r#"{"deposits":[],"withdrawals":[],"consolidations":[]}"#;
+        let requests: ExecutionRequestsV4 = serde_json::from_str(s).unwrap();
+        assert_eq!(requests, ExecutionRequestsV4::default());
     }
 }

@@ -3,6 +3,7 @@
 //! <https://www.quicknode.com/docs/ethereum/ots_getBlockTransactions>
 //! <https://github.com/otterscan/otterscan/blob/v2.6.1/docs/custom-jsonrpc.md>
 
+use crate::parity::TransactionTrace;
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawals};
 use serde::{
@@ -87,6 +88,25 @@ pub struct TraceEntry {
     pub input: Bytes,
     /// The output data for the trace.
     pub output: Bytes,
+}
+
+impl TraceEntry {
+    /// Create a new [`TraceEntry`] from a [`TransactionTrace`] if it is a call action.
+    ///
+    /// Returns `None` if the trace action is not a call.
+    pub fn from_transaction_trace(trace: &TransactionTrace) -> Option<Self> {
+        let call = trace.action.as_call()?;
+        let output = trace.result.as_ref().map(|out| out.output().clone()).unwrap_or_default();
+        Some(Self {
+            r#type: call.call_type.to_string(),
+            depth: trace.trace_address.len() as u32,
+            from: call.from,
+            to: call.to,
+            value: Some(call.value),
+            input: call.input.clone(),
+            output,
+        })
+    }
 }
 
 /// Internal issuance struct for `BlockDetails` struct

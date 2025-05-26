@@ -84,7 +84,7 @@ impl OtherFields {
     ) -> serde_json::Result<V> {
         let key = key.as_ref();
         self.get_deserialized(key)
-            .ok_or_else(|| serde::de::Error::custom(format!("Missing field `{}`", key)))?
+            .ok_or_else(|| serde::de::Error::custom(format!("Missing field `{key}`")))?
     }
 
     /// Removes the deserialized value of the field, if it exists
@@ -219,7 +219,7 @@ impl<T> WithOtherFields<T> {
     }
 
     /// Returns the wrapped value.
-    pub fn inner(&self) -> &T {
+    pub const fn inner(&self) -> &T {
         &self.inner
     }
 }

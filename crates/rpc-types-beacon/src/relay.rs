@@ -114,6 +114,8 @@ pub struct SignedBidSubmissionV1 {
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Capella).
 ///
+/// Also known as `CapellaSubmitBlockRequest`.
+///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/capella/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -129,6 +131,8 @@ pub struct SignedBidSubmissionV2 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Deneb).
+///
+/// Also known as `DenebSubmitBlockRequest`.
 ///
 /// <https://github.com/attestantio/go-builder-client/blob/e54c7fffd418d88414fad808dde3ed2ac863a7f8/api/deneb/submitblockrequest.go#L13>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -147,6 +151,9 @@ pub struct SignedBidSubmissionV3 {
 }
 
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Electra).
+///
+///
+/// Also known as `ElectraSubmitBlockRequest`.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -163,6 +170,74 @@ pub struct SignedBidSubmissionV4 {
     pub execution_requests: ExecutionRequestsV4,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
+}
+
+/// Represents all versions of signed bid submissions (submit block requests).
+///
+/// Note: The fields are ordered starting with the most recent version so that the
+/// untagged, transparent decoding prioritises the newest version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
+#[cfg_attr(feature = "ssz", ssz(enum_behaviour = "transparent"))]
+pub enum SubmitBlockRequest {
+    /// Electra [`SignedBidSubmissionV4`].
+    Electra(SignedBidSubmissionV4),
+    /// Deneb [`SignedBidSubmissionV3`].
+    Deneb(SignedBidSubmissionV3),
+    /// Capella [`SignedBidSubmissionV2`].
+    Capella(SignedBidSubmissionV2),
+}
+
+impl SubmitBlockRequest {
+    /// Returns the [`SignedBidSubmissionV2`] if this is [`Self::Capella`]
+    pub const fn as_capella(&self) -> Option<&SignedBidSubmissionV2> {
+        match self {
+            Self::Capella(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`SignedBidSubmissionV3`] if this is [`Self::Deneb`]
+    pub const fn as_deneb(&self) -> Option<&SignedBidSubmissionV3> {
+        match self {
+            Self::Deneb(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`SignedBidSubmissionV4`] if this is [`Self::Electra`]
+    pub const fn as_electra(&self) -> Option<&SignedBidSubmissionV4> {
+        match self {
+            Self::Electra(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
+    /// Returns the underlying [`BidTrace`].
+    pub const fn bid_trace(&self) -> &BidTrace {
+        match self {
+            Self::Capella(req) => &req.message,
+            Self::Deneb(req) => &req.message,
+            Self::Electra(req) => &req.message,
+        }
+    }
+}
+
+impl From<SignedBidSubmissionV2> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV2) -> Self {
+        Self::Capella(value)
+    }
+}
+impl From<SignedBidSubmissionV3> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV3) -> Self {
+        Self::Deneb(value)
+    }
+}
+impl From<SignedBidSubmissionV4> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV4) -> Self {
+        Self::Electra(value)
+    }
 }
 
 /// Query for the `/relay/v1/builder/blocks` endpoint
@@ -238,6 +313,39 @@ pub struct BuilderBlockValidationRequestV4 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
+}
+
+/// Response type for the GET `/relay/v1/data/bidtraces/builder_blocks_received`
+///
+/// Provides [BidTrace]s for payloads that were delivered to proposers.
+/// Only submissions that were successfully verified.
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
+pub struct BuilderBlockReceived {
+    #[serde_as(as = "DisplayFromStr")]
+    pub slot: u64,
+    pub parent_hash: B256,
+    pub block_hash: B256,
+    pub builder_pubkey: BlsPublicKey,
+    pub proposer_pubkey: BlsPublicKey,
+    pub proposer_fee_recipient: Address,
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_limit: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_used: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub value: U256,
+    #[serde_as(as = "DisplayFromStr")]
+    pub num_tx: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub block_number: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub timestamp: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub timestamp_ms: u64,
+    #[serde(default)]
+    pub optimistic_submission: bool,
 }
 
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
@@ -320,6 +428,42 @@ impl ProposerPayloadsDeliveredQuery {
     pub const fn order_by_asc(self) -> Self {
         self.order_by(OrderBy::Asc)
     }
+}
+
+/// Response for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
+///
+/// Represents a payload that was delivered to proposers
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ProposerPayloadDelivered {
+    /// The slot this payload belongs to.
+    #[serde_as(as = "DisplayFromStr")]
+    pub slot: u64,
+    /// Parent hash of the payload.
+    pub parent_hash: B256,
+    /// Hash of the payload..
+    pub block_hash: B256,
+    /// Builder's pubkey.
+    pub builder_pubkey: BlsPublicKey,
+    /// Proposer's BLS pubkey.
+    pub proposer_pubkey: BlsPublicKey,
+    /// The fee recipient of the payload.
+    pub proposer_fee_recipient: Address,
+    /// Gas limit used by the payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_limit: u64,
+    /// Gas used by the payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub gas_used: u64,
+    /// The payload's value.
+    #[serde_as(as = "DisplayFromStr")]
+    pub value: U256,
+    /// The block number of that payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub block_number: u64,
+    /// The number of transactions in that payload.
+    #[serde_as(as = "DisplayFromStr")]
+    pub num_tx: u64,
 }
 
 /// Sort results in either ascending or descending values.
@@ -498,10 +642,54 @@ mod tests {
     }
 
     #[test]
+    fn serde_builder_block_received() {
+        let s = r#"{
+    "slot": "1",
+    "parent_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "block_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "builder_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_fee_recipient": "0xabcf8e0d4e9587369b2301d0790347320302cc09",
+    "gas_limit": "1",
+    "gas_used": "1",
+    "value": "1",
+    "block_number": "1",
+    "num_tx": "1",
+    "timestamp": "1",
+    "timestamp_ms": "1"
+  }"#;
+        let block: BuilderBlockReceived = serde_json::from_str(s).unwrap();
+        let to_json: serde_json::Value = serde_json::to_value(block.clone()).unwrap();
+        let block2: BuilderBlockReceived = serde_json::from_value(to_json).unwrap();
+        assert_eq!(block, block2);
+    }
+
+    #[test]
     fn test_can_parse_validation_request_body() {
         const VALIDATION_REQUEST_BODY: &str = include_str!("examples/relay_single_payload.json");
 
         let _validation_request_body: BuilderBlockValidationRequest =
             serde_json::from_str(VALIDATION_REQUEST_BODY).unwrap();
+    }
+
+    #[test]
+    fn test_serde_proposer_payload_delivered() {
+        let s = r#"{
+    "slot": "1",
+    "parent_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "block_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+    "builder_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_pubkey": "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a",
+    "proposer_fee_recipient": "0xabcf8e0d4e9587369b2301d0790347320302cc09",
+    "gas_limit": "1",
+    "gas_used": "1",
+    "value": "1",
+    "block_number": "1",
+    "num_tx": "1"
+  }"#;
+        let payload: ProposerPayloadDelivered = serde_json::from_str(s).unwrap();
+        let json: serde_json::Value = serde_json::from_str(s).unwrap();
+        let to_json: serde_json::Value = serde_json::to_value(payload).unwrap();
+        assert_eq!(json, to_json);
     }
 }

@@ -1,6 +1,7 @@
 use crate::{SignableTransaction, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
+    eip2718::IsTyped2718,
     eip2930::AccessList,
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
     Typed2718,
@@ -265,6 +266,12 @@ impl SignableTransaction<Signature> for TxEip7702 {
 impl Typed2718 for TxEip7702 {
     fn ty(&self) -> u8 {
         TxType::Eip7702 as u8
+    }
+}
+
+impl IsTyped2718 for TxEip7702 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x04)
     }
 }
 

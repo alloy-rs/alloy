@@ -32,7 +32,7 @@ pub enum Error {
     /// An error occurred interacting with a contract over RPC.
     #[error(transparent)]
     TransportError(#[from] TransportError),
-    /// An error occured while waiting for a pending transaction.
+    /// An error occurred while waiting for a pending transaction.
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
 }
@@ -70,7 +70,7 @@ impl Error {
     /// None is returned if the revert data is empty or if the data could not be decoded into one of
     /// the custom errors defined in the interface.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```no_run
     /// use alloy_provider::ProviderBuilder;
@@ -115,7 +115,7 @@ impl Error {
     ///
     /// Returns an instance of the custom error type if decoding was successful, otherwise None.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```no_run
     /// use alloy_provider::ProviderBuilder;

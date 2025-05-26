@@ -7,6 +7,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "serde")]
+extern crate alloc;
+
 mod block;
 pub use block::AnyHeader;
 

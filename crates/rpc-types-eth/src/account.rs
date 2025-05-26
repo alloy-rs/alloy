@@ -9,9 +9,15 @@ pub use alloy_consensus::Account;
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccountInfo {
-    /// Account name
-    pub name: String,
+    /// Account balance
+    pub balance: U256,
+    /// Account nonce
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub nonce: u64,
+    /// Account code
+    pub code: Bytes,
 }
 
 /// Data structure with proof for one single storage-entry

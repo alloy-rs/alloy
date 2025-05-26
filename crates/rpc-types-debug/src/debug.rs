@@ -1,5 +1,6 @@
 //! Types for the `debug` API.
 
+use alloc::vec::Vec;
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
 

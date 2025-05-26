@@ -11,6 +11,7 @@ use alloy_primitives::B256;
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#request>
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct CancunPayloadFields {
     /// The parent beacon block root.
     pub parent_beacon_block_root: B256,
@@ -29,6 +30,7 @@ impl CancunPayloadFields {
 /// A container type for [CancunPayloadFields] that may or may not be present.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct MaybeCancunPayloadFields {
     fields: Option<CancunPayloadFields>,
 }

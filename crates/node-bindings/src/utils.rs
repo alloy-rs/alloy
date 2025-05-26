@@ -32,10 +32,10 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
 
     // Prepare both key variants
     if !key_equal.ends_with('=') {
-        key_equal = format!("{}=", key).into();
+        key_equal = format!("{key}=").into();
     }
     if !key_colon.ends_with(": ") {
-        key_colon = format!("{}: ", key).into();
+        key_colon = format!("{key}: ").into();
     }
 
     // Try to find the key with '='

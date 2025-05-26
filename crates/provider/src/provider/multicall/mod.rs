@@ -3,7 +3,7 @@
 use crate::Provider;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
-use alloy_rpc_types_eth::{state::StateOverride, BlockId};
+use alloy_rpc_types_eth::{state::StateOverride, BlockId, TransactionInputKind};
 use alloy_sol_types::SolCall;
 use bindings::IMulticall3::{
     blockAndAggregateCall, blockAndAggregateReturn, tryBlockAndAggregateCall,
@@ -38,26 +38,27 @@ pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE
 /// [`IMultiCall3`](crate::bindings::IMulticall3) contract which is available on 270+
 /// chains.
 ///
-/// ## Example
+/// # Examples
 ///
-/// ```ignore
+/// ```ignore (missing alloy-contract)
 /// use alloy_primitives::address;
 /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
 /// use alloy_sol_types::sol;
 ///
 /// sol! {
-///    #[sol(rpc)]
-///    #[derive(Debug, PartialEq)]
-///    interface ERC20 {
-///        function totalSupply() external view returns (uint256 totalSupply);
-///        function balanceOf(address owner) external view returns (uint256 balance);
-///    }
+///     #[sol(rpc)]
+///     #[derive(Debug, PartialEq)]
+///     interface ERC20 {
+///         function totalSupply() external view returns (uint256 totalSupply);
+///         function balanceOf(address owner) external view returns (uint256 balance);
+///     }
 /// }
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+///     let provider =
+///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
 ///     let erc20 = ERC20::new(weth, &provider);
 ///
 ///     let ts_call = erc20.totalSupply();
@@ -66,8 +67,19 @@ pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE
 ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
 ///
 ///     let (total_supply, balance) = multicall.aggregate().await.unwrap();
+///     println!("Total Supply: {total_supply}, Balance: {balance}");
 ///
-///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
+///     // Or dynamically:
+///     let mut dynamic_multicall = provider.multicall().dynamic();
+///     let addresses = vec![
+///         address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"),
+///         address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96046"),
+///     ];
+///     for &address in &addresses {
+///         dynamic_multicall = dynamic_multicall.add_dynamic(erc20.balanceOf(address));
+///     }
+///     let balances: Vec<_> = dynamic_multicall.aggregate().await.unwrap();
+///     println!("Balances: {:#?}", balances);
 /// }
 /// ```
 #[derive(Debug)]
@@ -85,6 +97,8 @@ pub struct MulticallBuilder<T: CallTuple, P: Provider<N>, N: Network> {
     ///
     /// By default it is set to [`MULTICALL3_ADDRESS`].
     address: Address,
+    /// The input kind supported by this builder
+    input_kind: TransactionInputKind,
     _pd: std::marker::PhantomData<(T, N)>,
 }
 
@@ -102,6 +116,20 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
+            input_kind: TransactionInputKind::default(),
+        }
+    }
+
+    /// Converts an empty [`MulticallBuilder`] into a dynamic one
+    pub fn dynamic<D: SolCall + 'static>(self) -> MulticallBuilder<Dynamic<D>, P, N> {
+        MulticallBuilder {
+            calls: self.calls,
+            provider: self.provider,
+            block: self.block,
+            state_override: self.state_override,
+            address: self.address,
+            input_kind: self.input_kind,
+            _pd: Default::default(),
         }
     }
 }
@@ -117,19 +145,21 @@ where
     ///
     /// An example would be trying to fetch multiple ERC20 balances of an address.
     ///
-    /// ## Example
+    /// This is equivalent to `provider.multicall().dynamic()`.
     ///
-    /// ```ignore
+    /// # Examples
+    ///
+    /// ```ignore (missing alloy-contract)
     /// use alloy_primitives::address;
     /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
-    ///   #[sol(rpc)]
-    ///   #[derive(Debug, PartialEq)]
-    ///   interface ERC20 {
-    ///     function balanceOf(address owner) external view returns (uint256 balance);
-    ///   }
+    ///     #[sol(rpc)]
+    ///     #[derive(Debug, PartialEq)]
+    ///     interface ERC20 {
+    ///         function balanceOf(address owner) external view returns (uint256 balance);
+    ///     }
     /// }
     ///
     /// #[tokio::main]
@@ -144,6 +174,8 @@ where
     ///    let owner = address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
     ///
     ///    let mut erc20_balances = MulticallBuilder::new_dynamic(provider);
+    ///    // Or:
+    ///    let mut erc20_balances = provider.multicall().dynamic();
     ///
     ///    for token in &[weth, usdc] {
     ///        erc20_balances = erc20_balances.add_dynamic(token.balanceOf(owner));
@@ -156,14 +188,7 @@ where
     ///    println!("WETH Balance: {:?}, USDC Balance: {:?}", weth_bal, usdc_bal);
     /// }
     pub fn new_dynamic(provider: P) -> Self {
-        Self {
-            calls: Vec::new(),
-            provider,
-            block: None,
-            state_override: None,
-            address: MULTICALL3_ADDRESS,
-            _pd: Default::default(),
-        }
+        MulticallBuilder::new(provider).dynamic()
     }
 
     /// Add a dynamic call to the builder
@@ -217,6 +242,7 @@ where
             block: None,
             state_override: None,
             address: MULTICALL3_ADDRESS,
+            input_kind: TransactionInputKind::default(),
             _pd: Default::default(),
         }
     }
@@ -231,13 +257,13 @@ where
     /// Set the address of the multicall3 contract
     ///
     /// Default is [`MULTICALL3_ADDRESS`].
-    pub fn address(mut self, address: Address) -> Self {
+    pub const fn address(mut self, address: Address) -> Self {
         self.address = address;
         self
     }
 
     /// Sets the block to be used for the call.
-    pub fn block(mut self, block: BlockId) -> Self {
+    pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }
@@ -278,6 +304,7 @@ where
             block: self.block,
             state_override: self.state_override,
             address: self.address,
+            input_kind: self.input_kind,
             _pd: Default::default(),
         }
     }
@@ -301,20 +328,20 @@ where
     /// One can obtain the block context such as block number and block hash by using the
     /// [MulticallBuilder::block_and_aggregate] function.
     ///
-    /// ## Example
+    /// # Examples
     ///
-    /// ```ignore
+    /// ```ignore (missing alloy-contract)
     /// use alloy_primitives::address;
     /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
     /// use alloy_sol_types::sol;
     ///
     /// sol! {
-    ///    #[sol(rpc)]
-    ///    #[derive(Debug, PartialEq)]
-    ///    interface ERC20 {
-    ///        function totalSupply() external view returns (uint256 totalSupply);
-    ///        function balanceOf(address owner) external view returns (uint256 balance);
-    ///    }
+    ///     #[sol(rpc)]
+    ///     #[derive(Debug, PartialEq)]
+    ///     interface ERC20 {
+    ///         function totalSupply() external view returns (uint256 totalSupply);
+    ///         function balanceOf(address owner) external view returns (uint256 balance);
+    ///     }
     /// }
     ///
     /// #[tokio::main]
@@ -364,7 +391,7 @@ where
     /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
     ///   index(-position) of the call and the returned data as [`Bytes`].
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```ignore
     /// use alloy_primitives::address;
@@ -464,7 +491,7 @@ where
     ///
     /// ```ignore
     /// sol! {
-    ///    function aggregate3Value(Call3Value[] calldata calls) external payable returns (Result[] memory returnData);
+    ///     function aggregate3Value(Call3Value[] calldata calls) external payable returns (Result[] memory returnData);
     /// }
     /// ```
     ///
@@ -527,7 +554,7 @@ where
         let call = call_type.abi_encode();
         let mut tx = N::TransactionRequest::default()
             .with_to(self.address)
-            .with_input(Bytes::from_iter(call));
+            .with_input_kind(Bytes::from_iter(call), self.input_kind);
 
         if let Some(value) = value {
             tx.set_value(value);
@@ -683,6 +710,7 @@ where
             block: self.block,
             state_override: self.state_override,
             address: self.address,
+            input_kind: self.input_kind,
             _pd: Default::default(),
         }
     }
@@ -695,5 +723,16 @@ where
     /// Check if the builder is empty
     pub fn is_empty(&self) -> bool {
         self.calls.is_empty()
+    }
+
+    /// Set the input kind for this builder
+    pub const fn with_input_kind(mut self, input_kind: TransactionInputKind) -> Self {
+        self.input_kind = input_kind;
+        self
+    }
+
+    /// Get the input kind for this builder
+    pub const fn input_kind(&self) -> TransactionInputKind {
+        self.input_kind
     }
 }

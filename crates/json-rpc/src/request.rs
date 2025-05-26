@@ -242,8 +242,7 @@ where
                             let version: String = map.next_value()?;
                             if version != "2.0" {
                                 return Err(serde::de::Error::custom(format!(
-                                    "unsupported JSON-RPC version: {}",
-                                    version
+                                    "unsupported JSON-RPC version: {version}"
                                 )));
                             }
                             jsonrpc = Some(());

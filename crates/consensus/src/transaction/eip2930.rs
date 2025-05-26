@@ -1,5 +1,7 @@
 use crate::{SignableTransaction, Transaction, TxType};
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
+use alloy_eips::{
+    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
@@ -213,6 +215,12 @@ impl Transaction for TxEip2930 {
 impl Typed2718 for TxEip2930 {
     fn ty(&self) -> u8 {
         TxType::Eip2930 as u8
+    }
+}
+
+impl IsTyped2718 for TxEip2930 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x01)
     }
 }
 

@@ -899,7 +899,7 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
     }
 }
 
-/// Bincode-compatibl [`Header`] serde implementation.
+/// Bincode-compatible [`Header`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) mod serde_bincode_compat {
     use alloc::borrow::Cow;

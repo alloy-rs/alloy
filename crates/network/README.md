@@ -17,7 +17,9 @@ networking. The core model is as follows:
 - `Network` - A trait that defines the RPC types for a given blockchain.
   Providers are parameterized by a `Network` type, and use the associated
   types to define the input and output types of the RPC methods.
-- TODO: More!!!
+- `TransactionBuilder` - A trait for constructing and validating network-specific transaction requests. Used to build typed transactions for signing and submission. See [`TransactionBuilder`](./src/transaction/builder.rs).
+- `NetworkWallet` - A trait for wallets that can sign transactions for a given network. Used to abstract over different signing backends. See [`NetworkWallet`](./src/transaction/signer.rs).
+- `BlockResponse`, `TransactionResponse`, `ReceiptResponse`, `HeaderResponse` - Traits (from `alloy-network-primitives`) that define the structure of block, transaction, receipt, and header types used in RPC responses. These are associated types in the `Network` trait and are implemented by network-specific types. See [`alloy-network-primitives`]([https://docs.rs/alloy-network-primitives/](https://docs.rs/alloy-network-primitives/)).
 
 ## Usage
 

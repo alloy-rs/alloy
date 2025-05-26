@@ -74,7 +74,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<N>;
 
-    /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
+    /// Returns the [`ProviderBuilder`] to build on.
     fn builder() -> ProviderBuilder<Identity, Identity, N>
     where
         Self: Sized,
@@ -151,9 +151,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
-    /// ## Example
+    /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// # use alloy_provider::Provider;
     /// # use alloy_eips::BlockId;
     /// # use alloy_rpc_types_eth::state::StateOverride;
@@ -192,41 +192,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Execute a multicall by leveraging the [`MulticallBuilder`].
     ///
-    /// This function returns a [`MulticallBuilder`] which is used to add multiple calls and execute
-    /// them.
+    /// Call [`MulticallBuilder::dynamic`] to add calls dynamically instead.
     ///
-    /// ## Example
-    ///
-    /// ```ignore
-    /// use alloy_primitives::address;
-    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
-    /// use alloy_sol_types::sol;
-    ///
-    /// sol! {
-    ///    #[sol(rpc)]
-    ///    #[derive(Debug, PartialEq)]
-    ///    interface ERC20 {
-    ///        function totalSupply() external view returns (uint256 totalSupply);
-    ///        function balanceOf(address owner) external view returns (uint256 balance);
-    ///    }
-    /// }
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
-    ///     let erc20 = ERC20::new(weth, &provider);
-    ///
-    ///     let ts_call = erc20.totalSupply();
-    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
-    ///
-    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
-    ///
-    ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
-    ///
-    ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
-    /// }
-    /// ```
+    /// See the [`MulticallBuilder`] documentation for more details.
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     fn multicall(&self) -> MulticallBuilder<Empty, &Self, N>
     where
@@ -348,6 +316,18 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
+    /// Retrieves account information ([Account](alloy_rpc_types_eth::Account)) for the given
+    /// [Address] at the particular [BlockId].
+    ///
+    /// Note: This is slightly different than `eth_getAccount` and not all clients support this
+    /// endpoint.
+    fn get_account_info(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, alloy_rpc_types_eth::AccountInfo> {
+        self.client().request("eth_getAccountInfo", address).into()
+    }
+
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
     /// at the particular [BlockId].
     fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
@@ -383,9 +363,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// By default this fetches the block with only the transaction hashes populated in the block,
     /// and not the full transactions.
     ///
-    ///
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::{Provider, ProviderBuilder};
@@ -413,7 +391,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// By default this fetches the block with only the transaction hashes populated in the block,
     /// and not the full transactions.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::{Provider, ProviderBuilder};
@@ -1312,6 +1290,7 @@ mod tests {
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
+    use alloy_consensus::transaction::SignerRecoverable;
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
         hyper,
@@ -1594,7 +1573,7 @@ mod tests {
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);
         while let Some(header) = stream.next().await {
-            println!("New block {:?}", header);
+            println!("New block {header:?}");
             assert!(header.number > 0);
         }
     }
@@ -1964,7 +1943,7 @@ mod tests {
             }
             Err(e) => {
                 assert_eq!(
-                    format!("{}",e),
+                    format!("{e}"),
                     "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually"
                 );
             }

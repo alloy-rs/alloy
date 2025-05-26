@@ -87,7 +87,7 @@ impl<S> AuthService<S> {
 
         let token = self.secret.encode(&claims)?;
 
-        Ok(format!("Bearer {}", token))
+        Ok(format!("Bearer {token}"))
     }
 }
 
