@@ -349,7 +349,8 @@ impl<Params: RpcSend> RequestType<Params> {
 
     fn params_hash(&self) -> TransportResult<B256> {
         // Merge the block_id + method + params and hash them.
-        // Ignoring all other BlockIds than BlockId::Hash and BlockId::Number(BlockNumberOrTag::Number(_)).
+        // Ignoring all other BlockIds than BlockId::Hash and
+        // BlockId::Number(BlockNumberOrTag::Number(_)).
         let hash = serde_json::to_string(&self.params())
             .map(|p| {
                 keccak256(
@@ -635,6 +636,8 @@ mod tests {
     #[cfg(all(test, feature = "anvil-api"))]
     #[tokio::test]
     async fn test_get_storage_at_different_block_ids() {
+        use crate::ext::AnvilApi;
+
         run_with_tempdir("get-code-different-block-id", |dir| async move {
             let cache_layer = CacheLayer::new(100);
             let shared_cache = cache_layer.cache();
@@ -658,8 +661,6 @@ mod tests {
             let counter_cached = provider.get_storage_at(counter_addr, U256::ZERO).block_id(block_id).await.unwrap(); // Received from cache.
             assert_eq!(counter, counter_cached);
 
-            // `use` inside of test because of feature flag.
-            use crate::ext::AnvilApi;
             provider.anvil_mine(Some(1), None).await.unwrap();
 
             // Send a tx incrementing the counter
