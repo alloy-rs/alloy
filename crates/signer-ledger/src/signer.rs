@@ -18,6 +18,8 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 
 #[cfg(feature = "eip7702")]
 use crate::utils::make_eip7702_tlv;
+#[cfg(feature = "eip7702")]
+use alloy_eips::eip7702::Authorization;
 
 /// A Ledger Ethereum signer.
 ///
@@ -286,12 +288,10 @@ impl LedgerSigner {
     #[cfg(feature = "eip7702")]
     pub async fn sign_auth(
     &self,
-    chain_id: ChainId,
-    delegate: Address,
-    nonce: u64,
+    auth: &Authorization,
 ) -> Result<Signature, LedgerError> {
     let path_bytes = Self::path_to_bytes(&self.derivation);
-    let tlv_payload = make_eip7702_tlv(chain_id.into(), &delegate, nonce);
+    let tlv_payload = make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
 
     let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
 
@@ -390,11 +390,6 @@ mod tests {
     use alloy_rlp::Decodable;
     use serial_test::serial;
     use std::sync::OnceLock;
-
-    #[cfg(feature = "eip7702")]
-    use alloy_primitives::keccak256;
-    #[cfg(feature = "eip7702")]
-    use rlp::RlpStream;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
 
@@ -512,30 +507,22 @@ mod tests {
     #[cfg(feature = "eip7702")]
     async fn test_sign_auth() {
         let ledger = init_ledger().await;
+
         let chain_id: ChainId = 11155111;
         let delegate: Address = address!("0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9");
         let nonce: u64 = 72;
-        let sig = ledger.sign_auth(chain_id, delegate, nonce).await
+        
+        let auth: Authorization = Authorization{
+            chain_id: U256::from(chain_id),
+            address: delegate,
+            nonce: nonce
+        } ;
+        let sig = ledger.sign_auth(&auth).await
             .expect("sign_auth should succeed");
 
-
-        let mut rlp_stream = RlpStream::new_list(3);
-        let cid: u64 = chain_id.into();
-        rlp_stream.append(&cid);
-
-        let raw: [u8; 20] = delegate.into();
-        rlp_stream.append(&raw.to_vec());
-
-        rlp_stream.append(&nonce);
-
-        let rlp_data = rlp_stream.out();
-        let mut to_hash = Vec::with_capacity(1 + rlp_data.len());
-        to_hash.push(0x05);
-        to_hash.extend_from_slice(&rlp_data);
-
-        let prehash = keccak256(&to_hash);
+        let hash: B256 = auth.signature_hash();
 
         let addr = ledger.get_address().await.unwrap();
-        assert_eq!(sig.recover_address_from_prehash(&prehash).unwrap(), addr);
+        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), addr);
     }
 }
