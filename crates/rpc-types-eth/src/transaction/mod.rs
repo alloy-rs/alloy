@@ -201,6 +201,34 @@ impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
     {
         self.inner.map(|tx| tx.into_signed())
     }
+
+    /// Returns a rpc [`Transaction`] with a [`TransactionInfo`] and
+    /// [`Recovered<EthereumTxEnvelope<Eip4844>>`] as input.
+    pub fn from_transaction(
+        tx: Recovered<EthereumTxEnvelope<Eip4844>>,
+        tx_info: TransactionInfo,
+    ) -> Self
+    where
+        EthereumTxEnvelope<Eip4844>: Typed2718,
+        Eip4844: alloy_consensus::Transaction,
+    {
+        let TransactionInfo {
+            block_hash, block_number, index: transaction_index, base_fee, ..
+        } = tx_info;
+        let effective_gas_price = base_fee
+            .map(|base_fee| {
+                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
+            })
+            .unwrap_or_else(|| tx.max_fee_per_gas());
+
+        Self {
+            inner: tx,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price: Some(effective_gas_price),
+        }
+    }
 }
 
 impl<T> From<&Transaction<T>> for TransactionInfo
