@@ -16,10 +16,6 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-#[cfg(feature = "eip7702")]
-use crate::utils::make_eip7702_tlv;
-#[cfg(feature = "eip7702")]
-use alloy_eips::eip7702::Authorization;
 
 /// A Ledger Ethereum signer.
 ///
@@ -288,10 +284,10 @@ impl LedgerSigner {
     #[cfg(feature = "eip7702")]
     pub async fn sign_auth(
     &self,
-    auth: &Authorization,
+    auth: &alloy_eip7702::Authorization,
 ) -> Result<Signature, LedgerError> {
     let path_bytes = Self::path_to_bytes(&self.derivation);
-    let tlv_payload = make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
+    let tlv_payload = crate::utils::make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
 
     let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
 
@@ -512,7 +508,7 @@ mod tests {
         let delegate: Address = address!("0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9");
         let nonce: u64 = 72;
         
-        let auth: Authorization = Authorization{
+        let auth: alloy_eip7702::Authorization = alloy_eip7702::Authorization{
             chain_id: U256::from(chain_id),
             address: delegate,
             nonce: nonce

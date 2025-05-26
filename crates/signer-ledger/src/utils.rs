@@ -1,6 +1,3 @@
-#[cfg(feature = "eip7702")]
-use alloy_primitives::{U256};
-
 // Helper to encode a big-endian varint (no leading zeroes)
 // Nonce limit is 2**64 - 1 https://eips.ethereum.org/EIPS/eip-2681
 #[cfg(feature = "eip7702")]
@@ -14,7 +11,7 @@ pub(crate) fn be_varint(n: u64) -> Vec<u8> {
 
 // Tlv encoding for the 7702 authorization list
 #[cfg(feature = "eip7702")]
-pub(crate) fn make_eip7702_tlv(chain_id: U256, delegate: &[u8; 20], nonce: u64) -> Vec<u8> {
+pub(crate) fn make_eip7702_tlv(chain_id: alloy_primitives::U256, delegate: &[u8; 20], nonce: u64) -> Vec<u8> {
     let mut tlv = Vec::new();
 
     // STRUCT_VERSION tag=0x00, one-byte version=1
