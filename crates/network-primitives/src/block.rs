@@ -41,6 +41,11 @@ impl<T> BlockTransactions<T> {
         }
     }
 
+    /// Returns the first transaction if the transactions are full.
+    pub fn first_transaction(&self) -> Option<&T> {
+        self.as_transactions().and_then(|txs| txs.first())
+    }
+
     /// Returns true if the enum variant is used for full transactions.
     #[inline]
     pub const fn is_full(&self) -> bool {
