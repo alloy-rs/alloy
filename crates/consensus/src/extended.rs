@@ -36,6 +36,59 @@ pub enum Extended<BuiltIn, Other> {
     Other(Other),
 }
 
+impl<B, T> Extended<B, T> {
+    /// Converts the transaction type to the given alternative that is `From<B>` for BuiltIn
+    /// and `From<T>` for Other.
+    pub fn convert<U, V>(self) -> Extended<U, V>
+    where
+        U: From<B>,
+        V: From<T>,
+    {
+        self.map(U::from, V::from)
+    }
+
+    /// Converts the transaction to the given alternative that is `TryFrom<B>` for BuiltIn
+    /// and `TryFrom<T>` for Other.
+    ///
+    /// Returns the transaction with the new transaction types if all conversions were successful.
+    pub fn try_convert<U, V>(self) -> Result<Extended<U, V>, ConvertError<U::Error, V::Error>>
+    where
+        U: TryFrom<B>,
+        V: TryFrom<T>,
+    {
+        self.try_map(U::try_from, V::try_from)
+    }
+
+    /// Applies the given closures to the inner transaction types.
+    pub fn map<U, V>(self, f: impl FnOnce(B) -> U, g: impl FnOnce(T) -> V) -> Extended<U, V> {
+        match self {
+            Self::BuiltIn(tx) => Extended::BuiltIn(f(tx)),
+            Self::Other(tx) => Extended::Other(g(tx)),
+        }
+    }
+
+    /// Applies the given fallible closures to the inner transactions.
+    pub fn try_map<U, V, E, F>(
+        self,
+        f: impl FnOnce(B) -> Result<U, E>,
+        g: impl FnOnce(T) -> Result<V, F>,
+    ) -> Result<Extended<U, V>, ConvertError<E, F>> {
+        match self {
+            Self::BuiltIn(tx) => f(tx).map(Extended::BuiltIn).map_err(ConvertError::BuiltIn),
+            Self::Other(tx) => g(tx).map(Extended::Other).map_err(ConvertError::Other),
+        }
+    }
+}
+
+/// Error type for conversion operations on [`Extended`].
+#[derive(Debug)]
+pub enum ConvertError<E, F> {
+    /// Error occurred while converting the built-in type
+    BuiltIn(E),
+    /// Error occurred while converting the other type
+    Other(F),
+}
+
 impl<B, T> Transaction for Extended<B, T>
 where
     B: Transaction,
