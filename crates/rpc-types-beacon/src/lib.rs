@@ -18,6 +18,9 @@ pub mod events;
 /// Types and functions related to the beacon block header.
 pub mod header;
 
+/// Types for the beacon `node` endpoints.
+pub mod node;
+
 /// Types and functions related to the beacon block payload.
 pub mod payload;
 
