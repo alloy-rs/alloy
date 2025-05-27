@@ -239,6 +239,8 @@ impl fmt::Debug for BlockNumberOrTag {
 ///
 /// This type can be used if you want to allow for lenient parsing of block numbers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct LenientBlockNumberOrTag(BlockNumberOrTag);
 
 impl LenientBlockNumberOrTag {
@@ -256,6 +258,11 @@ impl LenientBlockNumberOrTag {
 impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
     fn from(value: LenientBlockNumberOrTag) -> Self {
         value.0
+    }
+}
+impl From<LenientBlockNumberOrTag> for BlockId {
+    fn from(value: LenientBlockNumberOrTag) -> Self {
+        value.into_inner().into()
     }
 }
 
