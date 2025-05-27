@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
+
+### Bug Fixes
+
+- [provider] CacheLayer - Add block_id to RequestType::params_hash() ([#2512](https://github.com/alloy-rs/alloy/issues/2512))
+
+### Documentation
+
+- Add some kzgsettings docs ([#2518](https://github.com/alloy-rs/alloy/issues/2518))
+- [provider] Use multicall.dynamic() in more places ([#2508](https://github.com/alloy-rs/alloy/issues/2508))
+- Rm redundant ref ([#2502](https://github.com/alloy-rs/alloy/issues/2502))
+- Unhide `SendableTx` ([#2501](https://github.com/alloy-rs/alloy/issues/2501))
+
+### Features
+
+- Add missing from impl ([#2514](https://github.com/alloy-rs/alloy/issues/2514))
+- Added Transaction conversion from consensus for rpc ([#2511](https://github.com/alloy-rs/alloy/issues/2511))
+- Empty MulticallBuilder into dynamic ([#2507](https://github.com/alloy-rs/alloy/issues/2507))
+- Add trace helper fns ([#2504](https://github.com/alloy-rs/alloy/issues/2504))
+
+### Miscellaneous Tasks
+
+- Add serialize impl ([#2521](https://github.com/alloy-rs/alloy/issues/2521))
+- Add helper for first tx ([#2517](https://github.com/alloy-rs/alloy/issues/2517))
+- Add try_into helper fns ([#2515](https://github.com/alloy-rs/alloy/issues/2515))
+- Generalize rpc tx type conversions ([#2513](https://github.com/alloy-rs/alloy/issues/2513))
+- Add trace entry helper ([#2506](https://github.com/alloy-rs/alloy/issues/2506))
+- Add display for calltype ([#2505](https://github.com/alloy-rs/alloy/issues/2505))
+- Handle tron '0x' stateRoot as zero ([#2496](https://github.com/alloy-rs/alloy/issues/2496))
+
 ## [1.0.7](https://github.com/alloy-rs/alloy/releases/tag/v1.0.7) - 2025-05-24
 
 ### Features
@@ -19,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.7
 - Impl set_input_kind for anytxrequest ([#2497](https://github.com/alloy-rs/alloy/issues/2497))
 
 ## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21

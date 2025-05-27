@@ -5,12 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
+
+### Documentation
+
+- Add some kzgsettings docs ([#2518](https://github.com/alloy-rs/alloy/issues/2518))
+
+### Miscellaneous Tasks
+
+- Add serialize impl ([#2521](https://github.com/alloy-rs/alloy/issues/2521))
+
 ## [1.0.7](https://github.com/alloy-rs/alloy/releases/tag/v1.0.7) - 2025-05-24
 
 ### Features
 
 - Add lenient_block_number_or_tag to support raw integers ([#2488](https://github.com/alloy-rs/alloy/issues/2488))
 - Encodable2718:into_encoded ([#2486](https://github.com/alloy-rs/alloy/issues/2486))
+
+### Miscellaneous Tasks
+
+- Release 1.0.7
 
 ## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
 
