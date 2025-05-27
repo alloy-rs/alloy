@@ -260,6 +260,12 @@ impl From<LenientBlockNumberOrTag> for BlockNumberOrTag {
         value.0
     }
 }
+impl From<BlockNumberOrTag> for LenientBlockNumberOrTag {
+    fn from(value: BlockNumberOrTag) -> Self {
+        Self(value)
+    }
+}
+
 impl From<LenientBlockNumberOrTag> for BlockId {
     fn from(value: LenientBlockNumberOrTag) -> Self {
         value.into_inner().into()
