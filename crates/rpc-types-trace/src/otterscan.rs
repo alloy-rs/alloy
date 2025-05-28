@@ -5,9 +5,12 @@
 
 use crate::parity::TransactionTrace;
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawals};
+use alloy_rpc_types_eth::{
+    Block, BlockTransactions, Header, Log, Transaction, TransactionReceipt, Withdrawals,
+};
 use serde::{
     de::{self, Unexpected},
+    ser::SerializeSeq,
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
@@ -122,8 +125,13 @@ pub struct InternalIssuance {
     pub issuance: U256,
 }
 
-/// Custom `Block` struct that includes transaction count for Otterscan responses
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Custom `Block` struct that includes transaction count for Otterscan responses.
+///
+/// This is the same as a regular `Block`, but the input field returns only the 4 bytes method
+/// selector instead of the entire calldata.
+///
+/// See also <https://docs.otterscan.io/api-docs/ots-api#ots_getblocktransactions>
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OtsBlock<T = Transaction, H = Header> {
     /// The block information.
@@ -137,6 +145,81 @@ pub struct OtsBlock<T = Transaction, H = Header> {
 impl<T, H> From<Block<T, H>> for OtsBlock<T, H> {
     fn from(block: Block<T, H>) -> Self {
         Self { transaction_count: block.transactions.len(), block }
+    }
+}
+
+// we need to implement Serialize manually because we want to truncate the input field automatically
+// for convenience
+impl<T, H> Serialize for OtsBlock<T, H>
+where
+    T: Serialize,
+    H: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OtsBlockHelper<'a, T: Serialize, H> {
+            /// Header of the block.
+            #[serde(flatten)]
+            header: &'a H,
+            /// Uncles' hashes.
+            uncles: &'a Vec<B256>,
+            #[serde(
+                serialize_with = "serialize_txs_with_truncated_input",
+                skip_serializing_if = "BlockTransactions::is_uncle"
+            )]
+            transactions: &'a BlockTransactions<T>,
+            /// Withdrawals in the block.
+            #[serde(skip_serializing_if = "Option::is_none")]
+            withdrawals: &'a Option<Withdrawals>,
+            transaction_count: usize,
+        }
+
+        let Self { block: Block { header, uncles, transactions, withdrawals }, transaction_count } =
+            self;
+
+        let helper = OtsBlockHelper {
+            header,
+            uncles,
+            transactions,
+            withdrawals,
+            transaction_count: *transaction_count,
+        };
+
+        helper.serialize(serializer)
+    }
+}
+
+fn serialize_txs_with_truncated_input<T, S>(
+    txs: &BlockTransactions<T>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: Serialize,
+{
+    use serde_json::Value;
+    match txs {
+        BlockTransactions::Hashes(hashes) => hashes.serialize(serializer),
+        BlockTransactions::Uncle => serializer.serialize_seq(Some(0))?.end(),
+        BlockTransactions::Full(txs) => {
+            let mut value = serde_json::to_value(txs).map_err(serde::ser::Error::custom)?;
+            if let Value::Array(txs) = &mut value {
+                for tx in txs {
+                    if let Value::Object(map) = tx {
+                        if let Some(Value::String(input)) = map.get_mut("input") {
+                            // Truncate the input to the first 4 bytes (8 hex characters) plus 0x
+                            // prefix
+                            *input = input.chars().take(2 + 4 + 4).collect::<String>();
+                        }
+                    }
+                }
+            }
+            value.serialize(serializer)
+        }
     }
 }
 
@@ -323,5 +406,84 @@ mod tests {
         );
         assert_eq!(serde_json::from_str::<OperationType>("2").unwrap(), OperationType::OpCreate);
         assert_eq!(serde_json::from_str::<OperationType>("3").unwrap(), OperationType::OpCreate2);
+    }
+
+    #[test]
+    fn serde_ots_block_transactions() {
+        let s = r#"{
+  "fullblock": {
+    "hash": "0x5e98e8e4d80928867e03eb2224f66fc8c68f687de3a5550119c365fca7abb118",
+    "parentHash": "0x84eba4ac122adba9bbe79b78ccc538ec5fd7b612cd6c2cd6d4ac3a23160f6151",
+    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    "miner": "0x25941dc771bb64514fc8abbce970307fb9d477e9",
+    "stateRoot": "0x7347d30e42da2799eb5b51d8e1a81756323afd47d68e9c7f7fe5c6cfd38572bd",
+    "transactionsRoot": "0x7cbc552113ed936ee351981d5151a8913cc7cc2ac55d930d6a43ded6e721c21b",
+    "receiptsRoot": "0x056b23fbba480696b65fe5a59b8f2148a1299103c4f57df839233af2cf4ca2d2",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "difficulty": "0x0",
+    "number": "0x64733",
+    "gasLimit": "0x2255100",
+    "gasUsed": "0x5208",
+    "timestamp": "0x68285874",
+    "extraData": "0x4e65746865726d696e64",
+    "mixHash": "0x5aa29a261f252912f12377c312d68a616af8efef7a9f8c8911b7482bcf4a3adc",
+    "nonce": "0x0000000000000000",
+    "baseFeePerGas": "0x4227fedf",
+    "withdrawalsRoot": "0x9a0aedb6a7b38b44467d87dd8c08b64589fcf729a0f60e9361ecb160f074b08c",
+    "blobGasUsed": "0x0",
+    "excessBlobGas": "0x0",
+    "parentBeaconBlockRoot": "0x065c517950023785bf51c075203764504b5fa9b65b8fe3943aa9fb8a86e0391d",
+    "requestsHash": "0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size": "0x507",
+    "uncles": [],
+    "transactions": [
+      {
+        "type": "0x0",
+        "chainId": "0x88bb0",
+        "nonce": "0x0",
+        "gasPrice": "0x45f23888",
+        "gas": "0x5208",
+        "to": "0x6dbd21b035b11eb3d921872b1930670904c82803",
+        "value": "0xe8d4a51000",
+        "input": "0x00000000",
+        "r": "0xd22873dda61094957a2a2563fbb5cafde0a16839294fbecf2eb2d498c975d655",
+        "s": "0x5e718d90b3ee82bf2792f6704f98a30ae9c6e90475298a5f84751e840f0e0f9e",
+        "v": "0x111783",
+        "hash": "0x8c22653c4736f3cedf2d36fb4a5565397cfae051b6a5cc53a043078f03aa6ceb",
+        "blockHash": "0x5e98e8e4d80928867e03eb2224f66fc8c68f687de3a5550119c365fca7abb118",
+        "blockNumber": "0x64733",
+        "transactionIndex": "0x0",
+        "from": "0x6dbd21b035b11eb3d921872b1930670904c82803"
+      }
+    ],
+    "withdrawals": [ ],
+    "transactionCount": 1
+  },
+  "receipts": [
+    {
+      "status": "0x1",
+      "cumulativeGasUsed": "0x5208",
+      "logs": null,
+      "logsBloom": null,
+      "type": "0x0",
+      "transactionHash": "0x8c22653c4736f3cedf2d36fb4a5565397cfae051b6a5cc53a043078f03aa6ceb",
+      "transactionIndex": "0x0",
+      "blockHash": "0x5e98e8e4d80928867e03eb2224f66fc8c68f687de3a5550119c365fca7abb118",
+      "blockNumber": "0x64733",
+      "gasUsed": "0x5208",
+      "effectiveGasPrice": "0x45f23888",
+      "from": "0x6dbd21b035b11eb3d921872b1930670904c82803",
+      "to": "0x6dbd21b035b11eb3d921872b1930670904c82803",
+      "contractAddress": null,
+      "timestamp": "0x68285874"
+    }
+  ]
+}
+"#;
+
+        let block: OtsBlockTransactions = serde_json::from_str(s).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(s).unwrap();
+        let value = serde_json::to_value(&block).unwrap();
+        assert_eq!(value, expected, "Serialized value does not match expected value");
     }
 }
