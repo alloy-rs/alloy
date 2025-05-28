@@ -2,12 +2,12 @@
 
 use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
 use alloy_consensus::{
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
-    TxLegacy, TxType, Typed2718, TypedTransaction,
+    SignableTransaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
+    TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::hash::Hash;
 
 use alloc::{
@@ -828,6 +828,15 @@ impl TransactionRequest {
     /// Converts the transaction request into a `BuildTransactionErr` with the given message.
     fn into_tx_err(self, message: &'static str) -> BuildTransactionErr {
         BuildTransactionErr { tx: self, error: message.to_string() }
+    }
+
+    /// Builds a simulated EIP-4844 transaction envelope with a dummy signature.
+    pub fn build_typed_simulate_transaction(
+        self,
+    ) -> Option<alloy_consensus::EthereumTxEnvelope<TxEip4844>> {
+        let tx = self.build_typed_tx().ok()?;
+        let signature = Signature::new(Default::default(), Default::default(), false);
+        Some(tx.into_signed(signature).into())
     }
 }
 
