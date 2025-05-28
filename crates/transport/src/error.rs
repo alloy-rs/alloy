@@ -117,11 +117,10 @@ impl<I: SolInterface> TryParseTransportErrorResult<I> {
 
         decoded.map_or_else(
             || {
-                if let Some(revert_data) = revert_data {
-                    Self::UnknownSelector(revert_data)
-                } else {
-                    Self::Original(error)
-                }
+                revert_data.map_or_else(
+                    || Self::Original(error),
+                    |revert_data| Self::UnknownSelector(revert_data),
+                )
             },
             |decoded| Self::Decoded(decoded),
         )
