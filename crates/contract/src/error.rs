@@ -111,6 +111,34 @@ impl Error {
         self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
     }
 
+    /// Try to decode a contract error into a specific Solidity error interface.
+    /// If the error cannot be decoded or it is not a contract error, return the original error.
+    ///
+    /// Example usage:
+    ///
+    /// ```ignore
+    /// sol! {
+    ///    library ErrorLib {
+    ///       error SomeError(uint256 code);
+    ///    }
+    /// }
+    ///
+    /// // call a contract that may return an error with the SomeError interface
+    /// let returndata = match myContract.call().await {
+    ///    Ok(returndata) => returndata,
+    ///    Err(err) => {
+    ///         let decoded_error = err.try_decode_into_interface_error::<ErrorLib::ErrorLibError>()?;
+    ///        // handle the decoded error however you want; for example, return it
+    ///         return Err(decoded_error);
+    ///    },
+    /// }
+    /// ```
+    ///
+    /// See also [`Self::as_decoded_interface_error`] for more details.
+    pub fn try_decode_into_interface_error<I: SolInterface>(self) -> Result<I, Self> {
+        self.as_decoded_interface_error::<I>().ok_or(self)
+    }
+
     /// Decode the revert data into a custom [`SolError`] type.
     ///
     /// Returns an instance of the custom error type if decoding was successful, otherwise None.
