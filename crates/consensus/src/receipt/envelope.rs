@@ -1,6 +1,5 @@
-use core::fmt;
-
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
+use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{
         Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718, EIP1559_TX_TYPE_ID,
@@ -10,6 +9,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
+use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
