@@ -263,12 +263,12 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
 
 impl<T> Block<T> {
     /// Returns the block's hash as received from rpc.
-    pub fn hash(&self) -> B256 {
+    pub const fn hash(&self) -> B256 {
         self.header.hash
     }
 
     /// Returns a sealed reference of the header: `Sealed<&Header>`
-    pub fn sealed_heder(&self) -> Sealed<&alloy_consensus::Header> {
+    pub const fn sealed_heder(&self) -> Sealed<&alloy_consensus::Header> {
         Sealed::new_unchecked(&self.header.inner, self.header.hash)
     }
 
