@@ -484,6 +484,17 @@ impl TransactionRequest {
             TxKind::Call(to) => to,
         };
 
+        let blob_versioned_hashes = self.blob_versioned_hashes.clone().ok_or(ValueError::new(
+            self.clone(),
+            "Missing 'blob_versioned_hashes' field for Eip4844 transaction.",
+        ))?;
+
+        let max_fee_per_blob_gas = extract_field!(
+            self,
+            max_fee_per_blob_gas,
+            "Missing 'max_fee_per_blob_gas' field for Eip4844 transaction."
+        );
+
         Ok(TxEip4844 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: extract_field!(self, nonce, "Missing 'nonce' field for Eip4844 transaction."),
@@ -504,16 +515,9 @@ impl TransactionRequest {
             ),
             to: to_address,
             value: self.value.unwrap_or_default(),
-            access_list: self.access_list.clone().unwrap_or_default(),
-            blob_versioned_hashes: self.blob_versioned_hashes.clone().ok_or(ValueError::new(
-                self.clone(),
-                "Missing 'blob_versioned_hashes' field for Eip4844 transaction.",
-            ))?,
-            max_fee_per_blob_gas: extract_field!(
-                self,
-                max_fee_per_blob_gas,
-                "Missing 'max_fee_per_blob_gas' field for Eip4844 transaction."
-            ),
+            access_list: self.access_list.unwrap_or_default(),
+            blob_versioned_hashes,
+            max_fee_per_blob_gas,
             input: self.input.into_input().unwrap_or_default(),
         })
     }
