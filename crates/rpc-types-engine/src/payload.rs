@@ -309,7 +309,7 @@ pub struct BlockBuilder<'a> {
 
 impl<'a> BlockBuilder<'a> {
     /// Creates a new `BlockBuilder` for the given payload.
-    pub fn new(payload: &'a ExecutionPayloadV1) -> Self {
+    pub const fn new(payload: &'a ExecutionPayloadV1) -> Self {
         Self { payload }
     }
 
