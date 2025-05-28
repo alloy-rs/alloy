@@ -830,7 +830,8 @@ impl TransactionRequest {
         BuildTransactionErr { tx: self, error: message.to_string() }
     }
 
-    /// Builds a simulated EIP-4844 transaction envelope with a dummy signature.
+    /// Builds a signed typed transaction envelope for the `eth_simulateV1` endpoint with a dummy signature.
+    /// See also <https://github.com/ethereum/execution-apis/pull/484>
     pub fn build_typed_simulate_transaction(
         self,
     ) -> Option<alloy_consensus::EthereumTxEnvelope<TxEip4844>> {
