@@ -1,6 +1,4 @@
 use alloy_primitives::B256;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use crate::TransactionResponse;
 use alloc::{vec, vec::Vec};
@@ -11,7 +9,7 @@ use core::slice;
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum BlockTransactions<T> {
     /// Full transactions
@@ -309,7 +307,7 @@ impl<T: TransactionResponse> std::iter::FusedIterator for BlockTransactionHashes
 /// This essentially represents the `full:bool` argument in RPC calls that determine whether the
 /// response should include full transaction objects or just the hashes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BlockTransactionsKind {
     /// Only include hashes: [BlockTransactions::Hashes]
     #[default]
