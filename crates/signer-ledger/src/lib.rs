@@ -9,8 +9,8 @@
 #[macro_use]
 extern crate tracing;
 
-mod utils;
 mod signer;
+mod utils;
 pub use signer::LedgerSigner;
 
 mod types;

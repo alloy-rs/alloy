@@ -1,6 +1,6 @@
 //! Ledger Ethereum app wrapper.
 
-use crate::types::{DerivationType, LedgerError, INS, P1_FIRST_0, P1_FIRST_1, P1, P2};
+use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST_0, P1_FIRST_1, P2};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
@@ -15,7 +15,6 @@ use futures_util::lock::Mutex;
 use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
-
 
 /// A Ledger Ethereum signer.
 ///
@@ -279,37 +278,34 @@ impl LedgerSigner {
         self.sign_typed_data_with_separator(hash_struct, &domain.separator()).await
     }
 
-    // / Sign “auth data” per EIP-7702:
-    // / msg = keccak256(0x05 ‖ rlp([chain_id, address, nonce]))
+    /// Sign “auth data” per EIP-7702:
+    /// msg = keccak256(0x05 ‖ rlp([chain_id, address, nonce]))
     #[cfg(feature = "eip7702")]
     pub async fn sign_auth(
-    &self,
-    auth: &alloy_eip7702::Authorization,
-) -> Result<Signature, LedgerError> {
-    let path_bytes = Self::path_to_bytes(&self.derivation);
-    let tlv_payload = crate::utils::make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
+        &self,
+        auth: &alloy_eip7702::Authorization,
+    ) -> Result<Signature, LedgerError> {
+        let path_bytes = Self::path_to_bytes(&self.derivation);
+        let tlv_payload = crate::utils::make_eip7702_tlv(auth.chain_id, &auth.address, auth.nonce);
 
-    let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
+        let tlv_length = (tlv_payload.len() as u16).to_be_bytes();
 
-    let mut payload = Vec::with_capacity(path_bytes.len() + 2 + tlv_payload.len());
-    payload.extend_from_slice(&path_bytes);
-    payload.extend_from_slice(&tlv_length); 
-    payload.extend_from_slice(&tlv_payload);
+        let mut payload = Vec::with_capacity(path_bytes.len() + 2 + tlv_payload.len());
+        payload.extend_from_slice(&path_bytes);
+        payload.extend_from_slice(&tlv_length);
+        payload.extend_from_slice(&tlv_payload);
 
-    self.sign_payload(INS::SIGN_EIP7702_AUTHORIZATION, &payload).await
-}
+        self.sign_payload(INS::SIGN_EIP7702_AUTHORIZATION, &payload).await
+    }
 
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
     #[instrument(err, skip_all, fields(command = %command, payload = hex::encode(payload)))]
     async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
-        // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the header or continuations. 
-        // @note We need to mention the starter chunk first.
-        let p1_first = if command == INS::SIGN_EIP7702_AUTHORIZATION {
-            P1_FIRST_1
-        } else {
-            P1_FIRST_0
-        };
+        // @note Because tlv encoding is done on 7702 auth types sig, it checks if chunks are the
+        // header or continuations. @note We need to mention the starter chunk first.
+        let p1_first =
+            if command == INS::SIGN_EIP7702_AUTHORIZATION { P1_FIRST_1 } else { P1_FIRST_0 };
         let transport = self.transport.lock().await;
         let mut command = APDUCommand {
             cla: 0xe0,
@@ -319,7 +315,6 @@ impl LedgerSigner {
             data: APDUData::new(&[]),
             response_len: None,
         };
-
 
         let mut answer = None;
         // workaround for https://github.com/LedgerHQ/app-ethereum/issues/409
@@ -507,14 +502,13 @@ mod tests {
         let chain_id: ChainId = 11155111;
         let delegate: Address = address!("0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9");
         let nonce: u64 = 72;
-        
-        let auth: alloy_eip7702::Authorization = alloy_eip7702::Authorization{
+
+        let auth: alloy_eip7702::Authorization = alloy_eip7702::Authorization {
             chain_id: U256::from(chain_id),
             address: delegate,
-            nonce: nonce
-        } ;
-        let sig = ledger.sign_auth(&auth).await
-            .expect("sign_auth should succeed");
+            nonce,
+        };
+        let sig = ledger.sign_auth(&auth).await.expect("sign_auth should succeed");
 
         let hash: B256 = auth.signature_hash();
 

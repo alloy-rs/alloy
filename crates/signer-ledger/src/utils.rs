@@ -11,8 +11,12 @@ pub(crate) fn be_varint(n: u64) -> Vec<u8> {
 
 // Tlv encoding for the 7702 authorization list
 #[cfg(feature = "eip7702")]
-pub(crate) fn make_eip7702_tlv(chain_id: alloy_primitives::U256, delegate: &[u8; 20], nonce: u64) -> Vec<u8> {
-    let mut tlv = Vec::new();
+pub(crate) fn make_eip7702_tlv(
+    chain_id: alloy_primitives::U256,
+    delegate: &[u8; 20],
+    nonce: u64,
+) -> Vec<u8> {
+    let mut tlv = Vec::with_capacity(9 + 20);
 
     // STRUCT_VERSION tag=0x00, one-byte version=1
     tlv.push(0x00);
@@ -35,7 +39,6 @@ pub(crate) fn make_eip7702_tlv(chain_id: alloy_primitives::U256, delegate: &[u8;
     tlv.push(0x03);
     tlv.push(nn.len() as u8);
     tlv.extend_from_slice(&nn);
-    
 
     tlv
 }
