@@ -115,13 +115,16 @@ impl<I: SolInterface> TryParseTransportErrorResult<I> {
         let revert_data = error.as_error_resp().and_then(|e| e.as_revert_data());
         let decoded = revert_data.as_ref().and_then(|data| I::abi_decode(data).ok());
 
-        if let Some(decoded) = decoded {
-            TryParseTransportErrorResult::Decoded(decoded)
-        } else if let Some(revert_data) = revert_data {
-            TryParseTransportErrorResult::UnknownSelector(revert_data)
-        } else {
-            TryParseTransportErrorResult::Original(error)
-        }
+        decoded.map_or_else(
+            || {
+                if let Some(revert_data) = revert_data {
+                    Self::UnknownSelector(revert_data)
+                } else {
+                    Self::Original(error)
+                }
+            },
+            |decoded| Self::Decoded(decoded),
+        )
     }
 }
 
