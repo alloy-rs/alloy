@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Features
+
+- Introduce serde feature for network-primitives ([#2529](https://github.com/alloy-rs/alloy/issues/2529))
+- Add try decode into error ([#2524](https://github.com/alloy-rs/alloy/issues/2524))
+- Add some node types from beacon api ([#2527](https://github.com/alloy-rs/alloy/issues/2527))
+
+### Miscellaneous Tasks
+
+- Truncate input data for ots block on serialize ([#2525](https://github.com/alloy-rs/alloy/issues/2525))
+- Add from impl ([#2522](https://github.com/alloy-rs/alloy/issues/2522))
+
+### Other
+
+- Adding support for signing 7702 authorizations ([#2499](https://github.com/alloy-rs/alloy/issues/2499))
+
+### Styling
+
+- Added helper fn for building typed simulate transaction in TransactionRequest ([#2531](https://github.com/alloy-rs/alloy/issues/2531))
+
+## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
+
+### Bug Fixes
+
+- [provider] CacheLayer - Add block_id to RequestType::params_hash() ([#2512](https://github.com/alloy-rs/alloy/issues/2512))
+
+### Documentation
+
+- Add some kzgsettings docs ([#2518](https://github.com/alloy-rs/alloy/issues/2518))
+- [provider] Use multicall.dynamic() in more places ([#2508](https://github.com/alloy-rs/alloy/issues/2508))
+- Rm redundant ref ([#2502](https://github.com/alloy-rs/alloy/issues/2502))
+- Unhide `SendableTx` ([#2501](https://github.com/alloy-rs/alloy/issues/2501))
+
+### Features
+
+- Add missing from impl ([#2514](https://github.com/alloy-rs/alloy/issues/2514))
+- Added Transaction conversion from consensus for rpc ([#2511](https://github.com/alloy-rs/alloy/issues/2511))
+- Empty MulticallBuilder into dynamic ([#2507](https://github.com/alloy-rs/alloy/issues/2507))
+- Add trace helper fns ([#2504](https://github.com/alloy-rs/alloy/issues/2504))
+
+### Miscellaneous Tasks
+
+- Release 1.0.8
+- Add serialize impl ([#2521](https://github.com/alloy-rs/alloy/issues/2521))
+- Add helper for first tx ([#2517](https://github.com/alloy-rs/alloy/issues/2517))
+- Add try_into helper fns ([#2515](https://github.com/alloy-rs/alloy/issues/2515))
+- Generalize rpc tx type conversions ([#2513](https://github.com/alloy-rs/alloy/issues/2513))
+- Add trace entry helper ([#2506](https://github.com/alloy-rs/alloy/issues/2506))
+- Add display for calltype ([#2505](https://github.com/alloy-rs/alloy/issues/2505))
+- Handle tron '0x' stateRoot as zero ([#2496](https://github.com/alloy-rs/alloy/issues/2496))
+
+## [1.0.7](https://github.com/alloy-rs/alloy/releases/tag/v1.0.7) - 2025-05-24
+
+### Features
+
+- From tx for withotherfields ([#2500](https://github.com/alloy-rs/alloy/issues/2500))
+- Add Extended type with alloy trait impls ([#2498](https://github.com/alloy-rs/alloy/issues/2498))
+- Introducing BlockOverrides support to EthCallParams ([#2493](https://github.com/alloy-rs/alloy/issues/2493))
+- Introducing builder fn for BlockOverrides ([#2492](https://github.com/alloy-rs/alloy/issues/2492))
+- Add option to always set input+data in MulticallBuilder ([#2491](https://github.com/alloy-rs/alloy/issues/2491))
+- Add lenient_block_number_or_tag to support raw integers ([#2488](https://github.com/alloy-rs/alloy/issues/2488))
+- Encodable2718:into_encoded ([#2486](https://github.com/alloy-rs/alloy/issues/2486))
+
+### Miscellaneous Tasks
+
+- Release 1.0.7
+- Impl set_input_kind for anytxrequest ([#2497](https://github.com/alloy-rs/alloy/issues/2497))
+
 ## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
 
 ### Bug Fixes
@@ -17,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.6
 - Rm redundant commitment copy ([#2484](https://github.com/alloy-rs/alloy/issues/2484))
 
 ### Refactor

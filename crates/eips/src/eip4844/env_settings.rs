@@ -45,7 +45,13 @@ impl Hash for EnvKzgSettings {
 impl EnvKzgSettings {
     /// Returns the KZG settings.
     ///
-    /// This will initialize the default settings if it is not already loaded.
+    /// If this is [`EnvKzgSettings::Default`], this will initialize the default settings if it is
+    /// not already loaded, see also [`c_kzg::ethereum_kzg_settings`].
+    ///
+    /// To configure a different [precompute] value, [`c_kzg::ethereum_kzg_settings`] must be called
+    /// directly once. The default precompute value is `0`.
+    ///
+    /// [precompute]: https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112
     #[inline]
     pub fn get(&self) -> &KzgSettings {
         match self {

@@ -17,6 +17,7 @@ pub struct AnyHeader {
     #[cfg_attr(feature = "serde", serde(rename = "miner"))]
     pub beneficiary: Address,
     /// State root hash
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "lenient_state_root"))]
     pub state_root: B256,
     /// Transactions root hash
     pub transactions_root: B256,
@@ -356,5 +357,64 @@ impl TryFrom<AnyHeader> for Header {
 
     fn try_from(value: AnyHeader) -> Result<Self, Self::Error> {
         value.try_into_header()
+    }
+}
+
+/// Custom deserializer for `state_root` that treats `"0x"` or empty as `B256::ZERO`
+///
+/// This exists because some networks (like Tron) may serialize the state root as `"0x"`
+#[cfg(feature = "serde")]
+fn lenient_state_root<'de, D>(deserializer: D) -> Result<B256, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use alloc::string::String;
+    use core::str::FromStr;
+    use serde::de::Error;
+
+    let s: String = serde::de::Deserialize::deserialize(deserializer)?;
+    let s = s.trim();
+
+    if s == "0x" || s.is_empty() {
+        return Ok(B256::ZERO);
+    }
+
+    B256::from_str(s).map_err(D::Error::custom)
+}
+
+#[cfg(test)]
+mod tests {
+
+    // <https://github.com/alloy-rs/alloy/issues/2494>
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializes_tron_state_root_in_header() {
+        use super::*;
+        use alloy_primitives::B256;
+
+        let s = r#"{
+  "baseFeePerGas": "0x0",
+  "difficulty": "0x0",
+  "extraData": "0x",
+  "gasLimit": "0x160227b88",
+  "gasUsed": "0x360d92",
+  "hash": "0x00000000040a0687e0fc7194aabd024a4786ce94ad63855774f8d48896d8750b",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "miner": "0x9a96c8003a1e3a6866c08acff9f629e2a6ef062b",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "nonce": "0x0000000000000000",
+  "number": "0x40a0687",
+  "parentHash": "0x00000000040a068652c581a982a0d17976201ad44aa28eb4e24881e82f99ee04",
+  "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "size": "0xba05",
+  "stateRoot": "0x",
+  "timestamp": "0x6759f2f1",
+  "totalDifficulty": "0x0"
+}"#;
+
+        let header: AnyHeader = serde_json::from_str(s).unwrap();
+        assert_eq!(header.state_root, B256::ZERO);
     }
 }
