@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Truncate input data for ots block on serialize ([#2525](https://github.com/alloy-rs/alloy/issues/2525))
+
 ## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
 
 ### Features
@@ -13,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.8
 - Add trace entry helper ([#2506](https://github.com/alloy-rs/alloy/issues/2506))
 - Add display for calltype ([#2505](https://github.com/alloy-rs/alloy/issues/2505))
 
