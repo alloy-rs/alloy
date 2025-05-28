@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Features
+
+- Introduce serde feature for network-primitives ([#2529](https://github.com/alloy-rs/alloy/issues/2529))
+- Add try decode into error ([#2524](https://github.com/alloy-rs/alloy/issues/2524))
+- Add some node types from beacon api ([#2527](https://github.com/alloy-rs/alloy/issues/2527))
+
+### Miscellaneous Tasks
+
+- Truncate input data for ots block on serialize ([#2525](https://github.com/alloy-rs/alloy/issues/2525))
+- Add from impl ([#2522](https://github.com/alloy-rs/alloy/issues/2522))
+
+### Other
+
+- Adding support for signing 7702 authorizations ([#2499](https://github.com/alloy-rs/alloy/issues/2499))
+
+### Styling
+
+- Added helper fn for building typed simulate transaction in TransactionRequest ([#2531](https://github.com/alloy-rs/alloy/issues/2531))
+
 ## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
 
 ### Bug Fixes
@@ -27,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.8
 - Add serialize impl ([#2521](https://github.com/alloy-rs/alloy/issues/2521))
 - Add helper for first tx ([#2517](https://github.com/alloy-rs/alloy/issues/2517))
 - Add try_into helper fns ([#2515](https://github.com/alloy-rs/alloy/issues/2515))
