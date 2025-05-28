@@ -42,4 +42,9 @@ std = [
 	"alloy-serde/std",
 	"serde/std"
 ]
-serde = ["dep:serde"]
+serde = [
+	"dep:serde",
+	"alloy-consensus/serde",
+	"alloy-eips/serde",
+	"alloy-primitives/serde"
+]
