@@ -1,4 +1,6 @@
 use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
+use alloy_primitives::Bytes;
+use alloy_sol_types::SolInterface;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug};
@@ -92,6 +94,33 @@ impl TransportErrorKind {
                 msg.contains("429 Too Many Requests")
             }
             _ => false,
+        }
+    }
+}
+
+/// The result of trying to parse a transport error into a specific interface.
+#[derive(Debug)]
+pub enum TryParseTransportErrorResult<I: SolInterface> {
+    /// The error was successfully decoded into the specified interface.
+    Decoded(I),
+    /// The error was not decoded but the revert data was extracted.
+    UnknownSelector(Bytes),
+    /// The error was not decoded and the revert data was not extracted.
+    Original(TransportError),
+}
+
+impl<I: SolInterface> TryParseTransportErrorResult<I> {
+    /// Attempts to parse a transport error into a specific interface.
+    pub fn try_parse_transport_error(error: TransportError) -> Self {
+        let revert_data = error.as_error_resp().and_then(|e| e.as_revert_data());
+        let decoded = revert_data.as_ref().and_then(|data| I::abi_decode(data).ok());
+
+        if let Some(decoded) = decoded {
+            TryParseTransportErrorResult::Decoded(decoded)
+        } else if let Some(revert_data) = revert_data {
+            TryParseTransportErrorResult::UnknownSelector(revert_data)
+        } else {
+            TryParseTransportErrorResult::Original(error)
         }
     }
 }
