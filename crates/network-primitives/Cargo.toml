@@ -28,7 +28,7 @@ alloy-serde.workspace = true
 alloy-eips.workspace = true
 alloy-consensus = { workspace = true, features = ["serde"] }
 
-serde.workspace = true
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 rand.workspace = true
@@ -42,3 +42,4 @@ std = [
 	"alloy-serde/std",
 	"serde/std"
 ]
+serde = ["dep:serde"]
