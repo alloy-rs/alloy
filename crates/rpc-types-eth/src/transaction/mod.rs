@@ -201,6 +201,34 @@ impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
     {
         self.inner.map(|tx| tx.into_signed())
     }
+
+    /// Returns a rpc [`Transaction`] with a [`TransactionInfo`] and
+    /// [`Recovered<EthereumTxEnvelope<Eip4844>>`] as input.
+    pub fn from_transaction(
+        tx: Recovered<EthereumTxEnvelope<Eip4844>>,
+        tx_info: TransactionInfo,
+    ) -> Self
+    where
+        EthereumTxEnvelope<Eip4844>: Typed2718,
+        Eip4844: alloy_consensus::Transaction,
+    {
+        let TransactionInfo {
+            block_hash, block_number, index: transaction_index, base_fee, ..
+        } = tx_info;
+        let effective_gas_price = base_fee
+            .map(|base_fee| {
+                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
+            })
+            .unwrap_or_else(|| tx.max_fee_per_gas());
+
+        Self {
+            inner: tx,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price: Some(effective_gas_price),
+        }
+    }
 }
 
 impl<T> From<&Transaction<T>> for TransactionInfo
@@ -288,15 +316,22 @@ impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip
     }
 }
 
-impl<Eip4844> From<Transaction<Self>> for EthereumTxEnvelope<Eip4844> {
-    fn from(tx: Transaction<Self>) -> Self {
-        tx.inner.into_inner()
+impl<Eip4844, Other> From<Transaction<EthereumTxEnvelope<Eip4844>>> for EthereumTxEnvelope<Other>
+where
+    Self: From<EthereumTxEnvelope<Eip4844>>,
+{
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+        tx.inner.into_inner().into()
     }
 }
 
-impl<Eip4844> From<Transaction<Self>> for EthereumTypedTransaction<Eip4844> {
-    fn from(tx: Transaction<Self>) -> Self {
-        tx.inner.into_inner()
+impl<Eip4844, Other> From<Transaction<EthereumTypedTransaction<Eip4844>>>
+    for EthereumTypedTransaction<Other>
+where
+    Self: From<EthereumTypedTransaction<Eip4844>>,
+{
+    fn from(tx: Transaction<EthereumTypedTransaction<Eip4844>>) -> Self {
+        tx.inner.into_inner().into()
     }
 }
 
@@ -508,6 +543,17 @@ mod tests {
 
     #[allow(unused)]
     fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
+        tx.into()
+    }
+    #[allow(unused)]
+    fn assert_convert_into_consensus(tx: Transaction) -> EthereumTxEnvelope<TxEip4844> {
+        tx.into()
+    }
+
+    #[allow(unused)]
+    fn assert_convert_into_typed(
+        tx: Transaction<EthereumTypedTransaction<TxEip4844>>,
+    ) -> EthereumTypedTransaction<TxEip4844> {
         tx.into()
     }
 

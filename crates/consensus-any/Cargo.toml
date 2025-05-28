@@ -37,6 +37,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 
 [features]
 default = ["std"]

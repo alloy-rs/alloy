@@ -301,6 +301,15 @@ impl<T> Block<T> {
     }
 }
 
+impl<T, S> From<Block<T>> for alloy_consensus::Block<S>
+where
+    S: From<T>,
+{
+    fn from(block: Block<T>) -> Self {
+        block.into_consensus().convert_transactions()
+    }
+}
+
 /// RPC representation of block header, wrapping a consensus header.
 ///
 /// This wraps the consensus header and adds additional fields for RPC.

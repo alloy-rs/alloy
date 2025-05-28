@@ -279,7 +279,7 @@ where
     /// The result of the `eth_call` will be [`alloy_sol_types::Result`] with the Ok variant
     /// containing the decoded [`SolCall::Return`] type.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```ignore
     /// let call = EthCall::call(provider, data).decode_resp::<MySolCall>().await?.unwrap();

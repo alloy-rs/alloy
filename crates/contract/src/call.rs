@@ -141,7 +141,7 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
 
     /// Builds and returns a RLP-encoded unsigned transaction from the call that can be signed.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::ProviderBuilder;
@@ -182,7 +182,7 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
     /// Build a RLP-encoded signed raw transaction for the call that can be sent to the network
     /// using [`Provider::send_raw_transaction`].
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::{ProviderBuilder, Provider};
