@@ -122,10 +122,13 @@ impl MockTransport {
     fn map_request(&self, req: j::SerializedRequest) -> TransportResult<j::Response> {
         Ok(j::Response {
             id: req.id().clone(),
-            payload: self
-                .asserter
-                .pop_response()
-                .ok_or_else(|| TransportErrorKind::custom_str("empty asserter response queue"))?,
+            payload: self.asserter.pop_response().ok_or_else(|| {
+                TransportErrorKind::custom_str(&format!(
+                    "empty asserter response queue for request with id {id} and method {method}",
+                    id = req.id(),
+                    method = req.method()
+                ))
+            })?,
         })
     }
 }
