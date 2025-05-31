@@ -5,12 +5,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 /// Response from the `eth/v1/node/syncing` endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncStatusResponse {
-    pub data: SyncStatus,
-}
-
-/// Response from the `eth/v1/node/syncing` endpoint.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncStatus {
@@ -36,21 +30,11 @@ pub enum HealthStatus {
 
 /// Response from the `eth/v1/node/version` endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VersionResponse {
-    pub data: VersionData,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionData {
     pub version: String,
 }
 
 /// Root response from `/eth/v1/node/identity`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IdentityResponse {
-    pub data: NodeIdentity,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeIdentity {
     pub peer_id: String,
@@ -108,32 +92,18 @@ pub struct PeersResponse {
     pub meta: PeersMeta,
 }
 
-/// Response from `/eth/v1/node/peers/{peer_id}`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PeerResponse {
-    pub data: PeerInfo,
-}
-
+/// Response from `/eth/v1/node/peer_count`.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerCount {
     #[serde_as(as = "DisplayFromStr")]
     pub disconnected: usize,
-
     #[serde_as(as = "DisplayFromStr")]
     pub connecting: usize,
-
     #[serde_as(as = "DisplayFromStr")]
     pub connected: usize,
-
     #[serde_as(as = "DisplayFromStr")]
     pub disconnecting: usize,
-}
-
-/// Response from `/eth/v1/node/peer_count`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PeerCountResponse {
-    pub data: PeerCount,
 }
 
 #[cfg(test)]
@@ -157,7 +127,6 @@ mod tests {
     fn test_identity_with_null_enr() {
         let s = r#"
         {
-          "data": {
             "peer_id": "QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N",
             "enr": "enr:-IS4QHCYrYZbAKWCBRlAy5zzaDZXJBGkcnh4MHcBFZntXNFrdvJjX04jRzjzCBOonrkTfj499SZuOh8R33Ls8RRcy5wBgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQPKY0yuDUmstAHYpMa2_oxVtw0RW_QAdpzBQA8yWM0xOIN1ZHCCdl8",
             "p2p_addresses": [
@@ -171,27 +140,24 @@ mod tests {
               "attnets": "0x0000000000000000",
               "syncnets": "0x0f"
             }
-          }
         }
         "#;
 
-        let _result: IdentityResponse = serde_json::from_str(s).unwrap();
+        let _result: NodeIdentity = serde_json::from_str(s).unwrap();
     }
 
     #[test]
     fn test_peer_count_response() {
         let json = r#"
         {
-          "data": {
             "disconnected": "1",
             "connecting": "1",
             "connected": "1",
             "disconnecting": "1"
-          }
         }
         "#;
 
-        let _parsed: PeerCountResponse = serde_json::from_str(json).unwrap();
+        let _parsed: PeerCount = serde_json::from_str(json).unwrap();
     }
 
     #[test]
