@@ -18,7 +18,8 @@ pub struct RequestMeta {
     pub id: Id,
     /// Whether the request is a subscription, other than `eth_subscribe`.
     is_subscription: bool,
-    /// Optional HTTP extensions for the request.
+    /// Optional extensions for the request that can be used by middleware
+    /// or other components to attach additional metadata.
     extensions: Extensions,
 }
 
@@ -46,13 +47,19 @@ impl RequestMeta {
     }
 
     /// Returns a reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
     pub const fn extensions(&self) -> &Extensions {
         &self.extensions
     }
 
-    /// Add an extension to the request.
-    pub fn add_extension<T: Clone + Send + Sync + 'static>(&mut self, ext: T) {
-        self.extensions.insert(ext);
+    /// Returns a mutable reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub fn extensions_mut(&mut self) -> &mut Extensions {
+        &mut self.extensions
     }
 }
 
