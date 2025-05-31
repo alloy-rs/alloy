@@ -515,7 +515,8 @@ impl Geth {
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.keep();
+            let temp_genesis_dir_path =
+                tempdir().map_err(NodeError::CreateDirError)?.path().to_path_buf();
 
             // create a temp dir to store the genesis file
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
