@@ -12,7 +12,7 @@ pub(crate) use header::serde_bincode_compat;
 use crate::Transaction;
 use alloc::vec::Vec;
 use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
-use alloy_primitives::B256;
+use alloy_primitives::{Sealable, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -210,6 +210,14 @@ impl<T, H> BlockBody<T, H> {
         H: Encodable,
     {
         crate::proofs::calculate_ommers_root(&self.ommers)
+    }
+
+    /// Returns an iterator over the hashes of the ommers in the block body.
+    pub fn ommers_hashes(&self) -> impl Iterator<Item = B256> + '_
+    where
+        H: Sealable,
+    {
+        self.ommers.iter().map(|h| h.hash_slow())
     }
 
     /// Calculate the withdrawals root for the block body, if withdrawals exist. If there are no
