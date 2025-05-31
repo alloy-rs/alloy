@@ -1,5 +1,6 @@
 use crate::{common::Id, RpcBorrow, RpcSend};
 use alloy_primitives::{keccak256, B256};
+use http::Extensions;
 use serde::{
     de::{DeserializeOwned, MapAccess},
     ser::SerializeMap,
@@ -9,7 +10,7 @@ use serde_json::value::RawValue;
 use std::{borrow::Cow, marker::PhantomData, mem::MaybeUninit};
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct RequestMeta {
     /// The method name.
     pub method: Cow<'static, str>,
@@ -17,12 +18,15 @@ pub struct RequestMeta {
     pub id: Id,
     /// Whether the request is a subscription, other than `eth_subscribe`.
     is_subscription: bool,
+    /// Optional extensions for the request that can be used by middleware
+    /// or other components to attach additional metadata.
+    extensions: Extensions,
 }
 
 impl RequestMeta {
     /// Create a new `RequestMeta`.
-    pub const fn new(method: Cow<'static, str>, id: Id) -> Self {
-        Self { method, id, is_subscription: false }
+    pub fn new(method: Cow<'static, str>, id: Id) -> Self {
+        Self { method, id, is_subscription: false, extensions: Extensions::new() }
     }
 
     /// Returns `true` if the request is a subscription.
@@ -41,7 +45,33 @@ impl RequestMeta {
     pub fn set_subscription_status(&mut self, sub: bool) {
         self.is_subscription = sub;
     }
+
+    /// Returns a reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub const fn extensions(&self) -> &Extensions {
+        &self.extensions
+    }
+
+    /// Returns a mutable reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub fn extensions_mut(&mut self) -> &mut Extensions {
+        &mut self.extensions
+    }
 }
+
+impl PartialEq for RequestMeta {
+    fn eq(&self, other: &Self) -> bool {
+        self.method == other.method
+            && self.id == other.id
+            && self.is_subscription == other.is_subscription
+    }
+}
+
+impl Eq for RequestMeta {}
 
 /// A JSON-RPC 2.0 request object.
 ///
