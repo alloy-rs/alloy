@@ -199,6 +199,13 @@ where
     fn logs(&self) -> &[T] {
         &self.as_receipt().unwrap().logs
     }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.into_receipt().logs
+    }
 }
 
 impl ReceiptEnvelope {
