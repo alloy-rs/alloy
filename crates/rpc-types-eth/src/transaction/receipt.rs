@@ -186,8 +186,7 @@ impl<T> TransactionReceipt<T> {
 
     /// Calculates the address that will be created by the transaction, if any.
     ///
-    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
-    /// the `from` field is not set.
+    /// Returns `None` if the transaction is not a contract creation (the `to` field is set).
     pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
         if self.to.is_some() {
             return None;
