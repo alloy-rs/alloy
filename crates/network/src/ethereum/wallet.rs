@@ -2,7 +2,7 @@ use crate::{
     AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, FullSigner, Network, NetworkWallet, TxSigner,
 };
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use alloy_primitives::{map::AddressHashMap, Address, Signature};
+use alloy_primitives::{map::AddressHashMap, Address, Signature, B256};
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use super::Ethereum;
@@ -113,6 +113,61 @@ impl EthereumWallet {
                 alloy_signer::Error::other(format!("Missing signing credential for {sender}"))
             })?
             .sign_transaction(tx)
+            .await
+    }
+
+    /// Signs a hash with the given signer address.
+    ///
+    /// Hash can be arbitrary data or EIP-712 typed data hash.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use alloy_sol_types::{sol, eip712_domain};
+    /// use alloy_primitives::{address, keccak256, B256};
+    /// use alloy_signer_local::PrivateKeySigner;
+    /// sol! {
+    ///     struct Test {
+    ///         uint256 value;
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///   let domain = eip712_domain! {
+    ///      name: "Test",
+    ///      version: "1.0",
+    ///      chain_id: 1,
+    ///      verifying_contract: address!("0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"),
+    ///      salt: keccak256("test_salt"),
+    ///   };
+    ///   
+    ///   let alice: PrivateKeySigner = "0x...".parse()?;
+    ///   let bob: PrivateKeySigner = "0x...".parse()?;
+    ///
+    ///    let wallet = EthereumWallet::new(alice);
+    ///    wallet.register_signer(bob);
+    ///
+    ///    let t = Test { value: U256::from(0x42) };
+    ///
+    ///    let hash = t.eip712_signing_hash(&domain);
+    ///
+    ///    let signature = wallet.sign_hash_with(alice.address(), &hash).await?;
+    ///    
+    ///    Ok(())
+    /// }
+    /// ```
+    #[cfg(feature = "eip712")]
+    pub async fn sign_hash_with(
+        &self,
+        signer: Address,
+        hash: &B256,
+    ) -> alloy_signer::Result<Signature> {
+        self.signer_by_address(signer)
+            .ok_or_else(|| {
+                alloy_signer::Error::other(format!("Missing signing credential for {signer}"))
+            })?
+            .sign_hash(hash)
             .await
     }
 }
