@@ -35,7 +35,7 @@ alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
 alloy-signer.workspace = true
 alloy-serde.workspace = true
 alloy-sol-types.workspace = true
-alloy-dyn-abi.workspace = true
+alloy-dyn-abi = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
 
 auto_impl.workspace = true
@@ -49,4 +49,4 @@ thiserror.workspace = true
 
 [features]
 k256 = ["alloy-primitives/k256", "alloy-consensus/k256"]
-eip712 = ["alloy-signer/eip712"]
+eip712 = ["alloy-signer/eip712", "dep:alloy-dyn-abi"]
