@@ -69,3 +69,6 @@ pub const EMPTY_TRANSACTIONS: B256 = EMPTY_ROOT_HASH;
 
 /// Withdrawals root of empty withdrawals set.
 pub const EMPTY_WITHDRAWALS: B256 = EMPTY_ROOT_HASH;
+
+/// Maximum transaction gas limit as defined by [EIP-7825](https://eips.ethereum.org/EIPS/eip-7825) activated in `Osaka` hardfork.
+pub const MAX_TX_GAS_LIMIT_OSAKA: u64 = 30_000_000;
