@@ -479,7 +479,7 @@ pub struct ChainConfig {
     )]
     pub bpo3_time: Option<u64>,
 
-    /// BPO1 switch time (None = no fork, 0 = already on BPO4).
+    /// BPO4 switch time (None = no fork, 0 = already on BPO4).
     #[serde(
         skip_serializing_if = "Option::is_none",
         deserialize_with = "alloy_serde::quantity::opt::deserialize"
