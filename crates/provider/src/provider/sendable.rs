@@ -18,7 +18,7 @@ pub enum SendableTx<N: Network> {
 
 impl<N: Network> SendableTx<N> {
     /// Fallible cast to an unbuilt transaction request.
-    pub fn as_mut_builder(&mut self) -> Option<&mut N::TransactionRequest> {
+    pub const fn as_mut_builder(&mut self) -> Option<&mut N::TransactionRequest> {
         match self {
             Self::Builder(tx) => Some(tx),
             _ => None,

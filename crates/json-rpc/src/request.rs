@@ -36,13 +36,13 @@ impl RequestMeta {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.set_subscription_status(true);
     }
 
     /// Setter for `is_subscription`. Indicates to RPC clients that the request
     /// triggers a stream of notifications.
-    pub fn set_subscription_status(&mut self, sub: bool) {
+    pub const fn set_subscription_status(&mut self, sub: bool) {
         self.is_subscription = sub;
     }
 
@@ -58,7 +58,7 @@ impl RequestMeta {
     ///
     /// These can be used to attach additional metadata to the request
     /// that can be used by middleware or other components.
-    pub fn extensions_mut(&mut self) -> &mut Extensions {
+    pub const fn extensions_mut(&mut self) -> &mut Extensions {
         &mut self.extensions
     }
 }
@@ -103,13 +103,13 @@ impl<Params> Request<Params> {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription()
     }
 
     /// Setter for `is_subscription`. Indicates to RPC clients that the request
     /// triggers a stream of notifications.
-    pub fn set_subscription_status(&mut self, sub: bool) {
+    pub const fn set_subscription_status(&mut self, sub: bool) {
         self.meta.set_subscription_status(sub);
     }
 
@@ -353,7 +353,7 @@ impl SerializedRequest {
 
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription();
     }
 

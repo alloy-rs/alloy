@@ -35,13 +35,13 @@ impl<P, N> ContractInstance<P, N> {
 
     /// Sets the contract's address.
     #[inline]
-    pub fn set_address(&mut self, address: Address) {
+    pub const fn set_address(&mut self, address: Address) {
         self.address = address;
     }
 
     /// Returns a new contract instance at `address`.
     #[inline]
-    pub fn at(mut self, address: Address) -> Self {
+    pub const fn at(mut self, address: Address) -> Self {
         self.set_address(address);
         self
     }

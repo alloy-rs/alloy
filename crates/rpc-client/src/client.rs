@@ -272,7 +272,7 @@ impl RpcClientInner {
 
     /// Returns a mutable reference to the underlying transport.
     #[inline]
-    pub fn transport_mut(&mut self) -> &mut BoxTransport {
+    pub const fn transport_mut(&mut self) -> &mut BoxTransport {
         &mut self.transport
     }
 
@@ -332,7 +332,7 @@ impl RpcClientInner {
 
     /// Set the `is_local` flag.
     #[inline]
-    pub fn set_local(&mut self, is_local: bool) {
+    pub const fn set_local(&mut self, is_local: bool) {
         self.is_local = is_local;
     }
 
