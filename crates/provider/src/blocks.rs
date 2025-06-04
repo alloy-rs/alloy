@@ -11,7 +11,7 @@ use std::{marker::PhantomData, num::NonZeroUsize};
 use futures::{future::Either, FutureExt};
 
 /// The size of the block cache.
-const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
+const BLOCK_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(10).unwrap();
 
 /// Maximum number of retries for fetching a block.
 const MAX_RETRIES: usize = 3;

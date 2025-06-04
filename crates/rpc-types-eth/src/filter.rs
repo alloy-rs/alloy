@@ -328,13 +328,13 @@ impl FilterBlockOption {
 
     /// Sets the block number this range filter should start at.
     #[must_use]
-    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
     }
 
     /// Sets the block number this range filter should end at.
     #[must_use]
-    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
     }
 
@@ -1360,7 +1360,7 @@ impl FilteredParams {
     }
 
     /// Returns true if the filter matches the given block number
-    pub fn filter_block_range(&self, block_number: u64) -> bool {
+    pub const fn filter_block_range(&self, block_number: u64) -> bool {
         if self.filter.is_none() {
             return true;
         }

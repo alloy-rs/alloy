@@ -90,17 +90,17 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Return true if the transaction was successful.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.status()
     }
 
     /// Returns the success status of the receipt's transaction.
-    pub fn status(&self) -> bool {
+    pub const fn status(&self) -> bool {
         self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub fn cumulative_gas_used(&self) -> u64 {
+    pub const fn cumulative_gas_used(&self) -> u64 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 
@@ -115,7 +115,7 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Return the receipt's bloom.
-    pub fn logs_bloom(&self) -> &Bloom {
+    pub const fn logs_bloom(&self) -> &Bloom {
         &self.as_receipt_with_bloom().unwrap().logs_bloom
     }
 
@@ -133,7 +133,7 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Return the mutable inner receipt with bloom. Currently this is
     /// infallible, however, future receipt types may be added.
-    pub fn as_receipt_with_bloom_mut(&mut self) -> Option<&mut ReceiptWithBloom<Receipt<T>>> {
+    pub const fn as_receipt_with_bloom_mut(&mut self) -> Option<&mut ReceiptWithBloom<Receipt<T>>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)

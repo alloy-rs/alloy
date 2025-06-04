@@ -102,12 +102,12 @@ where
     }
 
     /// Sets the channel size for the poller task.
-    pub fn set_channel_size(&mut self, channel_size: usize) {
+    pub const fn set_channel_size(&mut self, channel_size: usize) {
         self.channel_size = channel_size;
     }
 
     /// Sets the channel size for the poller task.
-    pub fn with_channel_size(mut self, channel_size: usize) -> Self {
+    pub const fn with_channel_size(mut self, channel_size: usize) -> Self {
         self.set_channel_size(channel_size);
         self
     }
@@ -134,12 +134,12 @@ where
     }
 
     /// Sets the duration between polls.
-    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+    pub const fn set_poll_interval(&mut self, poll_interval: Duration) {
         self.poll_interval = poll_interval;
     }
 
     /// Sets the duration between polls.
-    pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
+    pub const fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
         self.set_poll_interval(poll_interval);
         self
     }
