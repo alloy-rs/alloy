@@ -78,6 +78,14 @@ impl<T, H> Block<T, H> {
         Self { header, uncles: vec![], transactions, withdrawals: None }
     }
 
+    /// Returns the block's number.
+    pub fn number(&self) -> u64
+    where
+        H: BlockHeader,
+    {
+        self.header.number()
+    }
+
     /// Apply a function to the block, returning the modified block.
     pub fn apply<F>(self, f: F) -> Self
     where
@@ -254,6 +262,16 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
 }
 
 impl<T> Block<T> {
+    /// Returns the block's hash as received from rpc.
+    pub const fn hash(&self) -> B256 {
+        self.header.hash
+    }
+
+    /// Returns a sealed reference of the header: `Sealed<&Header>`
+    pub const fn sealed_heder(&self) -> Sealed<&alloy_consensus::Header> {
+        Sealed::new_unchecked(&self.header.inner, self.header.hash)
+    }
+
     /// Consumes the type and returns the sealed [`alloy_consensus::Header`].
     pub fn into_sealed_header(self) -> Sealed<alloy_consensus::Header> {
         self.header.into_sealed()
@@ -298,6 +316,12 @@ impl<T> Block<T> {
             withdrawals,
         }
         .into_block(header.into_consensus())
+    }
+
+    /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with the block's hash.
+    pub fn into_consensus_sealed(self) -> Sealed<alloy_consensus::Block<T>> {
+        let hash = self.header.hash;
+        Sealed::new_unchecked(self.into_consensus(), hash)
     }
 }
 
