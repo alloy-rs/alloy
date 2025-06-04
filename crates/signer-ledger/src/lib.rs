@@ -10,6 +10,7 @@
 extern crate tracing;
 
 mod signer;
+mod utils;
 pub use signer::LedgerSigner;
 
 mod types;

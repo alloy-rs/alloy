@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt};
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Result, Encodable2718},
@@ -117,7 +118,14 @@ where
     }
 
     fn logs(&self) -> &[T] {
-        self.logs()
+        Self::logs(self)
+    }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.inner.receipt.logs
     }
 }
 

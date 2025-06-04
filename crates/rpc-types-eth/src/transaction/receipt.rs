@@ -155,27 +155,6 @@ impl TransactionReceipt {
     pub const fn transaction_type(&self) -> TxType {
         self.inner.tx_type()
     }
-
-    /// Calculates the address that will be created by the transaction, if any.
-    ///
-    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
-    /// the `from` field is not set.
-    pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
-        if self.to.is_some() {
-            return None;
-        }
-        Some(self.from.create(nonce))
-    }
-
-    /// Attempts to decode the logs to the provided log type.
-    ///
-    /// Returns the first log that decodes successfully.
-    ///
-    /// Returns None, if none of the logs could be decoded to the provided log type or if there
-    /// are no logs.
-    pub fn decoded_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
-        self.logs().iter().find_map(|log| E::decode_log(&log.inner).ok())
-    }
 }
 
 impl<T> TransactionReceipt<T> {
@@ -204,6 +183,16 @@ impl<T> TransactionReceipt<T> {
     pub fn into_inner(self) -> T {
         self.inner
     }
+
+    /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// Returns `None` if the transaction is not a contract creation (the `to` field is set).
+    pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
+        if self.to.is_some() {
+            return None;
+        }
+        Some(self.from.create(nonce))
+    }
 }
 
 impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
@@ -225,10 +214,23 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
     {
         self.map_logs(Into::into)
     }
+}
 
+impl<T: TxReceipt> TransactionReceipt<T> {
     /// Get the receipt logs.
-    pub fn logs(&self) -> &[L] {
+    pub fn logs(&self) -> &[T::Log] {
         self.inner.logs()
+    }
+}
+impl<T: TxReceipt<Log: AsRef<alloy_primitives::Log>>> TransactionReceipt<T> {
+    /// Attempts to decode the logs to the provided log type.
+    ///
+    /// Returns the first log that decodes successfully.
+    ///
+    /// Returns None, if none of the logs could be decoded to the provided log type or if there
+    /// are no logs.
+    pub fn decoded_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().iter().find_map(|log| E::decode_log(log.as_ref()).ok())
     }
 }
 

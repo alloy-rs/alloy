@@ -39,6 +39,9 @@ alloy-sol-types = { workspace = true, optional = true }
 alloy-dyn-abi = { workspace = true, optional = true }
 alloy-network.workspace = true
 
+# eip7702
+alloy-eip7702 = { workspace = true, optional = true }
+
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-rlp.workspace = true
@@ -48,6 +51,7 @@ tracing-subscriber.workspace = true
 
 [features]
 eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types", "dep:alloy-dyn-abi"]
+eip7702 = ["alloy-eip7702"]
 
 # WASM support
 browser = ["coins-ledger/browser"]

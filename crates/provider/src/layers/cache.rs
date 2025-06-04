@@ -348,9 +348,24 @@ impl<Params: RpcSend> RequestType<Params> {
     }
 
     fn params_hash(&self) -> TransportResult<B256> {
-        // Merge the method + params and hash them.
+        // Merge the block_id + method + params and hash them.
+        // Ignoring all other BlockIds than BlockId::Hash and
+        // BlockId::Number(BlockNumberOrTag::Number(_)).
         let hash = serde_json::to_string(&self.params())
-            .map(|p| keccak256(format!("{}{}", self.method(), p).as_bytes()))
+            .map(|p| {
+                keccak256(
+                    match self.block_id {
+                        Some(BlockId::Hash(rpc_block_hash)) => {
+                            format!("{}{}{}", rpc_block_hash, self.method(), p)
+                        }
+                        Some(BlockId::Number(BlockNumberOrTag::Number(number))) => {
+                            format!("{}{}{}", number, self.method(), p)
+                        }
+                        _ => format!("{}{}", self.method(), p),
+                    }
+                    .as_bytes(),
+                )
+            })
             .map_err(RpcError::ser_err)?;
 
         Ok(hash)
@@ -612,6 +627,51 @@ mod tests {
             let code = provider.get_code_at(counter_addr).block_id(block_id).await.unwrap(); // Received from RPC.
             let code2 = provider.get_code_at(counter_addr).block_id(block_id).await.unwrap(); // Received from cache.
             assert_eq!(code, code2);
+
+            shared_cache.save_cache(path).unwrap();
+        })
+        .await;
+    }
+
+    #[cfg(all(test, feature = "anvil-api"))]
+    #[tokio::test]
+    async fn test_get_storage_at_different_block_ids() {
+        use crate::ext::AnvilApi;
+
+        run_with_tempdir("get-code-different-block-id", |dir| async move {
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
+            let provider = ProviderBuilder::new().disable_recommended_fillers().with_gas_estimation().layer(cache_layer).connect_anvil_with_wallet();
+
+            let path = dir.join("rpc-cache-code.txt");
+            shared_cache.load_cache(path.clone()).unwrap();
+
+            let bytecode = hex::decode(
+                // solc v0.8.26; solc Counter.sol --via-ir --optimize --bin
+                "6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033"
+            ).unwrap();
+
+            let tx = TransactionRequest::default().with_nonce(0).with_deploy_code(bytecode).with_chain_id(31337);
+            let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+            let counter_addr = receipt.contract_address.unwrap();
+            let block_id = BlockId::number(receipt.block_number.unwrap());
+
+            let counter = provider.get_storage_at(counter_addr, U256::ZERO).block_id(block_id).await.unwrap(); // Received from RPC.
+            assert_eq!(counter, U256::ZERO);
+            let counter_cached = provider.get_storage_at(counter_addr, U256::ZERO).block_id(block_id).await.unwrap(); // Received from cache.
+            assert_eq!(counter, counter_cached);
+
+            provider.anvil_mine(Some(1), None).await.unwrap();
+
+            // Send a tx incrementing the counter
+            let tx2 = TransactionRequest::default().with_nonce(1).to(counter_addr).input(hex::decode("d09de08a").unwrap().into()).with_chain_id(31337);
+            let receipt2 = provider.send_transaction(tx2).await.unwrap().get_receipt().await.unwrap();
+            let block_id2 = BlockId::number(receipt2.block_number.unwrap());
+
+            let counter2 = provider.get_storage_at(counter_addr, U256::ZERO).block_id(block_id2).await.unwrap(); // Received from RPC
+            assert_eq!(counter2, U256::from(1));
+            let counter2_cached = provider.get_storage_at(counter_addr, U256::ZERO).block_id(block_id2).await.unwrap(); // Received from cache.
+            assert_eq!(counter2, counter2_cached);
 
             shared_cache.save_cache(path).unwrap();
         })

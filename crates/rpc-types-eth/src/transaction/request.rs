@@ -2,12 +2,12 @@
 
 use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
 use alloy_consensus::{
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
-    TxLegacy, TxType, Typed2718, TypedTransaction,
+    SignableTransaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
+    TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::hash::Hash;
 
 use alloc::{
@@ -15,7 +15,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use alloy_consensus::transaction::Recovered;
+use alloy_consensus::{error::ValueError, transaction::Recovered};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -829,6 +829,21 @@ impl TransactionRequest {
     fn into_tx_err(self, message: &'static str) -> BuildTransactionErr {
         BuildTransactionErr { tx: self, error: message.to_string() }
     }
+
+    /// Builds a signed typed transaction envelope for the `eth_simulateV1` endpoint with a dummy
+    /// signature. See also <https://github.com/ethereum/execution-apis/pull/484>
+    ///
+    /// Returns an error if the transaction is not buildable, i.e. if the required fields are
+    /// missing. See [`Self::buildable_type`] for more information.
+    pub fn build_typed_simulate_transaction(
+        self,
+    ) -> Result<alloy_consensus::EthereumTxEnvelope<TxEip4844>, ValueError<Self>> {
+        let tx = self
+            .build_typed_tx()
+            .map_err(|req| ValueError::new(req, "Transaction is not buildable"))?;
+        let signature = Signature::new(Default::default(), Default::default(), false);
+        Ok(tx.into_signed(signature).into())
+    }
 }
 
 impl TransactionBuilder4844 for TransactionRequest {
@@ -857,6 +872,13 @@ impl TransactionBuilder7702 for TransactionRequest {
 
     fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
         self.authorization_list = Some(authorization_list);
+    }
+}
+
+#[cfg(feature = "serde")]
+impl From<TransactionRequest> for alloy_serde::WithOtherFields<TransactionRequest> {
+    fn from(tx: TransactionRequest) -> Self {
+        Self::new(tx)
     }
 }
 
@@ -1119,6 +1141,18 @@ impl From<TxEnvelope> for TransactionRequest {
             }
         }
     }
+}
+
+/// Represents how a [`TransactionRequest`] handles input/data fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TransactionInputKind {
+    /// Only supports 'input' field
+    #[default]
+    Input,
+    /// Only supports 'data' field
+    Data,
+    /// Supports both 'input' and 'data' fields
+    Both,
 }
 
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.

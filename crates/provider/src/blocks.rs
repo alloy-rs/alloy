@@ -162,11 +162,11 @@ impl<N: Network> NewBlocks<N> {
                     }
                     Err(err) => {
                         error!(number, %err, "failed to fetch block");
-                        break 'task;
+                        break;
                     }
                     Ok(None) => {
                         error!(number, "failed to fetch block (doesn't exist)");
-                        break 'task;
+                        break;
                     }
                 };
                 self.known_blocks.put(number, block);
