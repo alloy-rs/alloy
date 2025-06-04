@@ -11,7 +11,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use alloy_eips::{eip7840::BlobParams, BlobScheduleBlobParams};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
@@ -458,6 +458,41 @@ pub struct ChainConfig {
     )]
     pub osaka_time: Option<u64>,
 
+    /// BPO1 switch time (None = no fork, 0 = already on BPO1).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub bpo1_time: Option<u64>,
+
+    /// BPO2 switch time (None = no fork, 0 = already on BPO2).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub bpo2_time: Option<u64>,
+
+    /// BPO3 switch time (None = no fork, 0 = already on BPO3).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub bpo3_time: Option<u64>,
+
+    /// BPO4 switch time (None = no fork, 0 = already on BPO4).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub bpo4_time: Option<u64>,
+
+    /// BPO5 switch time (None = no fork, 0 = already on BPO5).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
+    )]
+    pub bpo5_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -499,7 +534,53 @@ pub struct ChainConfig {
 impl ChainConfig {
     /// Returns the [`BlobScheduleBlobParams`] from the configured blob schedule values.
     pub fn blob_schedule_blob_params(&self) -> BlobScheduleBlobParams {
-        BlobScheduleBlobParams::from_schedule(&self.blob_schedule)
+        let mut cancun = None;
+        let mut prague = None;
+        let mut osaka = None;
+        let mut scheduled = Vec::new();
+
+        for (key, params) in &self.blob_schedule {
+            match key.as_str() {
+                "cancun" => cancun = Some(*params),
+                "prague" => prague = Some(*params),
+                "osaka" => osaka = Some(*params),
+                "bpo1" => {
+                    if let Some(timestamp) = self.bpo1_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo2" => {
+                    if let Some(timestamp) = self.bpo2_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo3" => {
+                    if let Some(timestamp) = self.bpo3_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo4" => {
+                    if let Some(timestamp) = self.bpo4_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo5" => {
+                    if let Some(timestamp) = self.bpo5_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        scheduled.sort_by_key(|(timestamp, _)| *timestamp);
+
+        BlobScheduleBlobParams {
+            cancun: cancun.unwrap_or_else(BlobParams::cancun),
+            prague: prague.unwrap_or_else(BlobParams::prague),
+            osaka: osaka.unwrap_or_else(BlobParams::osaka),
+            scheduled,
+        }
     }
 
     /// Checks if the blockchain is active at or after the Homestead fork block.
@@ -617,6 +698,11 @@ impl Default for ChainConfig {
             cancun_time: None,
             prague_time: None,
             osaka_time: None,
+            bpo1_time: None,
+            bpo2_time: None,
+            bpo3_time: None,
+            bpo4_time: None,
+            bpo5_time: None,
             terminal_total_difficulty: None,
             terminal_total_difficulty_passed: false,
             ethash: None,
