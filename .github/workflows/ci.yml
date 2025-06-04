@@ -27,7 +27,7 @@ jobs:
           - "1.85" # MSRV
         flags:
           # No features
-          - "--no-default-features"
+          - "--no-default-features -F reqwest-rustls-tls"
           # Default features
           - ""
           # All features
