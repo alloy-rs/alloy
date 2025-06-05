@@ -380,38 +380,23 @@ pub struct ChainConfig {
     pub osaka_time: Option<u64>,
 
     /// BPO1 switch time (None = no fork, 0 = already on BPO1).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo1_time: Option<u64>,
 
     /// BPO2 switch time (None = no fork, 0 = already on BPO2).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo2_time: Option<u64>,
 
     /// BPO3 switch time (None = no fork, 0 = already on BPO3).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo3_time: Option<u64>,
 
     /// BPO4 switch time (None = no fork, 0 = already on BPO4).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo4_time: Option<u64>,
 
     /// BPO5 switch time (None = no fork, 0 = already on BPO5).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo5_time: Option<u64>,
 
     /// Total difficulty reached that triggers the merge consensus upgrade.
