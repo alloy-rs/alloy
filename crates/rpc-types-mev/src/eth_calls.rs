@@ -257,11 +257,11 @@ pub struct EthSendBundle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refund_percent: Option<u8>,
     /// The address that receives the refund
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refund_recipient: Option<Address>,
     /// A list of tx hashes used to determine the refund
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refund_tx_hashes: Option<Vec<TxHash>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refund_tx_hashes: Vec<TxHash>,
 }
 
 impl EthSendBundle {
