@@ -23,6 +23,8 @@ async fn mocked_default_provider() {
 
     let response = provider.get_block_number().await.unwrap_err();
     assert!(response.to_string().contains("empty asserter response queue"), "{response}");
+    assert!(response.to_string().contains("eth_blockNumber"), "{response}");
+    assert!(response.to_string().contains("3"), "{response}");
 
     let accounts = [Address::with_last_byte(1), Address::with_last_byte(2)];
     asserter.push_success(&accounts);

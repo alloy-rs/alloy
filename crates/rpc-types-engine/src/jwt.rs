@@ -172,14 +172,13 @@ impl JwtSecret {
     ///
     /// This strips the leading `0x`, if any.
     pub fn from_hex<S: AsRef<str>>(hex: S) -> Result<Self, JwtError> {
-        let hex = hex.as_ref().trim().trim_start_matches("0x");
-        if hex.len() == JWT_SECRET_LEN {
-            let hex_bytes = hex::decode(hex)?;
-            // is 32bytes, see length check
-            let bytes = hex_bytes.try_into().expect("is expected len");
-            Ok(Self(bytes))
-        } else {
-            Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
+        let hex = hex.as_ref();
+        match hex::decode_to_array(hex) {
+            Ok(b) => Ok(Self(b)),
+            Err(hex::FromHexError::InvalidStringLength | hex::FromHexError::OddLength) => {
+                Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
+            }
+            Err(e) => Err(JwtError::JwtSecretHexDecodeError(e)),
         }
     }
 
@@ -246,9 +245,7 @@ impl JwtSecret {
 
     /// Generates a random [`JwtSecret`] containing a hex-encoded 256 bit secret key.
     pub fn random() -> Self {
-        let random_bytes: [u8; 32] = rand::thread_rng().gen();
-        let secret = hex::encode(random_bytes);
-        Self::from_hex(secret).unwrap()
+        Self(rand::thread_rng().gen())
     }
 
     /// Encode the header and claims given and sign the payload using the algorithm from the header

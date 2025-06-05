@@ -1,4 +1,5 @@
 use crate::{
+    error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
         RlpEcdsaEncodableTx,
@@ -199,6 +200,38 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
         match self {
             Self::Eip7702(tx) => Some(tx),
             _ => None,
+        }
+    }
+
+    /// Consumes the type and returns the [`TxLegacy`] if this transaction is of that type.
+    pub fn try_into_legacy(self) -> Result<TxLegacy, ValueError<Self>> {
+        match self {
+            Self::Legacy(tx) => Ok(tx),
+            _ => Err(ValueError::new(self, "Expected legacy transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the [`TxEip2930`]if this transaction is of that type.
+    pub fn try_into_eip2930(self) -> Result<TxEip2930, ValueError<Self>> {
+        match self {
+            Self::Eip2930(tx) => Ok(tx),
+            _ => Err(ValueError::new(self, "Expected EIP-2930 transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the EIP-4844 if this transaction is of that type.
+    pub fn try_into_eip4844(self) -> Result<Eip4844, ValueError<Self>> {
+        match self {
+            Self::Eip4844(tx) => Ok(tx),
+            _ => Err(ValueError::new(self, "Expected EIP-4844 transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the EIP-4844 if this transaction is of that type.
+    pub fn try_into_eip7702(self) -> Result<TxEip7702, ValueError<Self>> {
+        match self {
+            Self::Eip7702(tx) => Ok(tx),
+            _ => Err(ValueError::new(self, "Expected EIP-7702 transaction")),
         }
     }
 

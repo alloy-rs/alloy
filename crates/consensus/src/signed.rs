@@ -39,7 +39,7 @@ impl<T, Sig> Signed<T, Sig> {
     }
 
     /// Returns a mutable reference to the transaction.
-    pub fn tx_mut(&mut self) -> &mut T {
+    pub const fn tx_mut(&mut self) -> &mut T {
         &mut self.tx
     }
 

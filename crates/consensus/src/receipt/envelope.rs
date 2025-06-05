@@ -1,6 +1,5 @@
-use core::fmt;
-
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
+use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{
         Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718, EIP1559_TX_TYPE_ID,
@@ -10,6 +9,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable};
+use core::fmt;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -90,17 +90,17 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Return true if the transaction was successful.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.status()
     }
 
     /// Returns the success status of the receipt's transaction.
-    pub fn status(&self) -> bool {
+    pub const fn status(&self) -> bool {
         self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
-    pub fn cumulative_gas_used(&self) -> u64 {
+    pub const fn cumulative_gas_used(&self) -> u64 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 
@@ -109,8 +109,13 @@ impl<T> ReceiptEnvelope<T> {
         &self.as_receipt().unwrap().logs
     }
 
+    /// Consumes the type and returns the logs.
+    pub fn into_logs(self) -> Vec<T> {
+        self.into_receipt().logs
+    }
+
     /// Return the receipt's bloom.
-    pub fn logs_bloom(&self) -> &Bloom {
+    pub const fn logs_bloom(&self) -> &Bloom {
         &self.as_receipt_with_bloom().unwrap().logs_bloom
     }
 
@@ -128,13 +133,24 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Return the mutable inner receipt with bloom. Currently this is
     /// infallible, however, future receipt types may be added.
-    pub fn as_receipt_with_bloom_mut(&mut self) -> Option<&mut ReceiptWithBloom<Receipt<T>>> {
+    pub const fn as_receipt_with_bloom_mut(&mut self) -> Option<&mut ReceiptWithBloom<Receipt<T>>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
             | Self::Eip4844(t)
             | Self::Eip7702(t) => Some(t),
+        }
+    }
+
+    /// Consumes the type and returns the underlying [`Receipt`].
+    pub fn into_receipt(self) -> Receipt<T> {
+        match self {
+            Self::Legacy(t)
+            | Self::Eip2930(t)
+            | Self::Eip1559(t)
+            | Self::Eip4844(t)
+            | Self::Eip7702(t) => t.receipt,
         }
     }
 
@@ -182,6 +198,13 @@ where
     /// Return the receipt logs.
     fn logs(&self) -> &[T] {
         &self.as_receipt().unwrap().logs
+    }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.into_receipt().logs
     }
 }
 

@@ -92,6 +92,13 @@ where
     fn logs(&self) -> &[Self::Log] {
         &self.logs
     }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.logs
+    }
 }
 
 impl<T: Encodable> Receipt<T> {

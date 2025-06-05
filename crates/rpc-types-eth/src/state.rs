@@ -208,17 +208,17 @@ impl AccountOverride {
     }
 
     /// Sets the balance override in place.
-    pub fn set_balance(&mut self, balance: U256) {
+    pub const fn set_balance(&mut self, balance: U256) {
         self.balance = Some(balance);
     }
 
     /// Sets the nonce override in place.
-    pub fn set_nonce(&mut self, nonce: u64) {
+    pub const fn set_nonce(&mut self, nonce: u64) {
         self.nonce = Some(nonce);
     }
 
     /// Sets the move precompile address in place.
-    pub fn set_move_precompile_to(&mut self, address: Address) {
+    pub const fn set_move_precompile_to(&mut self, address: Address) {
         self.move_precompile_to = Some(address);
     }
 

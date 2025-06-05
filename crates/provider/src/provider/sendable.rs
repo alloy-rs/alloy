@@ -6,8 +6,8 @@ use alloy_network::Network;
 /// without changing the user-facing API.
 ///
 /// Users should NOT use this type directly. It should only be used as an
-/// implementation detail of [`Provider::send_transaction_internal`].
-#[doc(hidden, alias = "SendableTransaction")]
+/// implementation detail of [`Provider::send_transaction_internal`](crate::Provider).
+#[doc(alias = "SendableTransaction")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SendableTx<N: Network> {
     /// A transaction that is not yet signed.
@@ -18,7 +18,7 @@ pub enum SendableTx<N: Network> {
 
 impl<N: Network> SendableTx<N> {
     /// Fallible cast to an unbuilt transaction request.
-    pub fn as_mut_builder(&mut self) -> Option<&mut N::TransactionRequest> {
+    pub const fn as_mut_builder(&mut self) -> Option<&mut N::TransactionRequest> {
         match self {
             Self::Builder(tx) => Some(tx),
             _ => None,

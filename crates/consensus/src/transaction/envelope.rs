@@ -1161,7 +1161,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{recovered::SignerRecoverable, SignableTransaction},
+        transaction::{Recovered, SignableTransaction},
         TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1174,6 +1174,15 @@ mod tests {
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, Signature, U256};
     use std::{fs, path::PathBuf, str::FromStr, vec};
+
+    #[test]
+    fn assert_encodable() {
+        fn assert_encodable<T: Encodable2718>() {}
+
+        assert_encodable::<EthereumTxEnvelope<TxEip4844>>();
+        assert_encodable::<Recovered<EthereumTxEnvelope<TxEip4844>>>();
+        assert_encodable::<Recovered<EthereumTxEnvelope<TxEip4844Variant>>>();
+    }
 
     #[test]
     #[cfg(feature = "k256")]
@@ -1706,6 +1715,7 @@ mod tests {
     #[test]
     #[cfg(feature = "k256")]
     fn test_arbitrary_envelope() {
+        use crate::transaction::SignerRecoverable;
         use arbitrary::Arbitrary;
         let mut unstructured = arbitrary::Unstructured::new(b"arbitrary tx envelope");
         let tx = TxEnvelope::arbitrary(&mut unstructured).unwrap();
@@ -1910,6 +1920,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_deserialize_system_transaction_with_zero_signature_envelope() {
         let raw_tx = r#"{
             "blockHash": "0x5307b5c812a067f8bc1ed1cc89d319ae6f9a0c9693848bd25c36b5191de60b85",

@@ -38,7 +38,7 @@ impl<T> Recovered<T> {
     }
 
     /// Reference to the inner recovered object.
-    pub fn inner_mut(&mut self) -> &mut T {
+    pub const fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
