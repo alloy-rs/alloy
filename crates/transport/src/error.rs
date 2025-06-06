@@ -1,6 +1,4 @@
 use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
-use alloy_primitives::Bytes;
-use alloy_sol_types::SolInterface;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug};
@@ -183,63 +181,6 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
             }
         }
         None
-    }
-}
-
-/// The result of trying to parse a transport error into a specific interface.
-#[derive(Debug)]
-pub enum TryParseTransportErrorResult<I: SolInterface> {
-    /// The error was successfully decoded into the specified interface.
-    Decoded(I),
-    /// The error was not decoded but the revert data was extracted.
-    UnknownSelector(Bytes),
-    /// The error was not decoded and the revert data was not extracted.
-    Original(RpcError<TransportErrorKind, Box<RawValue>>),
-}
-
-/// Extension trait for TransportError parsing capabilities
-pub trait TransportErrorExt {
-    /// Attempts to parse a transport error into a specific interface.
-    fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I>;
-}
-
-impl<E> TransportErrorExt for RpcError<TransportErrorKind, E>
-where
-    E: AsRef<RawValue> + std::borrow::Borrow<RawValue>,
-{
-    fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I> {
-        let revert_data = self.as_error_resp().and_then(|e| e.as_revert_data().map(|d| d.to_vec()));
-        let decoded = revert_data.as_ref().and_then(|data| I::abi_decode(data.as_slice()).ok());
-
-        decoded.map_or_else(
-            || {
-                revert_data.map_or_else(
-                    || {
-                        let error: RpcError<TransportErrorKind, Box<RawValue>> = match self {
-                            Self::Transport(e) => RpcError::Transport(e),
-                            Self::SerError(e) => RpcError::SerError(e),
-                            Self::DeserError { text, err } => RpcError::DeserError { text, err },
-                            Self::ErrorResp(e) => RpcError::ErrorResp(ErrorPayload {
-                                code: e.code,
-                                message: e.message.clone(),
-                                data: Some(*Box::new(
-                                    e.data
-                                        .as_ref()
-                                        .map(|d| d.as_ref().to_owned())
-                                        .unwrap_or_default(),
-                                )),
-                            }),
-                            Self::NullResp => RpcError::NullResp,
-                            Self::UnsupportedFeature(e) => RpcError::UnsupportedFeature(e),
-                            Self::LocalUsageError(e) => RpcError::LocalUsageError(e),
-                        };
-                        TryParseTransportErrorResult::Original(error)
-                    },
-                    |revert_data| TryParseTransportErrorResult::UnknownSelector(revert_data.into()),
-                )
-            },
-            |decoded| TryParseTransportErrorResult::Decoded(decoded),
-        )
     }
 }
 

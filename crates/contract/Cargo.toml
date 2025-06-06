@@ -29,6 +29,7 @@ alloy-consensus.workspace = true
 alloy-provider.workspace = true
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-transport.workspace = true
+alloy-json-rpc.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["std"] }
 alloy-json-abi.workspace = true
@@ -38,6 +39,7 @@ alloy-sol-types.workspace = true
 futures-util.workspace = true
 futures.workspace = true
 thiserror.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 
 alloy-pubsub = { workspace = true, optional = true }
 
