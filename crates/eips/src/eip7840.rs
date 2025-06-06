@@ -104,20 +104,20 @@ impl BlobParams {
         blob_gas_used: u64,
         base_fee_per_gas: u64,
     ) -> u64 {
-        let block_gas_excess_and_used_sum = excess_blob_gas + blob_gas_used;
+        let next_excess_blob_gas = excess_blob_gas + blob_gas_used;
         let target_blob_gas = self.target_blob_gas_per_block();
-        if block_gas_excess_and_used_sum < target_blob_gas {
+        if next_excess_blob_gas < target_blob_gas {
             return 0;
         }
 
         if self.blob_base_cost as u128 * base_fee_per_gas as u128
             > DATA_GAS_PER_BLOB as u128 * self.calc_blob_fee(excess_blob_gas)
         {
-            block_gas_excess_and_used_sum
-                + (blob_gas_used * (self.max_blob_count - self.target_blob_count)
-                    / self.max_blob_count)
+            let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
+                / self.max_blob_count;
+            excess_blob_gas + scaled_excess
         } else {
-            block_gas_excess_and_used_sum - target_blob_gas
+            next_excess_blob_gas - target_blob_gas
         }
     }
 
