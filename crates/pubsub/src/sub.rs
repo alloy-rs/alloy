@@ -149,7 +149,7 @@ impl<T> Subscription<T> {
     }
 
     /// Get a mutable reference to the inner subscription.
-    pub fn inner_mut(&mut self) -> &mut RawSubscription {
+    pub const fn inner_mut(&mut self) -> &mut RawSubscription {
         &mut self.inner
     }
 

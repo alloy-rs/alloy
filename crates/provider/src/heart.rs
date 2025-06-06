@@ -139,7 +139,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
 
     /// Sets the transaction hash.
     #[doc(alias = "set_transaction_hash")]
-    pub fn set_tx_hash(&mut self, tx_hash: TxHash) {
+    pub const fn set_tx_hash(&mut self, tx_hash: TxHash) {
         self.config.set_tx_hash(tx_hash);
     }
 
@@ -158,7 +158,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "set_confirmations")]
-    pub fn set_required_confirmations(&mut self, confirmations: u64) {
+    pub const fn set_required_confirmations(&mut self, confirmations: u64) {
         self.config.set_required_confirmations(confirmations);
     }
 
@@ -175,7 +175,7 @@ impl<N: Network> PendingTransactionBuilder<N> {
     }
 
     /// Sets the timeout.
-    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+    pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.config.set_timeout(timeout);
     }
 
@@ -286,7 +286,7 @@ impl PendingTransactionConfig {
 
     /// Sets the transaction hash.
     #[doc(alias = "set_transaction_hash")]
-    pub fn set_tx_hash(&mut self, tx_hash: TxHash) {
+    pub const fn set_tx_hash(&mut self, tx_hash: TxHash) {
         self.tx_hash = tx_hash;
     }
 
@@ -305,7 +305,7 @@ impl PendingTransactionConfig {
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "set_confirmations")]
-    pub fn set_required_confirmations(&mut self, confirmations: u64) {
+    pub const fn set_required_confirmations(&mut self, confirmations: u64) {
         self.required_confirmations = confirmations;
     }
 
@@ -322,7 +322,7 @@ impl PendingTransactionConfig {
     }
 
     /// Sets the timeout.
-    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+    pub const fn set_timeout(&mut self, timeout: Option<Duration>) {
         self.timeout = timeout;
     }
 

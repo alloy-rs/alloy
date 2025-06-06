@@ -313,7 +313,7 @@ where
     }
 
     /// Sets the channel size for the poller task.
-    pub fn set_channel_size(&mut self, channel_size: usize) {
+    pub const fn set_channel_size(&mut self, channel_size: usize) {
         self.poller.set_channel_size(channel_size);
     }
 
@@ -323,7 +323,7 @@ where
     }
 
     /// Sets the duration between polls.
-    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+    pub const fn set_poll_interval(&mut self, poll_interval: Duration) {
         self.poller.set_poll_interval(poll_interval);
     }
 

@@ -474,7 +474,7 @@ impl TraceOutput {
     }
 
     /// Sets the gas used by this trace.
-    pub fn set_gas_used(&mut self, gas_used: u64) {
+    pub const fn set_gas_used(&mut self, gas_used: u64) {
         match self {
             Self::Call(call) => call.gas_used = gas_used,
             Self::Create(create) => create.gas_used = gas_used,
@@ -547,7 +547,7 @@ impl LocalizedTransactionTrace {
     ///
     /// This is intended to manually set the root trace's gas used to the actual gas used by the
     /// transaction, e.g. for geth's [`FlatCallFrame`](crate::geth::call::FlatCallFrame)
-    pub fn set_gas_used(&mut self, gas_used: u64) {
+    pub const fn set_gas_used(&mut self, gas_used: u64) {
         if let Some(res) = self.trace.result.as_mut() {
             res.set_gas_used(gas_used);
         }
