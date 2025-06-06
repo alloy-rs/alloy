@@ -521,6 +521,7 @@ mod tests {
                 "refundPercent": "0x4"
             }"#;
         let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
+        assert_eq!(bundle.block_number, 1);
         assert_eq!(bundle.min_timestamp, Some(2));
         assert_eq!(bundle.max_timestamp, Some(3));
         assert_eq!(bundle.refund_percent, Some(4));
