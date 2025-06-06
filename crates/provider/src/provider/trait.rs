@@ -1,6 +1,6 @@
 //! Ethereum JSON-RPC provider.
 
-#![allow(unknown_lints, elided_named_lifetimes)]
+#![allow(unknown_lints, mismatched_lifetime_syntaxes)]
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;

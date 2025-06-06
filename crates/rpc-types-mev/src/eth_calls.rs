@@ -481,13 +481,13 @@ mod tests {
             }"#;
         let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
         assert_eq!(bundle.txs.len(), 1);
-        assert_eq!(bundle.txs.get(0).unwrap(), &bytes!("0x1234"));
+        assert_eq!(bundle.txs.first().unwrap(), &bytes!("0x1234"));
         assert_eq!(bundle.block_number, 1);
         assert_eq!(bundle.min_timestamp, Some(2));
         assert_eq!(bundle.max_timestamp, Some(3));
         assert_eq!(bundle.reverting_tx_hashes.len(), 1);
         assert_eq!(
-            bundle.reverting_tx_hashes.get(0).unwrap(),
+            bundle.reverting_tx_hashes.first().unwrap(),
             &b256!("0x1111111111111111111111111111111111111111111111111111111111111111")
         );
         assert_eq!(
@@ -496,7 +496,7 @@ mod tests {
         );
         assert_eq!(bundle.dropping_tx_hashes.len(), 1);
         assert_eq!(
-            bundle.dropping_tx_hashes.get(0).unwrap(),
+            bundle.dropping_tx_hashes.first().unwrap(),
             &b256!("0x2222222222222222222222222222222222222222222222222222222222222222")
         );
         assert_eq!(bundle.refund_percent, Some(4));
@@ -506,7 +506,7 @@ mod tests {
         );
         assert_eq!(bundle.refund_tx_hashes.len(), 1);
         assert_eq!(
-            bundle.refund_tx_hashes.get(0).unwrap(),
+            bundle.refund_tx_hashes.first().unwrap(),
             &b256!("0x4444444444444444444444444444444444444444444444444444444444444444")
         );
     }
