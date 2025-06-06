@@ -1,5 +1,4 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_json_rpc::ErrorPayload;
 use alloy_primitives::{Bytes, Selector};
 use alloy_provider::PendingTransactionError;
 use alloy_sol_types::{SolError, SolInterface};
@@ -199,42 +198,18 @@ pub trait TransportErrorExt {
     fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I>;
 }
 
-impl<E> TransportErrorExt for RpcError<TransportErrorKind, E>
-where
-    E: AsRef<RawValue> + std::borrow::Borrow<RawValue>,
-{
+impl TransportErrorExt for TransportError {
     fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I> {
         let revert_data = self.as_error_resp().and_then(|e| e.as_revert_data().map(|d| d.to_vec()));
-        let decoded = revert_data.as_ref().and_then(|data| I::abi_decode(data.as_slice()).ok());
+        if let Some(decoded) =
+            revert_data.as_ref().and_then(|data| I::abi_decode(data.as_slice()).ok())
+        {
+            return TryParseTransportErrorResult::Decoded(decoded);
+        }
 
-        decoded.map_or_else(
-            || {
-                revert_data.map_or_else(
-                    || {
-                        let error: RpcError<TransportErrorKind, Box<RawValue>> = match self {
-                            Self::Transport(e) => RpcError::Transport(e),
-                            Self::SerError(e) => RpcError::SerError(e),
-                            Self::DeserError { text, err } => RpcError::DeserError { text, err },
-                            Self::ErrorResp(e) => RpcError::ErrorResp(ErrorPayload {
-                                code: e.code,
-                                message: e.message.clone(),
-                                data: Some(*Box::new(
-                                    e.data
-                                        .as_ref()
-                                        .map(|d| d.as_ref().to_owned())
-                                        .unwrap_or_default(),
-                                )),
-                            }),
-                            Self::NullResp => RpcError::NullResp,
-                            Self::UnsupportedFeature(e) => RpcError::UnsupportedFeature(e),
-                            Self::LocalUsageError(e) => RpcError::LocalUsageError(e),
-                        };
-                        TryParseTransportErrorResult::Original(error)
-                    },
-                    |revert_data| TryParseTransportErrorResult::UnknownSelector(revert_data.into()),
-                )
-            },
-            |decoded| TryParseTransportErrorResult::Decoded(decoded),
-        )
+        if let Some(decoded) = revert_data {
+            return TryParseTransportErrorResult::UnknownSelector(decoded.into());
+        }
+        TryParseTransportErrorResult::Original(self)
     }
 }
