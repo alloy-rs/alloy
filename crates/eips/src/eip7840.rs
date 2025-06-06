@@ -110,7 +110,7 @@ impl BlobParams {
             return 0;
         }
 
-        if BLOB_BASE_COST as u128 * base_fee_per_gas as u128
+        if self.blob_base_cost as u128 * base_fee_per_gas as u128
             > DATA_GAS_PER_BLOB as u128 * self.calc_blob_fee(excess_blob_gas)
         {
             block_gas_excess_and_used_sum
