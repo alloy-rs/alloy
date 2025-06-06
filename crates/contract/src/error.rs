@@ -2,7 +2,8 @@ use alloy_dyn_abi::Error as AbiError;
 use alloy_primitives::{Bytes, Selector};
 use alloy_provider::PendingTransactionError;
 use alloy_sol_types::{SolError, SolInterface};
-use alloy_transport::TransportError;
+use alloy_transport::{RpcError, TransportError, TransportErrorKind};
+use serde_json::value::RawValue;
 use thiserror::Error;
 
 /// Dynamic contract result type.
@@ -177,5 +178,38 @@ impl Error {
     /// ```
     pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
         self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
+    }
+}
+
+/// The result of trying to parse a transport error into a specific interface.
+#[derive(Debug)]
+pub enum TryParseTransportErrorResult<I: SolInterface> {
+    /// The error was successfully decoded into the specified interface.
+    Decoded(I),
+    /// The error was not decoded but the revert data was extracted.
+    UnknownSelector(Bytes),
+    /// The error was not decoded and the revert data was not extracted.
+    Original(RpcError<TransportErrorKind, Box<RawValue>>),
+}
+
+/// Extension trait for TransportError parsing capabilities
+pub trait TransportErrorExt {
+    /// Attempts to parse a transport error into a specific interface.
+    fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I>;
+}
+
+impl TransportErrorExt for TransportError {
+    fn try_parse_transport_error<I: SolInterface>(self) -> TryParseTransportErrorResult<I> {
+        let revert_data = self.as_error_resp().and_then(|e| e.as_revert_data().map(|d| d.to_vec()));
+        if let Some(decoded) =
+            revert_data.as_ref().and_then(|data| I::abi_decode(data.as_slice()).ok())
+        {
+            return TryParseTransportErrorResult::Decoded(decoded);
+        }
+
+        if let Some(decoded) = revert_data {
+            return TryParseTransportErrorResult::UnknownSelector(decoded.into());
+        }
+        TryParseTransportErrorResult::Original(self)
     }
 }
