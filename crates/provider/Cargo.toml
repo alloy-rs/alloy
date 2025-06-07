@@ -39,6 +39,7 @@ alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true, features = [
     "serde",
 ] }
+alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
@@ -127,3 +128,4 @@ trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
+mev-api = ["dep:alloy-rpc-types-mev"]
