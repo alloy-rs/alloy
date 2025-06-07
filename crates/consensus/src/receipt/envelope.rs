@@ -39,7 +39,7 @@ pub enum ReceiptEnvelope<T = Log> {
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     #[cfg_attr(feature = "serde", serde(rename = "0x2", alias = "0x02"))]
     Eip1559(ReceiptWithBloom<Receipt<T>>),
-    /// Receipt envelope with type flag 2, containing a [EIP-4844] receipt.
+    /// Receipt envelope with type flag 3, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
     #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
