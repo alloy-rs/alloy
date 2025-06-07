@@ -63,7 +63,7 @@ where
 
         // TODO: How to set the header in the request?
 
-        self.client().request("eth_sendBundle", (req,)).await
+        self.client().request("eth_sendBundle", (bundle,)).await
     }
 }
 
