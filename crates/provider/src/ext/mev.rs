@@ -10,7 +10,7 @@ use std::borrow::Cow;
 /// The HTTP header used for Flashbots signature authentication.
 pub const FLASHBOTS_SIGNATURE_HEADER: &str = "X-Flashbots-Signature";
 
-/// This module provides support for interacting with non-standard MEV-related RPC endpoints,
+/// This module provides support for interacting with non-standard MEV-related RPC endpoints.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait MevApi<N>: Send + Sync {
