@@ -14,12 +14,11 @@ pub const FLASHBOTS_SIGNATURE_HEADER: &str = "X-Flashbots-Signature";
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait MevApi<N>: Send + Sync {
-    /// Send a bundle to the builder.
+    /// Send a bundle.
     async fn send_bundle(&self, bundle: EthSendBundle) -> TransportResult<EthBundleHash>;
 
-    /// Use the provided signer to create a signature for the bundle and send the bundle with http
-    /// header `X-Flashbots-Signature` to the builder.
-    async fn send_signed_bundle<S: Signer + Send + Sync>(
+    /// Use the provides signer to send a bundle with `X-Flashbots-Signature` authentication header.
+    async fn send_bundle_with_auth<S: Signer + Send + Sync>(
         &self,
         bundle: EthSendBundle,
         signer: S,
@@ -40,7 +39,7 @@ where
         self.client().request("eth_sendBundle", (bundle,)).await
     }
 
-    async fn send_signed_bundle<S: Signer + Send + Sync>(
+    async fn send_bundle_with_auth<S: Signer + Send + Sync>(
         &self,
         bundle: EthSendBundle,
         signer: S,
