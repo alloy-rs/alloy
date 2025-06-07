@@ -36,9 +36,6 @@ where
     P: Provider<N>,
 {
     async fn send_bundle(&self, bundle: EthSendBundle) -> TransportResult<EthBundleHash> {
-        #[cfg(feature = "pubsub")]
-        self.client().pubsub_frontend().expect("This provider does not support pubsub");
-
         self.client().request("eth_sendBundle", (bundle,)).await
     }
 
@@ -47,9 +44,6 @@ where
         bundle: EthSendBundle,
         signer: S,
     ) -> TransportResult<EthBundleHash> {
-        #[cfg(feature = "pubsub")]
-        self.client().pubsub_frontend().expect("This provider does not support pubsub");
-
         let req = Request::<Vec<EthSendBundle>>::new(
             Cow::Borrowed("eth_sendBundle"),
             0.into(),
