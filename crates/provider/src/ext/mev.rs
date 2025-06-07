@@ -7,17 +7,20 @@ use alloy_signer::Signer;
 use alloy_transport::{TransportErrorKind, TransportResult};
 use std::borrow::Cow;
 
-/// The HTTP header used to send the Flashbots signature for authentication.
+/// The HTTP header used for Flashbots signature authentication.
 pub const FLASHBOTS_SIGNATURE_HEADER: &str = "X-Flashbots-Signature";
 
-/// MEV rpc interface that gives access to several non-standard RPC methods.
+/// This module provides support for interacting with non-standard MEV-related RPC endpoints,
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait MevApi<N>: Send + Sync {
-    /// Send a bundle.
+    /// Sends a MEV bundle using the `eth_sendBundle` RPC method.
+    /// Returns the resulting bundle hash on success.
     async fn send_bundle(&self, bundle: EthSendBundle) -> TransportResult<EthBundleHash>;
 
-    /// Use the provides signer to send a bundle with `X-Flashbots-Signature` authentication header.
+    /// Sends a MEV bundle via the `eth_sendBundle` RPC method with `X-Flashbots-Signature`
+    /// authentication header. The provided signer is used to generate the signature.
+    /// Returns the resulting bundle hash on success.
     async fn send_bundle_with_auth<S: Signer + Send + Sync>(
         &self,
         bundle: EthSendBundle,
@@ -64,10 +67,10 @@ where
     }
 }
 
-/// Sign the payload with the provided signer for Flashbots authentication. It returns the
-/// authentication header value that can be used for `X-Flashbots-Signature`.
+/// Uses the provided signer to generate a signature for Flashbots authentication.
+/// Returns the value for the `X-Flashbots-Signature` header.
 ///
-/// See [here](https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#authentication) for more details.
+/// See [here](https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#authentication) for more information.
 pub async fn sign_flashbots_payload<S: Signer + Sync>(
     body: String,
     signer: &S,
