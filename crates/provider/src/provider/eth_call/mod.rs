@@ -3,7 +3,10 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
-use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
+use alloy_rpc_types_eth::{
+    state::{AccountOverride, StateOverride},
+    BlockOverrides,
+};
 use alloy_sol_types::SolCall;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -258,6 +261,18 @@ where
         for (addr, account_override) in overrides.into_iter() {
             self = self.account_override(addr, account_override);
         }
+        self
+    }
+
+    /// Sets the block overrides for this call.
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.params.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the block overrides for this call, if any.
+    pub fn with_block_overrides_opt(mut self, overrides: Option<BlockOverrides>) -> Self {
+        self.params.block_overrides = overrides;
         self
     }
 
