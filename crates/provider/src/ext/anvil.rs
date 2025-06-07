@@ -155,6 +155,14 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         &self,
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash>;
+
+    /// Modifies the ERC20 balance of an account.
+    async fn anvil_deal_erc20(
+        &self,
+        address: Address,
+        token_address: Address,
+        balance: U256,
+    ) -> TransportResult<TxHash>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -329,11 +337,21 @@ where
     ) -> TransportResult<TxHash> {
         self.client().request("eth_sendUnsignedTransaction", (request,)).await
     }
+
     async fn anvil_send_impersonated_transaction(
         &self,
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash> {
         self.client().request("eth_sendTransaction", (request,)).await
+    }
+
+    async fn anvil_deal_erc20(
+        &self,
+        address: Address,
+        token_address: Address,
+        balance: U256,
+    ) -> TransportResult<TxHash> {
+        self.client().request("anvil_dealERC20", (address, token_address, balance)).await
     }
 }
 
