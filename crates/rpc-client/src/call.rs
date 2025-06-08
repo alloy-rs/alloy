@@ -1,6 +1,6 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Request, RequestPacket, ResponsePacket, RpcRecv,
-    RpcResult, RpcSend,
+    transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
+    RpcRecv, RpcResult, RpcSend,
 };
 use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
 use core::panic;
@@ -271,6 +271,19 @@ where
         };
         let request = request.expect("no request in prepared").map_params(map);
         RpcCall {
+            state: CallState::Prepared { request: Some(request), connection },
+            map: self.map,
+            _pd: PhantomData,
+        }
+    }
+
+    /// Maps the metadata of the request using the provided function.
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Self {
+        let CallState::Prepared { request, connection } = self.state else {
+            panic!("Cannot get request after request has been sent");
+        };
+        let request = request.expect("no request in prepared").map_meta(f);
+        Self {
             state: CallState::Prepared { request: Some(request), connection },
             map: self.map,
             _pd: PhantomData,

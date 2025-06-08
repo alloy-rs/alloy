@@ -47,8 +47,9 @@ pub use erc4337::Erc4337Api;
 
 #[cfg(feature = "mev-api")]
 mod mev;
+
 #[cfg(feature = "mev-api")]
-pub use mev::{sign_flashbots_payload, MevApi, FLASHBOTS_SIGNATURE_HEADER};
+pub use mev::{sign_flashbots_payload, MevApi, MevBuilder, FLASHBOTS_SIGNATURE_HEADER};
 
 #[cfg(test)]
 pub(crate) mod test {
