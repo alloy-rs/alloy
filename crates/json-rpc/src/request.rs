@@ -7,7 +7,10 @@ use serde::{
     Deserialize, Serialize,
 };
 use serde_json::value::RawValue;
-use std::{borrow::Cow, marker::PhantomData, mem::MaybeUninit};
+use std::{borrow::Cow, collections::HashMap, marker::PhantomData, mem::MaybeUninit};
+
+/// A map of HTTP headers that extends the request's headers when supported by the transport.
+pub type HttpHeaderExtension = HashMap<String, String>;
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
 #[derive(Clone, Debug)]

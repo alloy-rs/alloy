@@ -1,7 +1,8 @@
 use crate::Provider;
-use alloy_json_rpc::Request;
+use alloy_json_rpc::{HttpHeaderExtension, Request};
 use alloy_network::Network;
 use alloy_primitives::{hex, keccak256};
+use alloy_rpc_client::RpcCall;
 use alloy_rpc_types_mev::{EthBundleHash, EthSendBundle};
 use alloy_signer::Signer;
 use alloy_transport::{TransportErrorKind, TransportResult};
@@ -44,20 +45,21 @@ where
         bundle: EthSendBundle,
         signer: S,
     ) -> TransportResult<EthBundleHash> {
-        let req = Request::<Vec<EthSendBundle>>::new(
+        let mut request = Request::<Vec<EthSendBundle>>::new(
             Cow::Borrowed("eth_sendBundle"),
             0.into(),
             vec![bundle.clone()],
         );
-        let body = serde_json::to_string(&req).map_err(TransportErrorKind::custom)?;
-        let _signature = sign_flashbots_payload(body, &signer)
-            .await
-            .map_err(TransportErrorKind::custom)?
-            .as_str();
+        // Generate the Flashbots signature for the request body
+        let body = serde_json::to_string(&request).map_err(TransportErrorKind::custom)?;
+        let signature =
+            sign_flashbots_payload(body, &signer).await.map_err(TransportErrorKind::custom)?;
 
-        // TODO: How to set the header in the request?
+        let headers: HttpHeaderExtension =
+            HttpHeaderExtension::from_iter([(FLASHBOTS_SIGNATURE_HEADER.to_string(), signature)]);
 
-        self.client().request("eth_sendBundle", (bundle,)).await
+        request.meta.extensions_mut().insert(headers);
+        RpcCall::new(request, self.client().transport().clone()).await
     }
 }
 
