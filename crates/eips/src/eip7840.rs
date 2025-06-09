@@ -124,7 +124,7 @@ mod serde_impl {
                 max_blobs_per_tx,
             } = params;
 
-            SerdeHelper {
+            Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
@@ -145,7 +145,7 @@ mod serde_impl {
                 max_blobs_per_tx,
             } = helper;
 
-            BlobParams {
+            Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
