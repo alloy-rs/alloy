@@ -166,12 +166,16 @@ If you would like to add `no_std` support to a crate, please make sure to update
 
 None of these crates would have been possible without the great work done in:
 
-- [`ethers.js`](https://github.com/ethers-io/ethers.js/)
-- [`rust-web3`](https://github.com/tomusdrw/rust-web3/)
-- [`ruint`](https://github.com/recmo/uint)
-- [`ethabi`](https://github.com/rust-ethereum/ethabi)
-- [`ethcontract-rs`](https://github.com/gnosis/ethcontract-rs/)
-- [`guac_rs`](https://github.com/althea-net/guac_rs/)
+| Project | Description |
+|------------|-------------|
+| [`ethers.js`](https://github.com/ethers-io/ethers.js/) | A complete and compact JavaScript library for interacting with the Ethereum blockchain. |
+| [`rust-web3`](https://github.com/tomusdrw/rust-web3/) | Rust library for Ethereum JSON-RPC client communication, including support for async and WASM. |
+| [`ruint`](https://github.com/recmo/uint) | A fast, no-std, const-friendly implementation of fixed-size unsigned integers in Rust. |
+| [`ethabi`](https://github.com/rust-ethereum/ethabi) | Ethereum ABI encoding/decoding in Rust for contracts and transactions. |
+| [`ethcontract-rs`](https://github.com/gnosis/ethcontract-rs/) | Rust library to generate type-safe bindings to Ethereum smart contracts. |
+| [`guac_rs`](https://github.com/althea-net/guac_rs/) | Rust implementation of the GUAC protocol for Ethereum state channels. |
+
+
 
 #### License
 

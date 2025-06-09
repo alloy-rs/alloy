@@ -239,22 +239,34 @@ pub struct EthSendBundle {
     #[serde(with = "alloy_serde::quantity")]
     pub block_number: u64,
     /// unix timestamp when this bundle becomes active
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub min_timestamp: Option<u64>,
     /// unix timestamp how long this bundle stays valid
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub max_timestamp: Option<u64>,
     /// list of hashes of possibly reverting txs
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reverting_tx_hashes: Vec<TxHash>,
     /// UUID that can be used to cancel/replace this bundle
-    #[serde(default, rename = "replacementUuid", skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replacement_uuid: Option<String>,
     /// A list of tx hashes that are allowed to be discarded
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dropping_tx_hashes: Vec<TxHash>,
     /// The percent that should be refunded to refund recipient
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub refund_percent: Option<u8>,
     /// The address that receives the refund
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -411,6 +423,7 @@ impl PrivateTransactionPreferences {
 mod tests {
     use super::EthCallBundleResponse;
     use crate::EthSendBundle;
+    use alloy_primitives::{address, b256, bytes};
 
     #[test]
     fn can_deserialize_eth_call_resp() {
@@ -456,18 +469,101 @@ mod tests {
     fn can_deserialize_eth_send_bundle() {
         let s = r#"{
                 "txs": ["0x1234"],
-                "blockNumber": "0x1",
-                "minTimestamp": "0x1",
-                "maxTimestamp": "0x2",
+                "blockNumber": 1,
+                "minTimestamp": 2,
+                "maxTimestamp": 3,
                 "revertingTxHashes": ["0x1111111111111111111111111111111111111111111111111111111111111111"],
                 "replacementUuid": "11111111-1111-4111-8111-111111111111",
                 "droppingTxHashes": ["0x2222222222222222222222222222222222222222222222222222222222222222"],
-                "refundPercent": 1,
+                "refundPercent": 4,
                 "refundRecipient": "0x3333333333333333333333333333333333333333",
                 "refundTxHashes": ["0x4444444444444444444444444444444444444444444444444444444444444444"]
             }"#;
-        let response = serde_json::from_str::<EthSendBundle>(s).unwrap();
-        let json: serde_json::Value = serde_json::from_str(s).unwrap();
-        similar_asserts::assert_eq!(json, serde_json::to_value(response).unwrap());
+        let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
+        assert_eq!(bundle.txs.len(), 1);
+        assert_eq!(bundle.txs.first().unwrap(), &bytes!("0x1234"));
+        assert_eq!(bundle.block_number, 1);
+        assert_eq!(bundle.min_timestamp, Some(2));
+        assert_eq!(bundle.max_timestamp, Some(3));
+        assert_eq!(bundle.reverting_tx_hashes.len(), 1);
+        assert_eq!(
+            bundle.reverting_tx_hashes.first().unwrap(),
+            &b256!("0x1111111111111111111111111111111111111111111111111111111111111111")
+        );
+        assert_eq!(
+            bundle.replacement_uuid,
+            Some("11111111-1111-4111-8111-111111111111".to_string())
+        );
+        assert_eq!(bundle.dropping_tx_hashes.len(), 1);
+        assert_eq!(
+            bundle.dropping_tx_hashes.first().unwrap(),
+            &b256!("0x2222222222222222222222222222222222222222222222222222222222222222")
+        );
+        assert_eq!(bundle.refund_percent, Some(4));
+        assert_eq!(
+            bundle.refund_recipient,
+            Some(address!("0x3333333333333333333333333333333333333333"))
+        );
+        assert_eq!(bundle.refund_tx_hashes.len(), 1);
+        assert_eq!(
+            bundle.refund_tx_hashes.first().unwrap(),
+            &b256!("0x4444444444444444444444444444444444444444444444444444444444444444")
+        );
+    }
+
+    #[test]
+    fn can_deserialize_eth_send_bundle_with_hex_numbers() {
+        let s = r#"{
+                "txs": ["0x1234"],
+                "blockNumber": "0x1",
+                "minTimestamp": "0x2",
+                "maxTimestamp": "0x3",
+                "refundPercent": "0x4"
+            }"#;
+        let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
+        assert_eq!(bundle.block_number, 1);
+        assert_eq!(bundle.min_timestamp, Some(2));
+        assert_eq!(bundle.max_timestamp, Some(3));
+        assert_eq!(bundle.refund_percent, Some(4));
+    }
+
+    #[test]
+    fn can_serialize_eth_send_bundle() {
+        let bundle = EthSendBundle {
+            txs: vec![bytes!("0x1234")],
+            block_number: 1,
+            min_timestamp: Some(2),
+            max_timestamp: Some(3),
+            reverting_tx_hashes: vec![b256!(
+                "0x1111111111111111111111111111111111111111111111111111111111111111"
+            )],
+            replacement_uuid: Some("11111111-1111-4111-8111-111111111111".to_string()),
+            dropping_tx_hashes: vec![b256!(
+                "0x2222222222222222222222222222222222222222222222222222222222222222"
+            )],
+            refund_percent: Some(4),
+            refund_recipient: Some(address!("0x3333333333333333333333333333333333333333")),
+            refund_tx_hashes: vec![b256!(
+                "0x4444444444444444444444444444444444444444444444444444444444444444"
+            )],
+        };
+        let s = r#"
+            {
+                "txs": ["0x1234"],
+                "blockNumber": "0x1",
+                "minTimestamp": 2,
+                "maxTimestamp": 3,
+                "revertingTxHashes": ["0x1111111111111111111111111111111111111111111111111111111111111111"],
+                "replacementUuid": "11111111-1111-4111-8111-111111111111",
+                "droppingTxHashes": ["0x2222222222222222222222222222222222222222222222222222222222222222"],
+                "refundPercent": 4,
+                "refundRecipient": "0x3333333333333333333333333333333333333333",
+                "refundTxHashes": ["0x4444444444444444444444444444444444444444444444444444444444444444"]
+            }
+            "#;
+        let expected: serde_json::Value = serde_json::from_str(s).unwrap();
+        let value = serde_json::to_value(&bundle).unwrap();
+
+        assert_eq!(value, expected);
     }
 }
