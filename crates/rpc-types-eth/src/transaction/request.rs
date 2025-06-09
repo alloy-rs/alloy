@@ -217,6 +217,12 @@ impl TransactionRequest {
         self
     }
 
+    /// Sets the gas price for the transaction.
+    pub const fn gas_price(mut self, gas_price: u128) -> Self {
+        self.gas_price = Some(gas_price);
+        self
+    }
+
     /// Sets the maximum fee per gas for the transaction.
     pub const fn max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
         self.max_fee_per_gas = Some(max_fee_per_gas);
