@@ -2,7 +2,7 @@
 
 use crate::{
     eip4844::{self, DATA_GAS_PER_BLOB},
-    eip7691,
+    eip7594, eip7691,
 };
 
 /// Configuration for the blob-related calculations.
@@ -60,7 +60,7 @@ impl BlobParams {
             max_blob_count: eip7691::MAX_BLOBS_PER_BLOCK_ELECTRA,
             update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
-            max_blobs_per_tx: eip7691::MAX_BLOBS_PER_BLOCK_ELECTRA,
+            max_blobs_per_tx: eip7594::MAX_BLOBS_PER_TX_FUSAKA,
         }
     }
 
