@@ -86,6 +86,15 @@ impl LocalSigner<SigningKey> {
     pub fn to_field_bytes(&self) -> FieldBytes {
         self.credential.to_bytes()
     }
+
+    /// Returns this signer's public key as a hex string prefixed with "0x".
+    #[inline]
+    pub fn public_key(&self) -> String {
+        format!(
+            "0x{}",
+            hex::encode(&self.credential.verifying_key().to_encoded_point(false).as_bytes()[1..])
+        )
+    }
 }
 
 #[cfg(feature = "keystore")]
@@ -414,5 +423,12 @@ mod tests {
         "0z0000000000000000000000000000000000000000000000000000000000000001"
             .parse::<LocalSigner<SigningKey>>()
             .unwrap_err();
+    }
+
+    #[test]
+    fn public_key() {
+        let signer: LocalSigner<SigningKey> =
+            "0x51fde55a7d696da3b318b21e231dec5ff4b33e895f191b2988e122e969b20e90".parse().unwrap();
+        assert_eq!(signer.public_key(), "0x2bcb56445551cd344c9be67cfe27652932d7088c17b6c3c8dad622a5c8e8caf4574d68fa12355e7fefbe2377911016124b9284283527dd2ead05c7b6e5585fbd");
     }
 }
