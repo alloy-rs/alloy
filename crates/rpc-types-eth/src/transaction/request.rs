@@ -684,12 +684,73 @@ impl TransactionRequest {
 
     /// Check this builder's preferred type, based on the fields that are set.
     ///
+    /// This function is intended for building and eventually signing transactions client-side.
+    /// Unlike [`Self::minimal_tx_type`] which returns the minimal required type, this function
+    /// prefers [`TxType::Eip1559`] when no conflicting fields are set.
+    ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
     /// - EIP-4844 if sidecar or max_blob_fee_per_gas is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use alloy_consensus::TxType;
+    /// use alloy_eips::eip2930::AccessList;
+    /// use alloy_rpc_types_eth::TransactionRequest;
+    ///
+    /// // EIP-7702 (highest priority)
+    /// let mut request = TransactionRequest::default();
+    /// request.authorization_list = Some(vec![]);
+    /// assert_eq!(request.preferred_type(), TxType::Eip7702);
+    ///
+    /// // EIP-4844 with max_fee_per_blob_gas
+    /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Eip4844);
+    ///
+    /// // EIP-2930 with both access_list and gas_price
+    /// let request =
+    ///     TransactionRequest::default().access_list(AccessList::default()).gas_price(20000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Eip2930);
+    ///
+    /// // Legacy with only gas_price (no access_list)
+    /// let request = TransactionRequest::default().gas_price(20000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Legacy);
+    ///
+    /// // EIP-1559 as default for modern transactions
+    /// let request = TransactionRequest::default();
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559);
+    ///
+    /// // EIP-1559 even with access_list but no gas_price
+    /// let request = TransactionRequest::default().access_list(AccessList::default());
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559);
+    /// ```
+    ///
+    /// # Key Differences from [`Self::minimal_tx_type`]
+    ///
+    /// ```rust
+    /// use alloy_consensus::TxType;
+    /// use alloy_eips::eip2930::AccessList;
+    /// use alloy_rpc_types_eth::TransactionRequest;
+    ///
+    /// // Empty request - preferred_type prefers EIP-1559, minimal_tx_type falls back to Legacy
+    /// let request = TransactionRequest::default();
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // Preferred for new txs
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy); // Minimal requirement
+    ///
+    /// // Access list only - different behavior
+    /// let request = TransactionRequest::default().access_list(AccessList::default());
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // Still prefers EIP-1559
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip2930); // Minimal is EIP-2930
+    ///
+    /// // Gas price only - both agree on Legacy
+    /// let request = TransactionRequest::default().gas_price(20000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Legacy);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
+    /// ```
     pub const fn preferred_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
