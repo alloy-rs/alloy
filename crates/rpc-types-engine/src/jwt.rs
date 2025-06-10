@@ -172,7 +172,7 @@ impl JwtSecret {
     ///
     /// This strips the leading `0x`, if any.
     pub fn from_hex<S: AsRef<str>>(hex: S) -> Result<Self, JwtError> {
-        let hex = hex.as_ref();
+        let hex = hex.as_ref().trim();
         match hex::decode_to_array(hex) {
             Ok(b) => Ok(Self(b)),
             Err(hex::FromHexError::InvalidStringLength | hex::FromHexError::OddLength) => {
@@ -291,11 +291,19 @@ mod tests {
     #[test]
     fn from_hex() {
         let key = "f79ae8046bc11c9927afe911db7143c51a806c4a537cc08e0d37140b0192f430";
-        let secret: Result<JwtSecret, _> = JwtSecret::from_hex(key);
-        assert!(secret.is_ok());
+        let secret_0: Result<JwtSecret, _> = JwtSecret::from_hex(key);
+        assert!(secret_0.is_ok());
 
-        let secret: Result<JwtSecret, _> = JwtSecret::from_hex(key);
-        assert!(secret.is_ok());
+        let key = "0xf79ae8046bc11c9927afe911db7143c51a806c4a537cc08e0d37140b0192f430";
+        let secret_1: Result<JwtSecret, _> = JwtSecret::from_hex(key);
+        assert!(secret_1.is_ok());
+
+        let key = "0xf79ae8046bc11c9927afe911db7143c51a806c4a537cc08e0d37140b0192f430 ";
+        let secret_2: Result<JwtSecret, _> = JwtSecret::from_hex(key);
+        assert!(secret_2.is_ok());
+
+        assert_eq!(secret_0.as_ref().unwrap().clone(), secret_1.unwrap());
+        assert_eq!(secret_0.unwrap(), secret_2.unwrap());
     }
 
     #[test]
