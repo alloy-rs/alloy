@@ -114,7 +114,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// This is also commonly referred to as the "Blob Gas Fee Cap".
     fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
-    /// Return the max priority fee per gas if the transaction is an dynamic fee transaction, and
+    /// Return the max priority fee per gas if the transaction is a dynamic fee transaction, and
     /// otherwise return the gas price.
     ///
     /// # Warning
