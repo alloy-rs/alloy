@@ -665,6 +665,18 @@ pub struct BlockOverrides {
 }
 
 impl BlockOverrides {
+    /// Returns true if all fields are None, false if any field is not None
+    pub const fn is_empty(&self) -> bool {
+        self.number.is_none()
+            && self.difficulty.is_none()
+            && self.time.is_none()
+            && self.gas_limit.is_none()
+            && self.coinbase.is_none()
+            && self.random.is_none()
+            && self.base_fee.is_none()
+            && self.block_hash.is_none()
+    }
+
     /// Sets the block number override
     pub const fn with_number(mut self, number: U256) -> Self {
         self.number = Some(number);
@@ -925,6 +937,40 @@ mod tests {
     fn block_overrides() {
         let s = r#"{"blockNumber": "0xe39dd0"}"#;
         let _overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
+    }
+
+    #[test]
+    fn block_overrides_is_empty() {
+        // Default should be empty
+        let default_overrides = BlockOverrides::default();
+        assert!(default_overrides.is_empty());
+
+        // With one field set should not be empty
+        let overrides_with_number = BlockOverrides::default().with_number(U256::from(42));
+        assert!(!overrides_with_number.is_empty());
+
+        let overrides_with_difficulty = BlockOverrides::default().with_difficulty(U256::from(100));
+        assert!(!overrides_with_difficulty.is_empty());
+
+        let overrides_with_time = BlockOverrides::default().with_time(12345);
+        assert!(!overrides_with_time.is_empty());
+
+        let overrides_with_gas_limit = BlockOverrides::default().with_gas_limit(21000);
+        assert!(!overrides_with_gas_limit.is_empty());
+
+        let overrides_with_coinbase =
+            BlockOverrides::default().with_coinbase(Address::with_last_byte(1));
+        assert!(!overrides_with_coinbase.is_empty());
+
+        let overrides_with_random = BlockOverrides::default().with_random(B256::with_last_byte(1));
+        assert!(!overrides_with_random.is_empty());
+
+        let overrides_with_base_fee = BlockOverrides::default().with_base_fee(U256::from(20));
+        assert!(!overrides_with_base_fee.is_empty());
+
+        let overrides_with_block_hash =
+            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
+        assert!(!overrides_with_block_hash.is_empty());
     }
 
     #[test]
