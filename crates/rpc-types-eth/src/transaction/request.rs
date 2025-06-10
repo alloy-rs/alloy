@@ -629,6 +629,45 @@ impl TransactionRequest {
     /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
     /// - EIP-2930 if access_list is set
     /// - Legacy otherwise
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use alloy_consensus::TxType;
+    /// use alloy_eips::eip2930::AccessList;
+    /// use alloy_rpc_types_eth::TransactionRequest;
+    ///
+    /// // EIP-7702 (highest priority)
+    /// let mut request = TransactionRequest::default();
+    /// request.authorization_list = Some(vec![]);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip7702);
+    ///
+    /// // EIP-4844 with max_fee_per_blob_gas
+    /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
+    ///
+    /// // EIP-1559 with max_fee_per_gas
+    /// let request = TransactionRequest::default().max_fee_per_gas(2000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip1559);
+    ///
+    /// // EIP-1559 with max_priority_fee_per_gas
+    /// let request = TransactionRequest::default().max_priority_fee_per_gas(1000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip1559);
+    ///
+    /// // EIP-2930 with access_list
+    /// let request = TransactionRequest::default().access_list(AccessList::default());
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip2930);
+    ///
+    /// // Legacy (default fallback)
+    /// let request = TransactionRequest::default();
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
+    ///
+    /// // Priority example: EIP-4844 overrides EIP-1559
+    /// let mut request = TransactionRequest::default()
+    ///     .max_fee_per_gas(2000000000) // EIP-1559 (ignored)
+    ///     .max_fee_per_blob_gas(1000000000); // EIP-4844 (takes priority)
+    /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
+    /// ```
     pub const fn minimal_tx_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
