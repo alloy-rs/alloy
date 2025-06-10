@@ -958,7 +958,8 @@ mod tests {
         let overrides_with_gas_limit = BlockOverrides::default().with_gas_limit(21000);
         assert!(!overrides_with_gas_limit.is_empty());
 
-        let overrides_with_coinbase = BlockOverrides::default().with_coinbase(Address::with_last_byte(1));
+        let overrides_with_coinbase =
+            BlockOverrides::default().with_coinbase(Address::with_last_byte(1));
         assert!(!overrides_with_coinbase.is_empty());
 
         let overrides_with_random = BlockOverrides::default().with_random(B256::with_last_byte(1));
@@ -967,7 +968,8 @@ mod tests {
         let overrides_with_base_fee = BlockOverrides::default().with_base_fee(U256::from(20));
         assert!(!overrides_with_base_fee.is_empty());
 
-        let overrides_with_block_hash = BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
+        let overrides_with_block_hash =
+            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
         assert!(!overrides_with_block_hash.is_empty());
     }
 
