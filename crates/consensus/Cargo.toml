@@ -100,7 +100,8 @@ arbitrary = [
 	"alloy-primitives/arbitrary",
 	"alloy-serde?/arbitrary",
 	"alloy-trie/arbitrary",
-	"c-kzg?/arbitrary"
+	"c-kzg?/arbitrary",
+	"alloy-tx-envelope-macro/arbitrary"
 ]
 serde = [
 	"dep:serde",

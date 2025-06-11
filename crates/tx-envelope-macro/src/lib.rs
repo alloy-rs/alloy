@@ -8,11 +8,12 @@
 
 use std::fmt::Debug;
 
+use alloy_primitives::U8;
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, Data, DeriveInput,
-    Expr, Fields, Ident, MetaNameValue, Path, Token, Type,
+    Fields, Ident, MetaNameValue, Path, Token, Type,
 };
 
 #[derive(Debug)]
@@ -29,7 +30,7 @@ struct Variant {
 }
 
 /// Implements the `TransactionEnvelope` trait and defines TxType enum.
-#[proc_macro_derive(TxEnvelope, attributes(envelope))]
+#[proc_macro_derive(TransactionEnvelope, attributes(envelope))]
 pub fn delegate(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -38,7 +39,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         Ident::new(&format!("{}Type", input_type_name), input_type_name.span());
     let mut alloy_consensus: Path = parse_quote!(::alloy_consensus);
     let generics = input.generics.clone();
-    let mut bounds = input.generics.into_token_stream();
+    let unwrapped_generics = generics.params.clone();
 
     let attrs = input.attrs.iter().filter_map(|attr| {
         if let syn::Meta::List(list) = &attr.meta {
@@ -65,19 +66,6 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             if value.path.is_ident("alloy_consensus") {
                 if let Ok(path) = syn::parse(value.value.to_token_stream().into()) {
                     alloy_consensus = path;
-                }
-            }
-
-            if value.path.is_ident("bound") {
-                if let Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit_str), .. }) = value.value {
-                    match lit_str.value().parse::<proc_macro2::TokenStream>() {
-                        Ok(tokens) => {
-                            bounds = quote!(<#tokens>);
-                        },
-                        Err(err) => {
-                            return syn::Error::new(lit_str.span(), err).to_compile_error().into()
-                        }
-                    }
                 }
             }
         }
@@ -151,6 +139,21 @@ pub fn delegate(input: TokenStream) -> TokenStream {
     }
 
     let variant_names = variants.iter().map(|v| &v.name).collect::<Vec<_>>();
+    let variant_types = variants.iter().map(|v| &v.ty).collect::<Vec<_>>();
+
+    let typed_variant_names = variants
+        .iter()
+        .filter_map(|v| matches!(v.kind, VariantKind::Typed(_)).then_some(&v.name))
+        .collect::<Vec<_>>();
+
+    let flattened_variant_names = variants
+        .iter()
+        .filter_map(|v| matches!(v.kind, VariantKind::Flattened).then_some(&v.name))
+        .collect::<Vec<_>>();
+
+    let transaction_bounds = quote! {
+        Self: core::fmt::Debug, #(#variant_types: #alloy_consensus::Transaction),*
+    };
 
     let tx_type_variants = variants.iter().map(|v| {
         let Variant { name, ty, kind } = v;
@@ -194,34 +197,164 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         }
     });
 
-    let maybe_imports = if cfg!(feature = "serde") {
+    let maybe_txtype_serde = if cfg!(feature = "serde") {
+        let u8_path = quote! { #alloy_consensus::private::alloy_primitives::U8 }.to_string();
+        let u64_path = quote! { #alloy_consensus::private::alloy_primitives::U64 }.to_string();
         quote! {
-            use #alloy_consensus::private::alloy_primitives::U8 as PrimitivesU8;
-            use #alloy_consensus::private::alloy_primitives::U64 as PrimitivesU64;
+            #[derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize)]
+            #[serde(into = #u8_path, try_from = #u64_path)]
         }
     } else {
         quote! {}
     };
 
-    let maybe_serde_derive = if cfg!(feature = "serde") {
+    let maybe_tx_arbitrary = if cfg!(feature = "arbitrary") {
+        let arbitrary_bounds = quote! {
+            #(#variant_types: for<'a> #alloy_consensus::private::arbitrary::Arbitrary<'a>),*
+        };
+
+        let num_variants = variants.len();
+        let range = 0..num_variants;
+
         quote! {
-            #[derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize)]
-            #[serde(
-                into = "PrimitivesU8", 
-                try_from = "PrimitivesU64",
-            )]
+            impl #generics #alloy_consensus::private::arbitrary::Arbitrary<'_> for #input_type_name #generics where #arbitrary_bounds {
+                fn arbitrary(u: &mut #alloy_consensus::private::arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+                    match u.int_in_range(0..=#num_variants-1)? {
+                        #(
+                            #range => Ok(Self::#variant_names(u.arbitrary()?)),
+                        )*
+                        _ => unreachable!(),
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let maybe_tx_serde = if cfg!(feature = "serde") {
+        let serde_bounds = quote! {  #input_type_name #generics: Clone, #(#variant_types: serde::Serialize + serde::de::DeserializeOwned),* };
+
+        let serde_bounds_str = serde_bounds.to_string();
+
+        let tagged_variants = variants.iter().filter_map(|v| {
+            let Variant { name, ty, kind } = v;
+            match kind {
+                VariantKind::Flattened => None,
+                VariantKind::Typed(tx_type) => {
+                    let tx_type = U8::from(*tx_type);
+                    let rename = format!("0x{:x}", tx_type);
+                    let maybe_alias = if rename.len() == 3 {
+                        let alias = format!("0x0{}", rename.chars().last().unwrap());
+                        quote! {
+                            alias = #alias
+                        }
+                    } else {
+                        quote! {}
+                    };
+                    Some(quote! {
+                        #[serde(rename = #rename, #maybe_alias)]
+                        #name(#ty)
+                    })
+                }
+            }
+        });
+
+        let untagged_variants = variants.iter().filter_map(|v| {
+            let Variant { name, ty, kind } = v;
+            match kind {
+                VariantKind::Flattened => Some(quote! {
+                    #name(#ty)
+                }),
+                VariantKind::Typed(_) => None,
+            }
+        });
+        quote! {
+            mod serde_impl {
+                //! NB: Why do we need this?
+                //!
+                //! Because the tag may be missing, we need an abstraction over tagged (with
+                //! type) and untagged (always legacy). This is [`MaybeTaggedTxEnvelope`].
+                //!
+                //! The tagged variant is [`TaggedTxEnvelope`], which always has a type tag.
+                //!
+                //! We serialize via [`TaggedTxEnvelope`] and deserialize via
+                //! [`MaybeTaggedTxEnvelope`].
+                use super::*;
+
+                #[derive(Debug, serde::Serialize, serde::Deserialize)]
+                #[serde(tag = "type", bound = #serde_bounds_str)]
+                pub(crate) enum TaggedTxTypes #generics {
+                    #(
+                        #tagged_variants
+                    ),*
+                }
+
+                impl #generics From<TaggedTxTypes #generics> for #input_type_name #generics {
+                    fn from(value: TaggedTxTypes #generics) -> Self {
+                        match value {
+                            #(
+                                TaggedTxTypes::#generics::#typed_variant_names(value) => Self::#typed_variant_names(value),
+                            )*
+                        }
+                    }
+                }
+
+                #[derive(Debug, serde::Serialize, serde::Deserialize)]
+                #[serde(untagged, bound = #serde_bounds_str)]
+                pub(crate) enum UntaggedTxTypes #generics {
+                    Tagged(TaggedTxTypes #generics),
+                    #(
+                        #untagged_variants
+                    ),*
+                }
+
+                impl #generics From<UntaggedTxTypes #generics> for #input_type_name #generics {
+                    fn from(value: UntaggedTxTypes #generics) -> Self {
+                        match value {
+                            UntaggedTxTypes::Tagged(value) => value.into(),
+                            #(
+                                UntaggedTxTypes::#flattened_variant_names(value) => Self::#flattened_variant_names(value),
+                            )*
+                        }
+                    }
+                }
+
+                impl #generics From<#input_type_name #generics> for UntaggedTxTypes #generics {
+                    fn from(value: #input_type_name #generics) -> Self {
+                        match value {
+                            #(
+                                #input_type_name::#generics::#flattened_variant_names(value) => Self::#flattened_variant_names(value)
+                            ),*
+                            #(
+                                #input_type_name::#generics::#typed_variant_names(value) => Self::Tagged(TaggedTxTypes::#typed_variant_names(value))
+                            ),*
+                        }
+                    }
+                }
+
+                impl #generics serde::Serialize for #input_type_name #generics where #serde_bounds {
+                    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                        UntaggedTxTypes::#generics::from(self.clone()).serialize(serializer)
+                    }
+                }
+
+                impl <'de, #unwrapped_generics> serde::Deserialize<'de> for #input_type_name #generics where #serde_bounds {
+                    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                        UntaggedTxTypes::#generics::deserialize(deserializer).map(Into::into)
+                    }
+                }
+            }
         }
     } else {
         quote! {}
     };
 
     quote! {
-        #maybe_imports
-
         /// Transaction types supported by [`#inputt_type_name`].
         #[repr(u8)]
         #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        #maybe_serde_derive
+        #maybe_txtype_serde
         pub enum #tx_type_enum_name {
             #(#tx_type_variants),*
         }
@@ -240,7 +373,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
 
         impl TryFrom<u8> for #tx_type_enum_name {
             type Error = #alloy_consensus::private::alloy_eips::eip2718::Eip2718Error;
-        
+
             fn try_from(value: u8) -> Result<Self, Self::Error> {
                 #(#try_from_impls);*
                 return Err(#alloy_consensus::private::alloy_eips::eip2718::Eip2718Error::UnexpectedType(value))
@@ -249,25 +382,25 @@ pub fn delegate(input: TokenStream) -> TokenStream {
 
         impl TryFrom<u64> for #tx_type_enum_name {
             type Error = &'static str;
-        
+
             fn try_from(value: u64) -> Result<Self, Self::Error> {
                 let err = || "invalid tx type";
                 let value: u8 = value.try_into().map_err(|_| err())?;
                 Self::try_from(value).map_err(|_| err())
             }
         }
-        
+
         impl TryFrom<#alloy_consensus::private::alloy_primitives::U8> for #tx_type_enum_name {
             type Error = #alloy_consensus::private::alloy_eips::eip2718::Eip2718Error;
-        
+
             fn try_from(value: #alloy_consensus::private::alloy_primitives::U8) -> Result<Self, Self::Error> {
                 value.to::<u8>().try_into()
             }
         }
-        
+
         impl TryFrom<#alloy_consensus::private::alloy_primitives::U64> for #tx_type_enum_name {
             type Error = &'static str;
-        
+
             fn try_from(value: #alloy_consensus::private::alloy_primitives::U64) -> Result<Self, Self::Error> {
                 value.to::<u64>().try_into()
             }
@@ -287,7 +420,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #bounds #alloy_consensus::Transaction for #input_type_name #generics {
+        impl #generics #alloy_consensus::Transaction for #input_type_name #generics where #transaction_bounds {
             #[inline]
             fn chain_id(&self) -> Option<u64> {
                 match self {
@@ -443,13 +576,13 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #bounds #alloy_consensus::private::alloy_eips::eip2718::IsTyped2718 for #input_type_name #generics {
+        impl #generics #alloy_consensus::private::alloy_eips::eip2718::IsTyped2718 for #input_type_name #generics {
             fn is_type(type_id: u8) -> bool {
                 <#tx_type_enum_name as IsTyped2718>::is_type(type_id)
             }
         }
 
-        impl #bounds #alloy_consensus::Typed2718 for #input_type_name #generics {
+        impl #generics #alloy_consensus::Typed2718 for #input_type_name #generics where #transaction_bounds {
             fn ty(&self) -> u8 {
                 match self {
                     #(
@@ -459,9 +592,12 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #bounds #alloy_consensus::TransactionEnvelope for #input_type_name #generics {
+        impl #generics #alloy_consensus::TransactionEnvelope for #input_type_name #generics where #transaction_bounds {
             type TxType = #tx_type_enum_name;
         }
+
+        #maybe_tx_serde
+        #maybe_tx_arbitrary
     }
     .into()
 }

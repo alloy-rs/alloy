@@ -1,8 +1,8 @@
 //! Contains the Ethereum transaction type identifier.
 
+use crate::TxType;
 use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
-use crate::TxType;
 
 impl TxType {
     /// Returns true if the transaction type is Legacy.

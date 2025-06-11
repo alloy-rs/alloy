@@ -2,7 +2,9 @@ use crate::{
     transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
     Transaction,
 };
-use alloy_eips::{eip2718::Eip2718Result, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718};
+use alloy_eips::{
+    eip2718::Eip2718Result, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+};
 use alloy_primitives::{Bytes, Signature, TxKind, B256, U256};
 use alloy_rlp::BufMut;
 use core::hash::{Hash, Hasher};

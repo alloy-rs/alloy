@@ -5,8 +5,8 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant},
         RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
-    EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip4844WithSidecar,
-    TxEip7702, TxLegacy,
+    EthereumTypedTransaction, Signed, Transaction, TransactionEnvelope, TxEip1559, TxEip2930,
+    TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
@@ -168,24 +168,8 @@ impl<T> EthereumTxEnvelope<T> {
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Clone, Debug, alloy_tx_envelope_macro::TxEnvelope)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "serde",
-    serde(
-        into = "serde_from::TaggedTxEnvelope<Eip4844>",
-        from = "serde_from::MaybeTaggedTxEnvelope<Eip4844>",
-        bound = "Eip4844: Clone + RlpEcdsaEncodableTx + serde::Serialize + serde::de::DeserializeOwned"
-    )
-)]
-#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(
-    all(any(test, feature = "arbitrary"), feature = "k256"),
-    arbitrary(
-        bound = "Eip4844: for<'a> arbitrary::Arbitrary<'a> + RlpEcdsaEncodableTx + SignableTransaction<Signature>"
-    )
-)]
-#[envelope(alloy_consensus = crate, tx_type_name = TxType, bound = "Eip4844: Transaction")]
+#[derive(Clone, Debug, TransactionEnvelope)]
+#[envelope(alloy_consensus = crate, tx_type_name = TxType)]
 #[doc(alias = "TransactionEnvelope")]
 pub enum EthereumTxEnvelope<Eip4844> {
     /// An untagged [`TxLegacy`].
