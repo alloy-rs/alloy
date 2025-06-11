@@ -28,6 +28,7 @@ alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-trie = { workspace = true, features = ["ethereum"] }
 alloy-serde = { workspace = true, optional = true }
+alloy-tx-envelope-macro.workspace = true
 
 # k256
 k256 = { workspace = true, features = ["ecdsa"], optional = true }
@@ -102,15 +103,16 @@ arbitrary = [
 	"c-kzg?/arbitrary"
 ]
 serde = [
-    "dep:serde",
-    "alloy-primitives/serde",
-    "dep:alloy-serde",
-    "alloy-eips/serde",
-    "alloy-trie/serde",
-    "c-kzg?/serde",
-    "either/serde",
-    "k256?/serde",
-    "rand?/serde",
-    "secp256k1?/serde"
+	"dep:serde",
+	"alloy-primitives/serde",
+	"dep:alloy-serde",
+	"alloy-eips/serde",
+	"alloy-trie/serde",
+	"c-kzg?/serde",
+	"either/serde",
+	"k256?/serde",
+	"rand?/serde",
+	"secp256k1?/serde",
+	"alloy-tx-envelope-macro/serde"
 ]
 serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]

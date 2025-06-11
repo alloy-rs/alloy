@@ -38,9 +38,9 @@ pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
-    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction, TxEip1559,
-    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
-    TxType, TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction,
+    TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
+    TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction
 };
 
 pub use alloy_eips::{
@@ -79,4 +79,12 @@ pub mod serde_bincode_compat {
         receipt::serde_bincode_compat::*,
         transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
+}
+
+#[doc(hidden)]
+pub mod private {
+    pub use alloy_primitives;
+    pub use alloy_eips;
+    #[cfg(feature = "serde")]
+    pub use serde;
 }

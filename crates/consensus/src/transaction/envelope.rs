@@ -3,7 +3,6 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        tx_type::TxType,
         RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
     EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip4844WithSidecar,
@@ -15,7 +14,7 @@ use alloy_eips::{
     eip7594::Encodable7594,
     Typed2718,
 };
-use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, Signature, TxKind, B256, U256};
 use alloy_rlp::{Decodable, Encodable};
 use core::{
     fmt::Debug,
@@ -169,7 +168,7 @@ impl<T> EthereumTxEnvelope<T> {
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, alloy_tx_envelope_macro::TxEnvelope)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
@@ -186,13 +185,17 @@ impl<T> EthereumTxEnvelope<T> {
         bound = "Eip4844: for<'a> arbitrary::Arbitrary<'a> + RlpEcdsaEncodableTx + SignableTransaction<Signature>"
     )
 )]
+#[envelope(alloy_consensus = crate, tx_type_name = TxType, bound = "Eip4844: Transaction")]
 #[doc(alias = "TransactionEnvelope")]
 pub enum EthereumTxEnvelope<Eip4844> {
     /// An untagged [`TxLegacy`].
+    #[envelope(ty = 0)]
     Legacy(Signed<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
+    #[envelope(ty = 1)]
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
+    #[envelope(ty = 2)]
     Eip1559(Signed<TxEip1559>),
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
@@ -201,8 +204,10 @@ pub enum EthereumTxEnvelope<Eip4844> {
     ///
     /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
+    #[envelope(ty = 3)]
     Eip4844(Signed<Eip4844>),
     /// A [`TxEip7702`] tagged with type 4.
+    #[envelope(ty = 4)]
     Eip7702(Signed<TxEip7702>),
 }
 
@@ -545,21 +550,6 @@ impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844>
     }
 }
 
-impl<T> Typed2718 for Signed<T>
-where
-    T: RlpEcdsaEncodableTx + Send + Sync + Typed2718,
-{
-    fn ty(&self) -> u8 {
-        self.tx().ty()
-    }
-}
-
-impl<T> IsTyped2718 for EthereumTxEnvelope<T> {
-    fn is_type(type_id: u8) -> bool {
-        <TxType as IsTyped2718>::is_type(type_id)
-    }
-}
-
 impl<T> Encodable2718 for Signed<T>
 where
     T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
@@ -598,7 +588,7 @@ where
 
 impl<Eip4844> Encodable2718 for EthereumTxEnvelope<Eip4844>
 where
-    Eip4844: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+    Eip4844: RlpEcdsaEncodableTx + Transaction + Send + Sync,
 {
     fn encode_2718_len(&self) -> usize {
         self.eip2718_encoded_length()
@@ -630,209 +620,6 @@ where
             Self::Eip1559(tx) => *tx.hash(),
             Self::Eip4844(tx) => *tx.hash(),
             Self::Eip7702(tx) => *tx.hash(),
-        }
-    }
-}
-
-impl<Eip4844> Transaction for EthereumTxEnvelope<Eip4844>
-where
-    Self: Typed2718,
-    Eip4844: Transaction + Send + Sync,
-{
-    #[inline]
-    fn chain_id(&self) -> Option<ChainId> {
-        match self {
-            Self::Legacy(tx) => tx.tx().chain_id(),
-            Self::Eip2930(tx) => tx.tx().chain_id(),
-            Self::Eip1559(tx) => tx.tx().chain_id(),
-            Self::Eip4844(tx) => tx.tx().chain_id(),
-            Self::Eip7702(tx) => tx.tx().chain_id(),
-        }
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.tx().nonce(),
-            Self::Eip2930(tx) => tx.tx().nonce(),
-            Self::Eip1559(tx) => tx.tx().nonce(),
-            Self::Eip4844(tx) => tx.tx().nonce(),
-            Self::Eip7702(tx) => tx.tx().nonce(),
-        }
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.tx().gas_limit(),
-            Self::Eip2930(tx) => tx.tx().gas_limit(),
-            Self::Eip1559(tx) => tx.tx().gas_limit(),
-            Self::Eip4844(tx) => tx.tx().gas_limit(),
-            Self::Eip7702(tx) => tx.tx().gas_limit(),
-        }
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().gas_price(),
-            Self::Eip2930(tx) => tx.tx().gas_price(),
-            Self::Eip1559(tx) => tx.tx().gas_price(),
-            Self::Eip4844(tx) => tx.tx().gas_price(),
-            Self::Eip7702(tx) => tx.tx().gas_price(),
-        }
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip2930(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip1559(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip4844(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip7702(tx) => tx.tx().max_fee_per_gas(),
-        }
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip2930(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip1559(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip4844(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip7702(tx) => tx.tx().max_priority_fee_per_gas(),
-        }
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip2930(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip1559(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip4844(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip7702(tx) => tx.tx().max_fee_per_blob_gas(),
-        }
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
-        }
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip2930(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip1559(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip4844(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip7702(tx) => tx.tx().effective_gas_price(base_fee),
-        }
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        match self {
-            Self::Legacy(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip2930(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip1559(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip4844(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip7702(tx) => tx.tx().is_dynamic_fee(),
-        }
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        match self {
-            Self::Legacy(tx) => tx.tx().kind(),
-            Self::Eip2930(tx) => tx.tx().kind(),
-            Self::Eip1559(tx) => tx.tx().kind(),
-            Self::Eip4844(tx) => tx.tx().kind(),
-            Self::Eip7702(tx) => tx.tx().kind(),
-        }
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        match self {
-            Self::Legacy(tx) => tx.tx().is_create(),
-            Self::Eip2930(tx) => tx.tx().is_create(),
-            Self::Eip1559(tx) => tx.tx().is_create(),
-            Self::Eip4844(tx) => tx.tx().is_create(),
-            Self::Eip7702(tx) => tx.tx().is_create(),
-        }
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        match self {
-            Self::Legacy(tx) => tx.tx().value(),
-            Self::Eip2930(tx) => tx.tx().value(),
-            Self::Eip1559(tx) => tx.tx().value(),
-            Self::Eip4844(tx) => tx.tx().value(),
-            Self::Eip7702(tx) => tx.tx().value(),
-        }
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        match self {
-            Self::Legacy(tx) => tx.tx().input(),
-            Self::Eip2930(tx) => tx.tx().input(),
-            Self::Eip1559(tx) => tx.tx().input(),
-            Self::Eip4844(tx) => tx.tx().input(),
-            Self::Eip7702(tx) => tx.tx().input(),
-        }
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        match self {
-            Self::Legacy(tx) => tx.tx().access_list(),
-            Self::Eip2930(tx) => tx.tx().access_list(),
-            Self::Eip1559(tx) => tx.tx().access_list(),
-            Self::Eip4844(tx) => tx.tx().access_list(),
-            Self::Eip7702(tx) => tx.tx().access_list(),
-        }
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        match self {
-            Self::Legacy(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip2930(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip1559(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip4844(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip7702(tx) => tx.tx().blob_versioned_hashes(),
-        }
-    }
-
-    fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
-        match self {
-            Self::Legacy(tx) => tx.tx().authorization_list(),
-            Self::Eip2930(tx) => tx.tx().authorization_list(),
-            Self::Eip1559(tx) => tx.tx().authorization_list(),
-            Self::Eip4844(tx) => tx.tx().authorization_list(),
-            Self::Eip7702(tx) => tx.tx().authorization_list(),
-        }
-    }
-}
-
-impl<Eip4844: Typed2718> Typed2718 for EthereumTxEnvelope<Eip4844> {
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Legacy(tx) => tx.tx().ty(),
-            Self::Eip2930(tx) => tx.tx().ty(),
-            Self::Eip1559(tx) => tx.tx().ty(),
-            Self::Eip4844(tx) => tx.tx().ty(),
-            Self::Eip7702(tx) => tx.tx().ty(),
         }
     }
 }

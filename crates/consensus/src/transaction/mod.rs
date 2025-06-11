@@ -18,7 +18,7 @@ pub use eip7702::TxEip7702;
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
-pub use envelope::{EthereumTxEnvelope, TxEnvelope};
+pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
@@ -52,7 +52,6 @@ mod typed;
 pub use typed::{EthereumTypedTransaction, TypedTransaction};
 
 mod tx_type;
-pub use tx_type::TxType;
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
@@ -225,6 +224,12 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     fn authorization_count(&self) -> Option<u64> {
         self.authorization_list().map(|auths| auths.len() as u64)
     }
+}
+
+/// A typed transaction envelope.
+pub trait TransactionEnvelope: Transaction {
+    /// The enum of transaction types.
+    type TxType: Typed2718;
 }
 
 /// A signable transaction.
