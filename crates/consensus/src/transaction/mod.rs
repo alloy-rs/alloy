@@ -60,7 +60,7 @@ mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
 
 #[cfg(feature = "serde")]
-pub use legacy::signed_legacy_serde;
+pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
 
 /// Bincode-compatible serde implementations for transaction types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]

@@ -29,6 +29,12 @@ struct Variant {
     kind: VariantKind,
 }
 
+impl Variant {
+    fn is_legacy(&self) -> bool {
+        matches!(self.kind, VariantKind::Typed(0))
+    }
+}
+
 /// Implements the `TransactionEnvelope` trait and defines TxType enum.
 #[proc_macro_derive(TransactionEnvelope, attributes(envelope))]
 pub fn delegate(input: TokenStream) -> TokenStream {
@@ -146,9 +152,14 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         .filter_map(|v| matches!(v.kind, VariantKind::Typed(_)).then_some(&v.name))
         .collect::<Vec<_>>();
 
-    let flattened_variant_names = variants
+    let flattened_names = variants
         .iter()
         .filter_map(|v| matches!(v.kind, VariantKind::Flattened).then_some(&v.name))
+        .collect::<Vec<_>>();
+
+    let flattened_types = variants
+        .iter()
+        .filter_map(|v| matches!(v.kind, VariantKind::Flattened).then_some(&v.ty))
         .collect::<Vec<_>>();
 
     let transaction_bounds = quote! {
@@ -247,28 +258,56 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                     let maybe_alias = if rename.len() == 3 {
                         let alias = format!("0x0{}", rename.chars().last().unwrap());
                         quote! {
-                            alias = #alias
+                            , alias = #alias
+                        }
+                    } else {
+                        quote! {}
+                    };
+                    let maybe_with = if v.is_legacy() {
+                        let path = quote! {
+                            #alloy_consensus::transaction::legacy::signed_legacy_serde
+                        }
+                        .to_string();
+                        quote! {
+                            , with = #path
                         }
                     } else {
                         quote! {}
                     };
                     Some(quote! {
-                        #[serde(rename = #rename, #maybe_alias)]
+                        #[serde(rename = #rename #maybe_alias #maybe_with)]
                         #name(#ty)
                     })
                 }
             }
         });
 
-        let untagged_variants = variants.iter().filter_map(|v| {
-            let Variant { name, ty, kind } = v;
-            match kind {
-                VariantKind::Flattened => Some(quote! {
-                    #name(#ty)
-                }),
-                VariantKind::Typed(_) => None,
-            }
-        });
+        let (
+            maybe_untagged_legacy_variant,
+            maybe_untagged_legacy_arm,
+            maybe_untagged_legacy_deserialize,
+        ) = if let Some(v) = variants.iter().find(|v| v.is_legacy()) {
+            let Variant { ty, name, .. } = v;
+
+            let variant = quote! {
+                UntaggedLegacy(#ty)
+            };
+
+            let arm = quote! {
+                UntaggedTxTypes::UntaggedLegacy(tx) => Self::#name(tx),
+            };
+
+            let deserialize = quote! {
+                if let Ok(val) = #alloy_consensus::transaction::legacy::untagged_legacy_serde::deserialize(deserializer).map(Self::UntaggedLegacy) {
+                    return Ok(val);
+                }
+            };
+
+            (variant, arm, deserialize)
+        } else {
+            (quote! {}, quote! {}, quote! {})
+        };
+
         quote! {
             mod serde_impl {
                 //! NB: Why do we need this?
@@ -281,6 +320,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                 //! We serialize via [`TaggedTxEnvelope`] and deserialize via
                 //! [`MaybeTaggedTxEnvelope`].
                 use super::*;
+                use #alloy_consensus::private::serde;
 
                 #[derive(Debug, serde::Serialize, serde::Deserialize)]
                 #[serde(tag = "type", bound = #serde_bounds_str)]
@@ -300,13 +340,48 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                #[derive(Debug, serde::Serialize, serde::Deserialize)]
+                #[derive(serde::Serialize)]
                 #[serde(untagged, bound = #serde_bounds_str)]
                 pub(crate) enum UntaggedTxTypes #generics {
                     Tagged(TaggedTxTypes #generics),
                     #(
-                        #untagged_variants
-                    ),*
+                        #flattened_names(#flattened_types),
+                    )*
+                    #maybe_untagged_legacy_variant
+                }
+
+                // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`]
+                // attempt. Note: This use private serde API
+                impl<'de, #unwrapped_generics> serde::Deserialize<'de> for UntaggedTxTypes #generics where #serde_bounds {
+                    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        let content = serde::__private::de::Content::deserialize(deserializer)?;
+                        let deserializer =
+                            serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
+
+                        let tagged_res =
+                            TaggedTxTypes::#generics::deserialize(deserializer).map(Self::Tagged);
+
+                        if tagged_res.is_ok() {
+                            // return tagged if successful
+                            return tagged_res;
+                        }
+
+                        // proceed with untagged variants
+                        #(
+                            if let Ok(val) = serde::Deserialize::deserialize(deserializer).map(Self::#flattened_names) {
+                                return Ok(val);
+                            }
+                        )*
+
+                        #maybe_untagged_legacy_deserialize
+
+                        // return the original error, which is more useful than the untagged error
+                        //  > "data did not match any variant of untagged enum MaybeTaggedTxEnvelope"
+                        tagged_res
+                    }
                 }
 
                 impl #generics From<UntaggedTxTypes #generics> for #input_type_name #generics {
@@ -314,8 +389,9 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                         match value {
                             UntaggedTxTypes::Tagged(value) => value.into(),
                             #(
-                                UntaggedTxTypes::#flattened_variant_names(value) => Self::#flattened_variant_names(value),
+                                UntaggedTxTypes::#flattened_names(value) => Self::#flattened_names(value),
                             )*
+                            #maybe_untagged_legacy_arm
                         }
                     }
                 }
@@ -324,7 +400,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                     fn from(value: #input_type_name #generics) -> Self {
                         match value {
                             #(
-                                #input_type_name::#generics::#flattened_variant_names(value) => Self::#flattened_variant_names(value)
+                                #input_type_name::#generics::#flattened_names(value) => Self::#flattened_names(value)
                             ),*
                             #(
                                 #input_type_name::#generics::#typed_variant_names(value) => Self::Tagged(TaggedTxTypes::#typed_variant_names(value))

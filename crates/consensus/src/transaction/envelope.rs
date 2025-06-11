@@ -608,175 +608,6 @@ where
     }
 }
 
-#[cfg(feature = "serde")]
-mod serde_from {
-    //! NB: Why do we need this?
-    //!
-    //! Because the tag may be missing, we need an abstraction over tagged (with
-    //! type) and untagged (always legacy). This is [`MaybeTaggedTxEnvelope`].
-    //!
-    //! The tagged variant is [`TaggedTxEnvelope`], which always has a type tag.
-    //!
-    //! We serialize via [`TaggedTxEnvelope`] and deserialize via
-    //! [`MaybeTaggedTxEnvelope`].
-    use crate::{
-        transaction::RlpEcdsaEncodableTx, EthereumTxEnvelope, Signed, TxEip1559, TxEip2930,
-        TxEip7702, TxLegacy,
-    };
-
-    #[derive(Debug, serde::Deserialize)]
-    pub(crate) struct UntaggedLegacy {
-        #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
-        pub _ty: Option<()>,
-        #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
-        pub tx: Signed<TxLegacy>,
-    }
-
-    #[derive(Debug)]
-    pub(crate) enum MaybeTaggedTxEnvelope<Eip4844> {
-        Tagged(TaggedTxEnvelope<Eip4844>),
-        Untagged(UntaggedLegacy),
-    }
-
-    // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`]
-    // attempt. Note: This use private serde API
-    impl<'de, Eip4844> serde::Deserialize<'de> for MaybeTaggedTxEnvelope<Eip4844>
-    where
-        Eip4844: Clone + RlpEcdsaEncodableTx + serde::Serialize + serde::de::DeserializeOwned,
-    {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let content = serde::__private::de::Content::deserialize(deserializer)?;
-            let deserializer =
-                serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
-
-            let tagged_res =
-                TaggedTxEnvelope::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Tagged);
-
-            if tagged_res.is_ok() {
-                // return tagged if successful
-                return tagged_res;
-            }
-
-            // proceed with untagged legacy
-            if let Ok(val) =
-                UntaggedLegacy::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Untagged)
-            {
-                return Ok(val);
-            }
-
-            // return the original error, which is more useful than the untagged error
-            //  > "data did not match any variant of untagged enum MaybeTaggedTxEnvelope"
-            tagged_res
-        }
-    }
-
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    #[serde(
-        tag = "type",
-        bound = "Eip4844: Clone + RlpEcdsaEncodableTx + serde::Serialize + serde::de::DeserializeOwned"
-    )]
-    pub(crate) enum TaggedTxEnvelope<Eip4844> {
-        #[serde(rename = "0x0", alias = "0x00", with = "crate::transaction::signed_legacy_serde")]
-        Legacy(Signed<TxLegacy>),
-        #[serde(rename = "0x1", alias = "0x01")]
-        Eip2930(Signed<TxEip2930>),
-        #[serde(rename = "0x2", alias = "0x02")]
-        Eip1559(Signed<TxEip1559>),
-        #[serde(rename = "0x3", alias = "0x03")]
-        Eip4844(Signed<Eip4844>),
-        #[serde(rename = "0x4", alias = "0x04")]
-        Eip7702(Signed<TxEip7702>),
-    }
-
-    impl<Eip4844> From<MaybeTaggedTxEnvelope<Eip4844>> for EthereumTxEnvelope<Eip4844> {
-        fn from(value: MaybeTaggedTxEnvelope<Eip4844>) -> Self {
-            match value {
-                MaybeTaggedTxEnvelope::Tagged(tagged) => tagged.into(),
-                MaybeTaggedTxEnvelope::Untagged(UntaggedLegacy { tx, .. }) => Self::Legacy(tx),
-            }
-        }
-    }
-
-    impl<Eip4844> From<TaggedTxEnvelope<Eip4844>> for EthereumTxEnvelope<Eip4844> {
-        fn from(value: TaggedTxEnvelope<Eip4844>) -> Self {
-            match value {
-                TaggedTxEnvelope::Legacy(signed) => Self::Legacy(signed),
-                TaggedTxEnvelope::Eip2930(signed) => Self::Eip2930(signed),
-                TaggedTxEnvelope::Eip1559(signed) => Self::Eip1559(signed),
-                TaggedTxEnvelope::Eip4844(signed) => Self::Eip4844(signed),
-                TaggedTxEnvelope::Eip7702(signed) => Self::Eip7702(signed),
-            }
-        }
-    }
-
-    impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for TaggedTxEnvelope<Eip4844> {
-        fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
-            match value {
-                EthereumTxEnvelope::Legacy(signed) => Self::Legacy(signed),
-                EthereumTxEnvelope::Eip2930(signed) => Self::Eip2930(signed),
-                EthereumTxEnvelope::Eip1559(signed) => Self::Eip1559(signed),
-                EthereumTxEnvelope::Eip4844(signed) => Self::Eip4844(signed),
-                EthereumTxEnvelope::Eip7702(signed) => Self::Eip7702(signed),
-            }
-        }
-    }
-
-    // <https://github.com/succinctlabs/kona/issues/31>
-    #[test]
-    fn serde_block_tx() {
-        let rpc_tx = r#"{
-      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
-      "blockNumber": "0x6edcde",
-      "transactionIndex": "0x7",
-      "hash": "0x2cb125e083d6d2631e3752bd2b3d757bf31bf02bfe21de0ffa46fbb118d28b19",
-      "from": "0x03e5badf3bb1ade1a8f33f94536c827b6531948d",
-      "to": "0x3267e72dc8780a1512fa69da7759ec66f30350e3",
-      "input": "0x62e4c545000000000000000000000000464c8ec100f2f42fb4e42e07e203da2324f9fc6700000000000000000000000003e5badf3bb1ade1a8f33f94536c827b6531948d000000000000000000000000a064bfb5c7e81426647dc20a0d854da1538559dc00000000000000000000000000000000000000000000000000c6f3b40b6c0000",
-      "nonce": "0x2a8",
-      "value": "0x0",
-      "gas": "0x28afd",
-      "gasPrice": "0x23ec5dbc2",
-      "accessList": [],
-      "chainId": "0xaa36a7",
-      "type": "0x0",
-      "v": "0x1546d71",
-      "r": "0x809b9f0a1777e376cd1ee5d2f551035643755edf26ea65b7a00c822a24504962",
-      "s": "0x6a57bb8e21fe85c7e092868ee976fef71edca974d8c452fcf303f9180c764f64"
-    }"#;
-
-        let _ = serde_json::from_str::<MaybeTaggedTxEnvelope<crate::TxEip4844>>(rpc_tx).unwrap();
-    }
-
-    // <https://github.com/succinctlabs/kona/issues/31>
-    #[test]
-    fn serde_block_tx_legacy_chain_id() {
-        let rpc_tx = r#"{
-      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
-      "blockNumber": "0x6edcde",
-      "transactionIndex": "0x8",
-      "hash": "0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6",
-      "from": "0x8b87f0a788cc14b4f0f374da59920f5017ff05de",
-      "to": "0xcb33aa5b38d79e3d9fa8b10aff38aa201399a7e3",
-      "input": "0xaf7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce80000000000000000000000000000000000000000000000000000000000000064",
-      "nonce": "0x2",
-      "value": "0x0",
-      "gas": "0x2dc6c0",
-      "gasPrice": "0x18ef61d0a",
-      "accessList": [],
-      "chainId": "0xaa36a7",
-      "type": "0x0",
-      "v": "0x1c",
-      "r": "0x5e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664",
-      "s": "0x2353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4"
-    }"#;
-
-        let _ = serde_json::from_str::<TaggedTxEnvelope<crate::TxEip4844>>(rpc_tx).unwrap();
-    }
-}
-
 /// Bincode-compatible [`EthereumTxEnvelope`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub mod serde_bincode_compat {
@@ -1728,5 +1559,57 @@ mod tests {
             &b256!("0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06"),
             "hash should match the transaction hash"
         );
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x7",
+      "hash": "0x2cb125e083d6d2631e3752bd2b3d757bf31bf02bfe21de0ffa46fbb118d28b19",
+      "from": "0x03e5badf3bb1ade1a8f33f94536c827b6531948d",
+      "to": "0x3267e72dc8780a1512fa69da7759ec66f30350e3",
+      "input": "0x62e4c545000000000000000000000000464c8ec100f2f42fb4e42e07e203da2324f9fc6700000000000000000000000003e5badf3bb1ade1a8f33f94536c827b6531948d000000000000000000000000a064bfb5c7e81426647dc20a0d854da1538559dc00000000000000000000000000000000000000000000000000c6f3b40b6c0000",
+      "nonce": "0x2a8",
+      "value": "0x0",
+      "gas": "0x28afd",
+      "gasPrice": "0x23ec5dbc2",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1546d71",
+      "r": "0x809b9f0a1777e376cd1ee5d2f551035643755edf26ea65b7a00c822a24504962",
+      "s": "0x6a57bb8e21fe85c7e092868ee976fef71edca974d8c452fcf303f9180c764f64"
+    }"#;
+
+        let _ = serde_json::from_str::<TxEnvelope>(rpc_tx).unwrap();
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx_legacy_chain_id() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x8",
+      "hash": "0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6",
+      "from": "0x8b87f0a788cc14b4f0f374da59920f5017ff05de",
+      "to": "0xcb33aa5b38d79e3d9fa8b10aff38aa201399a7e3",
+      "input": "0xaf7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce80000000000000000000000000000000000000000000000000000000000000064",
+      "nonce": "0x2",
+      "value": "0x0",
+      "gas": "0x2dc6c0",
+      "gasPrice": "0x18ef61d0a",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1c",
+      "r": "0x5e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664",
+      "s": "0x2353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4"
+    }"#;
+
+        let _ = serde_json::from_str::<TxEnvelope>(rpc_tx).unwrap();
     }
 }

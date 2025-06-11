@@ -27,12 +27,9 @@ workspace = true
 
 [dependencies]
 syn = "2.0"
-proc-macro2 = "1.0"
 quote = "1.0"
 
 alloy-primitives.workspace = true
-
-itertools.workspace = true
 
 [features]
 arbitrary = [
