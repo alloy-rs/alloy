@@ -167,7 +167,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Modifies the ERC20 allowance of an account.
     async fn anvil_set_erc20_allowance(
         &self,
-        address: Address,
+        owner: Address,
         spender: Address,
         token: Address,
         allowance: U256,
@@ -365,12 +365,12 @@ where
 
     async fn anvil_set_erc20_allowance(
         &self,
-        address: Address,
+        owner: Address,
         spender: Address,
         token: Address,
         allowance: U256,
     ) -> TransportResult<TxHash> {
-        self.client().request("anvil_setERC20Allowance", (address, spender, token, allowance)).await
+        self.client().request("anvil_setERC20Allowance", (owner, spender, token, allowance)).await
     }
 }
 
