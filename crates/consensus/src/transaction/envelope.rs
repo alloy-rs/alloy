@@ -5,7 +5,7 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant},
         RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
-    EthereumTypedTransaction, Signed, Transaction, TransactionEnvelope, TxEip1559, TxEip2930,
+    EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
 use alloy_eips::{
@@ -15,7 +15,7 @@ use alloy_eips::{
     Typed2718,
 };
 use alloy_primitives::{Bytes, Signature, TxKind, B256, U256};
-use alloy_rlp::{Decodable, Encodable};
+use alloy_rlp::Decodable;
 use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -499,19 +499,6 @@ where
     }
 }
 
-impl<Eip4844> Encodable for EthereumTxEnvelope<Eip4844>
-where
-    Self: Encodable2718,
-{
-    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.network_encode(out)
-    }
-
-    fn length(&self) -> usize {
-        self.network_len()
-    }
-}
-
 impl<Eip4844: RlpEcdsaDecodableTx> Decodable for EthereumTxEnvelope<Eip4844> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self::network_decode(buf)?)
@@ -567,44 +554,6 @@ where
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         T::rlp_decode_signed(buf).map_err(Into::into)
-    }
-}
-
-impl<Eip4844> Encodable2718 for EthereumTxEnvelope<Eip4844>
-where
-    Eip4844: RlpEcdsaEncodableTx + Transaction + Send + Sync,
-{
-    fn encode_2718_len(&self) -> usize {
-        self.eip2718_encoded_length()
-    }
-
-    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
-        match self {
-            // Legacy transactions have no difference between network and 2718
-            Self::Legacy(tx) => tx.eip2718_encode(out),
-            Self::Eip2930(tx) => {
-                tx.eip2718_encode(out);
-            }
-            Self::Eip1559(tx) => {
-                tx.eip2718_encode(out);
-            }
-            Self::Eip4844(tx) => {
-                tx.eip2718_encode(out);
-            }
-            Self::Eip7702(tx) => {
-                tx.eip2718_encode(out);
-            }
-        }
-    }
-
-    fn trie_hash(&self) -> B256 {
-        match self {
-            Self::Legacy(tx) => *tx.hash(),
-            Self::Eip2930(tx) => *tx.hash(),
-            Self::Eip1559(tx) => *tx.hash(),
-            Self::Eip4844(tx) => *tx.hash(),
-            Self::Eip7702(tx) => *tx.hash(),
-        }
     }
 }
 

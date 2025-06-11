@@ -166,6 +166,14 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         Self: core::fmt::Debug, #(#variant_types: #alloy_consensus::Transaction),*
     };
 
+    let typed_bounds = quote! {
+        #(#variant_types: #alloy_consensus::private::alloy_eips::eip2718::Typed2718),*
+    };
+
+    let encodable_bounds = quote! {
+        #(#variant_types: #alloy_consensus::private::alloy_eips::Encodable2718),*
+    };
+
     let tx_type_variants = variants.iter().map(|v| {
         let Variant { name, ty, kind } = v;
         match kind {
@@ -658,13 +666,49 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #generics #alloy_consensus::Typed2718 for #input_type_name #generics where #transaction_bounds {
+        impl #generics #alloy_consensus::Typed2718 for #input_type_name #generics where #typed_bounds {
             fn ty(&self) -> u8 {
                 match self {
                     #(
                         Self::#variant_names(tx) => tx.ty(),
                     )*
                 }
+            }
+        }
+
+        impl #generics #alloy_consensus::private::alloy_eips::Encodable2718 for #input_type_name #generics where #encodable_bounds {
+            fn encode_2718_len(&self) -> usize {
+                match self {
+                    #(
+                        Self::#variant_names(tx) => tx.encode_2718_len(),
+                    )*
+                }
+            }
+
+            fn encode_2718(&self, out: &mut dyn #alloy_consensus::private::alloy_rlp::BufMut) {
+                match self {
+                    #(
+                        Self::#variant_names(tx) => tx.encode_2718(out),
+                    )*
+                }
+            }
+
+            fn trie_hash(&self) -> B256 {
+                match self {
+                    #(
+                        Self::#variant_names(tx) => tx.trie_hash(),
+                    )*
+                }
+            }
+        }
+
+        impl #generics #alloy_consensus::private::alloy_rlp::Encodable for #input_type_name #generics where #encodable_bounds {
+            fn encode(&self, out: &mut dyn #alloy_consensus::private::alloy_rlp::BufMut) {
+                self.network_encode(out)
+            }
+
+            fn length(&self) -> usize {
+                self.network_len()
             }
         }
 
