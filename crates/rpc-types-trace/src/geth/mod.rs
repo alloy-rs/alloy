@@ -307,6 +307,24 @@ impl GethDebugTracerType {
     pub const fn is_js(&self) -> bool {
         matches!(self, Self::JsTracer(_))
     }
+
+    /// Returns the tracer type as a string.
+    ///
+    /// If this is not a builtin tracer, it returns the captured string, which could be JavaScript
+    /// code or a custom identifier such as `"tracer": "stylusTracer"`
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::BuiltInTracer(tracer) => match tracer {
+                GethDebugBuiltInTracerType::FourByteTracer => "4byteTracer",
+                GethDebugBuiltInTracerType::CallTracer => "callTracer",
+                GethDebugBuiltInTracerType::FlatCallTracer => "flatCallTracer",
+                GethDebugBuiltInTracerType::PreStateTracer => "prestateTracer",
+                GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
+                GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
+            },
+            Self::JsTracer(code) => code,
+        }
+    }
 }
 
 impl From<GethDebugBuiltInTracerType> for GethDebugTracerType {
