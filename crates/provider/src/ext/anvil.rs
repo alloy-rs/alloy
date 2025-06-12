@@ -162,7 +162,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         address: Address,
         token_address: Address,
         balance: U256,
-    ) -> TransportResult<TxHash>;
+    ) -> TransportResult<()>;
 
     /// Modifies the ERC20 allowance of an account.
     async fn anvil_set_erc20_allowance(
@@ -171,7 +171,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         spender: Address,
         token: Address,
         allowance: U256,
-    ) -> TransportResult<TxHash>;
+    ) -> TransportResult<()>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -359,7 +359,7 @@ where
         address: Address,
         token_address: Address,
         balance: U256,
-    ) -> TransportResult<TxHash> {
+    ) -> TransportResult<()> {
         self.client().request("anvil_dealERC20", (address, token_address, balance)).await
     }
 
@@ -369,7 +369,7 @@ where
         spender: Address,
         token: Address,
         allowance: U256,
-    ) -> TransportResult<TxHash> {
+    ) -> TransportResult<()> {
         self.client().request("anvil_setERC20Allowance", (owner, spender, token, allowance)).await
     }
 }
