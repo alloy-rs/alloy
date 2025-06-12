@@ -9,17 +9,12 @@ use crate::{
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
-    eip2930::AccessList,
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip7594::Encodable7594,
     Typed2718,
 };
-use alloy_primitives::{Bytes, Signature, TxKind, B256, U256};
-use alloy_rlp::Decodable;
-use core::{
-    fmt::Debug,
-    hash::{Hash, Hasher},
-};
+use alloy_primitives::{Bytes, Signature, B256};
+use core::fmt::Debug;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
@@ -212,15 +207,6 @@ where
 }
 
 impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> Eq for EthereumTxEnvelope<Eip4844> {}
-
-impl<Eip4844> Hash for EthereumTxEnvelope<Eip4844>
-where
-    Self: Encodable2718,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.trie_hash().hash(state);
-    }
-}
 
 impl<T, Eip4844> From<Signed<T>> for EthereumTxEnvelope<Eip4844>
 where
@@ -499,28 +485,6 @@ where
     }
 }
 
-impl<Eip4844: RlpEcdsaDecodableTx> Decodable for EthereumTxEnvelope<Eip4844> {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self::network_decode(buf)?)
-    }
-}
-
-impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844> {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
-            TxType::Eip2930 => Ok(TxEip2930::rlp_decode_signed(buf)?.into()),
-            TxType::Eip1559 => Ok(TxEip1559::rlp_decode_signed(buf)?.into()),
-            TxType::Eip4844 => Ok(Self::Eip4844(Eip4844::rlp_decode_signed(buf)?)),
-            TxType::Eip7702 => Ok(TxEip7702::rlp_decode_signed(buf)?.into()),
-            TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
-        }
-    }
-
-    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
-    }
-}
-
 impl<T> Encodable2718 for Signed<T>
 where
     T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
@@ -713,7 +677,7 @@ mod tests {
     use super::*;
     use crate::{
         transaction::{Recovered, SignableTransaction},
-        TxEip4844, TxEip4844WithSidecar,
+        Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
     use alloy_eips::{
@@ -724,6 +688,7 @@ mod tests {
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, Signature, U256};
+    use alloy_rlp::Decodable;
     use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[test]

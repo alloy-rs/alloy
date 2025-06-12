@@ -556,3 +556,27 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
+
+    #[test]
+    fn test_custom_envelope() {
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = MyTxType)]
+        enum MyEnvelope {
+            #[envelope(flatten)]
+            Ethereum(TxEnvelope),
+            #[envelope(ty = 10)]
+            MyTx(Signed<TxEip1559>),
+            #[envelope(ty = 11)]
+            AnotherMyTx(Signed<TxEip1559>),
+        }
+
+        assert_eq!(u8::from(MyTxType::Ethereum(TxType::Eip1559)), 2);
+        assert_eq!(u8::from(MyTxType::MyTx), 10);
+        assert_eq!(MyTxType::try_from(2u8).unwrap(), MyTxType::Ethereum(TxType::Eip1559));
+        assert_eq!(MyTxType::try_from(10u8).unwrap(), MyTxType::MyTx);
+    }
+}
