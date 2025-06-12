@@ -162,7 +162,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         address: Address,
         token_address: Address,
         balance: U256,
-    ) -> TransportResult<TxHash>;
+    ) -> TransportResult<()>;
 
     /// Modifies the ERC20 allowance of an account.
     async fn anvil_set_erc20_allowance(
@@ -171,7 +171,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         spender: Address,
         token: Address,
         allowance: U256,
-    ) -> TransportResult<TxHash>;
+    ) -> TransportResult<()>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -359,7 +359,7 @@ where
         address: Address,
         token_address: Address,
         balance: U256,
-    ) -> TransportResult<TxHash> {
+    ) -> TransportResult<()> {
         self.client().request("anvil_dealERC20", (address, token_address, balance)).await
     }
 
@@ -369,7 +369,7 @@ where
         spender: Address,
         token: Address,
         allowance: U256,
-    ) -> TransportResult<TxHash> {
+    ) -> TransportResult<()> {
         self.client().request("anvil_setERC20Allowance", (owner, spender, token, allowance)).await
     }
 }
@@ -383,10 +383,12 @@ mod tests {
     };
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::B256;
+    use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_sol_types::{sol, SolCall};
 
     // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
+    const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
 
     #[tokio::test]
     async fn test_anvil_impersonate_account_stop_impersonating_account() {
@@ -1054,5 +1056,58 @@ mod tests {
         let res = provider.get_transaction_receipt(tx_hash).await.unwrap().unwrap();
         assert_eq!(res.from, alice);
         assert_eq!(res.to, Some(bob));
+    }
+
+    #[tokio::test]
+    async fn test_anvil_deal_erc20() {
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
+        let user = Address::random();
+        let amount = U256::from(1e18 as u64);
+
+        provider.anvil_deal_erc20(user, dai, amount).await.unwrap();
+
+        sol! {
+            function balanceOf(address owner) view returns (uint256);
+        }
+
+        let balance_of_call = balanceOfCall::new((user,));
+        let input = balanceOfCall::abi_encode(&balance_of_call);
+
+        let result = provider
+            .call(TransactionRequest::default().with_to(dai).with_input(input))
+            .await
+            .unwrap();
+        let balance = balanceOfCall::abi_decode_returns(&result).unwrap();
+
+        assert_eq!(balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_erc20_allowance() {
+        let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
+
+        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
+        let owner = Address::random();
+        let spender = Address::random();
+        let amount = U256::from(1e18 as u64);
+
+        provider.anvil_set_erc20_allowance(owner, spender, dai, amount).await.unwrap();
+
+        sol! {
+            function allowance(address owner, address spender) view returns (uint256);
+        }
+
+        let allowance_call = allowanceCall::new((owner, spender));
+        let input = allowanceCall::abi_encode(&allowance_call);
+
+        let result = provider
+            .call(TransactionRequest::default().with_to(dai).with_input(input))
+            .await
+            .unwrap();
+        let allowance = allowanceCall::abi_decode_returns(&result).unwrap();
+
+        assert_eq!(allowance, amount);
     }
 }
