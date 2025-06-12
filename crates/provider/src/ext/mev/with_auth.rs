@@ -96,11 +96,14 @@ where
                 )]);
 
                 // Patch the existing RPC call with the new headers
-                let rpc_call = self.inner.map_meta(|meta| {
-                    let mut meta = meta;
-                    meta.extensions_mut().insert(headers.clone());
-                    meta
-                });
+                let rpc_call = self
+                    .inner
+                    .map_meta(|meta| {
+                        let mut meta = meta;
+                        meta.extensions_mut().insert(headers.clone());
+                        meta
+                    })
+                    .map_err(TransportErrorKind::custom)?;
 
                 rpc_call.await
             };

@@ -8,12 +8,27 @@ use futures::FutureExt;
 use serde_json::value::RawValue;
 use std::{
     fmt,
+    fmt::Formatter,
     future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{self, ready, Poll::Ready},
 };
 use tower::Service;
+
+/// Error returned when attempting to modify a request that has already been sent.
+/// This typically occurs after the RPC call has progressed beyond its initial prepared state.
+#[derive(Clone, Copy, Debug, Default)]
+#[non_exhaustive]
+pub struct RequestAlreadySentError;
+
+impl fmt::Display for RequestAlreadySentError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("Cannot get request after request has been sent")
+    }
+}
+
+impl core::error::Error for RequestAlreadySentError {}
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -278,16 +293,19 @@ where
     }
 
     /// Maps the metadata of the request using the provided function.
-    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Self {
+    pub fn map_meta(
+        self,
+        f: impl FnOnce(RequestMeta) -> RequestMeta,
+    ) -> Result<Self, RequestAlreadySentError> {
         let CallState::Prepared { request, connection } = self.state else {
-            panic!("Cannot get request after request has been sent");
+            return Err(RequestAlreadySentError);
         };
         let request = request.expect("no request in prepared").map_meta(f);
-        Self {
+        Ok(Self {
             state: CallState::Prepared { request: Some(request), connection },
             map: self.map,
             _pd: PhantomData,
-        }
+        })
     }
 }
 
