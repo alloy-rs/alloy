@@ -308,7 +308,7 @@ impl GethDebugTracerType {
         matches!(self, Self::JsTracer(_))
     }
 
-    /// Returns the the tracer type as a string.
+    /// Returns the tracer type as a string.
     ///
     /// If this is not a builtin tracer, it returns the captured string, which could be JavaScript code or a custom identifier such as `"tracer": "stylusTracer"`
     pub fn as_str(&self) -> &str {
