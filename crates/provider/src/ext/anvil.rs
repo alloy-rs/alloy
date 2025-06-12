@@ -1066,7 +1066,7 @@ mod tests {
         let user = Address::random();
         let amount = U256::from(1e18 as u64);
 
-        let _res = provider.anvil_deal_erc20(user, dai, amount).await.unwrap();
+        provider.anvil_deal_erc20(user, dai, amount).await.unwrap();
 
         sol! {
             function balanceOf(address owner) view returns (uint256);
@@ -1093,7 +1093,7 @@ mod tests {
         let spender = Address::random();
         let amount = U256::from(1e18 as u64);
 
-        let _res = provider.anvil_set_erc20_allowance(owner, spender, dai, amount).await.unwrap();
+        provider.anvil_set_erc20_allowance(owner, spender, dai, amount).await.unwrap();
 
         sol! {
             function allowance(address owner, address spender) view returns (uint256);
