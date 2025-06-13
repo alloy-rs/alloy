@@ -87,7 +87,8 @@ impl LocalSigner<SigningKey> {
         self.credential.to_bytes()
     }
 
-    /// Returns this signer's public key as a hex string prefixed with "0x".
+    /// Convenience function that returns this signer's ethereum public key as a [`B512`] byte
+    /// array.
     #[inline]
     pub fn public_key(&self) -> B512 {
         B512::from_slice(&self.credential.verifying_key().to_encoded_point(false).as_bytes()[1..])
