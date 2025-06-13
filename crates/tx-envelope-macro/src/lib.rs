@@ -285,7 +285,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
                     };
                     let maybe_with = if v.is_legacy() {
                         let path = quote! {
-                            #alloy_consensus::transaction::legacy::signed_legacy_serde
+                            #alloy_consensus::transaction::signed_legacy_serde
                         }
                         .to_string();
                         quote! {
@@ -318,7 +318,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             };
 
             let deserialize = quote! {
-                if let Ok(val) = #alloy_consensus::transaction::legacy::untagged_legacy_serde::deserialize(deserializer).map(Self::UntaggedLegacy) {
+                if let Ok(val) = #alloy_consensus::transaction::untagged_legacy_serde::deserialize(deserializer).map(Self::UntaggedLegacy) {
                     return Ok(val);
                 }
             };
@@ -683,7 +683,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             }
 
             #[inline]
-            fn authorization_list(&self) -> Option<&[#alloy_consensus::transaction::SignedAuthorization]> {
+            fn authorization_list(&self) -> Option<&[#alloy_eips::eip7702::SignedAuthorization]> {
                 match self {
                     #(
                         Self::#variant_names(tx) => tx.authorization_list(),
