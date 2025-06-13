@@ -24,7 +24,7 @@ impl AccountInfo {
     /// Returns true if the code hash is the Keccak256 hash of the empty string `""`.
     #[inline]
     pub fn is_empty_code_hash(&self) -> bool {
-        self.code_hash() == KECCAK256_EMPTY
+        self.code.is_empty()
     }
 
     /// Returns the code hash of the account.
