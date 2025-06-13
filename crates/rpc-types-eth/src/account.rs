@@ -29,13 +29,17 @@ impl AccountInfo {
 
     /// Returns the code hash of the account.
     pub fn code_hash(&self) -> B256 {
-        alloy_primitives::keccak256(&self.code)
+        if self.code.is_empty() {
+            KECCAK256_EMPTY
+        } else {
+            alloy_primitives::keccak256(&self.code)
+        }
     }
 
     /// Returns if an account is empty.
     ///
     /// An account is empty if the following conditions are met.
-    /// - code hash is zero or set to the Keccak256 hash of the empty string `""`
+    /// - code hash is the Keccak256 hash of the empty string `""`
     /// - balance is zero
     /// - nonce is zero
     #[inline]
