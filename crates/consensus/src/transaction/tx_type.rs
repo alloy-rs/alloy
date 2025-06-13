@@ -1,7 +1,6 @@
 //! Contains the Ethereum transaction type identifier.
 
 use crate::TxType;
-use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
 impl TxType {
@@ -51,42 +50,6 @@ impl fmt::Display for TxType {
             Self::Eip4844 => write!(f, "EIP-4844"),
             Self::Eip7702 => write!(f, "EIP-7702"),
         }
-    }
-}
-
-impl PartialEq<u8> for TxType {
-    fn eq(&self, other: &u8) -> bool {
-        (*self as u8) == *other
-    }
-}
-
-impl PartialEq<TxType> for u8 {
-    fn eq(&self, other: &TxType) -> bool {
-        *self == *other as Self
-    }
-}
-
-#[cfg(any(test, feature = "arbitrary"))]
-impl arbitrary::Arbitrary<'_> for TxType {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(u.int_in_range(0u8..=4)?.try_into().unwrap())
-    }
-}
-
-impl Encodable for TxType {
-    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        (*self as u8).encode(out);
-    }
-
-    fn length(&self) -> usize {
-        1
-    }
-}
-
-impl Decodable for TxType {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let ty = u8::decode(buf)?;
-        Self::try_from(ty).map_err(|_| alloy_rlp::Error::Custom("invalid transaction type"))
     }
 }
 

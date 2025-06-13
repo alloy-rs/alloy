@@ -190,24 +190,6 @@ pub enum EthereumTxEnvelope<Eip4844> {
     Eip7702(Signed<TxEip7702>),
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> PartialEq for EthereumTxEnvelope<Eip4844>
-where
-    Eip4844: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Legacy(f0_self), Self::Legacy(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip2930(f0_self), Self::Eip2930(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip1559(f0_self), Self::Eip1559(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip4844(f0_self), Self::Eip4844(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip7702(f0_self), Self::Eip7702(f0_other)) => f0_self.eq(f0_other),
-            _unused => false,
-        }
-    }
-}
-
-impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> Eq for EthereumTxEnvelope<Eip4844> {}
-
 impl<T, Eip4844> From<Signed<T>> for EthereumTxEnvelope<Eip4844>
 where
     EthereumTypedTransaction<Eip4844>: From<T>,

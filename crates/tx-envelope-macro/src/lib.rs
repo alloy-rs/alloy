@@ -186,6 +186,10 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         #(#variant_types: #alloy_eips::Decodable2718),*
     };
 
+    let eq_bounds = quote! {
+        #(#variant_types: PartialEq),*
+    };
+
     let tx_type_variants = variants.iter().map(|v| {
         let Variant { name, ty, kind } = v;
         match kind {
@@ -239,17 +243,34 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
-    let maybe_tx_arbitrary = if cfg!(feature = "arbitrary") {
+    let maybe_arbitrary = if cfg!(feature = "arbitrary") {
+        let arbitrary = quote! { #alloy_consensus::private::arbitrary };
         let arbitrary_bounds = quote! {
-            #(#variant_types: for<'a> #alloy_consensus::private::arbitrary::Arbitrary<'a>),*
+            #(#variant_types: for<'a> #arbitrary::Arbitrary<'a>),*
         };
 
         let num_variants = variants.len();
         let range = 0..num_variants;
+        let typed_range = 0..typed_variant_tx_types.len();
+        let flattened_range = 0..flattened_names.len();
 
         quote! {
-            impl #generics #alloy_consensus::private::arbitrary::Arbitrary<'_> for #input_type_name #generics where #arbitrary_bounds {
-                fn arbitrary(u: &mut #alloy_consensus::private::arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+            impl #arbitrary::Arbitrary<'_> for #tx_type_enum_name {
+                fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                    match u.int_in_range(0..=#num_variants-1)? {
+                        #(
+                            #typed_range => Ok(Self::#typed_variant_names),
+                        )*
+                        #(
+                            #flattened_range => Ok(Self::#flattened_names(u.arbitrary()?)),
+                        )*
+                        _ => unreachable!(),
+                    }
+                }
+            }
+
+            impl #generics #arbitrary::Arbitrary<'_> for #input_type_name #generics where #arbitrary_bounds {
+                fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
                     match u.int_in_range(0..=#num_variants-1)? {
                         #(
                             #range => Ok(Self::#variant_names(u.arbitrary()?)),
@@ -527,6 +548,52 @@ pub fn delegate(input: TokenStream) -> TokenStream {
             }
         }
 
+        impl PartialEq<u8> for #tx_type_enum_name {
+            fn eq(&self, other: &u8) -> bool {
+                u8::from(*self) == *other
+            }
+        }
+
+        impl PartialEq<#tx_type_enum_name> for u8 {
+            fn eq(&self, other: &#tx_type_enum_name) -> bool {
+                *self == u8::from(*other)
+            }
+        }
+
+        impl #alloy_consensus::private::alloy_rlp::Encodable for #tx_type_enum_name {
+            fn encode(&self, out: &mut dyn #alloy_consensus::private::alloy_rlp::BufMut) {
+                u8::from(*self).encode(out);
+            }
+
+            fn length(&self) -> usize {
+                u8::from(*self).length()
+            }
+        }
+
+        impl #alloy_consensus::private::alloy_rlp::Decodable for #tx_type_enum_name {
+            fn decode(buf: &mut &[u8]) -> #alloy_consensus::private::alloy_rlp::Result<Self> {
+                let ty = u8::decode(buf)?;
+                Self::try_from(ty).map_err(|_| #alloy_consensus::private::alloy_rlp::Error::Custom("invalid transaction type"))
+            }
+        }
+
+        impl #generics PartialEq for #input_type_name #generics
+        where
+            #eq_bounds
+        {
+            fn eq(&self, other: &Self) -> bool {
+                match (self, other) {
+                    #(
+                        (Self::#variant_names(tx), Self::#variant_names(other)) => tx.eq(other),
+                    )*
+                    _ => false,
+                }
+            }
+        }
+
+        impl #generics Eq for #input_type_name #generics where #eq_bounds {}
+
+
         impl #generics core::hash::Hash for #input_type_name #generics
         where
             Self: #alloy_eips::Encodable2718,
@@ -783,7 +850,7 @@ pub fn delegate(input: TokenStream) -> TokenStream {
         }
 
         #maybe_tx_serde
-        #maybe_tx_arbitrary
+        #maybe_arbitrary
     }
     .into()
 }
