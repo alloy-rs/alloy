@@ -24,7 +24,7 @@ main() {
     wait
 }
 
-# Installs geth from https://geth.ethereum.org/downloads
+# Install geth from https://geth.ethereum.org/downloads
 install_geth() {
     case "$PLATFORM" in
         linux)
@@ -36,7 +36,7 @@ install_geth() {
             ;;
         *)
             NAME="geth-windows-amd64-$GETH_BUILD"
-            curl -so $NAME.zip "https://gethstore.blob.core.windows.net/builds/$NAME.zip"
+            curl -sLo $NAME.zip "https://gethstore.blob.core.windows.net/builds/$NAME.zip"
             unzip $NAME.zip
             mv -f "$NAME/geth.exe" ./
             rm -rf "$NAME" "$NAME.zip"
