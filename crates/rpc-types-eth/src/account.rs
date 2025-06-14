@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 use alloc::{string::String, vec::Vec};
-use alloy_primitives::{Address, Bytes, B256, B512, U256};
+use alloy_primitives::{Address, Bytes, B256, B512, KECCAK256_EMPTY, U256};
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::Account;
@@ -18,6 +18,34 @@ pub struct AccountInfo {
     pub nonce: u64,
     /// Account code
     pub code: Bytes,
+}
+
+impl AccountInfo {
+    /// Returns true if the code hash is the Keccak256 hash of the empty string `""`.
+    #[inline]
+    pub fn is_empty_code_hash(&self) -> bool {
+        self.code.is_empty()
+    }
+
+    /// Returns the code hash of the account.
+    pub fn code_hash(&self) -> B256 {
+        if self.code.is_empty() {
+            KECCAK256_EMPTY
+        } else {
+            alloy_primitives::keccak256(&self.code)
+        }
+    }
+
+    /// Returns if an account is empty.
+    ///
+    /// An account is empty if the following conditions are met.
+    /// - code hash is the Keccak256 hash of the empty string `""`
+    /// - balance is zero
+    /// - nonce is zero
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.is_empty_code_hash() && self.balance.is_zero() && self.nonce == 0
+    }
 }
 
 /// Data structure with proof for one single storage-entry
