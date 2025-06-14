@@ -141,6 +141,24 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
+    /// Get the block number for a given block identifier.
+    ///
+    /// This is a convenience function that fetches the full block when the block identifier is not
+    /// a number.
+    async fn get_block_number_by_id(
+        &self,
+        block_id: BlockId,
+    ) -> TransportResult<Option<BlockNumber>> {
+        match block_id {
+            BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
+            BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
+            _ => {
+                let block = self.get_block(block_id).await?;
+                Ok(block.map(|b| b.header().number()))
+            }
+        }
+    }
+
     /// Execute a smart contract call with a transaction request and state
     /// overrides, without publishing a transaction.
     ///
@@ -1679,6 +1697,29 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num)
+    }
+
+    #[tokio::test]
+    async fn gets_block_number_for_id() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let block_num = provider
+            .get_block_number_by_id(BlockId::Number(BlockNumberOrTag::Number(0)))
+            .await
+            .unwrap();
+        assert_eq!(block_num, Some(0));
+
+        let block_num = provider
+            .get_block_number_by_id(BlockId::Number(BlockNumberOrTag::Latest))
+            .await
+            .unwrap();
+        assert_eq!(block_num, Some(0));
+
+        let block =
+            provider.get_block_by_number(BlockNumberOrTag::Number(0)).await.unwrap().unwrap();
+        let hash = block.header.hash;
+        let block_num = provider.get_block_number_by_id(BlockId::Hash(hash.into())).await.unwrap();
+        assert_eq!(block_num, Some(0));
     }
 
     #[tokio::test]
