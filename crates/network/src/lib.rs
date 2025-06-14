@@ -6,6 +6,9 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[cfg(feature = "eip712")]
+use alloy_dyn_abi as _;
+
 use alloy_consensus::{BlockHeader, TxReceipt};
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
@@ -20,7 +23,7 @@ pub use transaction::{
 };
 
 mod ethereum;
-pub use ethereum::{Ethereum, EthereumWallet, IntoWallet};
+pub use ethereum::{ArcFullSigner, Ethereum, EthereumWallet, IntoWallet};
 
 /// Types for handling unknown network types.
 pub mod any;
