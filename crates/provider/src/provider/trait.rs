@@ -145,7 +145,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// This is a convenience function that fetches the full block when the block identifier is not
     /// a number.
-    async fn block_number_for_id(&self, block_id: BlockId) -> TransportResult<Option<BlockNumber>> {
+    async fn get_block_number_by_id(
+        &self,
+        block_id: BlockId,
+    ) -> TransportResult<Option<BlockNumber>> {
         match block_id {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
@@ -1701,19 +1704,21 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil();
 
         let block_num = provider
-            .block_number_for_id(BlockId::Number(BlockNumberOrTag::Number(0)))
+            .get_block_number_by_id(BlockId::Number(BlockNumberOrTag::Number(0)))
             .await
             .unwrap();
         assert_eq!(block_num, Some(0));
 
-        let block_num =
-            provider.block_number_for_id(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
+        let block_num = provider
+            .get_block_number_by_id(BlockId::Number(BlockNumberOrTag::Latest))
+            .await
+            .unwrap();
         assert_eq!(block_num, Some(0));
 
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Number(0)).await.unwrap().unwrap();
         let hash = block.header.hash;
-        let block_num = provider.block_number_for_id(BlockId::Hash(hash.into())).await.unwrap();
+        let block_num = provider.get_block_number_by_id(BlockId::Hash(hash.into())).await.unwrap();
         assert_eq!(block_num, Some(0));
     }
 
