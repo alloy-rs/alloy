@@ -1,6 +1,6 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Request, RequestPacket, ResponsePacket, RpcRecv,
-    RpcResult, RpcSend,
+    transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
+    RpcRecv, RpcResult, RpcSend,
 };
 use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
 use core::panic;
@@ -13,7 +13,21 @@ use std::{
     pin::Pin,
     task::{self, ready, Poll::Ready},
 };
+use thiserror::Error;
 use tower::Service;
+
+/// Error types for RPC call operations.
+#[derive(Debug, Error)]
+pub enum CallError {
+    /// Error returned when attempting to modify a request that has already been sent.
+    /// This typically occurs after the RPC call has progressed beyond its initial prepared state.
+    #[error("Cannot modify request after it has been sent")]
+    RequestAlreadySent,
+
+    /// Error returned when expected request is missing in prepared state.
+    #[error("No request found in prepared state")]
+    NoRequestInPrepared,
+}
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -275,6 +289,19 @@ where
             map: self.map,
             _pd: PhantomData,
         }
+    }
+
+    /// Maps the metadata of the request using the provided function.
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Result<Self, CallError> {
+        let CallState::Prepared { request, connection } = self.state else {
+            return Err(CallError::RequestAlreadySent);
+        };
+        let request = request.ok_or(CallError::NoRequestInPrepared)?.map_meta(f);
+        Ok(Self {
+            state: CallState::Prepared { request: Some(request), connection },
+            map: self.map,
+            _pd: PhantomData,
+        })
     }
 }
 

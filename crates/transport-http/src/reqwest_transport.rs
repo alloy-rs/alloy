@@ -39,6 +39,7 @@ impl Http<Client> {
             .client
             .post(self.url)
             .json(&req)
+            .headers(req.headers())
             .send()
             .await
             .map_err(TransportErrorKind::custom)?;
