@@ -296,19 +296,17 @@ where
     /// ```no_run
     /// # #[cfg(feature = "reqwest")]
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_provider::{Provider, ProviderBuilder};
     /// use alloy_network::TransactionBuilder;
     /// use alloy_primitives::{address, bytes};
+    /// use alloy_provider::{Provider, ProviderBuilder};
     ///
     /// let provider = ProviderBuilder::new().connect_http("https://eth.llamarpc.com".parse()?);
-    /// let tx = provider.transaction_request()
+    /// let tx = provider
+    ///     .transaction_request()
     ///     .to(address!("1234567890123456789012345678901234567890"))
     ///     .input(bytes!("deadbeef"));
-    /// 
-    /// let result = provider
-    ///     .call(tx)
-    ///     .ccip(provider.clone())
-    ///     .await?;
+    ///
+    /// let result = provider.call(tx).ccip(provider.clone()).await?;
     /// # Ok(())
     /// # }
     /// ```
