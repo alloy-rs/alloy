@@ -188,10 +188,7 @@ impl<N: Network> std::fmt::Debug for CcipCall<N> {
 
 impl<N: Network> CcipCall<N> {
     /// Create a new CCIP call from an EthCall with the default gateway client.
-    pub(crate) fn new(
-        inner: super::EthCall<N, Bytes>,
-        provider: Arc<dyn Provider<N>>,
-    ) -> Self {
+    pub(crate) fn new(inner: super::EthCall<N, Bytes>, provider: Arc<dyn Provider<N>>) -> Self {
         Self {
             inner,
             provider,
