@@ -1,4 +1,6 @@
 use crate::ProviderCall;
+#[cfg(feature = "reqwest")]
+use crate::Provider;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
@@ -280,6 +282,34 @@ where
     pub const fn block(mut self, block: BlockId) -> Self {
         self.params.block = Some(block);
         self
+    }
+    
+    /// Enable CCIP resolution for this call.
+    ///
+    /// This transforms the `EthCall` into a `CcipCall` that will automatically
+    /// handle OffchainLookup errors and fetch data from gateways.
+    ///
+    /// Note: This requires passing a provider reference to handle callback execution.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_provider::Provider;
+    ///
+    /// let result = provider
+    ///     .call(&tx)
+    ///     .ccip(&provider)
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "reqwest")]
+    pub fn ccip(
+        self,
+        provider: impl Provider<N> + 'static,
+    ) -> super::ccip::CcipCall<N, Resp, Output, Map> {
+        super::ccip::CcipCall::new(self, Arc::new(provider))
     }
 }
 

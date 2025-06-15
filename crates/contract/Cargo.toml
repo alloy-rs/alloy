@@ -56,3 +56,4 @@ serde_json.workspace = true
 
 [features]
 pubsub = ["alloy-provider/pubsub", "dep:alloy-pubsub"]
+reqwest = ["alloy-provider/reqwest"]

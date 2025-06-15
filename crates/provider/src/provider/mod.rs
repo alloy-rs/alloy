@@ -37,3 +37,11 @@ pub use subscription::GetSubscription;
 
 mod web3_signer;
 pub use web3_signer::Web3Signer;
+
+#[cfg(feature = "reqwest")]
+mod ccip;
+#[cfg(feature = "reqwest")]
+pub use ccip::{
+    CcipCall, CcipConfig, CcipError, DefaultGatewayClient, GatewayClient,
+    GatewayError, OffchainLookup,
+};
