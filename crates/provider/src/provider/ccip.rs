@@ -4,7 +4,6 @@
 //! which allows smart contracts to fetch external data securely and transparently.
 
 use crate::Provider;
-use alloy_json_rpc::RpcRecv;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes, FixedBytes};
 use alloy_sol_types::{sol, SolError, SolValue};
@@ -166,23 +165,18 @@ impl Default for CcipConfig {
 /// ```
 #[must_use = "CCIP calls do nothing unless awaited"]
 #[derive(Clone)]
-pub struct CcipCall<N, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct CcipCall<N>
 where
     N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
 {
-    inner: super::EthCall<N, Resp, Output, Map>,
+    inner: super::EthCall<N, Bytes>,
     provider: Arc<dyn Provider<N>>,
     config: CcipConfig,
     gateway_client: Arc<dyn CcipGatewayClient>,
-    _phantom: PhantomData<fn() -> (Resp, Output)>,
+    _phantom: PhantomData<N>,
 }
 
-impl<N: Network, Resp: RpcRecv, Output, Map> std::fmt::Debug for CcipCall<N, Resp, Output, Map>
-where
-    Map: Fn(Resp) -> Output,
-{
+impl<N: Network> std::fmt::Debug for CcipCall<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CcipCall")
             .field("inner", &"EthCall<...>")
@@ -192,13 +186,10 @@ where
     }
 }
 
-impl<N: Network, Resp: RpcRecv, Output, Map> CcipCall<N, Resp, Output, Map>
-where
-    Map: Fn(Resp) -> Output,
-{
+impl<N: Network> CcipCall<N> {
     /// Create a new CCIP call from an EthCall with the default gateway client.
     pub(crate) fn new(
-        inner: super::EthCall<N, Resp, Output, Map>,
+        inner: super::EthCall<N, Bytes>,
         provider: Arc<dyn Provider<N>>,
     ) -> Self {
         Self {
@@ -227,20 +218,6 @@ where
         self.gateway_client = Arc::new(client);
         self
     }
-
-    /// Map the response to a different type.
-    pub fn map_resp<NewOutput, NewMap>(self, map: NewMap) -> CcipCall<N, Resp, NewOutput, NewMap>
-    where
-        NewMap: Fn(Resp) -> NewOutput,
-    {
-        CcipCall {
-            inner: self.inner.map_resp(map),
-            provider: self.provider,
-            config: self.config,
-            gateway_client: self.gateway_client,
-            _phantom: PhantomData,
-        }
-    }
 }
 
 /// Future for executing a CCIP call.
@@ -250,38 +227,31 @@ where
 /// and calling the contract's callback function.
 #[must_use = "futures do nothing unless awaited"]
 #[pin_project::pin_project]
-pub struct CcipCallFuture<N, Resp, Output, Map>
+pub struct CcipCallFuture<N>
 where
     N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
 {
     #[pin]
     inner: Pin<Box<dyn Future<Output = Result<Bytes, CcipError>> + Send>>,
-    _phantom: PhantomData<(N, Resp, Output, Map)>,
+    _phantom: PhantomData<N>,
 }
 
-impl<N, Resp, Output, Map> std::fmt::Debug for CcipCallFuture<N, Resp, Output, Map>
+impl<N> std::fmt::Debug for CcipCallFuture<N>
 where
     N: Network,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CcipCallFuture").field("inner", &"Pin<Box<dyn Future<...>>>").finish()
     }
 }
 
-impl<N, Resp, Output, Map> CcipCallFuture<N, Resp, Output, Map>
+impl<N> CcipCallFuture<N>
 where
     N: Network,
-    Resp: RpcRecv + Send + 'static,
-    Output: Send + 'static,
-    Map: Fn(Resp) -> Output + Clone + Send + 'static,
 {
     /// Create a new CCIP call future.
     fn new(
-        eth_call: super::EthCall<N, Resp, Output, Map>,
+        eth_call: super::EthCall<N, Bytes>,
         provider: Arc<dyn Provider<N>>,
         config: CcipConfig,
         gateway_client: Arc<dyn CcipGatewayClient>,
@@ -294,12 +264,9 @@ where
     }
 }
 
-impl<N, Resp, Output, Map> Future for CcipCallFuture<N, Resp, Output, Map>
+impl<N> Future for CcipCallFuture<N>
 where
     N: Network,
-    Resp: RpcRecv,
-    Output: 'static,
-    Map: Fn(Resp) -> Output,
 {
     type Output = Result<Bytes, CcipError>;
 
@@ -309,13 +276,9 @@ where
     }
 }
 
-impl<N: Network, Resp: RpcRecv + Send + 'static, Output: Send + 'static, Map>
-    std::future::IntoFuture for CcipCall<N, Resp, Output, Map>
-where
-    Map: Fn(Resp) -> Output + Clone + Send + 'static,
-{
+impl<N: Network> std::future::IntoFuture for CcipCall<N> {
     type Output = Result<Bytes, CcipError>;
-    type IntoFuture = CcipCallFuture<N, Resp, Output, Map>;
+    type IntoFuture = CcipCallFuture<N>;
 
     fn into_future(self) -> Self::IntoFuture {
         CcipCallFuture::new(self.inner, self.provider, self.config, self.gateway_client)
@@ -323,25 +286,19 @@ where
 }
 
 /// Execute an EthCall with CCIP resolution support.
-async fn execute_with_ccip<N: Network, Resp: RpcRecv, Output: 'static, Map>(
-    eth_call: super::EthCall<N, Resp, Output, Map>,
+async fn execute_with_ccip<N: Network>(
+    eth_call: super::EthCall<N, Bytes>,
     provider: Arc<dyn Provider<N>>,
     config: CcipConfig,
     gateway_client: Arc<dyn CcipGatewayClient>,
     recursion_depth: u8,
-) -> Result<Bytes, CcipError>
-where
-    Map: Fn(Resp) -> Output,
-{
-    // For CCIP, we need to work with the raw bytes, not the decoded response
-    // We'll execute the underlying call and handle the OffchainLookup error
+) -> Result<Bytes, CcipError> {
+    // Try to execute the call normally first
     match eth_call.await {
-        Ok(_) => {
-            // If the call succeeds without OffchainLookup, it's not a CCIP call
-            // This is unexpected - CCIP calls should always revert with OffchainLookup
-            Err(CcipError::DecodeError(
-                "Expected OffchainLookup error but call succeeded".to_string(),
-            ))
+        Ok(bytes) => {
+            // If the call succeeds, it means no CCIP was needed
+            // Return the bytes directly
+            Ok(bytes)
         }
         Err(err) => {
             // Check if it's an OffchainLookup error

@@ -283,7 +283,12 @@ where
         self.params.block = Some(block);
         self
     }
+}
 
+impl<N> EthCall<N, Bytes>
+where
+    N: Network,
+{
     /// Enable CCIP resolution for this call.
     ///
     /// This transforms the `EthCall` into a `CcipCall` that will automatically
@@ -311,18 +316,10 @@ where
     /// # }
     /// ```
     #[cfg(feature = "reqwest")]
-    pub fn ccip(
-        self,
-        provider: impl Provider<N> + 'static,
-    ) -> super::ccip::CcipCall<N, Resp, Output, Map> {
+    pub fn ccip(self, provider: impl Provider<N> + 'static) -> super::ccip::CcipCall<N> {
         super::ccip::CcipCall::new(self, Arc::new(provider))
     }
-}
 
-impl<N> EthCall<N, Bytes>
-where
-    N: Network,
-{
     /// Decode the [`Bytes`] returned by an `"eth_call"` into a [`SolCall::Return`] type.
     ///
     /// ## Note
