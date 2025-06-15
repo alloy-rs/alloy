@@ -419,7 +419,6 @@ async fn resolve_offchain_lookup_bytes<N: Network>(
 /// This implementation follows the EIP-3668 specification for gateway requests:
 /// - Substitutes `{sender}` with the contract address (checksummed)
 /// - Substitutes `{data}` with the hex-encoded call data
-/// - Uses GET for URLs under 2048 bytes, POST for longer URLs
 /// - Expects JSON responses with a `data` field containing hex-encoded bytes
 impl CcipGatewayClient for reqwest::Client {
     fn fetch(
@@ -437,26 +436,21 @@ impl CcipGatewayClient for reqwest::Client {
                 .replace("{sender}", &format!("{:?}", sender))
                 .replace("{data}", &format!("0x{}", hex::encode(&call_data)));
 
-            // Determine if GET or POST based on URL length
-            let response = if url.len() > 2048 {
-                // Use POST for long URLs
-                let (base_url, _) = url.split_once('?').unwrap_or((&url, ""));
+            // Use POST for long URLs
+            let (base_url, _) = url.split_once('?').unwrap_or((&url, ""));
 
-                #[derive(Serialize)]
-                struct PostData {
-                    data: String,
-                    sender: Address,
-                }
+            #[derive(Serialize)]
+            struct PostData {
+                data: String,
+                sender: Address,
+            }
 
-                self.post(base_url)
-                    .json(&PostData { data: format!("0x{}", hex::encode(&call_data)), sender })
-                    .send()
-                    .await
-                    .map_err(|e| GatewayError::Http(e.to_string()))?
-            } else {
-                // Use GET for short URLs
-                self.get(&url).send().await.map_err(|e| GatewayError::Http(e.to_string()))?
-            };
+            let response = self
+                .post(base_url)
+                .json(&PostData { data: format!("0x{}", hex::encode(&call_data)), sender })
+                .send()
+                .await
+                .map_err(|e| GatewayError::Http(e.to_string()))?;
 
             // Check status
             if !response.status().is_success() {
@@ -470,7 +464,7 @@ impl CcipGatewayClient for reqwest::Client {
             // Parse JSON response
             #[derive(Deserialize)]
             struct GatewayResponse {
-                data: String,
+                data: Bytes,
             }
 
             let body = response
@@ -478,12 +472,7 @@ impl CcipGatewayClient for reqwest::Client {
                 .await
                 .map_err(|e| GatewayError::InvalidResponse(e.to_string()))?;
 
-            // Decode hex data
-            let data = body.data.strip_prefix("0x").unwrap_or(&body.data);
-            let bytes =
-                hex::decode(data).map_err(|e| GatewayError::InvalidResponse(e.to_string()))?;
-
-            Ok(bytes.into())
+            Ok(body.data)
         })
     }
 }
