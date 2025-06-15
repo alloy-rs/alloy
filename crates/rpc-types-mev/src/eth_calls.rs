@@ -312,21 +312,15 @@ impl EthSendBundle {
 }
 
 /// Response from the matchmaker after sending a bundle.
+#[deprecated = "Use `EthBundleHash` instead"]
+pub type SendBundleResponse = EthBundleHash;
+
+/// Response from the matchmaker after sending a bundle.
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EthBundleHash {
     /// Hash of the bundle bodies.
     pub bundle_hash: Option<B256>,
-}
-
-/// Response from the matchmaker after sending a bundle.
-#[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[deprecated = "Use `EthBundleHash` instead"]
-#[allow(deprecated)]
-pub struct SendBundleResponse {
-    /// Hash of the bundle bodies.
-    pub bundle_hash: B256,
 }
 
 /// Request for `eth_sendPrivateTransaction`
