@@ -9,7 +9,7 @@ use alloy_network::{
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 #[cfg(feature = "reqwest")]
-use alloy_provider::{CcipCall, ProviderCcipExt};
+use alloy_provider::CcipCall;
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
@@ -562,11 +562,11 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     ///     .await?;
     /// ```
     #[cfg(feature = "reqwest")]
-    pub fn ccip(&self) -> CcipCall<&P, N>
+    pub fn ccip(&self) -> CcipCall<N, Bytes>
     where
-        P: Provider<N>,
+        P: Provider<N> + Clone + 'static,
     {
-        self.provider.call_with_ccip(&self.request).block(self.block)
+        self.provider.call(self.request).block(self.block).ccip(self.provider.clone())
     }
 
     /// Decodes the output of a contract function using the provided decoder.

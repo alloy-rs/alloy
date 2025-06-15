@@ -158,7 +158,7 @@ impl Default for CcipConfig {
 /// let tx = provider
 ///     .transaction_request()
 ///     .to(address!("1234567890123456789012345678901234567890"))
-///     .input(bytes!("deadbeef"));
+///     .input(bytes!("deadbeef").into());
 ///
 /// let result = provider.call(tx).ccip(provider.clone()).await?;
 /// # Ok(())
