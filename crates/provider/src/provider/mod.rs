@@ -42,6 +42,6 @@ pub use web3_signer::Web3Signer;
 mod ccip;
 #[cfg(feature = "reqwest")]
 pub use ccip::{
-    CcipCall, CcipConfig, CcipError, DefaultGatewayClient, GatewayClient,
+    CcipCall, CcipCallFuture, CcipConfig, CcipError, CcipGatewayClient, DefaultGatewayClient,
     GatewayError, OffchainLookup,
 };

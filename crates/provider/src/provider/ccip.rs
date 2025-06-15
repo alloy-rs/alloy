@@ -11,7 +11,7 @@ use alloy_sol_types::{sol, SolError, SolValue};
 use alloy_transport::TransportError;
 use futures::Future;
 use serde::{Deserialize, Serialize};
-use std::{marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{marker::PhantomData, pin::Pin, sync::Arc, task::Poll, time::Duration};
 use thiserror::Error;
 
 /// Maximum number of recursive CCIP lookups allowed per EIP-3668
@@ -96,7 +96,7 @@ pub enum GatewayError {
 ///
 /// Gateway clients should validate responses to prevent malicious data injection.
 /// The default implementation enforces timeouts and validates response formats.
-pub trait GatewayClient: Send + Sync {
+pub trait CcipGatewayClient: Send + Sync {
     /// Fetch data from a gateway URL.
     ///
     /// # Arguments
@@ -177,7 +177,7 @@ where
     inner: super::EthCall<N, Resp, Output, Map>,
     provider: Arc<dyn Provider<N>>,
     config: CcipConfig,
-    gateway_client: Arc<dyn GatewayClient>,
+    gateway_client: Arc<dyn CcipGatewayClient>,
     _phantom: PhantomData<fn() -> (Resp, Output)>,
 }
 
@@ -189,7 +189,7 @@ where
         f.debug_struct("CcipCall")
             .field("inner", &"EthCall<...>")
             .field("config", &self.config)
-            .field("gateway_client", &"Arc<dyn GatewayClient>")
+            .field("gateway_client", &"Arc<dyn CcipGatewayClient>")
             .finish()
     }
 }
@@ -222,7 +222,7 @@ where
     }
     
     /// Override the gateway client.
-    pub fn with_gateway_client(mut self, client: impl GatewayClient + 'static) -> Self {
+    pub fn with_gateway_client(mut self, client: impl CcipGatewayClient + 'static) -> Self {
         self.gateway_client = Arc::new(client);
         self
     }
@@ -245,24 +245,93 @@ where
     }
 }
 
+/// Future for executing a CCIP call.
+///
+/// This future handles the execution of an EthCall with automatic CCIP resolution.
+/// It will attempt to resolve OffchainLookup errors by fetching data from gateways
+/// and calling the contract's callback function.
+#[must_use = "futures do nothing unless awaited"]
+#[pin_project::pin_project]
+pub struct CcipCallFuture<N, Resp, Output, Map>
+where
+    N: Network,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output,
+{
+    #[pin]
+    inner: Pin<Box<dyn Future<Output = Result<Output, CcipError>> + Send>>,
+    _phantom: PhantomData<(N, Resp, Map)>,
+}
+
+impl<N, Resp, Output, Map> std::fmt::Debug for CcipCallFuture<N, Resp, Output, Map>
+where
+    N: Network,
+    Resp: RpcRecv,
+    Map: Fn(Resp) -> Output,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CcipCallFuture")
+            .field("inner", &"Pin<Box<dyn Future<...>>>")
+            .finish()
+    }
+}
+
+
+impl<N, Resp, Output, Map> CcipCallFuture<N, Resp, Output, Map>
+where
+    N: Network,
+    Resp: RpcRecv + Send + 'static,
+    Output: Send + 'static,
+    Map: Fn(Resp) -> Output + Clone + Send + 'static,
+{
+    /// Create a new CCIP call future.
+    fn new(
+        eth_call: super::EthCall<N, Resp, Output, Map>,
+        provider: Arc<dyn Provider<N>>,
+        config: CcipConfig,
+        gateway_client: Arc<dyn CcipGatewayClient>,
+    ) -> Self {
+        let fut = Box::pin(async move {
+            execute_with_ccip(eth_call, provider, config, gateway_client, 0).await
+        });
+        
+        Self {
+            inner: fut,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<N, Resp, Output, Map> Future for CcipCallFuture<N, Resp, Output, Map>
+where
+    N: Network,
+    Resp: RpcRecv,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
+{
+    type Output = Result<Output, CcipError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        this.inner.poll(cx)
+    }
+}
+
 impl<N: Network, Resp: RpcRecv + Send + 'static, Output: Send + 'static, Map> std::future::IntoFuture
     for CcipCall<N, Resp, Output, Map>
 where
     Map: Fn(Resp) -> Output + Clone + Send + 'static,
 {
     type Output = Result<Output, CcipError>;
-    type IntoFuture = Pin<Box<dyn Future<Output = Self::Output> + Send>>;
+    type IntoFuture = CcipCallFuture<N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
-        let provider = self.provider.clone();
-        let config = self.config;
-        let gateway_client = self.gateway_client;
-        let inner = self.inner;
-        
-        Box::pin(async move {
-            // Execute with CCIP resolution
-            execute_with_ccip(inner, provider, config, gateway_client, 0).await
-        })
+        CcipCallFuture::new(
+            self.inner,
+            self.provider,
+            self.config,
+            self.gateway_client,
+        )
     }
 }
 
@@ -271,7 +340,7 @@ async fn execute_with_ccip<N: Network, Resp: RpcRecv, Output: 'static, Map>(
     eth_call: super::EthCall<N, Resp, Output, Map>,
     provider: Arc<dyn Provider<N>>,
     config: CcipConfig,
-    gateway_client: Arc<dyn GatewayClient>,
+    gateway_client: Arc<dyn CcipGatewayClient>,
     recursion_depth: u8,
 ) -> Result<Output, CcipError>
 where
@@ -314,7 +383,7 @@ async fn resolve_offchain_lookup_bytes<N: Network>(
     provider: Arc<dyn Provider<N>>,
     offchain_lookup: OffchainLookup,
     config: CcipConfig,
-    gateway_client: Arc<dyn GatewayClient>,
+    gateway_client: Arc<dyn CcipGatewayClient>,
     recursion_depth: u8,
 ) -> Result<Bytes, CcipError> {
     // Check if we have URLs
@@ -360,14 +429,14 @@ async fn resolve_offchain_lookup_bytes<N: Network>(
     Err(last_error.unwrap_or(GatewayError::AllUrlsFailed).into())
 }
 
-/// Implementation of `GatewayClient` for `reqwest::Client`.
+/// Implementation of `CcipGatewayClient` for `reqwest::Client`.
 ///
 /// This implementation follows the EIP-3668 specification for gateway requests:
 /// - Substitutes `{sender}` with the contract address (checksummed)
 /// - Substitutes `{data}` with the hex-encoded call data
 /// - Uses GET for URLs under 2048 bytes, POST for longer URLs
 /// - Expects JSON responses with a `data` field containing hex-encoded bytes
-impl GatewayClient for reqwest::Client {
+impl CcipGatewayClient for reqwest::Client {
     fn fetch(
         &self,
         url: &str,
@@ -442,7 +511,7 @@ impl GatewayClient for reqwest::Client {
 
 /// Default gateway client using HTTP.
 ///
-/// This is a wrapper around `reqwest::Client` that implements `GatewayClient`.
+/// This is a wrapper around `reqwest::Client` that implements `CcipGatewayClient`.
 #[derive(Debug, Clone)]
 pub struct DefaultGatewayClient {
     client: reqwest::Client,
@@ -463,7 +532,7 @@ impl Default for DefaultGatewayClient {
     }
 }
 
-impl GatewayClient for DefaultGatewayClient {
+impl CcipGatewayClient for DefaultGatewayClient {
     fn fetch(
         &self,
         url: &str,
