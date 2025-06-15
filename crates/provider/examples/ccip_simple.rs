@@ -1,5 +1,5 @@
 //! Example demonstrating simple CCIP (EIP-3668) usage.
-//! 
+//!
 //! This example requires the "reqwest" feature to be enabled.
 
 #[cfg(feature = "reqwest")]
@@ -21,11 +21,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The `ccip()` method enables automatic resolution of OffchainLookup errors
     let result = provider
         .call(tx)
-        .ccip(provider.clone())  // Pass the provider for callback execution
+        .ccip(provider.clone()) // Pass the provider for callback execution
         .await?;
 
     println!("Call result: 0x{}", alloy_primitives::hex::encode(result));
-    
+
     Ok(())
 }
 

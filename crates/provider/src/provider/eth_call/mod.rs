@@ -1,6 +1,6 @@
-use crate::ProviderCall;
 #[cfg(feature = "reqwest")]
 use crate::Provider;
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
@@ -283,7 +283,7 @@ where
         self.params.block = Some(block);
         self
     }
-    
+
     /// Enable CCIP resolution for this call.
     ///
     /// This transforms the `EthCall` into a `CcipCall` that will automatically
