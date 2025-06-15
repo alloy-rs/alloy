@@ -34,3 +34,4 @@ fn main() {
     eprintln!("This example requires the 'reqwest' feature to be enabled.");
     eprintln!("Run with: cargo run --example ccip_simple --features reqwest");
 }
+

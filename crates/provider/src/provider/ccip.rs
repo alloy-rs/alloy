@@ -136,7 +136,7 @@ impl Default for CcipConfig {
     }
 }
 
-/// CCIP-enabled call that wraps an [`EthCall`].
+/// CCIP-enabled call that wraps an [`EthCall`](super::EthCall).
 ///
 /// This type adds automatic CCIP resolution to an existing `EthCall`.
 /// When awaited, it will:
@@ -148,11 +148,13 @@ impl Default for CcipConfig {
 /// # Example
 ///
 /// ```no_run
-/// 
-///  async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// use alloy_primitives::{address, bytes};
-/// use alloy_provider::Provider;
+/// use alloy_provider::{Provider, ProviderBuilder};
+/// use alloy_network::TransactionBuilder;
 ///
+/// let provider = ProviderBuilder::new().connect_http("https://eth.llamarpc.com".parse()?);
+/// 
 /// let tx = provider.transaction_request()
 ///     .to(address!("1234567890123456789012345678901234567890"))
 ///     .input(bytes!("deadbeef"));
@@ -601,3 +603,4 @@ mod tests {
         assert_eq!(&input[0..4], &callback_function[..]);
     }
 }
+
