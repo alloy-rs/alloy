@@ -323,6 +323,7 @@ pub struct EthBundleHash {
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[deprecated = "Use `EthBundleHash` instead"]
+#[allow(deprecated)]
 pub struct SendBundleResponse {
     /// Hash of the bundle bodies.
     pub bundle_hash: B256,
