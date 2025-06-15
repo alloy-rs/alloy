@@ -562,11 +562,11 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     ///     .await?;
     /// ```
     #[cfg(feature = "reqwest")]
-    pub fn ccip(&self) -> CcipCall<N, Bytes>
+    pub fn ccip(self) -> CcipCall<N, Bytes>
     where
         P: Provider<N> + Clone + 'static,
     {
-        self.provider.call(self.request).block(self.block).ccip(self.provider.clone())
+        self.provider.call(self.request).block(self.block).ccip(self.provider)
     }
 
     /// Decodes the output of a contract function using the provided decoder.
