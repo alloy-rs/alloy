@@ -257,8 +257,8 @@ where
     Map: Fn(Resp) -> Output,
 {
     #[pin]
-    inner: Pin<Box<dyn Future<Output = Result<Output, CcipError>> + Send>>,
-    _phantom: PhantomData<(N, Resp, Map)>,
+    inner: Pin<Box<dyn Future<Output = Result<Bytes, CcipError>> + Send>>,
+    _phantom: PhantomData<(N, Resp, Output, Map)>,
 }
 
 impl<N, Resp, Output, Map> std::fmt::Debug for CcipCallFuture<N, Resp, Output, Map>
@@ -301,7 +301,7 @@ where
     Output: 'static,
     Map: Fn(Resp) -> Output,
 {
-    type Output = Result<Output, CcipError>;
+    type Output = Result<Bytes, CcipError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -314,7 +314,7 @@ impl<N: Network, Resp: RpcRecv + Send + 'static, Output: Send + 'static, Map>
 where
     Map: Fn(Resp) -> Output + Clone + Send + 'static,
 {
-    type Output = Result<Output, CcipError>;
+    type Output = Result<Bytes, CcipError>;
     type IntoFuture = CcipCallFuture<N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
@@ -329,36 +329,32 @@ async fn execute_with_ccip<N: Network, Resp: RpcRecv, Output: 'static, Map>(
     config: CcipConfig,
     gateway_client: Arc<dyn CcipGatewayClient>,
     recursion_depth: u8,
-) -> Result<Output, CcipError>
+) -> Result<Bytes, CcipError>
 where
     Map: Fn(Resp) -> Output,
 {
-    // Check recursion limit
-    if recursion_depth >= config.max_recursion {
-        return Err(CcipError::MaxRecursionExceeded);
-    }
-
-    // Execute the call
+    // For CCIP, we need to work with the raw bytes, not the decoded response
+    // We'll execute the underlying call and handle the OffchainLookup error
     match eth_call.await {
-        Ok(output) => Ok(output),
+        Ok(_) => {
+            // If the call succeeds without OffchainLookup, it's not a CCIP call
+            // This is unexpected - CCIP calls should always revert with OffchainLookup
+            Err(CcipError::DecodeError(
+                "Expected OffchainLookup error but call succeeded".to_string(),
+            ))
+        }
         Err(err) => {
             // Check if it's an OffchainLookup error
             if let Some(offchain_lookup) = extract_offchain_lookup(&err) {
-                // Resolve the offchain lookup
-                // We need to handle the callback which returns Bytes
-                // The Output type here is maintained through the recursion
-                let _callback_bytes = resolve_offchain_lookup_bytes(
-                    provider.clone(),
+                // Resolve the offchain lookup and return the raw bytes
+                resolve_offchain_lookup(
+                    provider,
                     offchain_lookup,
-                    config.clone(),
-                    gateway_client.clone(),
+                    config,
+                    gateway_client,
                     recursion_depth,
                 )
-                .await?;
-
-                // For now, we return an error because we can't convert Bytes to Output
-                // This would need proper handling based on the decoder
-                Err(CcipError::DecodeError("CCIP callback decoding not implemented".to_string()))
+                .await
             } else {
                 Err(err.into())
             }
@@ -366,52 +362,75 @@ where
     }
 }
 
-/// Resolve an OffchainLookup error by fetching from gateways.
-async fn resolve_offchain_lookup_bytes<N: Network>(
+/// Resolve OffchainLookup errors iteratively to avoid async recursion.
+async fn resolve_offchain_lookup<N: Network>(
     provider: Arc<dyn Provider<N>>,
-    offchain_lookup: OffchainLookup,
+    initial_lookup: OffchainLookup,
     config: CcipConfig,
     gateway_client: Arc<dyn CcipGatewayClient>,
-    recursion_depth: u8,
+    initial_depth: u8,
 ) -> Result<Bytes, CcipError> {
-    // Check if we have URLs
-    if offchain_lookup.urls.is_empty() {
-        return Err(CcipError::NoGatewayUrls);
-    }
+    let mut current_lookup = initial_lookup;
+    let mut depth = initial_depth;
 
-    // Try each gateway URL
-    let mut last_error = None;
-    for url in &offchain_lookup.urls {
-        match gateway_client.fetch(url, offchain_lookup.sender, &offchain_lookup.callData).await {
-            Ok(response) => {
-                // Build callback request
-                let callback_request = build_callback_request::<N>(
-                    offchain_lookup.sender,
-                    offchain_lookup.callbackFunction,
-                    response,
-                    offchain_lookup.extraData.clone(),
-                )?;
+    loop {
+        // Check recursion limit
+        if depth >= config.max_recursion {
+            return Err(CcipError::MaxRecursionExceeded);
+        }
 
-                // Execute the callback with CCIP resolution
-                let callback_call = provider.call(callback_request);
-                return execute_with_ccip(
-                    callback_call,
-                    provider,
-                    config,
-                    gateway_client,
-                    recursion_depth + 1,
-                )
-                .await;
+        // Check if we have URLs
+        if current_lookup.urls.is_empty() {
+            return Err(CcipError::NoGatewayUrls);
+        }
+
+        // Try each gateway URL
+        let mut last_error = None;
+        let mut gateway_response = None;
+
+        for url in &current_lookup.urls {
+            match gateway_client.fetch(url, current_lookup.sender, &current_lookup.callData).await {
+                Ok(response) => {
+                    gateway_response = Some(response);
+                    break;
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    continue;
+                }
             }
-            Err(e) => {
-                last_error = Some(e);
-                continue;
+        }
+
+        // Check if we got a response
+        let response = match gateway_response {
+            Some(resp) => resp,
+            None => return Err(last_error.unwrap_or(GatewayError::AllUrlsFailed).into()),
+        };
+
+        // Build callback request
+        let callback_request = build_callback_request::<N>(
+            current_lookup.sender,
+            current_lookup.callbackFunction,
+            response,
+            current_lookup.extraData.clone(),
+        )?;
+
+        // Execute the callback
+        let callback_call = provider.call(callback_request);
+        match callback_call.await {
+            Ok(bytes) => return Ok(bytes),
+            Err(err) => {
+                // Check if it's another OffchainLookup error
+                if let Some(next_lookup) = extract_offchain_lookup(&err) {
+                    current_lookup = next_lookup;
+                    depth += 1;
+                    // Continue the loop with the new lookup
+                } else {
+                    return Err(err.into());
+                }
             }
         }
     }
-
-    // All URLs failed
-    Err(last_error.unwrap_or(GatewayError::AllUrlsFailed).into())
 }
 
 /// Implementation of `CcipGatewayClient` for `reqwest::Client`.
@@ -419,6 +438,8 @@ async fn resolve_offchain_lookup_bytes<N: Network>(
 /// This implementation follows the EIP-3668 specification for gateway requests:
 /// - Substitutes `{sender}` with the contract address (checksummed)
 /// - Substitutes `{data}` with the hex-encoded call data
+/// - Uses GET when URL contains `{data}` parameter
+/// - Uses POST with JSON body when URL doesn't contain `{data}` parameter
 /// - Expects JSON responses with a `data` field containing hex-encoded bytes
 impl CcipGatewayClient for reqwest::Client {
     fn fetch(
@@ -431,26 +452,34 @@ impl CcipGatewayClient for reqwest::Client {
         let call_data = call_data.clone();
 
         Box::pin(async move {
+            // Check if URL contains {data} parameter
+            let contains_data_param = url.contains("{data}");
+
             // Parse URL and substitute parameters
-            let url = url
+            let substituted_url = url
                 .replace("{sender}", &format!("{:?}", sender))
                 .replace("{data}", &format!("0x{}", hex::encode(&call_data)));
 
-            // Use POST for long URLs
-            let (base_url, _) = url.split_once('?').unwrap_or((&url, ""));
+            let response = if contains_data_param {
+                // Use GET when URL contains {data}
+                self.get(&substituted_url)
+                    .send()
+                    .await
+                    .map_err(|e| GatewayError::Http(e.to_string()))?
+            } else {
+                // Use POST when URL doesn't contain {data}
+                #[derive(Serialize)]
+                struct PostData {
+                    data: String,
+                    sender: Address,
+                }
 
-            #[derive(Serialize)]
-            struct PostData {
-                data: String,
-                sender: Address,
-            }
-
-            let response = self
-                .post(base_url)
-                .json(&PostData { data: format!("0x{}", hex::encode(&call_data)), sender })
-                .send()
-                .await
-                .map_err(|e| GatewayError::Http(e.to_string()))?;
+                self.post(&substituted_url)
+                    .json(&PostData { data: format!("0x{}", hex::encode(&call_data)), sender })
+                    .send()
+                    .await
+                    .map_err(|e| GatewayError::Http(e.to_string()))?
+            };
 
             // Check status
             if !response.status().is_success() {

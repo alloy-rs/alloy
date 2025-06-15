@@ -8,12 +8,10 @@ use alloy_network::{
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
-#[cfg(feature = "reqwest")]
-use alloy_provider::CcipCall;
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::{self, future::IntoFuture, marker::PhantomData};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -562,7 +560,9 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     ///     .await?;
     /// ```
     #[cfg(feature = "reqwest")]
-    pub fn ccip(self) -> CcipCall<N, Bytes>
+    pub fn ccip(
+        self,
+    ) -> impl IntoFuture<Output = Result<alloy_primitives::Bytes, alloy_provider::CcipError>>
     where
         P: Provider<N> + Clone + 'static,
     {
