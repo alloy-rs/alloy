@@ -19,7 +19,7 @@ mod builtin;
 pub use builtin::BuiltInConnectionString;
 
 mod call;
-pub use call::{RequestAlreadySentError, RpcCall};
+pub use call::{CallError, RpcCall};
 
 mod client;
 pub use client::{ClientRef, NoParams, RpcClient, RpcClientInner, WeakClient};

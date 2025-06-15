@@ -8,27 +8,26 @@ use futures::FutureExt;
 use serde_json::value::RawValue;
 use std::{
     fmt,
-    fmt::Formatter,
     future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{self, ready, Poll::Ready},
 };
+use thiserror::Error;
 use tower::Service;
 
-/// Error returned when attempting to modify a request that has already been sent.
-/// This typically occurs after the RPC call has progressed beyond its initial prepared state.
-#[derive(Clone, Copy, Debug, Default)]
-#[non_exhaustive]
-pub struct RequestAlreadySentError;
+/// Error types for RPC call operations.
+#[derive(Debug, Error)]
+pub enum CallError {
+    /// Error returned when attempting to modify a request that has already been sent.
+    /// This typically occurs after the RPC call has progressed beyond its initial prepared state.
+    #[error("Cannot modify request after it has been sent")]
+    RequestAlreadySent,
 
-impl fmt::Display for RequestAlreadySentError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("Cannot get request after request has been sent")
-    }
+    /// Error returned when expected request is missing in prepared state.
+    #[error("No request found in prepared state")]
+    NoRequestInPrepared,
 }
-
-impl core::error::Error for RequestAlreadySentError {}
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -293,14 +292,11 @@ where
     }
 
     /// Maps the metadata of the request using the provided function.
-    pub fn map_meta(
-        self,
-        f: impl FnOnce(RequestMeta) -> RequestMeta,
-    ) -> Result<Self, RequestAlreadySentError> {
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Result<Self, CallError> {
         let CallState::Prepared { request, connection } = self.state else {
-            return Err(RequestAlreadySentError);
+            return Err(CallError::RequestAlreadySent);
         };
-        let request = request.expect("no request in prepared").map_meta(f);
+        let request = request.ok_or(CallError::NoRequestInPrepared)?.map_meta(f);
         Ok(Self {
             state: CallState::Prepared { request: Some(request), connection },
             map: self.map,
