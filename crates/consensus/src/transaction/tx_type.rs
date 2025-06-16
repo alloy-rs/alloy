@@ -3,6 +3,12 @@
 use crate::TxType;
 use core::fmt;
 
+impl Default for TxType {
+    fn default() -> Self {
+        TxType::Legacy
+    }
+}
+
 impl TxType {
     /// Returns true if the transaction type is Legacy.
     #[inline]
