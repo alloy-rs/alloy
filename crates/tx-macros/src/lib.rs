@@ -28,7 +28,7 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 /// - `#[envelope(alloy_consensus = path::to::alloy)]` - Custom path to alloy_consensus crate
 ///
 /// # Variant Attributes
-/// - Each variant must be annotated with `envelope` attribut with one of the following options:
+/// - Each variant must be annotated with `envelope` attribute with one of the following options:
 ///   - `#[envelope(ty = N)]` - Specify the transaction type ID (0-255)
 ///   - `#[envelope(flatten)]` - Flatten this variant to delegate to inner envelope type
 ///
