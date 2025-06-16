@@ -1,5 +1,5 @@
 [package]
-name = "alloy-tx-envelope-macro"
+name = "alloy-tx-macros"
 description = "Derive macro for transaction envelopes"
 
 version.workspace = true

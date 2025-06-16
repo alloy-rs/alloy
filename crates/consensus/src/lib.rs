@@ -59,7 +59,7 @@ pub use alloy_primitives::{Sealable, Sealed};
 mod signed;
 pub use signed::Signed;
 
-pub use alloy_tx_envelope_macro::TransactionEnvelope;
+pub use alloy_tx_macros::TransactionEnvelope;
 
 pub mod crypto;
 pub mod error;
