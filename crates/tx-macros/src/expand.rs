@@ -264,10 +264,11 @@ impl Expander {
             let alloy_consensus = &self.alloy_consensus;
             let u8_path = quote! { #alloy_primitives::U8 }.to_string();
             let u64_path = quote! { #alloy_primitives::U64 }.to_string();
+            let serde_str = quote! { #alloy_consensus::private::serde }.to_string();
 
             quote! {
                 #[derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize)]
-                #[serde(into = #u8_path, try_from = #u64_path)]
+                #[serde(into = #u8_path, try_from = #u64_path, crate = #serde_str)]
             }
         } else {
             quote! {}
@@ -609,16 +610,13 @@ impl Expander {
             return quote! {};
         }
 
-        use crate::serde::SerdeGenerator;
-
-        let generator = SerdeGenerator::new(
+        crate::serde::SerdeGenerator::new(
             &self.input_type_name,
             &self.generics,
             &self.variants,
             &self.alloy_consensus,
-        );
-
-        generator.generate()
+        )
+        .generate()
     }
 
     /// Generate arbitrary implementations if enabled.
