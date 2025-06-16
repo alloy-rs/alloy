@@ -1,6 +1,6 @@
 use crate::{common::Id, RpcBorrow, RpcSend};
 use alloy_primitives::{keccak256, B256};
-use http::{Extensions, HeaderMap};
+use http::Extensions;
 use serde::{
     de::{DeserializeOwned, MapAccess},
     ser::SerializeMap,
@@ -8,9 +8,6 @@ use serde::{
 };
 use serde_json::value::RawValue;
 use std::{borrow::Cow, marker::PhantomData, mem::MaybeUninit};
-
-/// A map of HTTP headers that extends the request's headers when supported by the transport.
-pub type HttpHeaderExtension = HeaderMap;
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
 #[derive(Clone, Debug)]

@@ -92,10 +92,7 @@ mod packet;
 pub use packet::{BorrowedResponsePacket, RequestPacket, ResponsePacket};
 
 mod request;
-pub use http::header::{HeaderName, HeaderValue};
-pub use request::{
-    HttpHeaderExtension, PartiallySerializedRequest, Request, RequestMeta, SerializedRequest,
-};
+pub use request::{PartiallySerializedRequest, Request, RequestMeta, SerializedRequest};
 
 mod response;
 pub use response::{
