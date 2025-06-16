@@ -65,8 +65,10 @@ impl Expander {
         let typed_impls = self.generate_tx_type_typed_impls();
         let serde_derive = self.generate_tx_type_serde_derive();
 
+        let doc_comment = format!("Transaction types supported by [`{}`].", self.input_type_name);
+
         quote! {
-            /// Transaction types supported by [`#input_type_name`].
+            #[doc = #doc_comment]
             #[repr(u8)]
             #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #serde_derive
