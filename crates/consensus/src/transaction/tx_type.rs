@@ -3,9 +3,10 @@
 use crate::TxType;
 use core::fmt;
 
+#[allow(clippy::derivable_impls)]
 impl Default for TxType {
     fn default() -> Self {
-        TxType::Legacy
+        Self::Legacy
     }
 }
 
