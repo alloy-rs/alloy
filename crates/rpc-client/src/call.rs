@@ -13,21 +13,7 @@ use std::{
     pin::Pin,
     task::{self, ready, Poll::Ready},
 };
-use thiserror::Error;
 use tower::Service;
-
-/// Error types for RPC call operations.
-#[derive(Debug, Error)]
-pub enum CallError {
-    /// Error returned when attempting to modify a request that has already been sent.
-    /// This typically occurs after the RPC call has progressed beyond its initial prepared state.
-    #[error("Cannot modify request after it has been sent")]
-    RequestAlreadySent,
-
-    /// Error returned when expected request is missing in prepared state.
-    #[error("No request found in prepared state")]
-    NoRequestInPrepared,
-}
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -292,16 +278,16 @@ where
     }
 
     /// Maps the metadata of the request using the provided function.
-    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Result<Self, CallError> {
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Self {
         let CallState::Prepared { request, connection } = self.state else {
-            return Err(CallError::RequestAlreadySent);
+            panic!("Cannot get request after request has been sent");
         };
-        let request = request.ok_or(CallError::NoRequestInPrepared)?.map_meta(f);
-        Ok(Self {
+        let request = request.expect("no request in prepared").map_meta(f);
+        Self {
             state: CallState::Prepared { request: Some(request), connection },
             map: self.map,
             _pd: PhantomData,
-        })
+        }
     }
 }
 
