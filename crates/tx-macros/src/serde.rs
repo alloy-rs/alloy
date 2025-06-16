@@ -11,6 +11,7 @@ pub(crate) struct SerdeGenerator<'a> {
     variants: &'a GroupedVariants,
     alloy_consensus: &'a Path,
     serde: TokenStream,
+    serde_cfg: &'a TokenStream,
 }
 
 impl<'a> SerdeGenerator<'a> {
@@ -19,9 +20,10 @@ impl<'a> SerdeGenerator<'a> {
         generics: &'a syn::Generics,
         variants: &'a GroupedVariants,
         alloy_consensus: &'a Path,
+        serde_cfg: &'a TokenStream,
     ) -> Self {
         let serde = quote! { #alloy_consensus::private::serde };
-        Self { input_type_name, generics, variants, alloy_consensus, serde }
+        Self { input_type_name, generics, variants, alloy_consensus, serde, serde_cfg }
     }
 
     /// Generate all serde-related code.
@@ -33,7 +35,10 @@ impl<'a> SerdeGenerator<'a> {
         let untagged_enum = self.generate_untagged_enum(&serde_bounds_str);
         let impls = self.generate_serde_impls(&serde_bounds);
 
+        let serde_cfg = self.serde_cfg;
+
         quote! {
+            #[cfg(#serde_cfg)]
             const _: () = {
                 #tagged_enum
                 #untagged_enum

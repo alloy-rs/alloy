@@ -15,6 +15,8 @@ pub(crate) struct Expander {
     pub(crate) generics: syn::Generics,
     /// Whether serde feature is enabled.
     pub(crate) serde_enabled: bool,
+    /// Custom serde cfg_attr.
+    pub(crate) serde_cfg: TokenStream,
     /// Whether arbitrary feature is enabled.
     pub(crate) arbitrary_enabled: bool,
     /// Cached path for alloy_primitives.
@@ -265,10 +267,11 @@ impl Expander {
             let u8_path = quote! { #alloy_primitives::U8 }.to_string();
             let u64_path = quote! { #alloy_primitives::U64 }.to_string();
             let serde_str = quote! { #alloy_consensus::private::serde }.to_string();
+            let serde_cfg = &self.serde_cfg;
 
             quote! {
-                #[derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize)]
-                #[serde(into = #u8_path, try_from = #u64_path, crate = #serde_str)]
+                #[cfg_attr(#serde_cfg, derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize))]
+                #[cfg_attr(#serde_cfg, serde(into = #u8_path, try_from = #u64_path, crate = #serde_str))]
             }
         } else {
             quote! {}
@@ -615,6 +618,7 @@ impl Expander {
             &self.generics,
             &self.variants,
             &self.alloy_consensus,
+            &self.serde_cfg,
         )
         .generate()
     }

@@ -3,7 +3,7 @@ use syn::{Ident, Path, Type};
 
 /// Container-level arguments for the TransactionEnvelope derive macro.
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(envelope), forward_attrs(allow, doc, cfg))]
+#[darling(attributes(envelope))]
 pub(crate) struct EnvelopeArgs {
     /// The identifier of the input enum.
     pub ident: Ident,
@@ -20,6 +20,10 @@ pub(crate) struct EnvelopeArgs {
     /// Defaults to `::alloy_consensus`.
     #[darling(default)]
     pub alloy_consensus: Option<Path>,
+
+    /// Custom `cfg_attr` value for serde implementations.
+    #[darling(default)]
+    pub serde_cfg: Option<syn::Meta>,
 
     /// The enum data (variants).
     pub data: darling::ast::Data<EnvelopeVariant, ()>,

@@ -66,6 +66,17 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
     let alloy_consensus =
         args.alloy_consensus.clone().unwrap_or_else(|| parse_quote!(::alloy_consensus));
     let generics = args.generics.clone();
+    let serde_cfg = match args.serde_cfg.as_ref() {
+        Some(syn::Meta::List(list)) => list.tokens.clone(),
+        Some(_) => {
+            return Err(Error::new_spanned(
+                &input.ident,
+                "serde_cfg must be a list like `serde_cfg(feature = \"serde\")`",
+            ))
+        }
+        // this is always true
+        None => quote! { all() },
+    };
 
     let variants = GroupedVariants::from_args(args)?;
 
@@ -80,6 +91,7 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
         alloy_consensus,
         generics,
         serde_enabled: cfg!(feature = "serde"),
+        serde_cfg,
         arbitrary_enabled: cfg!(feature = "arbitrary"),
         alloy_primitives,
         alloy_eips,
