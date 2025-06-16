@@ -169,19 +169,19 @@ impl<T: Decodable2718 + Sealable> Decodable2718 for Sealed<T> {
     }
 
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::typed_decode(ty, buf).map(Sealed::new)
+        T::typed_decode(ty, buf).map(Self::new)
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::fallback_decode(buf).map(Sealed::new)
+        T::fallback_decode(buf).map(Self::new)
     }
 
     fn decode_2718(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::decode_2718(buf).map(Sealed::new)
+        T::decode_2718(buf).map(Self::new)
     }
 
     fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::network_decode(buf).map(Sealed::new)
+        T::network_decode(buf).map(Self::new)
     }
 }
 

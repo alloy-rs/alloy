@@ -64,7 +64,7 @@ pub(crate) struct ProcessedVariant {
 
 impl ProcessedVariant {
     /// Returns true if this is a legacy transaction variant (type 0).
-    pub(crate) fn is_legacy(&self) -> bool {
+    pub(crate) const fn is_legacy(&self) -> bool {
         matches!(self.kind, VariantKind::Typed(0))
     }
 }

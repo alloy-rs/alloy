@@ -5,6 +5,7 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![allow(clippy::option_if_let_else)]
 
 mod expand;
 mod parse;
@@ -58,11 +59,10 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
 
     // Extract config values before consuming args
     let input_type_name = args.ident.clone();
-    let tx_type_enum_name = if let Some(name) = args.tx_type_name.clone() {
-        name
-    } else {
-        Ident::new(&format!("{}Type", input_type_name), input_type_name.span())
-    };
+    let tx_type_enum_name = args
+        .tx_type_name
+        .clone()
+        .unwrap_or_else(|| Ident::new(&format!("{input_type_name}Type"), input_type_name.span()));
     let alloy_consensus =
         args.alloy_consensus.clone().unwrap_or_else(|| parse_quote!(::alloy_consensus));
     let generics = args.generics.clone();

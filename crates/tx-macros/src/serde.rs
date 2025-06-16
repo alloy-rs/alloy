@@ -13,7 +13,7 @@ pub(crate) struct SerdeGenerator<'a> {
 }
 
 impl<'a> SerdeGenerator<'a> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         input_type_name: &'a Ident,
         generics: &'a syn::Generics,
         variants: &'a GroupedVariants,
@@ -82,7 +82,7 @@ impl<'a> SerdeGenerator<'a> {
 
                 if let VariantKind::Typed(tx_type) = kind {
                     let tx_type = U8::from(*tx_type);
-                    let rename = format!("0x{:x}", tx_type);
+                    let rename = format!("0x{tx_type:x}");
 
                     // Add alias for single digit hex values (e.g., "0x0" for "0x00")
                     let maybe_alias = if rename.len() == 3 {

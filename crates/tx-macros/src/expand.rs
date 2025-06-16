@@ -123,18 +123,15 @@ impl Expander {
 
             match &v.kind {
                 VariantKind::Flattened => {
-                    let doc_comment = format!(
-                        "Transaction type of an inner `{}`.",
-                        ty.to_token_stream().to_string()
-                    );
+                    let doc_comment =
+                        format!("Transaction type of an inner `{}`.", ty.to_token_stream());
                     quote! {
                         #[doc = #doc_comment]
                         #name(<#ty as #alloy_consensus::TransactionEnvelope>::TxType)
                     }
                 }
                 VariantKind::Typed(ty_id) => {
-                    let doc_comment =
-                        format!("Transaction type of `{}`.", ty.to_token_stream().to_string());
+                    let doc_comment = format!("Transaction type of `{}`.", ty.to_token_stream());
                     quote! {
                         #[doc = #doc_comment]
                         #name = #ty_id
