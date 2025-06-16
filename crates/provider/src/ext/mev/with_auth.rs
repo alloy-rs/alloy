@@ -102,7 +102,7 @@ where
                     .inner
                     .map_meta(|meta| {
                         let mut meta = meta;
-                        meta.extensions_mut().insert(headers.clone());
+                        meta.extensions_mut().insert(headers);
                         meta
                     })
                     .map_err(TransportErrorKind::custom)?;
