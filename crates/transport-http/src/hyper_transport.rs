@@ -99,10 +99,8 @@ where
             .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"));
 
         // Add any additional headers from the request packet.
-        for (key, value) in req.headers() {
-            if let Some(key) = key {
-                builder = builder.header(key, value);
-            }
+        for (name, value) in req.headers().iter() {
+            builder = builder.header(name, value);
         }
 
         let ser = req.serialize().map_err(TransportError::ser_err)?;
