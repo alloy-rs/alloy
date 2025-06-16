@@ -134,14 +134,14 @@ impl RequestPacket {
         let Some(single_req) = self.as_single() else {
             return HeaderMap::new();
         };
-        // If the request does not have the `HttpHeaderExtension`, return an empty map.
-        let Some(http_header_extension) =
+        // If the request has an `HttpHeaderExtension`, return its headers.
+        if let Some(http_header_extension) =
             single_req.meta().extensions().get::<HttpHeaderExtension>()
-        else {
-            return HeaderMap::new();
+        {
+            return http_header_extension.clone();
         };
 
-        http_header_extension.clone()
+        HeaderMap::new()
     }
 }
 
