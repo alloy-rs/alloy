@@ -1,6 +1,6 @@
 use crate::{ErrorPayload, HttpHeaderExtension, Id, Response, ResponsePayload, SerializedRequest};
 use alloy_primitives::map::HashSet;
-use http::{HeaderMap, HeaderName, HeaderValue};
+use http::HeaderMap;
 use serde::{
     de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
     Deserialize, Serialize,
@@ -130,22 +130,18 @@ impl RequestPacket {
     /// Returns a [`HeaderMap`] from the request if `HttpHeaderExtension` is present;
     /// otherwise, returns an empty map. Only supported for single requests.
     pub fn headers(&self) -> HeaderMap {
-        if let Some(single_req) = self.as_single() {
-            if let Some(http_header_extension) =
-                single_req.meta().extensions().get::<HttpHeaderExtension>()
-            {
-                let mut headers = HeaderMap::new();
-                for (key, value) in http_header_extension {
-                    if let (Ok(header_name), Ok(header_value)) =
-                        (HeaderName::try_from(key), HeaderValue::try_from(value))
-                    {
-                        headers.insert(header_name, header_value);
-                    }
-                }
-                return headers;
-            }
-        }
-        HeaderMap::new()
+        // If this is a batch request, we cannot return headers.
+        let Some(single_req) = self.as_single() else {
+            return HeaderMap::new();
+        };
+        // If the request does not have the `HttpHeaderExtension`, return an empty map.
+        let Some(http_header_extension) =
+            single_req.meta().extensions().get::<HttpHeaderExtension>()
+        else {
+            return HeaderMap::new();
+        };
+
+        http_header_extension.clone()
     }
 }
 

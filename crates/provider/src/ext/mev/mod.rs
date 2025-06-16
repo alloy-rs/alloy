@@ -6,7 +6,7 @@ use alloy_network::Network;
 use alloy_rpc_types_mev::{EthBundleHash, EthSendBundle};
 
 /// The HTTP header used for Flashbots signature authentication.
-pub const FLASHBOTS_SIGNATURE_HEADER: &str = "X-Flashbots-Signature";
+pub const FLASHBOTS_SIGNATURE_HEADER: &str = "x-flashbots-signature";
 
 /// This module provides support for interacting with non-standard MEV-related RPC endpoints.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]

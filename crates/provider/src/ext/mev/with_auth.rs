@@ -1,5 +1,5 @@
 use crate::{ext::FLASHBOTS_SIGNATURE_HEADER, ProviderCall};
-use alloy_json_rpc::{HttpHeaderExtension, RpcRecv, RpcSend};
+use alloy_json_rpc::{HeaderName, HeaderValue, HttpHeaderExtension, RpcRecv, RpcSend};
 use alloy_primitives::{hex, keccak256};
 use alloy_rpc_client::RpcCall;
 use alloy_signer::Signer;
@@ -90,9 +90,10 @@ where
                     .map_err(TransportErrorKind::custom)?;
 
                 // Add the Flashbots signature to the request headers
-                let headers: HttpHeaderExtension = HttpHeaderExtension::from_iter([(
-                    FLASHBOTS_SIGNATURE_HEADER.to_string(),
-                    signature,
+                let headers = HttpHeaderExtension::from_iter([(
+                    HeaderName::from_static(FLASHBOTS_SIGNATURE_HEADER),
+                    HeaderValue::from_str(signature.as_str())
+                        .map_err(TransportErrorKind::custom)?,
                 )]);
 
                 // Patch the existing RPC call with the new headers
