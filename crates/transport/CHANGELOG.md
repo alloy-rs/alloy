@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
 
+### Miscellaneous Tasks
+
+- Release 1.0.10
+
 ### Other
 
 - Improve mock transport error messages ([#2536](https://github.com/alloy-rs/alloy/issues/2536))

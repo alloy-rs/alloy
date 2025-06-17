@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [rpc-types-trace] Add as_str method to GethDebugTracerType ([#2576](https://github.com/alloy-rs/alloy/issues/2576))
 
+### Miscellaneous Tasks
+
+- Release 1.0.10
+
 ## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
 
 ### Miscellaneous Tasks
