@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Move `Transaction::from_transaction` ([#2590](https://github.com/alloy-rs/alloy/issues/2590))
 
+### Miscellaneous Tasks
+
+- Release 1.0.11
+
 ## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
 
 ### Bug Fixes
