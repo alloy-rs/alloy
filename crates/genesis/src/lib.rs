@@ -677,7 +677,7 @@ where
 
 /// Custom deserialization function for `Option<u64>`.
 ///
-/// This function allows it to be deserialized form a number or a "quantity" hex string.
+/// This function allows it to be deserialized from a number or a "quantity" hex string.
 /// We need a custom function as this should only be used for non-human-readable formats.
 fn deserialize_u64_opt<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
 where
