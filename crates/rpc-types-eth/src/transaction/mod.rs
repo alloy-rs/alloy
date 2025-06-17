@@ -149,6 +149,26 @@ where
     pub fn is_legacy_gas(&self) -> bool {
         self.inner.gas_price().is_some()
     }
+
+    /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
+    pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
+        let TransactionInfo {
+            block_hash, block_number, index: transaction_index, base_fee, ..
+        } = tx_info;
+        let effective_gas_price = base_fee
+            .map(|base_fee| {
+                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
+            })
+            .unwrap_or_else(|| tx.max_fee_per_gas());
+
+        Self {
+            inner: tx,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price: Some(effective_gas_price),
+        }
+    }
 }
 
 impl<T> Transaction<T>
@@ -200,29 +220,6 @@ impl<Eip4844> Transaction<EthereumTxEnvelope<Eip4844>> {
         EthereumTypedTransaction<Eip4844>: From<Eip4844>,
     {
         self.inner.map(|tx| tx.into_signed())
-    }
-
-    /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
-    pub fn from_transaction<T: TransactionTrait + Typed2718>(
-        tx: Recovered<T>,
-        tx_info: TransactionInfo,
-    ) -> Transaction<T> {
-        let TransactionInfo {
-            block_hash, block_number, index: transaction_index, base_fee, ..
-        } = tx_info;
-        let effective_gas_price = base_fee
-            .map(|base_fee| {
-                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
-            })
-            .unwrap_or_else(|| tx.max_fee_per_gas());
-
-        Transaction {
-            inner: tx,
-            block_hash,
-            block_number,
-            transaction_index,
-            effective_gas_price: Some(effective_gas_price),
-        }
     }
 }
 
