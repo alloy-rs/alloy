@@ -151,7 +151,11 @@ where
     }
 
     /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
-    pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
+    pub fn from_transaction<TxIn>(tx: Recovered<TxIn>, tx_info: TransactionInfo) -> Self
+    where
+        TxIn: TransactionTrait,
+        T: From<TxIn>,
+    {
         let TransactionInfo {
             block_hash, block_number, index: transaction_index, base_fee, ..
         } = tx_info;
@@ -162,7 +166,7 @@ where
             .unwrap_or_else(|| tx.max_fee_per_gas());
 
         Self {
-            inner: tx,
+            inner: tx.convert(),
             block_hash,
             block_number,
             transaction_index,
