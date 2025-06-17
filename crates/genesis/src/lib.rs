@@ -14,7 +14,7 @@ extern crate alloc;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use alloy_eips::{eip7840::BlobParams, BlobScheduleBlobParams};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
-use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
+use alloy_serde::{storage::deserialize_storage_map, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use core::str::FromStr;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
@@ -283,28 +283,6 @@ impl From<GenesisAccount> for TrieAccount {
     }
 }
 
-/// Custom deserialization function for the private key.
-///
-/// This function allows the private key to be deserialized from a string or a `null` value.
-///
-/// We need a custom function here especially to handle the case where the private key is `0x` and
-/// should be deserialized as `None`.
-fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let opt_str: Option<String> = Option::deserialize(deserializer)?;
-
-    if let Some(ref s) = opt_str {
-        if s == "0x" {
-            return Ok(None);
-        }
-        B256::from_str(s).map(Some).map_err(D::Error::custom)
-    } else {
-        Ok(None)
-    }
-}
-
 /// Defines core blockchain settings per block.
 ///
 /// Tailors unique settings for each network based on its genesis block.
@@ -323,181 +301,106 @@ pub struct ChainConfig {
     pub chain_id: u64,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub homestead_block: Option<u64>,
 
     /// The DAO fork switch block (None = no fork).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub dao_fork_block: Option<u64>,
 
     /// Whether or not the node supports the DAO hard-fork.
     pub dao_fork_support: bool,
 
     /// The [EIP-150](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md) hard fork block (None = no fork).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub eip150_block: Option<u64>,
 
     /// The [EIP-155](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md) hard fork block.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub eip155_block: Option<u64>,
 
     /// The [EIP-158](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-158.md) hard fork block.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub eip158_block: Option<u64>,
 
     /// The Byzantium hard fork block (None = no fork, 0 = already on byzantium).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub byzantium_block: Option<u64>,
 
     /// The Constantinople hard fork block (None = no fork, 0 = already on constantinople).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub constantinople_block: Option<u64>,
 
     /// The Petersburg hard fork block (None = no fork, 0 = already on petersburg).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub petersburg_block: Option<u64>,
 
     /// The Istanbul hard fork block (None = no fork, 0 = already on istanbul).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub istanbul_block: Option<u64>,
 
     /// The Muir Glacier hard fork block (None = no fork, 0 = already on muir glacier).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub muir_glacier_block: Option<u64>,
 
     /// The Berlin hard fork block (None = no fork, 0 = already on berlin).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub berlin_block: Option<u64>,
 
     /// The London hard fork block (None = no fork, 0 = already on london).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub london_block: Option<u64>,
 
     /// The Arrow Glacier hard fork block (None = no fork, 0 = already on arrow glacier).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub arrow_glacier_block: Option<u64>,
 
     /// The Gray Glacier hard fork block (None = no fork, 0 = already on gray glacier).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub gray_glacier_block: Option<u64>,
 
     /// Virtual fork after the merge to use as a network splitter.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub merge_netsplit_block: Option<u64>,
 
     /// Shanghai switch time (None = no fork, 0 = already on shanghai).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub shanghai_time: Option<u64>,
 
     /// Cancun switch time (None = no fork, 0 = already on cancun).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub cancun_time: Option<u64>,
 
     /// Prague switch time (None = no fork, 0 = already on prague).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub prague_time: Option<u64>,
 
     /// Osaka switch time (None = no fork, 0 = already on osaka).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub osaka_time: Option<u64>,
 
     /// BPO1 switch time (None = no fork, 0 = already on BPO1).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo1_time: Option<u64>,
 
     /// BPO2 switch time (None = no fork, 0 = already on BPO2).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo2_time: Option<u64>,
 
     /// BPO3 switch time (None = no fork, 0 = already on BPO3).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo3_time: Option<u64>,
 
     /// BPO4 switch time (None = no fork, 0 = already on BPO4).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo4_time: Option<u64>,
 
     /// BPO5 switch time (None = no fork, 0 = already on BPO5).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub bpo5_time: Option<u64>,
 
     /// Total difficulty reached that triggers the merge consensus upgrade.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_json_ttd_opt"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::ttd")]
     pub terminal_total_difficulty: Option<U256>,
 
     /// A flag specifying that the network already passed the terminal total difficulty. Its
@@ -745,6 +648,46 @@ pub struct ParliaConfig {
     /// Epoch length to update validator set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epoch: Option<u64>,
+}
+
+/// Custom deserialization function for the private key.
+///
+/// This function allows the private key to be deserialized from a string or a `null` value.
+///
+/// We need a custom function here especially to handle the case where the private key is `0x` and
+/// should be deserialized as `None`.
+fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        match Option::<String>::deserialize(deserializer)? {
+            Some(ref s) => {
+                if s == "0x" {
+                    return Ok(None);
+                }
+                B256::from_str(s).map(Some).map_err(D::Error::custom)
+            }
+            None => Ok(None),
+        }
+    } else {
+        Option::<B256>::deserialize(deserializer)
+    }
+}
+
+/// Custom deserialization function for `Option<u64>`.
+///
+/// This function allows it to be deserialized from a number or a "quantity" hex string.
+/// We need a custom function as this should only be used for non-human-readable formats.
+fn deserialize_u64_opt<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        alloy_serde::quantity::opt::deserialize(deserializer)
+    } else {
+        Option::<u64>::deserialize(deserializer)
+    }
 }
 
 #[cfg(test)]
