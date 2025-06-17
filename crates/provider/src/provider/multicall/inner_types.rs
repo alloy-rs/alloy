@@ -31,6 +31,14 @@ pub trait MulticallItem {
     fn target(&self) -> Address;
     /// ABI-encoded input data for the call.
     fn input(&self) -> Bytes;
+
+    /// Converts `self` to a [`CallItem`] while specifying whether it can fail.
+    fn into_call(self, allow_failure: bool) -> CallItem<Self::Decoder>
+    where
+        Self: Sized,
+    {
+        CallItem::<Self::Decoder>::from(self).allow_failure(allow_failure)
+    }
 }
 
 /// Helper type to build a [`CallItem`]
@@ -115,6 +123,20 @@ pub trait CallInfoTrait: std::fmt::Debug {
     fn to_call3(&self) -> Call3;
     /// Converts the [`CallItem`] into a [`Call3Value`] struct for `aggregate3Call`
     fn to_call3_value(&self) -> Call3Value;
+}
+
+impl<T, D> From<T> for CallItem<D>
+where
+    T: MulticallItem,
+    D: SolCall,
+{
+    /// Converts a [`MulticallItem`] into a [`CallItem`]
+    ///
+    /// By default, it doesn't allow for failure when used in [`aggregate3`][crate::MulticallBuilder::aggregate3].
+    /// Call [`allow_failure`][CallItem::allow_failure] on the result to specify the failure behavior.
+    fn from(value: T) -> Self {
+        Self::new(value.target(), value.input())
+    }
 }
 
 /// Marker for Dynamic Calls i.e where in SolCall type is locked to one specific type and multicall

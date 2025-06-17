@@ -193,10 +193,7 @@ where
 
     /// Add a dynamic call to the builder
     pub fn add_dynamic(mut self, item: impl MulticallItem<Decoder = D>) -> Self {
-        let target = item.target();
-        let input = item.input();
-
-        let call = CallItem::<D>::new(target, input);
+        let call: CallItem<D> = item.into();
 
         self.calls.push(call.to_call3_value());
         self
@@ -210,12 +207,7 @@ where
         item: impl MulticallItem<Decoder = D>,
         allow_failure: bool,
     ) -> Self {
-        let target = item.target();
-        let input = item.input();
-
-        let call = CallItem::<D>::new(target, input).allow_failure(allow_failure);
-
-        self.calls.push(call.to_call3_value());
+        self.calls.push(item.into_call(allow_failure).to_call3_value());
         self
     }
 
@@ -299,18 +291,13 @@ where
         T: TuplePush<Item::Decoder>,
         <T as TuplePush<Item::Decoder>>::Pushed: CallTuple,
     {
-        let target = item.target();
-        let input = item.input();
-
-        let call = CallItem::<Item::Decoder>::new(target, input);
-
+        let call: CallItem<Item::Decoder> = item.into();
         self.add_call(call)
     }
 
     /// Appends a [`SolCall`] to the stack while specifying whether it is allowed to fail
     ///
     /// This is useful in combination with [`aggregate3`][MulticallBuilder::aggregate3].
-    #[expect(clippy::should_implement_trait)]
     pub fn add3<Item: MulticallItem>(
         self,
         item: Item,
@@ -321,12 +308,7 @@ where
         T: TuplePush<Item::Decoder>,
         <T as TuplePush<Item::Decoder>>::Pushed: CallTuple,
     {
-        let target = item.target();
-        let input = item.input();
-
-        let call = CallItem::<Item::Decoder>::new(target, input).allow_failure(allow_failure);
-
-        self.add_call(call)
+        self.add_call(item.into_call(allow_failure))
     }
 
     /// Appends a [`CallItem`] to the stack.
