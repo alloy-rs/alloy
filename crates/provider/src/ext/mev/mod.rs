@@ -14,7 +14,10 @@ pub const FLASHBOTS_SIGNATURE_HEADER: &str = "x-flashbots-signature";
 pub trait MevApi<N>: Send + Sync {
     /// Sends a MEV bundle using the `eth_sendBundle` RPC method.
     /// Returns the resulting bundle hash on success.
-    fn send_bundle(&self, bundle: EthSendBundle) -> MevBuilder<(EthSendBundle,), EthBundleHash>;
+    fn send_bundle(
+        &self,
+        bundle: EthSendBundle,
+    ) -> MevBuilder<(EthSendBundle,), Option<EthBundleHash>>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -24,7 +27,10 @@ where
     N: Network,
     P: Provider<N>,
 {
-    fn send_bundle(&self, bundle: EthSendBundle) -> MevBuilder<(EthSendBundle,), EthBundleHash> {
+    fn send_bundle(
+        &self,
+        bundle: EthSendBundle,
+    ) -> MevBuilder<(EthSendBundle,), Option<EthBundleHash>> {
         MevBuilder::new_rpc(self.client().request("eth_sendBundle", (bundle,)))
     }
 }

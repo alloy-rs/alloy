@@ -320,7 +320,7 @@ pub type SendBundleResponse = EthBundleHash;
 #[serde(rename_all = "camelCase")]
 pub struct EthBundleHash {
     /// Hash of the bundle bodies.
-    pub bundle_hash: Option<B256>,
+    pub bundle_hash: B256,
 }
 
 /// Request for `eth_sendPrivateTransaction`
