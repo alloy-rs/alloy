@@ -14,7 +14,7 @@ use alloy_eips::{
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
-    eip7685::{Requests, RequestsOrHash},
+    eip7685::Requests,
     BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
@@ -1628,7 +1628,7 @@ impl ExecutionData {
     ///
     /// For the [`ExecutionPayloadSidecar`] this is expected to use just the requests hash, because
     /// the [`Requests`] are not part of the block/header. See also
-    /// [`RequestsOrHash`](alloy_eips::eip4844::RequestsOrHash).
+    /// [`RequestsOrHash`].
     ///
     /// See also [`ExecutionPayload::from_block_unchecked`].
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
