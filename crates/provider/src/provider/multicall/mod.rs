@@ -202,6 +202,23 @@ where
         self
     }
 
+    /// Add a dynamic call to the builder while specifying whether it is allowed to fail
+    ///
+    /// This is useful in combination with [`aggregate3`][MulticallBuilder::aggregate3].
+    pub fn add_dynamic3(
+        mut self,
+        item: impl MulticallItem<Decoder = D>,
+        allow_failure: bool,
+    ) -> Self {
+        let target = item.target();
+        let input = item.input();
+
+        let call = CallItem::<D>::new(target, input).allow_failure(allow_failure);
+
+        self.calls.push(call.to_call3_value());
+        self
+    }
+
     /// Add a dynamic [`CallItem`] to the builder
     pub fn add_call_dynamic(mut self, call: CallItem<D>) -> Self {
         self.calls.push(call.to_call3_value());
@@ -286,6 +303,28 @@ where
         let input = item.input();
 
         let call = CallItem::<Item::Decoder>::new(target, input);
+
+        self.add_call(call)
+    }
+
+    /// Appends a [`SolCall`] to the stack while specifying whether it is allowed to fail
+    ///
+    /// This is useful in combination with [`aggregate3`][MulticallBuilder::aggregate3].
+    #[expect(clippy::should_implement_trait)]
+    pub fn add3<Item: MulticallItem>(
+        self,
+        item: Item,
+        allow_failure: bool,
+    ) -> MulticallBuilder<T::Pushed, P, N>
+    where
+        Item::Decoder: 'static,
+        T: TuplePush<Item::Decoder>,
+        <T as TuplePush<Item::Decoder>>::Pushed: CallTuple,
+    {
+        let target = item.target();
+        let input = item.input();
+
+        let call = CallItem::<Item::Decoder>::new(target, input).allow_failure(allow_failure);
 
         self.add_call(call)
     }

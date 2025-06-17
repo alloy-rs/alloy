@@ -175,6 +175,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn add3() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
+
+        let dummy_addr = deploy_dummy(provider.clone()).await;
+
+        // allow failure
+        let multicall = provider.multicall().add3(dummy_addr.fail(), true);
+        let (failure,) = multicall.aggregate3().await.unwrap();
+
+        assert!(matches!(failure.unwrap_err(), Failure { idx: 0, return_data: _ }));
+    }
+
+    #[tokio::test]
     async fn test_util() {
         let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
         let provider = ProviderBuilder::new()
@@ -293,6 +308,23 @@ mod tests {
 
         assert_eq!(res.len(), 4);
         assert_eq!(res[0], res[1]);
+    }
+
+    #[tokio::test]
+    async fn add_dynamic3() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
+
+        let dummy = deploy_dummy(provider.clone()).await;
+
+        // allow failure
+        let multicall =
+            MulticallBuilder::new_dynamic(provider.clone()).add_dynamic3(dummy.fail(), true);
+        let res = multicall.aggregate3().await.unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert!(matches!(res[0].clone().unwrap_err(), Failure { idx: 0, return_data: _ }));
     }
 
     #[tokio::test]
