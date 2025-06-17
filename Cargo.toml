@@ -69,6 +69,7 @@ alloy-transport-http = { version = "1.0", path = "crates/transport-http", defaul
 alloy-transport-ipc = { version = "1.0", path = "crates/transport-ipc", default-features = false }
 alloy-transport-ws = { version = "1.0", path = "crates/transport-ws", default-features = false }
 alloy-eip5792 = { version = "1.0", path = "crates/eip5792", default-features = false }
+alloy-tx-macros = { version = "1.0", path = "crates/tx-macros", default-features = false }
 
 alloy-core = { version = "1.2.0", default-features = false }
 alloy-dyn-abi = { version = "1.2.0", default-features = false }

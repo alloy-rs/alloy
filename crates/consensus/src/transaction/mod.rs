@@ -18,7 +18,7 @@ pub use eip7702::TxEip7702;
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
-pub use envelope::{EthereumTxEnvelope, TxEnvelope};
+pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
@@ -52,7 +52,6 @@ mod typed;
 pub use typed::{EthereumTypedTransaction, TypedTransaction};
 
 mod tx_type;
-pub use tx_type::TxType;
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
@@ -61,7 +60,7 @@ mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
 
 #[cfg(feature = "serde")]
-pub use legacy::signed_legacy_serde;
+pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
 
 /// Bincode-compatible serde implementations for transaction types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -225,6 +224,12 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     fn authorization_count(&self) -> Option<u64> {
         self.authorization_list().map(|auths| auths.len() as u64)
     }
+}
+
+/// A typed transaction envelope.
+pub trait TransactionEnvelope: Transaction {
+    /// The enum of transaction types.
+    type TxType: Typed2718;
 }
 
 /// A signable transaction.
@@ -549,5 +554,29 @@ where
             Self::Left(tx) => tx.authorization_count(),
             Self::Right(tx) => tx.authorization_count(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
+
+    #[test]
+    fn test_custom_envelope() {
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = MyTxType)]
+        enum MyEnvelope {
+            #[envelope(flatten)]
+            Ethereum(TxEnvelope),
+            #[envelope(ty = 10)]
+            MyTx(Signed<TxEip1559>),
+            #[envelope(ty = 11)]
+            AnotherMyTx(Signed<TxEip1559>),
+        }
+
+        assert_eq!(u8::from(MyTxType::Ethereum(TxType::Eip1559)), 2);
+        assert_eq!(u8::from(MyTxType::MyTx), 10);
+        assert_eq!(MyTxType::try_from(2u8).unwrap(), MyTxType::Ethereum(TxType::Eip1559));
+        assert_eq!(MyTxType::try_from(10u8).unwrap(), MyTxType::MyTx);
     }
 }

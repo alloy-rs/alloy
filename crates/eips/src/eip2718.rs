@@ -3,7 +3,7 @@
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
 use crate::alloc::vec::Vec;
-use alloy_primitives::{keccak256, Bytes, Sealed, B256};
+use alloy_primitives::{keccak256, Bytes, Sealable, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use auto_impl::auto_impl;
 use core::fmt;
@@ -163,6 +163,28 @@ pub trait Decodable2718: Sized {
     }
 }
 
+impl<T: Decodable2718 + Sealable> Decodable2718 for Sealed<T> {
+    fn extract_type_byte(buf: &mut &[u8]) -> Option<u8> {
+        T::extract_type_byte(buf)
+    }
+
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::typed_decode(ty, buf).map(Self::new)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::fallback_decode(buf).map(Self::new)
+    }
+
+    fn decode_2718(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::decode_2718(buf).map(Self::new)
+    }
+
+    fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::network_decode(buf).map(Self::new)
+    }
+}
+
 /// Encoding trait for [EIP-2718] envelopes.
 ///
 /// These envelopes wrap a transaction or a receipt with a type flag. [EIP-2718] encodings are used
@@ -267,6 +289,20 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     }
 }
 
+impl<T: Encodable2718> Encodable2718 for Sealed<T> {
+    fn encode_2718_len(&self) -> usize {
+        self.inner().encode_2718_len()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.inner().encode_2718(out);
+    }
+
+    fn trie_hash(&self) -> B256 {
+        self.hash()
+    }
+}
+
 /// An [EIP-2718] envelope, blanket implemented for types that impl [`Encodable2718`] and
 /// [`Decodable2718`].
 ///
@@ -311,6 +347,12 @@ pub trait Typed2718 {
     /// Returns true if the type is an EIP-7702 transaction.
     fn is_eip7702(&self) -> bool {
         self.ty() == EIP7702_TX_TYPE_ID
+    }
+}
+
+impl<T: Typed2718> Typed2718 for Sealed<T> {
+    fn ty(&self) -> u8 {
+        self.inner().ty()
     }
 }
 
