@@ -120,6 +120,14 @@ impl<Params> Request<Params> {
     ) -> Request<NewParams> {
         Request { meta: self.meta, params: map(self.params) }
     }
+
+    /// Change the metadata of the request.
+    pub fn map_meta<F>(self, f: F) -> Self
+    where
+        F: FnOnce(RequestMeta) -> RequestMeta,
+    {
+        Self { meta: f(self.meta), params: self.params }
+    }
 }
 
 /// A [`Request`] that has been partially serialized.
