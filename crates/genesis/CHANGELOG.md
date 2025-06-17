@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Features
+
+- Implement support for BPO forks ([#2542](https://github.com/alloy-rs/alloy/issues/2542))
+
+### Miscellaneous Tasks
+
+- Random cleanup ([#2548](https://github.com/alloy-rs/alloy/issues/2548))
+
+### Other
+
+- Stabilize ChainConfig serde for Human-Readable & Binary Formats ([#2436](https://github.com/alloy-rs/alloy/issues/2436))
+
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
+
 ## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
 
 ### Miscellaneous Tasks
