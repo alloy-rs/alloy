@@ -240,6 +240,12 @@ where
         self
     }
 
+    /// Set the state overrides for this call, if any.
+    pub fn overrides_opt(mut self, overrides: Option<StateOverride>) -> Self {
+        self.params.overrides = overrides;
+        self
+    }
+
     /// Appends a single [AccountOverride] to the state override.
     ///
     /// Creates a new [`StateOverride`] if none has been set yet.
