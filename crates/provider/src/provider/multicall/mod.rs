@@ -193,8 +193,9 @@ where
 
     /// Add a dynamic call to the builder
     ///
-    /// The call will have `allowFailure` set to `false`. To allow failure, use [`add_call_dynamic`],
-    /// potentially converting a [`MulticallItem`] to a fallible [`CallItem`] with [`MulticallItem::into_call`].
+    /// The call will have `allowFailure` set to `false`. To allow failure, use
+    /// [`Self::add_call_dynamic`], potentially converting a [`MulticallItem`] to a fallible
+    /// [`CallItem`] with [`MulticallItem::into_call`].
     pub fn add_dynamic(mut self, item: impl MulticallItem<Decoder = D>) -> Self {
         let call: CallItem<D> = item.into();
 
@@ -276,8 +277,9 @@ where
 
     /// Appends a [`SolCall`] to the stack.
     ///
-    /// The call will have `allowFailure` set to `false`. To allow failure, use [`add_call`],
-    /// potentially converting a [`MulticallItem`] to a fallible [`CallItem`] with [`MulticallItem::into_call`].
+    /// The call will have `allowFailure` set to `false`. To allow failure, use [`Self::add_call`],
+    /// potentially converting a [`MulticallItem`] to a fallible [`CallItem`] with
+    /// [`MulticallItem::into_call`].
     #[expect(clippy::should_implement_trait)]
     pub fn add<Item: MulticallItem>(self, item: Item) -> MulticallBuilder<T::Pushed, P, N>
     where
