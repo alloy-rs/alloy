@@ -455,15 +455,33 @@ where
     Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
 {
     fn recover_signer(&self) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
-        let signature_hash = self.signature_hash();
-        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+        match self {
+            Self::Legacy(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip2930(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip1559(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip4844(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip7702(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+        }
     }
 
     fn recover_signer_unchecked(
         &self,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
-        let signature_hash = self.signature_hash();
-        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+        match self {
+            Self::Legacy(tx) => crate::transaction::SignerRecoverable::recover_signer_unchecked(tx),
+            Self::Eip2930(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+            Self::Eip1559(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+            Self::Eip4844(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+            Self::Eip7702(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+        }
     }
 }
 
