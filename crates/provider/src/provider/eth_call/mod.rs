@@ -241,8 +241,8 @@ where
     }
 
     /// Set the state overrides for this call, if any.
-    pub fn overrides_opt(mut self, overrides: impl Into<Option<StateOverride>>) -> Self {
-        self.params.overrides = overrides.into();
+    pub fn overrides_opt(mut self, overrides: Option<StateOverride>) -> Self {
+        self.params.overrides = overrides;
         self
     }
 
