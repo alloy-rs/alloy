@@ -92,13 +92,16 @@ impl<'a> SerdeGenerator<'a> {
                     let tx_type = U8::from(*tx_type);
                     let rename = format!("0x{tx_type:x}");
 
+                    let mut aliases = vec![];
                     // Add alias for single digit hex values (e.g., "0x0" for "0x00")
-                    let maybe_alias = if rename.len() == 3 {
-                        let alias = format!("0x0{}", rename.chars().last().unwrap());
-                        quote! { alias = #alias, }
-                    } else {
-                        quote! {}
-                    };
+                    if rename.len() == 3 {
+                        aliases.push(format!("0x0{}", rename.chars().last().unwrap()));
+                    }
+
+                    // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
+                    if rename != rename.to_uppercase() {
+                        aliases.push(rename.to_uppercase());
+                    }
 
                     // Special handling for legacy transactions
                     let maybe_with = if v.is_legacy() {
@@ -115,7 +118,7 @@ impl<'a> SerdeGenerator<'a> {
                     let maybe_other = serde_attrs.clone().unwrap_or_default();
 
                     Some(quote! {
-                        #[serde(rename = #rename, #maybe_alias #maybe_with #maybe_other)]
+                        #[serde(rename = #rename, #(alias = #aliases,)* #maybe_with #maybe_other)]
                         #name(#ty)
                     })
                 } else {
