@@ -1623,6 +1623,23 @@ impl ExecutionData {
         Self { payload, sidecar }
     }
 
+    /// Conversion from [`alloy_consensus::Block`]. Also returns the [`ExecutionPayloadSidecar`]
+    /// extracted from the block.
+    ///
+    /// For the [`ExecutionPayloadSidecar`] this is expected to use just the requests hash, because
+    /// the [`Requests`] are not part of the block/header. See also
+    /// [`RequestsOrHash`](alloy_eips::eip7685::RequestsOrHash).
+    ///
+    /// See also [`ExecutionPayload::from_block_unchecked`].
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let (payload, sidecar) = ExecutionPayload::from_block_unchecked(block_hash, block);
+        Self::new(payload, sidecar)
+    }
+
     /// Returns the parent hash of the block.
     pub const fn parent_hash(&self) -> B256 {
         self.payload.parent_hash()
