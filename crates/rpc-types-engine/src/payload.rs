@@ -1628,7 +1628,7 @@ impl ExecutionData {
     ///
     /// For the [`ExecutionPayloadSidecar`] this is expected to use just the requests hash, because
     /// the [`Requests`] are not part of the block/header. See also
-    /// [`RequestsOrHash`].
+    /// [`RequestsOrHash`](alloy_eips::eip7685::RequestsOrHash).
     ///
     /// See also [`ExecutionPayload::from_block_unchecked`].
     pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
