@@ -54,7 +54,9 @@ jobs:
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
         if: ${{ matrix.rust != '1.85' }} # MSRV
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.98
       - name: build
         if: ${{ matrix.rust == '1.85' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
