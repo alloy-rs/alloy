@@ -175,7 +175,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add3() {
+    async fn test_add_call_fallible() {
         let provider = ProviderBuilder::new()
             .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
             .unwrap();
@@ -183,7 +183,7 @@ mod tests {
         let dummy_addr = deploy_dummy(provider.clone()).await;
 
         // allow failure
-        let multicall = provider.multicall().add3(dummy_addr.fail(), true);
+        let multicall = provider.multicall().add_call(dummy_addr.fail().into_call(true));
         let (failure,) = multicall.aggregate3().await.unwrap();
 
         assert!(matches!(failure.unwrap_err(), Failure { idx: 0, return_data: _ }));
@@ -311,7 +311,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_dynamic3() {
+    async fn test_add_call_dynamic_fallible() {
         let provider = ProviderBuilder::new()
             .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
             .unwrap();
@@ -320,13 +320,11 @@ mod tests {
 
         // allow failure
         let multicall = MulticallBuilder::new_dynamic(provider.clone())
-            .add_dynamic3(dummy.fail(), true)
             .add_call_dynamic(dummy.fail().into_call(true));
         let res = multicall.aggregate3().await.unwrap();
 
-        assert_eq!(res.len(), 2);
+        assert_eq!(res.len(), 1);
         assert!(matches!(res[0].clone().unwrap_err(), Failure { idx: 0, return_data: _ }));
-        assert!(matches!(res[1].clone().unwrap_err(), Failure { idx: 1, return_data: _ }));
     }
 
     #[tokio::test]

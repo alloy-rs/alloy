@@ -192,22 +192,13 @@ where
     }
 
     /// Add a dynamic call to the builder
+    ///
+    /// The call will have `allowFailure` set to `false`. To allow failure, use [`add_call_dynamic`],
+    /// potentially converting a [`MulticallItem`] to a fallible [`CallItem`] with [`MulticallItem::into_call`].
     pub fn add_dynamic(mut self, item: impl MulticallItem<Decoder = D>) -> Self {
         let call: CallItem<D> = item.into();
 
         self.calls.push(call.to_call3_value());
-        self
-    }
-
-    /// Add a dynamic call to the builder while specifying whether it is allowed to fail
-    ///
-    /// This is useful in combination with [`aggregate3`][MulticallBuilder::aggregate3].
-    pub fn add_dynamic3(
-        mut self,
-        item: impl MulticallItem<Decoder = D>,
-        allow_failure: bool,
-    ) -> Self {
-        self.calls.push(item.into_call(allow_failure).to_call3_value());
         self
     }
 
@@ -284,6 +275,9 @@ where
     }
 
     /// Appends a [`SolCall`] to the stack.
+    ///
+    /// The call will have `allowFailure` set to `false`. To allow failure, use [`add_call`],
+    /// potentially converting a [`MulticallItem`] to a fallible [`CallItem`] with [`MulticallItem::into_call`].
     #[expect(clippy::should_implement_trait)]
     pub fn add<Item: MulticallItem>(self, item: Item) -> MulticallBuilder<T::Pushed, P, N>
     where
@@ -293,22 +287,6 @@ where
     {
         let call: CallItem<Item::Decoder> = item.into();
         self.add_call(call)
-    }
-
-    /// Appends a [`SolCall`] to the stack while specifying whether it is allowed to fail
-    ///
-    /// This is useful in combination with [`aggregate3`][MulticallBuilder::aggregate3].
-    pub fn add3<Item: MulticallItem>(
-        self,
-        item: Item,
-        allow_failure: bool,
-    ) -> MulticallBuilder<T::Pushed, P, N>
-    where
-        Item::Decoder: 'static,
-        T: TuplePush<Item::Decoder>,
-        <T as TuplePush<Item::Decoder>>::Pushed: CallTuple,
-    {
-        self.add_call(item.into_call(allow_failure))
     }
 
     /// Appends a [`CallItem`] to the stack.
