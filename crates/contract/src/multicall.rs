@@ -25,9 +25,7 @@ impl<P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder<P,
 mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
-    use alloy_provider::{
-        CallItem, CallItemBuilder, Failure, MulticallBuilder, Provider, ProviderBuilder,
-    };
+    use alloy_provider::{CallItem, Failure, MulticallBuilder, Provider, ProviderBuilder};
     use alloy_sol_types::sol;
     use DummyThatFails::DummyThatFailsInstance;
 
