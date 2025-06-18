@@ -39,7 +39,7 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 /// - Implementations of `Transaction`, `Typed2718`, `Encodable2718`, `Decodable2718`
 /// - Serde serialization/deserialization support (if `serde` feature is enabled)
 /// - Arbitrary implementations (if `arbitrary` feature is enabled)
-#[proc_macro_derive(TransactionEnvelope, attributes(envelope))]
+#[proc_macro_derive(TransactionEnvelope, attributes(envelope, serde))]
 pub fn derive_transaction_envelope(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

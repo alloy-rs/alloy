@@ -1,4 +1,5 @@
 use darling::{FromDeriveInput, FromMeta, FromVariant};
+use proc_macro2::TokenStream;
 use syn::{Ident, Path, Type};
 
 /// Container-level arguments for the TransactionEnvelope derive macro.
@@ -31,7 +32,7 @@ pub(crate) struct EnvelopeArgs {
 
 /// Variant of transaction envelope enum.
 #[derive(Debug, FromVariant)]
-#[darling(attributes(envelope))]
+#[darling(attributes(envelope), forward_attrs(serde))]
 pub(crate) struct EnvelopeVariant {
     /// The identifier of the variant.
     pub ident: Ident,
@@ -42,6 +43,9 @@ pub(crate) struct EnvelopeVariant {
     /// Kind of the variant.
     #[darling(flatten)]
     pub kind: VariantKind,
+
+    /// Forwarded attributes.
+    pub attrs: Vec<syn::Attribute>,
 }
 
 /// Kind of the envelope variant.
@@ -64,6 +68,8 @@ pub(crate) struct ProcessedVariant {
     pub ty: Type,
     /// The kind of variant.
     pub kind: VariantKind,
+    /// The serde attributes for the variant.
+    pub serde_attrs: Option<TokenStream>,
 }
 
 impl ProcessedVariant {
@@ -99,7 +105,18 @@ impl GroupedVariants {
 
         let mut processed = Vec::new();
         for variant in variants {
-            let EnvelopeVariant { ident, fields, kind } = variant;
+            let EnvelopeVariant { ident, fields, kind, attrs } = variant;
+
+            let serde_attrs =
+                if let Some(attr) = attrs.into_iter().find(|attr| attr.path().is_ident("serde")) {
+                    if let syn::Meta::List(list) = attr.meta {
+                        Some(list.tokens.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
             // Check that variant has exactly one unnamed field
             let ty = match &fields.style {
@@ -119,7 +136,7 @@ impl GroupedVariants {
                 }
             };
 
-            processed.push(ProcessedVariant { name: ident, ty, kind });
+            processed.push(ProcessedVariant { name: ident, ty, kind, serde_attrs });
         }
 
         let typed =
