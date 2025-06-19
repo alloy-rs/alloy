@@ -3,7 +3,7 @@ use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
 };
-use alloy_primitives::{bytes, Address, Bytes, B256};
+use alloy_primitives::{bytes, Address, Bytes, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
 
@@ -293,5 +293,18 @@ where
 
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.1.recover_signer_unchecked()
+    }
+}
+
+impl<T> SignerRecoverable for Sealed<T>
+where
+    T: SignerRecoverable,
+{
+    fn recover_signer(&self) -> Result<Address, RecoveryError> {
+        self.inner().recover_signer()
+    }
+
+    fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
+        self.inner().recover_signer_unchecked()
     }
 }

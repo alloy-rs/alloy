@@ -449,6 +449,24 @@ impl<T: Transaction> Transaction for Sealed<T> {
     }
 }
 
+#[cfg(any(feature = "secp256k1", feature = "k256"))]
+impl<T> crate::transaction::SignerRecoverable for Signed<T>
+where
+    T: SignableTransaction<Signature>,
+{
+    fn recover_signer(&self) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+    }
+
+    fn recover_signer_unchecked(
+        &self,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+}
+
 #[cfg(feature = "serde")]
 mod serde {
     use crate::transaction::RlpEcdsaEncodableTx;
