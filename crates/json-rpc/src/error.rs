@@ -31,7 +31,7 @@ pub enum RpcError<E, ErrResp = Box<RawValue>> {
         serde_json::Error,
     ),
     /// JSON deserialization error.
-    #[error("deserialization error: {err}")]
+    #[error("deserialization error: {err}\n{text}")]
     DeserError {
         /// The underlying serde_json error.
         // To avoid accidentally confusing ser and deser errors, we do not use
