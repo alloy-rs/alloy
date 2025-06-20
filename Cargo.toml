@@ -92,6 +92,7 @@ alloy-hardforks = "0.2.0"
 # ethereum
 ethereum_ssz_derive = "0.9"
 ethereum_ssz = "0.9"
+ssz_types = "0.11"
 tree_hash = "0.10.0"
 tree_hash_derive = "0.10.0"
 

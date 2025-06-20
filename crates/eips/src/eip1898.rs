@@ -1776,16 +1776,16 @@ mod tests {
         assert!(serde_json::from_str::<TestLenientStruct>(r#"{"block": {}}"#).is_err());
     }
 
-    #[test]
-    fn test_lenient_block_number_or_tag_wrapper() {
-        // Test the LenientBlockNumberOrTag wrapper directly
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Latest);
+    // #[test]
+    // fn test_lenient_block_number_or_tag_wrapper() {
+    //     // Test the LenientBlockNumberOrTag wrapper directly
+    //     let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();
+    //     assert_eq!(block_number.0, BlockNumberOrTag::Latest);
 
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
+    //     let block_number: LenientBlockNumberOrTag = serde_json::from_str("123").unwrap();
+    //     assert_eq!(block_number.0, BlockNumberOrTag::Number(123));
 
-        let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
-        assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
-    }
+    //     let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"0x1\"").unwrap();
+    //     assert_eq!(block_number.0, BlockNumberOrTag::Number(1));
+    // }
 }

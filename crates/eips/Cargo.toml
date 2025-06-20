@@ -52,6 +52,7 @@ sha2 = { workspace = true, optional = true }
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
+ssz_types = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -70,7 +71,7 @@ serde_json.workspace = true
 rand.workspace = true
 
 [features]
-default = ["std", "kzg-sidecar"]
+default = ["std", "kzg-sidecar", "ssz"]
 std = [
 	"alloy-primitives/std",
 	"alloy-rlp/std",
@@ -101,7 +102,7 @@ kzg = ["kzg-sidecar", "sha2", "dep:c-kzg"]
 kzg-sidecar = ["sha2"]
 k256 = ["alloy-eip7702/k256"]
 sha2 = ["dep:sha2"]
-ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive"]
+ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "dep:ssz_types"]
 arbitrary = [
 	"std",
 	"kzg-sidecar",
