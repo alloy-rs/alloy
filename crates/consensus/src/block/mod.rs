@@ -129,6 +129,15 @@ impl<T, H> Block<T, H> {
         self.map_transactions(|tx| tx.into_encoded())
     }
 
+    /// Replaces the header of the block.
+    ///
+    /// Note: This method only replaces the main block header. If you need to transform
+    /// the ommer headers as well, use [`map_header`](Self::map_header) instead.
+    pub fn with_header(mut self, header: H) -> Self {
+        self.header = header;
+        self
+    }
+
     /// Returns the RLP encoded length of the block's header and body.
     pub fn rlp_length_for(header: &H, body: &BlockBody<T, H>) -> usize
     where
