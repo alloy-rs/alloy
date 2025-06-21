@@ -10,7 +10,7 @@ use alloy_consensus::{
     Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Encodable2718, WithEncoded},
+    eip2718::{Decodable2718, Encodable2718},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
@@ -301,58 +301,6 @@ pub struct ExecutionPayloadV1 {
     pub transactions: Vec<Bytes>,
 }
 
-/// Helper to construct `Block<T>` from an execution payload.
-#[derive(Debug)]
-pub struct BlockBuilder<'a> {
-    payload: &'a ExecutionPayloadV1,
-}
-
-impl<'a> BlockBuilder<'a> {
-    /// Creates a new `BlockBuilder` for the given payload.
-    pub const fn new(payload: &'a ExecutionPayloadV1) -> Self {
-        Self { payload }
-    }
-
-    /// Builds a `Block<T>` from the payload and the provided transactions.
-    pub fn build<T>(&self, transactions: Vec<T>) -> Result<Block<T>, PayloadError> {
-        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
-            &self.payload.transactions,
-            |item, buf| buf.put_slice(item),
-        );
-
-        let header = Header {
-            parent_hash: self.payload.parent_hash,
-            beneficiary: self.payload.fee_recipient,
-            state_root: self.payload.state_root,
-            transactions_root,
-            receipts_root: self.payload.receipts_root,
-            withdrawals_root: None,
-            logs_bloom: self.payload.logs_bloom,
-            number: self.payload.block_number,
-            gas_limit: self.payload.gas_limit,
-            gas_used: self.payload.gas_used,
-            timestamp: self.payload.timestamp,
-            mix_hash: self.payload.prev_randao,
-            base_fee_per_gas: Some(
-                self.payload
-                    .base_fee_per_gas
-                    .try_into()
-                    .map_err(|_| PayloadError::BaseFee(self.payload.base_fee_per_gas))?,
-            ),
-            blob_gas_used: None,
-            excess_blob_gas: None,
-            parent_beacon_block_root: None,
-            requests_hash: None,
-            extra_data: self.payload.extra_data.clone(),
-            ommers_hash: EMPTY_OMMER_ROOT_HASH,
-            difficulty: Default::default(),
-            nonce: Default::default(),
-        };
-
-        Ok(Block { header, body: BlockBody { transactions, ommers: vec![], withdrawals: None } })
-    }
-}
-
 impl ExecutionPayloadV1 {
     /// Returns the block number and hash as a [`BlockNumHash`].
     pub const fn block_num_hash(&self) -> BlockNumHash {
@@ -360,62 +308,71 @@ impl ExecutionPayloadV1 {
     }
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`]
-    pub fn try_into_block<T: Decodable2718>(&self) -> Result<Block<T>, PayloadError> {
-        self.validate_payload()?;
-
-        let transactions = self
-            .transactions
-            .iter()
-            .map(|tx| {
-                let mut buf = tx.as_ref();
-                let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-                if !buf.is_empty() {
-                    return Err(alloy_rlp::Error::UnexpectedLength);
-                }
-                Ok(tx)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        BlockBuilder::new(self).build(transactions)
-    }
-
-    /// Converts [`ExecutionPayloadV1`] to [`Block<WithEncoded<T>>`].
-    /// This keeps both the decoded transaction and its original RLP bytes.
-    pub fn try_into_block_with_encoded<T: Decodable2718>(
-        &self,
-    ) -> Result<Block<WithEncoded<T>>, PayloadError> {
-        self.validate_payload()?;
-
-        let transactions = self
-            .transactions
-            .iter()
-            .map(|tx| {
-                let original = tx.as_ref();
-                let mut buf = original;
-
-                let decoded = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-                if !buf.is_empty() {
-                    return Err(alloy_rlp::Error::UnexpectedLength);
-                }
-
-                Ok(WithEncoded::new(original.to_vec().into(), decoded))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        BlockBuilder::new(self).build(transactions)
-    }
-
-    /// Validates basic payload constraints like extra data length and non-zero base fee.
-    fn validate_payload(&self) -> Result<(), PayloadError> {
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
         if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
-            return Err(PayloadError::ExtraData(self.extra_data.clone()));
+            return Err(PayloadError::ExtraData(self.extra_data));
         }
 
         if self.base_fee_per_gas.is_zero() {
             return Err(PayloadError::BaseFee(self.base_fee_per_gas));
         }
 
-        Ok(())
+        let transactions = self
+            .transactions
+            .iter()
+            .map(|tx| {
+                let mut buf = tx.as_ref();
+
+                let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
+
+                if !buf.is_empty() {
+                    return Err(alloy_rlp::Error::UnexpectedLength);
+                }
+
+                Ok(tx)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Reuse the encoded bytes for root calculation
+        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
+            &self.transactions,
+            |item, buf| buf.put_slice(item),
+        );
+
+        let header = Header {
+            parent_hash: self.parent_hash,
+            beneficiary: self.fee_recipient,
+            state_root: self.state_root,
+            transactions_root,
+            receipts_root: self.receipts_root,
+            withdrawals_root: None,
+            logs_bloom: self.logs_bloom,
+            number: self.block_number,
+            gas_limit: self.gas_limit,
+            gas_used: self.gas_used,
+            timestamp: self.timestamp,
+            mix_hash: self.prev_randao,
+            // WARNING: It’s allowed for a base fee in EIP1559 to increase unbounded. We assume that
+            // it will fit in an u64. This is not always necessarily true, although it is extremely
+            // unlikely not to be the case, a u64 maximum would have 2^64 which equates to 18 ETH
+            // per gas.
+            base_fee_per_gas: Some(
+                self.base_fee_per_gas
+                    .try_into()
+                    .map_err(|_| PayloadError::BaseFee(self.base_fee_per_gas))?,
+            ),
+            blob_gas_used: None,
+            excess_blob_gas: None,
+            parent_beacon_block_root: None,
+            requests_hash: None,
+            extra_data: self.extra_data,
+            // Defaults
+            ommers_hash: EMPTY_OMMER_ROOT_HASH,
+            difficulty: Default::default(),
+            nonce: Default::default(),
+        };
+
+        Ok(Block { header, body: BlockBody { transactions, ommers: vec![], withdrawals: None } })
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].
@@ -1795,7 +1752,7 @@ mod tests {
                         .parse()
                         .unwrap(),
                 }
-                .to_string(),
+                    .to_string(),
             },
         };
         assert_eq!(q, serde_json::from_str(s).unwrap());
