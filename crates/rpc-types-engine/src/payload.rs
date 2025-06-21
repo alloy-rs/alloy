@@ -1059,7 +1059,7 @@ impl ExecutionPayload {
         self,
         sidecar: &ExecutionPayloadSidecar,
     ) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with_sidecar_and_mapper(sidecar, |tx| {
+        self.try_into_block_with_sidecar_with(sidecar, |tx| {
             let mut buf = tx.as_ref();
             let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
             if !buf.is_empty() {
@@ -1074,7 +1074,7 @@ impl ExecutionPayload {
     /// The log bloom is assumed to be validated during serialization.
     ///
     /// See <https://github.com/ethereum/go-ethereum/blob/79a478bb6176425c2400e949890e668a3d9a3d05/core/beacon/types.go#L145>
-    pub fn try_into_block_with_sidecar_and_mapper<T, F, E>(
+    pub fn try_into_block_with_sidecar_with<T, F, E>(
         self,
         sidecar: &ExecutionPayloadSidecar,
         f: F,
@@ -1796,7 +1796,7 @@ impl ExecutionData {
         F: FnMut(Bytes) -> Result<T, E>,
         E: Into<PayloadError>,
     {
-        self.payload.try_into_block_with_sidecar_and_mapper(&self.sidecar, f)
+        self.payload.try_into_block_with_sidecar_with(&self.sidecar, f)
     }
 }
 
