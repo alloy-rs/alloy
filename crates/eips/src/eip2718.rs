@@ -124,7 +124,9 @@ pub trait Decodable2718: Sized {
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
-    /// Decode a transaction according to [EIP-2718], ensuring no trailing bytes.
+    /// Decode a transaction according to [EIP-2718], ensuring no trailing bytes.This is intended
+    /// to decode a single transaction from the entire buffer without leaving any trailing
+    /// bytes.This is needed because decode_2718 does not care about trailing bytes by design.
     fn decode_2718_exact(bytes: &[u8]) -> Eip2718Result<Self> {
         let mut buf = bytes;
         let tx = Self::decode_2718(&mut buf)?;
