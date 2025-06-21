@@ -124,9 +124,23 @@ pub trait Decodable2718: Sized {
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
-    /// Decode a transaction according to [EIP-2718], ensuring no trailing bytes.This is intended
-    /// to decode a single transaction from the entire buffer without leaving any trailing
-    /// bytes.This is needed because decode_2718 does not care about trailing bytes by design.
+    /// Decode a transaction according to [EIP-2718], ensuring no trailing bytes.
+    ///
+    /// This method decodes a single transaction from the entire buffer and ensures that the
+    /// buffer is completely consumed. If there are any trailing bytes after the transaction
+    /// data, an error is returned.
+    ///
+    /// This is different from [`decode_2718`](Self::decode_2718) which allows trailing bytes
+    /// in the buffer. This method is useful when you need to ensure that the input contains
+    /// exactly one transaction and nothing else.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The transaction data is invalid
+    /// - There are trailing bytes after the transaction
+    ///
+    /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
     fn decode_2718_exact(bytes: &[u8]) -> Eip2718Result<Self> {
         let mut buf = bytes;
         let tx = Self::decode_2718(&mut buf)?;
