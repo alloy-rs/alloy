@@ -320,17 +320,7 @@ impl ExecutionPayloadV1 {
         let transactions = self
             .transactions
             .iter()
-            .map(|tx| {
-                let mut buf = tx.as_ref();
-
-                let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-
-                if !buf.is_empty() {
-                    return Err(alloy_rlp::Error::UnexpectedLength);
-                }
-
-                Ok(tx)
-            })
+            .map(|tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from))
             .collect::<Result<Vec<_>, _>>()?;
 
         // Reuse the encoded bytes for root calculation

@@ -124,6 +124,16 @@ pub trait Decodable2718: Sized {
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
+    /// Decode a transaction according to [EIP-2718], ensuring no trailing bytes.
+    fn decode_2718_exact(bytes: &[u8]) -> Eip2718Result<Self> {
+        let mut buf = bytes;
+        let tx = Self::decode_2718(&mut buf)?;
+        if !buf.is_empty() {
+            return Err(Eip2718Error::RlpError(alloy_rlp::Error::UnexpectedLength));
+        }
+        Ok(tx)
+    }
+
     /// Decode an [EIP-2718] transaction in the network format. The network
     /// format is used ONLY by the Ethereum p2p protocol. Do not call this
     /// method unless you are building a p2p protocol client.
