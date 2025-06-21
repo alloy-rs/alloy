@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_primitives::Bloom;
 use alloy_rlp::BufMut;
 use core::fmt;
@@ -81,6 +82,15 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
 
     /// Returns the logs emitted by this transaction.
     fn logs(&self) -> &[Self::Log];
+
+    /// Consumes the type and returns the logs emitted by this transaction as a vector.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.logs().to_vec()
+    }
 }
 
 /// Receipt type that knows how to encode itself with a [`Bloom`] value.

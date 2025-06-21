@@ -21,7 +21,7 @@ macro_rules! delegate {
 
 /// An enum that combines two different transaction types.
 ///
-/// This is intended to be used to extend existing presets, for example the ethereum or optstack
+/// This is intended to be used to extend existing presets, for example the ethereum or opstack
 /// transaction types and receipts
 ///
 /// Note: The [`Extended::Other`] variants must not overlap with the builtin one, transaction
@@ -34,6 +34,86 @@ pub enum Extended<BuiltIn, Other> {
     BuiltIn(BuiltIn),
     /// The other transaction type.
     Other(Other),
+}
+
+impl<B, T> Extended<B, T> {
+    /// Converts only the built-in transaction type using `From`, leaving the other type unchanged.
+    pub fn convert_builtin<U>(self) -> Extended<U, T>
+    where
+        U: From<B>,
+    {
+        self.map_builtin(U::from)
+    }
+
+    /// Attempts to convert only the built-in transaction type using `TryFrom`, leaving the other
+    /// type unchanged.
+    pub fn try_convert_builtin<U>(self) -> Result<Extended<U, T>, U::Error>
+    where
+        U: TryFrom<B>,
+    {
+        self.try_map_builtin(U::try_from)
+    }
+
+    /// Converts only the other transaction type using `From`, leaving the built-in type unchanged.
+    pub fn convert_other<U>(self) -> Extended<B, U>
+    where
+        U: From<T>,
+    {
+        self.map_other(U::from)
+    }
+
+    /// Attempts to convert only the other transaction type using `TryFrom`, leaving the built-in
+    /// type unchanged.
+    pub fn try_convert_other<U>(self) -> Result<Extended<B, U>, U::Error>
+    where
+        U: TryFrom<T>,
+    {
+        self.try_map_other(U::try_from)
+    }
+
+    /// Maps only the built-in transaction type using the provided function, leaving the other type
+    /// unchanged.
+    pub fn map_builtin<U>(self, f: impl FnOnce(B) -> U) -> Extended<U, T> {
+        match self {
+            Self::BuiltIn(tx) => Extended::BuiltIn(f(tx)),
+            Self::Other(tx) => Extended::Other(tx),
+        }
+    }
+
+    /// Attempts to map only the built-in transaction type using the provided fallible function,
+    /// leaving the other type unchanged. Returns an error if the mapping of the built-in type
+    /// fails.
+    pub fn try_map_builtin<U, E>(
+        self,
+        f: impl FnOnce(B) -> Result<U, E>,
+    ) -> Result<Extended<U, T>, E> {
+        match self {
+            Self::BuiltIn(tx) => f(tx).map(Extended::BuiltIn),
+            Self::Other(tx) => Ok(Extended::Other(tx)),
+        }
+    }
+
+    /// Maps only the other transaction type using the provided function, leaving the built-in type
+    /// unchanged.
+    pub fn map_other<U>(self, f: impl FnOnce(T) -> U) -> Extended<B, U> {
+        match self {
+            Self::BuiltIn(tx) => Extended::BuiltIn(tx),
+            Self::Other(tx) => Extended::Other(f(tx)),
+        }
+    }
+
+    /// Attempts to map only the other transaction type using the provided fallible function,
+    /// leaving the built-in type unchanged. Returns an error if the mapping of the other type
+    /// fails.
+    pub fn try_map_other<U, F>(
+        self,
+        f: impl FnOnce(T) -> Result<U, F>,
+    ) -> Result<Extended<B, U>, F> {
+        match self {
+            Self::BuiltIn(tx) => Ok(Extended::BuiltIn(tx)),
+            Self::Other(tx) => f(tx).map(Extended::Other),
+        }
+    }
 }
 
 impl<B, T> Transaction for Extended<B, T>

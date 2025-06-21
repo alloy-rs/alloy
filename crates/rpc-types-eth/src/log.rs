@@ -91,6 +91,23 @@ impl Log<LogData> {
             removed: self.removed,
         })
     }
+
+    /// Decode the log data with validation into a typed log.
+    pub fn log_decode_validate<T: alloy_sol_types::SolEvent>(
+        &self,
+    ) -> alloy_sol_types::Result<Log<T>> {
+        let decoded = T::decode_log_validate(&self.inner)?;
+        Ok(Log {
+            inner: decoded,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            block_timestamp: self.block_timestamp,
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            log_index: self.log_index,
+            removed: self.removed,
+        })
+    }
 }
 
 impl<T> alloy_rlp::Encodable for Log<T>

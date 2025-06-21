@@ -25,9 +25,7 @@ impl<P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder<P,
 mod tests {
     use super::*;
     use alloy_primitives::{address, b256, U256};
-    use alloy_provider::{
-        CallItem, CallItemBuilder, Failure, MulticallBuilder, Provider, ProviderBuilder,
-    };
+    use alloy_provider::{CallItem, Failure, MulticallBuilder, Provider, ProviderBuilder};
     use alloy_sol_types::sol;
     use DummyThatFails::DummyThatFailsInstance;
 
@@ -129,7 +127,7 @@ mod tests {
 
         assert!(err.to_string().contains("Multicall3: call failed"), "{err}");
 
-        let failing_call = CallItemBuilder::new(dummy.fail()).allow_failure(true);
+        let failing_call = dummy.fail().into_call(true);
         let multicall = provider
             .multicall()
             .add(erc20.totalSupply())
@@ -172,6 +170,21 @@ mod tests {
         assert!(b2.is_ok());
         let err = failure.unwrap_err();
         assert!(matches!(err, Failure { idx: 4, return_data: _ }));
+    }
+
+    #[tokio::test]
+    async fn test_add_call_fallible() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
+
+        let dummy_addr = deploy_dummy(provider.clone()).await;
+
+        // allow failure
+        let multicall = provider.multicall().add_call(dummy_addr.fail().into_call(true));
+        let (failure,) = multicall.aggregate3().await.unwrap();
+
+        assert!(matches!(failure.unwrap_err(), Failure { idx: 0, return_data: _ }));
     }
 
     #[tokio::test]
@@ -293,6 +306,23 @@ mod tests {
 
         assert_eq!(res.len(), 4);
         assert_eq!(res[0], res[1]);
+    }
+
+    #[tokio::test]
+    async fn test_add_call_dynamic_fallible() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|a| a.fork(FORK_URL))
+            .unwrap();
+
+        let dummy = deploy_dummy(provider.clone()).await;
+
+        // allow failure
+        let multicall = MulticallBuilder::new_dynamic(provider.clone())
+            .add_call_dynamic(dummy.fail().into_call(true));
+        let res = multicall.aggregate3().await.unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert!(matches!(res[0].clone().unwrap_err(), Failure { idx: 0, return_data: _ }));
     }
 
     #[tokio::test]

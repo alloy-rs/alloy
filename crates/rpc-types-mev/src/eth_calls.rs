@@ -1,8 +1,9 @@
 use crate::{u256_numeric_string, Privacy, Validity};
 
 use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};
-use alloy_primitives::{keccak256, Address, Bytes, Keccak256, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, Keccak256, TxHash, B256, U256};
 use alloy_rpc_types_eth::TransactionIndex;
+use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
 /// Bundle of transactions for `eth_callBundle`
@@ -226,6 +227,9 @@ pub struct CancelPrivateTransactionRequest {
 ///
 /// Note: this is for `eth_sendBundle` and not `mev_sendBundle`
 ///
+/// This implement the refund capabilities from here:
+/// <https://buildernet.org/docs/api#eth_sendbundle>
+/// But keeps compatibility with original Flashbots API:
 /// <https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint#eth_sendbundle>
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -236,17 +240,44 @@ pub struct EthSendBundle {
     #[serde(with = "alloy_serde::quantity")]
     pub block_number: u64,
     /// unix timestamp when this bundle becomes active
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub min_timestamp: Option<u64>,
     /// unix timestamp how long this bundle stays valid
-    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub max_timestamp: Option<u64>,
     /// list of hashes of possibly reverting txs
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub reverting_tx_hashes: Vec<B256>,
+    pub reverting_tx_hashes: Vec<TxHash>,
     /// UUID that can be used to cancel/replace this bundle
-    #[serde(default, rename = "replacementUuid", skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replacement_uuid: Option<String>,
+    /// A list of tx hashes that are allowed to be discarded
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropping_tx_hashes: Vec<TxHash>,
+    /// The percent that should be refunded to refund recipient
+    #[serde(
+        default,
+        deserialize_with = "alloy_serde::quantity::opt::deserialize",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub refund_percent: Option<u8>,
+    /// The address that receives the refund
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refund_recipient: Option<Address>,
+    /// A list of tx hashes used to determine the refund
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refund_tx_hashes: Vec<TxHash>,
+    /// Additional fields that are specific to the builder
+    #[serde(flatten, default)]
+    pub extra_fields: OtherFields,
 }
 
 impl EthSendBundle {
@@ -281,17 +312,13 @@ impl EthSendBundle {
 }
 
 /// Response from the matchmaker after sending a bundle.
-#[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct EthBundleHash {
-    /// Hash of the bundle bodies.
-    pub bundle_hash: B256,
-}
+#[deprecated = "Use `EthBundleHash` instead"]
+pub type SendBundleResponse = EthBundleHash;
 
 /// Response from the matchmaker after sending a bundle.
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct SendBundleResponse {
+pub struct EthBundleHash {
     /// Hash of the bundle bodies.
     pub bundle_hash: B256,
 }
@@ -395,6 +422,10 @@ impl PrivateTransactionPreferences {
 #[cfg(test)]
 mod tests {
     use super::EthCallBundleResponse;
+    use crate::EthSendBundle;
+    use alloy_primitives::{address, b256, bytes};
+    use alloy_serde::OtherFields;
+    use serde_json::json;
 
     #[test]
     fn can_deserialize_eth_call_resp() {
@@ -434,5 +465,119 @@ mod tests {
         let response = serde_json::from_str::<EthCallBundleResponse>(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
         similar_asserts::assert_eq!(json, serde_json::to_value(response).unwrap());
+    }
+
+    #[test]
+    fn can_deserialize_eth_send_bundle() {
+        let s = r#"{
+                "txs": ["0x1234"],
+                "blockNumber": 1,
+                "minTimestamp": 2,
+                "maxTimestamp": 3,
+                "revertingTxHashes": ["0x1111111111111111111111111111111111111111111111111111111111111111"],
+                "replacementUuid": "11111111-1111-4111-8111-111111111111",
+                "droppingTxHashes": ["0x2222222222222222222222222222222222222222222222222222222222222222"],
+                "refundPercent": 4,
+                "refundRecipient": "0x3333333333333333333333333333333333333333",
+                "refundTxHashes": ["0x4444444444444444444444444444444444444444444444444444444444444444"],
+                "customField": 42
+            }"#;
+        let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
+        assert_eq!(bundle.txs.len(), 1);
+        assert_eq!(bundle.txs.first().unwrap(), &bytes!("0x1234"));
+        assert_eq!(bundle.block_number, 1);
+        assert_eq!(bundle.min_timestamp, Some(2));
+        assert_eq!(bundle.max_timestamp, Some(3));
+        assert_eq!(bundle.reverting_tx_hashes.len(), 1);
+        assert_eq!(
+            bundle.reverting_tx_hashes.first().unwrap(),
+            &b256!("0x1111111111111111111111111111111111111111111111111111111111111111")
+        );
+        assert_eq!(
+            bundle.replacement_uuid,
+            Some("11111111-1111-4111-8111-111111111111".to_string())
+        );
+        assert_eq!(bundle.dropping_tx_hashes.len(), 1);
+        assert_eq!(
+            bundle.dropping_tx_hashes.first().unwrap(),
+            &b256!("0x2222222222222222222222222222222222222222222222222222222222222222")
+        );
+        assert_eq!(bundle.refund_percent, Some(4));
+        assert_eq!(
+            bundle.refund_recipient,
+            Some(address!("0x3333333333333333333333333333333333333333"))
+        );
+        assert_eq!(bundle.refund_tx_hashes.len(), 1);
+        assert_eq!(
+            bundle.refund_tx_hashes.first().unwrap(),
+            &b256!("0x4444444444444444444444444444444444444444444444444444444444444444")
+        );
+        assert_eq!(bundle.extra_fields.get("customField"), Some(&json!(42)));
+    }
+
+    #[test]
+    fn can_deserialize_eth_send_bundle_with_hex_numbers() {
+        let s = r#"{
+                "txs": ["0x1234"],
+                "blockNumber": "0x1",
+                "minTimestamp": "0x2",
+                "maxTimestamp": "0x3",
+                "refundPercent": "0x4"
+            }"#;
+        let bundle = serde_json::from_str::<EthSendBundle>(s).unwrap();
+        assert_eq!(bundle.block_number, 1);
+        assert_eq!(bundle.min_timestamp, Some(2));
+        assert_eq!(bundle.max_timestamp, Some(3));
+        assert_eq!(bundle.refund_percent, Some(4));
+    }
+
+    #[test]
+    fn can_serialize_eth_send_bundle() {
+        let bundle = EthSendBundle {
+            txs: vec![bytes!("0x1234")],
+            block_number: 1,
+            min_timestamp: Some(2),
+            max_timestamp: Some(3),
+            reverting_tx_hashes: vec![b256!(
+                "0x1111111111111111111111111111111111111111111111111111111111111111"
+            )],
+            replacement_uuid: Some("11111111-1111-4111-8111-111111111111".to_string()),
+            dropping_tx_hashes: vec![b256!(
+                "0x2222222222222222222222222222222222222222222222222222222222222222"
+            )],
+            refund_percent: Some(4),
+            refund_recipient: Some(address!("0x3333333333333333333333333333333333333333")),
+            refund_tx_hashes: vec![b256!(
+                "0x4444444444444444444444444444444444444444444444444444444444444444"
+            )],
+            extra_fields: OtherFields::from_iter([("customField", json!(42))]),
+        };
+        let s = r#"
+            {
+                "txs": ["0x1234"],
+                "blockNumber": "0x1",
+                "minTimestamp": 2,
+                "maxTimestamp": 3,
+                "revertingTxHashes": ["0x1111111111111111111111111111111111111111111111111111111111111111"],
+                "replacementUuid": "11111111-1111-4111-8111-111111111111",
+                "droppingTxHashes": ["0x2222222222222222222222222222222222222222222222222222222222222222"],
+                "refundPercent": 4,
+                "refundRecipient": "0x3333333333333333333333333333333333333333",
+                "refundTxHashes": ["0x4444444444444444444444444444444444444444444444444444444444444444"],
+                "customField": 42
+            }
+            "#;
+        let expected: serde_json::Value = serde_json::from_str(s).unwrap();
+        let value = serde_json::to_value(&bundle).unwrap();
+
+        assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn skip_serialize_for_optional_fields() {
+        let bundle =
+            EthSendBundle { txs: vec![bytes!("0x1234")], block_number: 1, ..Default::default() };
+        let s = serde_json::to_string(&bundle).unwrap();
+        assert_eq!(s, r#"{"txs":["0x1234"],"blockNumber":"0x1"}"#);
     }
 }

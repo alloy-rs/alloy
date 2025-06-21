@@ -553,6 +553,35 @@ pub mod signed_legacy_serde {
     }
 }
 
+#[cfg(feature = "serde")]
+pub mod untagged_legacy_serde {
+    //! Helper module for deserializing legacy transactions and ensuring that the `type` field is
+    //! not present.
+    //!
+    //! This is expected to be used as a fallback for deserializing legacy transactions without a
+    //! tag, and is needed to make sure that unknown transaction variants are explicitly rejected
+    //! instead of being treated as legacy transactions.
+
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    pub(crate) struct UntaggedLegacy {
+        #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
+        _ty: Option<()>,
+        #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
+        tx: Signed<TxLegacy>,
+    }
+
+    /// Deserializes a legacy transaction without a tag.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Signed<TxLegacy>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        UntaggedLegacy::deserialize(deserializer).map(|tx| tx.tx)
+    }
+}
+
 /// Bincode-compatible [`TxLegacy`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {

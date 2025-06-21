@@ -1091,7 +1091,7 @@ impl ExecutionPayload {
     }
 
     /// Returns a mutable reference to the V1 payload.
-    pub fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
+    pub const fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
         match self {
             Self::V1(payload) => payload,
             Self::V2(payload) => &mut payload.payload_inner,
@@ -1118,7 +1118,7 @@ impl ExecutionPayload {
     }
 
     /// Returns a mutable reference to the V2 payload, if any.
-    pub fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
+    pub const fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
         match self {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
@@ -1135,7 +1135,7 @@ impl ExecutionPayload {
     }
 
     /// Returns a mutable reference to the V2 payload, if any.
-    pub fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
+    pub const fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
@@ -1664,6 +1664,23 @@ impl ExecutionData {
     /// Creates new instance of [`ExecutionData`].
     pub const fn new(payload: ExecutionPayload, sidecar: ExecutionPayloadSidecar) -> Self {
         Self { payload, sidecar }
+    }
+
+    /// Conversion from [`alloy_consensus::Block`]. Also returns the [`ExecutionPayloadSidecar`]
+    /// extracted from the block.
+    ///
+    /// For the [`ExecutionPayloadSidecar`] this is expected to use just the requests hash, because
+    /// the [`Requests`] are not part of the block/header. See also
+    /// [`RequestsOrHash`](alloy_eips::eip7685::RequestsOrHash).
+    ///
+    /// See also [`ExecutionPayload::from_block_unchecked`].
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let (payload, sidecar) = ExecutionPayload::from_block_unchecked(block_hash, block);
+        Self::new(payload, sidecar)
     }
 
     /// Returns the parent hash of the block.
