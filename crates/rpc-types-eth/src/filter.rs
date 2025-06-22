@@ -858,7 +858,7 @@ impl Filter {
     ///
     /// * `block_num_hash` - Block number and hash of the block
     /// * `block_timestamp` - Block timestamp
-    /// * `receipts` - Iterator of (transaction_hash, receipt) pairs
+    /// * `tx_hashes_and_receipts` - Iterator of (transaction_hash, receipt) pairs
     /// * `removed` - Whether logs are from a removed block (reorg)
     pub fn matching_block_logs_with_tx_hashes<'a, I, R>(
         &self,
