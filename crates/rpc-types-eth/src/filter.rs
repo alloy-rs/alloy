@@ -2132,8 +2132,8 @@ mod tests {
             }],
         };
 
-        let receipts = vec![receipt1, receipt2];
-        let tx_hashes = vec![B256::from([0xaa; 32]), B256::from([0xbb; 32])];
+        let receipts = [receipt1, receipt2];
+        let tx_hashes = [B256::from([0xaa; 32]), B256::from([0xbb; 32])];
 
         let block_num_hash = BlockNumHash::new(1000, B256::from([0xff; 32]));
         let block_timestamp = 1234567890;
