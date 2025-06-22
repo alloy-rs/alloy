@@ -417,7 +417,7 @@ mod pubsub_impl {
     }
 
     impl RpcClient {
-        /// Connect to a transport via a [`PubSubConnect`] implementor.
+        /// Connect to a transport via a [`PubSubConnect`] implementer.
         pub async fn connect_pubsub<C: PubSubConnect>(connect: C) -> TransportResult<Self> {
             ClientBuilder::default().pubsub(connect).await
         }
