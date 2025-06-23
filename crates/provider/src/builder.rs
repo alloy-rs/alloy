@@ -502,6 +502,18 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         self.connect_client(client)
     }
 
+    /// Build this provider with a pre-built Reqwest client.
+    #[cfg(any(test, feature = "reqwest"))]
+    pub fn connect_reqwest(self, client: reqwest::Client, url: reqwest::Url) -> F::Provider
+    where
+        L: ProviderLayer<crate::RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+    {
+        let client = ClientBuilder::default().http_with_client(client, url);
+        self.connect_client(client)
+    }
+
     /// Build this provider with an Reqwest HTTP transport.
     #[cfg(any(test, feature = "reqwest"))]
     #[deprecated(since = "0.12.6", note = "use `connect_http` instead")]

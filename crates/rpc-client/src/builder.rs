@@ -61,6 +61,20 @@ impl<L> ClientBuilder<L> {
         self.transport(transport, is_local)
     }
 
+    /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
+    /// HTTP transport using a pre-built `reqwest::Client`.
+    #[cfg(feature = "reqwest")]
+    pub fn http_with_client(self, client: reqwest::Client, url: url::Url) -> RpcClient
+    where
+        L: Layer<alloy_transport_http::Http<reqwest::Client>>,
+        L::Service: IntoBoxTransport,
+    {
+        let transport = alloy_transport_http::Http::with_client(client, url);
+        let is_local = transport.guess_local();
+
+        self.transport(transport, is_local)
+    }
+
     /// Convenience function to create a new [`RpcClient`] with a `hyper` HTTP transport.
     #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient
