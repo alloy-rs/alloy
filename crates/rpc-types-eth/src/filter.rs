@@ -2224,7 +2224,7 @@ mod tests {
         assert_eq!(result[0].inner.address, addr1);
         assert_eq!(result[1].inner.address, addr1);
 
-        // Test 6: Test matching_block_logs_with_tx_hashes with non-matching block
+        // Test 6: Test matching_block_logs with non-matching block
         let filter = Filter::new().from_block(2000u64).to_block(2000u64);
         let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
         let result =
