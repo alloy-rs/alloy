@@ -860,7 +860,7 @@ impl Filter {
     /// * `block_timestamp` - Block timestamp
     /// * `tx_hashes_and_receipts` - Iterator of (transaction_hash, receipt) pairs
     /// * `removed` - Whether logs are from a removed block (reorg)
-    pub fn matching_block_logs_with_tx_hashes<'a, I, R>(
+    pub fn matching_block_logs<'a, I, R>(
         &self,
         block_num_hash: BlockNumHash,
         block_timestamp: u64,
@@ -2217,12 +2217,8 @@ mod tests {
         // Test 5: Test matching_block_logs_with_tx_hashes with block filter
         let filter = Filter::new().from_block(1000u64).to_block(1000u64).address(addr1);
         let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
-        let result = filter.matching_block_logs_with_tx_hashes(
-            block_num_hash,
-            block_timestamp,
-            tx_receipt_pairs,
-            false,
-        );
+        let result =
+            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].inner.address, addr1);
@@ -2231,12 +2227,8 @@ mod tests {
         // Test 6: Test matching_block_logs_with_tx_hashes with non-matching block
         let filter = Filter::new().from_block(2000u64).to_block(2000u64);
         let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
-        let result = filter.matching_block_logs_with_tx_hashes(
-            block_num_hash,
-            block_timestamp,
-            tx_receipt_pairs,
-            false,
-        );
+        let result =
+            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
 
         assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
 
