@@ -477,12 +477,20 @@ impl Typed2718 for AnyRpcTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::B64;
 
     #[test]
     fn convert_any_block() {
         let block = AnyRpcBlock::new(
             Block::new(
-                AnyRpcHeader::from_sealed(AnyHeader::default().seal(B256::ZERO)),
+                AnyRpcHeader::from_sealed(
+                    AnyHeader {
+                        nonce: Some(B64::ZERO),
+                        mix_hash: Some(B256::ZERO),
+                        ..Default::default()
+                    }
+                    .seal(B256::ZERO),
+                ),
                 BlockTransactions::Full(vec![]),
             )
             .into(),
