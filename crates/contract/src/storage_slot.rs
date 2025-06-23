@@ -47,11 +47,10 @@ where
         let tx = TransactionRequest::default()
             .with_to(self.token_address)
             .with_input(self.calldata.clone());
-        print!("tx created");
+
         // first collect all the slots that are used by the function call
         let access_list_result = self.provider.create_access_list(&tx.clone()).await;
         let access_list = access_list_result.unwrap().access_list;
-        print!("al created");
         // iterate over all the accessed slots and try to find the one that contains the
         // target value by overriding the slot and checking the function call result
         for item in access_list.0 {
