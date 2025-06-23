@@ -1,5 +1,5 @@
 use alloy_consensus::{BlockHeader, Header};
-use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
@@ -99,6 +99,14 @@ pub struct AnyHeader {
 }
 
 impl AnyHeader {
+    /// Seal the header with a known hash.
+    ///
+    /// WARNING: This method does not perform validation whether the hash is correct.
+    #[inline]
+    pub const fn seal(self, hash: B256) -> Sealed<Self> {
+        Sealed::new_unchecked(self, hash)
+    }
+
     /// Attempts to convert this header into a `Header`.
     ///
     /// This can fail if the header is missing required fields:
