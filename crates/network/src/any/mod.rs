@@ -109,9 +109,10 @@ impl AnyRpcBlock {
     ) -> Result<alloy_consensus::Block<T, H>, AnyConversionError>
     where
         T: TryFrom<AnyRpcTransaction, Error: Error + Send + Sync + 'static>,
-        H: TryFrom<AnyRpcHeader, Error: Error + Send + Sync + 'static>,
+        H: TryFrom<AnyHeader, Error: Error + Send + Sync + 'static>,
     {
         self.into_inner()
+            .map_header(|h| h.into_consensus())
             .try_convert_header()
             .map_err(AnyConversionError::new)?
             .try_convert_transactions()
@@ -201,7 +202,7 @@ impl From<AnyRpcBlock> for WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader
 impl<T, H> TryFrom<AnyRpcBlock> for alloy_consensus::Block<T, H>
 where
     T: TryFrom<AnyRpcTransaction, Error: Error + Send + Sync + 'static>,
-    H: TryFrom<AnyRpcHeader, Error: Error + Send + Sync + 'static>,
+    H: TryFrom<AnyHeader, Error: Error + Send + Sync + 'static>,
 {
     type Error = AnyConversionError;
 
@@ -487,6 +488,7 @@ mod tests {
             .into(),
         );
 
-        let _block: alloy_consensus::Block<TxEnvelope, AnyRpcHeader> = block.try_into().unwrap();
+        let _block: alloy_consensus::Block<TxEnvelope, alloy_consensus::Header> =
+            block.try_into().unwrap();
     }
 }
