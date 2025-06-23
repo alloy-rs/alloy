@@ -36,6 +36,9 @@ pub enum Error {
     /// An error occurred while waiting for a pending transaction.
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
+    /// An error occurred while searching for storage slots of an ERC20 token.
+    #[error("Failed to find storage slot for {0} ERC20 token")]
+    StorageSlotNotFound(String),
 }
 
 impl From<alloy_sol_types::Error> for Error {
