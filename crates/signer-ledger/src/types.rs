@@ -60,7 +60,8 @@ pub enum LedgerError {
     },
 }
 
-pub(crate) const P1_FIRST: u8 = 0x00;
+pub(crate) const P1_FIRST_0: u8 = 0x00;
+pub(crate) const P1_FIRST_1: u8 = 0x01;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,6 +73,7 @@ pub(crate) enum INS {
     GET_APP_CONFIGURATION = 0x06,
     SIGN_PERSONAL_MESSAGE = 0x08,
     SIGN_ETH_EIP_712 = 0x0C,
+    SIGN_EIP7702_AUTHORIZATION = 0x34,
 }
 
 impl fmt::Display for INS {
@@ -82,6 +84,7 @@ impl fmt::Display for INS {
             Self::GET_APP_CONFIGURATION => write!(f, "GET_APP_CONFIGURATION"),
             Self::SIGN_PERSONAL_MESSAGE => write!(f, "SIGN_PERSONAL_MESSAGE"),
             Self::SIGN_ETH_EIP_712 => write!(f, "SIGN_ETH_EIP_712"),
+            Self::SIGN_EIP7702_AUTHORIZATION => write!(f, "SIGN_EIP7702_AUTHORIZATION"),
         }
     }
 }

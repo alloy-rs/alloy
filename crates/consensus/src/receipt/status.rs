@@ -30,7 +30,7 @@ impl Eip658Value {
     }
 
     /// Coerce this variant into a [`Eip658Value::Eip658`] with [`Self::coerce_status`].
-    pub fn coerced_eip658(&mut self) {
+    pub const fn coerced_eip658(&mut self) {
         *self = Self::Eip658(self.coerce_status())
     }
 

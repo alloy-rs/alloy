@@ -1,7 +1,7 @@
 //! Contains constants and helper functions for [EIP-7892](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7892.md)
 
 use crate::eip7840::BlobParams;
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::vec::Vec;
 
 /// A scheduled blob parameter update entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,36 +61,6 @@ impl BlobScheduleBlobParams {
     /// Returns the configured Osaka [`BlobParams`].
     pub const fn osaka(&self) -> &BlobParams {
         &self.osaka
-    }
-
-    /// Finds the active scheduled blob parameters for a given timestamp.
-    pub fn from_schedule(schedule: &BTreeMap<String, BlobParams>) -> Self {
-        let mut cancun = None;
-        let mut prague = None;
-        let mut osaka = None;
-        let mut scheduled = Vec::new();
-
-        for (key, params) in schedule {
-            match key.as_str() {
-                "cancun" => cancun = Some(*params),
-                "prague" => prague = Some(*params),
-                "osaka" => osaka = Some(*params),
-                _ => {
-                    if let Ok(timestamp) = key.parse::<u64>() {
-                        scheduled.push((timestamp, *params));
-                    }
-                }
-            }
-        }
-
-        scheduled.sort_by_key(|(timestamp, _)| *timestamp);
-
-        Self {
-            cancun: cancun.unwrap_or_else(BlobParams::cancun),
-            prague: prague.unwrap_or_else(BlobParams::prague),
-            osaka: osaka.unwrap_or_else(BlobParams::osaka),
-            scheduled,
-        }
     }
 }
 

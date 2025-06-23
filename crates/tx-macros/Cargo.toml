@@ -1,0 +1,42 @@
+[package]
+name = "alloy-tx-macros"
+description = "Derive macro for transaction envelopes"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[lib]
+proc-macro = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
+darling = "0.20"
+
+alloy-primitives.workspace = true
+
+[features]
+arbitrary = [
+	"alloy-primitives/arbitrary"
+]
+serde = [
+	"alloy-primitives/serde"
+]

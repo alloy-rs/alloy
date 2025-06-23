@@ -36,6 +36,12 @@ where
         self
     }
 
+    /// Sets the state overrides for this call, if any.
+    pub fn with_overrides_opt(mut self, overrides: Option<StateOverride>) -> Self {
+        self.overrides = overrides;
+        self
+    }
+
     /// Returns a reference to the state overrides if set.
     pub const fn overrides(&self) -> Option<&StateOverride> {
         self.overrides.as_ref()
@@ -59,6 +65,12 @@ where
     /// Sets the block overrides for this call.
     pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
         self.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the block overrides for this call, if any.
+    pub fn with_block_overrides_opt(mut self, overrides: Option<BlockOverrides>) -> Self {
+        self.block_overrides = overrides;
         self
     }
 

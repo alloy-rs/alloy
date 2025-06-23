@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Miscellaneous Tasks
+
+- Release 1.0.11
+
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Dependencies
+
+- Bump MSRV to 1.85 ([#2547](https://github.com/alloy-rs/alloy/issues/2547))
+
+### Features
+
+- [rpc-types-trace] Add as_str method to GethDebugTracerType ([#2576](https://github.com/alloy-rs/alloy/issues/2576))
+
+### Miscellaneous Tasks
+
+- Release 1.0.10
+- Release 1.0.10
+
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
+- Truncate input data for ots block on serialize ([#2525](https://github.com/alloy-rs/alloy/issues/2525))
+
+## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
+
+### Features
+
+- Add trace helper fns ([#2504](https://github.com/alloy-rs/alloy/issues/2504))
+
+### Miscellaneous Tasks
+
+- Release 1.0.8
+- Add trace entry helper ([#2506](https://github.com/alloy-rs/alloy/issues/2506))
+- Add display for calltype ([#2505](https://github.com/alloy-rs/alloy/issues/2505))
+
+## [1.0.7](https://github.com/alloy-rs/alloy/releases/tag/v1.0.7) - 2025-05-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.7
+
 ## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
 
 ### Miscellaneous Tasks

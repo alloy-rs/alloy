@@ -5,12 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Features
+
+- More serde compat for `TransactionEnvelope` macro ([#2594](https://github.com/alloy-rs/alloy/issues/2594))
+
+### Miscellaneous Tasks
+
+- Release 1.0.11
+
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Bug Fixes
+
+- Fix incorrect type flag doc for EIP-4844 + minor grammar in CI config ([#2554](https://github.com/alloy-rs/alloy/issues/2554))
+
+### Dependencies
+
+- Bump MSRV to 1.85 ([#2547](https://github.com/alloy-rs/alloy/issues/2547))
+
+### Features
+
+- Implement `TransactionEnvelope` derive macro ([#2585](https://github.com/alloy-rs/alloy/issues/2585))
+- Default into_logs fn ([#2539](https://github.com/alloy-rs/alloy/issues/2539))
+- Add TryFrom conversions for Extended ([#2520](https://github.com/alloy-rs/alloy/issues/2520))
+
+### Miscellaneous Tasks
+
+- Release 1.0.10
+- Release 1.0.10
+- Fix typo in comment [crates/consensus/src/transaction/mod.rs] ([#2569](https://github.com/alloy-rs/alloy/issues/2569))
+- Ommers_hashes helper ([#2537](https://github.com/alloy-rs/alloy/issues/2537))
+- Add ReceiptEnvelope helpers ([#2533](https://github.com/alloy-rs/alloy/issues/2533))
+
+### Other
+
+- Fix typo in comment ([#2561](https://github.com/alloy-rs/alloy/issues/2561))
+
+### Testing
+
+- Fix typo in test function name in receipts.rs ([#2580](https://github.com/alloy-rs/alloy/issues/2580))
+- Add sanity assert trait impl test ([#2552](https://github.com/alloy-rs/alloy/issues/2552))
+
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
+
+## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.8
+- Add try_into helper fns ([#2515](https://github.com/alloy-rs/alloy/issues/2515))
+
 ## [1.0.7](https://github.com/alloy-rs/alloy/releases/tag/v1.0.7) - 2025-05-24
 
 ### Features
 
 - Add Extended type with alloy trait impls ([#2498](https://github.com/alloy-rs/alloy/issues/2498))
 - Encodable2718:into_encoded ([#2486](https://github.com/alloy-rs/alloy/issues/2486))
+
+### Miscellaneous Tasks
+
+- Release 1.0.7
 
 ## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
 

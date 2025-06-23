@@ -2,7 +2,7 @@
 
 use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
 use alloc::{string::String, vec::Vec};
-use alloy_primitives::Bytes;
+use alloy_primitives::{Bytes, U256};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -48,6 +48,11 @@ impl SimBlock {
     pub fn extend_calls(mut self, calls: impl IntoIterator<Item = TransactionRequest>) -> Self {
         self.calls.extend(calls);
         self
+    }
+
+    /// Returns the block's block number override if it exists.
+    pub fn block_number_override(&self) -> Option<U256> {
+        self.block_overrides.as_ref().and_then(|overrides| overrides.number)
     }
 }
 

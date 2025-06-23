@@ -30,7 +30,7 @@ The PubSub system here consists of 3 logical parts:
 This crate provides the following:
 
 - [`PubSubConnect`]: A trait for instantiating a PubSub service by connecting
-  to some **backend**. Implementors of this trait are responsible for
+  to some **backend**. Implementers of this trait are responsible for
   the precise connection details, and for spawning the **backend** task.
   Users should ALWAYS call [`PubSubConnect::into_service`] to get a running
   service with a running backend.

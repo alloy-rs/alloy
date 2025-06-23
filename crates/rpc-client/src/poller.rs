@@ -1,5 +1,5 @@
 use crate::WeakClient;
-use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
@@ -20,9 +20,6 @@ use wasmtimer::tokio::sleep;
 
 #[cfg(not(target_family = "wasm"))]
 use tokio::time::sleep;
-
-/// The number of retries for polling a request.
-const MAX_RETRIES: usize = 3;
 
 /// A poller task builder.
 ///
@@ -105,12 +102,12 @@ where
     }
 
     /// Sets the channel size for the poller task.
-    pub fn set_channel_size(&mut self, channel_size: usize) {
+    pub const fn set_channel_size(&mut self, channel_size: usize) {
         self.channel_size = channel_size;
     }
 
     /// Sets the channel size for the poller task.
-    pub fn with_channel_size(mut self, channel_size: usize) -> Self {
+    pub const fn with_channel_size(mut self, channel_size: usize) -> Self {
         self.set_channel_size(channel_size);
         self
     }
@@ -137,12 +134,12 @@ where
     }
 
     /// Sets the duration between polls.
-    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+    pub const fn set_poll_interval(&mut self, poll_interval: Duration) {
         self.poll_interval = poll_interval;
     }
 
     /// Sets the duration between polls.
-    pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
+    pub const fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
         self.set_poll_interval(poll_interval);
         self
     }
@@ -176,8 +173,7 @@ where
         let span = debug_span!("poller", method = %self.method);
         stream! {
         let mut params = ParamsOnce::Typed(self.params);
-        let mut retries = MAX_RETRIES;
-        'outer: for _ in 0..self.limit {
+        for _ in 0..self.limit {
             let Some(client) = self.client.upgrade() else {
                 debug!("client dropped");
                 break;
@@ -192,21 +188,12 @@ where
                 }
             };
 
-            loop {
-                trace!("polling");
-                match client.request(self.method.clone(), params).await {
-                    Ok(resp) => yield resp,
-                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                        debug!(%err, "failed to poll, retrying");
-                        retries -= 1;
-                        continue;
-                    }
-                    Err(err) => {
-                        error!(%err, "failed to poll");
-                        break 'outer;
-                    }
+            trace!("polling");
+            match client.request(self.method.clone(), params).await {
+                Ok(resp) => yield resp,
+                Err(err) => {
+                    error!(%err, "failed to poll");
                 }
-                break;
             }
 
             trace!(duration=?self.poll_interval, "sleeping");

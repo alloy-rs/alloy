@@ -1,7 +1,7 @@
 //! [`k256`] signer implementation.
 
 use super::{LocalSigner, LocalSignerError};
-use alloy_primitives::{hex, B256};
+use alloy_primitives::{hex, B256, B512};
 use alloy_signer::utils::secret_key_to_address;
 use k256::{
     ecdsa::{self, SigningKey},
@@ -85,6 +85,13 @@ impl LocalSigner<SigningKey> {
     #[inline]
     pub fn to_field_bytes(&self) -> FieldBytes {
         self.credential.to_bytes()
+    }
+
+    /// Convenience function that returns this signer's ethereum public key as a [`B512`] byte
+    /// array.
+    #[inline]
+    pub fn public_key(&self) -> B512 {
+        B512::from_slice(&self.credential.verifying_key().to_encoded_point(false).as_bytes()[1..])
     }
 }
 
@@ -414,5 +421,12 @@ mod tests {
         "0z0000000000000000000000000000000000000000000000000000000000000001"
             .parse::<LocalSigner<SigningKey>>()
             .unwrap_err();
+    }
+
+    #[test]
+    fn public_key() {
+        let signer: LocalSigner<SigningKey> =
+            "0x51fde55a7d696da3b318b21e231dec5ff4b33e895f191b2988e122e969b20e90".parse().unwrap();
+        assert_eq!(signer.public_key(), B512::from_str("0x2bcb56445551cd344c9be67cfe27652932d7088c17b6c3c8dad622a5c8e8caf4574d68fa12355e7fefbe2377911016124b9284283527dd2ead05c7b6e5585fbd").unwrap());
     }
 }

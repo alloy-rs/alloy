@@ -18,7 +18,7 @@ pub use eip7702::TxEip7702;
 mod envelope;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub use envelope::serde_bincode_compat as envelope_serde_bincode_compat;
-pub use envelope::{EthereumTxEnvelope, TxEnvelope};
+pub use envelope::{EthereumTxEnvelope, TxEnvelope, TxType};
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
@@ -52,7 +52,6 @@ mod typed;
 pub use typed::{EthereumTypedTransaction, TypedTransaction};
 
 mod tx_type;
-pub use tx_type::TxType;
 
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
@@ -61,7 +60,7 @@ mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
 
 #[cfg(feature = "serde")]
-pub use legacy::signed_legacy_serde;
+pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
 
 /// Bincode-compatible serde implementations for transaction types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -114,7 +113,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// This is also commonly referred to as the "Blob Gas Fee Cap".
     fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
-    /// Return the max priority fee per gas if the transaction is an dynamic fee transaction, and
+    /// Return the max priority fee per gas if the transaction is a dynamic fee transaction, and
     /// otherwise return the gas price.
     ///
     /// # Warning
@@ -225,6 +224,12 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     fn authorization_count(&self) -> Option<u64> {
         self.authorization_list().map(|auths| auths.len() as u64)
     }
+}
+
+/// A typed transaction envelope.
+pub trait TransactionEnvelope: Transaction {
+    /// The enum of transaction types.
+    type TxType: Typed2718;
 }
 
 /// A signable transaction.
@@ -549,5 +554,71 @@ where
             Self::Left(tx) => tx.authorization_count(),
             Self::Right(tx) => tx.authorization_count(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
+    use alloy_primitives::Signature;
+    use rand::Rng;
+    use serde::{Serialize, Serializer};
+
+    #[test]
+    fn test_custom_envelope() {
+        fn serialize_with<S: Serializer>(
+            tx: &Signed<TxEip1559>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error> {
+            #[derive(Serialize)]
+            struct WithExtra<'a> {
+                #[serde(flatten)]
+                inner: &'a Signed<TxEip1559>,
+                extra: &'a str,
+            }
+            WithExtra { inner: tx, extra: "extra" }.serialize(serializer)
+        }
+
+        #[derive(Debug, Clone, TransactionEnvelope)]
+        #[envelope(alloy_consensus = crate, tx_type_name = MyTxType)]
+        enum MyEnvelope {
+            #[envelope(flatten)]
+            Ethereum(TxEnvelope),
+            #[envelope(ty = 10)]
+            MyTx(Signed<TxEip1559>),
+            #[envelope(ty = 11)]
+            #[serde(serialize_with = "serialize_with")]
+            AnotherMyTx(Signed<TxEip1559>),
+        }
+
+        assert_eq!(u8::from(MyTxType::Ethereum(TxType::Eip1559)), 2);
+        assert_eq!(u8::from(MyTxType::MyTx), 10);
+        assert_eq!(MyTxType::try_from(2u8).unwrap(), MyTxType::Ethereum(TxType::Eip1559));
+        assert_eq!(MyTxType::try_from(10u8).unwrap(), MyTxType::MyTx);
+
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        let tx = Signed::new_unhashed(
+            TxEip1559 {
+                chain_id: 1,
+                gas_limit: 21000,
+                max_fee_per_gas: 1000,
+                max_priority_fee_per_gas: 1000,
+                ..Default::default()
+            },
+            Signature::new(Default::default(), Default::default(), Default::default()),
+        );
+
+        let my_tx = serde_json::to_string(&MyEnvelope::MyTx(tx.clone())).unwrap();
+        let another_my_tx = serde_json::to_string(&MyEnvelope::AnotherMyTx(tx)).unwrap();
+
+        assert_eq!(
+            my_tx,
+            r#"{"type":"0xa","chainId":"0x1","nonce":"0x0","gas":"0x5208","maxFeePerGas":"0x3e8","maxPriorityFeePerGas":"0x3e8","to":null,"value":"0x0","accessList":[],"input":"0x","r":"0x0","s":"0x0","yParity":"0x0","v":"0x0","hash":"0x2eaaca5609601faae806f5147abb8f51ae91cba12604bedc23a16f2776d5a97b"}"#
+        );
+        assert_eq!(
+            another_my_tx,
+            r#"{"type":"0xb","chainId":"0x1","nonce":"0x0","gas":"0x5208","maxFeePerGas":"0x3e8","maxPriorityFeePerGas":"0x3e8","to":null,"value":"0x0","accessList":[],"input":"0x","r":"0x0","s":"0x0","yParity":"0x0","v":"0x0","hash":"0x2eaaca5609601faae806f5147abb8f51ae91cba12604bedc23a16f2776d5a97b","extra":"extra"}"#
+        );
     }
 }

@@ -7,7 +7,7 @@ use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Eip1559Estimation {
-    /// The base fee per gas.
+    /// The max fee per gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_fee_per_gas: u128,
     /// The max priority fee per gas.

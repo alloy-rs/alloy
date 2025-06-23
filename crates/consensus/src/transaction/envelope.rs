@@ -3,24 +3,18 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        tx_type::TxType,
         RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
-    EthereumTypedTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip4844WithSidecar,
-    TxEip7702, TxLegacy,
+    EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
+    TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718, IsTyped2718},
-    eip2930::AccessList,
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip7594::Encodable7594,
     Typed2718,
 };
-use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{Decodable, Encodable};
-use core::{
-    fmt::Debug,
-    hash::{Hash, Hasher},
-};
+use alloy_primitives::{Bytes, Signature, B256};
+use core::fmt::Debug;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
@@ -169,30 +163,18 @@ impl<T> EthereumTxEnvelope<T> {
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "serde",
-    serde(
-        into = "serde_from::TaggedTxEnvelope<Eip4844>",
-        from = "serde_from::MaybeTaggedTxEnvelope<Eip4844>",
-        bound = "Eip4844: Clone + RlpEcdsaEncodableTx + serde::Serialize + serde::de::DeserializeOwned"
-    )
-)]
-#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "k256"), derive(arbitrary::Arbitrary))]
-#[cfg_attr(
-    all(any(test, feature = "arbitrary"), feature = "k256"),
-    arbitrary(
-        bound = "Eip4844: for<'a> arbitrary::Arbitrary<'a> + RlpEcdsaEncodableTx + SignableTransaction<Signature>"
-    )
-)]
+#[derive(Clone, Debug, TransactionEnvelope)]
+#[envelope(alloy_consensus = crate, tx_type_name = TxType)]
 #[doc(alias = "TransactionEnvelope")]
 pub enum EthereumTxEnvelope<Eip4844> {
     /// An untagged [`TxLegacy`].
+    #[envelope(ty = 0)]
     Legacy(Signed<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
+    #[envelope(ty = 1)]
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
+    #[envelope(ty = 2)]
     Eip1559(Signed<TxEip1559>),
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
@@ -201,36 +183,11 @@ pub enum EthereumTxEnvelope<Eip4844> {
     ///
     /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
+    #[envelope(ty = 3)]
     Eip4844(Signed<Eip4844>),
     /// A [`TxEip7702`] tagged with type 4.
+    #[envelope(ty = 4)]
     Eip7702(Signed<TxEip7702>),
-}
-
-impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> PartialEq for EthereumTxEnvelope<Eip4844>
-where
-    Eip4844: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Legacy(f0_self), Self::Legacy(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip2930(f0_self), Self::Eip2930(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip1559(f0_self), Self::Eip1559(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip4844(f0_self), Self::Eip4844(f0_other)) => f0_self.eq(f0_other),
-            (Self::Eip7702(f0_self), Self::Eip7702(f0_other)) => f0_self.eq(f0_other),
-            _unused => false,
-        }
-    }
-}
-
-impl<Eip4844: RlpEcdsaEncodableTx + PartialEq> Eq for EthereumTxEnvelope<Eip4844> {}
-
-impl<Eip4844> Hash for EthereumTxEnvelope<Eip4844>
-where
-    Self: Encodable2718,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.trie_hash().hash(state);
-    }
 }
 
 impl<T, Eip4844> From<Signed<T>> for EthereumTxEnvelope<Eip4844>
@@ -498,65 +455,33 @@ where
     Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
 {
     fn recover_signer(&self) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
-        let signature_hash = self.signature_hash();
-        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
+        match self {
+            Self::Legacy(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip2930(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip1559(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip4844(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+            Self::Eip7702(tx) => crate::transaction::SignerRecoverable::recover_signer(tx),
+        }
     }
 
     fn recover_signer_unchecked(
         &self,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
-        let signature_hash = self.signature_hash();
-        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
-    }
-}
-
-impl<Eip4844> Encodable for EthereumTxEnvelope<Eip4844>
-where
-    Self: Encodable2718,
-{
-    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.network_encode(out)
-    }
-
-    fn length(&self) -> usize {
-        self.network_len()
-    }
-}
-
-impl<Eip4844: RlpEcdsaDecodableTx> Decodable for EthereumTxEnvelope<Eip4844> {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self::network_decode(buf)?)
-    }
-}
-
-impl<Eip4844: RlpEcdsaDecodableTx> Decodable2718 for EthereumTxEnvelope<Eip4844> {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
-            TxType::Eip2930 => Ok(TxEip2930::rlp_decode_signed(buf)?.into()),
-            TxType::Eip1559 => Ok(TxEip1559::rlp_decode_signed(buf)?.into()),
-            TxType::Eip4844 => Ok(Self::Eip4844(Eip4844::rlp_decode_signed(buf)?)),
-            TxType::Eip7702 => Ok(TxEip7702::rlp_decode_signed(buf)?.into()),
-            TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
+        match self {
+            Self::Legacy(tx) => crate::transaction::SignerRecoverable::recover_signer_unchecked(tx),
+            Self::Eip2930(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+            Self::Eip1559(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+            Self::Eip4844(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+            Self::Eip7702(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
         }
-    }
-
-    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
-    }
-}
-
-impl<T> Typed2718 for Signed<T>
-where
-    T: RlpEcdsaEncodableTx + Send + Sync + Typed2718,
-{
-    fn ty(&self) -> u8 {
-        self.tx().ty()
-    }
-}
-
-impl<T> IsTyped2718 for EthereumTxEnvelope<T> {
-    fn is_type(type_id: u8) -> bool {
-        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 
@@ -593,416 +518,6 @@ where
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         T::rlp_decode_signed(buf).map_err(Into::into)
-    }
-}
-
-impl<Eip4844> Encodable2718 for EthereumTxEnvelope<Eip4844>
-where
-    Eip4844: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
-{
-    fn encode_2718_len(&self) -> usize {
-        self.eip2718_encoded_length()
-    }
-
-    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
-        match self {
-            // Legacy transactions have no difference between network and 2718
-            Self::Legacy(tx) => tx.eip2718_encode(out),
-            Self::Eip2930(tx) => {
-                tx.eip2718_encode(out);
-            }
-            Self::Eip1559(tx) => {
-                tx.eip2718_encode(out);
-            }
-            Self::Eip4844(tx) => {
-                tx.eip2718_encode(out);
-            }
-            Self::Eip7702(tx) => {
-                tx.eip2718_encode(out);
-            }
-        }
-    }
-
-    fn trie_hash(&self) -> B256 {
-        match self {
-            Self::Legacy(tx) => *tx.hash(),
-            Self::Eip2930(tx) => *tx.hash(),
-            Self::Eip1559(tx) => *tx.hash(),
-            Self::Eip4844(tx) => *tx.hash(),
-            Self::Eip7702(tx) => *tx.hash(),
-        }
-    }
-}
-
-impl<Eip4844> Transaction for EthereumTxEnvelope<Eip4844>
-where
-    Self: Typed2718,
-    Eip4844: Transaction + Send + Sync,
-{
-    #[inline]
-    fn chain_id(&self) -> Option<ChainId> {
-        match self {
-            Self::Legacy(tx) => tx.tx().chain_id(),
-            Self::Eip2930(tx) => tx.tx().chain_id(),
-            Self::Eip1559(tx) => tx.tx().chain_id(),
-            Self::Eip4844(tx) => tx.tx().chain_id(),
-            Self::Eip7702(tx) => tx.tx().chain_id(),
-        }
-    }
-
-    #[inline]
-    fn nonce(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.tx().nonce(),
-            Self::Eip2930(tx) => tx.tx().nonce(),
-            Self::Eip1559(tx) => tx.tx().nonce(),
-            Self::Eip4844(tx) => tx.tx().nonce(),
-            Self::Eip7702(tx) => tx.tx().nonce(),
-        }
-    }
-
-    #[inline]
-    fn gas_limit(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.tx().gas_limit(),
-            Self::Eip2930(tx) => tx.tx().gas_limit(),
-            Self::Eip1559(tx) => tx.tx().gas_limit(),
-            Self::Eip4844(tx) => tx.tx().gas_limit(),
-            Self::Eip7702(tx) => tx.tx().gas_limit(),
-        }
-    }
-
-    #[inline]
-    fn gas_price(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().gas_price(),
-            Self::Eip2930(tx) => tx.tx().gas_price(),
-            Self::Eip1559(tx) => tx.tx().gas_price(),
-            Self::Eip4844(tx) => tx.tx().gas_price(),
-            Self::Eip7702(tx) => tx.tx().gas_price(),
-        }
-    }
-
-    #[inline]
-    fn max_fee_per_gas(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip2930(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip1559(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip4844(tx) => tx.tx().max_fee_per_gas(),
-            Self::Eip7702(tx) => tx.tx().max_fee_per_gas(),
-        }
-    }
-
-    #[inline]
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip2930(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip1559(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip4844(tx) => tx.tx().max_priority_fee_per_gas(),
-            Self::Eip7702(tx) => tx.tx().max_priority_fee_per_gas(),
-        }
-    }
-
-    #[inline]
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip2930(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip1559(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip4844(tx) => tx.tx().max_fee_per_blob_gas(),
-            Self::Eip7702(tx) => tx.tx().max_fee_per_blob_gas(),
-        }
-    }
-
-    #[inline]
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
-        }
-    }
-
-    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip2930(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip1559(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip4844(tx) => tx.tx().effective_gas_price(base_fee),
-            Self::Eip7702(tx) => tx.tx().effective_gas_price(base_fee),
-        }
-    }
-
-    #[inline]
-    fn is_dynamic_fee(&self) -> bool {
-        match self {
-            Self::Legacy(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip2930(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip1559(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip4844(tx) => tx.tx().is_dynamic_fee(),
-            Self::Eip7702(tx) => tx.tx().is_dynamic_fee(),
-        }
-    }
-
-    #[inline]
-    fn kind(&self) -> TxKind {
-        match self {
-            Self::Legacy(tx) => tx.tx().kind(),
-            Self::Eip2930(tx) => tx.tx().kind(),
-            Self::Eip1559(tx) => tx.tx().kind(),
-            Self::Eip4844(tx) => tx.tx().kind(),
-            Self::Eip7702(tx) => tx.tx().kind(),
-        }
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        match self {
-            Self::Legacy(tx) => tx.tx().is_create(),
-            Self::Eip2930(tx) => tx.tx().is_create(),
-            Self::Eip1559(tx) => tx.tx().is_create(),
-            Self::Eip4844(tx) => tx.tx().is_create(),
-            Self::Eip7702(tx) => tx.tx().is_create(),
-        }
-    }
-
-    #[inline]
-    fn value(&self) -> U256 {
-        match self {
-            Self::Legacy(tx) => tx.tx().value(),
-            Self::Eip2930(tx) => tx.tx().value(),
-            Self::Eip1559(tx) => tx.tx().value(),
-            Self::Eip4844(tx) => tx.tx().value(),
-            Self::Eip7702(tx) => tx.tx().value(),
-        }
-    }
-
-    #[inline]
-    fn input(&self) -> &Bytes {
-        match self {
-            Self::Legacy(tx) => tx.tx().input(),
-            Self::Eip2930(tx) => tx.tx().input(),
-            Self::Eip1559(tx) => tx.tx().input(),
-            Self::Eip4844(tx) => tx.tx().input(),
-            Self::Eip7702(tx) => tx.tx().input(),
-        }
-    }
-
-    #[inline]
-    fn access_list(&self) -> Option<&AccessList> {
-        match self {
-            Self::Legacy(tx) => tx.tx().access_list(),
-            Self::Eip2930(tx) => tx.tx().access_list(),
-            Self::Eip1559(tx) => tx.tx().access_list(),
-            Self::Eip4844(tx) => tx.tx().access_list(),
-            Self::Eip7702(tx) => tx.tx().access_list(),
-        }
-    }
-
-    #[inline]
-    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
-        match self {
-            Self::Legacy(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip2930(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip1559(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip4844(tx) => tx.tx().blob_versioned_hashes(),
-            Self::Eip7702(tx) => tx.tx().blob_versioned_hashes(),
-        }
-    }
-
-    fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
-        match self {
-            Self::Legacy(tx) => tx.tx().authorization_list(),
-            Self::Eip2930(tx) => tx.tx().authorization_list(),
-            Self::Eip1559(tx) => tx.tx().authorization_list(),
-            Self::Eip4844(tx) => tx.tx().authorization_list(),
-            Self::Eip7702(tx) => tx.tx().authorization_list(),
-        }
-    }
-}
-
-impl<Eip4844: Typed2718> Typed2718 for EthereumTxEnvelope<Eip4844> {
-    fn ty(&self) -> u8 {
-        match self {
-            Self::Legacy(tx) => tx.tx().ty(),
-            Self::Eip2930(tx) => tx.tx().ty(),
-            Self::Eip1559(tx) => tx.tx().ty(),
-            Self::Eip4844(tx) => tx.tx().ty(),
-            Self::Eip7702(tx) => tx.tx().ty(),
-        }
-    }
-}
-
-#[cfg(feature = "serde")]
-mod serde_from {
-    //! NB: Why do we need this?
-    //!
-    //! Because the tag may be missing, we need an abstraction over tagged (with
-    //! type) and untagged (always legacy). This is [`MaybeTaggedTxEnvelope`].
-    //!
-    //! The tagged variant is [`TaggedTxEnvelope`], which always has a type tag.
-    //!
-    //! We serialize via [`TaggedTxEnvelope`] and deserialize via
-    //! [`MaybeTaggedTxEnvelope`].
-    use crate::{
-        transaction::RlpEcdsaEncodableTx, EthereumTxEnvelope, Signed, TxEip1559, TxEip2930,
-        TxEip7702, TxLegacy,
-    };
-
-    #[derive(Debug, serde::Deserialize)]
-    pub(crate) struct UntaggedLegacy {
-        #[serde(default, rename = "type", deserialize_with = "alloy_serde::reject_if_some")]
-        pub _ty: Option<()>,
-        #[serde(flatten, with = "crate::transaction::signed_legacy_serde")]
-        pub tx: Signed<TxLegacy>,
-    }
-
-    #[derive(Debug)]
-    pub(crate) enum MaybeTaggedTxEnvelope<Eip4844> {
-        Tagged(TaggedTxEnvelope<Eip4844>),
-        Untagged(UntaggedLegacy),
-    }
-
-    // Manually modified derived serde(untagged) to preserve the error of the [`TaggedTxEnvelope`]
-    // attempt. Note: This use private serde API
-    impl<'de, Eip4844> serde::Deserialize<'de> for MaybeTaggedTxEnvelope<Eip4844>
-    where
-        Eip4844: Clone + RlpEcdsaEncodableTx + serde::Serialize + serde::de::DeserializeOwned,
-    {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let content = serde::__private::de::Content::deserialize(deserializer)?;
-            let deserializer =
-                serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
-
-            let tagged_res =
-                TaggedTxEnvelope::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Tagged);
-
-            if tagged_res.is_ok() {
-                // return tagged if successful
-                return tagged_res;
-            }
-
-            // proceed with untagged legacy
-            if let Ok(val) =
-                UntaggedLegacy::deserialize(deserializer).map(MaybeTaggedTxEnvelope::Untagged)
-            {
-                return Ok(val);
-            }
-
-            // return the original error, which is more useful than the untagged error
-            //  > "data did not match any variant of untagged enum MaybeTaggedTxEnvelope"
-            tagged_res
-        }
-    }
-
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    #[serde(
-        tag = "type",
-        bound = "Eip4844: Clone + RlpEcdsaEncodableTx + serde::Serialize + serde::de::DeserializeOwned"
-    )]
-    pub(crate) enum TaggedTxEnvelope<Eip4844> {
-        #[serde(rename = "0x0", alias = "0x00", with = "crate::transaction::signed_legacy_serde")]
-        Legacy(Signed<TxLegacy>),
-        #[serde(rename = "0x1", alias = "0x01")]
-        Eip2930(Signed<TxEip2930>),
-        #[serde(rename = "0x2", alias = "0x02")]
-        Eip1559(Signed<TxEip1559>),
-        #[serde(rename = "0x3", alias = "0x03")]
-        Eip4844(Signed<Eip4844>),
-        #[serde(rename = "0x4", alias = "0x04")]
-        Eip7702(Signed<TxEip7702>),
-    }
-
-    impl<Eip4844> From<MaybeTaggedTxEnvelope<Eip4844>> for EthereumTxEnvelope<Eip4844> {
-        fn from(value: MaybeTaggedTxEnvelope<Eip4844>) -> Self {
-            match value {
-                MaybeTaggedTxEnvelope::Tagged(tagged) => tagged.into(),
-                MaybeTaggedTxEnvelope::Untagged(UntaggedLegacy { tx, .. }) => Self::Legacy(tx),
-            }
-        }
-    }
-
-    impl<Eip4844> From<TaggedTxEnvelope<Eip4844>> for EthereumTxEnvelope<Eip4844> {
-        fn from(value: TaggedTxEnvelope<Eip4844>) -> Self {
-            match value {
-                TaggedTxEnvelope::Legacy(signed) => Self::Legacy(signed),
-                TaggedTxEnvelope::Eip2930(signed) => Self::Eip2930(signed),
-                TaggedTxEnvelope::Eip1559(signed) => Self::Eip1559(signed),
-                TaggedTxEnvelope::Eip4844(signed) => Self::Eip4844(signed),
-                TaggedTxEnvelope::Eip7702(signed) => Self::Eip7702(signed),
-            }
-        }
-    }
-
-    impl<Eip4844> From<EthereumTxEnvelope<Eip4844>> for TaggedTxEnvelope<Eip4844> {
-        fn from(value: EthereumTxEnvelope<Eip4844>) -> Self {
-            match value {
-                EthereumTxEnvelope::Legacy(signed) => Self::Legacy(signed),
-                EthereumTxEnvelope::Eip2930(signed) => Self::Eip2930(signed),
-                EthereumTxEnvelope::Eip1559(signed) => Self::Eip1559(signed),
-                EthereumTxEnvelope::Eip4844(signed) => Self::Eip4844(signed),
-                EthereumTxEnvelope::Eip7702(signed) => Self::Eip7702(signed),
-            }
-        }
-    }
-
-    // <https://github.com/succinctlabs/kona/issues/31>
-    #[test]
-    fn serde_block_tx() {
-        let rpc_tx = r#"{
-      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
-      "blockNumber": "0x6edcde",
-      "transactionIndex": "0x7",
-      "hash": "0x2cb125e083d6d2631e3752bd2b3d757bf31bf02bfe21de0ffa46fbb118d28b19",
-      "from": "0x03e5badf3bb1ade1a8f33f94536c827b6531948d",
-      "to": "0x3267e72dc8780a1512fa69da7759ec66f30350e3",
-      "input": "0x62e4c545000000000000000000000000464c8ec100f2f42fb4e42e07e203da2324f9fc6700000000000000000000000003e5badf3bb1ade1a8f33f94536c827b6531948d000000000000000000000000a064bfb5c7e81426647dc20a0d854da1538559dc00000000000000000000000000000000000000000000000000c6f3b40b6c0000",
-      "nonce": "0x2a8",
-      "value": "0x0",
-      "gas": "0x28afd",
-      "gasPrice": "0x23ec5dbc2",
-      "accessList": [],
-      "chainId": "0xaa36a7",
-      "type": "0x0",
-      "v": "0x1546d71",
-      "r": "0x809b9f0a1777e376cd1ee5d2f551035643755edf26ea65b7a00c822a24504962",
-      "s": "0x6a57bb8e21fe85c7e092868ee976fef71edca974d8c452fcf303f9180c764f64"
-    }"#;
-
-        let _ = serde_json::from_str::<MaybeTaggedTxEnvelope<crate::TxEip4844>>(rpc_tx).unwrap();
-    }
-
-    // <https://github.com/succinctlabs/kona/issues/31>
-    #[test]
-    fn serde_block_tx_legacy_chain_id() {
-        let rpc_tx = r#"{
-      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
-      "blockNumber": "0x6edcde",
-      "transactionIndex": "0x8",
-      "hash": "0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6",
-      "from": "0x8b87f0a788cc14b4f0f374da59920f5017ff05de",
-      "to": "0xcb33aa5b38d79e3d9fa8b10aff38aa201399a7e3",
-      "input": "0xaf7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce80000000000000000000000000000000000000000000000000000000000000064",
-      "nonce": "0x2",
-      "value": "0x0",
-      "gas": "0x2dc6c0",
-      "gasPrice": "0x18ef61d0a",
-      "accessList": [],
-      "chainId": "0xaa36a7",
-      "type": "0x0",
-      "v": "0x1c",
-      "r": "0x5e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664",
-      "s": "0x2353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4"
-    }"#;
-
-        let _ = serde_json::from_str::<TaggedTxEnvelope<crate::TxEip4844>>(rpc_tx).unwrap();
     }
 }
 
@@ -1161,8 +676,8 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{recovered::SignerRecoverable, SignableTransaction},
-        TxEip4844, TxEip4844WithSidecar,
+        transaction::{Recovered, SignableTransaction},
+        Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
     use alloy_eips::{
@@ -1173,7 +688,17 @@ mod tests {
     #[allow(unused_imports)]
     use alloy_primitives::{b256, Bytes, TxKind};
     use alloy_primitives::{hex, Address, Signature, U256};
+    use alloy_rlp::Decodable;
     use std::{fs, path::PathBuf, str::FromStr, vec};
+
+    #[test]
+    fn assert_encodable() {
+        fn assert_encodable<T: Encodable2718>() {}
+
+        assert_encodable::<EthereumTxEnvelope<TxEip4844>>();
+        assert_encodable::<Recovered<EthereumTxEnvelope<TxEip4844>>>();
+        assert_encodable::<Recovered<EthereumTxEnvelope<TxEip4844Variant>>>();
+    }
 
     #[test]
     #[cfg(feature = "k256")]
@@ -1706,6 +1231,7 @@ mod tests {
     #[test]
     #[cfg(feature = "k256")]
     fn test_arbitrary_envelope() {
+        use crate::transaction::SignerRecoverable;
         use arbitrary::Arbitrary;
         let mut unstructured = arbitrary::Unstructured::new(b"arbitrary tx envelope");
         let tx = TxEnvelope::arbitrary(&mut unstructured).unwrap();
@@ -1910,6 +1436,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_deserialize_system_transaction_with_zero_signature_envelope() {
         let raw_tx = r#"{
             "blockHash": "0x5307b5c812a067f8bc1ed1cc89d319ae6f9a0c9693848bd25c36b5191de60b85",
@@ -1946,5 +1473,57 @@ mod tests {
             &b256!("0x16ef68aa8f35add3a03167a12b5d1268e344f6605a64ecc3f1c3aa68e98e4e06"),
             "hash should match the transaction hash"
         );
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x7",
+      "hash": "0x2cb125e083d6d2631e3752bd2b3d757bf31bf02bfe21de0ffa46fbb118d28b19",
+      "from": "0x03e5badf3bb1ade1a8f33f94536c827b6531948d",
+      "to": "0x3267e72dc8780a1512fa69da7759ec66f30350e3",
+      "input": "0x62e4c545000000000000000000000000464c8ec100f2f42fb4e42e07e203da2324f9fc6700000000000000000000000003e5badf3bb1ade1a8f33f94536c827b6531948d000000000000000000000000a064bfb5c7e81426647dc20a0d854da1538559dc00000000000000000000000000000000000000000000000000c6f3b40b6c0000",
+      "nonce": "0x2a8",
+      "value": "0x0",
+      "gas": "0x28afd",
+      "gasPrice": "0x23ec5dbc2",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1546d71",
+      "r": "0x809b9f0a1777e376cd1ee5d2f551035643755edf26ea65b7a00c822a24504962",
+      "s": "0x6a57bb8e21fe85c7e092868ee976fef71edca974d8c452fcf303f9180c764f64"
+    }"#;
+
+        let _ = serde_json::from_str::<TxEnvelope>(rpc_tx).unwrap();
+    }
+
+    // <https://github.com/succinctlabs/kona/issues/31>
+    #[test]
+    fn serde_block_tx_legacy_chain_id() {
+        let rpc_tx = r#"{
+      "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
+      "blockNumber": "0x6edcde",
+      "transactionIndex": "0x8",
+      "hash": "0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6",
+      "from": "0x8b87f0a788cc14b4f0f374da59920f5017ff05de",
+      "to": "0xcb33aa5b38d79e3d9fa8b10aff38aa201399a7e3",
+      "input": "0xaf7b421018842e4628f3d9ee0e2c7679e29ed5dbaa75be75efecd392943503c9c68adce80000000000000000000000000000000000000000000000000000000000000064",
+      "nonce": "0x2",
+      "value": "0x0",
+      "gas": "0x2dc6c0",
+      "gasPrice": "0x18ef61d0a",
+      "accessList": [],
+      "chainId": "0xaa36a7",
+      "type": "0x0",
+      "v": "0x1c",
+      "r": "0x5e28679806caa50d25e9cb16aef8c0c08b235241b8f6e9d86faadf70421ba664",
+      "s": "0x2353bba82ef2c7ce4dd6695942399163160000272b14f9aa6cbadf011b76efa4"
+    }"#;
+
+        let _ = serde_json::from_str::<TxEnvelope>(rpc_tx).unwrap();
     }
 }
