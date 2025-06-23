@@ -2,7 +2,7 @@
 
 use core::{error::Error, fmt};
 
-/// A ConversionError that can can capture any error type that implements the `Error` trait.
+/// A ConversionError that can capture any error type that implements the `Error` trait.
 pub struct AnyConversionError {
     inner: Box<dyn Error + Send + Sync + 'static>,
 }
