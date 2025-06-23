@@ -2214,7 +2214,7 @@ mod tests {
             assert!(log.removed);
         }
 
-        // Test 5: Test matching_block_logs_with_tx_hashes with block filter
+        // Test 5: Test matching_block_logs with block filter
         let filter = Filter::new().from_block(1000u64).to_block(1000u64).address(addr1);
         let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
         let result =
