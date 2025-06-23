@@ -8,7 +8,7 @@ pub struct AnyConversionError {
 }
 
 impl AnyConversionError {
-    /// Creates a new `AnyError` wrapping the given error value.
+    /// Creates a new `AnyConversionError` wrapping the given error value.
     pub fn new<E>(error: E) -> Self
     where
         E: Error + Send + Sync + 'static,
