@@ -2,7 +2,7 @@ use crate::{
     AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, FullSigner, Network, NetworkWallet, TxSigner,
 };
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use alloy_primitives::{map::AddressHashMap, Address, Signature, B256};
+use alloy_primitives::{map::AddressHashMap, Address, Signature};
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use super::Ethereum;
@@ -161,7 +161,7 @@ impl EthereumWallet {
     pub async fn sign_hash_with(
         &self,
         signer: Address,
-        hash: &B256,
+        hash: &alloy_primitives::B256,
     ) -> alloy_signer::Result<Signature> {
         self.signer_by_address(signer)
             .ok_or_else(|| {
