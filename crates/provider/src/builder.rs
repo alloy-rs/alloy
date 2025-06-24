@@ -504,14 +504,27 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Build this provider with a pre-built Reqwest client.
     #[cfg(any(test, feature = "reqwest"))]
-    pub fn connect_reqwest(self, client: reqwest::Client, url: reqwest::Url) -> F::Provider
+    pub fn connect_reqwest<C>(self, client: C, url: reqwest::Url) -> F::Provider
     where
         L: ProviderLayer<crate::RootProvider<N>, N>,
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
         N: Network,
+        C: Into<reqwest::Client>,
     {
-        let client = ClientBuilder::default().http_with_client(client, url);
+        let client = ClientBuilder::default().http_with_client(client.into(), url);
         self.connect_client(client)
+    }
+
+    /// Build this provider with a provided Reqwest client builder.
+    #[cfg(any(test, feature = "reqwest"))]
+    pub fn with_reqwest<B>(self, builder: B, url: reqwest::Url) -> F::Provider
+    where
+        L: ProviderLayer<crate::RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        B: FnOnce(reqwest::ClientBuilder) -> reqwest::Client,
+    {
+        self.connect_reqwest(builder(reqwest::ClientBuilder::default()), url)
     }
 
     /// Build this provider with an Reqwest HTTP transport.
@@ -732,6 +745,27 @@ mod tests {
             .with_cached_nonce_management()
             .with_call_batching()
             .connect_http("http://localhost:8545".parse().unwrap());
+        let _ = provider.get_account(Default::default());
+        let provider = provider.erased();
+        let _ = provider.get_account(Default::default());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "reqwest")]
+    async fn test_with_reqwest() {
+        let provider = ProviderBuilder::new()
+            .with_cached_nonce_management()
+            .with_call_batching()
+            .with_reqwest(
+                |builder| {
+                    builder
+                        .user_agent("alloy/test")
+                        .timeout(std::time::Duration::from_secs(10))
+                        .build()
+                        .expect("failed to build reqwest client")
+                },
+                reqwest::Url::parse("http://localhost:8545").unwrap(),
+            );
         let _ = provider.get_account(Default::default());
         let provider = provider.erased();
         let _ = provider.get_account(Default::default());
