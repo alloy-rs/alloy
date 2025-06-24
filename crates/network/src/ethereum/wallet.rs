@@ -299,11 +299,6 @@ impl ArcFullSigner {
         self.0.as_ref()
     }
 
-    /// Get the underlying [`FullSigner`] as a mutable reference.
-    pub fn signer_mut(&mut self) -> &mut dyn FullSigner<Signature> {
-        Arc::get_mut(&mut self.0).expect("ArcFullSigner should be unique")
-    }
-
     /// Get the underlying [`FullSigner`] as an owned value.
     pub fn into_signer(self) -> Arc<dyn FullSigner<Signature> + Send + Sync> {
         self.0
