@@ -17,6 +17,8 @@ pub(crate) struct Expander {
     pub(crate) serde_enabled: bool,
     /// Custom serde cfg_attr.
     pub(crate) serde_cfg: TokenStream,
+    /// Custom arbitrary cfg_attr.
+    pub(crate) arbitrary_cfg: TokenStream,
     /// Whether arbitrary feature is enabled.
     pub(crate) arbitrary_enabled: bool,
     /// Cached path for alloy_primitives.
@@ -634,6 +636,7 @@ impl Expander {
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
         let alloy_consensus = &self.alloy_consensus;
         let arbitrary = quote! { #alloy_consensus::private::arbitrary };
+        let arbitrary_cfg = &self.arbitrary_cfg;
 
         let num_variants = self.variants.all.len();
 
@@ -653,26 +656,29 @@ impl Expander {
         let variant_types = self.variants.variant_types();
 
         quote! {
-            impl #arbitrary::Arbitrary<'_> for #tx_type_enum_name {
-                fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
-                    match u.int_in_range(0..=#num_variants-1)? {
-                        #(#tx_type_arms,)*
-                        _ => unreachable!(),
+            #[cfg(#arbitrary_cfg)]
+            const _: () = {
+                impl #arbitrary::Arbitrary<'_> for #tx_type_enum_name {
+                    fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                        match u.int_in_range(0..=#num_variants-1)? {
+                            #(#tx_type_arms,)*
+                            _ => unreachable!(),
+                        }
                     }
                 }
-            }
 
-            impl #impl_generics #arbitrary::Arbitrary<'_> for #input_type_name #ty_generics
-            where
-                #(#variant_types: for<'a> #arbitrary::Arbitrary<'a>),*
-            {
-                fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
-                    match u.int_in_range(0..=#num_variants-1)? {
-                        #(#enum_variant_arms,)*
-                        _ => unreachable!(),
+                impl #impl_generics #arbitrary::Arbitrary<'_> for #input_type_name #ty_generics
+                where
+                    #(#variant_types: for<'a> #arbitrary::Arbitrary<'a>),*
+                {
+                    fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                        match u.int_in_range(0..=#num_variants-1)? {
+                            #(#enum_variant_arms,)*
+                            _ => unreachable!(),
+                        }
                     }
                 }
-            }
+            };
         }
     }
 }
