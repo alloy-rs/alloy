@@ -26,6 +26,10 @@ pub(crate) struct EnvelopeArgs {
     #[darling(default)]
     pub serde_cfg: Option<syn::Meta>,
 
+    /// Custom `cfg_attr` value for arbitrary implementations.
+    #[darling(default)]
+    pub arbitrary_cfg: Option<syn::Meta>,
+
     /// The enum data (variants).
     pub data: darling::ast::Data<EnvelopeVariant, ()>,
 }
