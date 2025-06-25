@@ -309,14 +309,7 @@ impl ExecutionPayloadV1 {
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            let mut buf = tx.as_ref();
-            let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-            if !buf.is_empty() {
-                return Err(alloy_rlp::Error::UnexpectedLength);
-            }
-            Ok(tx)
-        })
+        self.try_into_block_with(|tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from))
     }
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`] with the given closure.
@@ -509,14 +502,7 @@ impl ExecutionPayloadV2 {
     ///
     /// See also [`ExecutionPayloadV1::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            let mut buf = tx.as_ref();
-            let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-            if !buf.is_empty() {
-                return Err(alloy_rlp::Error::UnexpectedLength);
-            }
-            Ok(tx)
-        })
+        self.try_into_block_with(|tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from))
     }
 
     /// Converts [`ExecutionPayloadV2`] to [`Block`] with a custom transaction mapper.
@@ -703,14 +689,7 @@ impl ExecutionPayloadV3 {
     ///
     /// See also [`ExecutionPayloadV2::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            let mut buf = tx.as_ref();
-            let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-            if !buf.is_empty() {
-                return Err(alloy_rlp::Error::UnexpectedLength);
-            }
-            Ok(tx)
-        })
+        self.try_into_block_with(|tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from))
     }
 
     /// Converts [`ExecutionPayloadV3`] to [`Block`] with a custom transaction mapper.
@@ -1059,14 +1038,7 @@ impl ExecutionPayload {
         self,
         sidecar: &ExecutionPayloadSidecar,
     ) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with_sidecar_with(sidecar, |tx| {
-            let mut buf = tx.as_ref();
-            let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-            if !buf.is_empty() {
-                return Err(alloy_rlp::Error::UnexpectedLength);
-            }
-            Ok(tx)
-        })
+        self.try_into_block_with_sidecar_with(sidecar, |tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from))
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`] with sidecar and a custom transaction mapper.
@@ -1099,14 +1071,7 @@ impl ExecutionPayload {
     ///
     /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            let mut buf = tx.as_ref();
-            let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-            if !buf.is_empty() {
-                return Err(alloy_rlp::Error::UnexpectedLength);
-            }
-            Ok(tx)
-        })
+        self.try_into_block_with(|tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from))
     }
 
     /// Converts [`ExecutionPayload`] to [`Block`] with a custom transaction mapper.
@@ -1768,14 +1733,7 @@ impl ExecutionData {
     pub fn try_into_block<T: Decodable2718>(
         self,
     ) -> Result<alloy_consensus::Block<T>, PayloadError> {
-        self.try_into_block_with(|tx| {
-            let mut buf = tx.as_ref();
-            let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-            if !buf.is_empty() {
-                return Err(alloy_rlp::Error::UnexpectedLength);
-            }
-            Ok(tx)
-        })
+        self.try_into_block_with(|tx| T::decode_2718_exact(tx.as_ref()).map_err(alloy_rlp::Error::from).map_err(PayloadError::from))
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar with a
