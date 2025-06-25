@@ -2550,7 +2550,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use AnyReceiptEnvelope for AnyNetwork ([#457](https://github.com/alloy-rs/alloy/issues/457))
 - Add AnyReceiptEnvelope ([#446](https://github.com/alloy-rs/alloy/issues/446))
 - Rename alloy-rpc-*-types to alloy-rpc-types-* ([#435](https://github.com/alloy-rs/alloy/issues/435))
-- Improve and complete `alloy` prelude crate feature flag compatiblity ([#421](https://github.com/alloy-rs/alloy/issues/421))
+- Improve and complete `alloy` prelude crate feature flag compatibility ([#421](https://github.com/alloy-rs/alloy/issues/421))
 - [rpc] Add `blockTimestamp` to Log ([#429](https://github.com/alloy-rs/alloy/issues/429))
 - Default to Ethereum network in `alloy-provider` and `alloy-contract` ([#356](https://github.com/alloy-rs/alloy/issues/356))
 - Embed primitives Log in rpc Log and consensus Receipt in rpc Receipt ([#396](https://github.com/alloy-rs/alloy/issues/396))
