@@ -1,28 +1,51 @@
-use alloy_network::TransactionBuilder;
+use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types_eth::{
-    state::{AccountOverride, EvmOverrides, StateOverridesBuilder},
+    state::{AccountOverride, StateOverridesBuilder},
     TransactionRequest,
 };
 use alloy_sol_types::{sol, SolValue};
 
 /// A future type for finding erc20 storage slot.
 #[derive(Debug, Clone)]
-pub struct StorageSlotFinder<P> {
+pub struct StorageSlotFinder<P, N>
+where
+    N: Network,
+{
     provider: P,
     token_address: Address,
     calldata: Bytes,
     expected_value: U256,
+    _phantom: std::marker::PhantomData<N>,
 }
 
-impl<P> StorageSlotFinder<P>
+/// Error type for StorageSlotFinder operations.
+#[derive(Debug, thiserror::Error)]
+pub enum StorageSlotFinderError {
+    /// An error while decoding the result
+    #[error("Failed to decode result as U256")]
+    DecodeError,
+    /// An error occurred while searching for storage slots of an ERC20 token.
+    #[error("Failed to find storage slot for {0} ERC20 token")]
+    StorageSlotNotFound(String),
+}
+
+impl<P, N> StorageSlotFinder<P, N>
 where
     P: Provider,
+    N: Network<TransactionRequest = TransactionRequest>,
+    N::TransactionRequest: TransactionBuilder<N>,
 {
     /// Creates a new finder.
     pub fn new(provider: P, token_address: Address, calldata: Bytes, expected_value: U256) -> Self {
-        Self { provider, token_address, calldata, expected_value }
+        Self {
+            provider,
+            token_address,
+            calldata,
+            expected_value,
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// Convenience constructor for `balanceOf(address)` case.
@@ -39,12 +62,18 @@ where
         }
 
         let calldata = IERC20::balanceOfCall { target: user }.target.abi_encode().into();
-        Self { provider, token_address, calldata, expected_value: expected_balance }
+        Self {
+            provider,
+            token_address,
+            calldata,
+            expected_value: expected_balance,
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// Finds the storage slot.
-    pub async fn find(self) -> Result<B256, crate::Error> {
-        let tx = TransactionRequest::default()
+    pub async fn find(self) -> Result<B256, crate::StorageSlotFinderError> {
+        let tx = N::TransactionRequest::default()
             .with_to(self.token_address)
             .with_input(self.calldata.clone());
 
@@ -82,7 +111,7 @@ where
                 }
             }
         }
-        Err(crate::Error::StorageSlotNotFound(self.token_address.to_string()))
+        Err(crate::StorageSlotFinderError::StorageSlotNotFound(self.token_address.to_string()))
     }
 }
 
@@ -108,7 +137,12 @@ mod tests {
                 function balanceOf(address owner) public view returns (uint256);
            }
         }
-        let finder = StorageSlotFinder::for_balance_of(provider.clone(), dai, user, amount);
+        let finder = StorageSlotFinder::<_, alloy_network::Ethereum>::for_balance_of(
+            provider.clone(),
+            dai,
+            user,
+            amount,
+        );
         let storage_slot = U256::from_be_bytes(finder.find().await.unwrap().0);
 
         provider
