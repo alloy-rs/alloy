@@ -17,6 +17,7 @@ pub enum BlobScheduleEntry {
 
 /// Blob parameters configuration for a chain, including scheduled updates.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobScheduleBlobParams {
     /// Configuration for blob-related calculations for the Cancun hardfork.
     pub cancun: BlobParams,
