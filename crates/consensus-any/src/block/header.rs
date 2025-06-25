@@ -1,5 +1,5 @@
-use alloy_consensus::{BlockHeader, Header};
-use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+use alloy_consensus::{error::ValueError, BlockHeader, Header};
+use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
@@ -99,6 +99,14 @@ pub struct AnyHeader {
 }
 
 impl AnyHeader {
+    /// Seal the header with a known hash.
+    ///
+    /// WARNING: This method does not perform validation whether the hash is correct.
+    #[inline]
+    pub const fn seal(self, hash: B256) -> Sealed<Self> {
+        Sealed::new_unchecked(self, hash)
+    }
+
     /// Attempts to convert this header into a `Header`.
     ///
     /// This can fail if the header is missing required fields:
@@ -106,9 +114,12 @@ impl AnyHeader {
     /// - mix_hash
     ///
     /// If the conversion fails, the original [`AnyHeader`] is returned.
-    pub fn try_into_header(self) -> Result<Header, Self> {
-        if self.nonce.is_none() || self.mix_hash.is_none() {
-            return Err(self);
+    pub fn try_into_header(self) -> Result<Header, ValueError<Self>> {
+        if self.nonce.is_none() {
+            return Err(ValueError::new(self, "missing nonce field"));
+        }
+        if self.mix_hash.is_none() {
+            return Err(ValueError::new(self, "missing mix hash field"));
         }
 
         let Self {
@@ -353,7 +364,7 @@ impl From<Header> for AnyHeader {
 }
 
 impl TryFrom<AnyHeader> for Header {
-    type Error = AnyHeader;
+    type Error = ValueError<AnyHeader>;
 
     fn try_from(value: AnyHeader) -> Result<Self, Self::Error> {
         value.try_into_header()

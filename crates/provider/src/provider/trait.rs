@@ -929,7 +929,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
-    /// APIs. Generally implementors should NOT override this method.
+    /// APIs. Generally implementers should NOT override this method.
     ///
     /// [`send_transaction`]: Self::send_transaction
     /// [`ProviderLayer`]: crate::ProviderLayer

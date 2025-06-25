@@ -1,17 +1,20 @@
 mod builder;
-
 mod either;
+
+pub mod error;
+
 use alloy_consensus::TxEnvelope;
 use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
+use std::error::Error;
 
 mod unknowns;
 pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
-use crate::Network;
+use crate::{any::error::AnyConversionError, Network};
 use alloy_consensus::{
     error::ValueError,
     transaction::{Either, Recovered},
@@ -98,6 +101,25 @@ impl AnyRpcBlock {
         self.0.into_inner()
     }
 
+    /// Attempts to convert the inner RPC [`Block`] into a consensus block.
+    ///
+    /// Returns an [`AnyConversionError`] if any of the conversions fail.
+    pub fn try_into_consensus<T, H>(
+        self,
+    ) -> Result<alloy_consensus::Block<T, H>, AnyConversionError>
+    where
+        T: TryFrom<AnyRpcTransaction, Error: Error + Send + Sync + 'static>,
+        H: TryFrom<AnyHeader, Error: Error + Send + Sync + 'static>,
+    {
+        self.into_inner()
+            .map_header(|h| h.into_consensus())
+            .try_convert_header()
+            .map_err(AnyConversionError::new)?
+            .try_convert_transactions()
+            .map_err(AnyConversionError::new)
+            .map(Block::into_consensus_block)
+    }
+
     /// Tries to convert inner transactions into a vector of [`AnyRpcTransaction`].
     ///
     /// Returns an error if the block contains only transaction hashes or if it is an uncle block.
@@ -174,6 +196,18 @@ impl From<AnyRpcBlock> for Block<AnyRpcTransaction, AnyRpcHeader> {
 impl From<AnyRpcBlock> for WithOtherFields<Block<AnyRpcTransaction, AnyRpcHeader>> {
     fn from(value: AnyRpcBlock) -> Self {
         value.0
+    }
+}
+
+impl<T, H> TryFrom<AnyRpcBlock> for alloy_consensus::Block<T, H>
+where
+    T: TryFrom<AnyRpcTransaction, Error: Error + Send + Sync + 'static>,
+    H: TryFrom<AnyHeader, Error: Error + Send + Sync + 'static>,
+{
+    type Error = AnyConversionError;
+
+    fn try_from(value: AnyRpcBlock) -> Result<Self, Self::Error> {
+        value.try_into_consensus()
     }
 }
 
@@ -437,5 +471,32 @@ impl TransactionResponse for AnyRpcTransaction {
 impl Typed2718 for AnyRpcTransaction {
     fn ty(&self) -> u8 {
         self.inner.ty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::B64;
+
+    #[test]
+    fn convert_any_block() {
+        let block = AnyRpcBlock::new(
+            Block::new(
+                AnyRpcHeader::from_sealed(
+                    AnyHeader {
+                        nonce: Some(B64::ZERO),
+                        mix_hash: Some(B256::ZERO),
+                        ..Default::default()
+                    }
+                    .seal(B256::ZERO),
+                ),
+                BlockTransactions::Full(vec![]),
+            )
+            .into(),
+        );
+
+        let _block: alloy_consensus::Block<TxEnvelope, alloy_consensus::Header> =
+            block.try_into().unwrap();
     }
 }
