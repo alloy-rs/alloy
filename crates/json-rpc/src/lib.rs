@@ -34,7 +34,7 @@
 //! - [`RpcResult`] - A result modeling an Rpc outcome as `Result<T,
 //! RpcError<E>>`.
 //!
-//! We recommend that transport implementors use [`RpcResult`] as the return
+//! We recommend that transport implementers use [`RpcResult`] as the return
 //! type for their transport methods, parameterized by their transport error
 //! type. This will allow them to return either a successful response or an
 //! error.

@@ -78,6 +78,17 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
         None => quote! { all() },
     };
 
+    let arbitrary_cfg = match args.arbitrary_cfg.as_ref() {
+        Some(syn::Meta::List(list)) => list.tokens.clone(),
+        Some(_) => {
+            return Err(Error::new_spanned(
+                &input.ident,
+                "arbitrary_cfg must be a list like `arbitrary_cfg(feature = \"arbitrary\")`",
+            ))
+        }
+        None => quote! { all() },
+    };
+
     let variants = GroupedVariants::from_args(args)?;
 
     let alloy_primitives = quote! { #alloy_consensus::private::alloy_primitives };
@@ -92,6 +103,7 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
         generics,
         serde_enabled: cfg!(feature = "serde"),
         serde_cfg,
+        arbitrary_cfg,
         arbitrary_enabled: cfg!(feature = "arbitrary"),
         alloy_primitives,
         alloy_eips,
