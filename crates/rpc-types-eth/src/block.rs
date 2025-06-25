@@ -153,6 +153,25 @@ impl<T, H> Block<T, H> {
         }
     }
 
+    /// Consumes the block and returns the [`alloy_consensus::Block`] with the current transaction
+    /// and header type.
+    ///
+    /// Note: Unlike [`Self::into_consensus`], this method returns the Header type `H` as-is without
+    /// converting it to [`alloy_consensus::Header`], See [`Header::into_consensus`].
+    ///
+    /// This has two caveats:
+    ///  - The returned block will always have empty uncles.
+    ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
+    ///    have an empty transaction vec.
+    pub fn into_consensus_block(self) -> alloy_consensus::Block<T, H> {
+        alloy_consensus::BlockBody {
+            transactions: self.transactions.into_transactions_vec(),
+            ommers: vec![],
+            withdrawals: self.withdrawals,
+        }
+        .into_block(self.header)
+    }
+
     /// Converts the block's header type by applying a function to it.
     pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
         Block {
@@ -168,6 +187,14 @@ impl<T, H> Block<T, H> {
     /// To obtain the underlying [`alloy_consensus::Header`] use [`Block::into_consensus_header`].
     pub fn into_header(self) -> H {
         self.header
+    }
+
+    /// Converts the block's header type to the given alternative that is `TryFrom<H>`
+    pub fn try_convert_header<U>(self) -> Result<Block<T, U>, U::Error>
+    where
+        U: TryFrom<H>,
+    {
+        self.try_map_header(U::try_from)
     }
 
     /// Converts the block's header type by applying a fallible function to it.
@@ -302,7 +329,8 @@ impl<T> Block<T> {
         }
     }
 
-    /// Consumes the block and returns the [`alloy_consensus::Block`].
+    /// Consumes the block and returns the ethereum [`alloy_consensus::Block`] with the ethereum
+    /// header type.
     ///
     /// This has two caveats:
     ///  - The returned block will always have empty uncles.
@@ -587,8 +615,8 @@ pub enum BlockError {
 }
 
 #[cfg(feature = "serde")]
-impl From<Block> for alloy_serde::WithOtherFields<Block> {
-    fn from(inner: Block) -> Self {
+impl<T, H> From<Block<T, H>> for alloy_serde::WithOtherFields<Block<T, H>> {
+    fn from(inner: Block<T, H>) -> Self {
         Self { inner, other: Default::default() }
     }
 }
