@@ -23,9 +23,6 @@ where
 /// Error type for StorageSlotFinder operations.
 #[derive(Debug, thiserror::Error)]
 pub enum StorageSlotFinderError {
-    /// An error while decoding the result
-    #[error("Failed to decode result as U256")]
-    DecodeError,
     /// An error occurred while searching for storage slots of an ERC20 token.
     #[error("Failed to find storage slot for {0} ERC20 token")]
     StorageSlotNotFound(String),
