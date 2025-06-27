@@ -9,17 +9,17 @@ use alloy_primitives::Bytes;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct Bundle {
+pub struct Bundle<TxReq = TransactionRequest> {
     /// All transactions to execute
-    pub transactions: Vec<TransactionRequest>,
+    pub transactions: Vec<TxReq>,
     /// Block overrides to apply
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_override: Option<BlockOverrides>,
 }
 
-impl From<Vec<TransactionRequest>> for Bundle {
-    /// Converts a `TransactionRequest` into a `Bundle`.
-    fn from(tx_request: Vec<TransactionRequest>) -> Self {
+impl<TxReq> From<Vec<TxReq>> for Bundle<TxReq> {
+    /// Converts `tx_request`s into a `Bundle`.
+    fn from(tx_request: Vec<TxReq>) -> Self {
         Self { transactions: tx_request, block_override: None }
     }
 }

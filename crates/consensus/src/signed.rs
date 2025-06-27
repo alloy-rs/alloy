@@ -465,6 +465,16 @@ where
         let signature_hash = self.signature_hash();
         crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
     }
+
+    fn recover_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        buf.clear();
+        self.tx.encoded_for_signing();
+        let signature_hash = alloy_primitives::keccak256(buf);
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
 }
 
 #[cfg(feature = "serde")]
