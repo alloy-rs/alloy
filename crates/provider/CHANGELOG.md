@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix typo in comments ([#2611](https://github.com/alloy-rs/alloy/issues/2611))
 
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
 ## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
 
 ### Features

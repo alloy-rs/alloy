@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- [json-rpc] Add raw text in error message ([#2621](https://github.com/alloy-rs/alloy/issues/2621))
+
 ## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
 
 ### Documentation
 
 - Fix typo in comments ([#2611](https://github.com/alloy-rs/alloy/issues/2611))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
 
 ## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
 

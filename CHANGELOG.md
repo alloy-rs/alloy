@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Features
+
+- Add recover_signer_unchecked_with_buf to `SignerRecoverable` trait ([#2626](https://github.com/alloy-rs/alloy/issues/2626))
+- [network] Add method to remove nonce from transaction using `TransactionBuilder` ([#2624](https://github.com/alloy-rs/alloy/issues/2624))
+- [rpc] Add generic `TxReq` to `Bundle` ([#2623](https://github.com/alloy-rs/alloy/issues/2623))
+- [rpc] Add generic `TxReq` to `SimBlock` ([#2622](https://github.com/alloy-rs/alloy/issues/2622))
+
+### Miscellaneous Tasks
+
+- Remove basefee check from try_into_block ([#2628](https://github.com/alloy-rs/alloy/issues/2628))
+- [json-rpc] Add raw text in error message ([#2621](https://github.com/alloy-rs/alloy/issues/2621))
+
 ## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
 
 ### Dependencies
@@ -30,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.13
 - Update code example in rpc-client README ([#2617](https://github.com/alloy-rs/alloy/issues/2617))
 - Make txtype AT typed2718 ([#2610](https://github.com/alloy-rs/alloy/issues/2610))
 - Add funding.json
