@@ -471,7 +471,7 @@ where
         buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
         buf.clear();
-        self.tx.encoded_for_signing();
+        self.tx.encode_for_signing(buf);
         let signature_hash = alloy_primitives::keccak256(buf);
         crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
     }
