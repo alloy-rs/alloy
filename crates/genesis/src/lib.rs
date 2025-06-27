@@ -434,6 +434,408 @@ pub struct ChainConfig {
     pub blob_schedule: BTreeMap<String, BlobParams>,
 }
 
+/// Bincode-compatible [`ChainConfig`] serde implementation.
+#[cfg(feature = "serde-bincode-compat")]
+pub mod serde_bincode_compat {
+    use alloc::{borrow::Cow, collections::BTreeMap, string::String};
+    use alloy_primitives::{Address, U256};
+    use alloy_serde::OtherFields;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::ChainConfig`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_genesis::{serde_bincode_compat, ChainConfig};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::ChainConfig")]
+    ///     config: ChainConfig,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct ChainConfig<'a> {
+        pub chain_id: u64,
+        #[serde(default)]
+        pub homestead_block: Option<u64>,
+        #[serde(default)]
+        pub dao_fork_block: Option<u64>,
+        #[serde(default)]
+        pub dao_fork_support: bool,
+        #[serde(default)]
+        pub eip150_block: Option<u64>,
+        #[serde(default)]
+        pub eip155_block: Option<u64>,
+        #[serde(default)]
+        pub eip158_block: Option<u64>,
+        #[serde(default)]
+        pub byzantium_block: Option<u64>,
+        #[serde(default)]
+        pub constantinople_block: Option<u64>,
+        #[serde(default)]
+        pub petersburg_block: Option<u64>,
+        #[serde(default)]
+        pub istanbul_block: Option<u64>,
+        #[serde(default)]
+        pub muir_glacier_block: Option<u64>,
+        #[serde(default)]
+        pub berlin_block: Option<u64>,
+        #[serde(default)]
+        pub london_block: Option<u64>,
+        #[serde(default)]
+        pub arrow_glacier_block: Option<u64>,
+        #[serde(default)]
+        pub gray_glacier_block: Option<u64>,
+        #[serde(default)]
+        pub merge_netsplit_block: Option<u64>,
+        #[serde(default)]
+        pub shanghai_time: Option<u64>,
+        #[serde(default)]
+        pub cancun_time: Option<u64>,
+        #[serde(default)]
+        pub prague_time: Option<u64>,
+        #[serde(default)]
+        pub osaka_time: Option<u64>,
+        #[serde(default)]
+        pub bpo1_time: Option<u64>,
+        #[serde(default)]
+        pub bpo2_time: Option<u64>,
+        #[serde(default)]
+        pub bpo3_time: Option<u64>,
+        #[serde(default)]
+        pub bpo4_time: Option<u64>,
+        #[serde(default)]
+        pub bpo5_time: Option<u64>,
+        #[serde(default)]
+        pub terminal_total_difficulty: Option<U256>,
+        #[serde(default)]
+        pub terminal_total_difficulty_passed: bool,
+        #[serde(default)]
+        pub ethash: Option<super::EthashConfig>,
+        #[serde(default)]
+        pub clique: Option<super::CliqueConfig>,
+        #[serde(default)]
+        pub parlia: Option<super::ParliaConfig>,
+        #[serde(default)]
+        pub deposit_contract_address: Option<Address>,
+        #[serde(default)]
+        pub blob_schedule: Cow<'a, BTreeMap<String, super::BlobParams>>,
+        /// Extra fields as string key-value pairs (bincode-compatible alternative to OtherFields)
+        #[serde(default)]
+        pub extra_fields: BTreeMap<String, String>,
+    }
+
+    impl<'a> From<&'a super::ChainConfig> for ChainConfig<'a> {
+        fn from(value: &'a super::ChainConfig) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                homestead_block: value.homestead_block,
+                dao_fork_block: value.dao_fork_block,
+                dao_fork_support: value.dao_fork_support,
+                eip150_block: value.eip150_block,
+                eip155_block: value.eip155_block,
+                eip158_block: value.eip158_block,
+                byzantium_block: value.byzantium_block,
+                constantinople_block: value.constantinople_block,
+                petersburg_block: value.petersburg_block,
+                istanbul_block: value.istanbul_block,
+                muir_glacier_block: value.muir_glacier_block,
+                berlin_block: value.berlin_block,
+                london_block: value.london_block,
+                arrow_glacier_block: value.arrow_glacier_block,
+                gray_glacier_block: value.gray_glacier_block,
+                merge_netsplit_block: value.merge_netsplit_block,
+                shanghai_time: value.shanghai_time,
+                cancun_time: value.cancun_time,
+                prague_time: value.prague_time,
+                osaka_time: value.osaka_time,
+                bpo1_time: value.bpo1_time,
+                bpo2_time: value.bpo2_time,
+                bpo3_time: value.bpo3_time,
+                bpo4_time: value.bpo4_time,
+                bpo5_time: value.bpo5_time,
+                terminal_total_difficulty: value.terminal_total_difficulty,
+                terminal_total_difficulty_passed: value.terminal_total_difficulty_passed,
+                ethash: value.ethash.clone(),
+                clique: value.clique.clone(),
+                parlia: value.parlia.clone(),
+                deposit_contract_address: value.deposit_contract_address,
+                blob_schedule: Cow::Borrowed(&value.blob_schedule),
+                extra_fields: {
+                    let mut extra_fields = BTreeMap::new();
+                    for (k, v) in value.extra_fields.clone().into_iter() {
+                        // Convert all serde_json::Value types to string for bincode compatibility
+                        extra_fields.insert(k, v.to_string());
+                    }
+                    extra_fields
+                },
+            }
+        }
+    }
+
+    impl From<ChainConfig<'_>> for super::ChainConfig {
+        fn from(value: ChainConfig<'_>) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                homestead_block: value.homestead_block,
+                dao_fork_block: value.dao_fork_block,
+                dao_fork_support: value.dao_fork_support,
+                eip150_block: value.eip150_block,
+                eip155_block: value.eip155_block,
+                eip158_block: value.eip158_block,
+                byzantium_block: value.byzantium_block,
+                constantinople_block: value.constantinople_block,
+                petersburg_block: value.petersburg_block,
+                istanbul_block: value.istanbul_block,
+                muir_glacier_block: value.muir_glacier_block,
+                berlin_block: value.berlin_block,
+                london_block: value.london_block,
+                arrow_glacier_block: value.arrow_glacier_block,
+                gray_glacier_block: value.gray_glacier_block,
+                merge_netsplit_block: value.merge_netsplit_block,
+                shanghai_time: value.shanghai_time,
+                cancun_time: value.cancun_time,
+                prague_time: value.prague_time,
+                osaka_time: value.osaka_time,
+                bpo1_time: value.bpo1_time,
+                bpo2_time: value.bpo2_time,
+                bpo3_time: value.bpo3_time,
+                bpo4_time: value.bpo4_time,
+                bpo5_time: value.bpo5_time,
+                terminal_total_difficulty: value.terminal_total_difficulty,
+                terminal_total_difficulty_passed: value.terminal_total_difficulty_passed,
+                ethash: value.ethash,
+                clique: value.clique,
+                parlia: value.parlia,
+                extra_fields: {
+                    let mut extra_fields = OtherFields::default();
+                    for (k, v) in value.extra_fields {
+                        // Parse strings back to serde_json::Value
+                        extra_fields.insert(
+                            k,
+                            serde_json::from_str(&v).unwrap_or(serde_json::Value::String(v)),
+                        );
+                    }
+                    extra_fields
+                },
+                deposit_contract_address: value.deposit_contract_address,
+                blob_schedule: value.blob_schedule.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::ChainConfig> for ChainConfig<'a> {
+        fn serialize_as<S>(source: &super::ChainConfig, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            ChainConfig::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::ChainConfig> for ChainConfig<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::ChainConfig, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            ChainConfig::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::ChainConfig;
+        use bincode::config;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_chain_config_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: ChainConfig,
+            }
+
+            // Create a test config with mixed Some/None values to test serialization
+            let config = ChainConfig {
+                chain_id: 1,
+                homestead_block: None,
+                dao_fork_block: Some(100),
+                dao_fork_support: false,
+                eip150_block: None,
+                eip155_block: Some(200),
+                eip158_block: None,
+                byzantium_block: Some(300),
+                constantinople_block: None,
+                petersburg_block: None,
+                istanbul_block: None,
+                muir_glacier_block: None,
+                berlin_block: None,
+                london_block: None,
+                arrow_glacier_block: None,
+                gray_glacier_block: None,
+                merge_netsplit_block: None,
+                shanghai_time: None,
+                cancun_time: None,
+                prague_time: None,
+                osaka_time: None,
+                bpo1_time: None,
+                bpo2_time: None,
+                bpo3_time: None,
+                bpo4_time: None,
+                bpo5_time: None,
+                terminal_total_difficulty: None,
+                terminal_total_difficulty_passed: false,
+                ethash: None,
+                clique: None,
+                parlia: None,
+                extra_fields: Default::default(),
+                deposit_contract_address: None,
+                blob_schedule: Default::default(),
+            };
+
+            let data = Data { config };
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_chain_config_serde_bincode_compat() {
+            use serde_with::serde_as;
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: crate::ChainConfig,
+            }
+
+            let mut config = crate::ChainConfig {
+                chain_id: 1,
+                homestead_block: None,
+                dao_fork_block: Some(100),
+                dao_fork_support: false,
+                eip150_block: None,
+                eip155_block: Some(200),
+                eip158_block: None,
+                byzantium_block: Some(300),
+                constantinople_block: None,
+                petersburg_block: None,
+                istanbul_block: None,
+                muir_glacier_block: None,
+                berlin_block: None,
+                london_block: None,
+                arrow_glacier_block: None,
+                gray_glacier_block: None,
+                merge_netsplit_block: None,
+                shanghai_time: None,
+                cancun_time: None,
+                prague_time: None,
+                osaka_time: None,
+                bpo1_time: None,
+                bpo2_time: None,
+                bpo3_time: None,
+                bpo4_time: None,
+                bpo5_time: None,
+                terminal_total_difficulty: None,
+                terminal_total_difficulty_passed: false,
+                ethash: None,
+                clique: None,
+                parlia: None,
+                extra_fields: Default::default(),
+                deposit_contract_address: None,
+                blob_schedule: Default::default(),
+            };
+
+            // Add some extra fields with different serde_json::Value types
+            config.extra_fields.insert(
+                "string_field".to_string(),
+                serde_json::Value::String("test_value".to_string()),
+            );
+            config.extra_fields.insert(
+                "number_field".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(42)),
+            );
+            config.extra_fields.insert("bool_field".to_string(), serde_json::Value::Bool(true));
+
+            let data = Data { config };
+
+            // Test bincode serialization with serde_bincode_compat
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_default_genesis_chain_config_bincode() {
+            use serde_with::serde_as;
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: crate::ChainConfig,
+            }
+
+            // Create a default genesis and extract its chain config
+            let genesis = crate::Genesis::default();
+            let config = genesis.config;
+
+            let data = Data { config };
+
+            // Test bincode serialization with serde_bincode_compat
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_mainnet_genesis_chain_config_bincode() {
+            use serde_with::serde_as;
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: crate::ChainConfig,
+            }
+
+            // Parse the mainnet genesis JSON
+            let mainnet_genesis_json = include_str!("../dumpgenesis/mainnet.json");
+
+            // Parse the genesis JSON
+            let genesis: crate::Genesis = serde_json::from_str(mainnet_genesis_json).unwrap();
+            let config = genesis.config;
+
+            let data = Data { config };
+
+            // Test bincode serialization with serde_bincode_compat
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
 impl ChainConfig {
     /// Returns the [`BlobScheduleBlobParams`] from the configured blob schedule values.
     pub fn blob_schedule_blob_params(&self) -> BlobScheduleBlobParams {
@@ -1774,5 +2176,53 @@ mod tests {
         assert_eq!(trie_account.storage_root, EMPTY_ROOT_HASH);
         // No code provided, so code hash should be KECCAK_EMPTY
         assert_eq!(trie_account.code_hash, KECCAK_EMPTY);
+    }
+
+    #[test]
+    fn test_chain_config_bincode_serialization_fails() {
+        // Create a simplified ChainConfig for bincode testing
+        // Note: bincode doesn't work well with serde_json::Value in OtherFields
+        let config = ChainConfig {
+            chain_id: 1,
+            homestead_block: None,
+            dao_fork_block: Some(100),
+            dao_fork_support: false,
+            eip150_block: None,
+            eip155_block: Some(200),
+            eip158_block: None,
+            byzantium_block: Some(300),
+            constantinople_block: None,
+            petersburg_block: None,
+            istanbul_block: None,
+            muir_glacier_block: None,
+            berlin_block: None,
+            london_block: None,
+            arrow_glacier_block: None,
+            gray_glacier_block: None,
+            merge_netsplit_block: None,
+            shanghai_time: None,
+            cancun_time: None,
+            prague_time: None,
+            osaka_time: None,
+            bpo1_time: None,
+            bpo2_time: None,
+            bpo3_time: None,
+            bpo4_time: None,
+            bpo5_time: None,
+            terminal_total_difficulty: None,
+            terminal_total_difficulty_passed: false,
+            ethash: None,
+            clique: None,
+            parlia: None,
+            extra_fields: Default::default(), // Empty OtherFields should work
+            deposit_contract_address: None,
+            blob_schedule: Default::default(),
+        };
+
+        // Test that bincode fails gracefully with OtherFields containing serde_json::Value
+        let result = bincode::serde::encode_to_vec(&config, bincode::config::legacy());
+
+        // We expect this to fail because serde_json::Value is not compatible with bincode
+        assert!(result.is_err());
     }
 }
