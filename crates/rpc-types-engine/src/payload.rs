@@ -326,10 +326,6 @@ impl ExecutionPayloadV1 {
             return Err(PayloadError::ExtraData(self.extra_data));
         }
 
-        if self.base_fee_per_gas.is_zero() {
-            return Err(PayloadError::BaseFee(self.base_fee_per_gas));
-        }
-
         // Calculate the transactions root using encoded bytes
         let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
             &self.transactions,
