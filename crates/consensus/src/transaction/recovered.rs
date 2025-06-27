@@ -251,6 +251,8 @@ pub trait SignerRecoverable {
     /// Same as [`SignerRecoverable::recover_signer_unchecked`] but receives a buffer to operate on
     /// for encoding. This is useful during batch recovery of historical transactions to avoid
     /// allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations clear this buffer.
     fn recover_signer_unchecked_with_buf(
         &self,
         buf: &mut alloc::vec::Vec<u8>,
