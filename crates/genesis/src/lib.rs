@@ -616,10 +616,7 @@ pub mod serde_bincode_compat {
                     let mut extra_fields = OtherFields::default();
                     for (k, v) in value.extra_fields {
                         // Parse strings back to serde_json::Value
-                        extra_fields.insert(
-                            k,
-                            serde_json::from_str(&v).unwrap_or(serde_json::Value::String(v)),
-                        );
+                        extra_fields.insert(k, v.parse().expect("Failed to parse extra field value back to JSON"));
                     }
                     extra_fields
                 },
