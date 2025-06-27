@@ -248,6 +248,14 @@ pub trait SignerRecoverable {
     /// Returns an error if the transaction's signature is invalid.
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError>;
 
+    /// Same as [`SignerRecoverable::recover_signer_unchecked`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of historical transactions to avoid
+    /// allocating a new buffer for each transaction.
+    fn recover_signer_unchecked_with_buf(
+        &self,
+        buf: &mut Vec<u8>,
+    ) -> Result<Address, RecoveryError>;
+
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
     /// `Recovered<Self>`
     fn try_into_recovered(self) -> Result<Recovered<Self>, RecoveryError>
@@ -294,6 +302,13 @@ where
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.1.recover_signer_unchecked()
     }
+
+    fn recover_signer_unchecked_with_buf(
+        &self,
+        buf: &mut Vec<u8>,
+    ) -> Result<Address, RecoveryError> {
+        self.1.recover_signer_unchecked_with_buf(buf)
+    }
 }
 
 impl<T> SignerRecoverable for Sealed<T>
@@ -306,5 +321,12 @@ where
 
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.inner().recover_signer_unchecked()
+    }
+
+    fn recover_signer_unchecked_with_buf(
+        &self,
+        buf: &mut Vec<u8>,
+    ) -> Result<Address, RecoveryError> {
+        self.inner().recover_signer_unchecked_with_buf(buf)
     }
 }

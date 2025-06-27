@@ -5,7 +5,7 @@ use crate::{
 use alloy_eips::{
     eip2718::Eip2718Result, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
 };
-use alloy_primitives::{Bytes, Sealed, Signature, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Bytes, Sealed, Signature, TxKind, B256, U256};
 use alloy_rlp::BufMut;
 use core::hash::{Hash, Hasher};
 #[cfg(not(feature = "std"))]
@@ -463,6 +463,15 @@ where
         &self,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
         let signature_hash = self.signature_hash();
+        crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+
+    fn recover_signer_unchecked_with_buf(
+        &self,
+        buf: &mut Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        self.tx.encoded_for_signing();
+        let signature_hash = keccak256(buf);
         crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
     }
 }

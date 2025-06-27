@@ -483,6 +483,29 @@ where
             }
         }
     }
+
+    fn recover_signer_unchecked_with_buf(
+        &self,
+        buf: &mut Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        match self {
+            Self::Legacy(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip2930(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip1559(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip4844(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip7702(tx) => {
+                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+            }
+        }
+    }
 }
 
 impl<T> Encodable2718 for Signed<T>
