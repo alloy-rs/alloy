@@ -486,7 +486,7 @@ where
 
     fn recover_signer_unchecked_with_buf(
         &self,
-        buf: &mut Vec<u8>,
+        buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
         match self {
             Self::Legacy(tx) => {

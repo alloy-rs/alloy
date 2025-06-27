@@ -253,7 +253,7 @@ pub trait SignerRecoverable {
     /// allocating a new buffer for each transaction.
     fn recover_signer_unchecked_with_buf(
         &self,
-        buf: &mut Vec<u8>,
+        buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<Address, RecoveryError>;
 
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
@@ -305,7 +305,7 @@ where
 
     fn recover_signer_unchecked_with_buf(
         &self,
-        buf: &mut Vec<u8>,
+        buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<Address, RecoveryError> {
         self.1.recover_signer_unchecked_with_buf(buf)
     }
@@ -325,7 +325,7 @@ where
 
     fn recover_signer_unchecked_with_buf(
         &self,
-        buf: &mut Vec<u8>,
+        buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<Address, RecoveryError> {
         self.inner().recover_signer_unchecked_with_buf(buf)
     }
