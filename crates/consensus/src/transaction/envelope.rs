@@ -484,25 +484,25 @@ where
         }
     }
 
-    fn recover_signer_unchecked_with_buf(
+    fn recover_unchecked_with_buf(
         &self,
         buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
         match self {
             Self::Legacy(tx) => {
-                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
             Self::Eip2930(tx) => {
-                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
             Self::Eip1559(tx) => {
-                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
             Self::Eip4844(tx) => {
-                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
             Self::Eip7702(tx) => {
-                crate::transaction::SignerRecoverable::recover_signer_unchecked_with_buf(tx, buf)
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
         }
     }
