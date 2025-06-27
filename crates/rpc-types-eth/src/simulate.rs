@@ -97,10 +97,10 @@ pub struct SimCallResult {
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct SimulatePayload {
+pub struct SimulatePayload<TxReq = TransactionRequest> {
     /// Array of block state calls to be executed at specific, optional block/state.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub block_state_calls: Vec<SimBlock>,
+    pub block_state_calls: Vec<SimBlock<TxReq>>,
     /// Flag to determine whether to trace ERC20/ERC721 token transfers within transactions.
     #[cfg_attr(feature = "serde", serde(default))]
     pub trace_transfers: bool,
@@ -112,15 +112,15 @@ pub struct SimulatePayload {
     pub return_full_transactions: bool,
 }
 
-impl SimulatePayload {
+impl<TxReq> SimulatePayload<TxReq> {
     /// Adds a block to the simulation payload.
-    pub fn extend(mut self, block: SimBlock) -> Self {
+    pub fn extend(mut self, block: SimBlock<TxReq>) -> Self {
         self.block_state_calls.push(block);
         self
     }
 
     /// Adds multiple blocks to the simulation payload.
-    pub fn extend_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock>) -> Self {
+    pub fn extend_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock<TxReq>>) -> Self {
         self.block_state_calls.extend(blocks);
         self
     }
