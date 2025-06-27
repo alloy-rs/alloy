@@ -561,9 +561,9 @@ pub mod serde_bincode_compat {
                 bpo5_time: value.bpo5_time,
                 terminal_total_difficulty: value.terminal_total_difficulty,
                 terminal_total_difficulty_passed: value.terminal_total_difficulty_passed,
-                ethash: value.ethash.clone(),
-                clique: value.clique.clone(),
-                parlia: value.parlia.clone(),
+                ethash: value.ethash,
+                clique: value.clique,
+                parlia: value.parlia,
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: Cow::Borrowed(&value.blob_schedule),
                 extra_fields: {
