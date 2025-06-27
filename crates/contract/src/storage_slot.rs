@@ -30,7 +30,7 @@ pub enum StorageSlotFinderError {
 
 impl<P, N> StorageSlotFinder<P, N>
 where
-    P: Provider,
+    P: Provider<N>,
     N: Network<TransactionRequest = TransactionRequest>,
     N::TransactionRequest: TransactionBuilder<N>,
 {
@@ -129,7 +129,7 @@ mod tests {
         let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
         let user = address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
         let amount = U256::from(1e18 as u64);
-        alloy_sol_types::sol! {
+        sol! {
            contract ERC20 {
                 function balanceOf(address owner) public view returns (uint256);
            }
