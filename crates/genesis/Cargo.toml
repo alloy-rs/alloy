@@ -47,4 +47,4 @@ std = [
 	"serde_json/std",
 	"serde_with/std",
 ]
-serde-bincode-compat = ["serde_with"]
+serde-bincode-compat = ["serde_with", "alloy-eips/serde-bincode-compat"]
