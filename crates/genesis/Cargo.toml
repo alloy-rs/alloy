@@ -45,5 +45,6 @@ std = [
 	"alloy-trie/std",
 	"alloy-eips/std",
 	"serde_json/std",
+	"serde_with/std",
 ]
 serde-bincode-compat = ["serde_with"]

@@ -460,74 +460,74 @@ pub mod serde_bincode_compat {
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
     pub struct ChainConfig<'a> {
-        pub chain_id: u64,
+        chain_id: u64,
         #[serde(default)]
-        pub homestead_block: Option<u64>,
+        homestead_block: Option<u64>,
         #[serde(default)]
-        pub dao_fork_block: Option<u64>,
+        dao_fork_block: Option<u64>,
         #[serde(default)]
-        pub dao_fork_support: bool,
+        dao_fork_support: bool,
         #[serde(default)]
-        pub eip150_block: Option<u64>,
+        eip150_block: Option<u64>,
         #[serde(default)]
-        pub eip155_block: Option<u64>,
+        eip155_block: Option<u64>,
         #[serde(default)]
-        pub eip158_block: Option<u64>,
+        eip158_block: Option<u64>,
         #[serde(default)]
-        pub byzantium_block: Option<u64>,
+        byzantium_block: Option<u64>,
         #[serde(default)]
-        pub constantinople_block: Option<u64>,
+        constantinople_block: Option<u64>,
         #[serde(default)]
-        pub petersburg_block: Option<u64>,
+        petersburg_block: Option<u64>,
         #[serde(default)]
-        pub istanbul_block: Option<u64>,
+        istanbul_block: Option<u64>,
         #[serde(default)]
-        pub muir_glacier_block: Option<u64>,
+        muir_glacier_block: Option<u64>,
         #[serde(default)]
-        pub berlin_block: Option<u64>,
+        berlin_block: Option<u64>,
         #[serde(default)]
-        pub london_block: Option<u64>,
+        london_block: Option<u64>,
         #[serde(default)]
-        pub arrow_glacier_block: Option<u64>,
+        arrow_glacier_block: Option<u64>,
         #[serde(default)]
-        pub gray_glacier_block: Option<u64>,
+        gray_glacier_block: Option<u64>,
         #[serde(default)]
-        pub merge_netsplit_block: Option<u64>,
+        merge_netsplit_block: Option<u64>,
         #[serde(default)]
-        pub shanghai_time: Option<u64>,
+        shanghai_time: Option<u64>,
         #[serde(default)]
-        pub cancun_time: Option<u64>,
+        cancun_time: Option<u64>,
         #[serde(default)]
-        pub prague_time: Option<u64>,
+        prague_time: Option<u64>,
         #[serde(default)]
-        pub osaka_time: Option<u64>,
+        osaka_time: Option<u64>,
         #[serde(default)]
-        pub bpo1_time: Option<u64>,
+        bpo1_time: Option<u64>,
         #[serde(default)]
-        pub bpo2_time: Option<u64>,
+        bpo2_time: Option<u64>,
         #[serde(default)]
-        pub bpo3_time: Option<u64>,
+        bpo3_time: Option<u64>,
         #[serde(default)]
-        pub bpo4_time: Option<u64>,
+        bpo4_time: Option<u64>,
         #[serde(default)]
-        pub bpo5_time: Option<u64>,
+        bpo5_time: Option<u64>,
         #[serde(default)]
-        pub terminal_total_difficulty: Option<U256>,
+        terminal_total_difficulty: Option<U256>,
         #[serde(default)]
-        pub terminal_total_difficulty_passed: bool,
+        terminal_total_difficulty_passed: bool,
         #[serde(default)]
-        pub ethash: Option<super::EthashConfig>,
+        ethash: Option<super::EthashConfig>,
         #[serde(default)]
-        pub clique: Option<super::CliqueConfig>,
+        clique: Option<super::CliqueConfig>,
         #[serde(default)]
-        pub parlia: Option<super::ParliaConfig>,
+        parlia: Option<super::ParliaConfig>,
         #[serde(default)]
-        pub deposit_contract_address: Option<Address>,
+        deposit_contract_address: Option<Address>,
         #[serde(default)]
-        pub blob_schedule: Cow<'a, BTreeMap<String, super::BlobParams>>,
+        blob_schedule: Cow<'a, BTreeMap<String, super::BlobParams>>,
         /// Extra fields as string key-value pairs (bincode-compatible alternative to OtherFields)
         #[serde(default)]
-        pub extra_fields: BTreeMap<String, String>,
+        extra_fields: BTreeMap<String, String>,
     }
 
     impl<'a> From<&'a super::ChainConfig> for ChainConfig<'a> {
