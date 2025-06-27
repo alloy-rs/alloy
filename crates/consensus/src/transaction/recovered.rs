@@ -254,7 +254,10 @@ pub trait SignerRecoverable {
     fn recover_signer_unchecked_with_buf(
         &self,
         buf: &mut alloc::vec::Vec<u8>,
-    ) -> Result<Address, RecoveryError>;
+    ) -> Result<Address, RecoveryError> {
+        let _ = buf;
+        self.recover_signer()
+    }
 
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
     /// `Recovered<Self>`
