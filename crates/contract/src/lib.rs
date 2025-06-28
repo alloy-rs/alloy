@@ -12,6 +12,9 @@ extern crate self as alloy_contract;
 mod eth_call;
 pub use eth_call::{CallDecoder, EthCall};
 
+mod storage_slot;
+pub use storage_slot::*;
+
 mod error;
 pub use error::{Error, Result, TransportErrorExt, TryParseTransportErrorResult};
 
