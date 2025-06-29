@@ -443,6 +443,9 @@ mod tests {
 
         /// Test that when crypto-backend feature is enabled but no provider is installed,
         /// it falls back to the default implementation
+        /// 
+        /// Note: this test is unreliable because if the CryptoProvider is set, it will use the MockProvider
+        /// which doesn't have ideal behaviour
         #[test]
         #[cfg(any(feature = "secp256k1", feature = "k256"))]
         fn test_fallback_to_default_when_no_provider() {
