@@ -91,6 +91,7 @@ std = [
 ]
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 secp256k1 = ["dep:secp256k1"]
+crypto-backend = []
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
 	"std",
