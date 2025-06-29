@@ -98,8 +98,7 @@ pub mod backend {
         }
     }
 
-    #[cfg(feature = "std")]
-    impl std::error::Error for CryptoProviderAlreadySetError {}
+    impl core::error::Error for CryptoProviderAlreadySetError {}
 
     /// Install the default crypto provider.
     ///
@@ -111,14 +110,14 @@ pub mod backend {
     ) -> Result<(), CryptoProviderAlreadySetError> {
         #[cfg(feature = "std")]
         {
-            DEFAULT_PROVIDER.set(provider.clone()).map_err(|_| {
+            DEFAULT_PROVIDER.set(provider).map_err(|provider| {
                 // Return the provider we tried to install in the error
                 CryptoProviderAlreadySetError { provider }
             })
         }
         #[cfg(not(feature = "std"))]
         {
-            DEFAULT_PROVIDER.set(Box::new(provider.clone())).map_err(|_| {
+            DEFAULT_PROVIDER.set(Box::new(provider)).map_err(|provider| {
                 // Return the provider we tried to install in the error
                 CryptoProviderAlreadySetError { provider }
             })
