@@ -119,7 +119,7 @@ pub mod backend {
         {
             DEFAULT_PROVIDER.set(Box::new(provider)).map_err(|provider| {
                 // Return the provider we tried to install in the error
-                CryptoProviderAlreadySetError { provider }
+                CryptoProviderAlreadySetError { provider: *provider }
             })
         }
     }
