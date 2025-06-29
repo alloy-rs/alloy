@@ -128,7 +128,7 @@ pub mod backend {
     }
 
     /// Get the currently installed default provider, panicking if none is installed.
-    pub(super) fn get_default_provider() -> &'static dyn CryptoProvider<Error = RecoveryError> {
+    pub fn get_default_provider() -> &'static dyn CryptoProvider<Error = RecoveryError> {
         try_get_provider().map_or_else(|| panic!("No crypto backend installed. Call install_default_provider() first."), |provider| provider)
     }
 
@@ -471,7 +471,7 @@ mod tests {
                 should_fail: true,
                 return_address: Address::from([0x22; 20]),
             });
-            let result2 = crate::crypto::backend::install_default_provider(provider2.clone());
+            let result2 = crate::crypto::backend::install_default_provider(provider2);
 
             // The second attempt should fail with ProviderAlreadySetError
             assert!(result2.is_err());
@@ -479,8 +479,9 @@ mod tests {
             // The error should contain the provider we tried to install (provider2)
             if let Err(err) = result2 {
                 // We can't easily compare Arc pointers due to type erasure,
-                // but we can verify the error contains a provider
-                assert!(!(err.provider.as_ref() as *const _ as *const u8).is_null());
+                // but we can verify the error contains a valid provider
+                // (just by accessing it without panicking)
+                let _provider_ref = err.provider.as_ref();
             }
         }
 
