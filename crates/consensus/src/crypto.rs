@@ -7,7 +7,7 @@ use alloy_primitives::U256;
 use alloy_primitives::Signature;
 
 #[cfg(feature = "crypto-backend")]
-pub use backend::{install_default_provider, CryptoProvider, ProviderAlreadySetError};
+pub use backend::{install_default_provider, CryptoProvider, CryptoProviderAlreadySetError};
 
 /// Opaque error type for sender recovery.
 #[derive(Debug, Default, thiserror::Error)]
@@ -79,27 +79,27 @@ pub mod backend {
 
     /// Error returned when attempting to install a provider when one is already installed.
     /// Contains the provider that was attempted to be installed.
-    pub struct ProviderAlreadySetError {
+    pub struct CryptoProviderAlreadySetError {
         /// The provider that was attempted to be installed.
         pub provider: Arc<dyn CryptoProvider>,
     }
 
-    impl core::fmt::Debug for ProviderAlreadySetError {
+    impl core::fmt::Debug for CryptoProviderAlreadySetError {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.debug_struct("ProviderAlreadySetError")
+            f.debug_struct("CryptoProviderAlreadySetError")
                 .field("provider", &"<crypto provider>")
                 .finish()
         }
     }
 
-    impl core::fmt::Display for ProviderAlreadySetError {
+    impl core::fmt::Display for CryptoProviderAlreadySetError {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             write!(f, "crypto provider already installed")
         }
     }
 
     #[cfg(feature = "std")]
-    impl std::error::Error for ProviderAlreadySetError {}
+    impl std::error::Error for CryptoProviderAlreadySetError {}
 
     /// Install the default crypto provider.
     ///
@@ -108,19 +108,19 @@ pub mod backend {
     /// already set.
     pub fn install_default_provider(
         provider: Arc<dyn CryptoProvider>,
-    ) -> Result<(), ProviderAlreadySetError> {
+    ) -> Result<(), CryptoProviderAlreadySetError> {
         #[cfg(feature = "std")]
         {
             DEFAULT_PROVIDER.set(provider.clone()).map_err(|_| {
                 // Return the provider we tried to install in the error
-                ProviderAlreadySetError { provider }
+                CryptoProviderAlreadySetError { provider }
             })
         }
         #[cfg(not(feature = "std"))]
         {
             DEFAULT_PROVIDER.set(Box::new(provider.clone())).map_err(|_| {
                 // Return the provider we tried to install in the error
-                ProviderAlreadySetError { provider }
+                CryptoProviderAlreadySetError { provider }
             })
         }
     }
@@ -471,7 +471,7 @@ mod tests {
             });
             let result2 = crate::crypto::backend::install_default_provider(provider2);
 
-            // The second attempt should fail with ProviderAlreadySetError
+            // The second attempt should fail with CryptoProviderAlreadySetError
             assert!(result2.is_err());
 
             // The error should contain the provider we tried to install (provider2)
