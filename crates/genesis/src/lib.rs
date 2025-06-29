@@ -437,7 +437,7 @@ pub struct ChainConfig {
 /// Bincode-compatible [`ChainConfig`] serde implementation.
 #[cfg(feature = "serde-bincode-compat")]
 pub mod serde_bincode_compat {
-    use alloc::{borrow::Cow, collections::BTreeMap, string::String};
+    use alloc::{borrow::Cow, collections::BTreeMap, string::{String, ToString}};
     use alloy_primitives::{Address, U256};
     use alloy_serde::OtherFields;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
