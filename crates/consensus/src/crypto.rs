@@ -44,6 +44,67 @@ pub const SECP256K1N_HALF: U256 = U256::from_be_bytes([
     0x5D, 0x57, 0x6E, 0x73, 0x57, 0xA4, 0x50, 0x1D, 0xDF, 0xE9, 0x2F, 0x46, 0x68, 0x1B, 0x20, 0xA0,
 ]);
 
+/// Crypto backend module for pluggable cryptographic implementations.
+#[cfg(feature = "crypto-backend")]
+pub mod backend {
+    use super::*;
+    use alloy_primitives::{Address, B256, Signature};
+    use core::sync::atomic::{AtomicPtr, Ordering};
+
+    /// Trait for cryptographic providers that can perform signature recovery.
+    pub trait CryptoProvider: Send + Sync + 'static {
+        /// Error type for this provider.
+        type Error: core::error::Error + Send + Sync + 'static;
+
+        /// Recover signer from signature and message hash, without ensuring low S values.
+        fn recover_signer_unchecked(
+            &self,
+            sig: &[u8; 65],
+            msg: &[u8; 32],
+        ) -> Result<Address, Self::Error>;
+    }
+
+    /// Global default crypto provider.
+    static DEFAULT_PROVIDER: AtomicPtr<dyn CryptoProvider<Error = RecoveryError>> = 
+        AtomicPtr::new(core::ptr::null_mut());
+
+    /// Install the default crypto provider.
+    ///
+    /// This sets the global default provider used by the high-level crypto functions.
+    /// If no provider is installed, the functions will panic at runtime.
+    pub fn install_default_provider(provider: Box<dyn CryptoProvider<Error = RecoveryError>>) {
+        let ptr = Box::into_raw(provider);
+        let old_ptr = DEFAULT_PROVIDER.swap(ptr, Ordering::AcqRel);
+        if !old_ptr.is_null() {
+            // Safety: We know this pointer was created by Box::into_raw
+            unsafe { drop(Box::from_raw(old_ptr)) };
+        }
+    }
+
+    /// Get the currently installed default provider, panicking if none is installed.
+    pub(super) fn get_default_provider() -> &'static dyn CryptoProvider<Error = RecoveryError> {
+        let ptr = DEFAULT_PROVIDER.load(Ordering::Acquire);
+        if ptr.is_null() {
+            panic!("No crypto backend installed. Call install_default_provider() first.");
+        } else {
+            // Safety: The pointer is guaranteed to be valid while it's stored in the atomic
+            unsafe { &*ptr }
+        }
+    }
+
+    /// Try to get the currently installed default provider, returning None if none is installed.
+    pub(super) fn try_get_provider() -> Option<&'static dyn CryptoProvider<Error = RecoveryError>> {
+        let ptr = DEFAULT_PROVIDER.load(Ordering::Acquire);
+        if ptr.is_null() {
+            None
+        } else {
+            // Safety: The pointer is guaranteed to be valid while it's stored in the atomic
+            Some(unsafe { &*ptr })
+        }
+    }
+
+}
+
 /// Secp256k1 cryptographic functions.
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
 pub mod secp256k1 {
@@ -73,6 +134,13 @@ pub mod secp256k1 {
         sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
         sig[64] = signature.v() as u8;
 
+        // Try dynamic backend first when crypto-backend feature is enabled
+        #[cfg(feature = "crypto-backend")]
+        if let Some(provider) = super::backend::try_get_provider() {
+            return provider.recover_signer_unchecked(&sig, &hash.0);
+        }
+
+        // Fallback to compile-time selected implementation
         // NOTE: we are removing error from underlying crypto library as it will restrain primitive
         // errors and we care only if recovery is passing or not.
         imp::recover_signer_unchecked(&sig, &hash.0).map_err(|_| RecoveryError::new())
@@ -89,7 +157,6 @@ pub mod secp256k1 {
         }
         recover_signer_unchecked(signature, hash)
     }
-}
 
 #[cfg(any(test, feature = "secp256k1"))]
 mod impl_secp256k1 {
@@ -285,5 +352,134 @@ mod tests {
         assert_eq!(k256_recovered, k256_signer);
 
         assert_eq!(secp256k1_recovered, k256_recovered);
+    }
+
+    #[cfg(feature = "crypto-backend")]
+    mod backend_tests {
+        use super::*;
+        use crate::crypto::backend::{CryptoProvider, install_default_provider, try_get_provider};
+        use alloy_primitives::{Address, B256, Signature};
+
+        /// Mock crypto provider for testing
+        struct MockCryptoProvider {
+            should_fail: bool,
+        }
+
+        impl CryptoProvider for MockCryptoProvider {
+            type Error = RecoveryError;
+
+            fn recover_signer_unchecked(
+                &self,
+                _sig: &[u8; 65],
+                _msg: &[u8; 32],
+            ) -> Result<Address, Self::Error> {
+                if self.should_fail {
+                    Err(RecoveryError::new())
+                } else {
+                    // Return a known/fixed test address
+                    // We don't care about the implementation specific details
+                    // of a particular CryptoProvider
+                    Ok(Address::from([0x42; 20]))
+                }
+            }
+        }
+
+        #[test]
+        fn test_install_and_use_provider() {
+            let provider = Box::new(MockCryptoProvider { should_fail: false });
+            install_default_provider(provider);
+
+            // Provider should now be installed
+            assert!(try_get_provider().is_some());
+
+            // Test signature recovery using the mock provider
+            let signature = Signature::new(
+                alloy_primitives::U256::from(1u64),
+                alloy_primitives::U256::from(2u64),
+                false,
+            );
+            let hash = B256::from([0x01; 32]);
+
+            let result = crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), Address::from([0x42; 20]));
+        }
+
+        #[test]
+        fn test_provider_error_handling() {
+            let provider = Box::new(MockCryptoProvider { should_fail: true });
+            install_default_provider(provider);
+
+            let signature = Signature::new(
+                alloy_primitives::U256::from(1u64),
+                alloy_primitives::U256::from(2u64),
+                false,
+            );
+            let hash = B256::from([0x01; 32]);
+
+            let result = crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_replace_provider() {
+            // Install first provider
+            let provider1 = Box::new(MockCryptoProvider { should_fail: false });
+            install_default_provider(provider1);
+
+            let signature = Signature::new(
+                alloy_primitives::U256::from(1u64),
+                alloy_primitives::U256::from(2u64),
+                false,
+            );
+            let hash = B256::from([0x01; 32]);
+
+            let result1 = crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
+            assert!(result1.is_ok());
+            assert_eq!(result1.unwrap(), Address::from([0x42; 20]));
+
+            // Replace with failing provider
+            let provider2 = Box::new(MockCryptoProvider { should_fail: true });
+            install_default_provider(provider2);
+
+            let result2 = crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
+            assert!(result2.is_err());
+        }
+
+        /// Test that when crypto-backend feature is enabled but no provider is installed,
+        /// it falls back to the default implementation
+        #[test]
+        #[cfg(any(feature = "secp256k1", feature = "k256"))]
+        fn test_fallback_to_default_when_no_provider() {
+            // Reset to no provider
+            use core::sync::atomic::Ordering;
+            use crate::crypto::backend::DEFAULT_PROVIDER;
+            let old_ptr = DEFAULT_PROVIDER.swap(core::ptr::null_mut(), Ordering::AcqRel);
+            if !old_ptr.is_null() {
+                unsafe { drop(Box::from_raw(old_ptr)) };
+            }
+
+            // Verify no provider
+            assert!(try_get_provider().is_none());
+
+            // Create a real signature for testing fallback
+            #[cfg(feature = "secp256k1")]
+            {
+                let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
+                let expected_signer = crate::crypto::impl_secp256k1::public_key_to_address(public);
+
+                let message = b"test fallback";
+                let hash = alloy_primitives::keccak256(message);
+                let signature = crate::crypto::impl_secp256k1::sign_message(
+                    B256::from_slice(&secret.secret_bytes()[..]),
+                    hash,
+                ).expect("sign message");
+
+                // This should use the fallback implementation
+                let recovered = crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
+                assert!(recovered.is_ok());
+                assert_eq!(recovered.unwrap(), expected_signer);
+            }
+        }
     }
 }
