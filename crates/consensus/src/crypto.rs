@@ -61,6 +61,49 @@ pub mod backend {
     use once_cell::race::OnceBox;
 
     /// Trait for cryptographic providers that can perform signature recovery.
+    ///
+    /// This trait allows pluggable cryptographic backends for Ethereum signature recovery.
+    /// By default, alloy uses compile-time selected implementations (secp256k1 or k256),
+    /// but applications can install a custom provider to override this behavior.
+    ///
+    /// # Why is this needed?
+    ///
+    /// The primary reason is performance - when targeting special execution environments
+    /// that require custom cryptographic logic. For example, zkVMs (zero-knowledge virtual machines)
+    /// may have special accelerators that would allow them to perform signature recovery faster.
+    ///
+    /// # Usage
+    ///
+    /// 1. Enable the `crypto-backend` feature in your `Cargo.toml`
+    /// 2. Implement the `CryptoProvider` trait for your custom backend
+    /// 3. Install it globally using [`install_default_provider`]
+    /// 4. All subsequent signature recovery operations will use your provider
+    ///
+    /// Note: This trait currently only provides signature recovery functionality,
+    /// not signature creation. For signature creation, use the compile-time selected
+    /// implementations in the [`secp256k1`] module.
+    ///
+    /// ```rust,ignore
+    /// use alloy_consensus::crypto::backend::{CryptoProvider, install_default_provider};
+    /// use alloy_primitives::Address;
+    /// use alloc::sync::Arc;
+    ///
+    /// struct MyCustomProvider;
+    ///
+    /// impl CryptoProvider for MyCustomProvider {
+    ///     fn recover_signer_unchecked(
+    ///         &self,
+    ///         sig: &[u8; 65],
+    ///         msg: &[u8; 32],
+    ///     ) -> Result<Address, RecoveryError> {
+    ///         // Your custom implementation here
+    ///         todo!()
+    ///     }
+    /// }
+    ///
+    /// // Install your provider globally
+    /// install_default_provider(Arc::new(MyCustomProvider)).unwrap();
+    /// ```
     pub trait CryptoProvider: Send + Sync + 'static {
         /// Recover signer from signature and message hash, without ensuring low S values.
         fn recover_signer_unchecked(
