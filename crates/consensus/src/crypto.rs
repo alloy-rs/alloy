@@ -489,42 +489,5 @@ mod tests {
                 let _provider_ref = err.provider.as_ref();
             }
         }
-
-        /// Test that when crypto-backend feature is enabled but no provider is installed,
-        /// it falls back to the default implementation
-        ///
-        /// Note: this test is unreliable because if the CryptoProvider is set, it will use the
-        /// MockProvider which doesn't have ideal behaviour
-        #[test]
-        #[cfg(any(feature = "secp256k1", feature = "k256"))]
-        fn test_fallback_to_default_when_no_provider() {
-            // This test works regardless of whether a provider is already installed
-            // because it tests the fallback behavior when the provider check fails
-
-            // Create a real signature for testing
-            #[cfg(feature = "secp256k1")]
-            {
-                let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
-                let expected_signer = crate::crypto::impl_secp256k1::public_key_to_address(public);
-
-                let message = b"test fallback";
-                let hash = alloy_primitives::keccak256(message);
-                let signature = crate::crypto::impl_secp256k1::sign_message(
-                    B256::from_slice(&secret.secret_bytes()[..]),
-                    hash,
-                )
-                .expect("sign message");
-
-                // This should always work - either via provider or fallback
-                let recovered =
-                    crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
-                assert!(recovered.is_ok());
-
-                // If no provider is installed, should use fallback and match expected signer
-                if try_get_provider().is_none() {
-                    assert_eq!(recovered.unwrap(), expected_signer);
-                }
-            }
-        }
     }
 }
