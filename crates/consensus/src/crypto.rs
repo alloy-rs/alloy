@@ -69,8 +69,9 @@ pub mod backend {
     /// # Why is this needed?
     ///
     /// The primary reason is performance - when targeting special execution environments
-    /// that require custom cryptographic logic. For example, zkVMs (zero-knowledge virtual machines)
-    /// may have special accelerators that would allow them to perform signature recovery faster.
+    /// that require custom cryptographic logic. For example, zkVMs (zero-knowledge virtual
+    /// machines) may have special accelerators that would allow them to perform signature
+    /// recovery faster.
     ///
     /// # Usage
     ///
