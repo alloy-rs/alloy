@@ -62,31 +62,26 @@ pub mod backend {
 
     /// Trait for cryptographic providers that can perform signature recovery.
     pub trait CryptoProvider: Send + Sync + 'static {
-        /// Error type for this provider.
-        type Error: core::error::Error + Send + Sync + 'static;
-
         /// Recover signer from signature and message hash, without ensuring low S values.
         fn recover_signer_unchecked(
             &self,
             sig: &[u8; 65],
             msg: &[u8; 32],
-        ) -> Result<Address, Self::Error>;
+        ) -> Result<Address, RecoveryError>;
     }
 
     /// Global default crypto provider.
     #[cfg(feature = "std")]
-    static DEFAULT_PROVIDER: OnceLock<Arc<dyn CryptoProvider<Error = RecoveryError>>> =
-        OnceLock::new();
+    static DEFAULT_PROVIDER: OnceLock<Arc<dyn CryptoProvider>> = OnceLock::new();
 
     #[cfg(not(feature = "std"))]
-    static DEFAULT_PROVIDER: OnceBox<Arc<dyn CryptoProvider<Error = RecoveryError>>> =
-        OnceBox::new();
+    static DEFAULT_PROVIDER: OnceBox<Arc<dyn CryptoProvider>> = OnceBox::new();
 
     /// Error returned when attempting to install a provider when one is already installed.
     /// Contains the provider that was attempted to be installed.
     pub struct ProviderAlreadySetError {
         /// The provider that was attempted to be installed.
-        pub provider: Arc<dyn CryptoProvider<Error = RecoveryError>>,
+        pub provider: Arc<dyn CryptoProvider>,
     }
 
     impl core::fmt::Debug for ProviderAlreadySetError {
@@ -112,7 +107,7 @@ pub mod backend {
     /// Returns an error containing the provider that was attempted to be installed if one is
     /// already set.
     pub fn install_default_provider(
-        provider: Arc<dyn CryptoProvider<Error = RecoveryError>>,
+        provider: Arc<dyn CryptoProvider>,
     ) -> Result<(), ProviderAlreadySetError> {
         #[cfg(feature = "std")]
         {
@@ -131,7 +126,7 @@ pub mod backend {
     }
 
     /// Get the currently installed default provider, panicking if none is installed.
-    pub fn get_default_provider() -> &'static dyn CryptoProvider<Error = RecoveryError> {
+    pub fn get_default_provider() -> &'static dyn CryptoProvider {
         try_get_provider().map_or_else(
             || panic!("No crypto backend installed. Call install_default_provider() first."),
             |provider| provider,
@@ -139,7 +134,7 @@ pub mod backend {
     }
 
     /// Try to get the currently installed default provider, returning None if none is installed.
-    pub(super) fn try_get_provider() -> Option<&'static dyn CryptoProvider<Error = RecoveryError>> {
+    pub(super) fn try_get_provider() -> Option<&'static dyn CryptoProvider> {
         #[cfg(feature = "std")]
         {
             DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
@@ -414,13 +409,11 @@ mod tests {
         }
 
         impl CryptoProvider for MockCryptoProvider {
-            type Error = RecoveryError;
-
             fn recover_signer_unchecked(
                 &self,
                 _sig: &[u8; 65],
                 _msg: &[u8; 32],
-            ) -> Result<Address, Self::Error> {
+            ) -> Result<Address, RecoveryError> {
                 if self.should_fail {
                     Err(RecoveryError::new())
                 } else {
