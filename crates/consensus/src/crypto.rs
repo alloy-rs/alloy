@@ -6,6 +6,9 @@ use alloy_primitives::U256;
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
 use alloy_primitives::Signature;
 
+#[cfg(feature = "crypto-backend")]
+pub use backend::{install_default_provider, CryptoProvider, ProviderAlreadySetError};
+
 /// Opaque error type for sender recovery.
 #[derive(Debug, Default, thiserror::Error)]
 #[error("Failed to recover the signer")]
@@ -400,10 +403,7 @@ mod tests {
 
     #[cfg(feature = "crypto-backend")]
     mod backend_tests {
-        use crate::crypto::{
-            backend::{try_get_provider, CryptoProvider},
-            RecoveryError,
-        };
+        use crate::crypto::{backend::CryptoProvider, RecoveryError};
         use alloc::sync::Arc;
         use alloy_primitives::{Address, Signature, B256};
 
