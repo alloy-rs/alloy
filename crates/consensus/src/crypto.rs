@@ -129,7 +129,10 @@ pub mod backend {
 
     /// Get the currently installed default provider, panicking if none is installed.
     pub fn get_default_provider() -> &'static dyn CryptoProvider<Error = RecoveryError> {
-        try_get_provider().map_or_else(|| panic!("No crypto backend installed. Call install_default_provider() first."), |provider| provider)
+        try_get_provider().map_or_else(
+            || panic!("No crypto backend installed. Call install_default_provider() first."),
+            |provider| provider,
+        )
     }
 
     /// Try to get the currently installed default provider, returning None if none is installed.
@@ -397,10 +400,12 @@ mod tests {
 
     #[cfg(feature = "crypto-backend")]
     mod backend_tests {
-        use crate::crypto::backend::{try_get_provider, CryptoProvider};
-        use crate::crypto::RecoveryError;
-        use alloy_primitives::{Address, Signature, B256};
+        use crate::crypto::{
+            backend::{try_get_provider, CryptoProvider},
+            RecoveryError,
+        };
         use alloc::sync::Arc;
+        use alloy_primitives::{Address, Signature, B256};
 
         /// Mock crypto provider for testing
         struct MockCryptoProvider {
