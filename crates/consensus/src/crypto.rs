@@ -55,7 +55,7 @@ pub mod backend {
     use std::sync::OnceLock;
 
     #[cfg(not(feature = "std"))]
-    use once_cell::sync::OnceBox;
+    use once_cell::race::OnceBox;
 
     /// Trait for cryptographic providers that can perform signature recovery.
     pub trait CryptoProvider: Send + Sync + 'static {
@@ -143,7 +143,7 @@ pub mod backend {
         }
         #[cfg(not(feature = "std"))]
         {
-            DEFAULT_PROVIDER.get().map(|boxed_arc| boxed_arc.as_ref().as_ref())
+            DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
         }
     }
 }
