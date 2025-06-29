@@ -398,6 +398,7 @@ mod tests {
         /// Mock crypto provider for testing
         struct MockCryptoProvider {
             should_fail: bool,
+            return_address: Address,
         }
 
         impl CryptoProvider for MockCryptoProvider {
@@ -411,11 +412,42 @@ mod tests {
                 if self.should_fail {
                     Err(RecoveryError::new())
                 } else {
-                    // Return a known/fixed test address
-                    // We don't care about the implementation specific details
-                    // of a particular CryptoProvider
-                    Ok(Address::from([0x42; 20]))
+                    Ok(self.return_address)
                 }
+            }
+        }
+
+        #[test]
+        fn test_crypto_backend_basic_functionality() {
+            // Test that when a provider is installed, it's actually used
+            let custom_address = Address::from([0x99; 20]); // Unique test address
+            let provider = Arc::new(MockCryptoProvider { 
+                should_fail: false,
+                return_address: custom_address,
+            });
+            
+            // Try to install the provider (may fail if already set from other tests)
+            let install_result = crate::crypto::backend::install_default_provider(provider);
+            
+            // Create test signature and hash
+            let signature = Signature::new(
+                alloy_primitives::U256::from(123u64),
+                alloy_primitives::U256::from(456u64),
+                false,
+            );
+            let hash = B256::from([0xAB; 32]);
+
+            // Call the high-level function
+            let result = crate::crypto::secp256k1::recover_signer_unchecked(&signature, hash);
+            
+            // If our provider was successfully installed, we should get our custom address
+            if install_result.is_ok() {
+                assert!(result.is_ok());
+                assert_eq!(result.unwrap(), custom_address);
+            }
+            // If provider was already set, we still should get a valid result
+            else {
+                assert!(result.is_ok()); // Should work with any provider
             }
         }
 
@@ -423,11 +455,17 @@ mod tests {
         fn test_provider_already_set_error() {
             // First installation might work or fail if already set from another test
             // Since tests are ran in parallel.
-            let provider1 = Arc::new(MockCryptoProvider { should_fail: false });
+            let provider1 = Arc::new(MockCryptoProvider { 
+                should_fail: false,
+                return_address: Address::from([0x11; 20]),
+            });
             let result1 = crate::crypto::backend::install_default_provider(provider1);
             
             // Second installation should always fail since OnceLock can only be set once
-            let provider2 = Arc::new(MockCryptoProvider { should_fail: true });
+            let provider2 = Arc::new(MockCryptoProvider { 
+                should_fail: true,
+                return_address: Address::from([0x22; 20]),
+            });
             let result2 = crate::crypto::backend::install_default_provider(provider2.clone());
             
             // The second attempt should fail with ProviderAlreadySetError
