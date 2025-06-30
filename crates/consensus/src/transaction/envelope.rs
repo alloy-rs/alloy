@@ -164,7 +164,7 @@ impl<T> EthereumTxEnvelope<T> {
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]
-#[envelope(alloy_consensus = crate, tx_type_name = TxType)]
+#[envelope(alloy_consensus = crate, tx_type_name = TxType, arbitrary_cfg(feature = "arbitrary"))]
 #[doc(alias = "TransactionEnvelope")]
 pub enum EthereumTxEnvelope<Eip4844> {
     /// An untagged [`TxLegacy`].
@@ -480,6 +480,29 @@ where
             }
             Self::Eip7702(tx) => {
                 crate::transaction::SignerRecoverable::recover_signer_unchecked(tx)
+            }
+        }
+    }
+
+    fn recover_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        match self {
+            Self::Legacy(tx) => {
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip2930(tx) => {
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip1559(tx) => {
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip4844(tx) => {
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
+            }
+            Self::Eip7702(tx) => {
+                crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
         }
     }

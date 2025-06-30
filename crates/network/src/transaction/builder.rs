@@ -84,9 +84,18 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Set the nonce for the transaction.
     fn set_nonce(&mut self, nonce: u64);
 
+    /// Takes the nonce out of the transaction, clearing it.
+    fn take_nonce(&mut self) -> Option<u64>;
+
     /// Builder-pattern method for setting the nonce.
     fn with_nonce(mut self, nonce: u64) -> Self {
         self.set_nonce(nonce);
+        self
+    }
+
+    /// Takes the nonce out of the transaction, clearing it.
+    fn without_nonce(mut self) -> Self {
+        self.take_nonce();
         self
     }
 

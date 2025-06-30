@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Bug Fixes
+
+- Encode into buf ([#2632](https://github.com/alloy-rs/alloy/issues/2632))
+
+## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.15
+- Rename ported fn ([#2629](https://github.com/alloy-rs/alloy/issues/2629))
+
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Features
+
+- Add recover_signer_unchecked_with_buf to `SignerRecoverable` trait ([#2626](https://github.com/alloy-rs/alloy/issues/2626))
+
+### Miscellaneous Tasks
+
+- Release 1.0.14
+
+## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
+
+### Features
+
+- [tx-macros] Add `arbitrary_cfg` parameter ([#2616](https://github.com/alloy-rs/alloy/issues/2616))
+- Add with_header method to Block type ([#2604](https://github.com/alloy-rs/alloy/issues/2604))
+- Implement SignerRecoverable for Signed<T> ([#2596](https://github.com/alloy-rs/alloy/issues/2596))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
 ## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
 
 ### Features
@@ -13,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.12
 - Release 1.0.11
 
 ## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
