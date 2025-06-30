@@ -380,7 +380,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing.
     /// Use `complete_legacy` to check if the request can be built.
-    pub fn build_legacy(self) -> Result<TxLegacy, &'static str> {
+    fn build_legacy(self) -> Result<TxLegacy, &'static str> {
         let checked_to = self.to.ok_or("Missing 'to' field for legacy transaction.")?;
 
         Ok(TxLegacy {
@@ -398,7 +398,7 @@ impl TransactionRequest {
     ///
     /// Returns ane error if required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
-    pub fn build_1559(self) -> Result<TxEip1559, &'static str> {
+    fn build_1559(self) -> Result<TxEip1559, &'static str> {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip1559 transaction.")?;
 
         Ok(TxEip1559 {
@@ -422,7 +422,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_2930` to check if the
     /// request can be built.
-    pub fn build_2930(self) -> Result<TxEip2930, &'static str> {
+    fn build_2930(self) -> Result<TxEip2930, &'static str> {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip2930 transaction.")?;
 
         Ok(TxEip2930 {
@@ -443,7 +443,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    pub fn build_4844_variant(self) -> Result<TxEip4844Variant, &'static str> {
+    fn build_4844_variant(self) -> Result<TxEip4844Variant, &'static str> {
         if self.sidecar.is_none() {
             self.build_4844_without_sidecar().map(Into::into)
         } else {
@@ -455,7 +455,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, &'static str> {
+    fn build_4844_without_sidecar(self) -> Result<TxEip4844, &'static str> {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip4844 transaction.")?;
 
         let to_address = match checked_to {
@@ -490,7 +490,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, &'static str> {
+    fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, &'static str> {
         self.populate_blob_hashes();
 
         let sidecar =
@@ -505,7 +505,7 @@ impl TransactionRequest {
     ///
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
-    pub fn build_7702(self) -> Result<TxEip7702, &'static str> {
+    fn build_7702(self) -> Result<TxEip7702, &'static str> {
         let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.")?;
 
         Ok(TxEip7702 {
