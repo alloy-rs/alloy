@@ -90,7 +90,7 @@ pub mod secp256k1 {
     /// If the S value is too large, then this will return a `RecoveryError`
     pub fn recover_signer(signature: &Signature, hash: B256) -> Result<Address, RecoveryError> {
         if signature.s() > SECP256K1N_HALF {
-            return Err(RecoveryError::from_source(super::InvalidSignatureS));
+            return Err(RecoveryError::from_source(InvalidSignatureS));
         }
         recover_signer_unchecked(signature, hash)
     }
