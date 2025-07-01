@@ -186,7 +186,7 @@ pub struct SignedBidSubmissionV5 {
     /// The execution payload for the submission.
     #[serde(with = "crate::payload::beacon_payload_v3")]
     pub execution_payload: ExecutionPayloadV3,
-    /// The Electra block bundle for this bid.
+    /// The Fulu block bundle for this bid.
     pub blobs_bundle: BlobsBundleV2,
     /// The Pectra execution requests for this bid.
     pub execution_requests: ExecutionRequestsV4,

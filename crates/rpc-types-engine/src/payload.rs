@@ -19,7 +19,6 @@ use alloy_eips::{
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
-use serde::Deserialize;
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -838,7 +837,8 @@ pub struct BlobsBundleV1 {
     pub blobs: Vec<alloy_consensus::Blob>,
 }
 
-impl<'de> Deserialize<'de> for BlobsBundleV1 {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -851,7 +851,7 @@ impl<'de> Deserialize<'de> for BlobsBundleV1 {
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
 
-        if raw.proofs.len() == raw.commitments.len() {
+        if raw.proofs.len() == raw.commitments.len() && raw.proofs.len() == raw.blobs.len() {
             Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
         } else {
             Err(serde::de::Error::invalid_length(
@@ -937,7 +937,8 @@ pub struct BlobsBundleV2 {
     pub blobs: Vec<alloy_consensus::Blob>,
 }
 
-impl<'de> Deserialize<'de> for BlobsBundleV2 {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
