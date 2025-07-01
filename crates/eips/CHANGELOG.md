@@ -5,10 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.15
+
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.14
+
+## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
+
+### Features
+
+- Added convinient fn decode_2718_exact ([#2603](https://github.com/alloy-rs/alloy/issues/2603))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Bug Fixes
+
+- Fix misleading doc comment ([#2545](https://github.com/alloy-rs/alloy/issues/2545))
+
+### Features
+
+- Implement `TransactionEnvelope` derive macro ([#2585](https://github.com/alloy-rs/alloy/issues/2585))
+- BlobParams::max_blobs_per_tx ([#2564](https://github.com/alloy-rs/alloy/issues/2564))
+- Implement support for BPO forks ([#2542](https://github.com/alloy-rs/alloy/issues/2542))
+
+### Miscellaneous Tasks
+
+- Release 1.0.12
+- Release 1.0.11
+- Release 1.0.10
+- Remove fulu blob constants ([#2563](https://github.com/alloy-rs/alloy/issues/2563))
+
 ## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
 
 ### Miscellaneous Tasks
 
+- Release 1.0.9
 - Add from impl ([#2522](https://github.com/alloy-rs/alloy/issues/2522))
 
 ## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27

@@ -31,6 +31,7 @@ pub use any::{
 };
 
 pub use alloy_eips::eip2718;
+use alloy_eips::Typed2718;
 pub use alloy_network_primitives::{
     self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
 };
@@ -48,7 +49,8 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     /// This should be a simple `#[repr(u8)]` enum, and as such has strict type
     /// bounds for better use in error messages, assertions etc.
     #[doc(alias = "TransactionType")]
-    type TxType: Into<u8>
+    type TxType: Typed2718
+        + Into<u8>
         + PartialEq
         + Eq
         + TryFrom<u8, Error = Eip2718Error>

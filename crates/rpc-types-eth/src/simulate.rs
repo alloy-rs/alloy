@@ -2,7 +2,7 @@
 
 use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
 use alloc::{string::String, vec::Vec};
-use alloy_primitives::Bytes;
+use alloy_primitives::{Bytes, U256};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -13,7 +13,7 @@ pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct SimBlock {
+pub struct SimBlock<TxReq = TransactionRequest> {
     /// Modifications to the default block characteristics.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_overrides: Option<BlockOverrides>,
@@ -22,10 +22,10 @@ pub struct SimBlock {
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub calls: Vec<TransactionRequest>,
+    pub calls: Vec<TxReq>,
 }
 
-impl SimBlock {
+impl<TxReq> SimBlock<TxReq> {
     /// Enables state overrides
     pub fn with_state_overrides(mut self, overrides: StateOverride) -> Self {
         self.state_overrides = Some(overrides);
@@ -39,15 +39,20 @@ impl SimBlock {
     }
 
     /// Adds a call to the block.
-    pub fn call(mut self, call: TransactionRequest) -> Self {
+    pub fn call(mut self, call: TxReq) -> Self {
         self.calls.push(call);
         self
     }
 
     /// Adds multiple calls to the block.
-    pub fn extend_calls(mut self, calls: impl IntoIterator<Item = TransactionRequest>) -> Self {
+    pub fn extend_calls(mut self, calls: impl IntoIterator<Item = TxReq>) -> Self {
         self.calls.extend(calls);
         self
+    }
+
+    /// Returns the block's block number override if it exists.
+    pub fn block_number_override(&self) -> Option<U256> {
+        self.block_overrides.as_ref().and_then(|overrides| overrides.number)
     }
 }
 
@@ -92,10 +97,10 @@ pub struct SimCallResult {
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct SimulatePayload {
+pub struct SimulatePayload<TxReq = TransactionRequest> {
     /// Array of block state calls to be executed at specific, optional block/state.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub block_state_calls: Vec<SimBlock>,
+    pub block_state_calls: Vec<SimBlock<TxReq>>,
     /// Flag to determine whether to trace ERC20/ERC721 token transfers within transactions.
     #[cfg_attr(feature = "serde", serde(default))]
     pub trace_transfers: bool,
@@ -107,15 +112,15 @@ pub struct SimulatePayload {
     pub return_full_transactions: bool,
 }
 
-impl SimulatePayload {
+impl<TxReq> SimulatePayload<TxReq> {
     /// Adds a block to the simulation payload.
-    pub fn extend(mut self, block: SimBlock) -> Self {
+    pub fn extend(mut self, block: SimBlock<TxReq>) -> Self {
         self.block_state_calls.push(block);
         self
     }
 
     /// Adds multiple blocks to the simulation payload.
-    pub fn extend_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock>) -> Self {
+    pub fn extend_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock<TxReq>>) -> Self {
         self.block_state_calls.extend(blocks);
         self
     }

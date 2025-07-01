@@ -328,13 +328,13 @@ impl FilterBlockOption {
 
     /// Sets the block number this range filter should start at.
     #[must_use]
-    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
     }
 
     /// Sets the block number this range filter should end at.
     #[must_use]
-    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
     }
 
@@ -796,6 +796,90 @@ impl Filter {
         for<'a> &'a U: Into<LogData>,
     {
         self.matches_log_block(log) && self.matches_parsed(log)
+    }
+
+    /// Appends logs matching the filter from a block's receipts.
+    ///
+    /// Iterates through receipts, filters logs, and appends them with
+    /// block metadata. Includes block number/hash matching.
+    ///
+    /// # Arguments
+    ///
+    /// * `all_logs` - Vector to append matching logs to
+    /// * `block_num_hash` - Block number and hash of the block
+    /// * `block_timestamp` - Block timestamp
+    /// * `tx_hashes_and_receipts` - Iterator of (transaction_hash, receipt) pairs
+    /// * `removed` - Whether logs are from a removed block (reorg)
+    pub fn append_matching_block_logs<'a, I, R>(
+        &self,
+        all_logs: &mut Vec<crate::Log>,
+        block_num_hash: BlockNumHash,
+        block_timestamp: u64,
+        tx_hashes_and_receipts: I,
+        removed: bool,
+    ) where
+        I: IntoIterator<Item = (B256, &'a R)>,
+        R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log> + 'a,
+    {
+        // Early return if block doesn't match filter
+        if !self.matches_block(&block_num_hash) {
+            return;
+        }
+
+        // Tracks the index of a log in the entire block
+        let mut log_index: u64 = 0;
+
+        // Iterate over receipts and append matching logs
+        for (receipt_idx, (tx_hash, receipt)) in tx_hashes_and_receipts.into_iter().enumerate() {
+            for log in receipt.logs() {
+                if self.matches(log) {
+                    let log = crate::Log {
+                        inner: log.clone(),
+                        block_hash: Some(block_num_hash.hash),
+                        block_number: Some(block_num_hash.number),
+                        transaction_hash: Some(tx_hash),
+                        // The transaction and receipt index is always the same
+                        transaction_index: Some(receipt_idx as u64),
+                        log_index: Some(log_index),
+                        removed,
+                        block_timestamp: Some(block_timestamp),
+                    };
+                    all_logs.push(log);
+                }
+
+                log_index += 1;
+            }
+        }
+    }
+
+    /// Returns matching logs from a block's receipts grouped by transaction hashes.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_num_hash` - Block number and hash of the block
+    /// * `block_timestamp` - Block timestamp
+    /// * `tx_hashes_and_receipts` - Iterator of (transaction_hash, receipt) pairs
+    /// * `removed` - Whether logs are from a removed block (reorg)
+    pub fn matching_block_logs<'a, I, R>(
+        &self,
+        block_num_hash: BlockNumHash,
+        block_timestamp: u64,
+        tx_hashes_and_receipts: I,
+        removed: bool,
+    ) -> Vec<crate::Log>
+    where
+        I: IntoIterator<Item = (B256, &'a R)>,
+        R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log> + 'a,
+    {
+        let mut logs = Vec::new();
+        self.append_matching_block_logs(
+            &mut logs,
+            block_num_hash,
+            block_timestamp,
+            tx_hashes_and_receipts,
+            removed,
+        );
+        logs
     }
 }
 
@@ -1360,7 +1444,7 @@ impl FilteredParams {
     }
 
     /// Returns true if the filter matches the given block number
-    pub fn filter_block_range(&self, block_number: u64) -> bool {
+    pub const fn filter_block_range(&self, block_number: u64) -> bool {
         if self.filter.is_none() {
             return true;
         }
@@ -2010,5 +2094,156 @@ mod tests {
 
         topic = topic.extend(U256::from(456));
         assert_eq!(topic.set.len(), 5);
+    }
+
+    #[test]
+    fn test_append_matching_block_logs() {
+        use alloy_consensus::Receipt;
+        use alloy_primitives::Bytes;
+
+        // Create test addresses and topics
+        let addr1 = Address::from([0x11; 20]);
+        let addr2 = Address::from([0x22; 20]);
+        let topic1 = B256::from([0x01; 32]);
+        let topic2 = B256::from([0x02; 32]);
+
+        // Create test receipts with logs
+        let receipt1 = Receipt {
+            status: alloy_consensus::Eip658Value::Eip658(true),
+            cumulative_gas_used: 100000,
+            logs: vec![
+                alloy_primitives::Log {
+                    address: addr1,
+                    data: LogData::new(vec![topic1], Bytes::from(vec![0x01, 0x02])).unwrap(),
+                },
+                alloy_primitives::Log {
+                    address: addr2,
+                    data: LogData::new(vec![topic2], Bytes::from(vec![0x03, 0x04])).unwrap(),
+                },
+            ],
+        };
+
+        let receipt2 = Receipt {
+            status: alloy_consensus::Eip658Value::Eip658(true),
+            cumulative_gas_used: 200000,
+            logs: vec![alloy_primitives::Log {
+                address: addr1,
+                data: LogData::new(vec![topic2], Bytes::from(vec![0x05])).unwrap(),
+            }],
+        };
+
+        let receipts = [receipt1, receipt2];
+        let tx_hashes = [B256::from([0xaa; 32]), B256::from([0xbb; 32])];
+
+        let block_num_hash = BlockNumHash::new(1000, B256::from([0xff; 32]));
+        let block_timestamp = 1234567890;
+
+        // Test 1: Filter by address
+        let filter = Filter::new().address(addr1);
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].inner.address, addr1);
+        assert_eq!(result[0].transaction_hash, Some(tx_hashes[0]));
+        assert_eq!(result[0].log_index, Some(0));
+        assert_eq!(result[0].transaction_index, Some(0));
+        assert_eq!(result[1].inner.address, addr1);
+        assert_eq!(result[1].transaction_hash, Some(tx_hashes[1]));
+        assert_eq!(result[1].log_index, Some(2));
+        assert_eq!(result[1].transaction_index, Some(1));
+
+        // Test 2: Filter by topic
+        let filter = Filter::new().event_signature(topic2);
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].inner.data.topics()[0], topic2);
+        assert_eq!(result[0].transaction_hash, Some(tx_hashes[0]));
+        assert_eq!(result[0].log_index, Some(1));
+        assert_eq!(result[1].inner.data.topics()[0], topic2);
+        assert_eq!(result[1].transaction_hash, Some(tx_hashes[1]));
+        assert_eq!(result[1].log_index, Some(2));
+
+        // Test 3: No matches
+        let filter = Filter::new().address(Address::from([0x99; 20]));
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 0);
+
+        // Test 4: Check all metadata is properly set
+        let filter = Filter::new();
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            true, // removed = true
+        );
+
+        assert_eq!(result.len(), 3);
+        for log in &result {
+            assert_eq!(log.block_hash, Some(block_num_hash.hash));
+            assert_eq!(log.block_number, Some(block_num_hash.number));
+            assert_eq!(log.block_timestamp, Some(block_timestamp));
+            assert!(log.removed);
+        }
+
+        // Test 5: Test matching_block_logs with block filter
+        let filter = Filter::new().from_block(1000u64).to_block(1000u64).address(addr1);
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        let result =
+            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].inner.address, addr1);
+        assert_eq!(result[1].inner.address, addr1);
+
+        // Test 6: Test matching_block_logs with non-matching block
+        let filter = Filter::new().from_block(2000u64).to_block(2000u64);
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        let result =
+            filter.matching_block_logs(block_num_hash, block_timestamp, tx_receipt_pairs, false);
+
+        assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
+
+        // Test 7: Test append_matching_block_logs with non-matching block
+        let filter = Filter::new().from_block(2000u64).to_block(2000u64);
+        let mut result = Vec::new();
+        let tx_receipt_pairs: Vec<_> = tx_hashes.iter().copied().zip(receipts.iter()).collect();
+        filter.append_matching_block_logs(
+            &mut result,
+            block_num_hash,
+            block_timestamp,
+            tx_receipt_pairs,
+            false,
+        );
+
+        assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
     }
 }

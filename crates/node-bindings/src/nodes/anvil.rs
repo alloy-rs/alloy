@@ -46,7 +46,7 @@ impl AnvilInstance {
     }
 
     /// Returns a mutable reference to the child process.
-    pub fn child_mut(&mut self) -> &mut Child {
+    pub const fn child_mut(&mut self) -> &mut Child {
         &mut self.child
     }
 

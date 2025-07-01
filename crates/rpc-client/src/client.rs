@@ -71,6 +71,14 @@ impl RpcClient {
         Self::new(http, is_local)
     }
 
+    /// Create a new [`RpcClient`] with an HTTP transport using a pre-built [`reqwest::Client`].
+    #[cfg(feature = "reqwest")]
+    pub fn new_http_with_client(client: reqwest::Client, url: reqwest::Url) -> Self {
+        let http = alloy_transport_http::Http::with_client(client, url);
+        let is_local = http.guess_local();
+        Self::new(http, is_local)
+    }
+
     /// Creates a new [`RpcClient`] with the given transport and a `MaybePubsub`.
     fn new_maybe_pubsub(
         t: impl IntoBoxTransport,
@@ -272,7 +280,7 @@ impl RpcClientInner {
 
     /// Returns a mutable reference to the underlying transport.
     #[inline]
-    pub fn transport_mut(&mut self) -> &mut BoxTransport {
+    pub const fn transport_mut(&mut self) -> &mut BoxTransport {
         &mut self.transport
     }
 
@@ -332,7 +340,7 @@ impl RpcClientInner {
 
     /// Set the `is_local` flag.
     #[inline]
-    pub fn set_local(&mut self, is_local: bool) {
+    pub const fn set_local(&mut self, is_local: bool) {
         self.is_local = is_local;
     }
 
@@ -417,7 +425,7 @@ mod pubsub_impl {
     }
 
     impl RpcClient {
-        /// Connect to a transport via a [`PubSubConnect`] implementor.
+        /// Connect to a transport via a [`PubSubConnect`] implementer.
         pub async fn connect_pubsub<C: PubSubConnect>(connect: C) -> TransportResult<Self> {
             ClientBuilder::default().pubsub(connect).await
         }

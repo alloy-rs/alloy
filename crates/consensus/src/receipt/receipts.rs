@@ -92,6 +92,13 @@ where
     fn logs(&self) -> &[Self::Log] {
         &self.logs
     }
+
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.logs
+    }
 }
 
 impl<T: Encodable> Receipt<T> {
@@ -549,7 +556,7 @@ mod test {
     }
 
     #[test]
-    fn rountrip_encodable_eip1559() {
+    fn roundtrip_encodable_eip1559() {
         let receipts =
             Receipts { receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(Default::default())]] };
 

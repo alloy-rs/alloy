@@ -3,7 +3,7 @@
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
 use crate::alloc::vec::Vec;
-use alloy_primitives::{keccak256, Bytes, Sealed, B256};
+use alloy_primitives::{keccak256, Bytes, Sealable, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use auto_impl::auto_impl;
 use core::fmt;
@@ -124,6 +124,32 @@ pub trait Decodable2718: Sized {
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
+    /// Decode a transaction according to [EIP-2718], ensuring no trailing bytes.
+    ///
+    /// This method decodes a single transaction from the entire buffer and ensures that the
+    /// buffer is completely consumed. If there are any trailing bytes after the transaction
+    /// data, an error is returned.
+    ///
+    /// This is different from [`decode_2718`](Self::decode_2718) which allows trailing bytes
+    /// in the buffer. This method is useful when you need to ensure that the input contains
+    /// exactly one transaction and nothing else.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The transaction data is invalid
+    /// - There are trailing bytes after the transaction
+    ///
+    /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+    fn decode_2718_exact(bytes: &[u8]) -> Eip2718Result<Self> {
+        let mut buf = bytes;
+        let tx = Self::decode_2718(&mut buf)?;
+        if !buf.is_empty() {
+            return Err(Eip2718Error::RlpError(alloy_rlp::Error::UnexpectedLength));
+        }
+        Ok(tx)
+    }
+
     /// Decode an [EIP-2718] transaction in the network format. The network
     /// format is used ONLY by the Ethereum p2p protocol. Do not call this
     /// method unless you are building a p2p protocol client.
@@ -160,6 +186,28 @@ pub trait Decodable2718: Sized {
         }
 
         Ok(tx)
+    }
+}
+
+impl<T: Decodable2718 + Sealable> Decodable2718 for Sealed<T> {
+    fn extract_type_byte(buf: &mut &[u8]) -> Option<u8> {
+        T::extract_type_byte(buf)
+    }
+
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::typed_decode(ty, buf).map(Self::new)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::fallback_decode(buf).map(Self::new)
+    }
+
+    fn decode_2718(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::decode_2718(buf).map(Self::new)
+    }
+
+    fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::network_decode(buf).map(Self::new)
     }
 }
 
@@ -267,6 +315,20 @@ pub trait Encodable2718: Typed2718 + Sized + Send + Sync {
     }
 }
 
+impl<T: Encodable2718> Encodable2718 for Sealed<T> {
+    fn encode_2718_len(&self) -> usize {
+        self.inner().encode_2718_len()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.inner().encode_2718(out);
+    }
+
+    fn trie_hash(&self) -> B256 {
+        self.hash()
+    }
+}
+
 /// An [EIP-2718] envelope, blanket implemented for types that impl [`Encodable2718`] and
 /// [`Decodable2718`].
 ///
@@ -311,6 +373,12 @@ pub trait Typed2718 {
     /// Returns true if the type is an EIP-7702 transaction.
     fn is_eip7702(&self) -> bool {
         self.ty() == EIP7702_TX_TYPE_ID
+    }
+}
+
+impl<T: Typed2718> Typed2718 for Sealed<T> {
+    fn ty(&self) -> u8 {
+        self.inner().ty()
     }
 }
 

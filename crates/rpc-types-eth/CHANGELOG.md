@@ -5,11 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.15
+
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Features
+
+- [rpc] Add generic `TxReq` to `Bundle` ([#2623](https://github.com/alloy-rs/alloy/issues/2623))
+- [rpc] Add generic `TxReq` to `SimBlock` ([#2622](https://github.com/alloy-rs/alloy/issues/2622))
+
+### Miscellaneous Tasks
+
+- Release 1.0.14
+
+## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
+
+### Features
+
+- Add better conversions for AnyRpcBlock ([#2614](https://github.com/alloy-rs/alloy/issues/2614))
+- Add log filtering methods to Filter ([#2607](https://github.com/alloy-rs/alloy/issues/2607))
+- Add block number helper getter ([#2608](https://github.com/alloy-rs/alloy/issues/2608))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Bug Fixes
+
+- Move `Transaction::from_transaction` ([#2590](https://github.com/alloy-rs/alloy/issues/2590))
+
+### Miscellaneous Tasks
+
+- Release 1.0.12
+- Release 1.0.11
+
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Bug Fixes
+
+- Fix Typo in Function Name ([#2582](https://github.com/alloy-rs/alloy/issues/2582))
+
+### Dependencies
+
+- Bump MSRV to 1.85 ([#2547](https://github.com/alloy-rs/alloy/issues/2547))
+
+### Documentation
+
+- Add examples for TransactionRequest::preferred_type() ([#2568](https://github.com/alloy-rs/alloy/issues/2568))
+- Add examples for TransactionRequest::minimal_tx_type() ([#2566](https://github.com/alloy-rs/alloy/issues/2566))
+
+### Features
+
+- [rpc] Convert into RPC transaction from generic `Transaction` ([#2586](https://github.com/alloy-rs/alloy/issues/2586))
+- [rpc-types-eth] Add helper methods to AccountInfo ([#2578](https://github.com/alloy-rs/alloy/issues/2578))
+- [rpc-types-eth] Add PrunedHistory error code 4444 ([#2575](https://github.com/alloy-rs/alloy/issues/2575))
+- Add BlockOverrides::is_empty() method ([#2571](https://github.com/alloy-rs/alloy/issues/2571))
+- Add missing gas_price setter to TransactionRequest ([#2567](https://github.com/alloy-rs/alloy/issues/2567))
+- Added `log_decode_validate` method ([#2546](https://github.com/alloy-rs/alloy/issues/2546))
+- Add additional qol block functions ([#2534](https://github.com/alloy-rs/alloy/issues/2534))
+
+### Miscellaneous Tasks
+
+- Release 1.0.10
+- Release 1.0.10
+- Relax receipt fn bounds ([#2538](https://github.com/alloy-rs/alloy/issues/2538))
+
 ## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
 
 ### Features
 
 - Introduce serde feature for network-primitives ([#2529](https://github.com/alloy-rs/alloy/issues/2529))
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
 
 ### Styling
 

@@ -78,6 +78,14 @@ impl<T, H> Block<T, H> {
         Self { header, uncles: vec![], transactions, withdrawals: None }
     }
 
+    /// Returns the block's number.
+    pub fn number(&self) -> u64
+    where
+        H: BlockHeader,
+    {
+        self.header.number()
+    }
+
     /// Apply a function to the block, returning the modified block.
     pub fn apply<F>(self, f: F) -> Self
     where
@@ -145,6 +153,25 @@ impl<T, H> Block<T, H> {
         }
     }
 
+    /// Consumes the block and returns the [`alloy_consensus::Block`] with the current transaction
+    /// and header type.
+    ///
+    /// Note: Unlike [`Self::into_consensus`], this method returns the Header type `H` as-is without
+    /// converting it to [`alloy_consensus::Header`], See [`Header::into_consensus`].
+    ///
+    /// This has two caveats:
+    ///  - The returned block will always have empty uncles.
+    ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
+    ///    have an empty transaction vec.
+    pub fn into_consensus_block(self) -> alloy_consensus::Block<T, H> {
+        alloy_consensus::BlockBody {
+            transactions: self.transactions.into_transactions_vec(),
+            ommers: vec![],
+            withdrawals: self.withdrawals,
+        }
+        .into_block(self.header)
+    }
+
     /// Converts the block's header type by applying a function to it.
     pub fn map_header<U>(self, f: impl FnOnce(H) -> U) -> Block<T, U> {
         Block {
@@ -160,6 +187,14 @@ impl<T, H> Block<T, H> {
     /// To obtain the underlying [`alloy_consensus::Header`] use [`Block::into_consensus_header`].
     pub fn into_header(self) -> H {
         self.header
+    }
+
+    /// Converts the block's header type to the given alternative that is `TryFrom<H>`
+    pub fn try_convert_header<U>(self) -> Result<Block<T, U>, U::Error>
+    where
+        U: TryFrom<H>,
+    {
+        self.try_map_header(U::try_from)
     }
 
     /// Converts the block's header type by applying a fallible function to it.
@@ -254,6 +289,16 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
 }
 
 impl<T> Block<T> {
+    /// Returns the block's hash as received from rpc.
+    pub const fn hash(&self) -> B256 {
+        self.header.hash
+    }
+
+    /// Returns a sealed reference of the header: `Sealed<&Header>`
+    pub const fn sealed_header(&self) -> Sealed<&alloy_consensus::Header> {
+        Sealed::new_unchecked(&self.header.inner, self.header.hash)
+    }
+
     /// Consumes the type and returns the sealed [`alloy_consensus::Header`].
     pub fn into_sealed_header(self) -> Sealed<alloy_consensus::Header> {
         self.header.into_sealed()
@@ -284,7 +329,8 @@ impl<T> Block<T> {
         }
     }
 
-    /// Consumes the block and returns the [`alloy_consensus::Block`].
+    /// Consumes the block and returns the ethereum [`alloy_consensus::Block`] with the ethereum
+    /// header type.
     ///
     /// This has two caveats:
     ///  - The returned block will always have empty uncles.
@@ -298,6 +344,12 @@ impl<T> Block<T> {
             withdrawals,
         }
         .into_block(header.into_consensus())
+    }
+
+    /// Same as [`Self::into_consensus`] but returns the block as [`Sealed`] with the block's hash.
+    pub fn into_consensus_sealed(self) -> Sealed<alloy_consensus::Block<T>> {
+        let hash = self.header.hash;
+        Sealed::new_unchecked(self.into_consensus(), hash)
     }
 }
 
@@ -563,8 +615,8 @@ pub enum BlockError {
 }
 
 #[cfg(feature = "serde")]
-impl From<Block> for alloy_serde::WithOtherFields<Block> {
-    fn from(inner: Block) -> Self {
+impl<T, H> From<Block<T, H>> for alloy_serde::WithOtherFields<Block<T, H>> {
+    fn from(inner: Block<T, H>) -> Self {
         Self { inner, other: Default::default() }
     }
 }
@@ -641,6 +693,18 @@ pub struct BlockOverrides {
 }
 
 impl BlockOverrides {
+    /// Returns true if all fields are None, false if any field is not None
+    pub const fn is_empty(&self) -> bool {
+        self.number.is_none()
+            && self.difficulty.is_none()
+            && self.time.is_none()
+            && self.gas_limit.is_none()
+            && self.coinbase.is_none()
+            && self.random.is_none()
+            && self.base_fee.is_none()
+            && self.block_hash.is_none()
+    }
+
     /// Sets the block number override
     pub const fn with_number(mut self, number: U256) -> Self {
         self.number = Some(number);
@@ -901,6 +965,40 @@ mod tests {
     fn block_overrides() {
         let s = r#"{"blockNumber": "0xe39dd0"}"#;
         let _overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
+    }
+
+    #[test]
+    fn block_overrides_is_empty() {
+        // Default should be empty
+        let default_overrides = BlockOverrides::default();
+        assert!(default_overrides.is_empty());
+
+        // With one field set should not be empty
+        let overrides_with_number = BlockOverrides::default().with_number(U256::from(42));
+        assert!(!overrides_with_number.is_empty());
+
+        let overrides_with_difficulty = BlockOverrides::default().with_difficulty(U256::from(100));
+        assert!(!overrides_with_difficulty.is_empty());
+
+        let overrides_with_time = BlockOverrides::default().with_time(12345);
+        assert!(!overrides_with_time.is_empty());
+
+        let overrides_with_gas_limit = BlockOverrides::default().with_gas_limit(21000);
+        assert!(!overrides_with_gas_limit.is_empty());
+
+        let overrides_with_coinbase =
+            BlockOverrides::default().with_coinbase(Address::with_last_byte(1));
+        assert!(!overrides_with_coinbase.is_empty());
+
+        let overrides_with_random = BlockOverrides::default().with_random(B256::with_last_byte(1));
+        assert!(!overrides_with_random.is_empty());
+
+        let overrides_with_base_fee = BlockOverrides::default().with_base_fee(U256::from(20));
+        assert!(!overrides_with_base_fee.is_empty());
+
+        let overrides_with_block_hash =
+            BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
+        assert!(!overrides_with_block_hash.is_empty());
     }
 
     #[test]

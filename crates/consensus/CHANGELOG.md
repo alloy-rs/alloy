@@ -5,6 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Bug Fixes
+
+- Encode into buf ([#2632](https://github.com/alloy-rs/alloy/issues/2632))
+
+## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.15
+- Rename ported fn ([#2629](https://github.com/alloy-rs/alloy/issues/2629))
+
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Features
+
+- Add recover_signer_unchecked_with_buf to `SignerRecoverable` trait ([#2626](https://github.com/alloy-rs/alloy/issues/2626))
+
+### Miscellaneous Tasks
+
+- Release 1.0.14
+
+## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
+
+### Features
+
+- [tx-macros] Add `arbitrary_cfg` parameter ([#2616](https://github.com/alloy-rs/alloy/issues/2616))
+- Add with_header method to Block type ([#2604](https://github.com/alloy-rs/alloy/issues/2604))
+- Implement SignerRecoverable for Signed<T> ([#2596](https://github.com/alloy-rs/alloy/issues/2596))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Features
+
+- More serde compat for `TransactionEnvelope` macro ([#2594](https://github.com/alloy-rs/alloy/issues/2594))
+
+### Miscellaneous Tasks
+
+- Release 1.0.12
+- Release 1.0.11
+
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Bug Fixes
+
+- Fix incorrect type flag doc for EIP-4844 + minor grammar in CI config ([#2554](https://github.com/alloy-rs/alloy/issues/2554))
+
+### Dependencies
+
+- Bump MSRV to 1.85 ([#2547](https://github.com/alloy-rs/alloy/issues/2547))
+
+### Features
+
+- Implement `TransactionEnvelope` derive macro ([#2585](https://github.com/alloy-rs/alloy/issues/2585))
+- Default into_logs fn ([#2539](https://github.com/alloy-rs/alloy/issues/2539))
+- Add TryFrom conversions for Extended ([#2520](https://github.com/alloy-rs/alloy/issues/2520))
+
+### Miscellaneous Tasks
+
+- Release 1.0.10
+- Release 1.0.10
+- Fix typo in comment [crates/consensus/src/transaction/mod.rs] ([#2569](https://github.com/alloy-rs/alloy/issues/2569))
+- Ommers_hashes helper ([#2537](https://github.com/alloy-rs/alloy/issues/2537))
+- Add ReceiptEnvelope helpers ([#2533](https://github.com/alloy-rs/alloy/issues/2533))
+
+### Other
+
+- Fix typo in comment ([#2561](https://github.com/alloy-rs/alloy/issues/2561))
+
+### Testing
+
+- Fix typo in test function name in receipts.rs ([#2580](https://github.com/alloy-rs/alloy/issues/2580))
+- Add sanity assert trait impl test ([#2552](https://github.com/alloy-rs/alloy/issues/2552))
+
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
+
 ## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
 
 ### Miscellaneous Tasks

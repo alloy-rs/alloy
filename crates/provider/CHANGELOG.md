@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.15
+
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.14
+
+## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
+
+### Documentation
+
+- Fix typo in comments ([#2611](https://github.com/alloy-rs/alloy/issues/2611))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Features
+
+- [provider] Conversion between `MulticallItem` and `CallItem` ([#2589](https://github.com/alloy-rs/alloy/issues/2589))
+
+### Miscellaneous Tasks
+
+- Release 1.0.12
+- Release 1.0.11
+
+### Other
+
+- Added overrides_opt fn ([#2595](https://github.com/alloy-rs/alloy/issues/2595))
+
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Bug Fixes
+
+- The bundle hash is null on root level, not the value ([#2588](https://github.com/alloy-rs/alloy/issues/2588))
+- ERC20 endpoints return type ([#2577](https://github.com/alloy-rs/alloy/issues/2577))
+- Make pollers and `Heartbeat` more reliable ([#2540](https://github.com/alloy-rs/alloy/issues/2540))
+
+### Dependencies
+
+- Bump MSRV to 1.85 ([#2547](https://github.com/alloy-rs/alloy/issues/2547))
+
+### Features
+
+- [provider] Add eth_sendBundle support to provider ([#2556](https://github.com/alloy-rs/alloy/issues/2556))
+- [provider] Add block_number_for_id helper method ([#2581](https://github.com/alloy-rs/alloy/issues/2581))
+- [provider] Add setERC20Allowance endpoint ([#2574](https://github.com/alloy-rs/alloy/issues/2574))
+- Added missing blockoverrides setter ([#2559](https://github.com/alloy-rs/alloy/issues/2559))
+
+### Miscellaneous Tasks
+
+- Release 1.0.10
+- Release 1.0.10
+- Add anvil_dealerc20 ([#2558](https://github.com/alloy-rs/alloy/issues/2558))
+- [rpc] `eth_sendBundle` allow hex and integer for input and output always integer ([#2553](https://github.com/alloy-rs/alloy/issues/2553))
+
+### Other
+
+- Improve mock transport error messages ([#2536](https://github.com/alloy-rs/alloy/issues/2536))
+
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
+
 ## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
 
 ### Bug Fixes

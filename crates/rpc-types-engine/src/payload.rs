@@ -309,35 +309,36 @@ impl ExecutionPayloadV1 {
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayloadV1`] to [`Block`] with the given closure.
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
         if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
             return Err(PayloadError::ExtraData(self.extra_data));
         }
 
-        if self.base_fee_per_gas.is_zero() {
-            return Err(PayloadError::BaseFee(self.base_fee_per_gas));
-        }
-
-        let transactions = self
-            .transactions
-            .iter()
-            .map(|tx| {
-                let mut buf = tx.as_ref();
-
-                let tx = T::decode_2718(&mut buf).map_err(alloy_rlp::Error::from)?;
-
-                if !buf.is_empty() {
-                    return Err(alloy_rlp::Error::UnexpectedLength);
-                }
-
-                Ok(tx)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Reuse the encoded bytes for root calculation
+        // Calculate the transactions root using encoded bytes
         let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
             &self.transactions,
             |item, buf| buf.put_slice(item),
         );
+
+        // Convert transactions using the provided mapper
+        let transactions = self
+            .transactions
+            .into_iter()
+            .map(f)
+            .collect::<Result<Vec<_>, E>>()
+            .map_err(Into::into)?;
 
         let header = Header {
             parent_hash: self.parent_hash,
@@ -352,7 +353,7 @@ impl ExecutionPayloadV1 {
             gas_used: self.gas_used,
             timestamp: self.timestamp,
             mix_hash: self.prev_randao,
-            // WARNING: It’s allowed for a base fee in EIP1559 to increase unbounded. We assume that
+            // WARNING: It's allowed for a base fee in EIP1559 to increase unbounded. We assume that
             // it will fit in an u64. This is not always necessarily true, although it is extremely
             // unlikely not to be the case, a u64 maximum would have 2^64 which equates to 18 ETH
             // per gas.
@@ -501,7 +502,22 @@ impl ExecutionPayloadV2 {
     ///
     /// See also [`ExecutionPayloadV1::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        let mut base_sealed_block = self.payload_inner.try_into_block()?;
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayloadV2`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// See also [`ExecutionPayloadV1::try_into_block_with`].
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        let mut base_sealed_block = self.payload_inner.try_into_block_with(f)?;
         let withdrawals_root =
             alloy_consensus::proofs::calculate_withdrawals_root(&self.withdrawals);
         base_sealed_block.body.withdrawals = Some(self.withdrawals.into());
@@ -677,7 +693,22 @@ impl ExecutionPayloadV3 {
     ///
     /// See also [`ExecutionPayloadV2::try_into_block`].
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-        let mut base_block = self.payload_inner.try_into_block()?;
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayloadV3`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// See also [`ExecutionPayloadV2::try_into_block_with`].
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        let mut base_block = self.payload_inner.try_into_block_with(f)?;
 
         base_block.header.blob_gas_used = Some(self.blob_gas_used);
         base_block.header.excess_blob_gas = Some(self.excess_blob_gas);
@@ -1015,7 +1046,28 @@ impl ExecutionPayload {
         self,
         sidecar: &ExecutionPayloadSidecar,
     ) -> Result<Block<T>, PayloadError> {
-        let mut base_payload = self.try_into_block()?;
+        self.try_into_block_with_sidecar_with(sidecar, |tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with sidecar and a custom transaction mapper.
+    ///
+    /// The log bloom is assumed to be validated during serialization.
+    ///
+    /// See <https://github.com/ethereum/go-ethereum/blob/79a478bb6176425c2400e949890e668a3d9a3d05/core/beacon/types.go#L145>
+    pub fn try_into_block_with_sidecar_with<T, F, E>(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+        f: F,
+    ) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        let mut base_payload = self.try_into_block_with(f)?;
         base_payload.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
         base_payload.header.requests_hash = sidecar.requests_hash();
 
@@ -1031,10 +1083,30 @@ impl ExecutionPayload {
     ///
     /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
     pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// Caution: This does not set fields that are not part of the payload and only part of the
+    /// [`ExecutionPayloadSidecar`]:
+    /// - parent_beacon_block_root
+    /// - requests_hash
+    ///
+    /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
         match self {
-            Self::V1(payload) => payload.try_into_block(),
-            Self::V2(payload) => payload.try_into_block(),
-            Self::V3(payload) => payload.try_into_block(),
+            Self::V1(payload) => payload.try_into_block_with(f),
+            Self::V2(payload) => payload.try_into_block_with(f),
+            Self::V3(payload) => payload.try_into_block_with(f),
         }
     }
 
@@ -1048,7 +1120,7 @@ impl ExecutionPayload {
     }
 
     /// Returns a mutable reference to the V1 payload.
-    pub fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
+    pub const fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
         match self {
             Self::V1(payload) => payload,
             Self::V2(payload) => &mut payload.payload_inner,
@@ -1075,7 +1147,7 @@ impl ExecutionPayload {
     }
 
     /// Returns a mutable reference to the V2 payload, if any.
-    pub fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
+    pub const fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
         match self {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
@@ -1092,7 +1164,7 @@ impl ExecutionPayload {
     }
 
     /// Returns a mutable reference to the V2 payload, if any.
-    pub fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
+    pub const fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
@@ -1623,6 +1695,23 @@ impl ExecutionData {
         Self { payload, sidecar }
     }
 
+    /// Conversion from [`alloy_consensus::Block`]. Also returns the [`ExecutionPayloadSidecar`]
+    /// extracted from the block.
+    ///
+    /// For the [`ExecutionPayloadSidecar`] this is expected to use just the requests hash, because
+    /// the [`Requests`] are not part of the block/header. See also
+    /// [`RequestsOrHash`](alloy_eips::eip7685::RequestsOrHash).
+    ///
+    /// See also [`ExecutionPayload::from_block_unchecked`].
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let (payload, sidecar) = ExecutionPayload::from_block_unchecked(block_hash, block);
+        Self::new(payload, sidecar)
+    }
+
     /// Returns the parent hash of the block.
     pub const fn parent_hash(&self) -> B256 {
         self.payload.parent_hash()
@@ -1660,7 +1749,32 @@ impl ExecutionData {
     pub fn try_into_block<T: Decodable2718>(
         self,
     ) -> Result<alloy_consensus::Block<T>, PayloadError> {
-        self.payload.try_into_block_with_sidecar(&self.sidecar)
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Tries to create a new unsealed block from the given payload and payload sidecar with a
+    /// custom transaction mapper.
+    ///
+    /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    ///
+    /// # Note
+    ///
+    /// The log bloom is assumed to be validated during serialization.
+    ///
+    /// See <https://github.com/ethereum/go-ethereum/blob/79a478bb6176425c2400e949890e668a3d9a3d05/core/beacon/types.go#L145>
+    pub fn try_into_block_with<T, F, E>(
+        self,
+        f: F,
+    ) -> Result<alloy_consensus::Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        self.payload.try_into_block_with_sidecar_with(&self.sidecar, f)
     }
 }
 
