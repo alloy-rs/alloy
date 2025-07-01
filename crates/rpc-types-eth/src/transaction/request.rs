@@ -1011,7 +1011,7 @@ impl TransactionRequest {
     /// the transaction, and transaction trie hash.
     ///
     /// In case the requirement is to build a _complete_ transaction, use `build_typed_tx` instead.
-    pub fn build_consensus_tx(self) -> Result<TypedTransaction, ValueError<Self>> {
+    pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
         match self.preferred_type() {
             TxType::Legacy => self.build_legacy().map(Into::into),
             TxType::Eip2930 => self.build_2930().map(Into::into),
@@ -1019,6 +1019,10 @@ impl TransactionRequest {
             TxType::Eip4844 => self.build_4844_variant().map(Into::into),
             TxType::Eip7702 => self.build_7702().map(Into::into),
         }
+        .map_err(|e| {
+            let error = e.to_string();
+            BuildTransactionErr { tx: e.into_value(), error }
+        })
     }
 
     /// Builds a signed typed transaction envelope for the `eth_simulateV1` endpoint with a dummy
@@ -1496,6 +1500,15 @@ impl From<Option<Bytes>> for TransactionInput {
     fn from(input: Option<Bytes>) -> Self {
         Self { input, data: None }
     }
+}
+
+/// Error thrown when a transaction request cannot be built into a transaction.
+#[derive(Debug)]
+pub struct BuildTransactionErr<T = TransactionRequest> {
+    /// Transaction request that failed to build into a transaction.
+    pub tx: T,
+    /// Error message.
+    pub error: String,
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
