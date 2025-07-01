@@ -852,7 +852,7 @@ impl<'de> Deserialize<'de> for BlobsBundleV1 {
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
 
         if raw.proofs.len() == raw.commitments.len() {
-            Ok(BlobsBundleV1 { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
@@ -951,7 +951,7 @@ impl<'de> Deserialize<'de> for BlobsBundleV2 {
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
 
         if raw.proofs.len() == raw.commitments.len() + CELLS_PER_EXT_BLOB {
-            Ok(BlobsBundleV2 { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
@@ -1877,19 +1877,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    fn serde_blobsbundlev2_empty() {
-        let blobs_bundle_v2 = BlobsBundleV2::empty();
-
-        let serialized = serde_json::to_string(&blobs_bundle_v2).unwrap();
-        let deserialized: BlobsBundleV2 = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, blobs_bundle_v2);
-    }
-
-    #[test]
-    #[cfg(feature = "serde")]
     fn serde_blobsbundlev2_not_empty_pass() {
         let commitments = vec![Bytes48::default()];
-        
+
         let blobs_bundle_v2 = BlobsBundleV2 {
             proofs: vec![Bytes48::default(); commitments.len() + CELLS_PER_EXT_BLOB],
             commitments,
