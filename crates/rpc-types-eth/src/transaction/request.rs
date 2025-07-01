@@ -500,7 +500,7 @@ impl TransactionRequest {
     pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
         // Check all fields that need references to self first
         let Some(to) = self.to else {
-            return Err(ValueError::new(self, "Missing 'to' field for Eip7702 transaction."));
+            return Err(ValueError::new(self, "Missing 'to' field for Eip4844 transaction."));
         };
         let Some(to_address) = to.to().copied() else {
             return Err(ValueError::new(self, "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."));
