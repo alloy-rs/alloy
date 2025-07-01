@@ -189,6 +189,11 @@ provider-anvil-node = [
     "alloy-provider?/anvil-node",
     "node-bindings",
 ]
+provider-mev-api = [
+    "providers",
+    "alloy-provider?/mev-api",
+    "rpc-types-mev",
+]
 
 # pubsub
 pubsub = [
