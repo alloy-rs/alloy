@@ -967,6 +967,8 @@ impl BlobsBundleV2 {
 
     /// Take `len` blob data from the bundle.
     ///
+    /// Note this will take `len * CELLS_PER_EXT_BLOB` proofs.
+    ///
     /// # Panics
     ///
     /// If len is more than the blobs bundle len.
@@ -987,6 +989,37 @@ impl BlobsBundleV2 {
         let (commitments, cell_proofs, blobs) = self.take(len);
         BlobTransactionSidecarEip7594 { commitments, cell_proofs, blobs }
     }
+
+    /// Converts this bundle into a single [`BlobTransactionSidecarEip7594`].
+    ///
+    /// Returns an error if the bundle doesn't contain the correct
+    ///
+    /// Returns an empty [`BlobTransactionSidecarEip7594`] if the bundle is empty.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_sidecar(
+        mut self,
+    ) -> Result<BlobTransactionSidecarEip7594, alloy_consensus::error::ValueError<Self>> {
+        let expected_cell_proofs_len = self.blobs.len() * CELLS_PER_EXT_BLOB;
+        if self.proofs.len() != expected_cell_proofs_len {
+            let msg = format!(
+                "cell proofs length mismatch, expected {expected_cell_proofs_len}, has {}",
+                self.proofs.len()
+            );
+            return Err(alloy_consensus::error::ValueError::new(self, msg));
+        }
+
+        if self.commitments.len() != self.blobs.len() {
+            let msg = format!(
+                "commitments length ({}) mismatch, expected blob length ({})",
+                self.commitments.len(),
+                self.proofs.len()
+            );
+            return Err(alloy_consensus::error::ValueError::new(self, msg));
+        }
+
+        let sidecar = self.pop_sidecar(self.blobs.len());
+        Ok(sidecar)
+    }
 }
 
 impl From<Vec<BlobTransactionSidecarEip7594>> for BlobsBundleV2 {
@@ -998,6 +1031,15 @@ impl From<Vec<BlobTransactionSidecarEip7594>> for BlobsBundleV2 {
 impl FromIterator<BlobTransactionSidecarEip7594> for BlobsBundleV2 {
     fn from_iter<T: IntoIterator<Item = BlobTransactionSidecarEip7594>>(iter: T) -> Self {
         Self::new(iter)
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
+    type Error = alloy_consensus::error::ValueError<BlobsBundleV2>;
+
+    fn try_from(value: BlobsBundleV2) -> Result<Self, Self::Error> {
+        value.try_into_sidecar()
     }
 }
 
