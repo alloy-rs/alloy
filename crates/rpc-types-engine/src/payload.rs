@@ -1012,7 +1012,7 @@ impl BlobsBundleV2 {
             let msg = format!(
                 "commitments length ({}) mismatch, expected blob length ({})",
                 self.commitments.len(),
-                self.proofs.len()
+                self.blobs.len()
             );
             return Err(alloy_consensus::error::ValueError::new(self, msg));
         }
