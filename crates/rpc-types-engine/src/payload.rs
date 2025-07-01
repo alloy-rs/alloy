@@ -992,7 +992,9 @@ impl BlobsBundleV2 {
 
     /// Converts this bundle into a single [`BlobTransactionSidecarEip7594`].
     ///
-    /// Returns an error if the bundle doesn't contain the correct
+    /// Returns an error if the bundle doesn't contain the correct number of cell proofs
+    /// (expected blobs.len() * CELLS_PER_EXT_BLOB) or if the commitments length doesn't
+    /// match the blobs length.
     ///
     /// Returns an empty [`BlobTransactionSidecarEip7594`] if the bundle is empty.
     #[cfg(feature = "kzg")]
