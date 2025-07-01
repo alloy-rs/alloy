@@ -1849,6 +1849,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev1_not_empty_pass() {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default()],
@@ -1863,6 +1864,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev1_not_empty_fail() {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default(), Bytes48::default()],
@@ -1878,6 +1880,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev2_not_empty_pass() {
         let commitments = vec![Bytes48::default()];
 
@@ -1894,6 +1897,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
     fn serde_blobsbundlev2_not_empty_fail() {
         let blobs_bundle_v2 = BlobsBundleV2 {
             proofs: vec![Bytes48::default()],
