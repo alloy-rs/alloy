@@ -85,7 +85,7 @@ alloy-primitives = { workspace = true, features = [
     "serde",
     "arbitrary",
 ] }
-
+alloy-consensus = { workspace = true, features = ["arbitrary"] }
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
 serde_json.workspace = true
