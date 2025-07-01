@@ -1,21 +1,20 @@
 //! Alloy basic Transaction Request type.
 
 use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
-use alloy_consensus::{
-    SignableTransaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
-    TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
-};
-use alloy_eips::eip7702::SignedAuthorization;
-use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
-use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
-use core::hash::Hash;
-
 use alloc::{
     string::{String, ToString},
     vec,
     vec::Vec,
 };
-use alloy_consensus::{error::ValueError, transaction::Recovered};
+use alloy_consensus::{
+    error::ValueError, transaction::Recovered, SignableTransaction, TxEip1559, TxEip2930,
+    TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType,
+    Typed2718, TypedTransaction,
+};
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use core::hash::Hash;
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -380,15 +379,27 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing.
     /// Use `complete_legacy` to check if the request can be built.
-    pub fn build_legacy(self) -> Result<TxLegacy, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for legacy transaction.")?;
+    pub fn build_legacy(self) -> Result<TxLegacy, ValueError<Self>> {
+        // Check all required fields first
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for legacy transaction."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for legacy transaction."));
+        };
+        let Some(gas_price) = self.gas_price else {
+            return Err(ValueError::new(self, "Missing 'gas_price' for legacy transaction."));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(self, "Missing 'gas_limit' for legacy transaction."));
+        };
 
         Ok(TxLegacy {
             chain_id: self.chain_id,
-            nonce: self.nonce.ok_or("Missing 'nonce' field for legacy transaction.")?,
-            gas_price: self.gas_price.ok_or("Missing 'gas_price' for legacy transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' for legacy transaction.")?,
-            to: checked_to,
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
         })
@@ -398,20 +409,39 @@ impl TransactionRequest {
     ///
     /// Returns ane error if required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
-    pub fn build_1559(self) -> Result<TxEip1559, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip1559 transaction.")?;
+    pub fn build_1559(self) -> Result<TxEip1559, ValueError<Self>> {
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip1559 transaction."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip1559 transaction."));
+        };
+        let Some(max_priority_fee_per_gas) = self.max_priority_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_priority_fee_per_gas' field for Eip1559 transaction.",
+            ));
+        };
+        let Some(max_fee_per_gas) = self.max_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_gas' field for Eip1559 transaction.",
+            ));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip1559 transaction.",
+            ));
+        };
 
         Ok(TxEip1559 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip1559 transaction.")?,
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip1559 transaction.")?,
-            max_fee_per_gas: self
-                .max_fee_per_gas
-                .ok_or("Missing 'max_fee_per_gas' field for Eip1559 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip1559 transaction.")?,
-            to: checked_to,
+            nonce,
+            max_priority_fee_per_gas,
+            max_fee_per_gas,
+            gas_limit,
+            to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -422,17 +452,32 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_2930` to check if the
     /// request can be built.
-    pub fn build_2930(self) -> Result<TxEip2930, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip2930 transaction.")?;
+    pub fn build_2930(self) -> Result<TxEip2930, ValueError<Self>> {
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip2930 transaction."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip2930 transaction."));
+        };
+        let Some(gas_price) = self.gas_price else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_price' field for Eip2930 transaction.",
+            ));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip2930 transaction.",
+            ));
+        };
 
         Ok(TxEip2930 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip2930 transaction.")?,
-            gas_price: self
-                .gas_price
-                .ok_or("Missing 'gas_price' field for Eip2930 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip2930 transaction.")?,
-            to: checked_to,
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -443,7 +488,7 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    pub fn build_4844_variant(self) -> Result<TxEip4844Variant, &'static str> {
+    pub fn build_4844_variant(self) -> Result<TxEip4844Variant, ValueError<Self>> {
         if self.sidecar.is_none() {
             self.build_4844_without_sidecar().map(Into::into)
         } else {
@@ -455,33 +500,72 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip4844 transaction.")?;
-
-        let to_address = match checked_to {
-            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."),
-            TxKind::Call(to) => to,
+    pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
+        // First check 'to' field and type
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip4844 transaction."));
         };
+        let TxKind::Call(to_address) = to else {
+            return Err(ValueError::new(
+                Self { to: Some(to), ..self },
+                "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.",
+            ));
+        };
+
+        // Check all required fields exist before extracting
+        if self.nonce.is_none() {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip4844 transaction."));
+        }
+        if self.gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip4844 transaction.",
+            ));
+        }
+        if self.max_fee_per_gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_gas' field for Eip4844 transaction.",
+            ));
+        }
+        if self.max_priority_fee_per_gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_priority_fee_per_gas' field for Eip4844 transaction.",
+            ));
+        }
+        if self.blob_versioned_hashes.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'blob_versioned_hashes' field for Eip4844 transaction.",
+            ));
+        }
+        if self.max_fee_per_blob_gas.is_none() {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_blob_gas' field for Eip4844 transaction.",
+            ));
+        }
+
+        // Now extract all fields - safe to unwrap since we checked above
+        let nonce = self.nonce.unwrap();
+        let gas_limit = self.gas.unwrap();
+        let max_fee_per_gas = self.max_fee_per_gas.unwrap();
+        let max_priority_fee_per_gas = self.max_priority_fee_per_gas.unwrap();
+        let blob_versioned_hashes = self.blob_versioned_hashes.unwrap();
+        let max_fee_per_blob_gas = self.max_fee_per_blob_gas.unwrap();
 
         Ok(TxEip4844 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip4844 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip4844 transaction.")?,
-            max_fee_per_gas: self
-                .max_fee_per_gas
-                .ok_or("Missing 'max_fee_per_gas' field for Eip4844 transaction.")?,
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip4844 transaction.")?,
+            nonce,
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
             to: to_address,
             value: self.value.unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
-            blob_versioned_hashes: self
-                .blob_versioned_hashes
-                .ok_or("Missing 'blob_versioned_hashes' field for Eip4844 transaction.")?,
-            max_fee_per_blob_gas: self
-                .max_fee_per_blob_gas
-                .ok_or("Missing 'max_fee_per_blob_gas' field for Eip4844 transaction.")?,
+            blob_versioned_hashes,
+            max_fee_per_blob_gas,
             input: self.input.into_input().unwrap_or_default(),
         })
     }
@@ -490,11 +574,12 @@ impl TransactionRequest {
     ///
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, &'static str> {
+    pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let sidecar =
-            self.sidecar.clone().ok_or("Missing 'sidecar' field for Eip4844 transaction.")?;
+        let Some(sidecar) = self.sidecar.clone() else {
+            return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
+        };
 
         Ok(TxEip4844WithSidecar { sidecar, tx: self.build_4844_without_sidecar()? })
     }
@@ -505,19 +590,41 @@ impl TransactionRequest {
     ///
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
-    pub fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.")?;
+    pub fn build_7702(self) -> Result<TxEip7702, ValueError<Self>> {
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip7702 transaction."));
+        };
+        let Some(to_address) = to.to().copied() else {
+            return Err(ValueError::new(self, "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."));
+        };
+        let Some(nonce) = self.nonce else {
+            return Err(ValueError::new(self, "Missing 'nonce' field for Eip7702 transaction."));
+        };
+        let Some(gas_limit) = self.gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'gas_limit' field for Eip7702 transaction.",
+            ));
+        };
+        let Some(max_fee_per_gas) = self.max_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_fee_per_gas' field for Eip7702 transaction.",
+            ));
+        };
+        let Some(max_priority_fee_per_gas) = self.max_priority_fee_per_gas else {
+            return Err(ValueError::new(
+                self,
+                "Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.",
+            ));
+        };
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip7702 transaction.")?,
-            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip7702 transaction.")?,
-            max_fee_per_gas: self
-                .max_fee_per_gas
-                .ok_or("Missing 'max_fee_per_gas' field for Eip7702 transaction.")?,
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.")?,
+            nonce,
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
             to: to_address,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
@@ -922,18 +1029,16 @@ impl TransactionRequest {
     /// In case the requirement is to build a _complete_ transaction, use `build_typed_tx` instead.
     pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
         match self.preferred_type() {
-            TxType::Legacy => self.clone().build_legacy().map(Into::into),
-            TxType::Eip2930 => self.clone().build_2930().map(Into::into),
-            TxType::Eip1559 => self.clone().build_1559().map(Into::into),
-            TxType::Eip4844 => self.clone().build_4844_variant().map(Into::into),
-            TxType::Eip7702 => self.clone().build_7702().map(Into::into),
+            TxType::Legacy => self.build_legacy().map(Into::into),
+            TxType::Eip2930 => self.build_2930().map(Into::into),
+            TxType::Eip1559 => self.build_1559().map(Into::into),
+            TxType::Eip4844 => self.build_4844_variant().map(Into::into),
+            TxType::Eip7702 => self.build_7702().map(Into::into),
         }
-        .map_err(|msg| self.into_tx_err(msg))
-    }
-
-    /// Converts the transaction request into a `BuildTransactionErr` with the given message.
-    fn into_tx_err(self, message: &'static str) -> BuildTransactionErr {
-        BuildTransactionErr { tx: self, error: message.to_string() }
+        .map_err(|e| {
+            let error = e.to_string();
+            BuildTransactionErr { tx: e.into_value(), error }
+        })
     }
 
     /// Builds a signed typed transaction envelope for the `eth_simulateV1` endpoint with a dummy
@@ -1413,13 +1518,6 @@ impl From<Option<Bytes>> for TransactionInput {
     }
 }
 
-/// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
-#[doc(alias = "TxInputError")]
-#[non_exhaustive]
-pub struct TransactionInputError;
-
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]
 pub struct BuildTransactionErr<T = TransactionRequest> {
@@ -1428,6 +1526,13 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
     /// Error message.
     pub error: String,
 }
+
+/// Error thrown when both `data` and `input` fields are set and not equal.
+#[derive(Debug, Default, thiserror::Error)]
+#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[doc(alias = "TxInputError")]
+#[non_exhaustive]
+pub struct TransactionInputError;
 
 #[cfg(test)]
 mod tests {
