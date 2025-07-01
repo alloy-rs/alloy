@@ -1,17 +1,20 @@
 //! Alloy basic Transaction Request type.
 
 use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use alloy_consensus::{
-    SignableTransaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
-    TxEip7702, TxEnvelope, TxLegacy, TxType, Typed2718, TypedTransaction,
+    error::ValueError, transaction::Recovered, SignableTransaction, TxEip1559, TxEip2930,
+    TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType,
+    Typed2718, TypedTransaction,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::hash::Hash;
-
-use alloc::{vec, vec::Vec};
-use alloy_consensus::{error::ValueError, transaction::Recovered};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -498,13 +501,18 @@ impl TransactionRequest {
     /// Returns an error if required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
     pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
-        // Check all fields that need references to self first
+        // First check 'to' field and type
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for Eip4844 transaction."));
         };
-        let Some(to_address) = to.to().copied() else {
-            return Err(ValueError::new(self, "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."));
+        let TxKind::Call(to_address) = to else {
+            return Err(ValueError::new(
+                Self { to: Some(to), ..self },
+                "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.",
+            ));
         };
+
+        // Check all required fields exist before extracting
         if self.nonce.is_none() {
             return Err(ValueError::new(self, "Missing 'nonce' field for Eip4844 transaction."));
         }
@@ -539,17 +547,25 @@ impl TransactionRequest {
             ));
         }
 
+        // Now extract all fields - safe to unwrap since we checked above
+        let nonce = self.nonce.unwrap();
+        let gas_limit = self.gas.unwrap();
+        let max_fee_per_gas = self.max_fee_per_gas.unwrap();
+        let max_priority_fee_per_gas = self.max_priority_fee_per_gas.unwrap();
+        let blob_versioned_hashes = self.blob_versioned_hashes.unwrap();
+        let max_fee_per_blob_gas = self.max_fee_per_blob_gas.unwrap();
+
         Ok(TxEip4844 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.unwrap(),
-            gas_limit: self.gas.unwrap(),
-            max_fee_per_gas: self.max_fee_per_gas.unwrap(),
-            max_priority_fee_per_gas: self.max_priority_fee_per_gas.unwrap(),
+            nonce,
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
             to: to_address,
             value: self.value.unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
-            blob_versioned_hashes: self.blob_versioned_hashes.unwrap(),
-            max_fee_per_blob_gas: self.max_fee_per_blob_gas.unwrap(),
+            blob_versioned_hashes,
+            max_fee_per_blob_gas,
             input: self.input.into_input().unwrap_or_default(),
         })
     }
