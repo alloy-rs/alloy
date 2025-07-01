@@ -884,6 +884,25 @@ impl BlobsBundleV1 {
         let (commitments, proofs, blobs) = self.take(len);
         BlobTransactionSidecar { commitments, proofs, blobs }
     }
+
+    /// Converts this bundle into a single [`BlobTransactionSidecar`].
+    ///
+    /// Returns an error if the bundle doesn't contain the same number of commitments as blobs and
+    /// proofs.
+    ///
+    /// Returns an empty [`BlobTransactionSidecar`] if the bundle is empty.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_sidecar(
+        mut self,
+    ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
+        if self.commitments.len() != self.proofs.len() || self.commitments.len() != self.blobs.len()
+        {
+            return Err(alloy_consensus::error::ValueError::new(self, "length mismatch"));
+        }
+
+        let sidecar = self.pop_sidecar(self.blobs.len());
+        Ok(sidecar)
+    }
 }
 
 impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
@@ -895,6 +914,15 @@ impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
 impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
     fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
         Self::new(iter)
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
+    type Error = alloy_consensus::error::ValueError<BlobsBundleV1>;
+
+    fn try_from(value: BlobsBundleV1) -> Result<Self, Self::Error> {
+        value.try_into_sidecar()
     }
 }
 
@@ -1786,6 +1814,13 @@ mod tests {
     use alloy_consensus::TxEnvelope;
     use alloy_primitives::{b256, hex};
     use similar_asserts::assert_eq;
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn convert_empty_bundle() {
+        let bundle = BlobsBundleV1::default();
+        let _sidecar = bundle.try_into_sidecar().unwrap();
+    }
 
     #[test]
     #[cfg(feature = "serde")]
