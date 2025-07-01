@@ -9,6 +9,11 @@ use alloy_primitives::Signature;
 #[cfg(feature = "crypto-backend")]
 pub use backend::{install_default_provider, CryptoProvider, CryptoProviderAlreadySetError};
 
+/// Error for signature S.
+#[derive(Debug, thiserror::Error)]
+#[error("signature S value is greater than `secp256k1n / 2`")]
+pub struct InvalidSignatureS;
+
 /// Opaque error type for sender recovery.
 #[derive(Debug, Default, thiserror::Error)]
 #[error("Failed to recover the signer")]
@@ -237,7 +242,7 @@ pub mod secp256k1 {
     /// If the S value is too large, then this will return a `RecoveryError`
     pub fn recover_signer(signature: &Signature, hash: B256) -> Result<Address, RecoveryError> {
         if signature.s() > SECP256K1N_HALF {
-            return Err(RecoveryError::new());
+            return Err(RecoveryError::from_source(InvalidSignatureS));
         }
         recover_signer_unchecked(signature, hash)
     }
