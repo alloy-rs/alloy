@@ -1853,7 +1853,7 @@ mod tests {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default()],
             commitments: vec![Bytes48::default()],
-            blobs: vec![],
+            blobs: vec![Blob::default()],
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
@@ -1867,7 +1867,7 @@ mod tests {
         let blobs_bundle_v1 = BlobsBundleV1 {
             proofs: vec![Bytes48::default(), Bytes48::default()],
             commitments: vec![Bytes48::default()],
-            blobs: vec![],
+            blobs: vec![Blob::default()],
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
