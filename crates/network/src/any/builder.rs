@@ -24,6 +24,10 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_nonce(nonce)
     }
 
+    fn take_nonce(&mut self) -> Option<u64> {
+        self.deref_mut().nonce.take()
+    }
+
     fn input(&self) -> Option<&Bytes> {
         self.deref().input()
     }

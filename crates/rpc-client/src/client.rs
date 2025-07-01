@@ -71,6 +71,14 @@ impl RpcClient {
         Self::new(http, is_local)
     }
 
+    /// Create a new [`RpcClient`] with an HTTP transport using a pre-built [`reqwest::Client`].
+    #[cfg(feature = "reqwest")]
+    pub fn new_http_with_client(client: reqwest::Client, url: reqwest::Url) -> Self {
+        let http = alloy_transport_http::Http::with_client(client, url);
+        let is_local = http.guess_local();
+        Self::new(http, is_local)
+    }
+
     /// Creates a new [`RpcClient`] with the given transport and a `MaybePubsub`.
     fn new_maybe_pubsub(
         t: impl IntoBoxTransport,
