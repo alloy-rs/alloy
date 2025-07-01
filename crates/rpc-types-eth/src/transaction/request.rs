@@ -499,9 +499,12 @@ impl TransactionRequest {
     /// request can be built.
     pub fn build_4844_without_sidecar(self) -> Result<TxEip4844, ValueError<Self>> {
         // Check all fields that need references to self first
-        if self.to.is_none() {
-            return Err(ValueError::new(self, "Missing 'to' field for Eip4844 transaction."));
-        }
+        let Some(to) = self.to else {
+            return Err(ValueError::new(self, "Missing 'to' field for Eip7702 transaction."));
+        };
+        let Some(to_address) = to.to().copied() else {
+            return Err(ValueError::new(self, "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly."));
+        };
         if self.nonce.is_none() {
             return Err(ValueError::new(self, "Missing 'nonce' field for Eip4844 transaction."));
         }
@@ -535,27 +538,6 @@ impl TransactionRequest {
                 "Missing 'max_fee_per_blob_gas' field for Eip4844 transaction.",
             ));
         }
-
-        // Now destructure self
-        let checked_to = self.to.unwrap();
-        let to_address = match checked_to {
-            TxKind::Create => {
-                return Err(ValueError::new(
-                    TransactionRequest {
-                        to: Some(checked_to),
-                        nonce: self.nonce,
-                        gas: self.gas,
-                        max_fee_per_gas: self.max_fee_per_gas,
-                        max_priority_fee_per_gas: self.max_priority_fee_per_gas,
-                        blob_versioned_hashes: self.blob_versioned_hashes,
-                        max_fee_per_blob_gas: self.max_fee_per_blob_gas,
-                        ..Default::default()
-                    },
-                    "The field `to` can only be of type TxKind::Call(Address). Please change it accordingly.",
-                ))
-            }
-            TxKind::Call(to) => to,
-        };
 
         Ok(TxEip4844 {
             chain_id: self.chain_id.unwrap_or(1),
