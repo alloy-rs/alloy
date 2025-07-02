@@ -15,6 +15,9 @@ pub use eth_call::{CallDecoder, EthCall};
 mod storage_slot;
 pub use storage_slot::*;
 
+mod impersonate;
+pub use impersonate::*;
+
 mod error;
 pub use error::{Error, Result, TransportErrorExt, TryParseTransportErrorResult};
 
