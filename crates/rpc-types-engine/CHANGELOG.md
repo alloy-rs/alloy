@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.17](https://github.com/alloy-rs/alloy/releases/tag/v1.0.17) - 2025-07-02
+
+### Features
+
+- Add BuilderBlockValidationV5 for relay for Fusaka ([#2638](https://github.com/alloy-rs/alloy/issues/2638))
+- Add helper conversion for blobsbundlev1 ([#2639](https://github.com/alloy-rs/alloy/issues/2639))
+
+### Miscellaneous Tasks
+
+- Add try_into_sidecar helper ([#2644](https://github.com/alloy-rs/alloy/issues/2644))
+- Fix missing arbitrary in tests ([#2643](https://github.com/alloy-rs/alloy/issues/2643))
+
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
+
 ## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
 
 ### Miscellaneous Tasks
