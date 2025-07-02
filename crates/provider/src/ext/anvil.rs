@@ -160,6 +160,18 @@ pub trait AnvilApi<N: Network>: Send + Sync {
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash>;
 
+    /// Executes a transaction and waits for it to be mined, returning the receipt.
+    async fn eth_send_transaction_sync(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse>;
+
+    /// Sends a raw transaction and waits for it to be mined, returning the receipt.
+    async fn eth_send_raw_transaction_sync(
+        &self,
+        request: Bytes,
+    ) -> TransportResult<N::ReceiptResponse>;
+
     /// Sets impersonated transaction
     async fn anvil_send_impersonated_transaction(
         &self,
@@ -356,6 +368,20 @@ where
         request: N::TransactionRequest,
     ) -> TransportResult<TxHash> {
         self.client().request("eth_sendUnsignedTransaction", (request,)).await
+    }
+
+    async fn eth_send_transaction_sync(
+        &self,
+        request: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.client().request("eth_sendTransactionSync", (request,)).await
+    }
+
+    async fn eth_send_raw_transaction_sync(
+        &self,
+        request: Bytes,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.client().request("eth_sendRawTransactionSync", (request,)).await
     }
 
     async fn anvil_send_impersonated_transaction(
