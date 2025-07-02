@@ -93,6 +93,8 @@ where
 mod test {
     use super::*;
     use crate::ProviderBuilder;
+    use alloy_primitives::{address, U256};
+    use alloy_sol_types::{sol, Eip712Domain};
     use itertools::Itertools;
 
     #[test]
@@ -108,5 +110,22 @@ mod test {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
+    }
+
+    #[tokio::test]
+    async fn sign_hash() {
+        sol! {
+            struct Test {
+                uint256 value;
+            }
+        }
+        use alloy_sol_types::SolStruct;
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let t = Test { value: U256::from(0x42) };
+        let domain = Eip712Domain::default();
+        let hash = t.eip712_signing_hash(&domain);
+        let signer = address!("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
+        let _ = provider.wallet().sign_hash_with(signer, &hash).await.unwrap();
     }
 }
