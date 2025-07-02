@@ -443,10 +443,11 @@ where
 
 /// Configuration for impersonated transactions, including optional funding and whether to stop
 /// impersonation.
-#[derive(Debug, Clone, Default)]
-
+#[derive(Debug, Clone)]
 pub struct ImpersonateConfig {
+    /// Optional amount of ETH to fund the impersonated account.
     pub fund_amount: Option<U256>,
+    /// Whether to stop impersonating after the transaction is sent.
     pub stop_impersonate: bool,
 }
 
