@@ -17,12 +17,17 @@ use futures::try_join;
 ///
 /// ```no_run
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+///
+/// use alloy_network::TransactionBuilder;
+/// use alloy_primitives::address;
+/// use alloy_provider::{Provider, ProviderBuilder};
+/// use alloy_rpc_types_eth::TransactionRequest;
+///
 /// let provider = ProviderBuilder::new().connect_anvil();
 ///
 /// let from = address!("0x000000000000000000000000000000000000dEaD");
 /// let to = address!("0x000000000000000000000000000000000000beef");
-/// let tx =
-///     TransactionRequest::default().with_from(from).with_to(to).with_value(U256::from(1_000_000));
+/// let tx = TransactionRequest::default().with_from(impersonate).with_to(to).with_value(val);
 ///
 /// let call = ImpersonatedCall::new(provider, tx, Some(U256::from(1e18 as u64)));
 /// let receipt = call.send_impersonated_tx().await?;
