@@ -450,8 +450,6 @@ pub struct ImpersonateConfig {
     pub stop_impersonate: bool,
 }
 
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
