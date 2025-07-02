@@ -951,12 +951,14 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
         }
         let raw = BlobsBundleRaw::deserialize(deserializer)?;
 
-        if raw.proofs.len() == raw.commitments.len() + CELLS_PER_EXT_BLOB {
+        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
+            && raw.commitments.len() == raw.blobs.len()
+        {
             Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
-                &format!("{}", raw.commitments.len() + CELLS_PER_EXT_BLOB).as_str(),
+                &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
             ))
         }
     }
@@ -1885,9 +1887,9 @@ mod tests {
         let commitments = vec![Bytes48::default()];
 
         let blobs_bundle_v2 = BlobsBundleV2 {
-            proofs: vec![Bytes48::default(); commitments.len() + CELLS_PER_EXT_BLOB],
+            proofs: vec![Bytes48::default(); commitments.len() * CELLS_PER_EXT_BLOB],
             commitments,
-            blobs: vec![],
+            blobs: vec![Blob::default()],
         };
 
         let serialized = serde_json::to_string(&blobs_bundle_v2).unwrap();
