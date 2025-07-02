@@ -39,7 +39,7 @@ use futures::try_join;
 #[derive(Debug, Clone)]
 pub struct ImpersonatedCall<P, N>
 where
-    P: Provider<N>,
+    P: Provider<N> + AnvilApi<N>,
     N: Network,
 {
     provider: P,
@@ -50,7 +50,7 @@ where
 
 impl<P, N> ImpersonatedCall<P, N>
 where
-    P: Provider<N>,
+    P: Provider<N> + AnvilApi<N>,
     N: Network,
     N: Network<TransactionRequest = TransactionRequest>,
 {
