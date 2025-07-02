@@ -20,7 +20,7 @@ pub use transaction::{
 };
 
 mod ethereum;
-pub use ethereum::{Ethereum, EthereumWallet, IntoWallet};
+pub use ethereum::{ArcFullSigner, Ethereum, EthereumWallet, IntoWallet};
 
 /// Types for handling unknown network types.
 pub mod any;
