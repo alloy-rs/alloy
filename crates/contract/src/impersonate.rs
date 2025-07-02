@@ -16,11 +16,6 @@ use futures::try_join;
 /// # Example
 ///
 /// ```no_run
-/// use alloy_primitives::{address, U256};
-/// use alloy_provider::{ext::AnvilApi, ProviderBuilder};
-/// use alloy_rpc_types_eth::TransactionRequest;
-/// use alloy_utils::ImpersonatedCall; // your module name here
-///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new().connect_anvil();
 ///
