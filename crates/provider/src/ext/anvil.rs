@@ -1,11 +1,12 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
 
-use crate::Provider;
+use crate::{PendingTransactionBuilder, Provider};
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_rpc_types_eth::Block;
-use alloy_transport::TransportResult;
+use alloy_rpc_types_eth::{Block, TransactionRequest};
+use alloy_transport::{TransportError, TransportResult};
+use futures::try_join;
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -23,6 +24,15 @@ pub trait AnvilApi<N: Network>: Send + Sync {
 
     /// If set to true will make every account impersonated.
     async fn anvil_auto_impersonate_account(&self, enabled: bool) -> TransportResult<()>;
+
+    /// Impersonates the `from` address in the given transaction request, optionally funds the
+    /// sender, sends the transaction, and optionally stops impersonating after execution based
+    /// on the provided config.
+    async fn anvil_send_impersonated_transaction_with_config(
+        &self,
+        request: N::TransactionRequest,
+        config: ImpersonateConfig,
+    ) -> TransportResult<PendingTransactionBuilder<N>>;
 
     /// Returns true if auto mining is enabled, and false.
     async fn anvil_get_auto_mine(&self) -> TransportResult<bool>;
@@ -180,6 +190,7 @@ impl<N, P> AnvilApi<N> for P
 where
     N: Network,
     P: Provider<N>,
+    N: Network<TransactionRequest = TransactionRequest>,
 {
     async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()> {
         self.client().request("anvil_impersonateAccount", (address,)).await
@@ -372,6 +383,44 @@ where
     ) -> TransportResult<()> {
         self.client().request("anvil_setERC20Allowance", (owner, spender, token, allowance)).await
     }
+
+    async fn anvil_send_impersonated_transaction_with_config(
+        &self,
+        request: N::TransactionRequest,
+        config: ImpersonateConfig,
+    ) -> TransportResult<PendingTransactionBuilder<N>> {
+        let from = request.from.ok_or_else(|| {
+            TransportError::from(alloy_transport::TransportErrorKind::Custom(
+                "TransactionRequest must have a `from` address set.".to_string().into(),
+            ))
+        })?;
+
+        let impersonate_future = self.anvil_impersonate_account(from);
+
+        if let Some(amount) = config.fund_amount {
+            let fund_future = self.anvil_set_balance(from, amount);
+            try_join!(fund_future, impersonate_future)?;
+        } else {
+            impersonate_future.await?;
+        }
+
+        let tx_hash = self.anvil_send_impersonated_transaction(request).await?;
+        let pending = PendingTransactionBuilder::new(self.root().clone(), tx_hash);
+
+        if config.stop_impersonate {
+            self.anvil_stop_impersonating_account(from).await?;
+        }
+
+        Ok(pending)
+    }
+}
+
+/// Configuration for impersonated transactions, including optional funding and whether to stop
+/// impersonation.
+#[derive(Debug, Clone, Default)]
+pub struct ImpersonateConfig {
+    fund_amount: Option<U256>,
+    stop_impersonate: bool,
 }
 
 #[cfg(test)]
@@ -429,6 +478,35 @@ mod tests {
         provider.anvil_stop_impersonating_account(impersonate).await.unwrap();
         let res = provider.send_transaction(tx).await;
         res.unwrap_err();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_impersonated_send_with_config() {
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .with_simple_nonce_management()
+            .filler(GasFiller)
+            .filler(ChainIdFiller::default())
+            .connect_anvil();
+
+        let impersonate = Address::random();
+        let to = Address::random();
+        let val = U256::from(1337);
+        let funding = U256::from(1e18 as u64);
+
+        let tx = TransactionRequest::default().with_from(impersonate).with_to(to).with_value(val);
+
+        let config = ImpersonateConfig { fund_amount: Some(funding), stop_impersonate: true };
+
+        let pending = provider
+            .anvil_send_impersonated_transaction_with_config(tx.clone(), config)
+            .await
+            .expect("impersonated send failed");
+        let receipt = pending.get_receipt().await.unwrap();
+        assert_eq!(receipt.from, impersonate);
+
+        let recipient_balance = provider.get_balance(to).await.unwrap();
+        assert_eq!(recipient_balance, val);
     }
 
     #[tokio::test]
