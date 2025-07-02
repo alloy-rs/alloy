@@ -444,9 +444,12 @@ where
 /// Configuration for impersonated transactions, including optional funding and whether to stop
 /// impersonation.
 #[derive(Debug, Clone, Default)]
+
 pub struct ImpersonateConfig {
-    fund_amount: Option<U256>,
-    stop_impersonate: bool,
+    pub fund_amount: Option<U256>,
+    pub stop_impersonate: bool,
+}
+
 }
 
 #[cfg(test)]
