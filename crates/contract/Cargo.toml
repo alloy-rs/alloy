@@ -46,7 +46,7 @@ alloy-pubsub = { workspace = true, optional = true }
 alloy-rpc-client = { workspace = true, features = ["pubsub", "ws"] }
 alloy-transport-http.workspace = true
 alloy-node-bindings.workspace = true
-alloy-provider = { workspace = true, features = ["anvil-node", "anvil-api"] }
+alloy-provider = { workspace = true, features = ["anvil-node"] }
 alloy-signer-local.workspace = true
 
 reqwest.workspace = true
