@@ -825,7 +825,7 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlobsBundleV1 {
@@ -835,6 +835,31 @@ pub struct BlobsBundleV1 {
     pub proofs: Vec<alloy_consensus::Bytes48>,
     /// All blobs in the bundle.
     pub blobs: Vec<alloy_consensus::Blob>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct BlobsBundleRaw {
+            commitments: Vec<alloy_consensus::Bytes48>,
+            proofs: Vec<alloy_consensus::Bytes48>,
+            blobs: Vec<alloy_consensus::Blob>,
+        }
+        let raw = BlobsBundleRaw::deserialize(deserializer)?;
+
+        if raw.proofs.len() == raw.commitments.len() && raw.proofs.len() == raw.blobs.len() {
+            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        } else {
+            Err(serde::de::Error::invalid_length(
+                raw.proofs.len(),
+                &format!("{}", raw.commitments.len()).as_str(),
+            ))
+        }
+    }
 }
 
 impl BlobsBundleV1 {
@@ -928,7 +953,7 @@ impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
 
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlobsBundleV2 {
@@ -938,6 +963,33 @@ pub struct BlobsBundleV2 {
     pub proofs: Vec<alloy_consensus::Bytes48>,
     /// All blobs in the bundle.
     pub blobs: Vec<alloy_consensus::Blob>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct BlobsBundleRaw {
+            commitments: Vec<alloy_consensus::Bytes48>,
+            proofs: Vec<alloy_consensus::Bytes48>,
+            blobs: Vec<alloy_consensus::Blob>,
+        }
+        let raw = BlobsBundleRaw::deserialize(deserializer)?;
+
+        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
+            && raw.commitments.len() == raw.blobs.len()
+        {
+            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        } else {
+            Err(serde::de::Error::invalid_length(
+                raw.proofs.len(),
+                &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
+            ))
+        }
+    }
 }
 
 impl BlobsBundleV2 {
@@ -1820,6 +1872,80 @@ mod tests {
     fn convert_empty_bundle() {
         let bundle = BlobsBundleV1::default();
         let _sidecar = bundle.try_into_sidecar().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_blobsbundlev1_empty() {
+        let blobs_bundle_v1 = BlobsBundleV1::empty();
+
+        let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
+        let deserialized: BlobsBundleV1 = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, blobs_bundle_v1);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
+    fn serde_blobsbundlev1_not_empty_pass() {
+        let blobs_bundle_v1 = BlobsBundleV1 {
+            proofs: vec![Bytes48::default()],
+            commitments: vec![Bytes48::default()],
+            blobs: vec![Blob::default()],
+        };
+
+        let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
+        let deserialized: BlobsBundleV1 = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, blobs_bundle_v1);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
+    fn serde_blobsbundlev1_not_empty_fail() {
+        let blobs_bundle_v1 = BlobsBundleV1 {
+            proofs: vec![Bytes48::default(), Bytes48::default()],
+            commitments: vec![Bytes48::default()],
+            blobs: vec![Blob::default()],
+        };
+
+        let serialized = serde_json::to_string(&blobs_bundle_v1).unwrap();
+        let deserialized: Result<BlobsBundleV1, serde_json::Error> =
+            serde_json::from_str(&serialized);
+        assert!(deserialized.is_err(), "invalid length 2, expected commitments.len()");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
+    fn serde_blobsbundlev2_not_empty_pass() {
+        let commitments = vec![Bytes48::default()];
+
+        let blobs_bundle_v2 = BlobsBundleV2 {
+            proofs: vec![Bytes48::default(); commitments.len() * CELLS_PER_EXT_BLOB],
+            commitments,
+            blobs: vec![Blob::default()],
+        };
+
+        let serialized = serde_json::to_string(&blobs_bundle_v2).unwrap();
+        let deserialized: BlobsBundleV2 = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, blobs_bundle_v2);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    #[cfg(not(debug_assertions))]
+    fn serde_blobsbundlev2_not_empty_fail() {
+        let blobs_bundle_v2 = BlobsBundleV2 {
+            proofs: vec![Bytes48::default()],
+            commitments: vec![Bytes48::default()],
+            blobs: vec![],
+        };
+
+        let serialized = serde_json::to_string(&blobs_bundle_v2).unwrap();
+        let deserialized: Result<BlobsBundleV2, serde_json::Error> =
+            serde_json::from_str(&serialized);
+        assert!(deserialized.is_err());
     }
 
     #[test]

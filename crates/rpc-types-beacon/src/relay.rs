@@ -5,7 +5,7 @@
 use crate::{requests::ExecutionRequestsV4, BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
-    BlobsBundleV1, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    BlobsBundleV1, BlobsBundleV2, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -172,6 +172,28 @@ pub struct SignedBidSubmissionV4 {
     pub signature: BlsSignature,
 }
 
+/// Submission for the `/relay/v1/builder/blocks` endpoint (Fulu).
+///
+///
+/// Also known as `FuluSubmitBlockRequest`.
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
+pub struct SignedBidSubmissionV5 {
+    /// The [`BidTrace`] message associated with the submission.
+    pub message: BidTrace,
+    /// The execution payload for the submission.
+    #[serde(with = "crate::payload::beacon_payload_v3")]
+    pub execution_payload: ExecutionPayloadV3,
+    /// The Fulu block bundle for this bid.
+    pub blobs_bundle: BlobsBundleV2,
+    /// The Pectra execution requests for this bid.
+    pub execution_requests: ExecutionRequestsV4,
+    /// The signature associated with the submission.
+    pub signature: BlsSignature,
+}
+
 /// Represents all versions of signed bid submissions (submit block requests).
 ///
 /// Note: The fields are ordered starting with the most recent version so that the
@@ -181,6 +203,8 @@ pub struct SignedBidSubmissionV4 {
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
 #[cfg_attr(feature = "ssz", ssz(enum_behaviour = "transparent"))]
 pub enum SubmitBlockRequest {
+    /// Fulu [`SignedBidSubmissionV5`].
+    Fulu(SignedBidSubmissionV5),
     /// Electra [`SignedBidSubmissionV4`].
     Electra(SignedBidSubmissionV4),
     /// Deneb [`SignedBidSubmissionV3`].
@@ -214,12 +238,21 @@ impl SubmitBlockRequest {
         }
     }
 
+    /// Returns the [`SignedBidSubmissionV5`] if this is [`Self::Fulu`]
+    pub const fn as_fulu(&self) -> Option<&SignedBidSubmissionV5> {
+        match self {
+            Self::Fulu(submission) => Some(submission),
+            _ => None,
+        }
+    }
+
     /// Returns the underlying [`BidTrace`].
     pub const fn bid_trace(&self) -> &BidTrace {
         match self {
             Self::Capella(req) => &req.message,
             Self::Deneb(req) => &req.message,
             Self::Electra(req) => &req.message,
+            Self::Fulu(req) => &req.message,
         }
     }
 }
@@ -237,6 +270,11 @@ impl From<SignedBidSubmissionV3> for SubmitBlockRequest {
 impl From<SignedBidSubmissionV4> for SubmitBlockRequest {
     fn from(value: SignedBidSubmissionV4) -> Self {
         Self::Electra(value)
+    }
+}
+impl From<SignedBidSubmissionV5> for SubmitBlockRequest {
+    fn from(value: SignedBidSubmissionV5) -> Self {
+        Self::Fulu(value)
     }
 }
 
@@ -308,6 +346,20 @@ pub struct BuilderBlockValidationRequestV4 {
     /// The request to be validated.
     #[serde(flatten)]
     pub request: SignedBidSubmissionV4,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
+}
+
+/// A Request to validate a [`SignedBidSubmissionV5`]
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV5 {
+    /// The request to be validated.
+    #[serde(flatten)]
+    pub request: SignedBidSubmissionV5,
     /// The registered gas limit for the validation request.
     #[serde_as(as = "DisplayFromStr")]
     pub registered_gas_limit: u64,
