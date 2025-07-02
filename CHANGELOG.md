@@ -5,11 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.17](https://github.com/alloy-rs/alloy/releases/tag/v1.0.17) - 2025-07-02
+
+### Features
+
+- [`network`] Use `FullSigner` in `EthereumWallet` to sign data ([#2523](https://github.com/alloy-rs/alloy/issues/2523))
+- Add BuilderBlockValidationV5 for relay for Fusaka ([#2638](https://github.com/alloy-rs/alloy/issues/2638))
+- Added FindStorageSlot  ([#2612](https://github.com/alloy-rs/alloy/issues/2612))
+- Add provider-mev-api top level feature re-export ([#2642](https://github.com/alloy-rs/alloy/issues/2642))
+- Make build_{eip} functions public ([#2519](https://github.com/alloy-rs/alloy/issues/2519))
+- Add dynamic crypto backend for ecrecover ([#2634](https://github.com/alloy-rs/alloy/issues/2634))
+- Add helper conversion for blobsbundlev1 ([#2639](https://github.com/alloy-rs/alloy/issues/2639))
+- Add `serde-bincode-compat` to `ChainConfig` ([#2630](https://github.com/alloy-rs/alloy/issues/2630))
+- [provider,rpc-client] Add connect_reqwest to ProviderBuilder ([#2615](https://github.com/alloy-rs/alloy/issues/2615))
+- Add dedicated error for SECP256K1N_HALF error ([#2636](https://github.com/alloy-rs/alloy/issues/2636))
+- [rpc] Add generic `TxReq` to `SimulatePayload` ([#2631](https://github.com/alloy-rs/alloy/issues/2631))
+
+### Miscellaneous Tasks
+
+- Add try_into_sidecar helper ([#2644](https://github.com/alloy-rs/alloy/issues/2644))
+- Fix missing arbitrary in tests ([#2643](https://github.com/alloy-rs/alloy/issues/2643))
+
+### Other
+
+- Revert "feat(`network`): use `FullSigner` in `EthereumWallet` to sign data" ([#2647](https://github.com/alloy-rs/alloy/issues/2647))
+- Make tx build fns public ([#2635](https://github.com/alloy-rs/alloy/issues/2635))
+
 ## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
 
 ### Bug Fixes
 
 - Encode into buf ([#2632](https://github.com/alloy-rs/alloy/issues/2632))
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
 
 ## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
 
