@@ -882,4 +882,12 @@ mod tests {
         let opts: GethDebugTracingCallOptions = serde_json::from_str(s).unwrap();
         assert!(opts.tracing_options.tracer.unwrap().is_js());
     }
+
+    #[test]
+    fn deserde_jstracer() {
+      let s = r#"{
+      "tracer": "{fault: function(log) {}, step: function(log) { const memToHex = mem => mem.reduce((s, byte) => s + byte.toString(16).padStart(2, '0'), ''); }, result: function() { return this.data; }}"
+      }"#;
+        let _tracer = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
+    }
 }
