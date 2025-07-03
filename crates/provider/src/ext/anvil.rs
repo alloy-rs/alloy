@@ -458,25 +458,25 @@ impl Default for ImpersonateConfig {
 
 impl ImpersonateConfig {
     /// Set the impersonation to continue after the transaction.
-    pub fn keep_impersonate(mut self) -> Self {
+    pub const fn keep_impersonate(mut self) -> Self {
         self.stop_impersonate = false;
         self
     }
 
     /// Set the impersonation to stop after the transaction.
-    pub fn stop_impersonate(mut self) -> Self {
+    pub const fn stop_impersonate(mut self) -> Self {
         self.stop_impersonate = true;
         self
     }
 
     /// Set the funding amount for the impersonated account.
-    pub fn fund(mut self, amount: U256) -> Self {
+    pub const fn fund(mut self, amount: U256) -> Self {
         self.fund_amount = Some(amount);
         self
     }
 
     /// Clear the funding amount.
-    pub fn no_fund(mut self) -> Self {
+    pub const fn no_fund(mut self) -> Self {
         self.fund_amount = None;
         self
     }
