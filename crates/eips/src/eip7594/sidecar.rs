@@ -516,10 +516,7 @@ impl BlobTransactionSidecarEip7594 {
 
     /// Build the sidecar from the data with the provided settings.
     #[cfg(feature = "kzg")]
-    pub fn build_with_settings(
-        self,
-        settings: &c_kzg::KzgSettings,
-    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+    pub fn build_with_settings(self, settings: &c_kzg::KzgSettings) -> Result<Self, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(self.blobs.len());
         let mut proofs = Vec::with_capacity(self.blobs.len());
         for blob in &self.blobs {
