@@ -885,7 +885,7 @@ mod tests {
 
     #[test]
     fn deserde_jstracer() {
-      let s = r#"{
+        let s = r#"{
       "tracer": "{fault: function(log) {}, step: function(log) { const memToHex = mem => mem.reduce((s, byte) => s + byte.toString(16).padStart(2, '0'), ''); }, result: function() { return this.data; }}"
       }"#;
         let _tracer = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
