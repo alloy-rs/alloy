@@ -58,11 +58,11 @@ impl<T> ReceiptEnvelope<T> {
         R: Into<ReceiptWithBloom<Receipt<T>>>,
     {
         match tx_type {
-            TxType::Legacy => ReceiptEnvelope::Legacy(receipt.into()),
-            TxType::Eip2930 => ReceiptEnvelope::Eip2930(receipt.into()),
-            TxType::Eip1559 => ReceiptEnvelope::Eip1559(receipt.into()),
-            TxType::Eip4844 => ReceiptEnvelope::Eip4844(receipt.into()),
-            TxType::Eip7702 => ReceiptEnvelope::Eip7702(receipt.into()),
+            TxType::Legacy => Self::Legacy(receipt.into()),
+            TxType::Eip2930 => Self::Eip2930(receipt.into()),
+            TxType::Eip1559 => Self::Eip1559(receipt.into()),
+            TxType::Eip4844 => Self::Eip4844(receipt.into()),
+            TxType::Eip7702 => Self::Eip7702(receipt.into()),
         }
     }
 
