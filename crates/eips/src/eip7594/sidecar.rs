@@ -540,7 +540,7 @@ impl BlobTransactionSidecarEip7594 {
             }
         }
 
-        Ok(BlobTransactionSidecarEip7594::new(self.blobs, commitments, proofs))
+        Ok(Self::new(self.blobs, commitments, proofs))
     }
 }
 
