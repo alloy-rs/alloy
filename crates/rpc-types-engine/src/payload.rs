@@ -918,15 +918,15 @@ impl BlobsBundleV1 {
     /// Returns an empty [`BlobTransactionSidecar`] if the bundle is empty.
     #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
-        mut self,
+        self,
     ) -> Result<BlobTransactionSidecar, alloy_consensus::error::ValueError<Self>> {
         if self.commitments.len() != self.proofs.len() || self.commitments.len() != self.blobs.len()
         {
             return Err(alloy_consensus::error::ValueError::new(self, "length mismatch"));
         }
 
-        let sidecar = self.pop_sidecar(self.blobs.len());
-        Ok(sidecar)
+        let Self { commitments, proofs, blobs } = self;
+        Ok(BlobTransactionSidecar { blobs, commitments, proofs })
     }
 }
 
@@ -1051,7 +1051,7 @@ impl BlobsBundleV2 {
     /// Returns an empty [`BlobTransactionSidecarEip7594`] if the bundle is empty.
     #[cfg(feature = "kzg")]
     pub fn try_into_sidecar(
-        mut self,
+        self,
     ) -> Result<BlobTransactionSidecarEip7594, alloy_consensus::error::ValueError<Self>> {
         let expected_cell_proofs_len = self.blobs.len() * CELLS_PER_EXT_BLOB;
         if self.proofs.len() != expected_cell_proofs_len {
@@ -1071,8 +1071,8 @@ impl BlobsBundleV2 {
             return Err(alloy_consensus::error::ValueError::new(self, msg));
         }
 
-        let sidecar = self.pop_sidecar(self.blobs.len());
-        Ok(sidecar)
+        let Self { commitments, proofs, blobs } = self;
+        Ok(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs: proofs })
     }
 }
 
