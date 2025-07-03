@@ -1,10 +1,10 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
 
 use crate::{PendingTransactionBuilder, Provider};
-use alloy_network::Network;
+use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
-use alloy_rpc_types_eth::{Block, TransactionRequest};
+use alloy_rpc_types_eth::Block;
 use alloy_transport::{TransportError, TransportResult};
 use futures::try_join;
 
@@ -202,7 +202,6 @@ impl<N, P> AnvilApi<N> for P
 where
     N: Network,
     P: Provider<N>,
-    N: Network<TransactionRequest = TransactionRequest>,
 {
     async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()> {
         self.client().request("anvil_impersonateAccount", (address,)).await
@@ -415,7 +414,7 @@ where
         request: N::TransactionRequest,
         config: ImpersonateConfig,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
-        let from = request.from.ok_or_else(|| {
+        let from = request.from().ok_or_else(|| {
             TransportError::from(alloy_transport::TransportErrorKind::Custom(
                 "TransactionRequest must have a `from` address set.".to_string().into(),
             ))
@@ -449,6 +448,38 @@ pub struct ImpersonateConfig {
     pub fund_amount: Option<U256>,
     /// Whether to stop impersonating after the transaction is sent.
     pub stop_impersonate: bool,
+}
+
+impl Default for ImpersonateConfig {
+    fn default() -> Self {
+        Self { fund_amount: None, stop_impersonate: true }
+    }
+}
+
+impl ImpersonateConfig {
+    /// Set the impersonation to continue after the transaction.
+    pub fn keep_impersonate(mut self) -> Self {
+        self.stop_impersonate = false;
+        self
+    }
+
+    /// Set the impersonation to stop after the transaction.
+    pub fn stop_impersonate(mut self) -> Self {
+        self.stop_impersonate = true;
+        self
+    }
+
+    /// Set the funding amount for the impersonated account.
+    pub fn fund(mut self, amount: U256) -> Self {
+        self.fund_amount = Some(amount);
+        self
+    }
+
+    /// Clear the funding amount.
+    pub fn no_fund(mut self) -> Self {
+        self.fund_amount = None;
+        self
+    }
 }
 
 #[cfg(test)]
