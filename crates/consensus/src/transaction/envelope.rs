@@ -1500,6 +1500,7 @@ mod tests {
 
     // <https://github.com/succinctlabs/kona/issues/31>
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block_tx() {
         let rpc_tx = r#"{
       "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
@@ -1526,6 +1527,7 @@ mod tests {
 
     // <https://github.com/succinctlabs/kona/issues/31>
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block_tx_legacy_chain_id() {
         let rpc_tx = r#"{
       "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
