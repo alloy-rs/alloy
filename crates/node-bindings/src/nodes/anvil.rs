@@ -121,6 +121,18 @@ impl AnvilInstance {
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
+        #[cfg(unix)]
+        {
+            // anvil has settings for dumping thing the state,cache on SIGTERM, so we try to kill it
+            // with sigterm
+            if let Ok(out) =
+                Command::new("kill").arg("-SIGTERM").arg(self.child.id().to_string()).output()
+            {
+                if out.status.success() {
+                    return;
+                }
+            }
+        }
         self.child.kill().expect("could not kill anvil");
     }
 }
@@ -160,6 +172,7 @@ pub struct Anvil {
     fork: Option<String>,
     fork_block_number: Option<u64>,
     args: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
     timeout: Option<u64>,
     keep_stdout: bool,
 }
@@ -333,6 +346,29 @@ impl Anvil {
         self
     }
 
+    /// Adds an environment variable to pass to the `anvil`.
+    pub fn env<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        self.envs.push((key.into(), value.into()));
+        self
+    }
+
+    /// Adds multiple environment variables to pass to the `anvil`.
+    pub fn envs<I, K, V>(mut self, envs: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        for (key, value) in envs {
+            self = self.env(key, value);
+        }
+        self
+    }
+
     /// Sets the timeout which will be used when the `anvil` instance is launched.
     pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
@@ -363,7 +399,12 @@ impl Anvil {
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
 
         // disable nightly warning
-        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "");
+        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "")
+            // disable color in logs
+            .env("NO_COLOR", "1");
+
+        // set additional environment variables
+        cmd.envs(self.envs);
 
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
@@ -487,5 +528,10 @@ mod test {
         //even though the block time is a f64, it should be passed as a whole number
         let anvil = Anvil::new().block_time(12);
         assert_eq!(anvil.block_time.unwrap().to_string(), "12");
+    }
+
+    #[test]
+    fn spawn_and_drop() {
+        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
     }
 }
