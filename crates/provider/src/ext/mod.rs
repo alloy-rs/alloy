@@ -8,7 +8,7 @@ pub use admin::AdminApi;
 #[cfg(feature = "anvil-api")]
 mod anvil;
 #[cfg(feature = "anvil-api")]
-pub use anvil::AnvilApi;
+pub use anvil::{AnvilApi, ImpersonateConfig};
 
 #[cfg(feature = "engine-api")]
 mod engine;

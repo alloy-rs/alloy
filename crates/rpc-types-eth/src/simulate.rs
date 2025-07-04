@@ -10,7 +10,7 @@ pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 /// Represents a batch of calls to be simulated sequentially within a block.
 /// This struct includes block and state overrides as well as the transaction requests to be
 /// executed.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimBlock<TxReq = TransactionRequest> {
@@ -23,6 +23,12 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     /// A vector of transactions to be simulated.
     #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TxReq>,
+}
+
+impl<TxReq> Default for SimBlock<TxReq> {
+    fn default() -> Self {
+        Self { block_overrides: None, state_overrides: None, calls: Vec::new() }
+    }
 }
 
 impl<TxReq> SimBlock<TxReq> {
@@ -94,7 +100,7 @@ pub struct SimCallResult {
 ///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
 /// validate transaction sequences, and whether to return full transaction objects.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatePayload<TxReq = TransactionRequest> {
@@ -110,6 +116,17 @@ pub struct SimulatePayload<TxReq = TransactionRequest> {
     /// Flag to decide if full transactions should be returned instead of just their hashes.
     #[cfg_attr(feature = "serde", serde(default))]
     pub return_full_transactions: bool,
+}
+
+impl<TxReq> Default for SimulatePayload<TxReq> {
+    fn default() -> Self {
+        Self {
+            block_state_calls: Vec::new(),
+            trace_transfers: false,
+            validation: false,
+            return_full_transactions: false,
+        }
+    }
 }
 
 impl<TxReq> SimulatePayload<TxReq> {
