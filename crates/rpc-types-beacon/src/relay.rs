@@ -10,6 +10,14 @@ use alloy_rpc_types_engine::{
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
+#[cfg(all(feature = "sha2", feature = "ssz"))]
+use alloy_eips::{eip4844::kzg_to_versioned_hash, eip7685::Requests};
+#[cfg(all(feature = "sha2", feature = "ssz"))]
+use alloy_rpc_types_engine::{
+    CancunPayloadFields, ExecutionData, ExecutionPayload, ExecutionPayloadSidecar,
+    PraguePayloadFields,
+};
+
 /// Represents an entry of the `/relay/v1/builder/validators` endpoint
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -351,6 +359,56 @@ pub struct BuilderBlockValidationRequestV4 {
     pub registered_gas_limit: u64,
     /// The parent beacon block root for the validation request.
     pub parent_beacon_block_root: B256,
+}
+
+impl BuilderBlockValidationRequestV4 {
+    /// Converts this validation request to [`ExecutionData`].
+    ///
+    /// Extracts the execution payload and creates the appropriate sidecar with versioned hashes and
+    /// execution requests.
+    #[cfg(all(feature = "sha2", feature = "ssz"))]
+    pub fn to_execution_data(&self) -> ExecutionData {
+        // Extract the execution payload
+        let payload = ExecutionPayload::V3(self.request.execution_payload.clone());
+
+        // Compute versioned hashes from blob commitments
+        let versioned_hashes = self
+            .request
+            .blobs_bundle
+            .commitments
+            .iter()
+            .map(|commitment| kzg_to_versioned_hash(commitment.as_slice()))
+            .collect();
+
+        // Create Cancun payload fields
+        let cancun_fields = CancunPayloadFields {
+            parent_beacon_block_root: self.parent_beacon_block_root,
+            versioned_hashes,
+        };
+
+        // Convert execution requests to Requests type
+        let requests: Requests = (&self.request.execution_requests).into();
+        let prague_fields = PraguePayloadFields::new(requests);
+
+        // Create the execution payload sidecar
+        let sidecar = ExecutionPayloadSidecar::v4(cancun_fields, prague_fields);
+
+        ExecutionData::new(payload, sidecar)
+    }
+}
+
+#[cfg(all(feature = "sha2", feature = "ssz"))]
+impl From<BuilderBlockValidationRequestV4> for ExecutionData {
+    fn from(request: BuilderBlockValidationRequestV4) -> Self {
+        request.to_execution_data()
+    }
+}
+
+#[cfg(all(feature = "sha2", feature = "ssz"))]
+impl From<&BuilderBlockValidationRequestV4> for ExecutionData {
+    fn from(request: &BuilderBlockValidationRequestV4) -> Self {
+        request.to_execution_data()
+    }
 }
 
 /// A Request to validate a [`SignedBidSubmissionV5`]
@@ -743,5 +801,91 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
         let to_json: serde_json::Value = serde_json::to_value(payload).unwrap();
         assert_eq!(json, to_json);
+    }
+
+    #[cfg(all(feature = "sha2", feature = "ssz"))]
+    #[test]
+    fn test_builder_block_validation_request_v4_to_execution_data() {
+        // Use the existing test data for SignedBidSubmissionV4 and wrap it in a validation request
+        let bid_submission_json =
+            include_str!("examples/relay_builder_block_validation_request_v4.json");
+        let bid_submission: SignedBidSubmissionV4 =
+            serde_json::from_str(bid_submission_json).unwrap();
+
+        let request = BuilderBlockValidationRequestV4 {
+            request: bid_submission,
+            registered_gas_limit: 30000000,
+            parent_beacon_block_root: B256::from_slice(&[0x12; 32]),
+        };
+
+        // Test the convenience method
+        let execution_data = request.to_execution_data();
+
+        // Verify the execution payload is V3
+        match &execution_data.payload {
+            ExecutionPayload::V3(payload) => {
+                assert_eq!(payload, &request.request.execution_payload);
+            }
+            _ => panic!("Expected ExecutionPayload::V3"),
+        }
+
+        // Verify the sidecar contains the correct parent beacon block root
+        assert_eq!(
+            execution_data.sidecar.parent_beacon_block_root(),
+            Some(request.parent_beacon_block_root)
+        );
+
+        // Verify versioned hashes are computed correctly
+        let cancun_fields = execution_data.sidecar.cancun().unwrap();
+        assert_eq!(cancun_fields.parent_beacon_block_root, request.parent_beacon_block_root);
+
+        // The versioned hashes should be computed from the blob commitments
+        let expected_hashes: Vec<_> = request
+            .request
+            .blobs_bundle
+            .commitments
+            .iter()
+            .map(|commitment| kzg_to_versioned_hash(commitment.as_slice()))
+            .collect();
+        assert_eq!(cancun_fields.versioned_hashes, expected_hashes);
+
+        // Verify execution requests are present
+        assert!(execution_data.sidecar.prague().is_some());
+    }
+
+    #[cfg(all(feature = "sha2", feature = "ssz"))]
+    #[test]
+    fn test_builder_block_validation_request_v4_from_trait() {
+        let bid_submission_json =
+            include_str!("examples/relay_builder_block_validation_request_v4.json");
+        let bid_submission: SignedBidSubmissionV4 =
+            serde_json::from_str(bid_submission_json).unwrap();
+
+        let request = BuilderBlockValidationRequestV4 {
+            request: bid_submission,
+            registered_gas_limit: 30000000,
+            parent_beacon_block_root: B256::from_slice(&[0x12; 32]),
+        };
+
+        // Test From trait for owned value
+        let execution_data_owned: ExecutionData = request.clone().into();
+
+        // Test From trait for reference
+        let execution_data_ref: ExecutionData = (&request).into();
+
+        // Both should be equal
+        assert_eq!(execution_data_owned.payload, execution_data_ref.payload);
+        assert_eq!(
+            execution_data_owned.sidecar.parent_beacon_block_root(),
+            execution_data_ref.sidecar.parent_beacon_block_root()
+        );
+
+        // Verify they match the result from the convenience method
+        let execution_data_method = request.to_execution_data();
+        assert_eq!(execution_data_owned.payload, execution_data_method.payload);
+        assert_eq!(
+            execution_data_owned.sidecar.parent_beacon_block_root(),
+            execution_data_method.sidecar.parent_beacon_block_root()
+        );
     }
 }
