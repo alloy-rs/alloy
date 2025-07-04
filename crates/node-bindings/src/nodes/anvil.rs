@@ -121,6 +121,18 @@ impl AnvilInstance {
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
+        #[cfg(unix)]
+        {
+            // anvil has settings for dumping thing the state,cache on SIGTERM, so we try to kill it
+            // with sigterm
+            if let Ok(out) =
+                Command::new("kill").arg("-SIGTERM").arg(self.child.id().to_string()).output()
+            {
+                if out.status.success() {
+                    return;
+                }
+            }
+        }
         self.child.kill().expect("could not kill anvil");
     }
 }
@@ -487,5 +499,10 @@ mod test {
         //even though the block time is a f64, it should be passed as a whole number
         let anvil = Anvil::new().block_time(12);
         assert_eq!(anvil.block_time.unwrap().to_string(), "12");
+    }
+
+    #[test]
+    fn spawn_and_drop() {
+        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
     }
 }
