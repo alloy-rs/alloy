@@ -513,32 +513,6 @@ impl BlobTransactionSidecarEip7594 {
 
         Ok(this)
     }
-
-    /// Build the sidecar from the data with the provided settings.
-    #[cfg(feature = "kzg")]
-    pub fn build_with_settings(self, settings: &c_kzg::KzgSettings) -> Result<Self, c_kzg::Error> {
-        let mut commitments = Vec::with_capacity(self.blobs.len());
-        let mut proofs = Vec::with_capacity(self.blobs.len());
-        for blob in &self.blobs {
-            // SAFETY: same size
-            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
-            let commitment = settings.blob_to_kzg_commitment(blob)?;
-            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
-
-            // SAFETY: same size
-            unsafe {
-                commitments
-                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
-                for kzg_proof in kzg_proofs.iter() {
-                    proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
-                        kzg_proof.to_bytes(),
-                    ));
-                }
-            }
-        }
-
-        Ok(Self::new(self.blobs, commitments, proofs))
-    }
 }
 
 impl Encodable for BlobTransactionSidecarEip7594 {
