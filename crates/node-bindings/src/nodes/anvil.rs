@@ -399,7 +399,9 @@ impl Anvil {
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
 
         // disable nightly warning
-        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "");
+        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "")
+            // disable color in logs
+            .env("NO_COLOR", "1");
 
         // set additional environment variables
         cmd.envs(self.envs);
