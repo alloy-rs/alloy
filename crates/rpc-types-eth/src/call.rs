@@ -6,7 +6,7 @@ use alloc::{
 use alloy_primitives::Bytes;
 
 /// Bundle of transactions
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Bundle<TxReq = TransactionRequest> {
@@ -15,6 +15,12 @@ pub struct Bundle<TxReq = TransactionRequest> {
     /// Block overrides to apply
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_override: Option<BlockOverrides>,
+}
+
+impl<TxReq> Default for Bundle<TxReq> {
+    fn default() -> Self {
+        Self { transactions: Vec::new(), block_override: None }
+    }
 }
 
 impl<TxReq> From<Vec<TxReq>> for Bundle<TxReq> {
