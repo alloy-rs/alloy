@@ -172,6 +172,7 @@ pub struct Anvil {
     fork: Option<String>,
     fork_block_number: Option<u64>,
     args: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
     timeout: Option<u64>,
     keep_stdout: bool,
 }
@@ -345,6 +346,29 @@ impl Anvil {
         self
     }
 
+    /// Adds an environment variable to pass to the `anvil`.
+    pub fn env<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        self.envs.push((key.into(), value.into()));
+        self
+    }
+
+    /// Adds multiple environment variables to pass to the `anvil`.
+    pub fn envs<I, K, V>(mut self, envs: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        for (key, value) in envs {
+            self = self.env(key, value);
+        }
+        self
+    }
+
     /// Sets the timeout which will be used when the `anvil` instance is launched.
     pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
@@ -376,6 +400,9 @@ impl Anvil {
 
         // disable nightly warning
         cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "");
+
+        // set additional environment variables
+        cmd.envs(self.envs);
 
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
