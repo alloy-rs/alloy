@@ -928,7 +928,7 @@ mod tests {
                 blobs: bid_submission_v4.blobs_bundle.blobs.clone(),
             },
             execution_requests: bid_submission_v4.execution_requests.clone(),
-            signature: bid_submission_v4.signature.clone(),
+            signature: bid_submission_v4.signature,
         };
 
         let request = BuilderBlockValidationRequestV5 {
@@ -993,7 +993,7 @@ mod tests {
                 blobs: bid_submission_v4.blobs_bundle.blobs.clone(),
             },
             execution_requests: bid_submission_v4.execution_requests.clone(),
-            signature: bid_submission_v4.signature.clone(),
+            signature: bid_submission_v4.signature,
         };
 
         let request = BuilderBlockValidationRequestV5 {
