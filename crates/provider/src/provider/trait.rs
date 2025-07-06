@@ -35,6 +35,7 @@ use alloy_rpc_types_eth::{
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
+use crate::provider::get_block::SubFinalizedBlocks;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -1021,6 +1022,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[cfg(feature = "pubsub")]
     fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
         SubFullBlocks::new(self.subscribe_blocks(), self.weak_client())
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_finalized_blocks(&self) -> SubFinalizedBlocks<N> {
+        SubFinalizedBlocks::new(self.subscribe_blocks(), self.weak_client())
     }
 
     /// Subscribe to a stream of pending transaction hashes.
