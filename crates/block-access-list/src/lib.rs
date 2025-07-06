@@ -1,14 +1,14 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Block-level access lists for Reth.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+extern crate alloc;
+/// Module for handling storage changes within a block.
+pub mod storage_change;
+pub use storage_change::*;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+/// Module for managing storage slots and their changes.
+pub mod storage_slots;
+pub use storage_slots::*;
+
+/// Module containing constants used throughout the block access list.
+pub mod constants;
+pub use constants::*;

@@ -10,6 +10,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-primitives.workspace = true
 
 [lints]
 workspace = true
