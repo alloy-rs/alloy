@@ -28,13 +28,13 @@ impl SlotChanges {
 
     /// Returns `true` if no changes have been recorded.
     #[inline]
-    pub const fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
     /// Returns the number of changes recorded for this slot.
     #[inline]
-    pub const fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.changes.len()
     }
 }
