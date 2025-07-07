@@ -6,7 +6,7 @@ use alloy_primitives::{Bytes, TxIndex};
 use crate::MAX_CODE_SIZE;
 
 /// This struct is used to track the new codes of accounts in a block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CodeChange {
     /// The index of the transaction that caused this balance change.
     pub tx_index: TxIndex,

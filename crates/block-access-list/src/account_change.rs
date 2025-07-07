@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// This struct is used to track the changes across accounts in a block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AccountChanges {
     /// The address of the account whoose changes are stored.
     pub address: Address,

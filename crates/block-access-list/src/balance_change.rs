@@ -4,7 +4,7 @@
 use alloy_primitives::TxIndex;
 
 /// This struct is used to track the balance changes of accounts in a block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BalanceChange {
     /// The index of the transaction that caused this balance change.
     pub tx_index: TxIndex,

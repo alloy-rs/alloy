@@ -3,7 +3,7 @@
 use crate::{account_change::AccountChanges, MAX_ACCOUNTS};
 
 /// This struct is used to store `account_changes` in a block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BlockAccessList {
     /// List of account changes in the block.
     pub account_changes: Vec<AccountChanges>,
