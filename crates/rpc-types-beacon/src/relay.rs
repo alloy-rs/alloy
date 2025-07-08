@@ -359,11 +359,7 @@ impl BuilderBlockValidationRequestV4 {
     /// Extracts the execution payload and creates the appropriate sidecar with versioned hashes and
     /// execution requests.
     #[cfg(all(feature = "sha2", feature = "ssz"))]
-    pub fn to_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
-        // Extract the execution payload
-        let payload =
-            alloy_rpc_types_engine::ExecutionPayload::V3(self.request.execution_payload.clone());
-
+    pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
         // Compute versioned hashes from blob commitments
         let versioned_hashes = self
             .request
@@ -387,14 +383,14 @@ impl BuilderBlockValidationRequestV4 {
         let sidecar =
             alloy_rpc_types_engine::ExecutionPayloadSidecar::v4(cancun_fields, prague_fields);
 
-        alloy_rpc_types_engine::ExecutionData::new(payload, sidecar)
+        alloy_rpc_types_engine::ExecutionData::new(self.request.execution_payload.into(), sidecar)
     }
 }
 
 #[cfg(all(feature = "sha2", feature = "ssz"))]
 impl From<BuilderBlockValidationRequestV4> for alloy_rpc_types_engine::ExecutionData {
     fn from(request: BuilderBlockValidationRequestV4) -> Self {
-        request.to_execution_data()
+        request.into_execution_data()
     }
 }
 
@@ -418,11 +414,7 @@ impl BuilderBlockValidationRequestV5 {
     /// Extracts the execution payload and creates the appropriate sidecar with versioned hashes and
     /// execution requests.
     #[cfg(all(feature = "sha2", feature = "ssz"))]
-    pub fn to_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
-        // Extract the execution payload
-        let payload =
-            alloy_rpc_types_engine::ExecutionPayload::V3(self.request.execution_payload.clone());
-
+    pub fn into_execution_data(self) -> alloy_rpc_types_engine::ExecutionData {
         // Compute versioned hashes from blob commitments
         let versioned_hashes = self
             .request
@@ -446,14 +438,14 @@ impl BuilderBlockValidationRequestV5 {
         let sidecar =
             alloy_rpc_types_engine::ExecutionPayloadSidecar::v4(cancun_fields, prague_fields);
 
-        alloy_rpc_types_engine::ExecutionData::new(payload, sidecar)
+        alloy_rpc_types_engine::ExecutionData::new(self.request.execution_payload.into(), sidecar)
     }
 }
 
 #[cfg(all(feature = "sha2", feature = "ssz"))]
 impl From<BuilderBlockValidationRequestV5> for alloy_rpc_types_engine::ExecutionData {
     fn from(request: BuilderBlockValidationRequestV5) -> Self {
-        request.to_execution_data()
+        request.into_execution_data()
     }
 }
 
@@ -860,7 +852,7 @@ mod tests {
             .map(|commitment| alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice()))
             .collect();
 
-        let execution_data = request.to_execution_data();
+        let execution_data = request.into_execution_data();
 
         // Verify the execution payload is V3
         match &execution_data.payload {
@@ -901,7 +893,7 @@ mod tests {
 
         let execution_data_owned: alloy_rpc_types_engine::ExecutionData = request.clone().into();
 
-        let execution_data_method = request.to_execution_data();
+        let execution_data_method = request.into_execution_data();
         assert_eq!(execution_data_owned.payload, execution_data_method.payload);
         assert_eq!(
             execution_data_owned.sidecar.parent_beacon_block_root(),
@@ -949,7 +941,7 @@ mod tests {
             .collect();
 
         // Test the convenience method
-        let execution_data = request.to_execution_data();
+        let execution_data = request.into_execution_data();
 
         // Verify the execution payload is V3
         match &execution_data.payload {
@@ -1004,7 +996,7 @@ mod tests {
 
         let execution_data_owned: alloy_rpc_types_engine::ExecutionData = request.clone().into();
 
-        let execution_data_method = request.to_execution_data();
+        let execution_data_method = request.into_execution_data();
         assert_eq!(execution_data_owned.payload, execution_data_method.payload);
         assert_eq!(
             execution_data_owned.sidecar.parent_beacon_block_root(),
