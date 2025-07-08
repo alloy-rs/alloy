@@ -109,10 +109,7 @@ mod contract {
 
         /// ENS Reverse Registrar contract
         #[sol(rpc)]
-        contract ReverseRegistrar {
-            function setName(string memory name) external returns (bytes32);
-            function setNameForAddr(address addr, address owner, address resolver, string name) external;
-        }
+        contract ReverseRegistrar {}
     }
 
     /// Error type for ENS resolution.
