@@ -114,11 +114,19 @@ impl RequestPacket {
         }
     }
 
-    /// Returns a all [`SerializedRequest`].
+    /// Returns all [`SerializedRequest`].
     pub fn requests(&self) -> &[SerializedRequest] {
         match self {
             Self::Single(req) => std::slice::from_ref(req),
             Self::Batch(req) => req.as_slice(),
+        }
+    }
+
+    /// Returns mutable reference to all [`SerializedRequest`].
+    pub fn requests_mut(&mut self) -> &mut [SerializedRequest] {
+        match self {
+            Self::Single(req) => std::slice::from_mut(req),
+            Self::Batch(req) => req.as_mut_slice(),
         }
     }
 
