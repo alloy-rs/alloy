@@ -376,8 +376,9 @@ impl BuilderBlockValidationRequestV4 {
         };
 
         // Convert execution requests to Requests type
-        let requests: alloy_eips::eip7685::Requests = (&self.request.execution_requests).into();
-        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(requests);
+        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(
+            self.request.execution_requests.to_requests(),
+        );
 
         // Create the execution payload sidecar
         let sidecar =
@@ -431,8 +432,9 @@ impl BuilderBlockValidationRequestV5 {
         };
 
         // Convert execution requests to Requests type
-        let requests: alloy_eips::eip7685::Requests = (&self.request.execution_requests).into();
-        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(requests);
+        let prague_fields = alloy_rpc_types_engine::PraguePayloadFields::new(
+            self.request.execution_requests.to_requests(),
+        );
 
         // Create the execution payload sidecar
         let sidecar =
