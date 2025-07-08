@@ -24,6 +24,7 @@ workspace = true
 
 [dependencies]
 alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
+alloy-block-access-list.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-trie = { workspace = true, features = ["ethereum"] }

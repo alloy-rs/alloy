@@ -373,7 +373,15 @@ impl ExecutionPayloadV1 {
             nonce: Default::default(),
         };
 
-        Ok(Block { header, body: BlockBody { transactions, ommers: vec![], withdrawals: None } })
+        Ok(Block {
+            header,
+            body: BlockBody {
+                transactions,
+                ommers: vec![],
+                withdrawals: None,
+                block_access_list: None,
+            },
+        })
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].

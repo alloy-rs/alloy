@@ -1,7 +1,14 @@
+//! Contains the `StorageChange` struct, which represents a single storage write operation within a
+//! transaction.
+
 use alloy_primitives::{StorageValue, TxIndex};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
+use serde::{Deserialize, Serialize};
 
 /// Represents a single storage write operation within a transaction.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
+)]
 pub struct StorageChange {
     /// Index of the transaction that performed the write.
     pub tx_index: TxIndex,

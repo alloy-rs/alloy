@@ -2,9 +2,13 @@
 //! Single balance change: `tx_index` -> `post_balance`
 
 use alloy_primitives::TxIndex;
+use alloy_rlp::{RlpDecodable, RlpEncodable};
+use serde::{Deserialize, Serialize};
 
 /// This struct is used to track the balance changes of accounts in a block.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
+)]
 pub struct BalanceChange {
     /// The index of the transaction that caused this balance change.
     pub tx_index: TxIndex,

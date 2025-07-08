@@ -10,7 +10,9 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["rlp","serde"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

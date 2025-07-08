@@ -2,7 +2,10 @@
 //! read for the account. All changes for a single account, grouped by field type.
 //! This eliminates address redundancy across different change types.
 
+use alloc::vec::Vec;
 use alloy_primitives::{Address, StorageKey};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     balance_change::BalanceChange, code_change::CodeChange, nonce_change::NonceChange,
@@ -10,7 +13,9 @@ use crate::{
 };
 
 /// This struct is used to track the changes across accounts in a block.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
+)]
 pub struct AccountChanges {
     /// The address of the account whoose changes are stored.
     pub address: Address,
@@ -28,6 +33,7 @@ pub struct AccountChanges {
 
 impl AccountChanges {
     /// Creates a new `AccountChanges` instance for the given address.
+    /// TODO! Needs appropriate method to populate
     pub fn new(address: Address) -> Self {
         Self {
             address,
