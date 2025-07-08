@@ -164,26 +164,22 @@ where
 mod tests {
     use crate::StorageSlotFinder;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::{address, B256, U256};
+    use alloy_primitives::{address, Address, B256, U256};
     use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
     const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
     use alloy_sol_types::SolCall;
-    use tracing_subscriber::fmt::init;
 
-    #[tokio::test]
-    async fn test_erc20_set_balance() {
-        init();
+    async fn test_erc20_token_set_balance(token: Address) {
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
-        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
         let user = address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
         let amount = U256::from(500u64);
-        let finder = StorageSlotFinder::balance_of(provider.clone(), dai, user);
+        let finder = StorageSlotFinder::balance_of(provider.clone(), token, user);
         let storage_slot = U256::from_be_bytes(finder.find_slot().await.unwrap().unwrap().0);
 
         provider
-            .anvil_set_storage_at(dai, storage_slot, B256::from(amount.to_be_bytes()))
+            .anvil_set_storage_at(token, storage_slot, B256::from(amount.to_be_bytes()))
             .await
             .unwrap();
 
@@ -195,11 +191,29 @@ mod tests {
         let input = balanceOfCall::abi_encode(&balance_of_call);
 
         let result = provider
-            .call(TransactionRequest::default().with_to(dai).with_input(input))
+            .call(TransactionRequest::default().with_to(token).with_input(input))
             .await
             .unwrap();
         let balance = balanceOfCall::abi_decode_returns(&result).unwrap();
 
         assert_eq!(balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_erc20_dai_set_balance() {
+        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
+        test_erc20_token_set_balance(dai).await
+    }
+
+    #[tokio::test]
+    async fn test_erc20_usdc_set_balance() {
+        let dai = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        test_erc20_token_set_balance(dai).await
+    }
+
+    #[tokio::test]
+    async fn test_erc20_tether_set_balance() {
+        let dai = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
+        test_erc20_token_set_balance(dai).await
     }
 }
