@@ -94,7 +94,7 @@ mod contract {
             function resolver(bytes32 node) view returns (address);
 
             /// returns the owner of this node
-            function owner(bytes32 node) external returns (address);
+            function owner(bytes32 node) view returns (address);
         }
 
         /// ENS Resolver interface.
@@ -156,8 +156,7 @@ mod provider {
             error_name: &str,
         ) -> Result<EnsResolverInstance<&P, N>, EnsError>;
 
-        /// Returns the reverse registrar for the specified node. The `&str` is only used for error
-        /// messages.
+        /// Returns the reverse registrar for the specified node.
         async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError>;
 
         /// Performs a forward lookup of an ENS name to an address.
