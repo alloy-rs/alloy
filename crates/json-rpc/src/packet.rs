@@ -122,7 +122,7 @@ impl RequestPacket {
         }
     }
 
-    /// Returns mutable reference to all [`SerializedRequest`].
+    /// Returns a mutable reference to all [`SerializedRequest`].
     pub fn requests_mut(&mut self) -> &mut [SerializedRequest] {
         match self {
             Self::Single(req) => std::slice::from_mut(req),
