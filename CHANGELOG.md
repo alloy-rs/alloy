@@ -5,10 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.17](https://github.com/alloy-rs/alloy/releases/tag/v1.0.17) - 2025-07-02
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
+
+### Bug Fixes
+
+- Kill anvil with sigterm ([#2660](https://github.com/alloy-rs/alloy/issues/2660))
 
 ### Features
 
+- Add conversion BuilderBlockValidationRequestV4 & V5 -> ExecutionData ([#2664](https://github.com/alloy-rs/alloy/issues/2664))
+- Added helper AnvilApi future type for oneshot impersonations ([#2645](https://github.com/alloy-rs/alloy/issues/2645))
+- [mev-api] Add support for eth_cancelBundle ([#2654](https://github.com/alloy-rs/alloy/issues/2654))
+- [rpc] Implement `Default` for types with `TxReq` generic without `Default` bound ([#2662](https://github.com/alloy-rs/alloy/issues/2662))
+- Add environment variable support to Anvil builder ([#2659](https://github.com/alloy-rs/alloy/issues/2659))
+- From_typed to envelope ([#2658](https://github.com/alloy-rs/alloy/issues/2658))
+- Added new eth_sendSync functions to AnvilApi ([#2650](https://github.com/alloy-rs/alloy/issues/2650))
 - [`network`] Use `FullSigner` in `EthereumWallet` to sign data ([#2523](https://github.com/alloy-rs/alloy/issues/2523))
 - Add BuilderBlockValidationV5 for relay for Fusaka ([#2638](https://github.com/alloy-rs/alloy/issues/2638))
 - Added FindStorageSlot  ([#2612](https://github.com/alloy-rs/alloy/issues/2612))
@@ -23,13 +34,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Move impls to signed ([#2671](https://github.com/alloy-rs/alloy/issues/2671))
+- Set NO_COLOR for anvil ([#2661](https://github.com/alloy-rs/alloy/issues/2661))
+- Make cargo t compile ([#2657](https://github.com/alloy-rs/alloy/issues/2657))
+- Avoid redundant collect ([#2652](https://github.com/alloy-rs/alloy/issues/2652))
+- Release 1.0.17
 - Add try_into_sidecar helper ([#2644](https://github.com/alloy-rs/alloy/issues/2644))
 - Fix missing arbitrary in tests ([#2643](https://github.com/alloy-rs/alloy/issues/2643))
 
 ### Other
 
+- Add more mutable accessors ([#2672](https://github.com/alloy-rs/alloy/issues/2672))
 - Revert "feat(`network`): use `FullSigner` in `EthereumWallet` to sign data" ([#2647](https://github.com/alloy-rs/alloy/issues/2647))
 - Make tx build fns public ([#2635](https://github.com/alloy-rs/alloy/issues/2635))
+
+### Styling
+
+- Add json test ([#2655](https://github.com/alloy-rs/alloy/issues/2655))
 
 ## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
 

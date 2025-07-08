@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.17](https://github.com/alloy-rs/alloy/releases/tag/v1.0.17) - 2025-07-02
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
 
 ### Features
 
 - Add provider-mev-api top level feature re-export ([#2642](https://github.com/alloy-rs/alloy/issues/2642))
+
+### Miscellaneous Tasks
+
+- Release 1.0.17
 
 ## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
 
