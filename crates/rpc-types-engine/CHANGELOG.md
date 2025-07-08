@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.18
 - Avoid redundant collect ([#2652](https://github.com/alloy-rs/alloy/issues/2652))
 - Release 1.0.17
 - Add try_into_sidecar helper ([#2644](https://github.com/alloy-rs/alloy/issues/2644))

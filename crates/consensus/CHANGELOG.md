@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.18
 - Move impls to signed ([#2671](https://github.com/alloy-rs/alloy/issues/2671))
 - Make cargo t compile ([#2657](https://github.com/alloy-rs/alloy/issues/2657))
 - Release 1.0.17

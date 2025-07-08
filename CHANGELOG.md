@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
+
+### Refactor
+
+- [rpc] Add handwritten bounds on generic `TxReq` using `serde` attributes ([#2674](https://github.com/alloy-rs/alloy/issues/2674))
+
+### Testing
+
+- Add token tests ([#2675](https://github.com/alloy-rs/alloy/issues/2675))
+
 ## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
 
 ### Bug Fixes
@@ -34,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.18
 - Move impls to signed ([#2671](https://github.com/alloy-rs/alloy/issues/2671))
 - Set NO_COLOR for anvil ([#2661](https://github.com/alloy-rs/alloy/issues/2661))
 - Make cargo t compile ([#2657](https://github.com/alloy-rs/alloy/issues/2657))
