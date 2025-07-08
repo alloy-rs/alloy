@@ -3,7 +3,10 @@ use crate::{
     Transaction,
 };
 use alloy_eips::{
-    eip2718::Eip2718Result, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+    eip2718::{Eip2718Error, Eip2718Result},
+    eip2930::AccessList,
+    eip7702::SignedAuthorization,
+    Decodable2718, Encodable2718, Typed2718,
 };
 use alloy_primitives::{Bytes, Sealed, Signature, TxKind, B256, U256};
 use alloy_rlp::BufMut;
@@ -474,6 +477,42 @@ where
         self.tx.encode_for_signing(buf);
         let signature_hash = alloy_primitives::keccak256(buf);
         crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+}
+
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
+    }
+}
+
+impl<T> Decodable2718 for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != ty {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
+        Ok(decoded)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
     }
 }
 
