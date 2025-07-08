@@ -92,6 +92,9 @@ mod contract {
         contract EnsRegistry {
             /// Returns the resolver for the specified node.
             function resolver(bytes32 node) view returns (address);
+
+            /// returns the owner of this node
+            function owner(bytes32 node) external returns (address);
         }
 
         /// ENS Resolver interface.
@@ -102,6 +105,13 @@ mod contract {
 
             /// Returns the name associated with an ENS node, for reverse records.
             function name(bytes32 node) view returns (string);
+        }
+
+        /// ENS Reverse Registrar contract
+        #[sol(rpc)]
+        contract ReverseRegistrar {
+            function setName(string memory name) external returns (bytes32);
+            function setNameForAddr(address addr, address owner, address resolver, string name) external;
         }
     }
 
@@ -114,6 +124,12 @@ mod contract {
         /// Failed to get resolver from the ENS registry.
         #[error("ENS resolver not found for name {0:?}")]
         ResolverNotFound(String),
+        /// Failed to get reverse registrar from the ENS registry.
+        #[error("Failed to get reverse registrar from the ENS registry: {0}")]
+        RevRegistrar(alloy_contract::Error),
+        /// Failed to get reverse registrar from the ENS registry.
+        #[error("ENS reverse registrar not found for addr.reverse")]
+        ReverseRegistrarNotFound,
         /// Failed to lookup ENS name from an address.
         #[error("Failed to lookup ENS name from an address: {0}")]
         Lookup(alloy_contract::Error),
@@ -127,7 +143,7 @@ mod contract {
 mod provider {
     use crate::{
         namehash, reverse_address, EnsError, EnsRegistry, EnsResolver::EnsResolverInstance,
-        ENS_ADDRESS,
+        ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS,
     };
     use alloy_primitives::{Address, B256};
     use alloy_provider::{Network, Provider};
@@ -142,6 +158,10 @@ mod provider {
             node: B256,
             error_name: &str,
         ) -> Result<EnsResolverInstance<&P, N>, EnsError>;
+
+        /// Returns the reverse registrar for the specified node. The `&str` is only used for error
+        /// messages.
+        async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError>;
 
         /// Performs a forward lookup of an ENS name to an address.
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
@@ -179,6 +199,19 @@ mod provider {
                 return Err(EnsError::ResolverNotFound(error_name.to_string()));
             }
             Ok(EnsResolverInstance::new(address, self))
+        }
+
+        async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError> {
+            let registry = EnsRegistry::new(ENS_ADDRESS, self);
+            let address = registry
+                .owner(namehash("addr.reverse"))
+                .call()
+                .await
+                .map_err(EnsError::RevRegistrar)?;
+            if address == Address::ZERO {
+                return Err(EnsError::ReverseRegistrarNotFound);
+            }
+            Ok(ReverseRegistrarInstance::new(address, self))
         }
     }
 }
@@ -269,5 +302,32 @@ mod test {
         ] {
             assert!(NameOrAddress::from_str(addr).is_err());
         }
+    }
+}
+
+#[cfg(all(test, feature = "provider"))]
+mod tests {
+    use super::*;
+    use alloy_primitives::address;
+    use alloy_provider::ProviderBuilder;
+
+    #[tokio::test]
+    async fn test_reverse_registrar_fetching_mainnet() {
+        let provider = ProviderBuilder::new()
+            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+
+        let res = provider.get_reverse_registrar().await;
+        assert_eq!(*res.unwrap().address(), address!("0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb"));
+    }
+
+    #[tokio::test]
+    async fn test_pub_resolver_fetching_mainnet() {
+        let provider = ProviderBuilder::new()
+            .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+
+        let name = "deployd.eth";
+        let node = namehash(name);
+        let res = provider.get_resolver(node, name).await;
+        assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
     }
 }
