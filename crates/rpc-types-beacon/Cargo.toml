@@ -43,6 +43,7 @@ serde_json.workspace = true
 similar-asserts.workspace = true
 
 [features]
+sha2 = ["alloy-eips/sha2"]
 ssz = [
 	"dep:ethereum_ssz",
 	"dep:ethereum_ssz_derive",

@@ -12,7 +12,16 @@ pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 /// executed.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        rename_all = "camelCase",
+        bound(
+            deserialize = "TxReq: serde::Deserialize<'de>",
+            serialize = "TxReq: serde::Serialize"
+        )
+    )
+)]
 pub struct SimBlock<TxReq = TransactionRequest> {
     /// Modifications to the default block characteristics.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -21,7 +30,7 @@ pub struct SimBlock<TxReq = TransactionRequest> {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "serde", serde(default = "Vec::new"))]
     pub calls: Vec<TxReq>,
 }
 
@@ -102,7 +111,16 @@ pub struct SimCallResult {
 /// validate transaction sequences, and whether to return full transaction objects.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        rename_all = "camelCase",
+        bound(
+            deserialize = "TxReq: serde::Deserialize<'de>",
+            serialize = "TxReq: serde::Serialize"
+        )
+    )
+)]
 pub struct SimulatePayload<TxReq = TransactionRequest> {
     /// Array of block state calls to be executed at specific, optional block/state.
     #[cfg_attr(feature = "serde", serde(default))]

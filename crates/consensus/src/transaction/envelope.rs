@@ -3,16 +3,12 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
+        RlpEcdsaEncodableTx,
     },
     EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
-use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
-    eip7594::Encodable7594,
-    Typed2718,
-};
+use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
 use alloy_primitives::{Bytes, Signature, B256};
 use core::fmt::Debug;
 
@@ -505,42 +501,6 @@ where
                 crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
         }
-    }
-}
-
-impl<T> Encodable2718 for Signed<T>
-where
-    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
-{
-    fn encode_2718_len(&self) -> usize {
-        self.eip2718_encoded_length()
-    }
-
-    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.eip2718_encode(out)
-    }
-
-    fn trie_hash(&self) -> B256 {
-        *self.hash()
-    }
-}
-
-impl<T> Decodable2718 for Signed<T>
-where
-    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
-{
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        let decoded = T::rlp_decode_signed(buf)?;
-
-        if decoded.ty() != ty {
-            return Err(Eip2718Error::UnexpectedType(ty));
-        }
-
-        Ok(decoded)
-    }
-
-    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::rlp_decode_signed(buf).map_err(Into::into)
     }
 }
 
