@@ -349,6 +349,11 @@ impl SerializedRequest {
         &self.meta
     }
 
+    /// Returns a mutable reference to the request metadata (ID and Method).
+    pub const fn meta_mut(&mut self) -> &mut RequestMeta {
+        &mut self.meta
+    }
+
     /// Returns the request ID.
     pub const fn id(&self) -> &Id {
         &self.meta.id
