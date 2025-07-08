@@ -207,13 +207,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_erc20_usdc_set_balance() {
-        let dai = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
-        test_erc20_token_set_balance(dai).await
+        let usdc = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        test_erc20_token_set_balance(usdc).await
     }
 
     #[tokio::test]
     async fn test_erc20_tether_set_balance() {
-        let dai = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
-        test_erc20_token_set_balance(dai).await
+        let tether = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
+        test_erc20_token_set_balance(tether).await
     }
 }
