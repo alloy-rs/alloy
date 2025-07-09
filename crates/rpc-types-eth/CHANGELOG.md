@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
 
+### Miscellaneous Tasks
+
+- Release 1.0.19
+
 ### Refactor
 
 - [rpc] Add handwritten bounds on generic `TxReq` using `serde` attributes ([#2674](https://github.com/alloy-rs/alloy/issues/2674))
