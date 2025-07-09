@@ -1010,15 +1010,17 @@ impl ssz::Decode for BlobsBundleV2 {
         let proofs_offset = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
         let blobs_offset = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
 
-        // Ensures no overlapping fields and no out-of-bounds access. Return error if any of these
-        // invalid conditions are true:
+        // Validates offsets to ensure no overlapping fields and no out-of-bounds access.
+        // Note: We use < instead of <= to allow empty fields where consecutive offsets are equal.
+        // For example, an empty bundle will have all offsets = 12 (end of header).
+        // Return error if any of these invalid conditions are true:
         // 1. commitments_offset < 12: would overlap with header
-        // 2. proofs_offset <= commitments_offset: proofs would overlap or come before commitments
-        // 3. blobs_offset <= proofs_offset: blobs would overlap or come before proofs
+        // 2. proofs_offset < commitments_offset: proofs would come before commitments
+        // 3. blobs_offset < proofs_offset: blobs would come before proofs
         // 4. blobs_offset > bytes.len(): would read beyond available data
         if commitments_offset < 12
-            || proofs_offset <= commitments_offset
-            || blobs_offset <= proofs_offset
+            || proofs_offset < commitments_offset
+            || blobs_offset < proofs_offset
             || blobs_offset > bytes.len()
         {
             return Err(ssz::DecodeError::BytesInvalid("Invalid offsets".to_string()));
@@ -2109,7 +2111,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
-    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_empty() {
         let blobs_bundle_v2 = BlobsBundleV2 { commitments: vec![], proofs: vec![], blobs: vec![] };
 
