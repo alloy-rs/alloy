@@ -20,6 +20,7 @@ pub use self::{
 };
 
 pub mod call;
+pub mod erc7562;
 pub mod four_byte;
 pub mod mux;
 pub mod noop;
