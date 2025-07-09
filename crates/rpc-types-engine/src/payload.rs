@@ -999,58 +999,31 @@ impl ssz::Decode for BlobsBundleV2 {
     }
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        // Need at least 12 bytes for the 3 offset values
-        if bytes.len() < 12 {
-            return Err(ssz::DecodeError::InvalidByteLength { len: bytes.len(), expected: 12 });
+        #[derive(ssz_derive::Decode)]
+        struct BlobsBundleRaw {
+            commitments: Vec<alloy_consensus::Bytes48>,
+            proofs: Vec<alloy_consensus::Bytes48>,
+            blobs: Vec<alloy_consensus::Blob>,
         }
 
-        // Read offsets (we know we have 12 bytes from check above)
-        let commitments_offset =
-            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
-        let proofs_offset = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
-        let blobs_offset = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+        let raw = BlobsBundleRaw::from_ssz_bytes(bytes)?;
 
-        // Validates offsets to ensure no overlapping fields and no out-of-bounds access.
-        // Note: We use < instead of <= to allow empty fields where consecutive offsets are equal.
-        // For example, an empty bundle will have all offsets = 12 (end of header).
-        // Return error if any of these invalid conditions are true:
-        // 1. commitments_offset < 12: would overlap with header
-        // 2. proofs_offset < commitments_offset: proofs would come before commitments
-        // 3. blobs_offset < proofs_offset: blobs would come before proofs
-        // 4. blobs_offset > bytes.len(): would read beyond available data
-        if commitments_offset < 12
-            || proofs_offset < commitments_offset
-            || blobs_offset < proofs_offset
-            || blobs_offset > bytes.len()
+        if raw.proofs.len() == raw.blobs.len() * CELLS_PER_EXT_BLOB
+            && raw.commitments.len() == raw.blobs.len()
         {
-            return Err(ssz::DecodeError::BytesInvalid("Invalid offsets".to_string()));
+            Ok(Self { commitments: raw.commitments, proofs: raw.proofs, blobs: raw.blobs })
+        } else {
+            Err(ssz::DecodeError::BytesInvalid(
+                format!(
+                    "Invalid BlobsBundleV2: expected {} proofs and {} commitments for {} blobs, got {} proofs and {} commitments",
+                    raw.blobs.len() * CELLS_PER_EXT_BLOB,
+                    raw.blobs.len(),
+                    raw.blobs.len(),
+                    raw.proofs.len(),
+                    raw.commitments.len()
+                )
+            ))
         }
-
-        // Decode fields
-        let commitments =
-            Vec::<Bytes48>::from_ssz_bytes(&bytes[commitments_offset..proofs_offset])?;
-        let proofs = Vec::<Bytes48>::from_ssz_bytes(&bytes[proofs_offset..blobs_offset])?;
-        let blobs = Vec::<Blob>::from_ssz_bytes(&bytes[blobs_offset..])?;
-
-        // Validate the lengths match the expected relationship
-        if proofs.len() != blobs.len() * CELLS_PER_EXT_BLOB {
-            return Err(ssz::DecodeError::BytesInvalid(format!(
-                "Invalid proofs length: expected {} for {} blobs, got {}",
-                blobs.len() * CELLS_PER_EXT_BLOB,
-                blobs.len(),
-                proofs.len()
-            )));
-        }
-
-        if commitments.len() != blobs.len() {
-            return Err(ssz::DecodeError::BytesInvalid(format!(
-                "Commitments length {} does not match blobs length {}",
-                commitments.len(),
-                blobs.len()
-            )));
-        }
-
-        Ok(Self { commitments, proofs, blobs })
     }
 }
 
