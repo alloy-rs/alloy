@@ -954,7 +954,7 @@ impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct BlobsBundleV2 {
     /// All commitments in the bundle.
@@ -989,6 +989,66 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
                 &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
             ))
         }
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for BlobsBundleV2 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        // Need at least 12 bytes for the 3 offset values
+        if bytes.len() < 12 {
+            return Err(ssz::DecodeError::InvalidByteLength { len: bytes.len(), expected: 12 });
+        }
+
+        // Read offsets (we know we have 12 bytes from check above)
+        let commitments_offset =
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+        let proofs_offset = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
+        let blobs_offset = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+
+        // Ensures no overlapping fields and no out-of-bounds access. Return error if any of these
+        // invalid conditions are true:
+        // 1. commitments_offset < 12: would overlap with header
+        // 2. proofs_offset <= commitments_offset: proofs would overlap or come before commitments
+        // 3. blobs_offset <= proofs_offset: blobs would overlap or come before proofs
+        // 4. blobs_offset > bytes.len(): would read beyond available data
+        if commitments_offset < 12
+            || proofs_offset <= commitments_offset
+            || blobs_offset <= proofs_offset
+            || blobs_offset > bytes.len()
+        {
+            return Err(ssz::DecodeError::BytesInvalid("Invalid offsets".to_string()));
+        }
+
+        // Decode fields
+        let commitments =
+            Vec::<Bytes48>::from_ssz_bytes(&bytes[commitments_offset..proofs_offset])?;
+        let proofs = Vec::<Bytes48>::from_ssz_bytes(&bytes[proofs_offset..blobs_offset])?;
+        let blobs = Vec::<Blob>::from_ssz_bytes(&bytes[blobs_offset..])?;
+
+        // Validate the lengths match the expected relationship
+        if proofs.len() != blobs.len() * CELLS_PER_EXT_BLOB {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Invalid proofs length: expected {} for {} blobs, got {}",
+                blobs.len() * CELLS_PER_EXT_BLOB,
+                blobs.len(),
+                proofs.len()
+            )));
+        }
+
+        if commitments.len() != blobs.len() {
+            return Err(ssz::DecodeError::BytesInvalid(format!(
+                "Commitments length {} does not match blobs length {}",
+                commitments.len(),
+                blobs.len()
+            )));
+        }
+
+        Ok(Self { commitments, proofs, blobs })
     }
 }
 
@@ -1990,6 +2050,70 @@ mod tests {
         let deserialized: Result<BlobsBundleV2, serde_json::Error> =
             serde_json::from_str(&serialized);
         assert!(deserialized.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev2_roundtrip() {
+        let commitments = vec![Bytes48::default(), Bytes48::default()];
+        let num_blobs = commitments.len();
+
+        let blobs_bundle_v2 = BlobsBundleV2 {
+            commitments,
+            proofs: vec![Bytes48::default(); num_blobs * CELLS_PER_EXT_BLOB],
+            blobs: vec![Blob::default(); num_blobs],
+        };
+
+        let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
+        let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
+
+        assert_eq!(decoded, blobs_bundle_v2);
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev2_invalid_proofs_length() {
+        let commitments = vec![Bytes48::default()];
+
+        let blobs_bundle_v2 = BlobsBundleV2 {
+            commitments,
+            proofs: vec![Bytes48::default(); 2],
+            blobs: vec![Blob::default()],
+        };
+
+        let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
+
+        // Attempt to decode - should fail due to mismatched proofs length
+        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev2_mismatched_commitments_blobs() {
+        let blobs_bundle_v2 = BlobsBundleV2 {
+            commitments: vec![Bytes48::default(), Bytes48::default()],
+            proofs: vec![Bytes48::default(); CELLS_PER_EXT_BLOB],
+            blobs: vec![Blob::default()],
+        };
+
+        let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
+
+        // Attempt to decode - should fail due to wrong number of commitments
+        let result: Result<BlobsBundleV2, _> = ssz::Decode::from_ssz_bytes(&encoded);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "ssz")]
+    fn ssz_blobsbundlev2_empty() {
+        let blobs_bundle_v2 = BlobsBundleV2 { commitments: vec![], proofs: vec![], blobs: vec![] };
+
+        let encoded = ssz::Encode::as_ssz_bytes(&blobs_bundle_v2);
+
+        // Decode from SSZ - empty bundle should be valid
+        let decoded: BlobsBundleV2 = ssz::Decode::from_ssz_bytes(&encoded).unwrap();
+        assert_eq!(decoded, blobs_bundle_v2);
     }
 
     #[test]
