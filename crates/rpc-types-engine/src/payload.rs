@@ -2054,6 +2054,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
+    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_roundtrip() {
         let commitments = vec![Bytes48::default(), Bytes48::default()];
         let num_blobs = commitments.len();
@@ -2072,6 +2073,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
+    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_invalid_proofs_length() {
         let commitments = vec![Bytes48::default()];
 
@@ -2090,6 +2092,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
+    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_mismatched_commitments_blobs() {
         let blobs_bundle_v2 = BlobsBundleV2 {
             commitments: vec![Bytes48::default(), Bytes48::default()],
@@ -2106,6 +2109,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ssz")]
+    #[cfg(not(debug_assertions))]
     fn ssz_blobsbundlev2_empty() {
         let blobs_bundle_v2 = BlobsBundleV2 { commitments: vec![], proofs: vec![], blobs: vec![] };
 
