@@ -1369,20 +1369,8 @@ pub(super) mod serde_bincode_compat {
     ///
     /// Intended to use with the [serde_with::serde_as] macro in the following way:
 
-/// ```rust
-/// use alloy_rpc_types_eth::{serde_bincode_compat, TransactionRequest};
-/// use serde::{Deserialize, Serialize};
-/// use serde_with::serde_as;
-/// 
-/// #[serde_as]
-/// #[derive(Serialize, Deserialize)]
-/// struct Data {
-///     #[serde_as(as = "serde_bincode_compat::transaction::TransactionRequest")]
-///     transaction: TransactionRequest,
-/// }
-/// ```
-
-    /// use alloy_rpc_types_eth::{ serde_bincode_compat, TransactionRequest};
+    /// ```rust
+    /// use alloy_rpc_types_eth::{serde_bincode_compat, TransactionRequest};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
@@ -1392,23 +1380,40 @@ pub(super) mod serde_bincode_compat {
     ///     #[serde_as(as = "serde_bincode_compat::transaction::TransactionRequest")]
     ///     transaction: TransactionRequest,
     /// }
+    /// ```
     #[derive(Debug, Serialize, Eq, PartialEq, Deserialize)]
     pub struct TransactionRequest<'a> {
+        /// The address of the transaction author.
         pub from: Option<Address>,
+        /// The destination address of the transaction.
         pub to: Option<TxKind>,
+        /// The legacy gas price.
         pub gas_price: Option<u128>,
+        /// The max base fee per gas the sender is willing to pay.
         pub max_fee_per_gas: Option<u128>,
+        /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
         pub max_priority_fee_per_gas: Option<u128>,
+        /// The max fee per blob gas for EIP-4844 blob transactions.
         pub max_fee_per_blob_gas: Option<u128>,
+        /// The gas limit for the transaction.
         pub gas: Option<u64>,
+        /// The value transferred in the transaction, in wei.
         pub value: Option<U256>,
+        /// Transaction data.
         pub input: Cow<'a, TransactionInput>,
+        /// The nonce of the transaction.
         pub nonce: Option<u64>,
+        /// The chain ID for the transaction.
         pub chain_id: Option<ChainId>,
+        /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
         pub access_list: Option<Cow<'a, AccessList>>,
+        /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
         pub transaction_type: Option<u8>,
+        /// Blob versioned hashes for EIP-4844 transactions.
         pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
+        /// Blob sidecar for EIP-4844 transactions.
         pub sidecar: Option<Cow<'a, BlobTransactionSidecar>>,
+        /// Authorization list for EIP-7702 transactions.
         pub authorization_list: Option<Cow<'a, Vec<SignedAuthorization>>>,
     }
 
