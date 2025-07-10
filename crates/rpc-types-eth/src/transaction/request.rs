@@ -1354,6 +1354,157 @@ impl From<TxEnvelope> for TransactionRequest {
     }
 }
 
+/// Bincode-compatible [TransactionRequest] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
+    use crate::TransactionInput;
+    use alloc::borrow::Cow;
+    use alloy_consensus::BlobTransactionSidecar;
+    use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+    use alloy_primitives::{Address, ChainId, TxKind, B256, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [super::TransactionRequest] serde implementation.
+    ///
+    /// Intended to use with the [serde_with::serde_as] macro in the following way:
+    /// rust
+    /// use alloy_rpc_types_eth::{ serde_bincode_compat, TransactionRequest};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::transaction::TransactionRequest")]
+    ///     transaction: TransactionRequest,
+    /// }
+    #[derive(Debug, Serialize, Eq, PartialEq, Deserialize)]
+    pub struct TransactionRequest<'a> {
+        pub from: Option<Address>,
+        pub to: Option<TxKind>,
+        pub gas_price: Option<u128>,
+        pub max_fee_per_gas: Option<u128>,
+        pub max_priority_fee_per_gas: Option<u128>,
+        pub max_fee_per_blob_gas: Option<u128>,
+        pub gas: Option<u64>,
+        pub value: Option<U256>,
+        pub input: Cow<'a, TransactionInput>,
+        pub nonce: Option<u64>,
+        pub chain_id: Option<ChainId>,
+        pub access_list: Option<Cow<'a, AccessList>>,
+        pub transaction_type: Option<u8>,
+        pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
+        pub sidecar: Option<Cow<'a, BlobTransactionSidecar>>,
+        pub authorization_list: Option<Cow<'a, Vec<SignedAuthorization>>>,
+    }
+
+    impl<'a> From<&'a super::TransactionRequest> for TransactionRequest<'a> {
+        fn from(value: &'a super::TransactionRequest) -> Self {
+            Self {
+                from: value.from,
+                to: value.to,
+                gas_price: value.gas_price,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                gas: value.gas,
+                value: value.value,
+                input: Cow::Borrowed(&value.input),
+                nonce: value.nonce,
+                chain_id: value.chain_id,
+                access_list: value.access_list.as_ref().map(Cow::Borrowed),
+                transaction_type: value.transaction_type,
+                blob_versioned_hashes: value.blob_versioned_hashes.as_ref().map(Cow::Borrowed),
+                sidecar: value.sidecar.as_ref().map(Cow::Borrowed),
+                authorization_list: value.authorization_list.as_ref().map(Cow::Borrowed),
+            }
+        }
+    }
+
+    impl<'a> From<TransactionRequest<'a>> for super::TransactionRequest {
+        fn from(value: TransactionRequest<'a>) -> Self {
+            Self {
+                from: value.from,
+                to: value.to,
+                gas_price: value.gas_price,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                gas: value.gas,
+                value: value.value,
+                input: value.input.into_owned(),
+                nonce: value.nonce,
+                chain_id: value.chain_id,
+                access_list: value.access_list.map(|list| list.into_owned()),
+                transaction_type: value.transaction_type,
+                blob_versioned_hashes: value
+                    .blob_versioned_hashes
+                    .map(|hashes| hashes.into_owned()),
+                sidecar: value.sidecar.map(|sidecar| sidecar.into_owned()),
+                authorization_list: value.authorization_list.map(|list| list.into_owned()),
+            }
+        }
+    }
+
+    impl SerializeAs<super::TransactionRequest> for TransactionRequest<'_> {
+        fn serialize_as<S>(
+            source: &super::TransactionRequest,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TransactionRequest::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TransactionRequest> for TransactionRequest<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TransactionRequest, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TransactionRequest::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::TransactionRequest;
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::serde_bincode_compat;
+
+        #[test]
+        fn test_tx_request_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+                transaction: TransactionRequest,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TransactionRequest::arbitrary(&mut arbitrary::Unstructured::new(
+                    &bytes,
+                ))
+                .unwrap(),
+            };
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
 /// Represents how a [`TransactionRequest`] handles input/data fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TransactionInputKind {
