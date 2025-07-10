@@ -291,6 +291,7 @@ serde = [
     "alloy-consensus?/serde",
     "dep:alloy-serde",
 ]
+serde-bincode-compat = ["alloy-consensus/serde-bincode-compat"]
 ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
 k256 = [
     "alloy-core/k256",
