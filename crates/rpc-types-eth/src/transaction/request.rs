@@ -1368,7 +1368,20 @@ pub(super) mod serde_bincode_compat {
     /// Bincode-compatible [super::TransactionRequest] serde implementation.
     ///
     /// Intended to use with the [serde_with::serde_as] macro in the following way:
-    /// rust
+
+/// ```rust
+/// use alloy_rpc_types_eth::{serde_bincode_compat, TransactionRequest};
+/// use serde::{Deserialize, Serialize};
+/// use serde_with::serde_as;
+/// 
+/// #[serde_as]
+/// #[derive(Serialize, Deserialize)]
+/// struct Data {
+///     #[serde_as(as = "serde_bincode_compat::transaction::TransactionRequest")]
+///     transaction: TransactionRequest,
+/// }
+/// ```
+
     /// use alloy_rpc_types_eth::{ serde_bincode_compat, TransactionRequest};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
