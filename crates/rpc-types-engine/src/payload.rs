@@ -1460,7 +1460,6 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             where
                 A: serde::de::MapAccess<'de>,
             {
-
                 // this currently rejects unknown fields
                 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
                 #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
@@ -1514,23 +1513,19 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         Fields::PrevRandao => prev_randao = Some(map.next_value()?),
                         Fields::BlockNumber => {
                             let raw = map.next_value::<U64>()?;
-                            block_number =
-                                Some(raw.to());
+                            block_number = Some(raw.to());
                         }
                         Fields::GasLimit => {
                             let raw = map.next_value::<U64>()?;
-                            gas_limit =
-                                Some(raw.to());
+                            gas_limit = Some(raw.to());
                         }
                         Fields::GasUsed => {
                             let raw = map.next_value::<U64>()?;
-                            gas_used =
-                                Some(raw.to());
+                            gas_used = Some(raw.to());
                         }
                         Fields::Timestamp => {
                             let raw = map.next_value::<U64>()?;
-                            timestamp =
-                                Some(raw.to());
+                            timestamp = Some(raw.to());
                         }
                         Fields::ExtraData => extra_data = Some(map.next_value()?),
                         Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
@@ -1539,13 +1534,11 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         Fields::Withdrawals => withdrawals = Some(map.next_value()?),
                         Fields::BlobGasUsed => {
                             let raw = map.next_value::<U64>()?;
-                            blob_gas_used =
-                                Some(raw.to());
+                            blob_gas_used = Some(raw.to());
                         }
                         Fields::ExcessBlobGas => {
                             let raw = map.next_value::<U64>()?;
-                            excess_blob_gas =
-                                Some(raw.to());
+                            excess_blob_gas = Some(raw.to());
                         }
                     }
                 }
@@ -2727,32 +2720,29 @@ mod tests {
                 "Requests hash mismatch in {:?}",
                 path
             );
-            
+
             // Verify the block hash matches the one in the payload
-            let expected_hash = payload_value["blockHash"].as_str().unwrap().parse::<B256>()
+            let expected_hash = payload_value["blockHash"]
+                .as_str()
+                .unwrap()
+                .parse::<B256>()
                 .unwrap_or_else(|e| panic!("Failed to parse block hash from {path:?}: {e}"));
             let actual_hash = block.header.hash_slow();
             assert_eq!(
-                actual_hash,
-                expected_hash,
+                actual_hash, expected_hash,
                 "Block hash mismatch in {:?}: expected {}, got {}",
-                path,
-                expected_hash,
-                actual_hash
+                path, expected_hash, actual_hash
             );
 
-
-            let block = payload.try_into_block_with_sidecar::<TxEnvelope>(&sidecar).unwrap_or_else(|e| {
-                panic!("Failed to convert payload to block from {path:?}: {e}")
-            });
+            let block =
+                payload.try_into_block_with_sidecar::<TxEnvelope>(&sidecar).unwrap_or_else(|e| {
+                    panic!("Failed to convert payload to block from {path:?}: {e}")
+                });
             let actual_hash = block.header.hash_slow();
             assert_eq!(
-                actual_hash,
-                expected_hash,
+                actual_hash, expected_hash,
                 "Block hash mismatch in {:?}: expected {}, got {}",
-                path,
-                expected_hash,
-                actual_hash
+                path, expected_hash, actual_hash
             );
         }
     }
