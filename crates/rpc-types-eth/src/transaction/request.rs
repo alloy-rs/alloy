@@ -1376,7 +1376,7 @@ pub(super) mod serde_bincode_compat {
     /// #[serde_as]
     /// #[derive(Serialize, Deserialize)]
     /// struct Data {
-    ///     #[serde_as(as = "serde_bincode_compat::transaction::TransactionRequest")]
+    ///     #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
     ///     transaction: TransactionRequest,
     /// }
     /// ```
