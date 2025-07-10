@@ -1369,7 +1369,7 @@ pub(super) mod serde_bincode_compat {
     ///
     /// Intended to use with the [serde_with::serde_as] macro in the following way:
     /// ```rust
-    /// use alloy_rpc_types_eth::{serde_bincode_compat, TransactionRequest};
+    /// use alloy_rpc_types_eth::{serde_bincode_compat, transaction, TransactionRequest};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
