@@ -322,6 +322,14 @@ impl ExecutionPayloadV1 {
         F: FnMut(Bytes) -> Result<T, E>,
         E: Into<PayloadError>,
     {
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayloadV1`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
         if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
             return Err(PayloadError::ExtraData(self.extra_data));
         }
@@ -331,14 +339,6 @@ impl ExecutionPayloadV1 {
             &self.transactions,
             |item, buf| buf.put_slice(item),
         );
-
-        // Convert transactions using the provided mapper
-        let transactions = self
-            .transactions
-            .into_iter()
-            .map(f)
-            .collect::<Result<Vec<_>, E>>()
-            .map_err(Into::into)?;
 
         let header = Header {
             parent_hash: self.parent_hash,
@@ -373,7 +373,10 @@ impl ExecutionPayloadV1 {
             nonce: Default::default(),
         };
 
-        Ok(Block { header, body: BlockBody { transactions, ommers: vec![], withdrawals: None } })
+        Ok(Block {
+            header,
+            body: BlockBody { transactions: self.transactions, ommers: vec![], withdrawals: None },
+        })
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].
@@ -517,7 +520,15 @@ impl ExecutionPayloadV2 {
         F: FnMut(Bytes) -> Result<T, E>,
         E: Into<PayloadError>,
     {
-        let mut base_sealed_block = self.payload_inner.try_into_block_with(f)?;
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayloadV2`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_sealed_block = self.payload_inner.into_block_raw()?;
         let withdrawals_root =
             alloy_consensus::proofs::calculate_withdrawals_root(&self.withdrawals);
         base_sealed_block.body.withdrawals = Some(self.withdrawals.into());
@@ -708,7 +719,15 @@ impl ExecutionPayloadV3 {
         F: FnMut(Bytes) -> Result<T, E>,
         E: Into<PayloadError>,
     {
-        let mut base_block = self.payload_inner.try_into_block_with(f)?;
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayloadV3`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.payload_inner.into_block_raw()?;
 
         base_block.header.blob_gas_used = Some(self.blob_gas_used);
         base_block.header.excess_blob_gas = Some(self.excess_blob_gas);
@@ -1226,11 +1245,21 @@ impl ExecutionPayload {
         F: FnMut(Bytes) -> Result<T, E>,
         E: Into<PayloadError>,
     {
-        let mut base_payload = self.try_into_block_with(f)?;
-        base_payload.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
-        base_payload.header.requests_hash = sidecar.requests_hash();
+        self.into_block_with_sidecar_raw(sidecar)?.try_map_transactions(f).map_err(Into::into)
+    }
 
-        Ok(base_payload)
+    /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions and sidecar.
+    ///
+    /// This is similar to [`Self::try_into_block_with_sidecar_with`] but returns the transactions
+    /// as raw bytes without any conversion.
+    pub fn into_block_with_sidecar_raw(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+    ) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.into_block_raw()?;
+        base_block.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
+        base_block.header.requests_hash = sidecar.requests_hash();
+        Ok(base_block)
     }
 
     /// Converts [`ExecutionPayloadV1`] to [`Block`].
@@ -1262,10 +1291,18 @@ impl ExecutionPayload {
         F: FnMut(Bytes) -> Result<T, E>,
         E: Into<PayloadError>,
     {
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
         match self {
-            Self::V1(payload) => payload.try_into_block_with(f),
-            Self::V2(payload) => payload.try_into_block_with(f),
-            Self::V3(payload) => payload.try_into_block_with(f),
+            Self::V1(payload) => payload.into_block_raw(),
+            Self::V2(payload) => payload.into_block_raw(),
+            Self::V3(payload) => payload.into_block_raw(),
         }
     }
 
@@ -1408,6 +1445,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
     where
         D: serde::Deserializer<'de>,
     {
+        use alloy_primitives::U64;
+
         struct ExecutionPayloadVisitor;
 
         impl<'de> serde::de::Visitor<'de> for ExecutionPayloadVisitor {
@@ -1421,7 +1460,6 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             where
                 A: serde::de::MapAccess<'de>,
             {
-                use serde::de::IntoDeserializer;
 
                 // this currently rejects unknown fields
                 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
@@ -1475,24 +1513,24 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         Fields::LogsBloom => logs_bloom = Some(map.next_value()?),
                         Fields::PrevRandao => prev_randao = Some(map.next_value()?),
                         Fields::BlockNumber => {
-                            let raw = map.next_value::<&str>()?;
+                            let raw = map.next_value::<U64>()?;
                             block_number =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                                Some(raw.to());
                         }
                         Fields::GasLimit => {
-                            let raw = map.next_value::<&str>()?;
+                            let raw = map.next_value::<U64>()?;
                             gas_limit =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                                Some(raw.to());
                         }
                         Fields::GasUsed => {
-                            let raw = map.next_value::<String>()?;
+                            let raw = map.next_value::<U64>()?;
                             gas_used =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                                Some(raw.to());
                         }
                         Fields::Timestamp => {
-                            let raw = map.next_value::<String>()?;
+                            let raw = map.next_value::<U64>()?;
                             timestamp =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                                Some(raw.to());
                         }
                         Fields::ExtraData => extra_data = Some(map.next_value()?),
                         Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
@@ -1500,14 +1538,14 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         Fields::Transactions => transactions = Some(map.next_value()?),
                         Fields::Withdrawals => withdrawals = Some(map.next_value()?),
                         Fields::BlobGasUsed => {
-                            let raw = map.next_value::<String>()?;
+                            let raw = map.next_value::<U64>()?;
                             blob_gas_used =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                                Some(raw.to());
                         }
                         Fields::ExcessBlobGas => {
-                            let raw = map.next_value::<String>()?;
+                            let raw = map.next_value::<U64>()?;
                             excess_blob_gas =
-                                Some(alloy_serde::quantity::deserialize(raw.into_deserializer())?);
+                                Some(raw.to());
                         }
                     }
                 }
@@ -1934,6 +1972,17 @@ impl ExecutionData {
         E: Into<PayloadError>,
     {
         self.payload.try_into_block_with_sidecar_with(&self.sidecar, f)
+    }
+
+    /// Converts [`ExecutionData`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.payload.into_block_raw()?;
+        base_block.header.parent_beacon_block_root = self.sidecar.parent_beacon_block_root();
+        base_block.header.requests_hash = self.sidecar.requests_hash();
+        Ok(base_block)
     }
 }
 
@@ -2617,5 +2666,94 @@ mod tests {
 
         // Ensure the actual hash is calculated if we set the fields to what they should be
         assert_eq!(block_hash_with_blob_fee_fields, block.header.hash_slow());
+    }
+
+    #[test]
+    fn test_payload_to_block_with_sidecar_raw() {
+        use std::path::PathBuf;
+
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/payload");
+        let dir = std::fs::read_dir(path).expect("Unable to read payload folder");
+
+        for entry in dir {
+            let entry = entry.expect("Unable to read entry");
+            let path = entry.path();
+
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+
+            let contents = std::fs::read_to_string(&path).expect("Unable to read file");
+            let value: serde_json::Value = serde_json::from_str(&contents)
+                .unwrap_or_else(|e| panic!("Failed to parse JSON from {path:?}: {e}"));
+
+            // Extract the newPayload object
+            let new_payload = &value["newPayload"];
+            let payload_value = &new_payload["payload"];
+            let sidecar_value = &new_payload["sidecar"];
+
+            let payload: ExecutionPayload = serde_json::from_value(payload_value.clone())
+                .unwrap_or_else(|e| panic!("Failed to deserialize payload from {path:?}: {e}"));
+
+            // Deserialize the sidecar
+            let sidecar: ExecutionPayloadSidecar = serde_json::from_value(sidecar_value.clone())
+                .unwrap_or_else(|e| panic!("Failed to deserialize sidecar from {path:?}: {e}"));
+
+            // Convert to block with raw transactions
+            let block = payload.clone().into_block_with_sidecar_raw(&sidecar).unwrap_or_else(|e| {
+                panic!("Failed to convert payload to block from {path:?}: {e}")
+            });
+
+            // Verify the block has raw transactions (Bytes) if there are any
+            if let Some(tx_count) = payload_value["transactions"].as_array().map(|a| a.len()) {
+                assert_eq!(
+                    block.body.transactions.len(),
+                    tx_count,
+                    "Transaction count mismatch in {:?}",
+                    path
+                );
+            }
+
+            // Verify sidecar fields are applied
+            assert_eq!(
+                block.header.parent_beacon_block_root,
+                sidecar.parent_beacon_block_root(),
+                "Parent beacon block root mismatch in {:?}",
+                path
+            );
+            assert_eq!(
+                block.header.requests_hash,
+                sidecar.requests_hash(),
+                "Requests hash mismatch in {:?}",
+                path
+            );
+            
+            // Verify the block hash matches the one in the payload
+            let expected_hash = payload_value["blockHash"].as_str().unwrap().parse::<B256>()
+                .unwrap_or_else(|e| panic!("Failed to parse block hash from {path:?}: {e}"));
+            let actual_hash = block.header.hash_slow();
+            assert_eq!(
+                actual_hash,
+                expected_hash,
+                "Block hash mismatch in {:?}: expected {}, got {}",
+                path,
+                expected_hash,
+                actual_hash
+            );
+
+
+            let block = payload.try_into_block_with_sidecar::<TxEnvelope>(&sidecar).unwrap_or_else(|e| {
+                panic!("Failed to convert payload to block from {path:?}: {e}")
+            });
+            let actual_hash = block.header.hash_slow();
+            assert_eq!(
+                actual_hash,
+                expected_hash,
+                "Block hash mismatch in {:?}: expected {}, got {}",
+                path,
+                expected_hash,
+                actual_hash
+            );
+        }
     }
 }
