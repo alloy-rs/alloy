@@ -47,10 +47,11 @@ impl SendBundleRequest {
 }
 
 /// Bincode-compatible [SendBundleRequest] serde implementation.
-#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+#[cfg(all(feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
+    use std::borrow::Cow;
+
     use crate::{BundleItem, Inclusion, Privacy, ProtocolVersion, Validity};
-    use alloc::borrow::Cow;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -58,7 +59,7 @@ pub(super) mod serde_bincode_compat {
     ///
     /// Intended to use with the [serde_with::serde_as] macro in the following way:
     /// ```rust
-    /// use alloy_rpc_types_eth::{serde_bincode_compat, transaction, TransactionRequest};
+    /// use alloy_rpc_types_mev::{serde_bincode_compat, SendBundleRequest};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
@@ -74,7 +75,9 @@ pub(super) mod serde_bincode_compat {
         /// The version of the MEV-share API to use.
         pub protocol_version: Cow<'a, ProtocolVersion>,
         /// Data used by block builders to check if the bundle should be considered for inclusion.
-        pub inclusion: Cow<'a, Inclusion>,
+        pub inclusion_block: u64,
+        /// The maximum block number for inclusion, if any.
+        pub inclusion_max_block: Option<u64>,
         /// The transactions to include in the bundle.
         pub bundle_body: Vec<Cow<'a, BundleItem>>,
         /// Requirements for the bundle to be included in the block.
@@ -87,8 +90,9 @@ pub(super) mod serde_bincode_compat {
         fn from(value: &'a super::SendBundleRequest) -> Self {
             Self {
                 protocol_version: Cow::Borrowed(&value.protocol_version),
-                inclusion: Cow::Borrowed(&value.inclusion),
-                bundle_body: value.bundle_body.iter().map(|item| Cow::Borrowed(item)).collect(),
+                inclusion_block: value.inclusion.block,
+                inclusion_max_block: value.inclusion.max_block,
+                bundle_body: value.bundle_body.iter().map(Cow::Borrowed).collect(),
                 validity: value.validity.as_ref().map(Cow::Borrowed),
                 privacy: value.privacy.as_ref().map(Cow::Borrowed),
             }
@@ -99,7 +103,10 @@ pub(super) mod serde_bincode_compat {
         fn from(value: SendBundleRequest<'a>) -> Self {
             Self {
                 protocol_version: value.protocol_version.into_owned(),
-                inclusion: value.inclusion.into_owned(),
+                inclusion: Inclusion {
+                    block: value.inclusion_block,
+                    max_block: value.inclusion_max_block,
+                },
                 bundle_body: value.bundle_body.into_iter().map(|item| item.into_owned()).collect(),
                 validity: value.validity.map(Cow::into_owned),
                 privacy: value.privacy.map(Cow::into_owned),
@@ -145,12 +152,9 @@ pub(super) mod serde_bincode_compat {
             }
 
             let data = Data { request: SendBundleRequest::default() };
-            println!("Data: {:?}", data);
             let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
-            println!("Encoded: {:?}", encoded);
             let (decoded, _) =
                 bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
-            println!("Decoded: {:?}", decoded);
             assert_eq!(decoded, data);
         }
     }

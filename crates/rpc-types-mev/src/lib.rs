@@ -7,12 +7,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 /// Serde-bincode-compat
-#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+#[cfg(all(feature = "serde-bincode-compat"))]
 pub mod serde_bincode_compat {
     pub use super::mev_calls::serde_bincode_compat::*;
 }
-
-extern crate alloc;
 
 mod eth_calls;
 pub use eth_calls::*;

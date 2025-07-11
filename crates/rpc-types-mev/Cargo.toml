@@ -26,27 +26,16 @@ alloy-serde.workspace = true
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-consensus = { workspace = true, features = ["serde"] }
 
-serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true 
 serde_with = { workspace = true, optional = true }
 
 [dev-dependencies]
 similar-asserts.workspace = true
 bincode = { workspace = true, features = ["serde"] }
-rand.workspace = true
-arbitrary = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
 
 [features]
-default = ["serde", "serde-bincode-compat"]
-serde = [
-    "dep:serde",
-    "dep:serde_json",
-    "alloy-eips/serde",
-    "alloy-rpc-types-eth/serde",
-    "alloy-consensus/serde",
-]
 serde-bincode-compat = ["serde_with", "alloy-eips/serde-bincode-compat"]
-
