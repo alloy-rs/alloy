@@ -46,3 +46,12 @@ pub type TransportFut<'a, T = alloy_json_rpc::ResponsePacket, E = TransportError
 
 /// Future for RPC-level requests.
 pub type RpcFut<'a, T> = futures_utils_wasm::BoxFuture<'a, TransportResult<T>>;
+
+/// Cross platform time types.
+mod time {
+    #[cfg(target_family = "wasm")]
+    pub(crate) use wasmtimer::time::Instant;
+
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) use std::time::Instant;
+}
