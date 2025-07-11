@@ -51,7 +51,7 @@ pub struct TxEip2930 {
     pub value: U256,
     /// The access list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930).
     ///
-    /// The `accessList` specifies a list of addresses and storage keys that the transaction
+    /// The `access_list` specifies a list of addresses and storage keys that the transaction
     /// plans to access. These addresses and storage keys are added into the `accessed_addresses`
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
