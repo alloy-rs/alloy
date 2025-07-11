@@ -47,7 +47,7 @@ impl SendBundleRequest {
 }
 
 /// Bincode-compatible [SendBundleRequest] serde implementation.
-#[cfg(all(feature = "serde-bincode-compat"))]
+#[cfg(feature = "serde-bincode-compat")]
 pub(super) mod serde_bincode_compat {
     use std::borrow::Cow;
 
