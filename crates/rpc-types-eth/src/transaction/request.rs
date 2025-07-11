@@ -1361,7 +1361,7 @@ pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_consensus::BlobTransactionSidecar;
     use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-    use alloy_primitives::{Address, ChainId, TxKind, B256, U256};
+    use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
@@ -1398,8 +1398,10 @@ pub(super) mod serde_bincode_compat {
         pub gas: Option<u64>,
         /// The value transferred in the transaction, in wei.
         pub value: Option<U256>,
+        /// Transaction input.
+        pub input: Option<Cow<'a, Bytes>>,
         /// Transaction data.
-        pub input: Cow<'a, TransactionInput>,
+        pub data: Option<Cow<'a, Bytes>>,
         /// The nonce of the transaction.
         pub nonce: Option<u64>,
         /// The chain ID for the transaction.
@@ -1427,7 +1429,8 @@ pub(super) mod serde_bincode_compat {
                 max_fee_per_blob_gas: value.max_fee_per_blob_gas,
                 gas: value.gas,
                 value: value.value,
-                input: Cow::Borrowed(&value.input),
+                input: value.input.input.as_ref().map(Cow::Borrowed),
+                data: value.input.data.as_ref().map(Cow::Borrowed),
                 nonce: value.nonce,
                 chain_id: value.chain_id,
                 access_list: value.access_list.as_ref().map(Cow::Borrowed),
@@ -1450,7 +1453,10 @@ pub(super) mod serde_bincode_compat {
                 max_fee_per_blob_gas: value.max_fee_per_blob_gas,
                 gas: value.gas,
                 value: value.value,
-                input: value.input.into_owned(),
+                input: TransactionInput {
+                    input: value.input.map(Cow::into_owned),
+                    data: value.data.map(Cow::into_owned),
+                },
                 nonce: value.nonce,
                 chain_id: value.chain_id,
                 access_list: value.access_list.map(|list| list.into_owned()),
