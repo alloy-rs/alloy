@@ -7,7 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 /// Serde-bincode-compat
-#[cfg(all(feature = "serde-bincode-compat"))]
+#[cfg(feature = "serde-bincode-compat")]
 pub mod serde_bincode_compat {
     pub use super::mev_calls::serde_bincode_compat::*;
 }
