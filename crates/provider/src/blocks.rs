@@ -2,13 +2,17 @@ use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
 use alloy_transport::RpcError;
-use async_stream::stream;
-use futures::{Stream, StreamExt};
+use futures::{ready, Future, FutureExt, Stream, StreamExt};
 use lru::LruCache;
-use std::{marker::PhantomData, num::NonZeroUsize};
+use std::{
+    marker::PhantomData, 
+    num::NonZeroUsize,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 #[cfg(feature = "pubsub")]
-use futures::{future::Either, FutureExt};
+use futures::future::Either;
 
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(10).unwrap();
@@ -47,30 +51,29 @@ impl<N: Network> NewBlocks<N> {
         self
     }
 
-    pub(crate) fn into_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
+    pub(crate) fn into_stream(self) -> NewBlocksStream<N> {
         // Return a stream that lazily subscribes to `newHeads` on the first poll.
         #[cfg(feature = "pubsub")]
         if let Some(client) = self.client.upgrade() {
             if client.pubsub_frontend().is_some() {
-                let subscriber = self.into_subscription_stream().map(futures::stream::iter);
-                let subscriber = futures::stream::once(subscriber);
-                return Either::Left(subscriber.flatten().flatten());
+                return NewBlocksStream::Subscription(Box::pin(async move {
+                    match self.into_subscription_stream().await {
+                        Some(stream) => Some(Box::pin(stream) as Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>),
+                        None => None,
+                    }
+                }));
             }
         }
 
         // Returns a stream that lazily initializes an `eth_blockNumber` polling task on the first
         // poll, mapped with `eth_getBlockByNumber`.
-        #[cfg(feature = "pubsub")]
-        let right = Either::Right;
-        #[cfg(not(feature = "pubsub"))]
-        let right = std::convert::identity;
-        right(self.into_poll_stream())
+        NewBlocksStream::Polling(self.into_poll_stream())
     }
 
     #[cfg(feature = "pubsub")]
     async fn into_subscription_stream(
         self,
-    ) -> Option<impl Stream<Item = N::BlockResponse> + 'static> {
+    ) -> Option<Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>> {
         use alloy_consensus::BlockHeader;
 
         let Some(client) = self.client.upgrade() else {
@@ -95,88 +98,231 @@ impl<N: Network> NewBlocks<N> {
                 return None;
             }
         };
-        let stream =
-            sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
-        Some(self.into_block_stream(stream))
+        let header_stream = sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
+        let block_stream = self.into_block_stream(Box::new(header_stream) as Box<dyn Stream<Item = u64> + Send + Unpin>);
+        Some(Box::pin(block_stream) as Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>)
     }
 
-    fn into_poll_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
+    fn into_poll_stream(self) -> BlockStream<N, Box<dyn Stream<Item = u64> + Send + Unpin>> {
         // Spawned lazily on the first `poll`.
         let stream =
             PollerBuilder::<NoParams, U64>::new(self.client.clone(), "eth_blockNumber", [])
                 .into_stream()
                 .map(|n| n.to());
 
-        self.into_block_stream(stream)
+        self.into_block_stream(Box::new(stream) as Box<dyn Stream<Item = u64> + Send + Unpin>)
     }
 
-    fn into_block_stream(
-        mut self,
-        mut numbers_stream: impl Stream<Item = u64> + Unpin + 'static,
-    ) -> impl Stream<Item = N::BlockResponse> + 'static {
-        stream! {
-        'task: loop {
-            // Clear any buffered blocks.
-            while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
-                debug!(number=self.next_yield, "yielding block");
-                self.next_yield += 1;
-                yield known_block;
-            }
+    fn into_block_stream<S>(self, numbers_stream: S) -> BlockStream<N, S>
+    where
+        S: Stream<Item = u64> + Unpin + 'static,
+    {
+        BlockStream::new(self, numbers_stream)
+    }
+}
 
-            // Get the tip.
-            let Some(block_number) = numbers_stream.next().await else {
-                debug!("polling stream ended");
-                break 'task;
-            };
-            trace!(%block_number, "got block number");
-            if self.next_yield == NO_BLOCK_NUMBER {
-                assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
-                self.next_yield = block_number;
-            } else if block_number < self.next_yield {
-                debug!(block_number, self.next_yield, "not advanced yet");
-                continue 'task;
-            }
+/// State for fetching blocks.
+enum BlockFetchState<N: Network> {
+    /// Yielding buffered blocks.
+    YieldingBuffered,
+    /// Waiting for next block number.
+    WaitingForNumber,
+    /// Fetching blocks from the client.
+    Fetching {
+        client: std::sync::Arc<alloy_rpc_client::RpcClientInner>,
+        target_block: BlockNumber,
+        current_number: BlockNumber,
+        retries: usize,
+        fut: Option<Pin<Box<dyn Future<Output = Result<Option<N::BlockResponse>, RpcError<alloy_transport::TransportErrorKind>>> + Send>>>,
+    },
+}
 
-            // Upgrade the provider.
-            let Some(client) = self.client.upgrade() else {
-                debug!("client dropped");
-                break 'task;
-            };
+/// A stream that yields blocks by fetching them from the client.
+pub(crate) struct BlockStream<N: Network, S> {
+    /// The underlying block numbers stream.
+    numbers_stream: S,
+    /// The client to fetch blocks with.
+    client: WeakClient,
+    /// The next block to yield.
+    next_yield: BlockNumber,
+    /// LRU cache of known blocks.
+    known_blocks: LruCache<BlockNumber, N::BlockResponse>,
+    /// Current state of the stream.
+    state: BlockFetchState<N>,
+    _phantom: PhantomData<N>,
+}
 
-            // Then try to fill as many blocks as possible.
-            // TODO: Maybe use `join_all`
-            let mut retries = MAX_RETRIES;
-            for number in self.next_yield..=block_number {
-                debug!(number, "fetching block");
-                let block = match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
-                    Ok(Some(block)) => block,
-                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                        debug!(number, %err, "failed to fetch block, retrying");
-                        retries -= 1;
+impl<N: Network, S> BlockStream<N, S> {
+    fn new(new_blocks: NewBlocks<N>, numbers_stream: S) -> Self {
+        Self {
+            numbers_stream,
+            client: new_blocks.client,
+            next_yield: new_blocks.next_yield,
+            known_blocks: new_blocks.known_blocks,
+            state: BlockFetchState::YieldingBuffered,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<N: Network, S> Unpin for BlockStream<N, S> {}
+
+impl<N: Network, S> Stream for BlockStream<N, S>
+where
+    S: Stream<Item = u64> + Unpin,
+{
+    type Item = N::BlockResponse;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        loop {
+            match &mut this.state {
+                BlockFetchState::YieldingBuffered => {
+                    // Clear any buffered blocks.
+                    if let Some(known_block) = this.known_blocks.pop(&this.next_yield) {
+                        debug!(number=this.next_yield, "yielding block");
+                        this.next_yield += 1;
+                        return Poll::Ready(Some(known_block));
+                    }
+                    // No more buffered blocks, wait for next number.
+                    this.state = BlockFetchState::WaitingForNumber;
+                }
+                BlockFetchState::WaitingForNumber => {
+                    // Get the tip.
+                    match ready!(this.numbers_stream.poll_next_unpin(cx)) {
+                        Some(block_number) => {
+                            trace!(%block_number, "got block number");
+                            if this.next_yield == NO_BLOCK_NUMBER {
+                                assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
+                                this.next_yield = block_number;
+                            } else if block_number < this.next_yield {
+                                debug!(block_number, this.next_yield, "not advanced yet");
+                                continue;
+                            }
+
+                            // Upgrade the client.
+                            let Some(client) = this.client.upgrade() else {
+                                debug!("client dropped");
+                                return Poll::Ready(None);
+                            };
+
+                            // Start fetching blocks.
+                            this.state = BlockFetchState::Fetching {
+                                client,
+                                target_block: block_number,
+                                current_number: this.next_yield,
+                                retries: MAX_RETRIES,
+                                fut: None,
+                            };
+                        }
+                        None => {
+                            debug!("polling stream ended");
+                            return Poll::Ready(None);
+                        }
+                    }
+                }
+                BlockFetchState::Fetching { client, target_block, current_number, retries, fut } => {
+                    if let Some(future) = fut {
+                        // Poll the ongoing request.
+                        match ready!(future.poll_unpin(cx)) {
+                            Ok(Some(block)) => {
+                                let number = *current_number;
+                                this.known_blocks.put(number, block);
+                                *current_number += 1;
+                                *fut = None;
+                                
+                                if this.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
+                                    // Cache is full, should be consumed before filling more blocks.
+                                    debug!(number, "cache full");
+                                    this.state = BlockFetchState::YieldingBuffered;
+                                    continue;
+                                }
+                            }
+                            Err(RpcError::Transport(err)) if *retries > 0 && err.recoverable() => {
+                                debug!(number=*current_number, %err, "failed to fetch block, retrying");
+                                *retries -= 1;
+                                *fut = None;
+                            }
+                            Ok(None) if *retries > 0 => {
+                                debug!(number=*current_number, "failed to fetch block (doesn't exist), retrying");
+                                *retries -= 1;
+                                *fut = None;
+                            }
+                            Err(err) => {
+                                error!(number=*current_number, %err, "failed to fetch block");
+                                this.state = BlockFetchState::YieldingBuffered;
+                                continue;
+                            }
+                            Ok(None) => {
+                                error!(number=*current_number, "failed to fetch block (doesn't exist)");
+                                this.state = BlockFetchState::YieldingBuffered;
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Check if we're done fetching.
+                    if *current_number > *target_block {
+                        this.state = BlockFetchState::YieldingBuffered;
                         continue;
                     }
-                    Ok(None) if retries > 0 => {
-                        debug!(number, "failed to fetch block (doesn't exist), retrying");
-                        retries -= 1;
-                        continue;
-                    }
-                    Err(err) => {
-                        error!(number, %err, "failed to fetch block");
-                        break;
-                    }
-                    Ok(None) => {
-                        error!(number, "failed to fetch block (doesn't exist)");
-                        break;
-                    }
-                };
-                self.known_blocks.put(number, block);
-                if self.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
-                    // Cache is full, should be consumed before filling more blocks.
-                    debug!(number, "cache full");
-                    break;
+
+                    // Start a new request.
+                    debug!(number=*current_number, "fetching block");
+                    let client_ref = client.clone();
+                    let number = *current_number;
+                    let future = Box::pin(async move {
+                        client_ref.request("eth_getBlockByNumber", (U64::from(number), false)).await
+                    });
+                    *fut = Some(future);
                 }
             }
         }
+    }
+}
+
+/// A stream that yields new blocks.
+pub(crate) enum NewBlocksStream<N: Network> {
+    /// Polling-based stream.
+    Polling(BlockStream<N, Box<dyn Stream<Item = u64> + Send + Unpin>>),
+    /// Subscription-based stream (WebSocket) - initial state.
+    #[cfg(feature = "pubsub")]
+    Subscription(Pin<Box<dyn Future<Output = Option<Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>>> + Send>>),
+    /// Subscription-based stream (WebSocket) - ready state.
+    #[cfg(feature = "pubsub")]
+    SubscriptionReady(Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>),
+}
+
+impl<N: Network> Stream for NewBlocksStream<N> {
+    type Item = N::BlockResponse;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self.get_mut() {
+            NewBlocksStream::Polling(stream) => stream.poll_next_unpin(cx),
+            #[cfg(feature = "pubsub")]
+            NewBlocksStream::Subscription(fut) => {
+                // First poll the future to get the stream
+                match ready!(fut.poll_unpin(cx)) {
+                    Some(mut stream) => {
+                        // Replace self with the actual stream for future polls
+                        match stream.poll_next_unpin(cx) {
+                            Poll::Ready(item) => {
+                                // Continue using the stream
+                                *self = NewBlocksStream::SubscriptionReady(stream);
+                                Poll::Ready(item)
+                            }
+                            Poll::Pending => {
+                                *self = NewBlocksStream::SubscriptionReady(stream);
+                                Poll::Pending
+                            }
+                        }
+                    }
+                    None => Poll::Ready(None),
+                }
+            }
+            #[cfg(feature = "pubsub")]
+            NewBlocksStream::SubscriptionReady(stream) => stream.poll_next_unpin(cx),
         }
     }
 }
