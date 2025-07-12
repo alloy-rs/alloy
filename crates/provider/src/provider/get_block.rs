@@ -1,5 +1,5 @@
 use std::{fmt::Debug, marker::PhantomData};
-
+use std::sync::Arc;
 use crate::{utils, ProviderCall};
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
@@ -14,7 +14,9 @@ use either::Either;
 use futures::{Stream, StreamExt};
 use serde_json::Value;
 use std::time::Duration;
-
+use reqwest::Client;
+use tokio::time::Instant;
+use alloy_consensus::BlockHeader;
 use super::FilterPollerBuilder;
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
@@ -228,7 +230,7 @@ where
 }
 
 type ProviderCallProducer<BlockResp> =
-    Box<dyn Fn(BlockTransactionsKind) -> ProviderCall<EthGetBlockParams, Option<BlockResp>> + Send>;
+Box<dyn Fn(BlockTransactionsKind) -> ProviderCall<EthGetBlockParams, Option<BlockResp>> + Send>;
 
 enum GetBlockInner<BlockResp>
 where
@@ -244,7 +246,7 @@ where
     /// This is specifically true in case of the response is returned from a geth node. See: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
     ///
     /// In such case, we first deserialize to [`Value`] and then check if the fields are missing or
-    /// set to null. If so, we set them to default values.  
+    /// set to null. If so, we set them to default values.
     PendingBlock(RpcCall<EthGetBlockParams, Value>),
     /// Closure that produces a [`ProviderCall`] given [`BlockTransactionsKind`].
     ProviderCall(ProviderCallProducer<BlockResp>),
@@ -329,7 +331,7 @@ where
 
     /// Consumes the stream of block hashes from the inner [`FilterPollerBuilder`] and maps it to a
     /// stream of [`BlockResponse`].
-    pub fn into_stream(self) -> impl Stream<Item = TransportResult<BlockResp>> + Unpin {
+    pub fn into_stream(self) -> impl Stream<Item=TransportResult<BlockResp>> + Unpin {
         let client = self.poller.client();
         let kind = self.kind;
         let stream = self
@@ -397,7 +399,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     /// Subscribe to the inner stream of headers and map them to block responses.
     pub async fn into_stream(
         self,
-    ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
+    ) -> TransportResult<impl Stream<Item=TransportResult<N::BlockResponse>> + Unpin> {
         use alloy_network_primitives::HeaderResponse;
         use futures::StreamExt;
 
@@ -438,6 +440,127 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
         }
     }
 }
+
+
+#[derive(Debug)]
+#[must_use = "this does nothing unless you call `.into_stream`"]
+#[cfg(feature = "pubsub")]
+pub struct SubFinalizedBlocks<N: alloy_network::Network> {
+    sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
+    client: alloy_rpc_client::WeakClient,
+    kind: BlockTransactionsKind,
+    last_finalized: Arc<tokio::sync::Mutex<Option<N::HeaderResponse>>>,
+}
+
+
+#[cfg(feature = "pubsub")]
+impl<N: alloy_network::Network> SubFinalizedBlocks<N> {
+    /// Create a new [`SubFullBlocks`] subscription with the given [`super::GetSubscription`].
+    ///
+    /// By default, this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
+    /// subscribe to blocks with full transactions.
+    pub fn new(
+        sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
+        client: alloy_rpc_client::WeakClient,
+    ) -> Self {
+        Self { sub, client, kind: BlockTransactionsKind::Hashes, last_finalized: Arc::new(tokio::sync::Mutex::new(None)) }
+    }
+
+    /// Subscribe to blocks with transaction hashes only.
+    pub const fn hashes(mut self) -> Self {
+        self.kind = BlockTransactionsKind::Hashes;
+        self
+    }
+
+    /// Set the channel size
+    pub fn channel_size(mut self, size: usize) -> Self {
+        self.sub = self.sub.channel_size(size);
+        self
+    }
+
+    pub fn last_finalized(&self) -> Arc<tokio::sync::Mutex<Option<N::HeaderResponse>>> {
+        self.last_finalized.clone()
+    }
+
+    /// Subscribe to the inner stream of headers and map them to block responses.
+    pub async fn into_stream(
+        self,
+    ) -> TransportResult<impl Stream<Item=TransportResult<N::BlockResponse>> + Unpin> {
+        use alloy_network_primitives::HeaderResponse;
+        use futures::StreamExt;
+
+        const EPOCH_SLOTS: u64 = 32;
+
+        let sub = self.sub.await?;
+
+        let stream = sub
+            .into_stream()
+            .then(move |resp| {
+                let kind = self.kind;
+                let client_weak = self.client.clone();
+                let last_finalized = self.last_finalized.clone();
+
+
+                async move {
+                    let client = client_weak
+                        .upgrade()
+                        .ok_or(TransportError::local_usage_str("Client dropped"))?;
+
+                    let current_epoch = resp.number() / EPOCH_SLOTS;
+
+                    let last_epoch = {
+                        let guard = last_finalized.lock().await;
+                        guard
+                            .as_ref()
+                            .map(|hdr| hdr.number() / EPOCH_SLOTS)
+                            .unwrap_or(0)
+                    };
+
+                    if current_epoch == last_epoch {
+                        println!("Same epoch, skipping");
+                        return Ok(None);
+                    }
+
+                    let call = client.request::<_, N::BlockResponse>("eth_getBlockByNumber", ("finalized", kind.is_full()));
+                    match call.await {
+                        Err(e) => Err(e),
+                        Ok(block) => {
+                            let mut lock = last_finalized.lock().await;
+                            let changed = match &*lock {
+                                Some(prev_hdr) => prev_hdr.hash() != block.header().hash(),
+                                None           => true,
+                            };
+
+                            if changed {
+                                *lock = Some(block.header().clone());
+                                let out = if kind.is_hashes() {
+                                    utils::convert_to_hashes(Some(block))
+                                } else {
+                                    Some(block)
+                                };
+                                Ok(out)
+                            } else {
+                                Ok(None)
+                            }
+                        }
+                    }
+
+                }
+            }).filter_map(|result| futures::future::ready(result.transpose()));
+
+
+        #[cfg(not(target_family = "wasm"))]
+        {
+            Ok(stream.boxed())
+        }
+
+        #[cfg(target_family = "wasm")]
+        {
+            Ok(stream.boxed_local())
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
