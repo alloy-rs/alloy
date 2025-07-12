@@ -320,7 +320,7 @@ pub struct BalanceChange {
     /// Dollar value of the
     pub dollar_value: String,
     /// Identifiers of the traces affecting this balance change.
-    pub tranfers: Option<Vec<usize>>,
+    pub transfers: Option<Vec<usize>>,
 }
 
 /// State changes of an address caused by a transaction
