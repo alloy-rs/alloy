@@ -146,12 +146,28 @@ impl<T> TxEip4844Variant<T> {
         }
     }
 
+    /// Returns the [`TxEip4844WithSidecar`] if it has a sidecar
+    pub const fn as_with_sidecar(&self) -> Option<&TxEip4844WithSidecar<T>> {
+        match self {
+            Self::TxEip4844WithSidecar(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
     /// Tries to unwrap the [`TxEip4844WithSidecar`] returns the transaction as error if it is not a
     /// [`TxEip4844WithSidecar`]
     pub fn try_into_4844_with_sidecar(self) -> Result<TxEip4844WithSidecar<T>, Self> {
         match self {
             Self::TxEip4844WithSidecar(tx) => Ok(tx),
             _ => Err(self),
+        }
+    }
+
+    /// Returns the sidecar if this is [`TxEip4844Variant::TxEip4844WithSidecar`].
+    pub const fn sidecar(&self) -> Option<&T> {
+        match self {
+            Self::TxEip4844WithSidecar(tx) => Some(tx.sidecar()),
+            _ => None,
         }
     }
 }
