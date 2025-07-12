@@ -1,7 +1,7 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
-use futures::{future::BoxFuture, ready, Future, FutureExt, Stream, StreamExt};
+use futures::{ready, Future, FutureExt, Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
@@ -182,9 +182,10 @@ enum PollState<Resp> {
     Waiting,
     /// Currently polling for a response.
     Polling(
-        BoxFuture<
+        alloy_transport::Pbf<
             'static,
-            Result<Resp, alloy_transport::RpcError<alloy_transport::TransportErrorKind>>,
+            Resp,
+            alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
         >,
     ),
     /// Sleeping between polls.
