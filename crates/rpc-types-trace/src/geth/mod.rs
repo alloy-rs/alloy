@@ -2,6 +2,7 @@
 
 use crate::geth::{
     call::FlatCallFrame,
+    erc7562::{Erc7562Config, Erc7562Frame},
     mux::{MuxConfig, MuxFrame},
 };
 use alloy_primitives::{Bytes, B256, U256};
@@ -131,6 +132,8 @@ pub enum GethTrace {
     NoopTracer(NoopFrame),
     /// The response for mux tracer
     MuxTracer(MuxFrame),
+    /// The response for ERC-7562 tracer
+    Erc7562Tracer(Erc7562Frame),
     /// Any other trace response, such as custom javascript response objects
     JS(serde_json::Value),
 }
@@ -289,6 +292,10 @@ pub enum GethDebugBuiltInTracerType {
     /// The mux tracer is a tracer that can run multiple tracers at once.
     #[serde(rename = "muxTracer")]
     MuxTracer,
+    /// The ERC-7562 tracer that checks validation rules defined in ERC-7562 (for ERC-4337 and
+    /// RIP-7560)
+    #[serde(rename = "erc7562Tracer")]
+    Erc7562Tracer,
 }
 
 /// Available tracers
@@ -322,6 +329,7 @@ impl GethDebugTracerType {
                 GethDebugBuiltInTracerType::PreStateTracer => "prestateTracer",
                 GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
                 GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
+                GethDebugBuiltInTracerType::Erc7562Tracer => "erc7562Tracer",
             },
             Self::JsTracer(code) => code,
         }
@@ -418,6 +426,12 @@ impl From<PreStateConfig> for GethDebugTracerConfig {
 
 impl From<MuxConfig> for GethDebugTracerConfig {
     fn from(value: MuxConfig) -> Self {
+        Self(serde_json::to_value(value).expect("is serializable"))
+    }
+}
+
+impl From<Erc7562Config> for GethDebugTracerConfig {
+    fn from(value: Erc7562Config) -> Self {
         Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
