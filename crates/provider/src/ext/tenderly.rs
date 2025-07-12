@@ -198,6 +198,6 @@ mod test {
             TxHash::from_str("0x6b2264fa8e28a641d834482d250080b39cbbf39251344573c7504d6137c4b793")
                 .unwrap();
 
-        let _res = provider.tenderly_trace_transaction(&vec![hash]).await.unwrap();
+        let _res = provider.tenderly_trace_transaction(&[hash]).await.unwrap();
     }
 }
