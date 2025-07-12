@@ -916,78 +916,6 @@ impl Filter {
     }
 }
 
-/// Iterator that yields logs from receipts that match a filter.
-///
-/// This iterator processes blocks of receipts, yielding all logs that match
-/// the provided filter criteria.
-pub struct FilterReceiptsIter<'a, I, R>
-where
-    I: Iterator,
-    I::Item: IntoIterator<Item = R>,
-    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
-{
-    filter: &'a Filter,
-    blocks_iter: I,
-    current_block: Option<<I::Item as IntoIterator>::IntoIter>,
-    current_logs: Option<alloc::vec::IntoIter<alloy_primitives::Log>>,
-}
-
-impl<'a, I, R> core::fmt::Debug for FilterReceiptsIter<'a, I, R>
-where
-    I: Iterator,
-    I::Item: IntoIterator<Item = R>,
-    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("FilterReceiptsIter")
-            .field("filter", &self.filter)
-            .field("has_current_block", &self.current_block.is_some())
-            .field("has_current_logs", &self.current_logs.is_some())
-            .finish()
-    }
-}
-
-impl<'a, I, R> Iterator for FilterReceiptsIter<'a, I, R>
-where
-    I: Iterator,
-    I::Item: IntoIterator<Item = R>,
-    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
-{
-    type Item = alloy_primitives::Log;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            // First, try to return a log from current logs iterator
-            if let Some(ref mut logs) = self.current_logs {
-                if let Some(log) = logs.next() {
-                    if self.filter.matches(&log) {
-                        return Some(log);
-                    }
-                    continue;
-                }
-            }
-
-            // No more logs, try to get the next receipt
-            if let Some(ref mut receipts) = self.current_block {
-                if let Some(receipt) = receipts.next() {
-                    // Create iterator from logs of this receipt
-                    self.current_logs = Some(receipt.into_logs().into_iter());
-                    continue;
-                }
-            }
-
-            // Current block exhausted or none set, try next block
-            match self.blocks_iter.next() {
-                Some(block) => {
-                    self.current_block = Some(block.into_iter());
-                    self.current_logs = None;
-                }
-                None => return None,
-            }
-        }
-    }
-}
-
 #[cfg(feature = "serde")]
 impl serde::Serialize for Filter {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -1627,6 +1555,78 @@ impl FilteredParams {
             }
         }
         true
+    }
+}
+
+/// Iterator that yields logs from receipts that match a filter.
+///
+/// This iterator processes blocks of receipts, yielding all logs that match
+/// the provided filter criteria.
+pub struct FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    filter: &'a Filter,
+    blocks_iter: I,
+    current_block: Option<<I::Item as IntoIterator>::IntoIter>,
+    current_logs: Option<alloc::vec::IntoIter<alloy_primitives::Log>>,
+}
+
+impl<'a, I, R> core::fmt::Debug for FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FilterReceiptsIter")
+            .field("filter", &self.filter)
+            .field("has_current_block", &self.current_block.is_some())
+            .field("has_current_logs", &self.current_logs.is_some())
+            .finish()
+    }
+}
+
+impl<'a, I, R> Iterator for FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    type Item = alloy_primitives::Log;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            // First, try to return a log from current logs iterator
+            if let Some(ref mut logs) = self.current_logs {
+                if let Some(log) = logs.next() {
+                    if self.filter.matches(&log) {
+                        return Some(log);
+                    }
+                    continue;
+                }
+            }
+
+            // No more logs, try to get the next receipt
+            if let Some(ref mut receipts) = self.current_block {
+                if let Some(receipt) = receipts.next() {
+                    // Create iterator from logs of this receipt
+                    self.current_logs = Some(receipt.into_logs().into_iter());
+                    continue;
+                }
+            }
+
+            // Current block exhausted or none set, try next block
+            match self.blocks_iter.next() {
+                Some(block) => {
+                    self.current_block = Some(block.into_iter());
+                    self.current_logs = None;
+                }
+                None => return None,
+            }
+        }
     }
 }
 
