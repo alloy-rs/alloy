@@ -881,6 +881,39 @@ impl Filter {
         );
         logs
     }
+
+    /// Creates an iterator that filters receipts for matching logs.
+    ///
+    /// This method takes an iterator of blocks (where each block is an iterator of receipts)
+    /// and returns an iterator that yields all logs matching this filter.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use alloy_consensus::Receipt;
+    /// # use alloy_primitives::{Address, Log, B256};
+    /// # fn example(receipts: Vec<Vec<Receipt>>) {
+    /// let filter = Filter::new()
+    ///     .address("0x1234...".parse::<Address>().unwrap())
+    ///     .event_signature(B256::from([0x01; 32]));
+    ///
+    /// let logs: Vec<Log> = filter.filter_receipts(receipts).collect();
+    /// # }
+    /// ```
+    pub fn filter_receipts<I, R>(&self, receipts: I) -> FilterReceiptsIter<'_, I::IntoIter, R>
+    where
+        I: IntoIterator,
+        I::Item: IntoIterator<Item = R>,
+        R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+    {
+        FilterReceiptsIter {
+            filter: self,
+            blocks_iter: receipts.into_iter(),
+            current_block: None,
+            current_logs: None,
+        }
+    }
 }
 
 #[cfg(feature = "serde")]
@@ -1522,6 +1555,78 @@ impl FilteredParams {
             }
         }
         true
+    }
+}
+
+/// Iterator that yields logs from receipts that match a filter.
+///
+/// This iterator processes blocks of receipts, yielding all logs that match
+/// the provided filter criteria.
+pub struct FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    filter: &'a Filter,
+    blocks_iter: I,
+    current_block: Option<<I::Item as IntoIterator>::IntoIter>,
+    current_logs: Option<alloc::vec::IntoIter<alloy_primitives::Log>>,
+}
+
+impl<'a, I, R> core::fmt::Debug for FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FilterReceiptsIter")
+            .field("filter", &self.filter)
+            .field("has_current_block", &self.current_block.is_some())
+            .field("has_current_logs", &self.current_logs.is_some())
+            .finish()
+    }
+}
+
+impl<'a, I, R> Iterator for FilterReceiptsIter<'a, I, R>
+where
+    I: Iterator,
+    I::Item: IntoIterator<Item = R>,
+    R: alloy_consensus::TxReceipt<Log = alloy_primitives::Log>,
+{
+    type Item = alloy_primitives::Log;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            // First, try to return a log from current logs iterator
+            if let Some(ref mut logs) = self.current_logs {
+                if let Some(log) = logs.next() {
+                    if self.filter.matches(&log) {
+                        return Some(log);
+                    }
+                    continue;
+                }
+            }
+
+            // No more logs, try to get the next receipt
+            if let Some(ref mut receipts) = self.current_block {
+                if let Some(receipt) = receipts.next() {
+                    // Create iterator from logs of this receipt
+                    self.current_logs = Some(receipt.into_logs().into_iter());
+                    continue;
+                }
+            }
+
+            // Current block exhausted or none set, try next block
+            match self.blocks_iter.next() {
+                Some(block) => {
+                    self.current_block = Some(block.into_iter());
+                    self.current_logs = None;
+                }
+                None => return None,
+            }
+        }
     }
 }
 
@@ -2245,5 +2350,95 @@ mod tests {
         );
 
         assert_eq!(result.len(), 0); // Should not append any logs due to block mismatch
+    }
+
+    #[test]
+    fn test_filter_receipts_iterator() {
+        use alloy_consensus::Receipt;
+        use alloy_primitives::Bytes;
+
+        // Create test addresses and topics
+        let addr1 = Address::from([0x11; 20]);
+        let addr2 = Address::from([0x22; 20]);
+        let topic1 = B256::from([0x01; 32]);
+        let topic2 = B256::from([0x02; 32]);
+
+        // Create test receipts for block 1
+        let block1_receipts = vec![
+            Receipt {
+                status: alloy_consensus::Eip658Value::Eip658(true),
+                cumulative_gas_used: 100000,
+                logs: vec![
+                    alloy_primitives::Log {
+                        address: addr1,
+                        data: LogData::new(vec![topic1], Bytes::from(vec![0x01, 0x02])).unwrap(),
+                    },
+                    alloy_primitives::Log {
+                        address: addr2,
+                        data: LogData::new(vec![topic2], Bytes::from(vec![0x03, 0x04])).unwrap(),
+                    },
+                ],
+            },
+            Receipt {
+                status: alloy_consensus::Eip658Value::Eip658(true),
+                cumulative_gas_used: 200000,
+                logs: vec![alloy_primitives::Log {
+                    address: addr1,
+                    data: LogData::new(vec![topic2], Bytes::from(vec![0x05])).unwrap(),
+                }],
+            },
+        ];
+
+        // Create test receipts for block 2
+        let block2_receipts = vec![Receipt {
+            status: alloy_consensus::Eip658Value::Eip658(true),
+            cumulative_gas_used: 300000,
+            logs: vec![
+                alloy_primitives::Log {
+                    address: addr1,
+                    data: LogData::new(vec![topic1], Bytes::from(vec![0x06])).unwrap(),
+                },
+                alloy_primitives::Log {
+                    address: addr2,
+                    data: LogData::new(vec![topic1], Bytes::from(vec![0x07])).unwrap(),
+                },
+            ],
+        }];
+
+        let all_receipts = vec![block1_receipts, block2_receipts];
+
+        // Test 1: Filter by address
+        let filter = Filter::new().address(addr1);
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        assert_eq!(logs.len(), 3); // Should match 3 logs with addr1
+        assert!(logs.iter().all(|log| log.address == addr1));
+
+        // Test 2: Filter by topic
+        let filter = Filter::new().event_signature(topic1);
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+
+        // Block 1, Receipt 1: topic1 (addr1), topic2 (addr2)
+        // Block 1, Receipt 2: topic2 (addr1)
+        // Block 2, Receipt 1: topic1 (addr1), topic1 (addr2)
+        // Total: 3 logs with topic1
+        assert_eq!(logs.len(), 3); // Should match 3 logs with topic1
+        assert!(logs.iter().all(|log| log.topics()[0] == topic1));
+
+        // Test 3: Filter by address and topic
+        let filter = Filter::new().address(addr1).event_signature(topic2);
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        assert_eq!(logs.len(), 1); // Should match 1 log with addr1 and topic2
+        assert_eq!(logs[0].address, addr1);
+        assert_eq!(logs[0].topics()[0], topic2);
+
+        // Test 4: No matches
+        let filter = Filter::new().address(Address::from([0x99; 20]));
+        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        assert_eq!(logs.len(), 0);
+
+        // Test 5: Empty filter matches all
+        let filter = Filter::new();
+        let logs: Vec<_> = filter.filter_receipts(all_receipts).collect();
+        assert_eq!(logs.len(), 5); // Should match all 5 logs
     }
 }
