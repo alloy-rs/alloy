@@ -5,7 +5,7 @@ use alloy_transport::RpcError;
 use futures::{ready, Future, FutureExt, Stream, StreamExt};
 use lru::LruCache;
 use std::{
-    marker::PhantomData, 
+    marker::PhantomData,
     num::NonZeroUsize,
     pin::Pin,
     task::{Context, Poll},
@@ -58,7 +58,8 @@ impl<N: Network> NewBlocks<N> {
             if client.pubsub_frontend().is_some() {
                 return NewBlocksStream::Subscription(Box::pin(async move {
                     match self.into_subscription_stream().await {
-                        Some(stream) => Some(Box::pin(stream) as Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>),
+                        Some(stream) => Some(Box::pin(stream)
+                            as Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>),
                         None => None,
                     }
                 }));
@@ -98,8 +99,11 @@ impl<N: Network> NewBlocks<N> {
                 return None;
             }
         };
-        let header_stream = sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
-        let block_stream = self.into_block_stream(Box::new(header_stream) as Box<dyn Stream<Item = u64> + Send + Unpin>);
+        let header_stream =
+            sub.into_typed::<N::HeaderResponse>().into_stream().map(|header| header.number());
+        let block_stream = self.into_block_stream(
+            Box::new(header_stream) as Box<dyn Stream<Item = u64> + Send + Unpin>
+        );
         Some(Box::pin(block_stream) as Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>)
     }
 
@@ -133,7 +137,18 @@ enum BlockFetchState<N: Network> {
         target_block: BlockNumber,
         current_number: BlockNumber,
         retries: usize,
-        fut: Option<Pin<Box<dyn Future<Output = Result<Option<N::BlockResponse>, RpcError<alloy_transport::TransportErrorKind>>> + Send>>>,
+        fut: Option<
+            Pin<
+                Box<
+                    dyn Future<
+                            Output = Result<
+                                Option<N::BlockResponse>,
+                                RpcError<alloy_transport::TransportErrorKind>,
+                            >,
+                        > + Send,
+                >,
+            >,
+        >,
     },
 }
 
@@ -181,7 +196,7 @@ where
                 BlockFetchState::YieldingBuffered => {
                     // Clear any buffered blocks.
                     if let Some(known_block) = this.known_blocks.pop(&this.next_yield) {
-                        debug!(number=this.next_yield, "yielding block");
+                        debug!(number = this.next_yield, "yielding block");
                         this.next_yield += 1;
                         return Poll::Ready(Some(known_block));
                     }
@@ -222,7 +237,13 @@ where
                         }
                     }
                 }
-                BlockFetchState::Fetching { client, target_block, current_number, retries, fut } => {
+                BlockFetchState::Fetching {
+                    client,
+                    target_block,
+                    current_number,
+                    retries,
+                    fut,
+                } => {
                     if let Some(future) = fut {
                         // Poll the ongoing request.
                         match ready!(future.poll_unpin(cx)) {
@@ -231,7 +252,7 @@ where
                                 this.known_blocks.put(number, block);
                                 *current_number += 1;
                                 *fut = None;
-                                
+
                                 if this.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
                                     // Cache is full, should be consumed before filling more blocks.
                                     debug!(number, "cache full");
@@ -245,7 +266,10 @@ where
                                 *fut = None;
                             }
                             Ok(None) if *retries > 0 => {
-                                debug!(number=*current_number, "failed to fetch block (doesn't exist), retrying");
+                                debug!(
+                                    number = *current_number,
+                                    "failed to fetch block (doesn't exist), retrying"
+                                );
                                 *retries -= 1;
                                 *fut = None;
                             }
@@ -255,7 +279,10 @@ where
                                 continue;
                             }
                             Ok(None) => {
-                                error!(number=*current_number, "failed to fetch block (doesn't exist)");
+                                error!(
+                                    number = *current_number,
+                                    "failed to fetch block (doesn't exist)"
+                                );
                                 this.state = BlockFetchState::YieldingBuffered;
                                 continue;
                             }
@@ -269,7 +296,7 @@ where
                     }
 
                     // Start a new request.
-                    debug!(number=*current_number, "fetching block");
+                    debug!(number = *current_number, "fetching block");
                     let client_ref = client.clone();
                     let number = *current_number;
                     let future = Box::pin(async move {
@@ -288,7 +315,14 @@ pub(crate) enum NewBlocksStream<N: Network> {
     Polling(BlockStream<N, Box<dyn Stream<Item = u64> + Send + Unpin>>),
     /// Subscription-based stream (WebSocket) - initial state.
     #[cfg(feature = "pubsub")]
-    Subscription(Pin<Box<dyn Future<Output = Option<Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>>> + Send>>),
+    Subscription(
+        Pin<
+            Box<
+                dyn Future<Output = Option<Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>>>
+                    + Send,
+            >,
+        >,
+    ),
     /// Subscription-based stream (WebSocket) - ready state.
     #[cfg(feature = "pubsub")]
     SubscriptionReady(Pin<Box<dyn Stream<Item = N::BlockResponse> + Send>>),
