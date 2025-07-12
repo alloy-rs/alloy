@@ -109,7 +109,7 @@ impl<'de> Deserialize<'de> for TenderlyLogInput {
             Err(e) => return Err(D::Error::custom(e)),
         };
 
-        Ok(TenderlyLogInput { value, r#type: ty, name: raw.name, indexed: raw.indexed })
+        Ok(Self { value, r#type: ty, name: raw.name, indexed: raw.indexed })
     }
 }
 
@@ -179,7 +179,7 @@ fn parse_dyn_value(
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(DynSolValue::Tuple(values))
         }
-        DynSolType::Function => Err(Error::custom("function type is not supported")),
+        _ => Err(Error::custom("type is not supported")),
     }
 }
 
