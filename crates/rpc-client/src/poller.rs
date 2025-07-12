@@ -1,19 +1,20 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
-use async_stream::stream;
-use futures::{Stream, StreamExt};
+use futures::{future::BoxFuture, ready, Future, FutureExt, Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
     marker::PhantomData,
     ops::{Deref, DerefMut},
+    pin::Pin,
+    task::{Context, Poll},
     time::Duration,
 };
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
-use tracing_futures::Instrument;
+use tracing::Span;
 
 #[cfg(target_family = "wasm")]
 use wasmtimer::tokio::sleep;
@@ -165,47 +166,188 @@ where
     ///
     /// Note that this does not spawn the poller on a separate task, thus all responses will be
     /// polled on the current thread once this stream is polled.
-    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
-        Box::pin(self.into_local_stream())
-    }
-
-    fn into_local_stream(self) -> impl Stream<Item = Resp> {
-        let span = debug_span!("poller", method = %self.method);
-        stream! {
-        let mut params = ParamsOnce::Typed(self.params);
-        for _ in 0..self.limit {
-            let Some(client) = self.client.upgrade() else {
-                debug!("client dropped");
-                break;
-            };
-
-            // Avoid serializing the params more than once.
-            let params = match params.get() {
-                Ok(p) => p,
-                Err(err) => {
-                    error!(%err, "failed to serialize params");
-                    break;
-                }
-            };
-
-            trace!("polling");
-            match client.request(self.method.clone(), params).await {
-                Ok(resp) => yield resp,
-                Err(err) => {
-                    error!(%err, "failed to poll");
-                }
-            }
-
-            trace!(duration=?self.poll_interval, "sleeping");
-            sleep(self.poll_interval).await;
-        }
-        }
-        .instrument(span)
+    pub fn into_stream(self) -> PollerStream<Resp> {
+        PollerStream::new(self)
     }
 
     /// Returns the [`WeakClient`] associated with the poller.
     pub fn client(&self) -> WeakClient {
         self.client.clone()
+    }
+}
+
+/// State for the polling stream.
+enum PollState<Resp> {
+    /// Waiting to start the next poll.
+    Waiting,
+    /// Currently polling for a response.
+    Polling(
+        BoxFuture<
+            'static,
+            Result<Resp, alloy_transport::RpcError<alloy_transport::TransportErrorKind>>,
+        >,
+    ),
+    /// Sleeping between polls.
+    Sleeping(Pin<Box<tokio::time::Sleep>>),
+}
+
+/// A stream of responses from polling an RPC method.
+///
+/// This stream polls the given RPC method at the specified interval and yields the responses.
+///
+/// # Examples
+///
+/// ```no_run
+/// # async fn example(client: alloy_rpc_client::RpcClient) -> Result<(), Box<dyn std::error::Error>> {
+/// use alloy_primitives::U64;
+/// use futures_util::StreamExt;
+///
+/// // Create a poller that fetches block numbers
+/// let poller = client
+///     .prepare_static_poller("eth_blockNumber", [])
+///     .with_poll_interval(std::time::Duration::from_secs(1));
+///
+/// // Convert the block number to a more useful format
+/// let mut stream = poller.into_stream().map(|block_num: U64| block_num.to::<u64>());
+///
+/// while let Some(block_number) = stream.next().await {
+///     println!("Current block: {}", block_number);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct PollerStream<Resp, Output = Resp, Map = fn(Resp) -> Output> {
+    client: WeakClient,
+    method: Cow<'static, str>,
+    params: Box<RawValue>,
+    poll_interval: Duration,
+    limit: usize,
+    poll_count: usize,
+    state: PollState<Resp>,
+    span: Span,
+    map: Map,
+    _pd: PhantomData<fn() -> Output>,
+}
+
+impl<Resp, Output, Map> std::fmt::Debug for PollerStream<Resp, Output, Map> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PollerStream")
+            .field("method", &self.method)
+            .field("poll_interval", &self.poll_interval)
+            .field("limit", &self.limit)
+            .field("poll_count", &self.poll_count)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<Resp> PollerStream<Resp> {
+    fn new<Params: Serialize>(builder: PollerBuilder<Params, Resp>) -> Self {
+        let span = debug_span!("poller", method = %builder.method);
+
+        // Serialize params once
+        let params = serde_json::value::to_raw_value(&builder.params).unwrap_or_else(|err| {
+            error!(%err, "failed to serialize params during initialization");
+            // Return empty params, stream will terminate on first poll
+            Box::<RawValue>::default()
+        });
+
+        Self {
+            client: builder.client,
+            method: builder.method,
+            params,
+            poll_interval: builder.poll_interval,
+            limit: builder.limit,
+            poll_count: 0,
+            state: PollState::Waiting,
+            span,
+            map: std::convert::identity,
+            _pd: PhantomData,
+        }
+    }
+}
+
+impl<Resp, Output, Map> PollerStream<Resp, Output, Map>
+where
+    Map: Fn(Resp) -> Output,
+{
+    /// Maps the responses using the provided function.
+    pub fn map<NewOutput, NewMap>(self, map: NewMap) -> PollerStream<Resp, NewOutput, NewMap>
+    where
+        NewMap: Fn(Resp) -> NewOutput,
+    {
+        PollerStream {
+            client: self.client,
+            method: self.method,
+            params: self.params,
+            poll_interval: self.poll_interval,
+            limit: self.limit,
+            poll_count: self.poll_count,
+            state: self.state,
+            span: self.span,
+            map,
+            _pd: PhantomData,
+        }
+    }
+}
+
+impl<Resp, Output, Map> Stream for PollerStream<Resp, Output, Map>
+where
+    Resp: RpcRecv + 'static,
+    Map: Fn(Resp) -> Output + Unpin,
+{
+    type Item = Output;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let _guard = this.span.enter();
+
+        loop {
+            match &mut this.state {
+                PollState::Waiting => {
+                    // Check if we've reached the limit
+                    if this.poll_count >= this.limit {
+                        debug!("poll limit reached");
+                        return Poll::Ready(None);
+                    }
+
+                    // Check if client is still alive
+                    let Some(client) = this.client.upgrade() else {
+                        debug!("client dropped");
+                        return Poll::Ready(None);
+                    };
+
+                    // Start polling
+                    trace!("polling");
+                    let method = this.method.clone();
+                    let params = this.params.clone();
+                    let fut = Box::pin(async move { client.request(method, params).await });
+                    this.state = PollState::Polling(fut);
+                }
+                PollState::Polling(fut) => {
+                    match ready!(fut.poll_unpin(cx)) {
+                        Ok(resp) => {
+                            this.poll_count += 1;
+                            // Start sleeping before next poll
+                            trace!(duration=?this.poll_interval, "sleeping");
+                            let sleep = Box::pin(sleep(this.poll_interval));
+                            this.state = PollState::Sleeping(sleep);
+                            return Poll::Ready(Some((this.map)(resp)));
+                        }
+                        Err(err) => {
+                            error!(%err, "failed to poll");
+                            // Start sleeping before retry
+                            trace!(duration=?this.poll_interval, "sleeping after error");
+                            let sleep = Box::pin(sleep(this.poll_interval));
+                            this.state = PollState::Sleeping(sleep);
+                        }
+                    }
+                }
+                PollState::Sleeping(sleep) => {
+                    ready!(sleep.as_mut().poll(cx));
+                    this.state = PollState::Waiting;
+                }
+            }
+        }
     }
 }
 
@@ -264,31 +406,6 @@ where
     /// [lag errors](tokio_stream::wrappers::errors::BroadcastStreamRecvError).
     pub fn into_stream_raw(self) -> BroadcastStream<Resp> {
         self.rx.into()
-    }
-}
-
-// Serializes the parameters only once.
-enum ParamsOnce<P> {
-    Typed(P),
-    Serialized(Box<RawValue>),
-}
-
-impl<P: Serialize> ParamsOnce<P> {
-    #[inline]
-    fn get(&mut self) -> serde_json::Result<&RawValue> {
-        match self {
-            Self::Typed(_) => self.init(),
-            Self::Serialized(p) => Ok(p),
-        }
-    }
-
-    #[cold]
-    fn init(&mut self) -> serde_json::Result<&RawValue> {
-        let Self::Typed(p) = self else { unreachable!() };
-        let v = serde_json::value::to_raw_value(p)?;
-        *self = Self::Serialized(v);
-        let Self::Serialized(v) = self else { unreachable!() };
-        Ok(v)
     }
 }
 
