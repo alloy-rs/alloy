@@ -17,10 +17,10 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::Span;
 
 #[cfg(target_family = "wasm")]
-use wasmtimer::tokio::sleep;
+use wasmtimer::tokio::{sleep, Sleep};
 
 #[cfg(not(target_family = "wasm"))]
-use tokio::time::sleep;
+use tokio::time::{sleep, Sleep};
 
 /// A poller task builder.
 ///
@@ -48,8 +48,8 @@ use tokio::time::sleep;
 /// use alloy_rpc_client::PollerBuilder;
 /// use futures_util::StreamExt;
 ///
-/// let poller: PollerBuilder<alloy_rpc_client::NoParams, U64> = client
-///     .prepare_static_poller("eth_blockNumber", [])
+/// let poller: PollerBuilder<(), U64> = client
+///     .prepare_static_poller("eth_blockNumber", ())
 ///     .with_poll_interval(std::time::Duration::from_secs(5));
 /// let mut stream = poller.into_stream();
 /// while let Some(block_number) = stream.next().await {
@@ -188,7 +188,7 @@ enum PollState<Resp> {
         >,
     ),
     /// Sleeping between polls.
-    Sleeping(Pin<Box<tokio::time::Sleep>>),
+    Sleeping(Pin<Box<Sleep>>),
 }
 
 /// A stream of responses from polling an RPC method.
@@ -204,7 +204,7 @@ enum PollState<Resp> {
 ///
 /// // Create a poller that fetches block numbers
 /// let poller = client
-///     .prepare_static_poller("eth_blockNumber", [])
+///     .prepare_static_poller("eth_blockNumber", ())
 ///     .with_poll_interval(std::time::Duration::from_secs(1));
 ///
 /// // Convert the block number to a more useful format
