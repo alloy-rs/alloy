@@ -3,7 +3,7 @@
 #![allow(unknown_lints, mismatched_lifetime_syntaxes)]
 
 #[cfg(feature = "pubsub")]
-use super::get_block::SubFullBlocks;
+use super::get_block::{SubFinalizedBlocks, SubFullBlocks};
 use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -35,7 +35,6 @@ use alloy_rpc_types_eth::{
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
-use crate::provider::get_block::SubFinalizedBlocks;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
