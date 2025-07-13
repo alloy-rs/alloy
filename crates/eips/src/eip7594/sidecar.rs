@@ -107,6 +107,22 @@ impl BlobTransactionSidecarVariant {
         VersionedHashIter::new(self.commitments())
     }
 
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        match self {
+            Self::Eip4844(s) => s.versioned_hash_index(hash),
+            Self::Eip7594(s) => s.versioned_hash_index(hash),
+        }
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        match self {
+            Self::Eip4844(s) => s.blob_by_versioned_hash(hash),
+            Self::Eip7594(s) => s.blob_by_versioned_hash(hash),
+        }
+    }
+
     /// Outputs the RLP length of the [BlobTransactionSidecarVariant] fields, without a RLP header.
     #[doc(hidden)]
     pub fn rlp_encoded_fields_length(&self) -> usize {
@@ -412,6 +428,18 @@ impl BlobTransactionSidecarEip7594 {
     /// Returns an iterator over the versioned hashes of the commitments.
     pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
         VersionedHashIter::new(&self.commitments)
+    }
+
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        self.commitments.iter().position(|commitment| {
+            crate::eip4844::kzg_to_versioned_hash(commitment.as_slice()) == *hash
+        })
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        self.versioned_hash_index(hash).and_then(|index| self.blobs.get(index))
     }
 
     /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV2`]) pairs

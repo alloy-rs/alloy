@@ -28,6 +28,12 @@ pub use receipt::TransactionReceipt;
 pub mod request;
 pub use request::{TransactionInput, TransactionInputKind, TransactionRequest};
 
+/// Serde-bincode-compat
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    pub use super::request::serde_bincode_compat::*;
+}
+
 /// Transaction object used in RPC.
 ///
 /// This represents a transaction in RPC format (`eth_getTransactionByHash`) and contains the full

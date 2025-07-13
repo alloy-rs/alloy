@@ -296,6 +296,18 @@ impl BlobTransactionSidecar {
         self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        self.commitments
+            .iter()
+            .position(|commitment| kzg_to_versioned_hash(commitment.as_slice()) == *hash)
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        self.versioned_hash_index(hash).and_then(|index| self.blobs.get(index))
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
     pub fn size(&self) -> usize {

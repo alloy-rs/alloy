@@ -1354,6 +1354,186 @@ impl From<TxEnvelope> for TransactionRequest {
     }
 }
 
+/// Bincode-compatible [TransactionRequest] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
+    use crate::TransactionInput;
+    use alloc::borrow::Cow;
+    use alloy_consensus::BlobTransactionSidecar;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [super::TransactionRequest] serde implementation.
+    ///
+    /// Intended to use with the [serde_with::serde_as] macro in the following way:
+    /// ```rust
+    /// use alloy_rpc_types_eth::{serde_bincode_compat, transaction, TransactionRequest};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+    ///     transaction: TransactionRequest,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct TransactionRequest<'a> {
+        /// The address of the transaction author.
+        pub from: Option<Address>,
+        /// The destination address of the transaction.
+        pub to: Option<TxKind>,
+        /// The legacy gas price.
+        pub gas_price: Option<u128>,
+        /// The max base fee per gas the sender is willing to pay.
+        pub max_fee_per_gas: Option<u128>,
+        /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
+        pub max_priority_fee_per_gas: Option<u128>,
+        /// The max fee per blob gas for EIP-4844 blob transactions.
+        pub max_fee_per_blob_gas: Option<u128>,
+        /// The gas limit for the transaction.
+        pub gas: Option<u64>,
+        /// The value transferred in the transaction, in wei.
+        pub value: Option<U256>,
+        /// Transaction input.
+        pub input: Option<Cow<'a, Bytes>>,
+        /// Transaction data.
+        pub data: Option<Cow<'a, Bytes>>,
+        /// The nonce of the transaction.
+        pub nonce: Option<u64>,
+        /// The chain ID for the transaction.
+        pub chain_id: Option<ChainId>,
+        /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
+        pub access_list: Option<Cow<'a, AccessList>>,
+        /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
+        pub transaction_type: Option<u8>,
+        /// Blob versioned hashes for EIP-4844 transactions.
+        pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
+        /// Blob sidecar for EIP-4844 transactions.
+        pub sidecar: Option<Cow<'a, BlobTransactionSidecar>>,
+        /// Authorization list for EIP-7702 transactions.
+        pub authorization_list:
+            Option<Vec<alloy_eips::eip7702::serde_bincode_compat::SignedAuthorization<'a>>>,
+    }
+
+    impl<'a> From<&'a super::TransactionRequest> for TransactionRequest<'a> {
+        fn from(value: &'a super::TransactionRequest) -> Self {
+            Self {
+                from: value.from,
+                to: value.to,
+                gas_price: value.gas_price,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                gas: value.gas,
+                value: value.value,
+                input: value.input.input.as_ref().map(Cow::Borrowed),
+                data: value.input.data.as_ref().map(Cow::Borrowed),
+                nonce: value.nonce,
+                chain_id: value.chain_id,
+                access_list: value.access_list.as_ref().map(Cow::Borrowed),
+                transaction_type: value.transaction_type,
+                blob_versioned_hashes: value.blob_versioned_hashes.as_ref().map(Cow::Borrowed),
+                sidecar: value.sidecar.as_ref().map(Cow::Borrowed),
+                authorization_list: value
+                    .authorization_list
+                    .as_ref()
+                    .map(|auths| auths.iter().map(Into::into).collect()),
+            }
+        }
+    }
+
+    impl<'a> From<TransactionRequest<'a>> for super::TransactionRequest {
+        fn from(value: TransactionRequest<'a>) -> Self {
+            Self {
+                from: value.from,
+                to: value.to,
+                gas_price: value.gas_price,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                max_fee_per_blob_gas: value.max_fee_per_blob_gas,
+                gas: value.gas,
+                value: value.value,
+                input: TransactionInput {
+                    input: value.input.map(Cow::into_owned),
+                    data: value.data.map(Cow::into_owned),
+                },
+                nonce: value.nonce,
+                chain_id: value.chain_id,
+                access_list: value.access_list.map(|list| list.into_owned()),
+                transaction_type: value.transaction_type,
+                blob_versioned_hashes: value
+                    .blob_versioned_hashes
+                    .map(|hashes| hashes.into_owned()),
+                sidecar: value.sidecar.map(|sidecar| sidecar.into_owned()),
+                authorization_list: value
+                    .authorization_list
+                    .map(|list| list.into_iter().map(Into::into).collect()),
+            }
+        }
+    }
+
+    impl SerializeAs<super::TransactionRequest> for TransactionRequest<'_> {
+        fn serialize_as<S>(
+            source: &super::TransactionRequest,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TransactionRequest::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TransactionRequest> for TransactionRequest<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TransactionRequest, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TransactionRequest::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::TransactionRequest;
+        use arbitrary::Arbitrary;
+        use bincode::config;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::serde_bincode_compat;
+
+        #[test]
+        fn test_tx_request_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::TransactionRequest")]
+                transaction: TransactionRequest,
+            }
+
+            let mut bytes = vec![0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TransactionRequest::arbitrary(&mut arbitrary::Unstructured::new(
+                    &bytes,
+                ))
+                .unwrap(),
+            };
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
 /// Represents how a [`TransactionRequest`] handles input/data fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TransactionInputKind {
