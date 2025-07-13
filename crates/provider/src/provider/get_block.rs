@@ -559,7 +559,7 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
                 let current_slot = Self::timestamp_to_slot(current_timestamp);
 
                 if current_slot >= last_slot + Self::FINALITY_DELAY_SLOTS {
-                    // 64 slots have passed, enter polling mode
+                    // 32 slots have passed, enter polling mode
                     self.polling_mode = true;
                     true
                 } else if self.polling_mode {
