@@ -519,8 +519,8 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
     /// Ethereum slot duration in seconds
     const SLOT_DURATION: u64 = 12;
     /// Number of slots to wait before requesting finalized block again
-    /// This is approximately 2 epochs (64 slots ≈ 768 seconds ≈ 12.8 minutes)
-    const FINALITY_DELAY_SLOTS: u64 = 64;
+    /// This is approximately 1 epochs (32 slots ≈ 384 seconds ≈ 6.4 minutes)
+    const FINALITY_DELAY_SLOTS: u64 = 32;
 
     /// Create a new [`FinalizedBlocksStream`] with the given subscription and client.
     pub fn new(
@@ -581,7 +581,7 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
             (None, Some(_)) => true, // First finalized block
             (Some(cached), Some(new)) => {
                 // Compare block numbers to see if it's a newer finalized block
-                cached.header().number() != new.header().number()
+                cached.header().number() != new.header().number() 
             }
             (Some(_), None) => false, // New request returned None, keep cached
             (None, None) => false,    // Both None, no update
