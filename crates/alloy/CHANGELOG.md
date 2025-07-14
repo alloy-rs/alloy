@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Re-export `serde-bincode-compat` ([#2688](https://github.com/alloy-rs/alloy/issues/2688))
 
+### Miscellaneous Tasks
+
+- Release 1.0.21
+
 ## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
 
 ### Miscellaneous Tasks

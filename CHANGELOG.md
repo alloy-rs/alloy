@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Bug Fixes
+
+- No-std for serde-bincode-compat ([#2711](https://github.com/alloy-rs/alloy/issues/2711))
+
+### Dependencies
+
+- [rpc-client] Replace impl Stream with dedicated PollerStream type ([#2695](https://github.com/alloy-rs/alloy/issues/2695))
+
+### Features
+
+- Add filter_receipts iterator for filtering logs from receipts ([#2701](https://github.com/alloy-rs/alloy/issues/2701))
+
+### Miscellaneous Tasks
+
+- Pin latest patch ([#2710](https://github.com/alloy-rs/alloy/issues/2710))
+
 ## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
 
 ### Bug Fixes
@@ -27,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.21
 - Sidecar helper fns ([#2700](https://github.com/alloy-rs/alloy/issues/2700))
 - Add into_with_bloom_unchecked ([#2683](https://github.com/alloy-rs/alloy/issues/2683))
 - Add Recovered::copied ([#2680](https://github.com/alloy-rs/alloy/issues/2680))

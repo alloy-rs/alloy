@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc-types-engine] Add into_block_raw methods for payload types ([#2684](https://github.com/alloy-rs/alloy/issues/2684))
 - [rpc-types-engine] Custom ssz decode to distinguish Fulu and Electra payload ([#2679](https://github.com/alloy-rs/alloy/issues/2679))
 
+### Miscellaneous Tasks
+
+- Release 1.0.21
+
 ## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
 
 ### Miscellaneous Tasks

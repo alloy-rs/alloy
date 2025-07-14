@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.21
 - Add into_with_bloom_unchecked ([#2683](https://github.com/alloy-rs/alloy/issues/2683))
 - Add Recovered::copied ([#2680](https://github.com/alloy-rs/alloy/issues/2680))
 
