@@ -126,7 +126,7 @@ impl Log<LogData> {
     /// # Returns
     ///
     /// A vector of RPC logs with all metadata fields populated, ready to be included in the
-    /// transaction receipt. ```
+    /// transaction receipt.
     pub fn collect_for_receipt<I, T>(
         previous_log_count: usize,
         meta: TransactionMeta,
