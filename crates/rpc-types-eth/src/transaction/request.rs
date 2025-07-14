@@ -1370,7 +1370,7 @@ impl From<TxEnvelope> for TransactionRequest {
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
     use crate::TransactionInput;
-    use alloc::borrow::Cow;
+    use alloc::{borrow::Cow, vec::Vec};
     use alloy_consensus::BlobTransactionSidecar;
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
