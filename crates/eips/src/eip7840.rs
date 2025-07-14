@@ -9,7 +9,7 @@ use crate::{
 /// as defined by [EIP-7918 (Decoupling Blob Gas from Execution Gas)](https://eips.ethereum.org/EIPS/eip-7918).
 /// This ensures that even though blob gas and execution gas are decoupled, there is still a base
 /// cost in execution gas to include blobs.
-pub const BLOB_BASE_COST: u64 = 2_u64.pow(14);
+pub const BLOB_BASE_COST: u64 = 2_u64.pow(13);
 
 /// Configuration for the blob-related calculations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
