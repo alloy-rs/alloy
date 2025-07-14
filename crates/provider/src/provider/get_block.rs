@@ -541,11 +541,6 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
         }
     }
 
-    /// Calculate the current slot based on timestamp
-    fn timestamp_to_slot(timestamp: u64) -> u64 {
-        timestamp / Self::SLOT_DURATION
-    }
-
     fn global_slot(ts: u64) -> u64 {
         (ts.saturating_sub(Self::GENESIS_TIME)) / Self::SLOT_DURATION
     }
@@ -612,7 +607,7 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
         let this = self.get_mut();
 
         // If we have a pending request, poll it first
-        if let Some(mut pending) = this.pending_request.as_mut() {
+        if let Some(pending) = this.pending_request.as_mut() {
             let result = ready!(pending.as_mut().poll(cx));
 
             this.pending_request = None;
@@ -640,8 +635,9 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
                         if let Some(ref block) = processed_block {
                             this.cached_finalized_block = Some(block.clone());
                         }
-                        this.last_finalized_slot =
-                            processed_block.as_ref().map(|b| Self::global_slot(b.header().timestamp()));
+                        this.last_finalized_slot = processed_block
+                            .as_ref()
+                            .map(|b| Self::global_slot(b.header().timestamp()));
                         this.polling_mode = false;
                         tracing::debug!(
                             new_finalized = %processed_block.as_ref()
@@ -704,7 +700,7 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
                     this.pending_request = Some(call);
 
                     // Poll the future immediately
-                    if let Some(mut pending) = this.pending_request.as_mut() {
+                    if let Some(pending) = this.pending_request.as_mut() {
                         let result = ready!(pending.as_mut().poll(cx));
 
                         this.pending_request = None;
@@ -741,7 +737,8 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
                                     );
                                     // polling_mode stays true
                                 }
-                                this.last_finalized_slot = Some(Self::global_slot(current_timestamp));
+                                this.last_finalized_slot =
+                                    Some(Self::global_slot(current_timestamp));
 
                                 Poll::Ready(Some(Ok((
                                     header,
@@ -751,7 +748,8 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
                             Err(_err) => {
                                 // If finalized block request fails, still return the header
                                 // with cached block
-                                this.last_finalized_slot = Some(Self::global_slot(current_timestamp));
+                                this.last_finalized_slot =
+                                    Some(Self::global_slot(current_timestamp));
                                 tracing::warn!(
                                     "❌ finalized RPC failed, using cached block (immediate)"
                                 );
