@@ -31,8 +31,8 @@ pub struct BlobParams {
     /// [`eip4844::BLOB_TX_MIN_BLOB_GASPRICE`] if not set.
     pub min_blob_fee: u128,
     /// Maximum number of blobs per transaction.
-    ///
-    /// If not specified, defaults to `max_blob_count` during deserialization.
+    /// Defaults to `max_blob_count` unless set otherwise.
+    #[cfg_attr(feature = "serde", serde(skip_serializing, default))]
     pub max_blobs_per_tx: u64,
     /// Minimum execution gas required to include a blob in a block.
     #[cfg_attr(feature = "serde", serde(skip_serializing, default))]
@@ -74,6 +74,12 @@ impl BlobParams {
             max_blobs_per_tx: eip7594::MAX_BLOBS_PER_TX_FUSAKA,
             blob_base_cost: BLOB_BASE_COST,
         }
+    }
+
+    /// Set max blobs per transaction on [`BlobParams`].
+    pub const fn with_max_blobs_per_tx(mut self, max_blobs_per_tx: u64) -> Self {
+        self.max_blobs_per_tx = max_blobs_per_tx;
+        self
     }
 
     /// Set blob base cost on [`BlobParams`].
@@ -143,7 +149,6 @@ mod serde_impl {
         #[serde(rename = "baseFeeUpdateFraction")]
         update_fraction: u128,
         min_blob_fee: Option<u128>,
-        max_blobs_per_tx: Option<u64>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -153,7 +158,7 @@ mod serde_impl {
                 max_blob_count,
                 update_fraction,
                 min_blob_fee,
-                max_blobs_per_tx,
+                max_blobs_per_tx: _,
                 blob_base_cost: _,
             } = params;
 
@@ -163,27 +168,21 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
                     .then_some(min_blob_fee),
-                max_blobs_per_tx: Some(max_blobs_per_tx),
             }
         }
     }
 
     impl From<SerdeHelper> for BlobParams {
         fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper {
-                target_blob_count,
-                max_blob_count,
-                update_fraction,
-                min_blob_fee,
-                max_blobs_per_tx,
-            } = helper;
+            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
+                helper;
 
             Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
                 min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
-                max_blobs_per_tx: max_blobs_per_tx.unwrap_or(max_blob_count),
+                max_blobs_per_tx: max_blob_count,
                 blob_base_cost: 0,
             }
         }
