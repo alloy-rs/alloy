@@ -1138,7 +1138,7 @@ mod tests {
             .with_difficulty(difficulty)
             .with_mix_hash(mix_hash)
             .with_coinbase(coinbase)
-            .extend_accounts(account.clone());
+            .extend_accounts(account);
 
         assert_ne!(custom_genesis, default_genesis);
         // check every field
@@ -1163,7 +1163,7 @@ mod tests {
         };
         let mut updated_account = BTreeMap::default();
         updated_account.insert(same_address, new_alloc_account);
-        let custom_genesis = custom_genesis.extend_accounts(updated_account.clone());
+        let custom_genesis = custom_genesis.extend_accounts(updated_account);
         assert_ne!(account, updated_account);
         assert_eq!(custom_genesis.alloc.len(), 1);
 
