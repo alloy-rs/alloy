@@ -1093,6 +1093,18 @@ impl From<TransactionRequest> for alloy_serde::WithOtherFields<TransactionReques
     }
 }
 
+impl AsRef<Self> for TransactionRequest {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl AsMut<Self> for TransactionRequest {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
         tx.into_request()
