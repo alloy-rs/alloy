@@ -1,21 +1,22 @@
 use super::FilterPollerBuilder;
 use crate::{utils, ProviderCall};
-use alloy_consensus::BlockHeader;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
-#[cfg(feature = "pubsub")]
-use alloy_rpc_types_eth::pubsub::SubscriptionKind;
 use alloy_transport::{TransportError, TransportResult};
 use either::Either;
-#[cfg(feature = "pubsub")]
-use futures::task::Poll;
 use futures::{Stream, StreamExt};
 use serde_json::Value;
-use std::{fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::{fmt::Debug, marker::PhantomData, time::Duration};
+#[cfg(feature = "pubsub")]
+use {
+    alloy_consensus::BlockHeader, alloy_rpc_types_eth::pubsub::SubscriptionKind,
+    alloy_transport::BoxFuture, futures::ready, futures::task::Poll, futures::FutureExt,
+    std::future::IntoFuture, std::pin::Pin,
+};
 
 /// The parameters for an `eth_getBlockBy{Hash, Number}` RPC request.
 ///
@@ -500,16 +501,12 @@ pub struct FinalizedBlocksStream<N: alloy_network::Network> {
     inner: Pin<Box<dyn Stream<Item = N::HeaderResponse> + Send>>,
     client: alloy_rpc_client::WeakClient,
     kind: BlockTransactionsKind,
-    pending_request: Option<
-        Pin<
-            Box<dyn std::future::Future<Output = TransportResult<Option<N::BlockResponse>>> + Send>,
-        >,
-    >,
+    pending_request: Option<BoxFuture<'static, TransportResult<Option<N::BlockResponse>>>>,
     current_header: Option<N::HeaderResponse>,
     /// Cached finalized block to avoid unnecessary requests
     cached_finalized_block: Option<N::BlockResponse>,
-    /// Timestamp of when we last requested the finalized block
-    last_finalized_request_timestamp: Option<u64>,
+    /// Slot of when we last requested the finalized block
+    last_finalized_slot: Option<u64>,
     /// Whether we're in polling mode (actively checking for finalized block updates)
     polling_mode: bool,
 }
@@ -521,6 +518,9 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
     /// Number of slots to wait before requesting finalized block again
     /// This is approximately 1 epochs (32 slots ≈ 384 seconds ≈ 6.4 minutes)
     const FINALITY_DELAY_SLOTS: u64 = 32;
+
+    /// The timestamp of the genesis block in seconds.
+    const GENESIS_TIME: u64 = 1_606_824_023; // Beacon-genesis is 2020-12-01 12:00:23 UTC
 
     /// Create a new [`FinalizedBlocksStream`] with the given subscription and client.
     pub fn new(
@@ -536,7 +536,7 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
             pending_request: None,
             current_header: None,
             cached_finalized_block: None,
-            last_finalized_request_timestamp: None,
+            last_finalized_slot: None,
             polling_mode: false,
         }
     }
@@ -546,28 +546,40 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
         timestamp / Self::SLOT_DURATION
     }
 
+    fn global_slot(ts: u64) -> u64 {
+        (ts.saturating_sub(Self::GENESIS_TIME)) / Self::SLOT_DURATION
+    }
+
     /// Check if we should enter polling mode or make a finalized block request
     fn should_request_finalized_block(&mut self, current_timestamp: u64) -> bool {
-        match self.last_finalized_request_timestamp {
+        match self.last_finalized_slot {
             None => {
                 // First request - enter polling mode
                 self.polling_mode = true;
+                tracing::debug!("🔔 first finalized request → enter polling_mode");
                 true
             }
-            Some(last_timestamp) => {
-                let last_slot = Self::timestamp_to_slot(last_timestamp);
-                let current_slot = Self::timestamp_to_slot(current_timestamp);
+            Some(last_slot) => {
+                let current_slot = Self::global_slot(current_timestamp);
+                let diff = current_slot.saturating_sub(last_slot);
 
-                if current_slot >= last_slot + Self::FINALITY_DELAY_SLOTS {
-                    // 32 slots have passed, enter polling mode
+                tracing::trace!(
+                    current_slot,
+                    last_slot,
+                    diff,
+                    polling = self.polling_mode,
+                    "⏱  evaluating finalized request"
+                );
+
+                if current_slot % 32 == 0 && !self.polling_mode {
+                    tracing::debug!(current_slot, "🌑 epoch boundary → enter polling_mode");
                     self.polling_mode = true;
                     true
-                } else if self.polling_mode {
-                    // We're in polling mode, keep requesting until we get an update
+                } else if diff >= Self::FINALITY_DELAY_SLOTS {
+                    self.polling_mode = true;
                     true
                 } else {
-                    // Still within the 64 slot window and not polling
-                    false
+                    self.polling_mode
                 }
             }
         }
@@ -581,7 +593,7 @@ impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
             (None, Some(_)) => true, // First finalized block
             (Some(cached), Some(new)) => {
                 // Compare block numbers to see if it's a newer finalized block
-                cached.header().number() != new.header().number() 
+                cached.header().number() != new.header().number()
             }
             (Some(_), None) => false, // New request returned None, keep cached
             (None, None) => false,    // Both None, no update
@@ -600,59 +612,62 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
         let this = self.get_mut();
 
         // If we have a pending request, poll it first
-        if let Some(mut pending) = this.pending_request.take() {
-            match pending.as_mut().poll(cx) {
-                Poll::Ready(result) => {
-                    let header = this
-                        .current_header
-                        .take()
-                        .expect("current_header should be set when pending_request is set");
+        if let Some(mut pending) = this.pending_request.as_mut() {
+            let result = ready!(pending.as_mut().poll(cx));
 
-                    match result {
-                        Ok(finalized_block) => {
-                            let processed_block = finalized_block.map(|block| {
-                                if this.kind.is_hashes() {
-                                    utils::convert_to_hashes(Some(block)).unwrap()
-                                } else {
-                                    block
-                                }
-                            });
+            this.pending_request = None;
 
-                            // Check if we got a new finalized block
-                            if this.is_finalized_block_updated(&processed_block) {
-                                // Update cache with new finalized block and exit polling mode
-                                if let Some(ref block) = processed_block {
-                                    this.cached_finalized_block = Some(block.clone());
-                                }
-                                this.last_finalized_request_timestamp = Some(header.timestamp());
-                                this.polling_mode = false; // Exit polling mode
-                            } else if this.polling_mode {
-                                // Still in polling mode but no update, update timestamp anyway
-                                this.last_finalized_request_timestamp = Some(header.timestamp());
-                                // Keep polling_mode = true to continue polling
-                            }
+            let header = this
+                .current_header
+                .take()
+                .expect("current_header should be set when pending_request is set");
 
-                            return Poll::Ready(Some(Ok((
-                                header,
-                                processed_block.or_else(|| this.cached_finalized_block.clone()),
-                            ))));
+            tracing::debug!(header_number = %header.number(), "📬 finalized RPC responded");
+
+            match result {
+                Ok(finalized_block) => {
+                    let processed_block = finalized_block.map(|block| {
+                        if this.kind.is_hashes() {
+                            utils::convert_to_hashes(Some(block)).unwrap()
+                        } else {
+                            block
                         }
-                        Err(_err) => {
-                            // If finalized block request fails, still return the header with cached
-                            // block
-                            this.last_finalized_request_timestamp = Some(header.timestamp());
-                            // Keep polling mode status unchanged on error
-                            return Poll::Ready(Some(Ok((
-                                header,
-                                this.cached_finalized_block.clone(),
-                            ))));
+                    });
+
+                    // Check if we got a new finalized block
+                    if this.is_finalized_block_updated(&processed_block) {
+                        // Update cache with new finalized block and exit polling mode
+                        if let Some(ref block) = processed_block {
+                            this.cached_finalized_block = Some(block.clone());
                         }
+                        this.last_finalized_slot =
+                            processed_block.as_ref().map(|b| Self::global_slot(b.header().timestamp()));
+                        this.polling_mode = false;
+                        tracing::debug!(
+                            new_finalized = %processed_block.as_ref()
+                                .map(|b| b.header().number())
+                                .unwrap_or_default(),
+                            "✅ finalized advanced → exit polling_mode"
+                        );
+                    } else if this.polling_mode {
+                        // Still in polling mode but no update, update finalized slot anyway
+                        this.last_finalized_slot = Some(Self::global_slot(header.timestamp()));
+                        tracing::trace!("🔄 still polling - no finalized update yet");
+                        // Keep polling_mode = true to continue polling
                     }
+
+                    return Poll::Ready(Some(Ok((
+                        header,
+                        processed_block.or_else(|| this.cached_finalized_block.clone()),
+                    ))));
                 }
-                Poll::Pending => {
-                    // Put the future back and return Pending
-                    this.pending_request = Some(pending);
-                    return Poll::Pending;
+                Err(_err) => {
+                    // If finalized block request fails, still return the header with cached
+                    // block
+                    this.last_finalized_slot = Some(Self::global_slot(header.timestamp()));
+                    tracing::warn!("❌ finalized RPC failed, using cached block");
+                    // Keep polling mode status unchanged on error
+                    return Poll::Ready(Some(Ok((header, this.cached_finalized_block.clone()))));
                 }
             }
         }
@@ -676,73 +691,72 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
                     let kind = this.kind;
 
                     // Create the future for fetching finalized block
-                    let finalized_future = async move {
-                        client
-                            .request::<_, Option<N::BlockResponse>>(
-                                "eth_getBlockByNumber",
-                                ("finalized", kind.is_full()),
-                            )
-                            .await
-                    };
+                    let call = EthGetBlock::<N::BlockResponse>::by_number(
+                        BlockNumberOrTag::Finalized,
+                        client.as_ref(),
+                    )
+                    .kind(kind)
+                    .into_future()
+                    .boxed();
 
                     // Store the header and the pending request
                     this.current_header = Some(header);
-                    this.pending_request = Some(Box::pin(finalized_future));
+                    this.pending_request = Some(call);
 
                     // Poll the future immediately
-                    if let Some(mut pending) = this.pending_request.take() {
-                        match pending.as_mut().poll(cx) {
-                            Poll::Ready(result) => {
-                                let header = this.current_header.take().unwrap();
+                    if let Some(mut pending) = this.pending_request.as_mut() {
+                        let result = ready!(pending.as_mut().poll(cx));
 
-                                match result {
-                                    Ok(finalized_block) => {
-                                        let processed_block = finalized_block.map(|block| {
-                                            if this.kind.is_hashes() {
-                                                utils::convert_to_hashes(Some(block)).unwrap()
-                                            } else {
-                                                block
-                                            }
-                                        });
+                        this.pending_request = None;
+                        let header = this.current_header.take().unwrap();
 
-                                        // Check if we got a new finalized block
-                                        if this.is_finalized_block_updated(&processed_block) {
-                                            // Update cache with new finalized block and exit
-                                            // polling mode
-                                            if let Some(ref block) = processed_block {
-                                                this.cached_finalized_block = Some(block.clone());
-                                            }
-                                            this.polling_mode = false; // Exit polling mode
-                                        } else if this.polling_mode {
-                                            // Keep polling mode active if no update
-                                            // polling_mode stays true
-                                        }
-                                        this.last_finalized_request_timestamp =
-                                            Some(current_timestamp);
-
-                                        Poll::Ready(Some(Ok((
-                                            header,
-                                            processed_block
-                                                .or_else(|| this.cached_finalized_block.clone()),
-                                        ))))
+                        match result {
+                            Ok(finalized_block) => {
+                                let processed_block = finalized_block.map(|block| {
+                                    if this.kind.is_hashes() {
+                                        utils::convert_to_hashes(Some(block)).unwrap()
+                                    } else {
+                                        block
                                     }
-                                    Err(_err) => {
-                                        // If finalized block request fails, still return the header
-                                        // with cached block
-                                        this.last_finalized_request_timestamp =
-                                            Some(current_timestamp);
-                                        // Keep polling mode status unchanged on error
-                                        Poll::Ready(Some(Ok((
-                                            header,
-                                            this.cached_finalized_block.clone(),
-                                        ))))
+                                });
+
+                                // Check if we got a new finalized block
+                                if this.is_finalized_block_updated(&processed_block) {
+                                    // Update cache with new finalized block and exit
+                                    // polling mode
+                                    if let Some(ref block) = processed_block {
+                                        this.cached_finalized_block = Some(block.clone());
                                     }
+                                    this.polling_mode = false; // Exit polling mode
+                                    tracing::debug!(
+                                        new_finalized = %processed_block.as_ref()
+                                            .map(|b| b.header().number())
+                                            .unwrap_or_default(),
+                                        "✅ finalized advanced → exit polling_mode (immediate)"
+                                    );
+                                } else if this.polling_mode {
+                                    // Keep polling mode active if no update
+                                    tracing::trace!(
+                                        "🔄 still polling - no finalized update yet (immediate)"
+                                    );
+                                    // polling_mode stays true
                                 }
+                                this.last_finalized_slot = Some(Self::global_slot(current_timestamp));
+
+                                Poll::Ready(Some(Ok((
+                                    header,
+                                    processed_block.or_else(|| this.cached_finalized_block.clone()),
+                                ))))
                             }
-                            Poll::Pending => {
-                                // Put the future back and return Pending
-                                this.pending_request = Some(pending);
-                                Poll::Pending
+                            Err(_err) => {
+                                // If finalized block request fails, still return the header
+                                // with cached block
+                                this.last_finalized_slot = Some(Self::global_slot(current_timestamp));
+                                tracing::warn!(
+                                    "❌ finalized RPC failed, using cached block (immediate)"
+                                );
+                                // Keep polling mode status unchanged on error
+                                Poll::Ready(Some(Ok((header, this.cached_finalized_block.clone()))))
                             }
                         }
                     } else {
@@ -750,6 +764,13 @@ impl<N: alloy_network::Network> Stream for FinalizedBlocksStream<N> {
                     }
                 } else {
                     // Use cached finalized block without making a request
+                    tracing::trace!(
+                        header_number = %header.number(),
+                        cached_finalized = %this.cached_finalized_block.as_ref()
+                            .map(|b| b.header().number())
+                            .unwrap_or_default(),
+                        "💾 using cached finalized block"
+                    );
                     Poll::Ready(Some(Ok((header, this.cached_finalized_block.clone()))))
                 }
             }
