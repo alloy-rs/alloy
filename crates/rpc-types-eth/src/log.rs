@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_consensus::transaction::TransactionMeta;
 use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 
