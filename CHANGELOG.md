@@ -5,11 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
+
+### Bug Fixes
+
+- Correct broken doc links ([#2703](https://github.com/alloy-rs/alloy/issues/2703))
+- Flaky bincode sigs ([#2694](https://github.com/alloy-rs/alloy/issues/2694))
+- Use correct wasm instant ([#2693](https://github.com/alloy-rs/alloy/issues/2693))
+
+### Features
+
+- Impl AsRef<Self> for TransactionRequest ([#2708](https://github.com/alloy-rs/alloy/issues/2708))
+- Add sidecar helpers ([#2697](https://github.com/alloy-rs/alloy/issues/2697))
+- Allowed mev_calls::SendBundleRequest to be bincodable ([#2692](https://github.com/alloy-rs/alloy/issues/2692))
+- Added bincodable version of a TransactionRequest struct ([#2687](https://github.com/alloy-rs/alloy/issues/2687))
+- Erc-7562 frame ([#2682](https://github.com/alloy-rs/alloy/issues/2682))
+- Re-export `serde-bincode-compat` ([#2688](https://github.com/alloy-rs/alloy/issues/2688))
+- [rpc-types-engine] Add into_block_raw methods for payload types ([#2684](https://github.com/alloy-rs/alloy/issues/2684))
+- [rpc-types-engine] Custom ssz decode to distinguish Fulu and Electra payload ([#2679](https://github.com/alloy-rs/alloy/issues/2679))
+- Added  Eip7594 support to Simplecoder for creating blob sidecars ([#2653](https://github.com/alloy-rs/alloy/issues/2653))
+
+### Miscellaneous Tasks
+
+- Sidecar helper fns ([#2700](https://github.com/alloy-rs/alloy/issues/2700))
+- Add into_with_bloom_unchecked ([#2683](https://github.com/alloy-rs/alloy/issues/2683))
+- Add Recovered::copied ([#2680](https://github.com/alloy-rs/alloy/issues/2680))
+
+### Other
+
+- Remove redundant comment in BlockBody arbitrary implementation ([#2702](https://github.com/alloy-rs/alloy/issues/2702))
+- Add EIP-2930 link and clarify access_list docs ([#2691](https://github.com/alloy-rs/alloy/issues/2691))
+
 ## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
 
 ### Features
 
 - [rpc] Add generic `TxReq` to `TraceCallRequest` ([#2677](https://github.com/alloy-rs/alloy/issues/2677))
+
+### Miscellaneous Tasks
+
+- Release 1.0.20
 
 ### Other
 
