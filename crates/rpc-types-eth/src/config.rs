@@ -1,6 +1,6 @@
 use alloy_eips::{eip2124::ForkHash, eip7840::BlobParams};
 use alloy_primitives::{Address, U64};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Response type for `eth_config`
 #[derive(Clone, Debug, PartialEq)]
@@ -21,6 +21,13 @@ pub struct EthConfig {
     /// The EIP-2124 `CRC32` hash for the next fork of all previous forks
     /// starting from genesis block.
     pub next_fork_id: Option<ForkHash>,
+    /// Fork configuration of the last fork (before current).
+    pub last: Option<EthForkConfig>,
+    /// The `CRC32` hash of the last fork configuration.
+    pub last_hash: Option<ForkHash>,
+    /// The EIP-2124 `CRC32` hash for the last fork of all previous forks
+    /// starting from genesis block.
+    pub last_fork_id: Option<ForkHash>,
 }
 
 /// The fork configuration object as defined by [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
@@ -57,7 +64,7 @@ pub struct EthForkConfig {
     /// For Prague, the added contracts are (in order): `BLS12_G1ADD`, `BLS12_G1MSM`,
     /// `BLS12_G2ADD`, `BLS12_G2MSM`, `BLS12_PAIRING_CHECK`, `BLS12_MAP_FP_TO_G1`,
     /// `BLS12_MAP_FP2_TO_G2`.
-    pub precompiles: HashMap<Address, String>,
+    pub precompiles: BTreeMap<Address, String>,
     /// A JSON object representing system-level contracts relevant to the fork, as introduced in
     /// their defining EIPs. Keys are the contract names (e.g., BEACON_ROOTS_ADDRESS) from the
     /// first EIP where they appeared, sorted alphabetically. Values are 20-byte addresses in
@@ -71,7 +78,7 @@ pub struct EthForkConfig {
     /// `HISTORY_STORAGE_ADDRESS`, and `WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS`.
     ///
     /// Future forks MUST define the list of system contracts in their meta-EIPs.
-    pub system_contracts: HashMap<String, Address>,
+    pub system_contracts: BTreeMap<String, Address>,
 }
 
 #[cfg(test)]
