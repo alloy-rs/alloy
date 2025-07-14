@@ -496,6 +496,7 @@ where
 }
 
 #[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
 pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
