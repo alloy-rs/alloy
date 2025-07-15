@@ -436,14 +436,24 @@ where
     /// }
     /// ```
     pub async fn try_aggregate(&self, require_success: bool) -> Result<T::Returns> {
+        let output = self.build_and_call(self.to_try_aggregate_call(require_success), None).await?;
+        T::decode_return_results(&output)
+    }
+
+    /// Encodes the calls for the `tryAggregateCall` function and returns the populated transaction
+    /// request.
+    pub fn to_try_aggregate_request(&self, require_success: bool) -> N::TransactionRequest {
+        self.build_request(self.to_try_aggregate_call(require_success), None)
+    }
+
+    /// Creates the [`tryAggregateCall`].
+    fn to_try_aggregate_call(&self, require_success: bool) -> tryAggregateCall {
         let calls = &self
             .calls
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
-        let output = self.build_and_call(call, None).await?;
-        T::decode_return_results(&output)
+        tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() }
     }
 
     /// Call the `aggregate3` function
