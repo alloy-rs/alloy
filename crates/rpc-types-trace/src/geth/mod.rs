@@ -508,6 +508,11 @@ impl GethDebugTracingOptions {
         Self::new_tracer(GethDebugTracerType::JsTracer(code.into()))
     }
 
+    /// Creates new options for [`GethDebugBuiltInTracerType::Erc7562Tracer`]
+    pub fn erc7562_tracer(config: Erc7562Config) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::Erc7562Tracer).with_config(config)
+    }
+
     /// Sets the timeout to use for tracing
     pub fn with_timeout(mut self, duration: Duration) -> Self {
         self.timeout = Some(format!("{}ms", duration.as_millis()));
