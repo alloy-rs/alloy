@@ -120,6 +120,8 @@ pub struct StructLog {
 pub enum GethTrace {
     /// The response for the default struct log tracer
     Default(DefaultFrame),
+    /// The response for ERC-7562 tracer
+    Erc7562Tracer(Erc7562Frame),
     /// The response for call tracer
     CallTracer(CallFrame),
     /// The response for the flat call tracer
@@ -132,8 +134,6 @@ pub enum GethTrace {
     NoopTracer(NoopFrame),
     /// The response for mux tracer
     MuxTracer(MuxFrame),
-    /// The response for ERC-7562 tracer
-    Erc7562Tracer(Erc7562Frame),
     /// Any other trace response, such as custom javascript response objects
     JS(serde_json::Value),
 }
@@ -195,6 +195,14 @@ impl GethTrace {
         }
     }
 
+    /// Try to convert the inner tracer to [Erc7562Frame]
+    pub fn try_into_erc7562_frame(self) -> Result<Erc7562Frame, UnexpectedTracerError> {
+        match self {
+            Self::Erc7562Tracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
     /// Try to convert the inner tracer to [serde_json::Value]
     pub fn try_into_json_value(self) -> Result<serde_json::Value, UnexpectedTracerError> {
         match self {
@@ -249,6 +257,12 @@ impl From<NoopFrame> for GethTrace {
 impl From<MuxFrame> for GethTrace {
     fn from(value: MuxFrame) -> Self {
         Self::MuxTracer(value)
+    }
+}
+
+impl From<Erc7562Frame> for GethTrace {
+    fn from(value: Erc7562Frame) -> Self {
+        Self::Erc7562Tracer(value)
     }
 }
 
@@ -880,6 +894,10 @@ mod tests {
 
         let geth_trace = GethTrace::MuxTracer(MuxFrame::default());
         let inner = geth_trace.try_into_mux_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::Erc7562Tracer(Erc7562Frame::default());
+        let inner = geth_trace.try_into_erc7562_frame();
         assert!(inner.is_ok());
 
         let geth_trace = GethTrace::JS(serde_json::Value::Null);
