@@ -178,6 +178,8 @@ where
 
 /// State for the polling stream.
 enum PollState<Resp> {
+    /// Poller is paused
+    Paused,
     /// Waiting to start the next poll.
     Waiting,
     /// Currently polling for a response.
@@ -265,6 +267,22 @@ impl<Resp> PollerStream<Resp> {
             _pd: PhantomData,
         }
     }
+
+    /// Pauses the poller until it's unpaused.
+    ///
+    /// While paused the poller will not initiate new rpc requests
+    pub fn pause(&mut self) {
+        self.state = PollState::Paused;
+    }
+
+    /// Unpauses the poller.
+    ///
+    /// The poller will initiate new rpc requests once polled.
+    pub fn unpause(&mut self) {
+        if matches!(self.state, PollState::Paused) {
+            self.state = PollState::Waiting;
+        }
+    }
 }
 
 impl<Resp, Output, Map> PollerStream<Resp, Output, Map>
@@ -304,6 +322,7 @@ where
 
         loop {
             match &mut this.state {
+                PollState::Paused => return Poll::Pending,
                 PollState::Waiting => {
                     // Check if we've reached the limit
                     if this.poll_count >= this.limit {
