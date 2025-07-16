@@ -1,11 +1,16 @@
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
-use alloy_transport::RpcError;
-use async_stream::stream;
-use futures::{Stream, StreamExt};
+use alloy_transport::{RpcError, TransportErrorKind};
+use futures::{Future, Stream, StreamExt};
 use lru::LruCache;
-use std::{marker::PhantomData, num::NonZeroUsize};
+use std::{
+    marker::PhantomData,
+    num::NonZeroUsize,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tracing::{debug, error, trace};
 
 #[cfg(feature = "pubsub")]
 use futures::{future::Either, FutureExt};
@@ -29,6 +34,42 @@ pub(crate) struct NewBlocks<N: Network = Ethereum> {
     /// LRU cache of known blocks. Only used by the polling task.
     known_blocks: LruCache<BlockNumber, N::BlockResponse>,
     _phantom: PhantomData<N>,
+}
+
+/// A stream that converts block numbers into full block responses.
+///
+/// This stream polls an underlying block number stream and fetches complete
+/// block data for each number, maintaining sequential order and handling gaps.
+pub(crate) struct BlockStream<N: Network, S> {
+    /// The underlying stream of block numbers
+    numbers_stream: S,
+    /// Weak reference to the RPC client
+    client: WeakClient,
+    /// The next block number to yield
+    next_yield: BlockNumber,
+    /// Cache of fetched blocks
+    known_blocks: LruCache<BlockNumber, N::BlockResponse>,
+    /// Current block fetch future
+    current_fetch: Option<
+        Pin<
+            Box<
+                dyn Future<Output = Result<Option<N::BlockResponse>, RpcError<TransportErrorKind>>>
+                    + Send,
+            >,
+        >,
+    >,
+    /// Current fetch state
+    fetch_state: FetchState,
+    _phantom: PhantomData<N>,
+}
+
+/// State of the current fetch operation
+#[derive(Debug, Clone, Copy)]
+enum FetchState {
+    /// Waiting for a new block number
+    WaitingForNumber,
+    /// Fetching blocks from `start` to `end` (inclusive)
+    Fetching { start: u64, end: u64, current: u64, retries: usize },
 }
 
 impl<N: Network> NewBlocks<N> {
@@ -110,76 +151,194 @@ impl<N: Network> NewBlocks<N> {
         self.into_block_stream(stream)
     }
 
-    fn into_block_stream(
-        mut self,
-        mut numbers_stream: impl Stream<Item = u64> + Unpin + 'static,
-    ) -> impl Stream<Item = N::BlockResponse> + 'static {
-        stream! {
-        'task: loop {
-            // Clear any buffered blocks.
-            while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
-                debug!(number=self.next_yield, "yielding block");
-                self.next_yield += 1;
-                yield known_block;
+    /// Converts a stream of block numbers into a stream of full block responses.
+    ///
+    /// This function takes a stream that emits block numbers (either from polling
+    /// `eth_blockNumber` or from `newHeads` subscriptions) and transforms it into
+    /// a stream of complete block data by fetching each block via `eth_getBlockByNumber`.
+    ///
+    /// # Arguments
+    ///
+    /// * `numbers_stream` - A stream that yields block numbers to be fetched
+    ///
+    /// # Returns
+    ///
+    /// A `BlockStream` that yields complete block responses (`N::BlockResponse`) for each
+    /// block number received from the input stream.
+    ///
+    /// # Behavior
+    ///
+    /// - Maintains an internal cache of fetched blocks to handle reorgs and gaps
+    /// - Yields blocks sequentially starting from `next_yield`
+    /// - Fetches blocks with up to `MAX_RETRIES` attempts for recoverable errors
+    /// - Fills gaps by fetching all blocks between the last yielded and the latest
+    /// - Stops when the client is dropped or the input stream ends
+    fn into_block_stream<S>(self, numbers_stream: S) -> BlockStream<N, S>
+    where
+        S: Stream<Item = u64> + Unpin + 'static,
+    {
+        BlockStream {
+            numbers_stream,
+            client: self.client,
+            next_yield: self.next_yield,
+            known_blocks: self.known_blocks,
+            current_fetch: None,
+            fetch_state: FetchState::WaitingForNumber,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<N, S> Unpin for BlockStream<N, S>
+where
+    N: Network,
+    S: Unpin,
+{
+}
+
+impl<N, S> Stream for BlockStream<N, S>
+where
+    N: Network,
+    S: Stream<Item = u64> + Unpin,
+{
+    type Item = N::BlockResponse;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        loop {
+            // First, try to yield any buffered blocks
+            if let Some(known_block) = this.known_blocks.pop(&this.next_yield) {
+                debug!(number = this.next_yield, "yielding block");
+                this.next_yield += 1;
+                return Poll::Ready(Some(known_block));
             }
 
-            // Get the tip.
-            let Some(block_number) = numbers_stream.next().await else {
-                debug!("polling stream ended");
-                break 'task;
-            };
-            trace!(%block_number, "got block number");
-            if self.next_yield == NO_BLOCK_NUMBER {
-                assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
-                // this stream can be initialized after the first tx was sent,
-                // to avoid the edge case where the tx is mined immediately, we should apply an
-                // offset to the initial fetch so that we fetch tip - 1
-                self.next_yield = block_number.saturating_sub(1);
-            } else if block_number < self.next_yield {
-                debug!(block_number, self.next_yield, "not advanced yet");
-                continue 'task;
-            }
+            // If we have a pending fetch, poll it
+            if let Some(mut fetch_fut) = this.current_fetch.take() {
+                match fetch_fut.as_mut().poll(cx) {
+                    Poll::Ready(result) => {
+                        if let FetchState::Fetching { start, end, current, retries } =
+                            this.fetch_state
+                        {
+                            match result {
+                                Ok(Some(block)) => {
+                                    this.known_blocks.put(current, block);
 
-            // Upgrade the provider.
-            let Some(client) = self.client.upgrade() else {
-                debug!("client dropped");
-                break 'task;
-            };
-
-            // Then try to fill as many blocks as possible.
-            // TODO: Maybe use `join_all`
-            let mut retries = MAX_RETRIES;
-            for number in self.next_yield..=block_number {
-                debug!(number, "fetching block");
-                let block = match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
-                    Ok(Some(block)) => block,
-                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                        debug!(number, %err, "failed to fetch block, retrying");
-                        retries -= 1;
-                        continue;
+                                    // Check if we've filled the cache or finished the range
+                                    if current >= end
+                                        || this.known_blocks.len() == BLOCK_CACHE_SIZE.get()
+                                    {
+                                        this.fetch_state = FetchState::WaitingForNumber;
+                                        if this.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
+                                            debug!(number = current, "cache full");
+                                        }
+                                    } else {
+                                        // Continue fetching next block
+                                        this.fetch_state = FetchState::Fetching {
+                                            start,
+                                            end,
+                                            current: current + 1,
+                                            retries: MAX_RETRIES,
+                                        };
+                                    }
+                                }
+                                Err(RpcError::Transport(err))
+                                    if retries > 0 && err.recoverable() =>
+                                {
+                                    debug!(number = current, %err, "failed to fetch block, retrying");
+                                    this.fetch_state = FetchState::Fetching {
+                                        start,
+                                        end,
+                                        current,
+                                        retries: retries - 1,
+                                    };
+                                }
+                                Ok(None) if retries > 0 => {
+                                    debug!(
+                                        number = current,
+                                        "failed to fetch block (doesn't exist), retrying"
+                                    );
+                                    this.fetch_state = FetchState::Fetching {
+                                        start,
+                                        end,
+                                        current,
+                                        retries: retries - 1,
+                                    };
+                                }
+                                Err(err) => {
+                                    error!(number = current, %err, "failed to fetch block");
+                                    this.fetch_state = FetchState::WaitingForNumber;
+                                }
+                                Ok(None) => {
+                                    error!(
+                                        number = current,
+                                        "failed to fetch block (doesn't exist)"
+                                    );
+                                    this.fetch_state = FetchState::WaitingForNumber;
+                                }
+                            }
+                        }
                     }
-                    Ok(None) if retries > 0 => {
-                        debug!(number, "failed to fetch block (doesn't exist), retrying");
-                        retries -= 1;
-                        continue;
+                    Poll::Pending => {
+                        this.current_fetch = Some(fetch_fut);
+                        return Poll::Pending;
                     }
-                    Err(err) => {
-                        error!(number, %err, "failed to fetch block");
-                        break;
-                    }
-                    Ok(None) => {
-                        error!(number, "failed to fetch block (doesn't exist)");
-                        break;
-                    }
-                };
-                self.known_blocks.put(number, block);
-                if self.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
-                    // Cache is full, should be consumed before filling more blocks.
-                    debug!(number, "cache full");
-                    break;
                 }
             }
-        }
+
+            // Handle the current fetch state
+            match this.fetch_state {
+                FetchState::WaitingForNumber => {
+                    // Poll for a new block number
+                    match Pin::new(&mut this.numbers_stream).poll_next(cx) {
+                        Poll::Ready(Some(block_number)) => {
+                            trace!(%block_number, "got block number");
+
+                            if this.next_yield == NO_BLOCK_NUMBER {
+                                assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
+                                // this stream can be initialized after the first tx was sent,
+                                // to avoid the edge case where the tx is mined immediately, we
+                                // should apply an offset to the
+                                // initial fetch so that we fetch tip - 1
+                                this.next_yield = block_number.saturating_sub(1);
+                            } else if block_number < this.next_yield {
+                                debug!(
+                                    block_number,
+                                    next_yield = this.next_yield,
+                                    "not advanced yet"
+                                );
+                                continue;
+                            }
+
+                            // Start fetching blocks
+                            this.fetch_state = FetchState::Fetching {
+                                start: this.next_yield,
+                                end: block_number,
+                                current: this.next_yield,
+                                retries: MAX_RETRIES,
+                            };
+                        }
+                        Poll::Ready(None) => {
+                            debug!("polling stream ended");
+                            return Poll::Ready(None);
+                        }
+                        Poll::Pending => return Poll::Pending,
+                    }
+                }
+                FetchState::Fetching { current, .. } => {
+                    // Upgrade the provider
+                    let Some(client) = this.client.upgrade() else {
+                        debug!("client dropped");
+                        return Poll::Ready(None);
+                    };
+
+                    // Start fetching the current block
+                    debug!(number = current, "fetching block");
+                    let fut = client.request("eth_getBlockByNumber", (U64::from(current), false));
+                    this.current_fetch = Some(Box::pin(fut));
+                }
+            }
         }
     }
 }
