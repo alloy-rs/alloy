@@ -145,7 +145,13 @@ macro_rules! impl_tuple {
 
                 Ok(($(
                     match &results[$idx].success {
-                        true => Ok($ty::abi_decode_returns(&results[$idx].returnData).map_err(MulticallError::DecodeError)?),
+                        true => {
+                            if &results[$idx].returnData.is_empty() {
+                                Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() })
+                            } else {
+                                Ok($ty::abi_decode_returns(&results[$idx].returnData).map_err(MulticallError::DecodeError)?)
+                            }
+                        },
                         false => Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() }),
                     },
                 )+))
