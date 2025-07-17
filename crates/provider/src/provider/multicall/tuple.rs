@@ -146,7 +146,7 @@ macro_rules! impl_tuple {
                 Ok(($(
                     match &results[$idx].success {
                         true => {
-                            if &results[$idx].returnData.is_empty() {
+                            if results[$idx].returnData.is_empty() {
                                 Err(Failure { idx: $idx, return_data: results[$idx].returnData.clone() })
                             } else {
                                 Ok($ty::abi_decode_returns(&results[$idx].returnData).map_err(MulticallError::DecodeError)?)
