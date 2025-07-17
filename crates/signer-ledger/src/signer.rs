@@ -173,10 +173,10 @@ impl LedgerSigner {
         chain_id: Option<ChainId>,
         transport: Arc<Mutex<Ledger>>,
     ) -> Result<Self, LedgerError> {
-        let mut transport_guard = transport.lock().await;
-        let address =
-            Self::get_address_with_path_transport(&mut *transport_guard, &derivation).await?;
-        drop(transport_guard);
+        let address = {
+            let transport_guard = transport.lock().await;
+            Self::get_address_with_path_transport(&transport_guard, &derivation).await?
+        };
         debug!(%address, "Connected to Ledger");
 
         Ok(Self { transport, derivation, chain_id, address })
