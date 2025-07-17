@@ -3,7 +3,7 @@ mod with_auth;
 pub use self::with_auth::{sign_flashbots_payload, MevBuilder};
 use crate::Provider;
 use alloy_network::Network;
-use alloy_rpc_types_mev::{EthBundleHash, EthCancelBundle, EthSendBundle};
+use alloy_rpc_types_mev::{EthBundleHash, EthCancelBundle, EthSendBlobs, EthSendBundle};
 
 /// The HTTP header used for Flashbots signature authentication.
 pub const FLASHBOTS_SIGNATURE_HEADER: &str = "x-flashbots-signature";
@@ -21,6 +21,9 @@ pub trait MevApi<N>: Send + Sync {
 
     /// Cancels a previously sent MEV bundle using the `eth_cancelBundle` RPC method.
     fn cancel_bundle(&self, replacement_uuid: String) -> MevBuilder<(EthCancelBundle,), ()>;
+
+    /// Sends blob transaction permutations using the `eth_sendBlobs` RPC method.
+    fn send_blobs(&self, blobs: EthSendBlobs) -> MevBuilder<(EthSendBlobs,), ()>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -41,5 +44,9 @@ where
         MevBuilder::new_rpc(
             self.client().request("eth_cancelBundle", (EthCancelBundle { replacement_uuid },)),
         )
+    }
+
+    fn send_blobs(&self, blobs: EthSendBlobs) -> MevBuilder<(EthSendBlobs,), ()> {
+        MevBuilder::new_rpc(self.client().request("eth_sendBlobs", (blobs,)))
     }
 }
