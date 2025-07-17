@@ -431,6 +431,27 @@ impl PrivateTransactionPreferences {
     }
 }
 
+/// Bundle of blob transaction permutations for `eth_sendBlobs`
+///
+/// Sends multiple blob transaction permutations with the same nonce. These are conflicting
+/// transactions with different amounts of blobs where only one may be included.
+///
+/// For more details see:
+/// <https://docs.titanbuilder.xyz/api/eth_sendblobs>
+/// See also EIP-7925 draft:
+/// <https://ethereum-magicians.org/t/23333>
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EthSendBlobs {
+    /// A list of hex-encoded signed blob transactions (permutations with same nonce, different
+    /// blob counts)
+    pub txs: Vec<Bytes>,
+    /// Hex-encoded number string, optional. Highest block number in which one of the transactions
+    /// should be included.
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub max_block_number: Option<u64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::EthCallBundleResponse;
