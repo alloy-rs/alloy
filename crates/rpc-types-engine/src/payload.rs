@@ -1375,6 +1375,16 @@ impl ExecutionPayload {
         }
     }
 
+    /// Returns the transactions for the payload.
+    pub const fn transactions(&self) -> &Vec<Bytes> {
+        &self.as_v1().transactions
+    }
+
+    /// Returns a mutable reference to the transactions for the payload.
+    pub const fn transactions_mut(&mut self) -> &mut Vec<Bytes> {
+        &mut self.as_v1_mut().transactions
+    }
+
     /// Returns the timestamp for the payload.
     pub const fn timestamp(&self) -> u64 {
         self.as_v1().timestamp

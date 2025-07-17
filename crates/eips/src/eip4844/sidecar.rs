@@ -37,10 +37,7 @@ pub struct IndexedBlobHash {
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
-    #[cfg_attr(
-        all(debug_assertions, feature = "serde"),
-        serde(deserialize_with = "deserialize_blobs")
-    )]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -482,7 +479,7 @@ impl Decodable7594 for BlobTransactionSidecar {
     }
 }
 
-// Helper function to deserialize boxed blobs
+/// Helper function to deserialize boxed blobs from a serde deserializer.
 #[cfg(all(debug_assertions, feature = "serde"))]
 pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
@@ -496,6 +493,40 @@ where
         blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
     }
     Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    Vec::<Blob>::deserialize(deserializer)
+}
+
+/// Helper function to deserialize boxed blobs from an existing [`MapAccess`]
+///
+/// [`MapAccess`]: serde::de::MapAccess
+#[cfg(all(debug_assertions, feature = "serde"))]
+pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
+    map_access: &mut M,
+) -> Result<Vec<Blob>, M::Error> {
+    let raw_blobs: Vec<alloy_primitives::Bytes> = map_access.next_value()?;
+    let mut blobs = Vec::with_capacity(raw_blobs.len());
+    for blob in raw_blobs {
+        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
+    }
+    Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
+    map_access: &mut M,
+) -> Result<Vec<Blob>, M::Error> {
+    use serde::de::MapAccess;
+    map_access.next_value()
 }
 
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].

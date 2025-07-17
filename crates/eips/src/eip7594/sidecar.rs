@@ -213,7 +213,9 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
+        use core::fmt;
+
+        #[derive(serde::Deserialize, fmt::Debug)]
         #[serde(field_identifier, rename_all = "camelCase")]
         enum Field {
             Blobs,
@@ -243,7 +245,9 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        Field::Blobs => blobs = Some(map.next_value()?),
+                        Field::Blobs => {
+                            blobs = Some(crate::eip4844::deserialize_blobs_map(&mut map)?);
+                        }
                         Field::Commitments => commitments = Some(map.next_value()?),
                         Field::Proofs => proofs = Some(map.next_value()?),
                         Field::CellProofs => cell_proofs = Some(map.next_value()?),
@@ -293,10 +297,7 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BlobTransactionSidecarEip7594 {
     /// The blob data.
-    #[cfg_attr(
-        all(debug_assertions, feature = "serde"),
-        serde(deserialize_with = "crate::eip4844::deserialize_blobs")
-    )]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "crate::eip4844::deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -632,14 +633,17 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn sidecar_variant_json_deserialize_sanity() {
-        let eip4844 = BlobTransactionSidecar::default();
+        let mut eip4844 = BlobTransactionSidecar::default();
+        eip4844.blobs.push(Blob::repeat_byte(0x2));
+
         let json = serde_json::to_string(&eip4844).unwrap();
         let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
         assert!(variant.is_eip4844());
         let jsonvariant = serde_json::to_string(&variant).unwrap();
         assert_eq!(json, jsonvariant);
 
-        let eip7594 = BlobTransactionSidecarEip7594::default();
+        let mut eip7594 = BlobTransactionSidecarEip7594::default();
+        eip7594.blobs.push(Blob::repeat_byte(0x4));
         let json = serde_json::to_string(&eip7594).unwrap();
         let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
         assert!(variant.is_eip7594());
