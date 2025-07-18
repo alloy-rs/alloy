@@ -1,9 +1,8 @@
 //! This module extends the Ethereum JSON-RPC provider with the Tenderly namespace's RPC methods.
-use crate::{EthCall, Provider};
-use alloy_eips::BlockNumberOrTag;
+use crate::{EthCall, EthCallMany, Provider};
 use alloy_network::Network;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
+use alloy_rpc_types_eth::Bundle;
 use alloy_rpc_types_tenderly::TenderlySimulationResult;
 use alloy_transport::TransportResult;
 
@@ -35,13 +34,10 @@ pub trait TenderlyApi<N: Network>: Send + Sync {
 
     /// Simulates a transaction as it would execute on the given block, allowing overrides of state
     /// variables and balances of all accounts
-    async fn tenderly_simulate_bundle(
+    fn tenderly_simulate_bundle<'req>(
         &self,
-        txs: &[N::TransactionRequest],
-        block: BlockNumberOrTag,
-        state_overrides: Option<StateOverride>,
-        block_overrides: Option<BlockOverrides>,
-    ) -> TransportResult<Vec<TenderlySimulationResult>>;
+        bundles: &'req [Bundle],
+    ) -> EthCallMany<'req, N, Vec<TenderlySimulationResult>>;
 
     /// Replays transaction on the blockchain and provides information about the execution.
     async fn tenderly_trace_transaction(
@@ -64,16 +60,12 @@ where
         EthCall::new(self.weak_client(), "tenderly_simulateTransaction", tx)
     }
 
-    async fn tenderly_simulate_bundle(
+    fn tenderly_simulate_bundle<'req>(
         &self,
-        txs: &[N::TransactionRequest],
-        block: BlockNumberOrTag,
-        state_overrides: Option<StateOverride>,
-        block_overrides: Option<BlockOverrides>,
-    ) -> TransportResult<Vec<TenderlySimulationResult>> {
-        self.client()
-            .request("tenderly_simulateBundle", (txs, block, state_overrides, block_overrides))
-            .await
+        bundles: &'req [Bundle],
+    ) -> EthCallMany<'req, N, Vec<TenderlySimulationResult>> {
+        debug_assert_eq!(bundles.len(), 1);
+        EthCallMany::new(self.weak_client(), "tenderly_simulateBundle", bundles)
     }
 
     async fn tenderly_trace_transaction(
@@ -88,11 +80,14 @@ where
 mod test {
     use std::{env, str::FromStr};
 
-    use alloy_primitives::{address, utils::parse_ether, Address, U256};
-    use alloy_rpc_types_eth::{
-        state::{AccountOverride, StateOverridesBuilder},
-        TransactionRequest,
+    use alloy_eips::BlockNumberOrTag;
+    use alloy_primitives::{
+        address,
+        map::{FbBuildHasher, HashMap},
+        utils::parse_ether,
+        Address, U256,
     };
+    use alloy_rpc_types_eth::{state::AccountOverride, TransactionRequest};
 
     use crate::ProviderBuilder;
 
@@ -160,7 +155,7 @@ mod test {
         let provider = ProviderBuilder::new().connect_http(url);
 
         let gas_price = provider.get_gas_price().await.unwrap();
-        let block = BlockNumberOrTag::Latest;
+        let block = BlockNumberOrTag::Latest.into();
         let value = parse_ether("1").unwrap();
 
         let tx = TransactionRequest::default()
@@ -170,14 +165,21 @@ mod test {
             .max_fee_per_gas(gas_price + 1)
             .max_priority_fee_per_gas(gas_price + 1);
 
+        let txs = vec![tx.clone(), tx];
+        let bundle = vec![Bundle::from(txs)];
+
         let account_override = AccountOverride::default().with_balance(U256::MAX);
-        let state_override =
-            StateOverridesBuilder::default().append(Address::ZERO, account_override).build();
+        let mut overrides = HashMap::with_hasher(FbBuildHasher::default());
+        overrides.insert(Address::ZERO, account_override);
 
         let _res = provider
-            .tenderly_simulate_bundle(&vec![tx.clone(), tx], block, Some(state_override), None)
+            .tenderly_simulate_bundle(&bundle)
+            .block(block)
+            .overrides(&overrides)
             .await
             .unwrap();
+
+        dbg!(_res);
     }
 
     #[tokio::test]

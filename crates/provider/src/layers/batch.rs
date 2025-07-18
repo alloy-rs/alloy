@@ -434,9 +434,10 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
 
     fn call_many(
         &self,
+        method: &'static str,
         params: crate::EthCallManyParams<'_>,
     ) -> TransportResult<crate::ProviderCall<crate::EthCallManyParams<'static>, Bytes>> {
-        Caller::<N, Bytes>::call_many(&self.weak, params)
+        Caller::<N, Bytes>::call_many(&self.weak, method, params)
     }
 }
 

@@ -226,6 +226,8 @@ pub enum TenderlyCallType {
     StaticCall,
     /// DelegateCall type.
     DelegateCall,
+    /// Create type.
+    Create,
 }
 
 /// Information about the assets affected by the transaction.

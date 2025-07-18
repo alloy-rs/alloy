@@ -23,6 +23,7 @@ where
     /// Method that needs to be implemented for `"eth_callMany"` RPC requests.
     fn call_many(
         &self,
+        method: &'static str,
         params: EthCallManyParams<'_>,
     ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, Resp>>;
 }
@@ -42,9 +43,10 @@ where
 
     fn call_many(
         &self,
+        method: &'static str,
         params: EthCallManyParams<'_>,
     ) -> TransportResult<ProviderCall<EthCallManyParams<'static>, Resp>> {
-        provider_rpc_call(self, "eth_callMany", params.into_owned())
+        provider_rpc_call(self, method, params.into_owned())
     }
 }
 
