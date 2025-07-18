@@ -460,6 +460,27 @@ pub struct EthSendBlobs {
     pub max_block_number: Option<u64>,
 }
 
+/// Bundle of transactions for `eth_sendEndOfBlockBundle`
+///
+/// For more details see:
+/// <https://docs.titanbuilder.xyz/api/eth_sendendofblockbundle> or
+/// <https://docs.quasar.win/eth_sendendofblockbundle>
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EthSendEndOfBlockBundle {
+    /// A list of hex-encoded signed transactions
+    pub txs: Vec<Bytes>,
+    /// Hex-encoded block number for which this bundle is valid on
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub block_number: Option<u64>,
+    /// List of hashes of possibly reverting txs
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reverting_tx_hashes: Vec<TxHash>,
+    /// Pool addresses targeted by the bundle
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_pools: Vec<Address>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::EthCallBundleResponse;
