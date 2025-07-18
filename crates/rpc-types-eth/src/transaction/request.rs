@@ -1093,6 +1093,18 @@ impl From<TransactionRequest> for alloy_serde::WithOtherFields<TransactionReques
     }
 }
 
+impl AsRef<Self> for TransactionRequest {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl AsMut<Self> for TransactionRequest {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
         tx.into_request()
@@ -1358,7 +1370,7 @@ impl From<TxEnvelope> for TransactionRequest {
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
     use crate::TransactionInput;
-    use alloc::borrow::Cow;
+    use alloc::{borrow::Cow, vec::Vec};
     use alloy_consensus::BlobTransactionSidecar;
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};

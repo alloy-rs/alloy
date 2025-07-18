@@ -362,14 +362,24 @@ where
     /// }
     /// ```
     pub async fn aggregate(&self) -> Result<T::SuccessReturns> {
+        let output = self.build_and_call(self.to_aggregate_call(), None).await?;
+        T::decode_returns(&output.returnData)
+    }
+
+    /// Encodes the calls for the `aggregate` function and returns the populated transaction
+    /// request.
+    pub fn to_aggregate_request(&self) -> N::TransactionRequest {
+        self.build_request(self.to_aggregate_call(), None)
+    }
+
+    /// Creates the [`aggregate3Call`].
+    fn to_aggregate_call(&self) -> aggregateCall {
         let calls = self
             .calls
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call = aggregateCall { calls: calls.to_vec() };
-        let output = self.build_and_call(call, None).await?;
-        T::decode_returns(&output.returnData)
+        aggregateCall { calls: calls.to_vec() }
     }
 
     /// Call the `tryAggregate` function
@@ -426,14 +436,24 @@ where
     /// }
     /// ```
     pub async fn try_aggregate(&self, require_success: bool) -> Result<T::Returns> {
+        let output = self.build_and_call(self.to_try_aggregate_call(require_success), None).await?;
+        T::decode_return_results(&output)
+    }
+
+    /// Encodes the calls for the `tryAggregateCall` function and returns the populated transaction
+    /// request.
+    pub fn to_try_aggregate_request(&self, require_success: bool) -> N::TransactionRequest {
+        self.build_request(self.to_try_aggregate_call(require_success), None)
+    }
+
+    /// Creates the [`tryAggregateCall`].
+    fn to_try_aggregate_call(&self, require_success: bool) -> tryAggregateCall {
         let calls = &self
             .calls
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call = tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
-        let output = self.build_and_call(call, None).await?;
-        T::decode_return_results(&output)
+        tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() }
     }
 
     /// Call the `aggregate3` function
@@ -462,6 +482,19 @@ where
     /// - The [`Result::Err`] variant contains the [`Failure`] struct which holds the
     ///   index(-position) of the call and the returned data as [`Bytes`].
     pub async fn aggregate3(&self) -> Result<T::Returns> {
+        let call = self.to_aggregate3_call();
+        let output = self.build_and_call(call, None).await?;
+        T::decode_return_results(&output)
+    }
+
+    /// Encodes the calls for the `aggregate3` function and returns the populated transaction
+    /// request.
+    pub fn to_aggregate3_request(&self) -> N::TransactionRequest {
+        self.build_request(self.to_aggregate3_call(), None)
+    }
+
+    /// Creates the [`aggregate3Call`]
+    fn to_aggregate3_call(&self) -> aggregate3Call {
         let calls = self
             .calls
             .iter()
@@ -471,9 +504,7 @@ where
                 allowFailure: c.allowFailure,
             })
             .collect::<Vec<_>>();
-        let call = aggregate3Call { calls: calls.to_vec() };
-        let output = self.build_and_call(call, None).await?;
-        T::decode_return_results(&output)
+        aggregate3Call { calls: calls.to_vec() }
     }
 
     /// Call the `aggregate3Value` function
@@ -541,6 +572,23 @@ where
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
     }
 
+    /// Helper for building the transaction request for the given call type input.
+    fn build_request<M: SolCall>(
+        &self,
+        call_type: M,
+        value: Option<U256>,
+    ) -> N::TransactionRequest {
+        let call = call_type.abi_encode();
+        let mut tx = N::TransactionRequest::default()
+            .with_to(self.address)
+            .with_input_kind(Bytes::from_iter(call), self.input_kind);
+
+        if let Some(value) = value {
+            tx.set_value(value);
+        }
+        tx
+    }
+
     /// Helper fn to build a tx and call the multicall contract
     ///
     /// ## Params
@@ -552,14 +600,7 @@ where
         call_type: M,
         value: Option<U256>,
     ) -> Result<M::Return> {
-        let call = call_type.abi_encode();
-        let mut tx = N::TransactionRequest::default()
-            .with_to(self.address)
-            .with_input_kind(Bytes::from_iter(call), self.input_kind);
-
-        if let Some(value) = value {
-            tx.set_value(value);
-        }
+        let tx = self.build_request(call_type, value);
 
         let mut eth_call = self.provider.root().call(tx);
 

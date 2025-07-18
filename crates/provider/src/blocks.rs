@@ -131,7 +131,10 @@ impl<N: Network> NewBlocks<N> {
             trace!(%block_number, "got block number");
             if self.next_yield == NO_BLOCK_NUMBER {
                 assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
-                self.next_yield = block_number;
+                // this stream can be initialized after the first tx was sent,
+                // to avoid the edge case where the tx is mined immediately, we should apply an
+                // offset to the initial fetch so that we fetch tip - 1
+                self.next_yield = block_number.saturating_sub(1);
             } else if block_number < self.next_yield {
                 debug!(block_number, self.next_yield, "not advanced yet");
                 continue 'task;

@@ -24,7 +24,7 @@ jobs:
         rust:
           - "stable"
           - "nightly"
-          - "1.85" # MSRV
+          - "1.86" # MSRV
         flags:
           # No features
           - "--no-default-features -F reqwest-rustls-tls"
@@ -53,14 +53,14 @@ jobs:
           cache-on-failure: true
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
-        if: ${{ matrix.rust != '1.85' }} # MSRV
+        if: ${{ matrix.rust != '1.86' }} # MSRV
         uses: taiki-e/install-action@nextest
       - name: build
-        if: ${{ matrix.rust == '1.85' }} # MSRV
+        if: ${{ matrix.rust == '1.86' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
         shell: bash
-        if: ${{ matrix.rust != '1.85' }} # MSRV
+        if: ${{ matrix.rust != '1.86' }} # MSRV
         run: cargo nextest run --workspace ${{ matrix.flags }}
 
   doctest:

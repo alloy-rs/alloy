@@ -227,7 +227,7 @@ impl<Params: RpcSend> TraceParams<Params> {
     /// Create a new `TraceParams` with the given parameters.
     ///
     /// The `method` is used to determine which parameters to ignore according to the `trace_*` api
-    /// spec. See <https://reth.rs/jsonrpc/trace.html>.
+    /// spec. See <https://reth.rs/jsonrpc/trace>.
     pub fn new(
         method: &String,
         params: Params,

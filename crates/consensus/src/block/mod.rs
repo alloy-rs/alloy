@@ -343,7 +343,6 @@ where
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // first generate up to 100 txs
-        // first generate a reasonable amount of txs
         let transactions = (0..u.int_in_range(0..=100)?)
             .map(|_| T::arbitrary(u))
             .collect::<arbitrary::Result<Vec<_>>>()?;
