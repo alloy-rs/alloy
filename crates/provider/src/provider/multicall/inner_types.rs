@@ -159,8 +159,11 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
     ) -> Result<Self::Returns> {
         let mut ret = vec![];
         for (idx, res) in results.iter().enumerate() {
-            if res.success && let Ok(decode) = D::abi_decode_returns(&res.returnData) {
-                ret.push(Ok(decode))
+            if res.success {
+                ret.push(
+                    D::abi_decode_returns(&res.returnData)
+                        .or(Err(Failure { idx, return_data: res.returnData.clone() }))
+                )
             } else {
                 ret.push(Err(Failure { idx, return_data: res.returnData.clone() }));
             }
