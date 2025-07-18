@@ -3,10 +3,11 @@ mod with_auth;
 pub use self::with_auth::{sign_flashbots_payload, MevBuilder};
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::TxHash;
+use alloy_primitives::{hex, TxHash};
 use alloy_rpc_types_mev::{
     EthBundleHash, EthCallBundle, EthCallBundleResponse, EthCancelBundle,
     EthCancelPrivateTransaction, EthSendBlobs, EthSendBundle, EthSendPrivateTransaction,
+    PrivateTransactionPreferences,
 };
 
 /// The HTTP header used for Flashbots signature authentication.
@@ -40,6 +41,13 @@ pub trait MevApi<N>: Send + Sync {
         &self,
         private_tx: EthSendPrivateTransaction,
     ) -> MevBuilder<(EthSendPrivateTransaction,), Option<TxHash>>;
+
+    /// Sends a private transaction using the `eth_sendPrivateRawTransaction` RPC method.
+    fn send_private_raw_transaction(
+        &self,
+        encoded_tx: &[u8],
+        preferences: Option<PrivateTransactionPreferences>,
+    ) -> MevBuilder<(String, Option<PrivateTransactionPreferences>), Option<TxHash>>;
 
     /// Cancels a previously sent private transaction using the `eth_cancelPrivateTransaction` RPC
     /// method.
@@ -85,6 +93,17 @@ where
         private_tx: EthSendPrivateTransaction,
     ) -> MevBuilder<(EthSendPrivateTransaction,), Option<TxHash>> {
         MevBuilder::new_rpc(self.client().request("eth_sendPrivateTransaction", (private_tx,)))
+    }
+
+    fn send_private_raw_transaction(
+        &self,
+        encoded_tx: &[u8],
+        preferences: Option<PrivateTransactionPreferences>,
+    ) -> MevBuilder<(String, Option<PrivateTransactionPreferences>), Option<TxHash>> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        MevBuilder::new_rpc(
+            self.client().request("eth_sendPrivateRawTransaction", (rlp_hex, preferences)),
+        )
     }
 
     fn cancel_private_transaction(
