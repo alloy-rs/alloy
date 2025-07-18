@@ -7,7 +7,7 @@ use alloy_primitives::{hex, TxHash};
 use alloy_rpc_types_mev::{
     EthBundleHash, EthCallBundle, EthCallBundleResponse, EthCancelBundle,
     EthCancelPrivateTransaction, EthSendBlobs, EthSendBundle, EthSendEndOfBlockBundle,
-    EthSendPrivateTransaction, PrivateTransactionPreferences,
+    EthSendPrivateTransaction, MevSendBundle, PrivateTransactionPreferences,
 };
 
 /// The HTTP header used for Flashbots signature authentication.
@@ -62,6 +62,13 @@ pub trait MevApi<N>: Send + Sync {
         &self,
         bundle: EthSendEndOfBlockBundle,
     ) -> MevBuilder<(EthSendEndOfBlockBundle,), Option<EthBundleHash>>;
+
+    /// Sends a MEV bundle using the `mev_sendBundle` RPC method.
+    /// Returns the resulting bundle hash on success.
+    fn send_mev_bundle(
+        &self,
+        bundle: MevSendBundle,
+    ) -> MevBuilder<(MevSendBundle,), Option<EthBundleHash>>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -130,5 +137,12 @@ where
         bundle: EthSendEndOfBlockBundle,
     ) -> MevBuilder<(EthSendEndOfBlockBundle,), Option<EthBundleHash>> {
         MevBuilder::new_rpc(self.client().request("eth_sendEndOfBlockBundle", (bundle,)))
+    }
+
+    fn send_mev_bundle(
+        &self,
+        bundle: MevSendBundle,
+    ) -> MevBuilder<(MevSendBundle,), Option<EthBundleHash>> {
+        MevBuilder::new_rpc(self.client().request("mev_sendBundle", (bundle,)))
     }
 }
