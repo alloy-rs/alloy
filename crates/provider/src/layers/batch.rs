@@ -420,22 +420,16 @@ impl CallBatchCaller {
 impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
     fn call(
         &self,
+        method: &'static str,
         params: crate::EthCallParams<N>,
     ) -> TransportResult<crate::ProviderCall<crate::EthCallParams<N>, Bytes>> {
         if !self.inner.should_batch_call(&params) {
-            return Caller::<N, Bytes>::call(&self.weak, params);
+            return Caller::<N, Bytes>::call(&self.weak, method, params);
         }
 
         Ok(crate::ProviderCall::BoxedFuture(Box::pin(
             self.inner.clone().schedule::<N>(CallBatchMsgKind::Call(params.into_data())),
         )))
-    }
-
-    fn estimate_gas(
-        &self,
-        params: crate::EthCallParams<N>,
-    ) -> TransportResult<crate::ProviderCall<crate::EthCallParams<N>, Bytes>> {
-        Caller::<N, Bytes>::estimate_gas(&self.weak, params)
     }
 
     fn call_many(

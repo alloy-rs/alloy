@@ -1,5 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Tenderly namespace's RPC methods.
-use crate::Provider;
+use crate::{EthCall, Provider};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
@@ -28,13 +28,10 @@ use alloy_transport::TransportResult;
 pub trait TenderlyApi<N: Network>: Send + Sync {
     /// Simulates a transaction as it would execute on the given block, allowing overrides of state
     /// variables and balances of all accounts
-    async fn tenderly_simulate_transaction(
+    fn tenderly_simulate_transaction(
         &self,
         tx: N::TransactionRequest,
-        block: BlockNumberOrTag,
-        state_overrides: Option<StateOverride>,
-        block_overrides: Option<BlockOverrides>,
-    ) -> TransportResult<TenderlySimulationResult>;
+    ) -> EthCall<N, TenderlySimulationResult>;
 
     /// Simulates a transaction as it would execute on the given block, allowing overrides of state
     /// variables and balances of all accounts
@@ -60,16 +57,11 @@ where
     N: Network,
     P: Provider<N>,
 {
-    async fn tenderly_simulate_transaction(
+    fn tenderly_simulate_transaction(
         &self,
         tx: N::TransactionRequest,
-        block: BlockNumberOrTag,
-        state_overrides: Option<StateOverride>,
-        block_overrides: Option<BlockOverrides>,
-    ) -> TransportResult<TenderlySimulationResult> {
-        self.client()
-            .request("tenderly_simulateTransaction", (tx, block, state_overrides, block_overrides))
-            .await
+    ) -> EthCall<N, TenderlySimulationResult> {
+        EthCall::new(self.weak_client(), "tenderly_simulateTransaction", tx)
     }
 
     async fn tenderly_simulate_bundle(
@@ -113,7 +105,7 @@ mod test {
         let provider = ProviderBuilder::new().connect_http(url);
 
         let gas_price = provider.get_gas_price().await.unwrap();
-        let block = BlockNumberOrTag::Latest;
+        let block = BlockNumberOrTag::Latest.into();
         let value = parse_ether("1").unwrap();
 
         // send to WETH9 to cause an erc20 transfer
@@ -125,11 +117,11 @@ mod test {
             .max_priority_fee_per_gas(gas_price + 1);
 
         let account_override = AccountOverride::default().with_balance(U256::MAX);
-        let state_override =
-            StateOverridesBuilder::default().append(Address::ZERO, account_override).build();
 
         let _res = provider
-            .tenderly_simulate_transaction(tx, block, Some(state_override), None)
+            .tenderly_simulate_transaction(tx)
+            .block(block)
+            .account_override(Address::ZERO, account_override)
             .await
             .unwrap();
     }
@@ -141,7 +133,7 @@ mod test {
         let provider = ProviderBuilder::new().connect_http(url);
 
         let gas_price = provider.get_gas_price().await.unwrap();
-        let block = BlockNumberOrTag::Latest;
+        let block = BlockNumberOrTag::Latest.into();
         let value = parse_ether("1").unwrap();
 
         let tx = TransactionRequest::default()
@@ -152,11 +144,11 @@ mod test {
             .max_priority_fee_per_gas(gas_price + 1);
 
         let account_override = AccountOverride::default().with_balance(U256::MAX);
-        let state_override =
-            StateOverridesBuilder::default().append(Address::ZERO, account_override).build();
 
         let _res = provider
-            .tenderly_simulate_transaction(tx, block, Some(state_override), None)
+            .tenderly_simulate_transaction(tx)
+            .block(block)
+            .account_override(Address::ZERO, account_override)
             .await
             .unwrap();
     }
