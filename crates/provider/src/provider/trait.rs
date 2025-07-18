@@ -205,7 +205,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         bundles: &'req [Bundle],
     ) -> EthCallMany<'req, N, Vec<Vec<EthCallResponse>>> {
-        EthCallMany::new(self.weak_client(), bundles)
+        EthCallMany::new(self.weak_client(), "eth_callMany", bundles)
     }
 
     /// Execute a multicall by leveraging the [`MulticallBuilder`].

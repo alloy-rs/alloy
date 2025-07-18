@@ -420,10 +420,11 @@ impl CallBatchCaller {
 impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
     fn call(
         &self,
+        method: &'static str,
         params: crate::EthCallParams<N>,
     ) -> TransportResult<crate::ProviderCall<crate::EthCallParams<N>, Bytes>> {
         if !self.inner.should_batch_call(&params) {
-            return Caller::<N, Bytes>::call(&self.weak, params);
+            return Caller::<N, Bytes>::call(&self.weak, method, params);
         }
 
         Ok(crate::ProviderCall::BoxedFuture(Box::pin(
@@ -431,18 +432,12 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
         )))
     }
 
-    fn estimate_gas(
-        &self,
-        params: crate::EthCallParams<N>,
-    ) -> TransportResult<crate::ProviderCall<crate::EthCallParams<N>, Bytes>> {
-        Caller::<N, Bytes>::estimate_gas(&self.weak, params)
-    }
-
     fn call_many(
         &self,
+        method: &'static str,
         params: crate::EthCallManyParams<'_>,
     ) -> TransportResult<crate::ProviderCall<crate::EthCallManyParams<'static>, Bytes>> {
-        Caller::<N, Bytes>::call_many(&self.weak, params)
+        Caller::<N, Bytes>::call_many(&self.weak, method, params)
     }
 }
 

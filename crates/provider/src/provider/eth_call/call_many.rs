@@ -21,6 +21,7 @@ where
 {
     caller: Arc<dyn Caller<N, Resp>>,
     params: EthCallManyParams<'req>,
+    method: &'static str,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
@@ -34,7 +35,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EthCallMany")
             .field("params", &self.params)
-            .field("method", &"eth_callMany")
+            .field("method", &self.method)
             .finish()
     }
 }
@@ -45,9 +46,14 @@ where
     Resp: RpcRecv,
 {
     /// Instantiates a new `EthCallMany` with the given parameters.
-    pub fn new(caller: impl Caller<N, Resp> + 'static, bundles: &'req [Bundle]) -> Self {
+    pub fn new(
+        caller: impl Caller<N, Resp> + 'static,
+        method: &'static str,
+        bundles: &'req [Bundle],
+    ) -> Self {
         Self {
             caller: Arc::new(caller),
+            method,
             params: EthCallManyParams::new(bundles),
             map: std::convert::identity,
             _pd: PhantomData,
@@ -69,7 +75,13 @@ where
     where
         NewMap: Fn(Resp) -> NewOutput,
     {
-        EthCallMany { caller: self.caller, params: self.params, map, _pd: PhantomData }
+        EthCallMany {
+            caller: self.caller,
+            method: self.method,
+            params: self.params,
+            map,
+            _pd: PhantomData,
+        }
     }
 
     /// Set the [`BlockId`] in the [`StateContext`].
@@ -117,6 +129,7 @@ where
         CallManyFut {
             inner: CallManyInnerFut::Preparing {
                 caller: self.caller,
+                method: self.method,
                 params: self.params,
                 map: self.map,
             },
@@ -148,13 +161,13 @@ where
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let CallManyInnerFut::Preparing { caller, params, map } =
+        let CallManyInnerFut::Preparing { caller, method, params, map } =
             std::mem::replace(&mut self.inner, CallManyInnerFut::Polling)
         else {
             unreachable!("bad state");
         };
 
-        let fut = caller.call_many(params)?;
+        let fut = caller.call_many(method, params)?;
         self.inner = CallManyInnerFut::Running { fut, map };
         self.poll_running(cx)
     }
@@ -190,8 +203,16 @@ where
 }
 
 enum CallManyInnerFut<'req, N: Network, Resp: RpcRecv, Output, Map: Fn(Resp) -> Output> {
-    Preparing { caller: Arc<dyn Caller<N, Resp>>, params: EthCallManyParams<'req>, map: Map },
-    Running { fut: ProviderCall<EthCallManyParams<'static>, Resp>, map: Map },
+    Preparing {
+        caller: Arc<dyn Caller<N, Resp>>,
+        method: &'static str,
+        params: EthCallManyParams<'req>,
+        map: Map,
+    },
+    Running {
+        fut: ProviderCall<EthCallManyParams<'static>, Resp>,
+        map: Map,
+    },
     Polling,
 }
 

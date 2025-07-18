@@ -97,11 +97,8 @@ where
             unreachable!("bad state")
         };
 
-        let fut =
-            if method.eq("eth_call") { caller.call(params) } else { caller.estimate_gas(params) }?;
-
+        let fut = caller.call(method, params)?;
         self.inner = EthCallFutInner::Running { map, fut };
-
         self.poll_running(cx)
     }
 
