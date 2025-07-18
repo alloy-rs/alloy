@@ -228,9 +228,13 @@ pub struct CancelBundleRequest {
 }
 
 /// Request for `eth_cancelPrivateTransaction`
+#[deprecated = "Use `EthCancelPrivateTransaction` instead"]
+pub type CancelPrivateTransactionRequest = EthCancelPrivateTransaction;
+
+/// Request for `eth_cancelPrivateTransaction`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct CancelPrivateTransactionRequest {
+pub struct EthCancelPrivateTransaction {
     /// Transaction hash of the transaction to be canceled
     pub tx_hash: B256,
 }
@@ -336,9 +340,13 @@ pub struct EthBundleHash {
 }
 
 /// Request for `eth_sendPrivateTransaction`
+#[deprecated = "Use `EthSendPrivateTransaction` instead"]
+pub type PrivateTransactionRequest = EthSendPrivateTransaction;
+
+/// Request for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct PrivateTransactionRequest {
+pub struct EthSendPrivateTransaction {
     /// raw signed transaction
     pub tx: Bytes,
     /// Hex-encoded number string, optional. Highest block number in which the transaction should
@@ -350,8 +358,8 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
-impl PrivateTransactionRequest {
-    /// Creates new [`PrivateTransactionRequest`] from the given encodable transaction.
+impl EthSendPrivateTransaction {
+    /// Creates new [`EthSendPrivateTransaction`] from the given encodable transaction.
     pub fn new<T: Encodable2718>(tx: &T) -> Self {
         Self {
             tx: tx.encoded_2718().into(),
@@ -381,7 +389,7 @@ impl PrivateTransactionRequest {
     }
 }
 
-impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+impl<T: Encodable2718> From<T> for EthSendPrivateTransaction {
     fn from(envelope: T) -> Self {
         Self::new(&envelope)
     }
