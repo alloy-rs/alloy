@@ -514,7 +514,7 @@ pub struct FinalizedBlocksStream<N: alloy_network::Network> {
 #[cfg(feature = "pubsub")]
 impl<N: alloy_network::Network> FinalizedBlocksStream<N> {
     /// Ethereum slot duration in seconds
-    const SLOT_DURATION: u64 = 12;
+    const SLOT_DURATION: u64 = alloy_eips::merge::SLOT_DURATION_SECS;
     /// Number of slots to wait before requesting finalized block again
     /// This is approximately 1 epochs (32 slots ≈ 384 seconds ≈ 6.4 minutes)
     const FINALITY_DELAY_SLOTS: u64 = 32;
