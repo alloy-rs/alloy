@@ -1,6 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
 
 use crate::{PendingTransactionBuilder, Provider};
+use alloy_consensus::Blob;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
@@ -153,6 +154,18 @@ pub trait AnvilApi<N: Network>: Send + Sync {
 
     /// Rollback the chain  
     async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()>;
+
+    /// Retrieves a blob by its versioned hash.
+    async fn anvil_get_blob_by_versioned_hash(
+        &self,
+        versioned_hash: B256,
+    ) -> TransportResult<Option<Blob>>;
+
+    /// Retrieves blobs by transaction hash.
+    async fn amvil_get_blobs_by_tx_hash(
+        &self,
+        tx_hash: TxHash,
+    ) -> TransportResult<Option<Vec<Blob>>>;
 
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
@@ -360,6 +373,20 @@ where
 
     async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()> {
         self.client().request("anvil_rollback", (depth,)).await
+    }
+
+    async fn anvil_get_blob_by_versioned_hash(
+        &self,
+        versioned_hash: B256,
+    ) -> TransportResult<Option<Blob>> {
+        self.client().request("anvil_getBlobByHash", (versioned_hash,)).await
+    }
+
+    async fn amvil_get_blobs_by_tx_hash(
+        &self,
+        tx_hash: TxHash,
+    ) -> TransportResult<Option<Vec<Blob>>> {
+        self.client().request("anvil_getBlobsByTransactionHash", (tx_hash,)).await
     }
 
     async fn eth_send_unsigned_transaction(
