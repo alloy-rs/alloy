@@ -7,7 +7,7 @@ use crate::geth::{
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, time::Duration, borrow::Cow};
 // re-exports
 pub use self::{
     call::{CallConfig, CallFrame, CallLogFrame, FlatCallConfig},
@@ -73,7 +73,7 @@ pub struct StructLog {
     /// program counter
     pub pc: u64,
     /// opcode to be executed
-    pub op: String,
+    pub op: Cow<'static, str>,
     /// remaining gas
     pub gas: u64,
     /// cost for executing op
