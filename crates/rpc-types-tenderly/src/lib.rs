@@ -355,7 +355,7 @@ pub struct StateChange {
     pub storage: Option<Vec<StorageSlotChange>>,
 }
 
-/// Describes the change of a storage slot due to a trasnaction.
+/// Describes the change of a storage slot due to a transaction.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageSlotChange {
