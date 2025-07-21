@@ -142,12 +142,13 @@ mod serde_impl {
     #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct SerdeHelper {
-        #[serde(rename = "target")]
-        target_blob_count: u64,
-        #[serde(rename = "max")]
-        max_blob_count: u64,
         #[serde(rename = "baseFeeUpdateFraction")]
         update_fraction: u128,
+        #[serde(rename = "max")]
+        max_blob_count: u64,
+        #[serde(rename = "target")]
+        target_blob_count: u64,
+        #[serde(skip_serializing)]
         min_blob_fee: Option<u128>,
     }
 
