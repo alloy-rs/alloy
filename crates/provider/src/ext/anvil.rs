@@ -1219,58 +1219,82 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_get_blob_by_versioned_hash() {
-        let provider = ProviderBuilder::new()
-            .connect_anvil_with_wallet_and_config(|anvil| {
-                anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let provider = ProviderBuilder::new()
+                        .connect_anvil_with_wallet_and_config(|anvil| {
+                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                        })
+                        .unwrap();
+
+                    let accounts = provider.get_accounts().await.unwrap();
+                    let alice = accounts[0];
+                    let bob = accounts[1];
+                    let sidecar: SidecarBuilder<SimpleCoder> =
+                        SidecarBuilder::from_slice(b"Blobs are fun!");
+                    let sidecar = sidecar.build().unwrap();
+
+                    let tx = TransactionRequest::default()
+                        .with_from(alice)
+                        .with_to(bob)
+                        .with_blob_sidecar(sidecar.clone());
+
+                    let pending_tx = provider.send_transaction(tx).await.unwrap();
+                    let _receipt = pending_tx.get_receipt().await.unwrap();
+                    let hash = sidecar.versioned_hash_for_blob(0).unwrap();
+
+                    let blob =
+                        provider.anvil_get_blob_by_versioned_hash(hash).await.unwrap().unwrap();
+
+                    assert_eq!(blob, sidecar.blobs[0]);
+                });
             })
+            .unwrap()
+            .join()
             .unwrap();
-
-        let accounts = provider.get_accounts().await.unwrap();
-        let alice = accounts[0];
-        let bob = accounts[1];
-        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Blobs are fun!");
-        let sidecar = sidecar.build().unwrap();
-
-        let tx = TransactionRequest::default()
-            .with_from(alice)
-            .with_to(bob)
-            .with_blob_sidecar(sidecar.clone());
-
-        let pending_tx = provider.send_transaction(tx).await.unwrap();
-        let _receipt = pending_tx.get_receipt().await.unwrap();
-        let hash = sidecar.versioned_hash_for_blob(0).unwrap();
-
-        let blob = provider.anvil_get_blob_by_versioned_hash(hash).await.unwrap().unwrap();
-
-        assert_eq!(blob, sidecar.blobs[0]);
     }
 
     #[tokio::test]
     async fn test_anvil_get_blobs_by_tx_hash() {
-        let provider = ProviderBuilder::new()
-            .connect_anvil_with_wallet_and_config(|anvil| {
-                anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let provider = ProviderBuilder::new()
+                        .connect_anvil_with_wallet_and_config(|anvil| {
+                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                        })
+                        .unwrap();
+
+                    let accounts = provider.get_accounts().await.unwrap();
+                    let alice = accounts[0];
+                    let bob = accounts[1];
+                    let sidecar: SidecarBuilder<SimpleCoder> =
+                        SidecarBuilder::from_slice(b"Blobs are fun!");
+                    let sidecar = sidecar.build().unwrap();
+
+                    let tx = TransactionRequest::default()
+                        .with_from(alice)
+                        .with_to(bob)
+                        .with_blob_sidecar(sidecar.clone());
+
+                    let pending_tx = provider.send_transaction(tx).await.unwrap();
+                    let receipt = pending_tx.get_receipt().await.unwrap();
+                    let tx_hash = receipt.transaction_hash;
+
+                    let blobs =
+                        provider.anvil_get_blobs_by_tx_hash(tx_hash).await.unwrap().unwrap();
+
+                    assert_eq!(blobs, sidecar.blobs);
+                });
             })
+            .unwrap()
+            .join()
             .unwrap();
-
-        let accounts = provider.get_accounts().await.unwrap();
-        let alice = accounts[0];
-        let bob = accounts[1];
-        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Blobs are fun!");
-        let sidecar = sidecar.build().unwrap();
-
-        let tx = TransactionRequest::default()
-            .with_from(alice)
-            .with_to(bob)
-            .with_blob_sidecar(sidecar.clone());
-
-        let pending_tx = provider.send_transaction(tx).await.unwrap();
-        let receipt = pending_tx.get_receipt().await.unwrap();
-        let tx_hash = receipt.transaction_hash;
-
-        let blobs = provider.anvil_get_blobs_by_tx_hash(tx_hash).await.unwrap().unwrap();
-
-        assert_eq!(blobs, sidecar.blobs);
     }
 
     #[tokio::test]
