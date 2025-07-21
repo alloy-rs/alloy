@@ -386,7 +386,11 @@ mod tests {
         let input = include_str!("../test_data/success.json");
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
-        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
+        // strip whitespace to force equal formatting
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
     }
 
     #[test]
@@ -394,7 +398,10 @@ mod tests {
         let input = include_str!("../test_data/failure.json");
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
-        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
     }
 
     #[test]
@@ -402,7 +409,10 @@ mod tests {
         let input = include_str!("../test_data/bundle_success.json");
         let parsed: Vec<TenderlySimulationResult> = serde_json::from_str(input).unwrap();
 
-        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
     }
 
     #[test]
@@ -410,7 +420,10 @@ mod tests {
         let input = include_str!("../test_data/trace_success.json");
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
-        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
     }
 
     #[test]
@@ -418,7 +431,10 @@ mod tests {
         let input = include_str!("../test_data/trace_complex.json");
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
-        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
     }
 
     #[test]
@@ -426,6 +442,9 @@ mod tests {
         let input = include_str!("../test_data/trace_swap.json");
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
-        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
+            input.split_whitespace().collect::<String>()
+        );
     }
 }
