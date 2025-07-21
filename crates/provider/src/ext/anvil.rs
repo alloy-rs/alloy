@@ -1,6 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
 
 use crate::{PendingTransactionBuilder, Provider};
+use alloy_consensus::Blob;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
@@ -153,6 +154,18 @@ pub trait AnvilApi<N: Network>: Send + Sync {
 
     /// Rollback the chain  
     async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()>;
+
+    /// Retrieves a blob by its versioned hash.
+    async fn anvil_get_blob_by_versioned_hash(
+        &self,
+        versioned_hash: B256,
+    ) -> TransportResult<Option<Blob>>;
+
+    /// Retrieves blobs by transaction hash.
+    async fn anvil_get_blobs_by_tx_hash(
+        &self,
+        tx_hash: TxHash,
+    ) -> TransportResult<Option<Vec<Blob>>>;
 
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
@@ -362,6 +375,14 @@ where
         self.client().request("anvil_rollback", (depth,)).await
     }
 
+    async fn anvil_get_blob_by_versioned_hash(&self, hash: B256) -> TransportResult<Option<Blob>> {
+        self.client().request("anvil_getBlobByHash", (hash,)).await
+    }
+
+    async fn anvil_get_blobs_by_tx_hash(&self, hash: TxHash) -> TransportResult<Option<Vec<Blob>>> {
+        self.client().request("anvil_getBlobsByTransactionHash", (hash,)).await
+    }
+
     async fn eth_send_unsigned_transaction(
         &self,
         request: N::TransactionRequest,
@@ -489,8 +510,9 @@ mod tests {
         fillers::{ChainIdFiller, GasFiller},
         ProviderBuilder,
     };
+    use alloy_consensus::{SidecarBuilder, SimpleCoder};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::TransactionBuilder;
+    use alloy_network::{TransactionBuilder, TransactionBuilder4844};
     use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
@@ -1193,6 +1215,86 @@ mod tests {
         let res = provider.get_transaction_receipt(tx_hash).await.unwrap().unwrap();
         assert_eq!(res.from, alice);
         assert_eq!(res.to, Some(bob));
+    }
+
+    #[tokio::test]
+    async fn test_anvil_get_blob_by_versioned_hash() {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let provider = ProviderBuilder::new()
+                        .connect_anvil_with_wallet_and_config(|anvil| {
+                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                        })
+                        .unwrap();
+
+                    let accounts = provider.get_accounts().await.unwrap();
+                    let alice = accounts[0];
+                    let bob = accounts[1];
+                    let sidecar: SidecarBuilder<SimpleCoder> =
+                        SidecarBuilder::from_slice(b"Blobs are fun!");
+                    let sidecar = sidecar.build().unwrap();
+
+                    let tx = TransactionRequest::default()
+                        .with_from(alice)
+                        .with_to(bob)
+                        .with_blob_sidecar(sidecar.clone());
+
+                    let pending_tx = provider.send_transaction(tx).await.unwrap();
+                    let _receipt = pending_tx.get_receipt().await.unwrap();
+                    let hash = sidecar.versioned_hash_for_blob(0).unwrap();
+
+                    let blob =
+                        provider.anvil_get_blob_by_versioned_hash(hash).await.unwrap().unwrap();
+
+                    assert_eq!(blob, sidecar.blobs[0]);
+                });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_get_blobs_by_tx_hash() {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let provider = ProviderBuilder::new()
+                        .connect_anvil_with_wallet_and_config(|anvil| {
+                            anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+                        })
+                        .unwrap();
+
+                    let accounts = provider.get_accounts().await.unwrap();
+                    let alice = accounts[0];
+                    let bob = accounts[1];
+                    let sidecar: SidecarBuilder<SimpleCoder> =
+                        SidecarBuilder::from_slice(b"Blobs are fun!");
+                    let sidecar = sidecar.build().unwrap();
+
+                    let tx = TransactionRequest::default()
+                        .with_from(alice)
+                        .with_to(bob)
+                        .with_blob_sidecar(sidecar.clone());
+
+                    let pending_tx = provider.send_transaction(tx).await.unwrap();
+                    let receipt = pending_tx.get_receipt().await.unwrap();
+                    let tx_hash = receipt.transaction_hash;
+
+                    let blobs =
+                        provider.anvil_get_blobs_by_tx_hash(tx_hash).await.unwrap().unwrap();
+
+                    assert_eq!(blobs, sidecar.blobs);
+                });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[tokio::test]
