@@ -1,4 +1,6 @@
-use alloy_eips::{eip2124::ForkHash, eip7840::BlobParams};
+//! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
+
+use crate::{eip2124::ForkHash, eip7840::BlobParams};
 use alloy_primitives::{Address, U64};
 use core::{fmt, str};
 use std::collections::BTreeMap;
@@ -82,6 +84,7 @@ pub struct EthForkConfig {
     pub system_contracts: BTreeMap<SystemContract, Address>,
 }
 
+#[cfg(feature = "serde")]
 impl EthForkConfig {
     /// Generate a fork hash, a CRC-32 hash of JSON object representing the fork configuration is
     /// converted into canonical form as per RFC-8785 (in short no whitespace, sorted keys, and
