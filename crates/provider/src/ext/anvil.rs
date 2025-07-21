@@ -162,7 +162,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     ) -> TransportResult<Option<Blob>>;
 
     /// Retrieves blobs by transaction hash.
-    async fn amvil_get_blobs_by_tx_hash(
+    async fn anvil_get_blobs_by_tx_hash(
         &self,
         tx_hash: TxHash,
     ) -> TransportResult<Option<Vec<Blob>>>;
@@ -375,18 +375,12 @@ where
         self.client().request("anvil_rollback", (depth,)).await
     }
 
-    async fn anvil_get_blob_by_versioned_hash(
-        &self,
-        versioned_hash: B256,
-    ) -> TransportResult<Option<Blob>> {
-        self.client().request("anvil_getBlobByHash", (versioned_hash,)).await
+    async fn anvil_get_blob_by_versioned_hash(&self, hash: B256) -> TransportResult<Option<Blob>> {
+        self.client().request("anvil_getBlobByHash", (hash,)).await
     }
 
-    async fn amvil_get_blobs_by_tx_hash(
-        &self,
-        tx_hash: TxHash,
-    ) -> TransportResult<Option<Vec<Blob>>> {
-        self.client().request("anvil_getBlobsByTransactionHash", (tx_hash,)).await
+    async fn anvil_get_blobs_by_tx_hash(&self, hash: TxHash) -> TransportResult<Option<Vec<Blob>>> {
+        self.client().request("anvil_getBlobsByTransactionHash", (hash,)).await
     }
 
     async fn eth_send_unsigned_transaction(
@@ -516,8 +510,9 @@ mod tests {
         fillers::{ChainIdFiller, GasFiller},
         ProviderBuilder,
     };
+    use alloy_consensus::{SidecarBuilder, SimpleCoder};
     use alloy_eips::BlockNumberOrTag;
-    use alloy_network::TransactionBuilder;
+    use alloy_network::{TransactionBuilder, TransactionBuilder4844};
     use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::{sol, SolCall};
@@ -1220,6 +1215,62 @@ mod tests {
         let res = provider.get_transaction_receipt(tx_hash).await.unwrap().unwrap();
         assert_eq!(res.from, alice);
         assert_eq!(res.to, Some(bob));
+    }
+
+    #[tokio::test]
+    async fn test_anvil_get_blob_by_versioned_hash() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|anvil| {
+                anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+            })
+            .unwrap();
+
+        let accounts = provider.get_accounts().await.unwrap();
+        let alice = accounts[0];
+        let bob = accounts[1];
+        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Blobs are fun!");
+        let sidecar = sidecar.build().unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_blob_sidecar(sidecar.clone());
+
+        let pending_tx = provider.send_transaction(tx).await.unwrap();
+        let _receipt = pending_tx.get_receipt().await.unwrap();
+        let hash = sidecar.versioned_hash_for_blob(0).unwrap();
+
+        let blob = provider.anvil_get_blob_by_versioned_hash(hash).await.unwrap().unwrap();
+
+        assert_eq!(blob, sidecar.blobs[0]);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_get_blobs_by_tx_hash() {
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_wallet_and_config(|anvil| {
+                anvil.fork(FORK_URL).args(["--hardfork", "cancun"])
+            })
+            .unwrap();
+
+        let accounts = provider.get_accounts().await.unwrap();
+        let alice = accounts[0];
+        let bob = accounts[1];
+        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Blobs are fun!");
+        let sidecar = sidecar.build().unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_blob_sidecar(sidecar.clone());
+
+        let pending_tx = provider.send_transaction(tx).await.unwrap();
+        let receipt = pending_tx.get_receipt().await.unwrap();
+        let tx_hash = receipt.transaction_hash;
+
+        let blobs = provider.anvil_get_blobs_by_tx_hash(tx_hash).await.unwrap().unwrap();
+
+        assert_eq!(blobs, sidecar.blobs);
     }
 
     #[tokio::test]
