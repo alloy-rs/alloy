@@ -36,6 +36,7 @@ thiserror.workspace = true
 # serde
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 
@@ -80,6 +81,7 @@ std = [
 ]
 serde = [
 	"dep:serde",
+	"dep:serde_with",
 	"dep:serde_json",
 	"dep:alloy-serde",
 	"alloy-primitives/serde",
