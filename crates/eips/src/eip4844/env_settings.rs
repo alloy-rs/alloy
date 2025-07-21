@@ -6,7 +6,7 @@ pub use c_kzg::KzgSettings;
 
 /// Precompute value that optimizes computing cell kzg proofs.
 ///
-/// Set to 8 as the recommended default for computing proofs..
+/// Set to 8 as the recommended default for computing proofs.
 ///
 /// Learn more: <https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112>
 const PRECOMPUTE: u64 = 8;
