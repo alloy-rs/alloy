@@ -5,6 +5,12 @@ use crate::{
     eip7594, eip7691,
 };
 
+/// BLOB_BASE_COST represents the minimum execution gas required to include a blob in a block,
+/// as defined by [EIP-7918 (Decoupling Blob Gas from Execution Gas)](https://eips.ethereum.org/EIPS/eip-7918).
+/// This ensures that even though blob gas and execution gas are decoupled, there is still a base
+/// cost in execution gas to include blobs.
+pub const BLOB_BASE_COST: u64 = 2_u64.pow(14);
+
 /// Configuration for the blob-related calculations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -28,6 +34,9 @@ pub struct BlobParams {
     ///
     /// If not specified, defaults to `max_blob_count` during deserialization.
     pub max_blobs_per_tx: u64,
+    /// Minimum execution gas required to include a blob in a block.
+    #[cfg_attr(feature = "serde", serde(skip_serializing, default))]
+    pub blob_base_cost: u64,
 }
 
 impl BlobParams {
@@ -39,6 +48,7 @@ impl BlobParams {
             update_fraction: eip4844::BLOB_GASPRICE_UPDATE_FRACTION,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
             max_blobs_per_tx: eip4844::MAX_BLOBS_PER_BLOCK_DENCUN as u64,
+            blob_base_cost: 0,
         }
     }
 
@@ -50,6 +60,7 @@ impl BlobParams {
             update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
             max_blobs_per_tx: eip7691::MAX_BLOBS_PER_BLOCK_ELECTRA,
+            blob_base_cost: 0,
         }
     }
 
@@ -61,7 +72,14 @@ impl BlobParams {
             update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
             max_blobs_per_tx: eip7594::MAX_BLOBS_PER_TX_FUSAKA,
+            blob_base_cost: BLOB_BASE_COST,
         }
+    }
+
+    /// Set blob base cost on [`BlobParams`].
+    pub const fn with_blob_base_cost(mut self, blob_base_cost: u64) -> Self {
+        self.blob_base_cost = blob_base_cost;
+        self
     }
 
     /// Returns the maximum available blob gas in a block.
@@ -85,9 +103,23 @@ impl BlobParams {
         &self,
         excess_blob_gas: u64,
         blob_gas_used: u64,
+        base_fee_per_gas: u64,
     ) -> u64 {
-        (excess_blob_gas + blob_gas_used)
-            .saturating_sub(eip4844::DATA_GAS_PER_BLOB * self.target_blob_count)
+        let next_excess_blob_gas = excess_blob_gas + blob_gas_used;
+        let target_blob_gas = self.target_blob_gas_per_block();
+        if next_excess_blob_gas < target_blob_gas {
+            return 0;
+        }
+
+        if self.blob_base_cost as u128 * base_fee_per_gas as u128
+            > DATA_GAS_PER_BLOB as u128 * self.calc_blob_fee(excess_blob_gas)
+        {
+            let scaled_excess = blob_gas_used * (self.max_blob_count - self.target_blob_count)
+                / self.max_blob_count;
+            excess_blob_gas + scaled_excess
+        } else {
+            next_excess_blob_gas - target_blob_gas
+        }
     }
 
     /// Calculates the blob fee for block based on its `excess_blob_gas`.
@@ -122,6 +154,7 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee,
                 max_blobs_per_tx,
+                blob_base_cost: _,
             } = params;
 
             Self {
@@ -151,6 +184,7 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
                 max_blobs_per_tx: max_blobs_per_tx.unwrap_or(max_blob_count),
+                blob_base_cost: 0,
             }
         }
     }
