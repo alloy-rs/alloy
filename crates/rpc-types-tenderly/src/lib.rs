@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, Log, I256, U256, U64};
+use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, Log, I256, U256};
 use serde::{de::Error, Deserialize, Deserializer};
 
 /// Tenderly RPC simulation result.
@@ -20,9 +20,11 @@ pub struct TenderlySimulationResult {
     /// The final status of the transaction, typically indicating success or failure.
     pub status: bool,
     /// The amount of gas used by the transaction.
-    pub gas_used: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_used: u64,
     /// The total amount of gas used when this transaction was executed in the block.
-    pub cumulative_gas_used: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub cumulative_gas_used: u64,
     /// The block the transaction was simulated in.
     pub block_number: BlockNumberOrTag,
     /// The type of the transaction.
@@ -194,9 +196,11 @@ pub struct TenderlyTrace {
     /// Target address of the call.
     pub to: Address,
     /// Gas used by the call.
-    pub gas: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas: u64,
     /// Gas used by the call.
-    pub gas_used: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_used: u64,
     /// Value of the call. Omitted if zero.
     pub value: Option<U256>,
     /// Input of the call.
