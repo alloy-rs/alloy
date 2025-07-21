@@ -38,10 +38,13 @@ pub struct TenderlySimulationResult {
     /// Tenderly trace of the transaction execution.
     pub trace: Vec<TenderlyTrace>,
     /// Asset changes caused by the transaction.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub asset_changes: Option<Vec<AssetChange>>,
     /// Balance changes caused by the transaction.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub balance_changes: Option<Vec<BalanceChange>>,
     /// State changes caused by the transaction.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub state_changes: Option<Vec<StateChange>>,
 }
 
@@ -54,14 +57,15 @@ pub struct TenderlyLog {
     /// True if log was emitted by an anonymous event.
     pub anonymous: bool,
     /// Decoded inputs of the event.
-    pub inputs: Option<Vec<TenderlyLogInput>>,
+    /// This field is not skipped when inputs are `None`.
+    pub inputs: Option<Vec<DecodedValue>>,
     /// Unencoded logs.
     pub raw: Log,
 }
 
 /// Log inputs decoded by the tenderly node.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TenderlyLogInput {
+pub struct DecodedValue {
     /// Value of the input.
     #[serde(rename = "value")]
     raw_value: serde_json::Value,
@@ -69,12 +73,14 @@ pub struct TenderlyLogInput {
     #[serde(rename = "type")]
     raw_typ: serde_json::Value,
     /// Name of the input.
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// True if the input is indexed.
-    pub indexed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexed: Option<bool>,
 }
 
-impl TenderlyLogInput {
+impl DecodedValue {
     /// Returns the parsed type of the log input.
     pub fn typ(&self) -> Option<DynSolType> {
         let raw = self.raw_typ.as_str()?;
@@ -183,14 +189,25 @@ pub struct TenderlyTrace {
     /// Gas used by the call.
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
-    /// Value of the call. Omitted if zero.
+    /// Value of the call.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<U256>,
+    /// Error caused by the call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
     /// Input of the call.
     pub input: Bytes,
-    /// Name of the method. Omitted if unknown.
+    /// Decoded Trace Input
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decoded_input: Option<Vec<DecodedValue>>,
+    /// Name of the method.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub method: Option<String>,
     /// Output of the call.
     pub output: Bytes,
+    /// Decoded output of the call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decoded_output: Option<Vec<DecodedValue>>,
     /// How many subtraces this trace has.
     pub subtraces: usize,
     /// The identifier of this transaction trace in the set.
@@ -225,14 +242,18 @@ pub struct AssetChange {
     /// Type of the asset change.
     pub r#type: ChangeType,
     /// Sender address.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<Address>,
     /// Recipient address.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<Address>,
     /// Unformatted amount of the asset.
     pub raw_amount: U256,
     /// Amount formatted according to asset decimals.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<String>,
     /// Dollar value of the change.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dollar_value: Option<String>,
 }
 
@@ -243,20 +264,25 @@ pub struct AssetInfo {
     /// Token standard of the asset.
     pub standard: AssetStandard,
     /// Fungibility of the asset, omitted if unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<AssetFungibility>,
     /// Address of the token contract.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_address: Option<Address>,
     /// Symbol of the asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
     /// Name of the asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// URL of the asset logo.
-    // TODO: use url crate here?
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub logo: Option<String>,
     /// Decimals of the asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decimals: Option<u8>,
     /// Dollar value of the asset.
-    // TODO: this does not fit in a f64 so I left it as string for now
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dollar_value: Option<String>,
 }
 
@@ -308,6 +334,7 @@ pub struct BalanceChange {
     /// Dollar value of the
     pub dollar_value: String,
     /// Identifiers of the traces affecting this balance change.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub transfers: Option<Vec<usize>>,
 }
 
@@ -317,12 +344,15 @@ pub struct BalanceChange {
 pub struct StateChange {
     /// Address affected by the transaction..
     pub address: Address,
-    /// Storage change caused by the transaction.
-    pub storage: Option<Vec<StorageSlotChange>>,
     /// Nonce change caused by the transaction.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<ValueChange>,
     /// Balance change caused by the transaction.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub balance: Option<ValueChange>,
+    /// Storage change caused by the transaction.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage: Option<Vec<StorageSlotChange>>,
 }
 
 /// Describes the change of a storage slot due to a trasnaction.
@@ -354,36 +384,48 @@ mod tests {
     #[test]
     fn test_success_response() {
         let input = include_str!("../test_data/success.json");
-        let _parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
     }
 
     #[test]
     fn test_failure_response() {
         let input = include_str!("../test_data/failure.json");
-        let _parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
     }
 
     #[test]
     fn test_bundle_success_response() {
         let input = include_str!("../test_data/bundle_success.json");
-        let _parsed: Vec<TenderlySimulationResult> = serde_json::from_str(input).unwrap();
+        let parsed: Vec<TenderlySimulationResult> = serde_json::from_str(input).unwrap();
+
+        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
     }
 
     #[test]
     fn test_trace_success_response() {
         let input = include_str!("../test_data/trace_success.json");
-        let _parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
     }
 
     #[test]
     fn test_trace_complex_response() {
         let input = include_str!("../test_data/trace_complex.json");
-        let _parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
     }
 
     #[test]
     fn test_trace_swap_response() {
         let input = include_str!("../test_data/trace_swap.json");
-        let _parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+        let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
+
+        assert_eq!(serde_json::to_string_pretty(&parsed).unwrap(), input.trim());
     }
 }
