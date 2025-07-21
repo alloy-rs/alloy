@@ -8,13 +8,14 @@
 
 use std::str::FromStr;
 
+use alloy_consensus::TxType;
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_eips::BlockNumberOrTag;
 use alloy_primitives::{Address, Bloom, Bytes, FixedBytes, Log, I256, U256};
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{de::Error, Deserialize, Serialize};
 
 /// Tenderly RPC simulation result.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TenderlySimulationResult {
     /// The final status of the transaction, typically indicating success or failure.
@@ -28,7 +29,8 @@ pub struct TenderlySimulationResult {
     /// The block the transaction was simulated in.
     pub block_number: BlockNumberOrTag,
     /// The type of the transaction.
-    pub r#type: TransactionType,
+    #[serde(rename = "type")]
+    pub typ: TxType,
     /// The blocks bloom filter.
     pub logs_bloom: Bloom,
     /// Logs generated during the execution of the transaction.
@@ -43,28 +45,8 @@ pub struct TenderlySimulationResult {
     pub state_changes: Option<Vec<StateChange>>,
 }
 
-/// Ethereum transaction type
-#[derive(Debug, Deserialize)]
-pub enum TransactionType {
-    /// Legacy transaction
-    #[serde(rename = "0x0")]
-    Legacy,
-    /// EIP-2930 transaction
-    #[serde(rename = "0x1")]
-    Eip2930,
-    /// EIP-1559 transaction
-    #[serde(rename = "0x2")]
-    Eip1559,
-    /// EIP-4844 transaction
-    #[serde(rename = "0x3")]
-    Eip4844,
-    /// EIP-7702 transaction
-    #[serde(rename = "0x4")]
-    Eip7702,
-}
-
 /// Logs returned by Tenderly RPC, might be decoded.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TenderlyLog {
     /// Decoded name of the emitted log.
@@ -78,115 +60,115 @@ pub struct TenderlyLog {
 }
 
 /// Log inputs decoded by the tenderly node.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TenderlyLogInput {
     /// Value of the input.
-    pub value: DynSolValue,
+    #[serde(rename = "value")]
+    raw_value: serde_json::Value,
     /// Type of the input.
-    pub r#type: DynSolType,
+    #[serde(rename = "type")]
+    raw_typ: serde_json::Value,
     /// Name of the input.
     pub name: String,
     /// True if the input is indexed.
     pub indexed: bool,
 }
 
-impl<'de> Deserialize<'de> for TenderlyLogInput {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct RawLogInput {
-            value: serde_json::Value,
-            r#type: String,
-            name: String,
-            indexed: bool,
-        }
-
-        let raw = RawLogInput::deserialize(deserializer)?;
-        let ty: DynSolType = raw.r#type.parse().unwrap();
-        let value = match parse_dyn_value(&raw.value, &ty) {
-            Ok(value) => value,
-            Err(e) => return Err(D::Error::custom(e)),
+impl TenderlyLogInput {
+    /// Returns the parsed type of the log input.
+    pub fn typ(&self) -> Option<DynSolType> {
+        let raw = self.raw_typ.as_str()?;
+        let Ok(typ) = raw.parse() else {
+            return None;
         };
-
-        Ok(Self { value, r#type: ty, name: raw.name, indexed: raw.indexed })
+        Some(typ)
     }
-}
 
-fn parse_dyn_value(
-    val: &serde_json::Value,
-    ty: &DynSolType,
-) -> Result<DynSolValue, serde_json::error::Error> {
-    use serde_json::Error;
+    /// Returns the parsed value of the log input.
+    pub fn value(&self) -> Option<DynSolValue> {
+        let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.typ()?) else {
+            return None;
+        };
+        Some(val)
+    }
 
-    match ty {
-        DynSolType::Bool => {
-            val.as_bool().map(DynSolValue::Bool).ok_or_else(|| Error::custom("expected bool"))
-        }
-        DynSolType::Uint(bits) => val
-            .as_str()
-            .ok_or_else(|| Error::custom("expected string"))
-            .and_then(|a| U256::from_str(a).map_err(Error::custom))
-            .map(|u| DynSolValue::Uint(u, *bits)),
-        DynSolType::Int(bits) => val
-            .as_str()
-            .ok_or_else(|| Error::custom("expected string"))
-            .and_then(|a| I256::from_str(a).map_err(Error::custom))
-            .map(|i| DynSolValue::Int(i, *bits)),
-        DynSolType::Address => val
-            .as_str()
-            .ok_or_else(|| Error::custom("expected string"))
-            .and_then(|a| Address::from_str(a).map_err(Error::custom))
-            .map(DynSolValue::Address),
-        DynSolType::FixedBytes(size) => val
-            .as_str()
-            .ok_or_else(|| Error::custom("expected string"))
-            .and_then(|a| FixedBytes::from_str(a).map_err(Error::custom))
-            .map(|b| DynSolValue::FixedBytes(b, *size)),
-        DynSolType::Bytes => val
-            .as_str()
-            .ok_or_else(|| Error::custom("expected string"))
-            .and_then(|b| Bytes::from_str(b).map_err(Error::custom))
-            .map(|b| DynSolValue::Bytes(b.into())),
-        DynSolType::String => val
-            .as_str()
-            .ok_or_else(|| Error::custom("expected string"))
-            .map(|s| DynSolValue::String(s.to_owned())),
-        DynSolType::Array(inner) => {
-            let arr = val.as_array().ok_or_else(|| Error::custom("expected array"))?;
-            let values: Vec<DynSolValue> =
-                arr.iter().map(|v| parse_dyn_value(v, inner)).collect::<Result<Vec<_>, _>>()?;
-            Ok(DynSolValue::Array(values))
-        }
-        DynSolType::FixedArray(inner, size) => {
-            let arr = val.as_array().ok_or_else(|| Error::custom("expected array"))?;
-            if arr.len() != *size {
-                return Err(Error::custom("array size mismatch"));
+    fn parse_dyn_value(
+        val: &serde_json::Value,
+        ty: &DynSolType,
+    ) -> Result<DynSolValue, serde_json::error::Error> {
+        use serde_json::Error;
+
+        match ty {
+            DynSolType::Bool => {
+                val.as_bool().map(DynSolValue::Bool).ok_or_else(|| Error::custom("expected bool"))
             }
-            let values: Vec<DynSolValue> =
-                arr.iter().map(|v| parse_dyn_value(v, inner)).collect::<Result<Vec<_>, _>>()?;
-            Ok(DynSolValue::FixedArray(values))
-        }
-        DynSolType::Tuple(types) => {
-            let arr = val.as_array().ok_or_else(|| Error::custom("expected tuple"))?;
-            if arr.len() != types.len() {
-                return Err(Error::custom("tuple length mismatch"));
+            DynSolType::Uint(bits) => val
+                .as_str()
+                .ok_or_else(|| Error::custom("expected string"))
+                .and_then(|a| U256::from_str(a).map_err(Error::custom))
+                .map(|u| DynSolValue::Uint(u, *bits)),
+            DynSolType::Int(bits) => val
+                .as_str()
+                .ok_or_else(|| Error::custom("expected string"))
+                .and_then(|a| I256::from_str(a).map_err(Error::custom))
+                .map(|i| DynSolValue::Int(i, *bits)),
+            DynSolType::Address => val
+                .as_str()
+                .ok_or_else(|| Error::custom("expected string"))
+                .and_then(|a| Address::from_str(a).map_err(Error::custom))
+                .map(DynSolValue::Address),
+            DynSolType::FixedBytes(size) => val
+                .as_str()
+                .ok_or_else(|| Error::custom("expected string"))
+                .and_then(|a| FixedBytes::from_str(a).map_err(Error::custom))
+                .map(|b| DynSolValue::FixedBytes(b, *size)),
+            DynSolType::Bytes => val
+                .as_str()
+                .ok_or_else(|| Error::custom("expected string"))
+                .and_then(|b| Bytes::from_str(b).map_err(Error::custom))
+                .map(|b| DynSolValue::Bytes(b.into())),
+            DynSolType::String => val
+                .as_str()
+                .ok_or_else(|| Error::custom("expected string"))
+                .map(|s| DynSolValue::String(s.to_owned())),
+            DynSolType::Array(inner) => {
+                let arr = val.as_array().ok_or_else(|| Error::custom("expected array"))?;
+                let values: Vec<DynSolValue> = arr
+                    .iter()
+                    .map(|v| Self::parse_dyn_value(v, inner))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(DynSolValue::Array(values))
             }
-            let values = arr
-                .iter()
-                .zip(types.iter())
-                .map(|(v, t)| parse_dyn_value(v, t))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(DynSolValue::Tuple(values))
+            DynSolType::FixedArray(inner, size) => {
+                let arr = val.as_array().ok_or_else(|| Error::custom("expected array"))?;
+                if arr.len() != *size {
+                    return Err(Error::custom("array size mismatch"));
+                }
+                let values: Vec<DynSolValue> = arr
+                    .iter()
+                    .map(|v| Self::parse_dyn_value(v, inner))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(DynSolValue::FixedArray(values))
+            }
+            DynSolType::Tuple(types) => {
+                let arr = val.as_array().ok_or_else(|| Error::custom("expected tuple"))?;
+                if arr.len() != types.len() {
+                    return Err(Error::custom("tuple length mismatch"));
+                }
+                let values = arr
+                    .iter()
+                    .zip(types.iter())
+                    .map(|(v, t)| Self::parse_dyn_value(v, t))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(DynSolValue::Tuple(values))
+            }
+            _ => Err(Error::custom("type is not supported")),
         }
-        _ => Err(Error::custom("type is not supported")),
     }
 }
 
 /// Call trace generated by tenderly.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TenderlyTrace {
     /// Call type.
@@ -219,7 +201,7 @@ pub struct TenderlyTrace {
 }
 
 /// Types of EVM calls.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TenderlyCallType {
     /// Call type.
@@ -230,10 +212,12 @@ pub enum TenderlyCallType {
     StaticCall,
     /// DelegateCall type.
     DelegateCall,
+    /// AuthorizedCall type.
+    AuthCall,
 }
 
 /// Information about the assets affected by the transaction.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetChange {
     /// Information about the exchanged asset.
@@ -253,7 +237,7 @@ pub struct AssetChange {
 }
 
 /// Information describing an onchain asset.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetInfo {
     /// Token standard of the asset.
@@ -277,7 +261,7 @@ pub struct AssetInfo {
 }
 
 /// Token standard of an asset.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum AssetStandard {
     /// Native currency of the network.
@@ -292,7 +276,7 @@ pub enum AssetStandard {
 }
 
 /// Token standard of an asset.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub enum AssetFungibility {
     /// Native asset.
@@ -304,7 +288,7 @@ pub enum AssetFungibility {
 }
 
 /// Token standard of an asset.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub enum ChangeType {
     /// Asset mint.
@@ -316,7 +300,7 @@ pub enum ChangeType {
 }
 
 /// Balance change of an address caused by a transaction.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceChange {
     /// Address affected by the transaction.
@@ -328,7 +312,7 @@ pub struct BalanceChange {
 }
 
 /// State changes of an address caused by a transaction
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StateChange {
     /// Address affected by the transaction..
@@ -342,7 +326,7 @@ pub struct StateChange {
 }
 
 /// Describes the change of a storage slot due to a trasnaction.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageSlotChange {
     /// Storage slot.
@@ -354,7 +338,7 @@ pub struct StorageSlotChange {
 }
 
 /// Describes the change of a value due to a trasnaction.
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueChange {
     /// Value before the transaction.

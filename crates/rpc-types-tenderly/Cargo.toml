@@ -26,7 +26,7 @@ workspace = true
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-eips = { workspace = true, features = ["serde"] }
 alloy-dyn-abi = { workspace = true }
-alloy-consensus = { workspace = true }
+alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-serde = { workspace = true }
 
 serde.workspace = true
