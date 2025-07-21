@@ -313,7 +313,7 @@ pub enum AssetFungibility {
     NonFungible,
 }
 
-/// Token standard of an asset.
+/// Type of asset change.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub enum ChangeType {
