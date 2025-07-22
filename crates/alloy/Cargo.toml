@@ -225,7 +225,6 @@ rpc-types-any = ["rpc-types", "alloy-rpc-types?/any"]
 rpc-types-beacon = [
     "rpc-types",
     "alloy-rpc-types?/beacon",
-    "alloy-provider?/beacon-api",
 ]
 rpc-types-debug = [
     "rpc-types",
