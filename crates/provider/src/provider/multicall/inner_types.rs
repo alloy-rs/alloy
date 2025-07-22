@@ -160,9 +160,10 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
         let mut ret = vec![];
         for (idx, res) in results.iter().enumerate() {
             if res.success {
-                ret.push(Ok(
-                    D::abi_decode_returns(&res.returnData).map_err(MulticallError::DecodeError)?
-                ));
+                ret.push(
+                    D::abi_decode_returns(&res.returnData)
+                        .map_err(|_| Failure { idx, return_data: res.returnData.clone() }),
+                )
             } else {
                 ret.push(Err(Failure { idx, return_data: res.returnData.clone() }));
             }
