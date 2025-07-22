@@ -27,6 +27,7 @@ alloy-primitives = { workspace = true, features = ["map"] }
 alloy-serde.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
+alloy-rpc-types-any = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
 alloy-rpc-types-debug = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true, features = [
@@ -52,6 +53,7 @@ default = [
 ]
 admin = ["dep:alloy-rpc-types-admin"]
 anvil = ["dep:alloy-rpc-types-anvil"]
+any = ["dep:alloy-rpc-types-any"]
 beacon = ["dep:alloy-rpc-types-beacon"]
 debug = ["dep:alloy-rpc-types-debug"]
 engine = ["dep:alloy-rpc-types-engine"]
