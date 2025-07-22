@@ -1,5 +1,7 @@
 //! Ledger Ethereum app wrapper.
 
+use std::sync::Arc;
+
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST_0, P1_FIRST_1, P2};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256};
@@ -24,7 +26,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 /// will always return an error.
 #[derive(Debug)]
 pub struct LedgerSigner {
-    transport: Mutex<Ledger>,
+    transport: Arc<Mutex<Ledger>>,
     derivation: DerivationType,
     pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
@@ -162,7 +164,22 @@ impl LedgerSigner {
         let address = Self::get_address_with_path_transport(&transport, &derivation).await?;
         debug!(%address, "Connected to Ledger");
 
-        Ok(Self { transport: Mutex::new(transport), derivation, chain_id, address })
+        Ok(Self { transport: Mutex::new(transport).into(), derivation, chain_id, address })
+    }
+
+    /// Instantiate the application using a existing transport.
+    pub async fn new_with_transport(
+        derivation: DerivationType,
+        chain_id: Option<ChainId>,
+        transport: Arc<Mutex<Ledger>>,
+    ) -> Result<Self, LedgerError> {
+        let address = {
+            let transport_guard = transport.lock().await;
+            Self::get_address_with_path_transport(&transport_guard, &derivation).await?
+        };
+        debug!(%address, "Connected to Ledger");
+
+        Ok(Self { transport, derivation, chain_id, address })
     }
 
     /// Get the account which corresponds to our derivation path
