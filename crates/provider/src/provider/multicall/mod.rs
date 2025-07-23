@@ -1,5 +1,6 @@
 //! A Multicall Builder
 
+use crate::PendingTransactionBuilder;
 use crate::Provider;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
@@ -365,6 +366,10 @@ where
         let output = self.build_and_call(self.to_aggregate_call(), None).await?;
         T::decode_returns(&output.returnData)
     }
+    /// Sends the `aggregate` function as a transaction
+    pub async fn send_aggregate(&self) -> Result<PendingTransactionBuilder<N>> {
+        self.build_and_send(self.to_aggregate_call(), None).await
+    }
 
     /// Encodes the calls for the `aggregate` function and returns the populated transaction
     /// request.
@@ -614,6 +619,19 @@ where
 
         let res = eth_call.await.map_err(MulticallError::TransportError)?;
         M::abi_decode_returns(&res).map_err(MulticallError::DecodeError)
+    }
+
+    async fn build_and_send<M: SolCall>(
+        &self,
+        call_type: M,
+        value: Option<U256>,
+    ) -> Result<PendingTransactionBuilder<N>> {
+        let tx = self.build_request(call_type, value);
+
+        let pending_tx =
+            self.provider.send_transaction(tx).await.map_err(MulticallError::TransportError)?;
+
+        Ok(pending_tx)
     }
 
     /// Add a call to get the block hash from a block number
