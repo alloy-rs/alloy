@@ -40,7 +40,10 @@ impl NonceManager for SimpleNonceManager {
         P: Provider<N>,
         N: Network,
     {
-        provider.get_transaction_count(address).pending().await
+        provider
+            .get_transaction_count(address, alloy_eips::BlockNumberOrTag::Pending)
+            .pending()
+            .await
     }
 }
 
@@ -79,7 +82,7 @@ impl NonceManager for CachedNonceManager {
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
             trace!(%address, "fetching nonce");
-            provider.get_transaction_count(address).await?
+            provider.get_transaction_count(address, alloy_eips::BlockNumberOrTag::Pending).await?
         } else {
             trace!(%address, current_nonce = *nonce, "incrementing nonce");
             *nonce + 1

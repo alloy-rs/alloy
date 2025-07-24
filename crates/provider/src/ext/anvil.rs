@@ -550,7 +550,8 @@ mod tests {
         let res = provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
         assert_eq!(res.from, impersonate);
 
-        let nonce = provider.get_transaction_count(impersonate).await.unwrap();
+        let nonce =
+            provider.get_transaction_count(impersonate, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(nonce, 1);
 
         let balance = provider.get_balance(to).await.unwrap();
@@ -619,7 +620,8 @@ mod tests {
         let res = provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
         assert_eq!(res.from, impersonate);
 
-        let nonce = provider.get_transaction_count(impersonate).await.unwrap();
+        let nonce =
+            provider.get_transaction_count(impersonate, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(nonce, 1);
 
         let balance = provider.get_balance(to).await.unwrap();
@@ -799,7 +801,8 @@ mod tests {
         let nonce = 1337;
         provider.anvil_set_nonce(address, nonce).await.unwrap();
 
-        let new_nonce = provider.get_transaction_count(address).await.unwrap();
+        let new_nonce =
+            provider.get_transaction_count(address, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(new_nonce, nonce);
     }
 
@@ -959,13 +962,15 @@ mod tests {
 
         provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
-        let tx_count = provider.get_transaction_count(alice).await.unwrap();
+        let tx_count =
+            provider.get_transaction_count(alice, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(tx_count, 2);
 
         let res = provider.anvil_revert(snapshot_id).await.unwrap();
         assert!(res);
 
-        let tx_count = provider.get_transaction_count(alice).await.unwrap();
+        let tx_count =
+            provider.get_transaction_count(alice, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(tx_count, 0);
     }
 

@@ -767,9 +767,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
+        block_number: BlockNumberOrTag,
+    ) -> RpcWithBlock<(Address, BlockNumberOrTag), U64, u64, fn(U64) -> u64> {
         self.client()
-            .request("eth_getTransactionCount", address)
+            .request("eth_getTransactionCount", (address, block_number))
             .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
@@ -1738,7 +1739,8 @@ mod tests {
         let sender = accounts[0];
 
         // Initial tx count should be 0
-        let count = provider.get_transaction_count(sender).await.unwrap();
+        let count =
+            provider.get_transaction_count(sender, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(count, 0);
 
         // Send Tx
@@ -1753,11 +1755,16 @@ mod tests {
         let _ = provider.send_transaction(tx).await.unwrap().get_receipt().await;
 
         // Tx count should be 1
-        let count = provider.get_transaction_count(sender).await.unwrap();
+        let count =
+            provider.get_transaction_count(sender, BlockNumberOrTag::Pending).await.unwrap();
         assert_eq!(count, 1);
 
         // Tx count should be 0 at block 0
-        let count = provider.get_transaction_count(sender).block_id(0.into()).await.unwrap();
+        let count = provider
+            .get_transaction_count(sender, BlockNumberOrTag::Pending)
+            .block_id(0.into())
+            .await
+            .unwrap();
         assert_eq!(count, 0);
     }
 

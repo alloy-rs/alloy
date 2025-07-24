@@ -297,8 +297,9 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
-        self.0.get_transaction_count(address)
+        block_number: BlockNumberOrTag,
+    ) -> RpcWithBlock<(Address, BlockNumberOrTag), U64, u64, fn(U64) -> u64> {
+        self.0.get_transaction_count(address, block_number)
     }
 
     fn get_transaction_receipt(
