@@ -310,32 +310,30 @@ where
             _pd: Default::default(),
         }
     }
-
     /// Creates the [`aggregate3ValueCall`]
-fn to_aggregate3_value_call(&self) -> aggregate3ValueCall {
-    aggregate3ValueCall { calls: self.calls.to_vec() }
-}
+    fn to_aggregate3_value_call(&self) -> aggregate3ValueCall {
+        aggregate3ValueCall { calls: self.calls.to_vec() }
+    }
 
-/// Creates the [`blockAndAggregateCall`]
-fn to_block_and_aggregate_call(&self) -> blockAndAggregateCall {
-    let calls = self
-        .calls
-        .iter()
-        .map(|c| Call { target: c.target, callData: c.callData.clone() })
-        .collect::<Vec<_>>();
-    blockAndAggregateCall { calls }
-}
+    /// Creates the [`blockAndAggregateCall`]
+    fn to_block_and_aggregate_call(&self) -> blockAndAggregateCall {
+        let calls = self
+            .calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect::<Vec<_>>();
+        blockAndAggregateCall { calls }
+    }
 
-/// Creates the [`tryBlockAndAggregateCall`]
-fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndAggregateCall {
-    let calls = self
-        .calls
-        .iter()
-        .map(|c| Call { target: c.target, callData: c.callData.clone() })
-        .collect::<Vec<_>>();
-    tryBlockAndAggregateCall { requireSuccess: require_success, calls }
-}
-    
+    /// Creates the [`tryBlockAndAggregateCall`]
+    fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndAggregateCall {
+        let calls = self
+            .calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect::<Vec<_>>();
+        tryBlockAndAggregateCall { requireSuccess: require_success, calls }
+    }
 
     /// Calls the `aggregate` function
     ///
@@ -536,10 +534,10 @@ fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndA
     }
     /// Sends the `aggregate3Value` function as a transaction
     pub async fn send_aggregate3_value(&self) -> Result<PendingTransactionBuilder<N>> {
-    let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
-    let call = self.to_aggregate3_value_call();
-    self.build_and_send(call, Some(total_value)).await
-}
+        let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
+        let call = self.to_aggregate3_value_call();
+        self.build_and_send(call, Some(total_value)).await
+    }
 
     /// Creates the [`aggregate3Call`]
     fn to_aggregate3_call(&self) -> aggregate3Call {
@@ -604,9 +602,9 @@ fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndA
     }
     /// Sends the `blockAndAggregate` function as a transaction
     pub async fn send_block_and_aggregate(&self) -> Result<PendingTransactionBuilder<N>> {
-    let call = self.to_block_and_aggregate_call();
-    self.build_and_send(call, None).await
-}
+        let call = self.to_block_and_aggregate_call();
+        self.build_and_send(call, None).await
+    }
 
     /// Call the `tryBlockAndAggregate` function
     pub async fn try_block_and_aggregate(
@@ -625,13 +623,13 @@ fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndA
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
     }
     /// Sends the `tryBlockAndAggregate` function as a transaction  
-pub async fn send_try_block_and_aggregate(
-    &self,
-    require_success: bool,
-) -> Result<PendingTransactionBuilder<N>> {
-    let call = self.to_try_block_and_aggregate_call(require_success);
-    self.build_and_send(call, None).await
-}
+    pub async fn send_try_block_and_aggregate(
+        &self,
+        require_success: bool,
+    ) -> Result<PendingTransactionBuilder<N>> {
+        let call = self.to_try_block_and_aggregate_call(require_success);
+        self.build_and_send(call, None).await
+    }
     /// Helper for building the transaction request for the given call type input.
     fn build_request<M: SolCall>(
         &self,
