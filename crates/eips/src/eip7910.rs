@@ -94,6 +94,27 @@ impl EthForkConfig {
     }
 }
 
+/// Base fork configuration.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EthBaseForkConfig {
+    /// The fork activation timestamp, represented as a JSON number in Unix epoch seconds (UTC).
+    /// For the "current" configuration, this reflects the actual activation time; for "next," it
+    /// is the scheduled time. Activation time is required. If a fork is activated at genesis
+    /// the value `0` is used. If the fork is not scheduled to be activated or its activation time
+    /// is unknown it should not be in the rpc results.
+    pub activation_time: u64,
+    /// The blob configuration parameters for the specific fork, as defined in the genesis file.
+    /// This is a JSON object with three members — `baseFeeUpdateFraction`, `max`, and `target` —
+    /// all represented as JSON numbers.
+    pub blob_schedule: BlobParams,
+    ///     The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
+    /// hexadecimal number, with all leading zeros removed. This specification does not support
+    /// chains without a chain ID or with a chain ID of zero.
+    ///
+    /// For purposes of canonicalization this value must always be a string.
+    pub chain_id: U64,
+}
+
 /// System-level contracts for [`EthForkConfig`].
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
