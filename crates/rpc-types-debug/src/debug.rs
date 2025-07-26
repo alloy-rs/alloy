@@ -1,25 +1,27 @@
 //! Types for the `debug` API.
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use alloy_primitives::{Bytes, StorageKey, StorageValue, B256};
+use alloy_primitives::{Bytes, StorageKey, B256};
 use serde::{Deserialize, Serialize};
 
 /// Represents the result of a storage slot query.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StorageResult {
-    /// The key of the storage slot
-    pub key: B256,
     /// The storage key
-    pub storage_key: StorageKey,
+    pub key: StorageKey,
     /// The value stored at the slot
-    pub value: StorageValue,
+    pub value: B256,
 }
 
-/// Represents a map of storage slots.
-pub type StorageMap = BTreeMap<B256, StorageResult>;
+/// Wrapper type for a map of storage slots.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageMap(pub BTreeMap<B256, StorageResult>);
 
 /// Represents the result of a storage range query.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StorageRangeResult {
     /// A map of storage slots
     pub storage: StorageMap,
@@ -85,4 +87,33 @@ pub struct ExecutionWitness {
     /// The naive way to construct the headers would be to unconditionally include the last
     /// 256 block headers. However note, we may not need all 256, like in the example above.
     pub headers: Vec<Bytes>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_storage_range_result_roundtrip() {
+        let json_input = json!({
+          "storage": {
+            "0x0000000000000000000000000000000000000000000000000000000000000002": {
+              "key": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "value": "0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            },
+            "0x0000000000000000000000000000000000000000000000000000000000000003": {
+              "key": "0x0000000000000000000000000000000000000000000000000000000000000003",
+              "value": "0x0000000000000000000000000000000000000000000000000000000000000006"
+            }
+          },
+          "nextKey": "0x0000000000000000000000000000000000000000000000000000000000000004"
+        });
+
+        let parsed: StorageRangeResult = serde_json::from_value(json_input.clone()).unwrap();
+
+        let output = serde_json::to_value(&parsed).unwrap();
+
+        assert_eq!(json_input, output);
+    }
 }
