@@ -1,8 +1,31 @@
 //! Types for the `debug` API.
 
-use alloc::vec::Vec;
-use alloy_primitives::Bytes;
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use alloy_primitives::{Bytes, StorageKey, StorageValue, B256};
 use serde::{Deserialize, Serialize};
+
+/// Represents the result of a storage slot query.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StorageResult {
+    /// The key of the storage slot
+    pub key: B256,
+    /// The storage key
+    pub storage_key: StorageKey,
+    /// The value stored at the slot
+    pub value: StorageValue,
+}
+
+/// Represents a map of storage slots.
+pub type StorageMap = BTreeMap<B256, StorageResult>;
+
+/// Represents the result of a storage range query.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StorageRangeResult {
+    /// A map of storage slots
+    pub storage: StorageMap,
+    /// The next key
+    pub next_key: Option<B256>,
+}
 
 /// Represents the execution witness of a block. Contains an optional map of state preimages.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
