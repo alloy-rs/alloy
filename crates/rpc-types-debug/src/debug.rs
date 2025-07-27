@@ -15,12 +15,36 @@ pub struct StorageResult {
     pub value: B256,
 }
 
+impl From<(StorageKey, B256)> for StorageResult {
+    fn from((key, value): (StorageKey, B256)) -> Self {
+        Self { key, value }
+    }
+}
+
+impl From<StorageResult> for (StorageKey, B256) {
+    fn from(result: StorageResult) -> Self {
+        (result.key, result.value)
+    }
+}
+
 /// Wrapper type for a map of storage slots.
 #[derive(
     Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AsRef, Deref, AsMut, DerefMut,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct StorageMap(pub BTreeMap<B256, StorageResult>);
+
+impl From<BTreeMap<B256, StorageResult>> for StorageMap {
+    fn from(map: BTreeMap<B256, StorageResult>) -> Self {
+        Self(map)
+    }
+}
+
+impl From<StorageMap> for BTreeMap<B256, StorageResult> {
+    fn from(map: StorageMap) -> Self {
+        map.0
+    }
+}
 
 /// Represents the result of a storage range query.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +54,18 @@ pub struct StorageRangeResult {
     pub storage: StorageMap,
     /// The next key
     pub next_key: Option<B256>,
+}
+
+impl From<(StorageMap, Option<B256>)> for StorageRangeResult {
+    fn from((storage, next_key): (StorageMap, Option<B256>)) -> Self {
+        Self { storage, next_key }
+    }
+}
+
+impl From<StorageRangeResult> for (StorageMap, Option<B256>) {
+    fn from(result: StorageRangeResult) -> Self {
+        (result.storage, result.next_key)
+    }
 }
 
 /// Represents the execution witness of a block. Contains an optional map of state preimages.
