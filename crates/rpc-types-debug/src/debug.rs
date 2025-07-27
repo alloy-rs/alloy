@@ -2,6 +2,7 @@
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use alloy_primitives::{Bytes, StorageKey, B256};
+use derive_more::{AsMut, AsRef, Deref, DerefMut};
 use serde::{Deserialize, Serialize};
 
 /// Represents the result of a storage slot query.
@@ -15,7 +16,9 @@ pub struct StorageResult {
 }
 
 /// Wrapper type for a map of storage slots.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AsRef, Deref, AsMut, DerefMut,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageMap(pub BTreeMap<B256, StorageResult>);
 
