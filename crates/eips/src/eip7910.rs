@@ -1,6 +1,6 @@
 //! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
 
-use crate::{eip2124::ForkHash, eip7840::BlobParams};
+use crate::{eip2124::ForkHash, eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
 use alloy_primitives::{Address, U64};
 use core::{fmt, str};
 use std::collections::BTreeMap;
@@ -169,6 +169,32 @@ impl SystemContract {
         SystemContract::HistoryStorage,
         SystemContract::WithdrawalRequestPredeploy,
     ];
+
+    /// Returns Cancun system contracts.
+    pub fn cancun() -> [(SystemContract, Address); 1] {
+        [(SystemContract::BeaconRoots, eip4788::BEACON_ROOTS_ADDRESS)]
+    }
+
+    /// Returns Prague system contracts.
+    /// Takes an optional deposit contract address. If it's `None`, mainnet deposit contract address
+    /// will be used instead.
+    pub fn prague(deposit_contract: Option<Address>) -> [(SystemContract, Address); 4] {
+        [
+            (SystemContract::HistoryStorage, eip2935::HISTORY_STORAGE_ADDRESS),
+            (
+                SystemContract::ConsolidationRequestPredeploy,
+                eip7251::CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS,
+            ),
+            (
+                SystemContract::WithdrawalRequestPredeploy,
+                eip7002::WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS,
+            ),
+            (
+                SystemContract::DepositContract,
+                deposit_contract.unwrap_or(eip6110::MAINNET_DEPOSIT_CONTRACT_ADDRESS),
+            ),
+        ]
+    }
 }
 
 /// Parse error for [`SystemContract`].
