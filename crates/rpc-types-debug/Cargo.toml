@@ -26,3 +26,13 @@ workspace = true
 alloy-primitives = { workspace = true, features = ["serde"] }
 
 serde.workspace = true
+
+derive_more = { workspace = true, features = [
+	"as_ref",
+	"deref",
+	"deref_mut",
+	"from",
+], default-features = false }
+
+[dev-dependencies]
+serde_json.workspace = true
