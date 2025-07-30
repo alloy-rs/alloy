@@ -87,6 +87,11 @@ impl<D: SolCall> CallItem<D> {
         self
     }
 
+    /// Convenience function for `allow_failure(true)`
+    pub const fn with_failure_allowed(self) -> Self {
+        self.allow_failure(true)
+    }
+
     /// Set the value to send with the call.
     pub const fn value(mut self, value: U256) -> Self {
         self.value = value;
