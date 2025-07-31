@@ -3,7 +3,7 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
-    layers::{CallBatchLayer, ChainLayer},
+    layers::{CallBatchLayer, ChainLayer, PollIntervalLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -12,7 +12,7 @@ use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_transport::{TransportError, TransportResult};
-use std::marker::PhantomData;
+use std::{marker::PhantomData, time::Duration};
 
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
@@ -230,6 +230,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Does nothing to the client with a local transport.
     pub fn with_chain(self, chain: NamedChain) -> ProviderBuilder<Stack<ChainLayer, L>, F, N> {
         self.layer(ChainLayer::new(chain))
+    }
+
+    /// Sets a custom poll interval for the client.
+    ///
+    /// This overrides any default polling frequency, such as the one configured
+    /// by `with_chain()`.
+    ///
+    /// **Note:** If the poll interval is set multiple times, the last value
+    /// applied to the builder will be the one that is used.
+    pub fn with_poll_interval(
+        self,
+        poll_interval: Duration,
+    ) -> ProviderBuilder<Stack<PollIntervalLayer, L>, F, N> {
+        self.layer(PollIntervalLayer::new(poll_interval))
     }
 
     // --- Fillers ---
