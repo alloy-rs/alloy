@@ -1,5 +1,5 @@
 use crate::WeakClient;
-use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
+use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
 use futures::{ready, stream::FusedStream, Future, FutureExt, Stream, StreamExt};
 use serde::Serialize;
