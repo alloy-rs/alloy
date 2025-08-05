@@ -25,9 +25,6 @@ pub use block::*;
 mod call;
 pub use call::{Bundle, EthCallResponse, StateContext, TransactionIndex};
 
-mod config;
-pub use config::*;
-
 pub mod error;
 
 mod fee;
