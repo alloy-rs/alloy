@@ -41,6 +41,7 @@ governor = { version = "0.8.1", default-features = false, features = [
 futures.workspace = true
 parking_lot.workspace = true
 derive_more.workspace = true
+auto_impl.workspace = true
 
 # non-WASM only
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
