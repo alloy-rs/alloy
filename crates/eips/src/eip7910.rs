@@ -92,6 +92,10 @@ pub struct EthBaseForkConfig {
     ///
     /// For purposes of canonicalization this value must always be a string.
     pub chain_id: U64,
+    /// The `FORK_HASH` value as specified in [EIP-6122](https://eips.ethereum.org/EIPS/eip-6122) of the specific fork,
+    /// presented as an unsigned 0x-prefixed hexadecimal numbers, with zeros left padded to a four
+    /// byte length, in lower case.
+    pub fork_id: Bytes,
 }
 
 /// System-level contracts for [`EthForkConfig`].
