@@ -175,6 +175,23 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     }
 }
 
+/// Implement `Drop` for `MnemonicBuilder`,
+/// make sure password and phrase will be cleaned up
+impl<W: Wordlist> Drop for MnemonicBuilder<W> {
+    fn drop(&mut self) {
+        if let Some(phrase) = &mut self.phrase {
+            unsafe {
+                phrase.as_bytes_mut().fill(0);
+            }
+        }
+        if let Some(password) = &mut self.password {
+            unsafe {
+                password.as_bytes_mut().fill(0);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
