@@ -55,3 +55,5 @@ pub mod eip7840;
 
 pub mod eip7892;
 pub use eip7892::{BlobScheduleBlobParams, BlobScheduleEntry};
+
+pub mod eip7910;

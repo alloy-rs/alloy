@@ -1,5 +1,7 @@
-use alloy_eips::{eip2124::ForkHash, eip7840::BlobParams};
-use alloy_primitives::{Address, U64};
+//! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
+
+use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
+use alloy_primitives::{Address, Bytes, U64};
 use core::{fmt, str};
 use std::collections::BTreeMap;
 
@@ -10,25 +12,10 @@ use std::collections::BTreeMap;
 pub struct EthConfig {
     /// Fork configuration of the current active fork.
     pub current: EthForkConfig,
-    /// The `CRC32` hash of the current fork configuration.
-    pub current_hash: ForkHash,
-    /// The EIP-2124 `CRC32` hash for the current fork of all previous forks
-    /// starting from genesis block.
-    pub current_fork_id: ForkHash,
     /// Fork configuration of the next scheduled fork.
     pub next: Option<EthForkConfig>,
-    /// The `CRC32` hash of the next fork configuration.
-    pub next_hash: Option<ForkHash>,
-    /// The EIP-2124 `CRC32` hash for the next fork of all previous forks
-    /// starting from genesis block.
-    pub next_fork_id: Option<ForkHash>,
     /// Fork configuration of the last fork (before current).
     pub last: Option<EthForkConfig>,
-    /// The `CRC32` hash of the last fork configuration.
-    pub last_hash: Option<ForkHash>,
-    /// The EIP-2124 `CRC32` hash for the last fork of all previous forks
-    /// starting from genesis block.
-    pub last_fork_id: Option<ForkHash>,
 }
 
 /// The fork configuration object as defined by [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
@@ -46,12 +33,16 @@ pub struct EthForkConfig {
     /// This is a JSON object with three members — `baseFeeUpdateFraction`, `max`, and `target` —
     /// all represented as JSON numbers.
     pub blob_schedule: BlobParams,
-    ///     The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
+    /// The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
     /// hexadecimal number, with all leading zeros removed. This specification does not support
     /// chains without a chain ID or with a chain ID of zero.
     ///
     /// For purposes of canonicalization this value must always be a string.
     pub chain_id: U64,
+    /// The `FORK_HASH` value as specified in [EIP-6122](https://eips.ethereum.org/EIPS/eip-6122) of the specific fork,
+    /// presented as an unsigned 0x-prefixed hexadecimal numbers, with zeros left padded to a four
+    /// byte length, in lower case.
+    pub fork_id: Bytes,
     /// A representation of the active precompile contracts for the fork. If a precompile is
     /// replaced by an on-chain contract, or removed, then it is not included.
     ///
@@ -65,7 +56,7 @@ pub struct EthForkConfig {
     /// For Prague, the added contracts are (in order): `BLS12_G1ADD`, `BLS12_G1MSM`,
     /// `BLS12_G2ADD`, `BLS12_G2MSM`, `BLS12_PAIRING_CHECK`, `BLS12_MAP_FP_TO_G1`,
     /// `BLS12_MAP_FP2_TO_G2`.
-    pub precompiles: BTreeMap<Address, String>,
+    pub precompiles: BTreeMap<String, Address>,
     /// A JSON object representing system-level contracts relevant to the fork, as introduced in
     /// their defining EIPs. Keys are the contract names (e.g., BEACON_ROOTS_ADDRESS) from the
     /// first EIP where they appeared, sorted alphabetically. Values are 20-byte addresses in
@@ -82,13 +73,29 @@ pub struct EthForkConfig {
     pub system_contracts: BTreeMap<SystemContract, Address>,
 }
 
-impl EthForkConfig {
-    /// Generate a fork hash, a CRC-32 hash of JSON object representing the fork configuration is
-    /// converted into canonical form as per RFC-8785 (in short no whitespace, sorted keys, and
-    /// numeric values in their simplest form)
-    pub fn fork_hash(&self) -> serde_json::Result<ForkHash> {
-        Ok(ForkHash::from(&serde_json::to_vec(&self)?[..]))
-    }
+/// Base fork configuration.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EthBaseForkConfig {
+    /// The fork activation timestamp, represented as a JSON number in Unix epoch seconds (UTC).
+    /// For the "current" configuration, this reflects the actual activation time; for "next," it
+    /// is the scheduled time. Activation time is required. If a fork is activated at genesis
+    /// the value `0` is used. If the fork is not scheduled to be activated or its activation time
+    /// is unknown it should not be in the rpc results.
+    pub activation_time: u64,
+    /// The blob configuration parameters for the specific fork, as defined in the genesis file.
+    /// This is a JSON object with three members — `baseFeeUpdateFraction`, `max`, and `target` —
+    /// all represented as JSON numbers.
+    pub blob_schedule: BlobParams,
+    ///     The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
+    /// hexadecimal number, with all leading zeros removed. This specification does not support
+    /// chains without a chain ID or with a chain ID of zero.
+    ///
+    /// For purposes of canonicalization this value must always be a string.
+    pub chain_id: U64,
+    /// The `FORK_HASH` value as specified in [EIP-6122](https://eips.ethereum.org/EIPS/eip-6122) of the specific fork,
+    /// presented as an unsigned 0x-prefixed hexadecimal numbers, with zeros left padded to a four
+    /// byte length, in lower case.
+    pub fork_id: Bytes,
 }
 
 /// System-level contracts for [`EthForkConfig`].
@@ -145,6 +152,32 @@ impl SystemContract {
         SystemContract::HistoryStorage,
         SystemContract::WithdrawalRequestPredeploy,
     ];
+
+    /// Returns Cancun system contracts.
+    pub fn cancun() -> [(SystemContract, Address); 1] {
+        [(SystemContract::BeaconRoots, eip4788::BEACON_ROOTS_ADDRESS)]
+    }
+
+    /// Returns Prague system contracts.
+    /// Takes an optional deposit contract address. If it's `None`, mainnet deposit contract address
+    /// will be used instead.
+    pub fn prague(deposit_contract: Option<Address>) -> [(SystemContract, Address); 4] {
+        [
+            (SystemContract::HistoryStorage, eip2935::HISTORY_STORAGE_ADDRESS),
+            (
+                SystemContract::ConsolidationRequestPredeploy,
+                eip7251::CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS,
+            ),
+            (
+                SystemContract::WithdrawalRequestPredeploy,
+                eip7002::WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS,
+            ),
+            (
+                SystemContract::DepositContract,
+                deposit_contract.unwrap_or(eip6110::MAINNET_DEPOSIT_CONTRACT_ADDRESS),
+            ),
+        ]
+    }
 }
 
 /// Parse error for [`SystemContract`].
@@ -174,6 +207,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn system_contract_serde_roundtrip() {
         for contract in SystemContract::ALL {
@@ -187,7 +221,6 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn hoodie_prague_eth_config() {
-        let expected_fork_hash = ForkHash([0x10, 0x36, 0x84, 0x96]);
         let raw = r#"
             {
                 "activationTime": 1742999832,
@@ -197,24 +230,25 @@ mod tests {
                     "target": 6
                 },
                 "chainId": "0x88bb0",
+                "forkId": "0x0929e24e",
                 "precompiles": {
-                    "0x0000000000000000000000000000000000000001": "ECREC",
-                    "0x0000000000000000000000000000000000000002": "SHA256",
-                    "0x0000000000000000000000000000000000000003": "RIPEMD160",
-                    "0x0000000000000000000000000000000000000004": "ID",
-                    "0x0000000000000000000000000000000000000005": "MODEXP",
-                    "0x0000000000000000000000000000000000000006": "BN256_ADD",
-                    "0x0000000000000000000000000000000000000007": "BN256_MUL",
-                    "0x0000000000000000000000000000000000000008": "BN256_PAIRING",
-                    "0x0000000000000000000000000000000000000009": "BLAKE2F",
-                    "0x000000000000000000000000000000000000000a": "KZG_POINT_EVALUATION",
-                    "0x000000000000000000000000000000000000000b": "BLS12_G1ADD",
-                    "0x000000000000000000000000000000000000000c": "BLS12_G1MSM",
-                    "0x000000000000000000000000000000000000000d": "BLS12_G2ADD",
-                    "0x000000000000000000000000000000000000000e": "BLS12_G2MSM",
-                    "0x000000000000000000000000000000000000000f": "BLS12_PAIRING_CHECK",
-                    "0x0000000000000000000000000000000000000010": "BLS12_MAP_FP_TO_G1",
-                    "0x0000000000000000000000000000000000000011": "BLS12_MAP_FP2_TO_G2"
+                    "BLAKE2F": "0x0000000000000000000000000000000000000009",
+                    "BLS12_G1ADD": "0x000000000000000000000000000000000000000b",
+                    "BLS12_G1MSM": "0x000000000000000000000000000000000000000c",
+                    "BLS12_G2ADD": "0x000000000000000000000000000000000000000d",
+                    "BLS12_G2MSM": "0x000000000000000000000000000000000000000e",
+                    "BLS12_MAP_FP2_TO_G2": "0x0000000000000000000000000000000000000011",
+                    "BLS12_MAP_FP_TO_G1": "0x0000000000000000000000000000000000000010",
+                    "BLS12_PAIRING_CHECK": "0x000000000000000000000000000000000000000f",
+                    "BN254_ADD": "0x0000000000000000000000000000000000000006",
+                    "BN254_MUL": "0x0000000000000000000000000000000000000007",
+                    "BN254_PAIRING": "0x0000000000000000000000000000000000000008",
+                    "ECREC": "0x0000000000000000000000000000000000000001",
+                    "ID": "0x0000000000000000000000000000000000000004",
+                    "KZG_POINT_EVALUATION": "0x000000000000000000000000000000000000000a",
+                    "MODEXP": "0x0000000000000000000000000000000000000005",
+                    "RIPEMD160": "0x0000000000000000000000000000000000000003",
+                    "SHA256": "0x0000000000000000000000000000000000000002"
                 },
                 "systemContracts": {
                     "BEACON_ROOTS_ADDRESS": "0x000f3df6d732807ef1319fb7b8bb8522d0beac02",
@@ -231,6 +265,5 @@ mod tests {
             serde_json::to_string(&fork_config).unwrap(),
             raw.chars().filter(|c| !c.is_whitespace()).collect::<String>()
         );
-        assert_eq!(fork_config.fork_hash().unwrap(), expected_fork_hash);
     }
 }
