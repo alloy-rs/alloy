@@ -15,6 +15,7 @@ use alloy_primitives::{
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::mem;
+use crate::block::HeaderInfo;
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -561,6 +562,20 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 /// Trait for extracting specific Ethereum block data from a header
 #[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
+
+    /// Extracts essential information into one container type.
+    fn header_info(&self) -> HeaderInfo {
+        HeaderInfo {
+            number: self.number(),
+            beneficiary: self.beneficiary(),
+            timestamp: self.timestamp(),
+            gas_limit: self.gas_limit(),
+            base_fee_per_gas: self.base_fee_per_gas(),
+            difficulty: self.difficulty(),
+            mix_hash: self.mix_hash(),
+        }
+    }
+
     /// Retrieves the parent hash of the block
     fn parent_hash(&self) -> B256;
 

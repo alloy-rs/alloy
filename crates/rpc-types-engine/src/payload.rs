@@ -5,10 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use alloy_consensus::{
-    constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header,
-    Transaction, EMPTY_OMMER_ROOT_HASH,
-};
+use alloy_consensus::{constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header, HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH};
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip4844::BlobTransactionSidecar,
@@ -302,6 +299,20 @@ pub struct ExecutionPayloadV1 {
 }
 
 impl ExecutionPayloadV1 {
+
+    /// Extracts essential information into one container type.
+    pub fn header_info(&self) -> HeaderInfo {
+        HeaderInfo {
+            number: self.block_number,
+            beneficiary: self.fee_recipient,
+            timestamp: self.timestamp,
+            gas_limit: self.gas_limit,
+            base_fee_per_gas: Some(self.base_fee_per_gas.saturating_to()),
+            difficulty: U256::ZERO,
+            mix_hash: Some(self.prev_randao),
+        }
+    }
+    
     /// Returns the block number and hash as a [`BlockNumHash`].
     pub const fn block_num_hash(&self) -> BlockNumHash {
         BlockNumHash::new(self.block_number, self.block_hash)
@@ -1167,6 +1178,12 @@ pub enum ExecutionPayload {
 }
 
 impl ExecutionPayload {
+
+    /// Extracts essential information into one container type.
+    pub fn header_info(&self) -> HeaderInfo {
+       self.as_v1().header_info()
+    }
+    
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
     /// [`ExecutionPayloadSidecar`] extracted from the block.
     ///
