@@ -376,7 +376,7 @@ impl ExecutionPayloadV1 {
         Ok(Block {
             header,
             body: BlockBody {
-                transactions,
+                transactions: self.transactions,
                 ommers: vec![],
                 withdrawals: None,
                 block_access_list: None,

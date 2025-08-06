@@ -33,6 +33,7 @@ large-enum-variant = "allow"
 result-large-err = "allow"
 
 [workspace.dependencies]
+alloy-block-access-list = { version = "1.0.23", path = "crates/block-access-list", default-features = false }
 alloy-consensus = { version = "1.0.23", path = "crates/consensus", default-features = false }
 alloy-consensus-any = { version = "1.0.23", path = "crates/consensus-any", default-features = false }
 alloy-contract = { version = "1.0.23", path = "crates/contract", default-features = false }
