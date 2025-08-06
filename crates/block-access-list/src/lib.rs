@@ -15,15 +15,12 @@ pub use constants::*;
 
 /// Module for handling code changes within a block.
 pub mod code_change;
-pub use code_change::*;
 
 /// Module for handling nonce changes within a block.
 pub mod nonce_change;
-pub use nonce_change::*;
 
 /// Module for handling balance changes within a block.
 pub mod balance_change;
-pub use balance_change::*;
 
 /// Module for handling account changes within a block.
 pub mod account_change;
@@ -32,3 +29,7 @@ pub use account_change::*;
 /// Module for managing the block access list (BAL).
 pub mod bal;
 pub use bal::*;
+
+/// Module for core eip-7928
+pub mod bal_core;
+pub use bal_core::*;
