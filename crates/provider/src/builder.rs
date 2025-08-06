@@ -11,7 +11,7 @@ use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::{TransportConnect, TransportError, TransportResult};
 use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
@@ -410,6 +410,36 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().connect(s).await?;
         Ok(self.connect_client(client))
+    }
+
+    /// Finish the layer stack by providing a [`TransportConnect`] instance.
+    pub async fn connect_with<C>(self, connect: &C) -> Result<F::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        C: TransportConnect,
+    {
+        connect
+            .get_transport()
+            .await
+            .map(|t| RpcClient::new(t, connect.is_local()))
+            .map(|client| self.connect_client(client))
+    }
+
+    /// Finish the layer stack by providing a [`PubSubConnect`] instance,
+    /// producing a [`Provider`] with pubsub capabilities.
+    ///
+    /// [`PubSubConnect`]: alloy_pubsub::PubSubConnect
+    #[cfg(feature = "pubsub")]
+    pub async fn connect_pubsub_with<C>(self, connect: C) -> Result<F::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        C: alloy_pubsub::PubSubConnect,
+    {
+        ClientBuilder::default().pubsub(connect).await.map(|client| self.connect_client(client))
     }
 
     /// Finish the layer stack by providing a connection string for a built-in
