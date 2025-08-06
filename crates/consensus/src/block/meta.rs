@@ -1,4 +1,4 @@
-//! Commonly used types that contain metadata of a block
+//! Commonly used types that contain metadata of a block.
 
 use alloy_primitives::{Address, B256, U256};
 
@@ -19,9 +19,17 @@ pub struct HeaderInfo {
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     pub base_fee_per_gas: Option<u64>,
+    /// A running total of blob gas consumed in excess of the target, prior to the block. Blocks
+    /// with above-target blob gas consumption increase this value, blocks with below-target blob
+    /// gas consumption decrease it (bounded at 0). This was added in EIP-4844.
+    pub excess_blob_gas: Option<u64>,
+    /// The total amount of blob gas consumed by the transactions within the block, added in
+    /// EIP-4844.
+    pub blob_gas_used: Option<u64>,
     /// The difficulty of the block
     ///
-    /// Unused after the Paris (AKA the merge) upgrade and replaced by `prevrandao` and expected to be 0.
+    /// Unused after the Paris (AKA the merge) upgrade and replaced by `prevrandao` and expected to
+    /// be 0.
     pub difficulty: U256,
     /// The output of the randomness beacon provided by the beacon chain
     ///
