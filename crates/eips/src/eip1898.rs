@@ -605,7 +605,7 @@ impl<'de> serde::Deserialize<'de> for BlockId {
             where
                 E: serde::de::Error,
             {
-                // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefor deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
+                // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefore deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
                 // However, since the hex string should be a QUANTITY, we can safely assume that if the len is 66 bytes, it is in fact a hash, ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/rpc/types.go#L184-L184>
                 if v.len() == 66 {
                     Ok(v.parse::<B256>().map_err(serde::de::Error::custom)?.into())
