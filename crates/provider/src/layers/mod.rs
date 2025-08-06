@@ -11,6 +11,9 @@ pub use batch::{CallBatchLayer, CallBatchProvider};
 mod chain;
 pub use chain::ChainLayer;
 
+mod poll_interval;
+pub use poll_interval::PollIntervalLayer;
+
 #[cfg(not(target_family = "wasm"))]
 mod cache;
 #[cfg(not(target_family = "wasm"))]
