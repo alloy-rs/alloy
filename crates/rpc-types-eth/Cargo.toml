@@ -76,6 +76,8 @@ std = [
 	"serde?/std",
 	"serde_json?/std",
 	"thiserror/std",
+	"serde_with?/std"
+
 ]
 serde = [
 	"dep:serde",
