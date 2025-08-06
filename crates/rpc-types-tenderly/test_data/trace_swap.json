@@ -1,0 +1,857 @@
+{
+  "status": true,
+  "gasUsed": "0x21122",
+  "cumulativeGasUsed": "0x21122",
+  "blockNumber": "0x15d6057",
+  "type": "0x2",
+  "logsBloom": "0x100000200000000000000000000000000000000000000000000000000000000000000000200000000010000000000000020000000c0000000000010000000000000000000000000000000808000000000000000000400020000200000000000000000000000000000000000000000000020000000400040000000010000000000000000800000000000000000000000000000000000000000000000000000000010000000000000000000000100000000000000000000000000000000000000000000802000000000000000000000800000000400000000000000002000000000000240000000400004000000000000000200000000000000000000000000000",
+  "logs": [
+    {
+      "name": "Swap",
+      "anonymous": false,
+      "inputs": [
+        {
+          "value": "0x599326d9cd5e1ea0893305c87d5ec3199e7f05e94d72159f35dea381479a615e",
+          "type": "bytes32",
+          "name": "id",
+          "indexed": true
+        },
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "sender",
+          "indexed": true
+        },
+        {
+          "value": "-1198092017663049253",
+          "type": "int128",
+          "name": "amount0",
+          "indexed": false
+        },
+        {
+          "value": "3036562",
+          "type": "int128",
+          "name": "amount1",
+          "indexed": false
+        },
+        {
+          "value": "126061109190537843887508",
+          "type": "uint160",
+          "name": "sqrtPriceX96",
+          "indexed": false
+        },
+        {
+          "value": "1172800039167059",
+          "type": "uint128",
+          "name": "liquidity",
+          "indexed": false
+        },
+        {
+          "value": "-267035",
+          "type": "int24",
+          "name": "tick",
+          "indexed": false
+        },
+        {
+          "value": "500",
+          "type": "uint24",
+          "name": "fee",
+          "indexed": false
+        }
+      ],
+      "raw": {
+        "address": "0x000000000004444c5dc75cb358380d2e3de08a90",
+        "topics": [
+          "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f",
+          "0x599326d9cd5e1ea0893305c87d5ec3199e7f05e94d72159f35dea381479a615e",
+          "0x0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd65708"
+        ],
+        "data": "0xffffffffffffffffffffffffffffffffffffffffffffffffef5f85a85ef681db00000000000000000000000000000000000000000000000000000000002e5592000000000000000000000000000000000000000000001ab1c952fc69aa98cd9400000000000000000000000000000000000000000000000000042aa7c9ba2453fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbece500000000000000000000000000000000000000000000000000000000000001f4"
+      }
+    },
+    {
+      "name": "Transfer",
+      "anonymous": false,
+      "inputs": [
+        {
+          "value": "0x000000000004444c5dc75cb358380d2e3de08a90",
+          "type": "address",
+          "name": "from",
+          "indexed": true
+        },
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "to",
+          "indexed": true
+        },
+        {
+          "value": "3036562",
+          "type": "uint256",
+          "name": "value",
+          "indexed": false
+        }
+      ],
+      "raw": {
+        "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "topics": [
+          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+          "0x000000000000000000000000000000000004444c5dc75cb358380d2e3de08a90",
+          "0x0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd65708"
+        ],
+        "data": "0x00000000000000000000000000000000000000000000000000000000002e5592"
+      }
+    },
+    {
+      "name": "Transfer",
+      "anonymous": false,
+      "inputs": [
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "from",
+          "indexed": true
+        },
+        {
+          "value": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+          "type": "address",
+          "name": "to",
+          "indexed": true
+        },
+        {
+          "value": "3036562",
+          "type": "uint256",
+          "name": "value",
+          "indexed": false
+        }
+      ],
+      "raw": {
+        "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "topics": [
+          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+          "0x0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "0x000000000000000000000000fbd4cdb413e45a52e2c8312f670e9ce67e794c37"
+        ],
+        "data": "0x00000000000000000000000000000000000000000000000000000000002e5592"
+      }
+    },
+    {
+      "name": "Transfer",
+      "anonymous": false,
+      "inputs": [
+        {
+          "value": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+          "type": "address",
+          "name": "src",
+          "indexed": true
+        },
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "dst",
+          "indexed": true
+        },
+        {
+          "value": "1198092017663049253",
+          "type": "uint256",
+          "name": "wad",
+          "indexed": false
+        }
+      ],
+      "raw": {
+        "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "topics": [
+          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+          "0x000000000000000000000000fbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+          "0x0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd65708"
+        ],
+        "data": "0x00000000000000000000000000000000000000000000000010a07a57a1097e25"
+      }
+    },
+    {
+      "name": "Withdrawal",
+      "anonymous": false,
+      "inputs": [
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "src",
+          "indexed": true
+        },
+        {
+          "value": "1198092017663049253",
+          "type": "uint256",
+          "name": "wad",
+          "indexed": false
+        }
+      ],
+      "raw": {
+        "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "topics": [
+          "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65",
+          "0x0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd65708"
+        ],
+        "data": "0x00000000000000000000000000000000000000000000000010a07a57a1097e25"
+      }
+    }
+  ],
+  "trace": [
+    {
+      "type": "CALL",
+      "from": "0xbbde9f0c24b6f59d7e828bb4e129992be0cdc237",
+      "to": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "gas": "0x6118c",
+      "gasUsed": "0x23e56",
+      "value": "0x15d6057",
+      "input": "0xa00000000000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd65708000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000010a07a57a1097e2500000000000000000000000000000000000000000000000000000000002e5592000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "output": "0x",
+      "subtraces": 1,
+      "traceAddress": []
+    },
+    {
+      "type": "CALL",
+      "from": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "to": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "gas": "0x5e184",
+      "gasUsed": "0x22447",
+      "value": "0x0",
+      "input": "0x128acb08000000000000000000000000fbd4cdb413e45a52e2c8312f670e9ce67e794c37000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000010a07a57a1097e2500000000000000000000000000000000000000000000000000000001000276a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000040000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000001",
+      "output": "0x00000000000000000000000000000000000000000000000010a07a57a1097e25ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd1aa6e",
+      "subtraces": 1,
+      "traceAddress": [
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "gas": "0x5b91c",
+      "gasUsed": "0x21008",
+      "value": "0x0",
+      "input": "0x48c8949100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000040000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000001",
+      "decodedInput": [
+        {
+          "value": "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000001",
+          "type": "bytes",
+          "name": "data",
+          "indexed": false
+        }
+      ],
+      "method": "unlock",
+      "output": "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffef5f85a85ef681db000000000000000000000000002e5592",
+      "decodedOutput": [
+        {
+          "value": "0xffffffffffffffffef5f85a85ef681db000000000000000000000000002e5592",
+          "type": "bytes",
+          "name": "result",
+          "indexed": false
+        }
+      ],
+      "subtraces": 1,
+      "traceAddress": [
+        0,
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "to": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "gas": "0x59e04",
+      "gasUsed": "0x20855",
+      "value": "0x0",
+      "input": "0x91dd734600000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000040000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000001",
+      "decodedInput": [
+        {
+          "value": "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000001",
+          "type": "bytes",
+          "name": "data",
+          "indexed": false
+        }
+      ],
+      "output": "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffef5f85a85ef681db000000000000000000000000002e5592",
+      "decodedOutput": [
+        {
+          "value": "0xffffffffffffffffef5f85a85ef681db000000000000000000000000002e5592",
+          "type": "bytes",
+          "indexed": false
+        }
+      ],
+      "subtraces": 7,
+      "traceAddress": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "gas": "0x58094",
+      "gasUsed": "0x6dea",
+      "value": "0x0",
+      "input": "0xf3cd914c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c59900000000000000000000000000000000000000000000000000000000000001f4000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ffffffffffffffffffffffffffffffffffffffffffffffffef5f85a85ef681db00000000000000000000000000000000000000000000000000000001000276a400000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000",
+      "decodedInput": [
+        {
+          "value": {
+            "currency0": "0x0000000000000000000000000000000000000000",
+            "currency1": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+            "fee": "500",
+            "hooks": "0x0000000000000000000000000000000000000000",
+            "tickSpacing": "10"
+          },
+          "type": "(address,address,uint24,int24,address)",
+          "name": "key",
+          "indexed": false
+        },
+        {
+          "value": {
+            "amountSpecified": "-1198092017663049253",
+            "sqrtPriceLimitX96": "4295128740",
+            "zeroForOne": true
+          },
+          "type": "(bool,int256,uint160)",
+          "name": "params",
+          "indexed": false
+        },
+        {
+          "value": "0x",
+          "type": "bytes",
+          "name": "hookData",
+          "indexed": false
+        }
+      ],
+      "method": "swap",
+      "output": "0xffffffffffffffffef5f85a85ef681db000000000000000000000000002e5592",
+      "decodedOutput": [
+        {
+          "value": "-407689587559465212419715447302868692656603707827043805806",
+          "type": "int256",
+          "name": "swapDelta",
+          "indexed": false
+        }
+      ],
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "gas": "0x5101c",
+      "gasUsed": "0x900c",
+      "value": "0x0",
+      "input": "0x0b0d9c090000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c5990000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd6570800000000000000000000000000000000000000000000000000000000002e5592",
+      "decodedInput": [
+        {
+          "value": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "type": "address",
+          "name": "currency",
+          "indexed": false
+        },
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "to",
+          "indexed": false
+        },
+        {
+          "value": "3036562",
+          "type": "uint256",
+          "name": "amount",
+          "indexed": false
+        }
+      ],
+      "method": "take",
+      "output": "0x",
+      "subtraces": 1,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "to": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "gas": "0x4ec8f",
+      "gasUsed": "0x8023",
+      "value": "0x0",
+      "input": "0xa9059cbb0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd6570800000000000000000000000000000000000000000000000000000000002e5592",
+      "decodedInput": [
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "_to",
+          "indexed": false
+        },
+        {
+          "value": "3036562",
+          "type": "uint256",
+          "name": "_value",
+          "indexed": false
+        }
+      ],
+      "method": "transfer",
+      "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "decodedOutput": [
+        {
+          "value": true,
+          "type": "bool",
+          "indexed": false
+        }
+      ],
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "gas": "0x48065",
+      "gasUsed": "0x22c7",
+      "value": "0x0",
+      "input": "0xa9059cbb000000000000000000000000fbd4cdb413e45a52e2c8312f670e9ce67e794c3700000000000000000000000000000000000000000000000000000000002e5592",
+      "decodedInput": [
+        {
+          "value": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+          "type": "address",
+          "name": "_to",
+          "indexed": false
+        },
+        {
+          "value": "3036562",
+          "type": "uint256",
+          "name": "_value",
+          "indexed": false
+        }
+      ],
+      "method": "transfer",
+      "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "decodedOutput": [
+        {
+          "value": true,
+          "type": "bool",
+          "indexed": false
+        }
+      ],
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        2
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "gas": "0x45c94",
+      "gasUsed": "0x355",
+      "value": "0x0",
+      "input": "0xa58411940000000000000000000000000000000000000000000000000000000000000000",
+      "decodedInput": [
+        {
+          "value": "0x0000000000000000000000000000000000000000",
+          "type": "address",
+          "name": "currency",
+          "indexed": false
+        }
+      ],
+      "method": "sync",
+      "output": "0x",
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        3
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "gas": "0x455cf",
+      "gasUsed": "0x857d",
+      "value": "0x0",
+      "input": "0xfa461e3300000000000000000000000000000000000000000000000010a07a57a1097e25ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd1aa6e00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000040000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000001",
+      "output": "0x",
+      "subtraces": 1,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        4
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "gas": "0x4349f",
+      "gasUsed": "0x750a",
+      "value": "0x0",
+      "input": "0xa9059cbb0000000000000000000000004b3c3e3a4fd80c382b586f8c50ca542a2dd6570800000000000000000000000000000000000000000000000010a07a57a1097e25",
+      "decodedInput": [
+        {
+          "value": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+          "type": "address",
+          "name": "dst",
+          "indexed": false
+        },
+        {
+          "value": "1198092017663049253",
+          "type": "uint256",
+          "name": "wad",
+          "indexed": false
+        }
+      ],
+      "method": "transfer",
+      "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "decodedOutput": [
+        {
+          "value": true,
+          "type": "bool",
+          "indexed": false
+        }
+      ],
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        4,
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "gas": "0x3d06a",
+      "gasUsed": "0x23f7",
+      "value": "0x0",
+      "input": "0x2e1a7d4d00000000000000000000000000000000000000000000000010a07a57a1097e25",
+      "decodedInput": [
+        {
+          "value": "1198092017663049253",
+          "type": "uint256",
+          "name": "wad",
+          "indexed": false
+        }
+      ],
+      "method": "withdraw",
+      "output": "0x",
+      "subtraces": 1,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        5
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "to": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "gas": "0x8fc",
+      "gasUsed": "0x43",
+      "value": "0x10a07a57a1097e25",
+      "input": "0x",
+      "output": "0x",
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        5,
+        0
+      ]
+    },
+    {
+      "type": "CALL",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "gas": "0x39234",
+      "gasUsed": "0x4f9",
+      "value": "0x10a07a57a1097e25",
+      "input": "0x11da60b4",
+      "output": "0x00000000000000000000000000000000000000000000000010a07a57a1097e25",
+      "decodedOutput": [
+        {
+          "value": "1198092017663049253",
+          "type": "uint256",
+          "indexed": false
+        }
+      ],
+      "subtraces": 0,
+      "traceAddress": [
+        0,
+        0,
+        0,
+        6
+      ]
+    }
+  ],
+  "assetChanges": [
+    {
+      "assetInfo": {
+        "standard": "ERC20",
+        "type": "Fungible",
+        "contractAddress": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "symbol": "wbtc",
+        "name": "Wrapped Bitcoin",
+        "logo": "https://coin-images.coingecko.com/coins/images/7598/large/wrapped_bitcoin_wbtc.png?1696507857",
+        "decimals": 8,
+        "dollarValue": "117798"
+      },
+      "type": "Transfer",
+      "from": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "to": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "rawAmount": "0x2e5592",
+      "amount": "0.03036562",
+      "dollarValue": "3577.00930476"
+    },
+    {
+      "assetInfo": {
+        "standard": "ERC20",
+        "type": "Fungible",
+        "contractAddress": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "symbol": "wbtc",
+        "name": "Wrapped Bitcoin",
+        "logo": "https://coin-images.coingecko.com/coins/images/7598/large/wrapped_bitcoin_wbtc.png?1696507857",
+        "decimals": 8,
+        "dollarValue": "117798"
+      },
+      "type": "Transfer",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "rawAmount": "0x2e5592",
+      "amount": "0.03036562",
+      "dollarValue": "3577.00930476"
+    },
+    {
+      "assetInfo": {
+        "standard": "ERC20",
+        "type": "Fungible",
+        "contractAddress": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "symbol": "weth",
+        "name": "WETH",
+        "logo": "https://coin-images.coingecko.com/coins/images/2518/large/weth.png?1696503332",
+        "decimals": 18,
+        "dollarValue": "2992.85009765625"
+      },
+      "type": "Transfer",
+      "from": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "to": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "rawAmount": "0x10a07a57a1097e25",
+      "amount": "1.198092017663049253",
+      "dollarValue": "3585.7098120640305567"
+    },
+    {
+      "assetInfo": {
+        "standard": "ERC20",
+        "type": "Fungible",
+        "contractAddress": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "symbol": "weth",
+        "name": "WETH",
+        "logo": "https://coin-images.coingecko.com/coins/images/2518/large/weth.png?1696503332",
+        "decimals": 18,
+        "dollarValue": "2992.85009765625"
+      },
+      "type": "Burn",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "rawAmount": "0x10a07a57a1097e25",
+      "amount": "1.198092017663049253",
+      "dollarValue": "3585.7098120640305567"
+    },
+    {
+      "assetInfo": {
+        "standard": "NativeCurrency",
+        "type": "Native",
+        "symbol": "eth",
+        "name": "Ethereum",
+        "logo": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628",
+        "decimals": 18,
+        "dollarValue": "2992.3798828125"
+      },
+      "type": "Transfer",
+      "from": "0xbbde9f0c24b6f59d7e828bb4e129992be0cdc237",
+      "to": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "rawAmount": "0x15d6057",
+      "amount": "0.000000000022896727",
+      "dollarValue": "0.000000068515705257049804687"
+    },
+    {
+      "assetInfo": {
+        "standard": "NativeCurrency",
+        "type": "Native",
+        "symbol": "eth",
+        "name": "Ethereum",
+        "logo": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628",
+        "decimals": 18,
+        "dollarValue": "2992.3798828125"
+      },
+      "type": "Transfer",
+      "from": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "to": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "rawAmount": "0x10a07a57a1097e25",
+      "amount": "1.198092017663049253",
+      "dollarValue": "3585.1464514131470038"
+    },
+    {
+      "assetInfo": {
+        "standard": "NativeCurrency",
+        "type": "Native",
+        "symbol": "eth",
+        "name": "Ethereum",
+        "logo": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628",
+        "decimals": 18,
+        "dollarValue": "2992.3798828125"
+      },
+      "type": "Transfer",
+      "from": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "rawAmount": "0x10a07a57a1097e25",
+      "amount": "1.198092017663049253",
+      "dollarValue": "3585.1464514131470038"
+    }
+  ],
+  "balanceChanges": [
+    {
+      "address": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "dollarValue": "8.137146653147003805",
+      "transfers": [
+        0,
+        6
+      ]
+    },
+    {
+      "address": "0x4b3c3e3a4fd80c382b586f8c50ca542a2dd65708",
+      "dollarValue": "0",
+      "transfers": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        6
+      ]
+    },
+    {
+      "address": "0xbbde9f0c24b6f59d7e828bb4e129992be0cdc237",
+      "dollarValue": "-0.000000068515705257049804687",
+      "transfers": [
+        4
+      ]
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "dollarValue": "-3585.1464514131470038",
+      "transfers": [
+        5
+      ]
+    },
+    {
+      "address": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "dollarValue": "-8.700507235514851464",
+      "transfers": [
+        1,
+        2,
+        4
+      ]
+    }
+  ],
+  "stateChanges": [
+    {
+      "address": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "balance": {
+        "previousValue": "0x806bc148fa546f24f4d",
+        "newValue": "0x806ccb509fce7fbcd72"
+      },
+      "storage": [
+        {
+          "slot": "0x8977f7a7ba33f89c913a4d63cb879a2e0934df8eb67f1d0f6b7479f5b5aac76e",
+          "previousValue": "0x0000000001f4000000fbed05000000000000000000001abce8219c0602000000",
+          "newValue": "0x0000000001f4000000fbece5000000000000000000001ab1c952fc69aa98cd94"
+        },
+        {
+          "slot": "0x8977f7a7ba33f89c913a4d63cb879a2e0934df8eb67f1d0f6b7479f5b5aac76f",
+          "previousValue": "0x000000000000000000000000000019a39ccf436379a4e34caec42b8eeae1a621",
+          "newValue": "0x000000000000000000000000000019a41f91eb9f78e83824a8d1007adb9b8ee1"
+        }
+      ]
+    },
+    {
+      "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "storage": [
+        {
+          "slot": "0x11fd237061433ba9f221f703bed587e7636b11fbe3815abba27443968931d654",
+          "previousValue": "0x000000000000000000000000000000000000000000000000000000045d9f2d56",
+          "newValue": "0x000000000000000000000000000000000000000000000000000000045d70d7c4"
+        },
+        {
+          "slot": "0x2c54d69f9a0b0c2c6c5abee77e19c15eb739e34f2b06b925240ecd99c3b1b615",
+          "previousValue": "0x00000000000000000000000000000000000000000000000000000000f21ce244",
+          "newValue": "0x00000000000000000000000000000000000000000000000000000000f24b37d6"
+        }
+      ]
+    },
+    {
+      "address": "0xbbde9f0c24b6f59d7e828bb4e129992be0cdc237",
+      "nonce": {
+        "previousValue": "0x26b6c",
+        "newValue": "0x26b6d"
+      },
+      "balance": {
+        "previousValue": "0x54c47c2188f4bc95",
+        "newValue": "0x54c0690e7fc45e9e"
+      }
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "balance": {
+        "previousValue": "0x20955956bf0e560b9a923",
+        "newValue": "0x2095584cb768dbfb02afe"
+      },
+      "storage": [
+        {
+          "slot": "0x95eb8b8ef7069f8b5c679fa94eca1f6d19856b88aa03f8eaa9ca2b675d797698",
+          "previousValue": "0x00000000000000000000000000000000000000000000008f006b696442374181",
+          "newValue": "0x00000000000000000000000000000000000000000000008eefcaef0ca12dc35c"
+        }
+      ]
+    },
+    {
+      "address": "0xdadb0d80178819f2319190d340ce9a924f783711",
+      "balance": {
+        "previousValue": "0x2786fbf4b1530e9ff",
+        "newValue": "0x2786fbfd9e5911ef5"
+      }
+    },
+    {
+      "address": "0xfbd4cdb413e45a52e2c8312f670e9ce67e794c37",
+      "balance": {
+        "previousValue": "0x16385a4fdebf66112",
+        "newValue": "0x16385a4fded53c169"
+      }
+    }
+  ]
+}
