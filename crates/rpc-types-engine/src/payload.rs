@@ -1422,12 +1422,10 @@ impl ExecutionPayload {
         self.as_v1().gas_limit
     }
 
-
     /// Returns the fee recipient.
     pub const fn fee_recipient(&self) -> Address {
         self.as_v1().fee_recipient
     }
-
 
     /// Returns the timestamp for the payload.
     pub const fn timestamp(&self) -> u64 {
