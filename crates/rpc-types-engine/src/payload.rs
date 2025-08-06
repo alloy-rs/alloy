@@ -1387,7 +1387,6 @@ impl ExecutionPayload {
 
     /// Extracts essential information into one container type.
     pub fn header_info(&self) -> HeaderInfo {
-        self.as_v1();
         HeaderInfo {
             number: self.block_number(),
             beneficiary: self.fee_recipient(),
