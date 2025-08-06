@@ -183,6 +183,11 @@ impl<T> Recovered<&T> {
         let Self { inner, signer } = self;
         Recovered::new_unchecked(inner.clone(), signer)
     }
+
+    /// Helper function to explicitly create a new copy of `Recovered<&T>`
+    pub const fn copied(&self) -> Self {
+        *self
+    }
 }
 
 impl<T: Encodable> Encodable for Recovered<T> {

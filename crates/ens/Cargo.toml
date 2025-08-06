@@ -30,6 +30,10 @@ alloy-sol-types = { workspace = true, optional = true }
 async-trait = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
+[dev-dependencies]
+alloy-provider = { workspace = true, features = ["reqwest"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
 [features]
 contract = ["dep:alloy-contract", "dep:thiserror", "dep:alloy-sol-types"]
 provider = ["contract", "dep:alloy-provider", "dep:async-trait"]

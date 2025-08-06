@@ -37,10 +37,7 @@ pub struct IndexedBlobHash {
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
-    #[cfg_attr(
-        all(debug_assertions, feature = "serde"),
-        serde(deserialize_with = "deserialize_blobs")
-    )]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -296,6 +293,18 @@ impl BlobTransactionSidecar {
         self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        self.commitments
+            .iter()
+            .position(|commitment| kzg_to_versioned_hash(commitment.as_slice()) == *hash)
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        self.versioned_hash_index(hash).and_then(|index| self.blobs.get(index))
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
     pub fn size(&self) -> usize {
@@ -470,7 +479,7 @@ impl Decodable7594 for BlobTransactionSidecar {
     }
 }
 
-// Helper function to deserialize boxed blobs
+/// Helper function to deserialize boxed blobs from a serde deserializer.
 #[cfg(all(debug_assertions, feature = "serde"))]
 pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
@@ -484,6 +493,40 @@ where
         blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
     }
     Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    Vec::<Blob>::deserialize(deserializer)
+}
+
+/// Helper function to deserialize boxed blobs from an existing [`MapAccess`]
+///
+/// [`MapAccess`]: serde::de::MapAccess
+#[cfg(all(debug_assertions, feature = "serde"))]
+pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
+    map_access: &mut M,
+) -> Result<Vec<Blob>, M::Error> {
+    let raw_blobs: Vec<alloy_primitives::Bytes> = map_access.next_value()?;
+    let mut blobs = Vec::with_capacity(raw_blobs.len());
+    for blob in raw_blobs {
+        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
+    }
+    Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
+    map_access: &mut M,
+) -> Result<Vec<Blob>, M::Error> {
+    use serde::de::MapAccess;
+    map_access.next_value()
 }
 
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].
