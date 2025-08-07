@@ -68,8 +68,9 @@ impl RetryBackoffLayer {
     /// (coming from forking mode) assuming here that storage request will be the
     /// driver for Rate limits we choose `17` as the average cost
     /// of any request
-    pub const fn with_avg_unit_cost(mut self, avg_cost: u64) {
+    pub const fn with_avg_unit_cost(mut self, avg_cost: u64) -> Self {
         self.avg_cost = avg_cost;
+        self
     }
 }
 

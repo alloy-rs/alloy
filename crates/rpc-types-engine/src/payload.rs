@@ -7,7 +7,7 @@ use alloc::{
 };
 use alloy_consensus::{
     constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header,
-    Transaction, EMPTY_OMMER_ROOT_HASH,
+    HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
@@ -1383,6 +1383,48 @@ impl ExecutionPayload {
     /// Returns a mutable reference to the transactions for the payload.
     pub const fn transactions_mut(&mut self) -> &mut Vec<Bytes> {
         &mut self.as_v1_mut().transactions
+    }
+
+    /// Extracts essential information into one container type.
+    pub fn header_info(&self) -> HeaderInfo {
+        HeaderInfo {
+            number: self.block_number(),
+            beneficiary: self.fee_recipient(),
+            timestamp: self.timestamp(),
+            gas_limit: self.gas_limit(),
+            base_fee_per_gas: Some(self.saturated_base_fee_per_gas()),
+            excess_blob_gas: self.excess_blob_gas(),
+            blob_gas_used: self.blob_gas_used(),
+            difficulty: U256::ZERO,
+            mix_hash: Some(self.prev_randao()),
+        }
+    }
+
+    /// Returns the gas limit for the payload.
+    ///
+    /// Note: this returns the u64 saturated base fee, but it is specified as [`U256`].
+    pub fn saturated_base_fee_per_gas(&self) -> u64 {
+        self.as_v1().base_fee_per_gas.saturating_to()
+    }
+
+    /// Returns the blob gas used for the payload.
+    pub fn blob_gas_used(&self) -> Option<u64> {
+        self.as_v3().map(|payload| payload.blob_gas_used)
+    }
+
+    /// Returns the excess blob gas for the payload.
+    pub fn excess_blob_gas(&self) -> Option<u64> {
+        self.as_v3().map(|payload| payload.excess_blob_gas)
+    }
+
+    /// Returns the gas limit for the payload.
+    pub const fn gas_limit(&self) -> u64 {
+        self.as_v1().gas_limit
+    }
+
+    /// Returns the fee recipient.
+    pub const fn fee_recipient(&self) -> Address {
+        self.as_v1().fee_recipient
     }
 
     /// Returns the timestamp for the payload.

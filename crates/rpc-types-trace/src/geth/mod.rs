@@ -59,7 +59,6 @@ pub struct DefaultFrame {
     /// How much gas was used.
     pub gas: u64,
     /// Output of the transaction
-    #[serde(serialize_with = "alloy_serde::serialize_hex_string_no_prefix")]
     pub return_value: Bytes,
     /// Recorded traces of the transaction
     pub struct_logs: Vec<StructLog>,
@@ -748,6 +747,19 @@ fn serialize_string_storage_map_opt<S: Serializer>(
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_return_data_prefix() {
+        let raw = r#"{
+  "failed": false,
+  "gas": 0,
+  "returnValue": "",
+  "structLogs": []
+}"#;
+
+        let frame = serde_json::from_str::<DefaultFrame>(raw).unwrap();
+        assert_eq!(frame, DefaultFrame::default());
+    }
 
     #[test]
     fn test_tracer_config() {

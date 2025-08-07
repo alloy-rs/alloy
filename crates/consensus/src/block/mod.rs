@@ -6,6 +6,9 @@ pub use header::{BlockHeader, Header};
 mod traits;
 pub use traits::EthBlock;
 
+mod meta;
+pub use meta::HeaderInfo;
+
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
