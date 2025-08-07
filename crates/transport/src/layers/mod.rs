@@ -13,3 +13,6 @@ pub use retry::{RateLimitRetryPolicy, RetryBackoffLayer, RetryBackoffService, Re
 /// FallbackLayer
 mod fallback;
 pub use fallback::{FallbackLayer, FallbackService};
+
+pub mod redundancy;
+pub use redundancy::{RedundancyLayer, RedundancyService};
