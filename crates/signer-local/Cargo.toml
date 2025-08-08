@@ -32,7 +32,10 @@ k256.workspace = true
 rand.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
-zeroize = { workspace = true, optional = true, features = ["zeroize_derive"] }
+zeroize = { workspace = true, optional = true, features = [
+    "zeroize_derive",
+    "alloc",
+] }
 
 # keystore
 eth-keystore = { version = "0.5.0", default-features = false, optional = true }
