@@ -12,11 +12,15 @@ use rand::Rng;
 use std::{marker::PhantomData, path::PathBuf};
 use thiserror::Error;
 
+#[cfg(feature = "zeroize")]
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
 /// Represents a structure that can resolve into a `PrivateKeySigner`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
+#[derive(Clone, Debug, PartialEq)]
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist = English> {
     /// The mnemonic phrase can be supplied to the builder as a string. A builder that has a valid
@@ -27,11 +31,13 @@ pub struct MnemonicBuilder<W: Wordlist = English> {
     word_count: usize,
     /// The derivation path at which the extended private key child will be derived at. By default
     /// the mnemonic builder uses the path: "m/44'/60'/0'/0/0".
+    #[cfg_attr(feature = "zeroize", zeroize(skip))]
     derivation_path: DerivationPath,
     /// Optional password for the mnemonic phrase.
     password: Option<String>,
     /// Optional field that if enabled, writes the mnemonic phrase to disk storage at the provided
     /// path.
+    #[cfg_attr(feature = "zeroize", zeroize(skip))]
     write_to: Option<PathBuf>,
     /// PhantomData
     _wordlist: PhantomData<W>,
