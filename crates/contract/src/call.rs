@@ -11,7 +11,7 @@ use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::{future::IntoFuture, marker::PhantomData};
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -544,6 +544,29 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
             None => call,
         };
         call.into()
+    }
+
+    /// Queries the blockchain via an `eth_call` with CCIP (EIP-3668) support.
+    ///
+    /// This method will automatically handle OffchainLookup errors by fetching data
+    /// from the specified gateway URLs and calling back to the contract.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let result = contract
+    ///     .my_method()
+    ///     .ccip()
+    ///     .await?;
+    /// ```
+    #[cfg(feature = "reqwest")]
+    pub fn ccip(
+        self,
+    ) -> impl IntoFuture<Output = Result<alloy_primitives::Bytes, alloy_provider::CcipError>>
+    where
+        P: Provider<N> + Clone + 'static,
+    {
+        self.provider.call(self.request).block(self.block).ccip(self.provider)
     }
 
     /// Decodes the output of a contract function using the provided decoder.
