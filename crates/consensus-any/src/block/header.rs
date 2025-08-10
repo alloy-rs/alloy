@@ -96,6 +96,9 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+    /// EIP-7928 block access list hash.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub bal_hash: Option<B256>,
 }
 
 impl AnyHeader {
@@ -144,6 +147,7 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            bal_hash,
         } = self;
 
         Ok(Header {
@@ -168,6 +172,7 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            bal_hash,
         })
     }
 
@@ -197,6 +202,7 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            bal_hash,
         } = self;
 
         Header {
@@ -221,6 +227,7 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            bal_hash,
         }
     }
 }
@@ -335,6 +342,7 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            bal_hash,
         } = value;
 
         Self {
@@ -359,6 +367,7 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            bal_hash,
         }
     }
 }
