@@ -1,8 +1,5 @@
 //! Contains the `CodeChange` struct, which represents a new code for an account.
 //! Single code change: `tx_index` -> `new_code`
-
-use crate::MAX_CODE_SIZE;
-use alloc::vec::Vec;
 use alloy_primitives::{Bytes, TxIndex};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
@@ -15,12 +12,12 @@ pub struct CodeChange {
     /// The index of the transaction that caused this balance change.
     pub tx_index: TxIndex,
     /// The new code of the account.
-    pub new_code: Vec<Bytes>,
+    pub new_code: Bytes,
 }
 impl CodeChange {
     /// Creates a new `CodeChange`.
     pub fn new(tx_index: TxIndex) -> Self {
-        Self { tx_index, new_code: Vec::with_capacity(MAX_CODE_SIZE) }
+        Self { tx_index, new_code: Default::default() }
     }
 
     /// Returns the transaction index.
@@ -31,7 +28,7 @@ impl CodeChange {
 
     /// Returns the new code.
     #[inline]
-    pub fn new_code(&self) -> &[Bytes] {
+    pub fn new_code(&self) -> &Bytes {
         &self.new_code
     }
 }
