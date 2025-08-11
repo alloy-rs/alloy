@@ -1,7 +1,7 @@
 //! Geth call tracer types.
 
 use crate::parity::LocalizedTransactionTrace;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, Selector, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`.
@@ -45,6 +45,21 @@ pub struct CallFrame {
     pub typ: String,
 }
 
+impl CallFrame {
+    /// Error selector is the first 4 bytes of calldata
+    pub fn selector(&self) -> Option<Selector> {
+        if self.input.len() < 4 {
+            return None;
+        }
+        Some(Selector::from_slice(&self.input[..4]))
+    }
+
+    /// Returns true if this call reverted.
+    pub const fn is_revert(&self) -> bool {
+        self.revert_reason.is_some()
+    }
+}
+
 /// Represents a recorded log that is emitted during a trace call.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallLogFrame {
@@ -60,6 +75,23 @@ pub struct CallLogFrame {
     /// The position of the log relative to subcalls within the same trace.
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub position: Option<u64>,
+}
+
+impl CallLogFrame {
+    /// Converts this log frame into a primitives log object
+    pub fn into_log(self) -> alloy_primitives::Log {
+        alloy_primitives::Log::new_unchecked(
+            self.address.unwrap_or_default(),
+            self.topics.unwrap_or_default(),
+            self.data.unwrap_or_default(),
+        )
+    }
+}
+
+impl From<CallLogFrame> for alloy_primitives::Log {
+    fn from(value: CallLogFrame) -> Self {
+        value.into_log()
+    }
 }
 
 /// The configuration for the call tracer.
