@@ -29,7 +29,3 @@ pub use account_change::*;
 /// Module for managing the block access list (BAL).
 pub mod bal;
 pub use bal::*;
-
-/// Module for core eip-7928
-pub mod bal_core;
-pub use bal_core::*;
