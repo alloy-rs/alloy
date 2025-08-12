@@ -186,3 +186,10 @@ pub mod transports {
     #[doc(inline)]
     pub use alloy_transport_ws as ws;
 }
+
+/// Fast Merkle-Patricia Trie (MPT) state root calculator and proof generator
+/// for prefix-sorted nibbles.
+///
+/// See [`alloy_trie`] for more details.
+#[cfg(feature = "trie")]
+pub use alloy_trie as trie;
