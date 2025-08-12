@@ -332,5 +332,6 @@ arbitrary = [
     "alloy-eips?/arbitrary",
     "alloy-rpc-types?/arbitrary",
     "alloy-serde?/arbitrary",
+    "alloy-trie?/arbitrary",
 ]
 postgres = ["alloy-core/postgres"]
