@@ -88,6 +88,7 @@ pub mod private {
     pub use alloy_eips;
     pub use alloy_primitives;
     pub use alloy_rlp;
+    pub use alloy_trie;
     #[cfg(feature = "arbitrary")]
     pub use arbitrary;
     #[cfg(feature = "serde")]

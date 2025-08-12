@@ -62,6 +62,9 @@ alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 
+# trie
+alloy-trie = { workspace = true, optional = true }
+
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
@@ -273,6 +276,9 @@ transport-http = ["transports", "dep:alloy-transport-http"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
+
+# trie
+trie = ["dep:alloy-trie"]
 
 # ---------------------------------------- Core re-exports --------------------------------------- #
 
