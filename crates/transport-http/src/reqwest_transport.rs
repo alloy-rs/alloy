@@ -52,8 +52,11 @@ impl Http<Client> {
         // if there is one.
         let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
 
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
+        if tracing::enabled!(tracing::Level::TRACE) {
+            trace!(body = %String::from_utf8_lossy(&body), "response body");
+        } else {
+            debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        }
 
         if !status.is_success() {
             return Err(TransportErrorKind::http_error(
