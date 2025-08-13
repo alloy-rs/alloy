@@ -407,7 +407,7 @@ impl TransactionRequest {
 
     /// Build an EIP-1559 transaction.
     ///
-    /// Returns ane error if required fields are missing. Use `complete_1559` to check if the
+    /// Returns an error if required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
     pub fn build_1559(self) -> Result<TxEip1559, ValueError<Self>> {
         let Some(to) = self.to else {
