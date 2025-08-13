@@ -97,7 +97,7 @@ pub struct ExecutionPayloadHeader {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BeaconPayloadAttributes {
     #[serde_as(as = "DisplayFromStr")]
     timestamp: u64,
@@ -112,8 +112,8 @@ struct BeaconPayloadAttributes {
 
 /// Optimism Payload Attributes
 #[serde_as]
-#[derive(Serialize, Deserialize)]
-struct BeaconOptimismPayloadAttributes {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BeaconOptimismPayloadAttributes {
     #[serde(flatten)]
     payload_attributes: BeaconPayloadAttributes,
     #[serde(default, skip_serializing_if = "Option::is_none")]
