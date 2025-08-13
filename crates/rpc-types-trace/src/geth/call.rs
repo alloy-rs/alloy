@@ -58,6 +58,25 @@ impl CallFrame {
     pub const fn is_revert(&self) -> bool {
         self.revert_reason.is_some()
     }
+
+    /// Returns true if this is a regular call
+    pub fn is_call(&self) -> bool {
+        self.typ == "CALL"
+    }
+    /// Returns true if this is a delegate call
+    pub fn is_delegate_call(&self) -> bool {
+        self.typ == "DELEGATECALL"
+    }
+
+    /// Returns true if this is a static call
+    pub fn is_static_call(&self) -> bool {
+        self.typ == "STATICCALL"
+    }
+
+    /// Returns true if this is a auth call
+    pub fn is_auth_call(&self) -> bool {
+        self.typ == "AUTHCALL"
+    }
 }
 
 /// Represents a recorded log that is emitted during a trace call.

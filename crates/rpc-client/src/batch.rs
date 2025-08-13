@@ -276,6 +276,6 @@ impl Future for BatchFuture {
             return self.poll_ser_error(cx);
         }
 
-        panic!("Called poll on CallState in invalid state")
+        panic!("Called poll on BatchFuture in invalid state")
     }
 }
