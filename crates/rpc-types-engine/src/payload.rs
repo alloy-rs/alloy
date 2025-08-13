@@ -1479,22 +1479,6 @@ impl ExecutionPayload {
         Some(blob_params.calc_blob_fee(self.excess_blob_gas()?))
     }
 
-    /// Calculate excess blob gas for the next block according to the EIP-4844
-    /// spec.
-    ///
-    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
-        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
-    }
-
-    /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional
-    /// [`BlobParams`] argument.
-    ///
-    /// Returns `None` if the `blob_params` are `None`.
-    pub fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
-        self.next_block_excess_blob_gas(blob_params?)
-    }
-
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None.
@@ -1511,12 +1495,20 @@ impl ExecutionPayload {
         self.as_v1().next_block_base_fee(base_fee_params)
     }
 
-    /// Convenience function for [`Self::next_block_blob_fee`] with an optional [`BlobParams`]
-    /// argument.
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
+        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
+    }
+
+    /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional
+    /// [`BlobParams`] argument.
     ///
     /// Returns `None` if the `blob_params` are `None`.
-    pub fn maybe_next_block_blob_fee(&self, blob_params: Option<BlobParams>) -> Option<u128> {
-        self.next_block_blob_fee(blob_params?)
+    pub fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
+        self.next_block_excess_blob_gas(blob_params?)
     }
 }
 
