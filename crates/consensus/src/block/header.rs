@@ -660,7 +660,7 @@ pub trait BlockHeader {
     ///
     /// Returns `None` if the `blob_params` are `None`.
     fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
-        self.next_block_excess_blob_gas(blob_params?)
+        blob_params.and_then(|params| self.next_block_excess_blob_gas(params))
     }
 
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
