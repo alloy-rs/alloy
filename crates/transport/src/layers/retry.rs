@@ -3,6 +3,7 @@ use crate::{
     TransportFut,
 };
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
+use core::fmt;
 use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -98,6 +99,17 @@ impl<P: RetryPolicy> RetryBackoffLayer<P> {
 #[non_exhaustive]
 pub struct RateLimitRetryPolicy;
 
+impl RateLimitRetryPolicy {
+    /// Creates a new [`RetryPolicy`] that in addition to this policy respects the given closure
+    /// function for detecting if an error should be retried.
+    pub fn or<F>(self, f: F) -> OrRetryPolicyFn<Self>
+    where
+        F: Fn(&TransportError) -> bool + Send + Sync + 'static,
+    {
+        OrRetryPolicyFn::new(self, f)
+    }
+}
+
 /// [RetryPolicy] defines logic for which [TransportError] instances should
 /// the client retry the request and try to recover from.
 pub trait RetryPolicy: Send + Sync + std::fmt::Debug {
@@ -116,6 +128,43 @@ impl RetryPolicy for RateLimitRetryPolicy {
     /// Provides a backoff hint if the error response contains it
     fn backoff_hint(&self, error: &TransportError) -> Option<std::time::Duration> {
         error.backoff_hint()
+    }
+}
+
+/// A [`RetryPolicy`] that supports an additional closure for deciding if an error should be
+/// retried.
+#[derive(Clone)]
+pub struct OrRetryPolicyFn<P = RateLimitRetryPolicy> {
+    inner: Arc<dyn Fn(&TransportError) -> bool + Send + Sync>,
+    base: P,
+}
+
+impl<P> OrRetryPolicyFn<P> {
+    /// Creates a new instance with the given base policy and the given closure
+    pub fn new<F>(base: P, or: F) -> Self
+    where
+        F: Fn(&TransportError) -> bool + Send + Sync + 'static,
+    {
+        Self { inner: Arc::new(or), base }
+    }
+}
+
+impl<P: RetryPolicy> RetryPolicy for OrRetryPolicyFn<P> {
+    fn should_retry(&self, error: &TransportError) -> bool {
+        self.inner.as_ref()(error) || self.base.should_retry(error)
+    }
+
+    fn backoff_hint(&self, error: &TransportError) -> Option<Duration> {
+        self.base.backoff_hint(error)
+    }
+}
+
+impl<P: fmt::Debug> fmt::Debug for OrRetryPolicyFn<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OrRetryPolicyFn")
+            .field("base", &self.base)
+            .field("inner", &"{{..}}")
+            .finish_non_exhaustive()
     }
 }
 
