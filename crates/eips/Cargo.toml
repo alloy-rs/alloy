@@ -1,6 +1,6 @@
 [package]
 name = "alloy-eips"
-description = "Ethereum Improvement Proprosal (EIP) implementations"
+description = "Ethereum Improvement Proposal (EIP) implementations"
 
 version.workspace = true
 edition.workspace = true
