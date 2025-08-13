@@ -1407,7 +1407,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
 
-        // Setup tower serive with multiple layers modifying request headers
+        // Setup tower service with multiple layers modifying request headers
         let service = tower::ServiceBuilder::new()
             .layer(SetRequestHeaderLayer::if_not_present(
                 header::USER_AGENT,

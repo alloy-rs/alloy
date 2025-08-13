@@ -368,7 +368,7 @@ mod tests {
 
         let signer: LocalSigner<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000003".parse().unwrap();
-        assert_eq!(signer.address, address!("6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
+        assert_eq!(signer.address, address!("0x6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
     }
 
     #[test]
