@@ -5,6 +5,7 @@ use alloy_eips::{
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
+use alloc::vec::Vec;
 
 use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
