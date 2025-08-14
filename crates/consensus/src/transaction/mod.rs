@@ -59,6 +59,9 @@ pub use meta::{TransactionInfo, TransactionMeta};
 mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
 
+mod hashable;
+pub use hashable::TxHashable;
+
 #[cfg(feature = "serde")]
 pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
 
