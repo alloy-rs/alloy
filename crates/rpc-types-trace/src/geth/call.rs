@@ -42,7 +42,7 @@ pub struct CallFrame {
     pub value: Option<U256>,
     /// The type of the call.
     #[serde(rename = "type")]
-    pub typ: CallKind,
+    pub typ: String,
 }
 
 impl CallFrame {
@@ -63,6 +63,7 @@ impl CallFrame {
     pub fn is_call(&self) -> bool {
         self.typ == CallKind::Call
     }
+
     /// Returns true if this is a delegate call
     pub fn is_delegate_call(&self) -> bool {
         self.typ == CallKind::DelegateCall
@@ -235,6 +236,30 @@ impl CallKind {
 impl core::fmt::Display for CallKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(self.to_str())
+    }
+}
+
+impl PartialEq<String> for CallKind {
+    fn eq(&self, other: &String) -> bool {
+        self.to_str() == other.as_str()
+    }
+}
+
+impl PartialEq<CallKind> for String {
+    fn eq(&self, other: &CallKind) -> bool {
+        self.as_str() == other.to_str()
+    }
+}
+
+impl PartialEq<&str> for CallKind {
+    fn eq(&self, other: &&str) -> bool {
+        self.to_str() == *other
+    }
+}
+
+impl PartialEq<CallKind> for &str {
+    fn eq(&self, other: &CallKind) -> bool {
+        *self == other.to_str()
     }
 }
 
