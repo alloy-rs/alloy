@@ -1,11 +1,11 @@
 use crate::{transaction::hashable::TxHashable, SignableTransaction, Transaction, TxType};
+use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
-use alloc::vec::Vec;
 
 use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
