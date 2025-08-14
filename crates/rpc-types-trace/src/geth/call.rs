@@ -175,7 +175,7 @@ impl FlatCallConfig {
 /// An iterator for traversing `CallFrame` hierarchies.
 ///
 /// Traversal is **depth-first** by default.
-/// You can skip children of the current frame via [`skip_children`].
+/// You can skip children of the current frame via `skip_children`.
 #[derive(Debug)]
 pub struct CallFrameIter<'a> {
     /// Stack of (frame reference, parent reference)
@@ -191,7 +191,7 @@ impl<'a> CallFrameIter<'a> {
 
     /// Skip all children of the **current** frame.
     ///
-    /// This applies only to the *next* [`next`] call,
+    /// This applies only to the *next* `next` call,
     /// and will prevent traversal into its children.
     pub fn skip_children(&mut self) {
         // Mark the current depth so we can avoid pushing its children
@@ -290,7 +290,7 @@ mod tests {
         let mut init_frame: CallFrame = serde_json::from_str(DEFAULT).unwrap();
         init_frame.calls.push(init_frame.clone());
         let init_frame_raw: CallFrame = serde_json::from_str(DEFAULT).unwrap();
-        init_frame.calls[0].calls.push(init_frame_raw.clone());
+        init_frame.calls[0].calls.push(init_frame_raw);
 
         let mut call_iter = CallFrameIter::new(&init_frame);
 
