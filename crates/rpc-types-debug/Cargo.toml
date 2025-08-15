@@ -26,6 +26,7 @@ workspace = true
 alloy-primitives = { workspace = true, features = ["serde"] }
 
 serde.workspace = true
+serde_with = { workspace = true, features = ["base64"] }
 
 derive_more = { workspace = true, features = [
 	"as_ref",
