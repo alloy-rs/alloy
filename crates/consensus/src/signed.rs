@@ -1,5 +1,5 @@
 use crate::{
-    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashRef},
     Transaction,
 };
 use alloy_eips::{
@@ -166,6 +166,15 @@ where
     /// Network encode the signed transaction.
     pub fn network_encode(&self, out: &mut dyn BufMut) {
         self.tx.network_encode(&self.signature, out);
+    }
+}
+
+impl<T> TxHashRef for Signed<T>
+where
+    T: RlpEcdsaEncodableTx,
+{
+    fn tx_hash(&self) -> &B256 {
+        self.hash()
     }
 }
 

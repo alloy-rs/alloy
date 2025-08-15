@@ -3,7 +3,7 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        RlpEcdsaEncodableTx,
+        RlpEcdsaEncodableTx, TxHashRef,
     },
     EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
@@ -442,6 +442,12 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
             Self::Eip4844(t) => t.eip2718_encoded_length(),
             Self::Eip7702(t) => t.eip2718_encoded_length(),
         }
+    }
+}
+
+impl<Eip4844: RlpEcdsaEncodableTx> TxHashRef for EthereumTxEnvelope<Eip4844> {
+    fn tx_hash(&self) -> &B256 {
+        Self::tx_hash(self)
     }
 }
 
