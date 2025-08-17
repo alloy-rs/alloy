@@ -8,8 +8,8 @@ use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    balance_change::BalanceChange, code_change::CodeChange, nonce_change::NonceChange, SlotChanges,
-    MAX_SLOTS, MAX_TXS,
+    balance_change::BalanceChanges, code_change::CodeChanges, nonce_change::NonceChanges,
+    SlotChanges, MAX_SLOTS, MAX_TXS,
 };
 
 /// This struct is used to track the changes across accounts in a block.
@@ -24,11 +24,11 @@ pub struct AccountChanges {
     /// List of storage reads for this account.
     pub storage_reads: Vec<StorageKey>,
     /// List of balance changes for this account.
-    pub balance_changes: Vec<BalanceChange>,
+    pub balance_changes: Vec<BalanceChanges>,
     /// List of nonce changes for this account.
-    pub nonce_changes: Vec<NonceChange>,
+    pub nonce_changes: Vec<NonceChanges>,
     /// List of code changes for this account.
-    pub code_changes: Vec<CodeChange>,
+    pub code_changes: Vec<CodeChanges>,
 }
 
 impl AccountChanges {
@@ -65,19 +65,19 @@ impl AccountChanges {
 
     /// Returns the balance changes for this account.
     #[inline]
-    pub fn balance_changes(&self) -> &[BalanceChange] {
+    pub fn balance_changes(&self) -> &[BalanceChanges] {
         &self.balance_changes
     }
 
     /// Returns the nonce changes for this account.
     #[inline]
-    pub fn nonce_changes(&self) -> &[NonceChange] {
+    pub fn nonce_changes(&self) -> &[NonceChanges] {
         &self.nonce_changes
     }
 
     /// Returns the code changes for this account.
     #[inline]
-    pub fn code_changes(&self) -> &[CodeChange] {
+    pub fn code_changes(&self) -> &[CodeChanges] {
         &self.code_changes
     }
 }

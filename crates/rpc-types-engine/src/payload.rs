@@ -371,7 +371,7 @@ impl ExecutionPayloadV1 {
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
             difficulty: Default::default(),
             nonce: Default::default(),
-            bal_hash: Default::default(),
+            block_access_list_hash: Default::default(),
         };
 
         Ok(Block {

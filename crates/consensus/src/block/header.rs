@@ -132,7 +132,7 @@ pub struct Header {
     ///
     /// [Eip-7928]: https://eips.ethereum.org/EIPS/eip-7928
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub bal_hash: Option<B256>,
+    pub block_access_list_hash: Option<B256>,
 }
 
 impl AsRef<Self> for Header {
@@ -165,7 +165,7 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            bal_hash: None,
+            block_access_list_hash: None,
         }
     }
 }
@@ -447,7 +447,7 @@ impl Decodable for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            bal_hash: None,
+            block_access_list_hash: None,
         };
         if started_len - buf.len() < rlp_head.payload_length {
             this.base_fee_per_gas = Some(u64::decode(buf)?);
@@ -553,7 +553,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             parent_beacon_block_root: u.arbitrary()?,
             requests_hash: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
-            bal_hash: u.arbitrary()?,
+            block_access_list_hash: u.arbitrary()?,
         };
 
         Ok(generate_valid_header(
@@ -959,7 +959,7 @@ pub(crate) mod serde_bincode_compat {
         #[serde(default)]
         requests_hash: Option<B256>,
         #[serde(default)]
-        bal_hash: Option<B256>,
+        block_access_list_hash: Option<B256>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -986,7 +986,7 @@ pub(crate) mod serde_bincode_compat {
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
-                bal_hash: value.bal_hash,
+                block_access_list_hash: value.block_access_list_hash,
                 extra_data: Cow::Borrowed(&value.extra_data),
             }
         }
@@ -1015,7 +1015,7 @@ pub(crate) mod serde_bincode_compat {
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
-                bal_hash: value.bal_hash,
+                block_access_list_hash: value.block_access_list_hash,
                 extra_data: value.extra_data.into_owned(),
             }
         }
