@@ -81,6 +81,12 @@ impl AccountChanges {
         &self.code_changes
     }
 
+    /// Set the address.
+    pub fn with_address(mut self, address: Address) -> Self {
+        self.address = address;
+        self
+    }
+
     /// Add a storage read slot.
     pub fn with_storage_read(mut self, key: StorageKey) -> Self {
         self.storage_reads.push(key);

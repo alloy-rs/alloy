@@ -44,4 +44,18 @@ impl SlotChanges {
     pub fn len(&self) -> usize {
         self.changes.len()
     }
+
+    /// Creates a new `SlotChanges` for the given slot with a single change.
+    #[inline]
+    pub fn with_slot(mut self, slot: StorageKey) -> Self {
+        self.slot = slot;
+        self
+    }
+
+    /// Builder-style: add a change and return self.
+    #[inline]
+    pub fn with_change(mut self, change: StorageChange) -> Self {
+        self.changes.push(change);
+        self
+    }
 }
