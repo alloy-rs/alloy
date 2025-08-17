@@ -12,4 +12,4 @@ pub const MAX_ACCOUNTS: usize = 300_000;
 pub const MAX_CODE_SIZE: usize = 24_576;
 
 /// Type alias for block index for eip-7928.
-pub type BlockAccessIndex = u16;
+pub type BlockAccessIndex = u64;
