@@ -80,4 +80,52 @@ impl AccountChanges {
     pub fn code_changes(&self) -> &[CodeChanges] {
         &self.code_changes
     }
+
+    /// Add a storage read slot.
+    pub fn with_storage_read(mut self, key: StorageKey) -> Self {
+        self.storage_reads.push(key);
+        self
+    }
+
+    /// Add a storage change (multiple writes to a slot grouped in `SlotChanges`).
+    pub fn with_storage_change(mut self, change: SlotChanges) -> Self {
+        self.storage_changes.push(change);
+        self
+    }
+
+    /// Add a balance change.
+    pub fn with_balance_change(mut self, change: BalanceChanges) -> Self {
+        self.balance_changes.push(change);
+        self
+    }
+
+    /// Add a nonce change.
+    pub fn with_nonce_change(mut self, change: NonceChanges) -> Self {
+        self.nonce_changes.push(change);
+        self
+    }
+
+    /// Add a code change.
+    pub fn with_code_change(mut self, change: CodeChanges) -> Self {
+        self.code_changes.push(change);
+        self
+    }
+
+    /// Add multiple storage reads at once.
+    pub fn extend_storage_reads<I>(mut self, iter: I) -> Self
+    where
+        I: IntoIterator<Item = StorageKey>,
+    {
+        self.storage_reads.extend(iter);
+        self
+    }
+
+    /// Add multiple slot changes at once.
+    pub fn extend_storage_changes<I>(mut self, iter: I) -> Self
+    where
+        I: IntoIterator<Item = SlotChanges>,
+    {
+        self.storage_changes.extend(iter);
+        self
+    }
 }

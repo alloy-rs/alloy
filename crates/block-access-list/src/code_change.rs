@@ -18,8 +18,8 @@ pub struct CodeChanges {
 }
 impl CodeChanges {
     /// Creates a new `CodeChange`.
-    pub fn new(block_access_index: BlockAccessIndex) -> Self {
-        Self { block_access_index, new_code: Default::default() }
+    pub fn new(block_access_index: BlockAccessIndex,new_code:Bytes) -> Self {
+        Self { block_access_index, new_code }
     }
 
     /// Returns the bal index.
