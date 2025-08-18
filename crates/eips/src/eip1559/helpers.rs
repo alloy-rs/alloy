@@ -31,7 +31,7 @@ impl Eip1559Estimation {
     }
 
     /// Consumes the type and returns the scaled estimation.
-    pub fn scaled_by_pct(mut self, pct: u64) -> Self {
+    pub const fn scaled_by_pct(mut self, pct: u64) -> Self {
         self.scale_by_pct(pct);
         self
     }
