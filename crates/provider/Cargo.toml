@@ -67,7 +67,7 @@ tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
 either.workspace = true
-http.workspace = true
+http = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
@@ -130,4 +130,4 @@ trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
-mev-api = ["dep:alloy-rpc-types-mev"]
+mev-api = ["dep:alloy-rpc-types-mev", "dep:http"]

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Allow sharing Ledger transport in LedgerSigner ([#2707](https://github.com/alloy-rs/alloy/issues/2707))
 
+### Miscellaneous Tasks
+
+- Release 1.0.23
+
 ## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
 
 ### Miscellaneous Tasks

@@ -5,12 +5,16 @@
 //! This module is not public API.
 use super::SolCallBuilder;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{MulticallItem, Provider};
 use alloy_sol_types::SolCall;
 
 impl<P: Provider<N>, C: SolCall, N: Network> MulticallItem for SolCallBuilder<P, C, N> {
     type Decoder = C;
+
+    fn value(&self) -> U256 {
+        self.request.value().unwrap_or_default()
+    }
 
     fn target(&self) -> Address {
         self.request.to().expect("`to` not set for `SolCallBuilder`")

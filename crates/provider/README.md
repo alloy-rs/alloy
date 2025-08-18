@@ -23,7 +23,7 @@ correct nonces.
 The `ProviderBuilder` struct can quickly create a stacked provider, similar to
 [`tower::ServiceBuilder`].
 
-[alloy-networks]: https://github.com/alloy-rs/alloy/tree/main/crates/network
+[`alloy-networks`]: https://github.com/alloy-rs/alloy/tree/main/crates/network
 [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 [`ethers.js`]: https://docs.ethers.org/v6/
 

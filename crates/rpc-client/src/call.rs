@@ -78,8 +78,11 @@ where
                     }
 
                     let request = request.take().expect("no request");
-                    debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
-                    trace!(params_ty=%std::any::type_name::<Params>(), ?request, "full request");
+                    if tracing::enabled!(tracing::Level::TRACE) {
+                        trace!(?request, "sending request");
+                    } else {
+                        debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+                    }
                     let request = request.serialize();
                     let fut = match request {
                         Ok(request) => {
@@ -339,11 +342,8 @@ where
     type Output = TransportResult<Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        trace!(?self.state, "polling RpcCall");
-
         let this = self.get_mut();
         let resp = try_deserialize_ok(ready!(this.state.poll_unpin(cx)));
-
         Ready(resp.map(this.map.take().expect("polled after completion")))
     }
 }
