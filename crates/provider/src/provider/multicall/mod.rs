@@ -624,6 +624,7 @@ where
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
     }
+
     /// Sends the `tryBlockAndAggregate` function as a transaction  
     pub async fn send_try_block_and_aggregate(
         &self,
@@ -632,6 +633,7 @@ where
         let call = self.to_try_block_and_aggregate_call(require_success);
         self.build_and_send(call, None).await
     }
+
     /// Helper for building the transaction request for the given call type input.
     fn build_request<M: SolCall>(
         &self,
