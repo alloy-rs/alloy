@@ -25,7 +25,7 @@ impl Eip1559Estimation {
     /// assert_eq!(est.max_fee_per_gas, 110);
     /// assert_eq!(est.max_priority_fee_per_gas, 110);
     /// ```
-    pub fn scale_by_pct(&mut self, pct: u64) {
+    pub const fn scale_by_pct(&mut self, pct: u64) {
         self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
         self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
     }
