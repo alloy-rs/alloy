@@ -1,7 +1,6 @@
 //! A Multicall Builder
 
-use crate::PendingTransactionBuilder;
-use crate::Provider;
+use crate::{PendingTransactionBuilder, Provider};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{address, Address, BlockNumber, Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockId, TransactionInputKind};
@@ -390,7 +389,8 @@ where
         let output = self.build_and_call(self.to_aggregate_call(), None).await?;
         T::decode_returns(&output.returnData)
     }
-    /// Sends the `aggregate` function as a transaction
+
+    /// Sends the `aggregate` function as a transaction.
     pub async fn send_aggregate(&self) -> Result<PendingTransactionBuilder<N>> {
         self.build_and_send(self.to_aggregate_call(), None).await
     }
@@ -522,6 +522,7 @@ where
         let output = self.build_and_call(call, None).await?;
         T::decode_return_results(&output)
     }
+
     /// Sends the `aggregate3` function as a transaction
     pub async fn send_aggregate3(&self) -> Result<PendingTransactionBuilder<N>> {
         self.build_and_send(self.to_aggregate3_call(), None).await
@@ -532,6 +533,7 @@ where
     pub fn to_aggregate3_request(&self) -> N::TransactionRequest {
         self.build_request(self.to_aggregate3_call(), None)
     }
+
     /// Sends the `aggregate3Value` function as a transaction
     pub async fn send_aggregate3_value(&self) -> Result<PendingTransactionBuilder<N>> {
         let total_value = self.calls.iter().map(|c| c.value).fold(U256::ZERO, |acc, x| acc + x);
