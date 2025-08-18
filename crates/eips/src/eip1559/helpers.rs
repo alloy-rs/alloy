@@ -15,6 +15,28 @@ pub struct Eip1559Estimation {
     pub max_priority_fee_per_gas: u128,
 }
 
+impl Eip1559Estimation {
+    /// Scales the [`Eip1559Estimation`] by the given percentage value.
+    ///
+    /// ```
+    /// use alloy_eips::eip1559::Eip1559Estimation;
+    /// let est =
+    ///     Eip1559Estimation { max_fee_per_gas: 100, max_priority_fee_per_gas: 100 }.scaled_by_pct(10);
+    /// assert_eq!(est.max_fee_per_gas, 110);
+    /// assert_eq!(est.max_priority_fee_per_gas, 110);
+    /// ```
+    pub fn scale_by_pct(&mut self, pct: u64) {
+        self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
+        self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
+    }
+
+    /// Consumes the type and returns the scaled estimation.
+    pub fn scaled_by_pct(mut self, pct: u64) -> Self {
+        self.scale_by_pct(pct);
+        self
+    }
+}
+
 /// Calculate the base fee for the next block based on the EIP-1559 specification.
 ///
 /// This function calculates the base fee for the next block according to the rules defined in the
