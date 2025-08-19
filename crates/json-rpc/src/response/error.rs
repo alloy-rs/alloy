@@ -329,14 +329,14 @@ where
         }
     }
 
-    /// Attempt to extract revert data from the JsonRpcError be recursively
+    /// Attempt to extract revert data from the JSON-RPC error by recursively
     /// traversing the error's data field
     ///
-    /// This returns the first hex it finds in the data object, and its
-    /// behavior may change with `serde_json` internal changes.
+    /// Returns the first hex string found in the data object; behavior may change
+    /// with `serde_json` internal changes.
     ///
-    /// If no hex object is found, it will return an empty bytes IFF the error
-    /// is a revert
+    /// If no hex value is found, returns `None` even if the message indicates a
+    /// revert.
     ///
     /// Inspired by ethers-js logic:
     /// <https://github.com/ethers-io/ethers.js/blob/9f990c57f0486728902d4b8e049536f2bb3487ee/packages/providers/src.ts/json-rpc-provider.ts#L25-L53>
