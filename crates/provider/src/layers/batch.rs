@@ -180,9 +180,7 @@ impl<N: Network> CallBatchMsgKind<N> {
             },
             Self::BlockNumber => m3a_call(IMulticall3::getBlockNumberCall {}.abi_encode()),
             Self::ChainId => m3a_call(IMulticall3::getChainIdCall {}.abi_encode()),
-            Self::Balance(addr) => {
-                m3a_call(IMulticall3::getEthBalanceCall { addr: *addr }.abi_encode())
-            }
+            &Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr }.abi_encode()),
         }
     }
 }
@@ -214,19 +212,13 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchProvider<P, N> {
     fn new(inner: P, layer: &CallBatchLayer) -> Self {
         let inner = Arc::new(inner);
         let tx = CallBatchBackend::spawn(inner.clone(), layer);
-        Self {
-            provider: inner,
-            inner: CallBatchProviderInner { tx, m3a: layer.m3a },
-            _pd: PhantomData,
-        }
+        Self { provider: inner, inner: CallBatchProviderInner { tx }, _pd: PhantomData }
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 struct CallBatchProviderInner<N: Network> {
     tx: mpsc::UnboundedSender<CallBatchMsg<N>>,
-    m3a: Address,
 }
 
 impl<N: Network> CallBatchProviderInner<N> {
@@ -336,34 +328,9 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         let pending = std::mem::take(&mut self.pending);
 
         // If there's only a single call, avoid batching and perform the request directly.
-        // Instead, execute the call directly and wrap the result in a Multicall3-style response.
         if pending.len() == 1 {
             let msg = pending.into_iter().next().unwrap();
-
-            let result: TransportResult<IMulticall3::Result> = match msg.kind {
-                CallBatchMsgKind::Call(tx) => self
-                    .inner
-                    .call(tx)
-                    .await
-                    .map(|res| IMulticall3::Result { success: true, returnData: res }),
-                CallBatchMsgKind::BlockNumber => {
-                    self.inner.get_block_number().into_future().await.map(|res| {
-                        IMulticall3::Result { success: true, returnData: res.abi_encode().into() }
-                    })
-                }
-                CallBatchMsgKind::ChainId => {
-                    self.inner.get_chain_id().into_future().await.map(|res| IMulticall3::Result {
-                        success: true,
-                        returnData: res.abi_encode().into(),
-                    })
-                }
-                CallBatchMsgKind::Balance(addr) => {
-                    self.inner.get_balance(addr).into_future().await.map(|res| {
-                        IMulticall3::Result { success: true, returnData: res.abi_encode().into() }
-                    })
-                }
-            };
-
+            let result = self.call_one(msg.kind).await;
             let _ = msg.tx.send(result);
             return;
         }
@@ -384,15 +351,32 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         }
     }
 
+    async fn call_one(&mut self, msg: CallBatchMsgKind<N>) -> TransportResult<IMulticall3::Result> {
+        let m3_res =
+            |success, return_data| IMulticall3::Result { success, returnData: return_data };
+        match msg {
+            CallBatchMsgKind::Call(tx) => self.inner.call(tx).await.map(|res| m3_res(true, res)),
+            CallBatchMsgKind::BlockNumber => {
+                self.inner.get_block_number().await.map(|res| m3_res(true, res.abi_encode().into()))
+            }
+            CallBatchMsgKind::ChainId => {
+                self.inner.get_chain_id().await.map(|res| m3_res(true, res.abi_encode().into()))
+            }
+            CallBatchMsgKind::Balance(addr) => {
+                self.inner.get_balance(addr).await.map(|res| m3_res(true, res.abi_encode().into()))
+            }
+        }
+    }
+
     async fn send_batch_inner(
         &self,
         pending: &[CallBatchMsg<N>],
     ) -> TransportResult<Vec<IMulticall3::Result>> {
-        let call3s: Vec<_> = pending.iter().map(|msg| msg.kind.to_call3(self.m3a)).collect();
+        let calls: Vec<_> = pending.iter().map(|msg| msg.kind.to_call3(self.m3a)).collect();
 
         let tx = N::TransactionRequest::default()
             .with_to(self.m3a)
-            .with_input(IMulticall3::aggregate3Call { calls: call3s }.abi_encode());
+            .with_input(IMulticall3::aggregate3Call { calls }.abi_encode());
 
         let bytes = self.inner.call(tx).await?;
         if bytes.is_empty() {
