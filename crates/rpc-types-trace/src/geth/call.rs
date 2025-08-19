@@ -198,26 +198,26 @@ impl<'a> CallFrameItem<'a> {
 /// An iterator for traversing `CallFrame` hierarchies.
 ///
 /// Traversal is **depth-first** by default.
-/// Children of a frame can be skipped using [`CallFrameItem::skip_children`].
+/// Children of a frame can be skipped using [`CallFrameIter::skip_children`].
 #[derive(Debug)]
 pub struct CallFrameIter<'a> {
     /// Stack of (frame-item reference, parent reference)
     stack: Vec<(&'a CallFrame, Option<&'a CallFrame>)>,
-    /// Whether to skip children for the most recently yielded item
-    skip_children: bool,
+    /// The last frame that was yielded.
+    last_frame: Option<&'a CallFrame>,
 }
 
 impl<'a> CallFrameIter<'a> {
     /// Creates a new iterator starting from `root`.
     pub fn new(root: &'a CallFrame) -> Self {
-        Self { stack: vec![(root, None)], skip_children: false }
+        Self { stack: vec![(root, None)], last_frame: None }
     }
 
     /// Skips children for the most recently yielded item.
     /// Note: this would panic if there are no parent owning the children to skip.
     pub fn skip_children(&mut self) {
-        let parent = self.stack.last().map(|&(_, parent)| parent).unwrap().unwrap();
-        self.stack = self.stack.split_off(parent.calls.len());
+        let parent = self.last_frame.unwrap();
+        let _ = self.stack.split_off(parent.calls.len());
     }
 }
 
@@ -232,11 +232,9 @@ impl<'a> Iterator for CallFrameIter<'a> {
             self.stack.push((child, Some(frame)));
         }
 
-        // Reset skip_children flag
-        self.skip_children = false;
-
         // Create and return the item
         let item = CallFrameItem { frame, parent };
+        self.last_frame = Some(frame);
 
         Some(item)
     }
@@ -449,24 +447,30 @@ mod tests {
         assert_eq!(call_2, None);
     }
 
-    // #[test]
-    // fn test_call_frame_iter_with_skip_child_2() {
-    //     let init_frame: CallFrame = serde_json::from_str(MULTI_DEFAULT).unwrap();
+    #[test]
+    fn test_call_frame_iter_with_multiple_skip_children() {
+        let init_frame: CallFrame = serde_json::from_str(MULTI_DEFAULT).unwrap();
 
-    //     let mut call_iter = CallFrameIter::new(&init_frame);
+        let mut call_iter = CallFrameIter::new(&init_frame);
 
-    //     let _call_1 = call_iter.next().unwrap();
-    //     let _call_2 = call_iter.next().unwrap();
-    //     call_iter.skip_children();
+        let call_1 = call_iter.next().unwrap();
+        assert_eq!(call_1.frame().value, Some(U256::from(1)));
 
-    //     let _call_3 = call_iter.next().unwrap();
-    //     let call_4 = call_iter.next().unwrap();
-    //     assert_eq!(call_4.0.value, Some(U256::from(4)));
+        let call_2 = call_iter.next().unwrap();
+        assert_eq!(call_2.frame().value, Some(U256::from(3)));
 
-    //     let call_5 = call_iter.next().unwrap();
-    //     assert_eq!(call_5.0.value, Some(U256::from(2)));
+        let call_3 = call_iter.next().unwrap();
+        assert_eq!(call_3.frame().value, Some(U256::from(5)));
 
-    //     let call_6 = call_iter.next();
-    //     assert_eq!(call_6, None);
-    // }
+        call_iter.skip_children();
+
+        let call_4 = call_iter.next().unwrap();
+        assert_eq!(call_4.frame().value, Some(U256::from(4)));
+
+        let call_5 = call_iter.next().unwrap();
+        assert_eq!(call_5.frame().value, Some(U256::from(2)));
+
+        let call_6 = call_iter.next();
+        assert_eq!(call_6, None);
+    }
 }
