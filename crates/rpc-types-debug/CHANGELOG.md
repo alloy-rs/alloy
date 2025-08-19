@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added type for debug_storageRangeAt ([#2741](https://github.com/alloy-rs/alloy/issues/2741))
 
+### Miscellaneous Tasks
+
+- Release 1.0.24
+
 ## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
 
 ### Miscellaneous Tasks
