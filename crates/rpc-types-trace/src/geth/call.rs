@@ -185,12 +185,12 @@ pub struct CallFrameItem<'a> {
 
 impl<'a> CallFrameItem<'a> {
     /// The current frame.
-    pub fn frame(&self) -> &CallFrame {
+    pub const fn frame(&self) -> &CallFrame {
         self.frame
     }
 
     /// The parent of this frame, if any.
-    pub fn parent(&self) -> Option<&CallFrame> {
+    pub const fn parent(&self) -> Option<&CallFrame> {
         self.parent
     }
 }
