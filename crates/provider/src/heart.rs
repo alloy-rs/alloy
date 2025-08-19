@@ -14,6 +14,10 @@ use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
     future::Future,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 use tokio::{
@@ -463,18 +467,22 @@ pub(crate) struct Heartbeat<N, S> {
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
 
+    /// Whether the heartbeat is currently paused.
+    is_paused: Arc<AtomicBool>,
+
     _network: std::marker::PhantomData<N>,
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Create a new heartbeat task.
-    pub(crate) fn new(stream: S) -> Self {
+    pub(crate) fn new(stream: S, is_paused: Arc<AtomicBool>) -> Self {
         Self {
             stream: stream.fuse(),
             past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
             reap_at: Default::default(),
+            is_paused,
             _network: Default::default(),
         }
     }
@@ -528,6 +536,21 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 }
                 Some(watcher)
             }).collect();
+        }
+    }
+
+    /// Check if we have any pending transactions.
+    fn has_pending_transactions(&self) -> bool {
+        !self.unconfirmed.is_empty() || !self.waiting_confs.is_empty()
+    }
+
+    /// Update the pause state based on whether we have pending transactions.
+    fn update_pause_state(&mut self) {
+        let should_pause = !self.has_pending_transactions();
+        let is_paused = self.is_paused.load(Ordering::Relaxed);
+        if is_paused != should_pause {
+            debug!(paused = should_pause, "updating heartbeat pause state");
+            self.is_paused.store(should_pause, Ordering::Relaxed);
         }
     }
 
@@ -663,6 +686,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
         'shutdown: loop {
             {
+                self.update_pause_state();
+
                 let next_reap = self.next_reap();
                 let sleep = std::pin::pin!(sleep_until(next_reap.into()));
 

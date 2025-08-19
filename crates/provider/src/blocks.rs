@@ -5,7 +5,15 @@ use alloy_transport::RpcError;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use std::{marker::PhantomData, num::NonZeroUsize};
+use std::{
+    marker::PhantomData,
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    task::Poll,
+};
 
 #[cfg(feature = "pubsub")]
 use futures::{future::Either, FutureExt};
@@ -28,6 +36,7 @@ pub(crate) struct NewBlocks<N: Network = Ethereum> {
     next_yield: BlockNumber,
     /// LRU cache of known blocks. Only used by the polling task.
     known_blocks: LruCache<BlockNumber, N::BlockResponse>,
+    pub(crate) is_paused: Arc<AtomicBool>,
     _phantom: PhantomData<N>,
 }
 
@@ -37,6 +46,7 @@ impl<N: Network> NewBlocks<N> {
             client,
             next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
+            is_paused: Arc::new(AtomicBool::new(false)),
             _phantom: PhantomData,
         }
     }
@@ -123,13 +133,17 @@ impl<N: Network> NewBlocks<N> {
                 yield known_block;
             }
 
+            // If we're paused, wait until we're unpaused.
+            // Once unpaused, reset `self.next_yield` to ignore the blocks that were included while we were paused.
+            let unpaused = self.check_paused().await;
+
             // Get the tip.
             let Some(block_number) = numbers_stream.next().await else {
                 debug!("polling stream ended");
                 break 'task;
             };
             trace!(%block_number, "got block number");
-            if self.next_yield == NO_BLOCK_NUMBER {
+            if self.next_yield == NO_BLOCK_NUMBER || unpaused {
                 assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
                 // this stream can be initialized after the first tx was sent,
                 // to avoid the edge case where the tx is mined immediately, we should apply an
@@ -181,6 +195,19 @@ impl<N: Network> NewBlocks<N> {
             }
         }
         }
+    }
+
+    /// Awaits `self.is_paused`, returning `true` if it was paused when this was first called.
+    async fn check_paused(&self) -> bool {
+        let was_paused = self.is_paused.load(Ordering::Relaxed);
+        std::future::poll_fn(move |_cx| {
+            if self.is_paused.load(Ordering::Relaxed) {
+                Poll::Pending
+            } else {
+                Poll::Ready(was_paused)
+            }
+        })
+        .await
     }
 }
 
