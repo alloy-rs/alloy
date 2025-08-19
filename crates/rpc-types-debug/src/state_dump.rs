@@ -46,6 +46,8 @@ pub struct StateDump {
     pub accounts: BTreeMap<Address, AccountState>,
     /// Next can be set to represent that this dump is only partial, and Next
     /// is where an iterator should be positioned in order to continue the dump.
+    ///
+    /// Note: this uses base64 because this is based on the default go-ethereum behaviour that by default serializes in base64 <https://github.com/ethereum/go-ethereum/blob/85077be58edea572f29c3b1a6a055077f1a56a8b/core/state/dump.go#L66-L68>
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<Base64>")]
     pub next: Option<Bytes>,
