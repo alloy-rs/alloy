@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.25
 - Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
 - Add encode helper ([#2789](https://github.com/alloy-rs/alloy/issues/2789))
 - Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
