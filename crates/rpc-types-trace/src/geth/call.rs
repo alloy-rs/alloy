@@ -214,10 +214,11 @@ impl<'a> CallFrameIter<'a> {
     }
 
     /// Skips children for the most recently yielded item.
-    /// Note: this would panic if there are no parent owning the children to skip.
+    /// Note: this would panic if there are no parent owning the children to
+    /// skip. `next` must be called before `skip_children`.
     pub fn skip_children(&mut self) {
         let parent = self.last_frame.unwrap();
-        let _ = self.stack.split_off(parent.calls.len());
+        let _ = self.stack.split_off(self.stack.len() - parent.calls.len());
     }
 }
 
@@ -438,9 +439,10 @@ mod tests {
         let mut call_iter = CallFrameIter::new(&init_frame);
 
         let call_1 = call_iter.next().unwrap();
-        println!("call One: {:?}", call_1.frame());
         if call_1.frame().is_delegate_call() {
+            println!("Here: {:?}", call_iter.stack.len());
             call_iter.skip_children();
+            println!("Here: {:?}", call_iter.stack.len());
         }
 
         let call_2 = call_iter.next();
