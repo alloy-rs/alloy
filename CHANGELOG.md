@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Bug Fixes
+
+- [docs] Correct typos in EIP reference ([#2759](https://github.com/alloy-rs/alloy/issues/2759))
+- [`CallBatchLayer`] Don't batch if single request ([#2397](https://github.com/alloy-rs/alloy/issues/2397))
+- [batch.rs] Reference BatchFuture in panic message ([#2771](https://github.com/alloy-rs/alloy/issues/2771))
+- Typo in code comment ([#2767](https://github.com/alloy-rs/alloy/issues/2767))
+
+### Features
+
+- Add scale helper ([#2797](https://github.com/alloy-rs/alloy/issues/2797))
+- Add authorization list to CallBuilder ([#2798](https://github.com/alloy-rs/alloy/issues/2798))
+- [rpc-types-trace] Move `CallKind` from `revm-inspector` ([#2779](https://github.com/alloy-rs/alloy/issues/2779))
+- Add orretrypolicyfn ([#2785](https://github.com/alloy-rs/alloy/issues/2785))
+- Complete execution payload getter methods ([#2782](https://github.com/alloy-rs/alloy/issues/2782))
+- Implement `Drop` for `MnemonicBuilder` make sure passphrase and password will be cleaned up ([#2756](https://github.com/alloy-rs/alloy/issues/2756))
+- Expose alloy trie ([#2773](https://github.com/alloy-rs/alloy/issues/2773))
+- Add callframe utils ([#2769](https://github.com/alloy-rs/alloy/issues/2769))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
+- Add encode helper ([#2789](https://github.com/alloy-rs/alloy/issues/2789))
+- Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
+- Remove `BeaconOptimismPayloadAttributes` ([#2784](https://github.com/alloy-rs/alloy/issues/2784))
+- Reduce logs for requests ([#2783](https://github.com/alloy-rs/alloy/issues/2783))
+- Add more callframe utils ([#2777](https://github.com/alloy-rs/alloy/issues/2777))
+
+### Other
+
+- Clarify as_revert_data docs to reflect None on missing hex ([#2786](https://github.com/alloy-rs/alloy/issues/2786))
+
+### Styling
+
+- Multicall send support ([#2736](https://github.com/alloy-rs/alloy/issues/2736))
+
 ## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
 
 ### Bug Fixes
@@ -24,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.24
 - Feature gate serde test ([#2765](https://github.com/alloy-rs/alloy/issues/2765))
 - Serialize return data with prefix ([#2763](https://github.com/alloy-rs/alloy/issues/2763))
 

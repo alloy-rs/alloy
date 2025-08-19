@@ -4,7 +4,7 @@ use alloy_consensus::{
     EthereumTxEnvelope, EthereumTypedTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
     TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718,
 };
-use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
@@ -16,7 +16,7 @@ pub use alloy_consensus::{
 pub use alloy_consensus_any::AnyReceiptEnvelope;
 pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
-    eip7702::Authorization,
+    eip7702::{Authorization, SignedAuthorization},
 };
 
 mod error;
