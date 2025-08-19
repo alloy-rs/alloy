@@ -16,6 +16,9 @@ pub enum EthRpcErrorCode {
     /// Thrown when querying for `finalized` or `safe` block before the merge transition is
     /// finalized, <https://github.com/ethereum/execution-apis/blob/6d17705a875e52c26826124c2a8a15ed542aeca2/src/schemas/block.yaml#L109>
     UnknownBlock,
+    /// Thrown when historical data is not available.
+    /// <https://eips.ethereum.org/EIPS/eip-4444#json-rpc-changes>
+    PrunedHistory,
 }
 
 impl EthRpcErrorCode {
@@ -27,6 +30,7 @@ impl EthRpcErrorCode {
             Self::InvalidInput => -32000,
             Self::ResourceNotFound => -32001,
             Self::UnknownBlock => -39001,
+            Self::PrunedHistory => 4444,
         }
     }
 }

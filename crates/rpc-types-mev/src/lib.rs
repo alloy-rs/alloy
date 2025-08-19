@@ -6,6 +6,12 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+/// Serde-bincode-compat
+#[cfg(feature = "serde-bincode-compat")]
+pub mod serde_bincode_compat {
+    pub use super::mev_calls::serde_bincode_compat::*;
+}
+
 mod eth_calls;
 pub use eth_calls::*;
 

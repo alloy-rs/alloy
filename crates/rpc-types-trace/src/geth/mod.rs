@@ -20,6 +20,7 @@ pub use self::{
 };
 
 pub mod call;
+pub mod erc7562;
 pub mod four_byte;
 pub mod mux;
 pub mod noop;
@@ -58,7 +59,6 @@ pub struct DefaultFrame {
     /// How much gas was used.
     pub gas: u64,
     /// Output of the transaction
-    #[serde(serialize_with = "alloy_serde::serialize_hex_string_no_prefix")]
     pub return_value: Bytes,
     /// Recorded traces of the transaction
     pub struct_logs: Vec<StructLog>,
@@ -300,6 +300,31 @@ pub enum GethDebugTracerType {
     BuiltInTracer(GethDebugBuiltInTracerType),
     /// custom JS tracer
     JsTracer(String),
+}
+
+impl GethDebugTracerType {
+    /// Returns true if this a [`GethDebugTracerType::JsTracer`] variant.
+    pub const fn is_js(&self) -> bool {
+        matches!(self, Self::JsTracer(_))
+    }
+
+    /// Returns the tracer type as a string.
+    ///
+    /// If this is not a builtin tracer, it returns the captured string, which could be JavaScript
+    /// code or a custom identifier such as `"tracer": "stylusTracer"`
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::BuiltInTracer(tracer) => match tracer {
+                GethDebugBuiltInTracerType::FourByteTracer => "4byteTracer",
+                GethDebugBuiltInTracerType::CallTracer => "callTracer",
+                GethDebugBuiltInTracerType::FlatCallTracer => "flatCallTracer",
+                GethDebugBuiltInTracerType::PreStateTracer => "prestateTracer",
+                GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
+                GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
+            },
+            Self::JsTracer(code) => code,
+        }
+    }
 }
 
 impl From<GethDebugBuiltInTracerType> for GethDebugTracerType {
@@ -724,6 +749,19 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
+    fn test_return_data_prefix() {
+        let raw = r#"{
+  "failed": false,
+  "gas": 0,
+  "returnValue": "",
+  "structLogs": []
+}"#;
+
+        let frame = serde_json::from_str::<DefaultFrame>(raw).unwrap();
+        assert_eq!(frame, DefaultFrame::default());
+    }
+
+    #[test]
     fn test_tracer_config() {
         let s = "{\"tracer\": \"callTracer\"}";
         let opts = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
@@ -848,5 +886,21 @@ mod tests {
         let inner = geth_trace.try_into_call_frame();
         assert!(inner.is_err());
         assert!(matches!(inner, Err(UnexpectedTracerError(_))));
+    }
+
+    // <https://github.com/paradigmxyz/reth/issues/16289>
+    #[test]
+    fn test_deserde_json_debug_trace_call_json_tracer() {
+        let s = include_str!("../../test_data/call_tracer/json-call-tracer16289.json");
+        let opts: GethDebugTracingCallOptions = serde_json::from_str(s).unwrap();
+        assert!(opts.tracing_options.tracer.unwrap().is_js());
+    }
+
+    #[test]
+    fn deserde_jstracer() {
+        let s = r#"{
+      "tracer": "{fault: function(log) {}, step: function(log) { const memToHex = mem => mem.reduce((s, byte) => s + byte.toString(16).padStart(2, '0'), ''); }, result: function() { return this.data; }}"
+      }"#;
+        let _tracer = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
     }
 }

@@ -28,3 +28,5 @@ changed or not.
     - [ ] If some crates were published before the error, AFAICT you must manually `--exclude <crate>` each already-published crate.
     - [ ] Verify that the commit is correct, and push to the repository with `git push --tags`.
 - [ ] Create a new GitHub release with the automatically generated changelog and with the name set to `<repo> v<X.Y.Z>`
+- [ ] Update version in `alloy` meta crate [README.md](./crates/alloy/README.md#installation) to the new version.
+- [ ] Update version in [alloy-docs top navbar](https://github.com/alloy-rs/docs/blob/main/vocs/vocs.config.tsx#L58)

@@ -49,7 +49,7 @@ impl serde::Serialize for EthGetBlockParams {
 
 impl EthGetBlockParams {
     /// Instantiate [`EthGetBlockParams`] with the given block and kind.
-    pub fn new(block: BlockId, kind: BlockTransactionsKind) -> Self {
+    pub const fn new(block: BlockId, kind: BlockTransactionsKind) -> Self {
         Self { block, kind }
     }
 }
@@ -130,19 +130,19 @@ where
     }
 
     /// Set the [`BlockTransactionsKind`] for the request.
-    pub fn kind(mut self, kind: BlockTransactionsKind) -> Self {
+    pub const fn kind(mut self, kind: BlockTransactionsKind) -> Self {
         self.kind = kind;
         self
     }
 
     /// Set the [`BlockTransactionsKind`] to [`BlockTransactionsKind::Full`].
-    pub fn full(mut self) -> Self {
+    pub const fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
         self
     }
 
     /// Set the [`BlockTransactionsKind`] to [`BlockTransactionsKind::Hashes`].
-    pub fn hashes(mut self) -> Self {
+    pub const fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
     }
@@ -239,7 +239,7 @@ where
     /// Pending Block Call
     ///
     /// This has been made explicit to handle cases where fields such as `hash`, `nonce`, `miner`
-    /// are either missing or set to null causing deserilization issues. See: <https://github.com/alloy-rs/alloy/issues/2117>
+    /// are either missing or set to null causing deserialization issues. See: <https://github.com/alloy-rs/alloy/issues/2117>
     ///
     /// This is specifically true in case of the response is returned from a geth node. See: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
     ///
@@ -296,24 +296,24 @@ where
     BlockResp: BlockResponse + RpcRecv,
 {
     /// Create a new [`WatchBlocks`] instance.
-    pub(crate) fn new(poller: FilterPollerBuilder<B256>) -> Self {
+    pub(crate) const fn new(poller: FilterPollerBuilder<B256>) -> Self {
         Self { poller, kind: BlockTransactionsKind::Hashes, _pd: PhantomData }
     }
 
     /// Poll for blocks with full transactions i.e [`BlockTransactionsKind::Full`].
-    pub fn full(mut self) -> Self {
+    pub const fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
         self
     }
 
     /// Poll for blocks with just transactions hashes i.e [`BlockTransactionsKind::Hashes`].
-    pub fn hashes(mut self) -> Self {
+    pub const fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
     }
 
     /// Sets the channel size for the poller task.
-    pub fn set_channel_size(&mut self, channel_size: usize) {
+    pub const fn set_channel_size(&mut self, channel_size: usize) {
         self.poller.set_channel_size(channel_size);
     }
 
@@ -323,7 +323,7 @@ where
     }
 
     /// Sets the duration between polls.
-    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+    pub const fn set_poll_interval(&mut self, poll_interval: Duration) {
         self.poller.set_poll_interval(poll_interval);
     }
 
@@ -369,7 +369,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     ///
     /// By default, this subscribes to block with tx hashes only. Use [`SubFullBlocks::full`] to
     /// subscribe to blocks with full transactions.
-    pub fn new(
+    pub const fn new(
         sub: super::GetSubscription<(SubscriptionKind,), N::HeaderResponse>,
         client: alloy_rpc_client::WeakClient,
     ) -> Self {
@@ -377,13 +377,13 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     }
 
     /// Subscribe to blocks with full transactions.
-    pub fn full(mut self) -> Self {
+    pub const fn full(mut self) -> Self {
         self.kind = BlockTransactionsKind::Full;
         self
     }
 
     /// Subscribe to blocks with transaction hashes only.
-    pub fn hashes(mut self) -> Self {
+    pub const fn hashes(mut self) -> Self {
         self.kind = BlockTransactionsKind::Hashes;
         self
     }

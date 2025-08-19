@@ -5,6 +5,247 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
+
+### Features
+
+- Add headerinfo helper type ([#2766](https://github.com/alloy-rs/alloy/issues/2766))
+
+## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.23
+
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Miscellaneous Tasks
+
+- Release 1.0.22
+
+## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
+
+### Features
+
+- Add sidecar helpers ([#2697](https://github.com/alloy-rs/alloy/issues/2697))
+
+### Miscellaneous Tasks
+
+- Release 1.0.21
+- Add into_with_bloom_unchecked ([#2683](https://github.com/alloy-rs/alloy/issues/2683))
+- Add Recovered::copied ([#2680](https://github.com/alloy-rs/alloy/issues/2680))
+
+### Other
+
+- Remove redundant comment in BlockBody arbitrary implementation ([#2702](https://github.com/alloy-rs/alloy/issues/2702))
+- Add EIP-2930 link and clarify access_list docs ([#2691](https://github.com/alloy-rs/alloy/issues/2691))
+
+## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
+
+### Miscellaneous Tasks
+
+- Release 1.0.20
+
+## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.19
+
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
+
+### Features
+
+- From_typed to envelope ([#2658](https://github.com/alloy-rs/alloy/issues/2658))
+- Add dynamic crypto backend for ecrecover ([#2634](https://github.com/alloy-rs/alloy/issues/2634))
+- Add dedicated error for SECP256K1N_HALF error ([#2636](https://github.com/alloy-rs/alloy/issues/2636))
+
+### Miscellaneous Tasks
+
+- Release 1.0.18
+- Move impls to signed ([#2671](https://github.com/alloy-rs/alloy/issues/2671))
+- Make cargo t compile ([#2657](https://github.com/alloy-rs/alloy/issues/2657))
+- Release 1.0.17
+
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Bug Fixes
+
+- Encode into buf ([#2632](https://github.com/alloy-rs/alloy/issues/2632))
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
+
+## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.15
+- Rename ported fn ([#2629](https://github.com/alloy-rs/alloy/issues/2629))
+
+## [1.0.14](https://github.com/alloy-rs/alloy/releases/tag/v1.0.14) - 2025-06-27
+
+### Features
+
+- Add recover_signer_unchecked_with_buf to `SignerRecoverable` trait ([#2626](https://github.com/alloy-rs/alloy/issues/2626))
+
+### Miscellaneous Tasks
+
+- Release 1.0.14
+
+## [1.0.13](https://github.com/alloy-rs/alloy/releases/tag/v1.0.13) - 2025-06-26
+
+### Features
+
+- [tx-macros] Add `arbitrary_cfg` parameter ([#2616](https://github.com/alloy-rs/alloy/issues/2616))
+- Add with_header method to Block type ([#2604](https://github.com/alloy-rs/alloy/issues/2604))
+- Implement SignerRecoverable for Signed<T> ([#2596](https://github.com/alloy-rs/alloy/issues/2596))
+
+### Miscellaneous Tasks
+
+- Release 1.0.13
+
+## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
+
+### Features
+
+- More serde compat for `TransactionEnvelope` macro ([#2594](https://github.com/alloy-rs/alloy/issues/2594))
+
+### Miscellaneous Tasks
+
+- Release 1.0.12
+- Release 1.0.11
+
+## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
+
+### Bug Fixes
+
+- Fix incorrect type flag doc for EIP-4844 + minor grammar in CI config ([#2554](https://github.com/alloy-rs/alloy/issues/2554))
+
+### Dependencies
+
+- Bump MSRV to 1.85 ([#2547](https://github.com/alloy-rs/alloy/issues/2547))
+
+### Features
+
+- Implement `TransactionEnvelope` derive macro ([#2585](https://github.com/alloy-rs/alloy/issues/2585))
+- Default into_logs fn ([#2539](https://github.com/alloy-rs/alloy/issues/2539))
+- Add TryFrom conversions for Extended ([#2520](https://github.com/alloy-rs/alloy/issues/2520))
+
+### Miscellaneous Tasks
+
+- Release 1.0.10
+- Release 1.0.10
+- Fix typo in comment [crates/consensus/src/transaction/mod.rs] ([#2569](https://github.com/alloy-rs/alloy/issues/2569))
+- Ommers_hashes helper ([#2537](https://github.com/alloy-rs/alloy/issues/2537))
+- Add ReceiptEnvelope helpers ([#2533](https://github.com/alloy-rs/alloy/issues/2533))
+
+### Other
+
+- Fix typo in comment ([#2561](https://github.com/alloy-rs/alloy/issues/2561))
+
+### Testing
+
+- Fix typo in test function name in receipts.rs ([#2580](https://github.com/alloy-rs/alloy/issues/2580))
+- Add sanity assert trait impl test ([#2552](https://github.com/alloy-rs/alloy/issues/2552))
+
+## [1.0.9](https://github.com/alloy-rs/alloy/releases/tag/v1.0.9) - 2025-05-28
+
+### Miscellaneous Tasks
+
+- Release 1.0.9
+
+## [1.0.8](https://github.com/alloy-rs/alloy/releases/tag/v1.0.8) - 2025-05-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.8
+- Add try_into helper fns ([#2515](https://github.com/alloy-rs/alloy/issues/2515))
+
+## [1.0.7](https://github.com/alloy-rs/alloy/releases/tag/v1.0.7) - 2025-05-24
+
+### Features
+
+- Add Extended type with alloy trait impls ([#2498](https://github.com/alloy-rs/alloy/issues/2498))
+- Encodable2718:into_encoded ([#2486](https://github.com/alloy-rs/alloy/issues/2486))
+
+### Miscellaneous Tasks
+
+- Release 1.0.7
+
+## [1.0.6](https://github.com/alloy-rs/alloy/releases/tag/v1.0.6) - 2025-05-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.6
+
+## [1.0.5](https://github.com/alloy-rs/alloy/releases/tag/v1.0.5) - 2025-05-20
+
+### Miscellaneous Tasks
+
+- Release 1.0.5
+
+## [1.0.4](https://github.com/alloy-rs/alloy/releases/tag/v1.0.4) - 2025-05-19
+
+### Documentation
+
+- Fix typos and improve documentation clarity in serde-related modules ([#2475](https://github.com/alloy-rs/alloy/issues/2475))
+
+### Features
+
+- [consensus] Sidecar generic (round 2) ([#2466](https://github.com/alloy-rs/alloy/issues/2466))
+- [consensus] `TxEip4844Variant` generic over sidecar ([#2461](https://github.com/alloy-rs/alloy/issues/2461))
+
+### Miscellaneous Tasks
+
+- Release 1.0.4
+- Warn missing-const-for-fn ([#2418](https://github.com/alloy-rs/alloy/issues/2418))
+- Rm leftover recovery impl ([#2467](https://github.com/alloy-rs/alloy/issues/2467))
+- [consensus] Relax 4844 with sidecar creation ([#2465](https://github.com/alloy-rs/alloy/issues/2465))
+
+### Other
+
+- SignerRecoverable for WithEncoded<T> ([#2474](https://github.com/alloy-rs/alloy/issues/2474))
+
+## [1.0.3](https://github.com/alloy-rs/alloy/releases/tag/v1.0.3) - 2025-05-15
+
+### Bug Fixes
+
+- [`consensus`] Allow `"accessList": null` when deserializing EIP-1559 transactions. ([#2450](https://github.com/alloy-rs/alloy/issues/2450))
+
+### Features
+
+- [consensus] Relax `TxEip4844WithSidecar` trait implementations ([#2446](https://github.com/alloy-rs/alloy/issues/2446))
+
+### Miscellaneous Tasks
+
+- Release 1.0.3 ([#2460](https://github.com/alloy-rs/alloy/issues/2460))
+- Release 1.0.2
+- Relax some conversions ([#2456](https://github.com/alloy-rs/alloy/issues/2456))
+
+### Testing
+
+- [eips] Add tests for EIP-7594 sidecar ([#2449](https://github.com/alloy-rs/alloy/issues/2449))
+
+## [1.0.1](https://github.com/alloy-rs/alloy/releases/tag/v1.0.1) - 2025-05-13
+
+### Miscellaneous Tasks
+
+- Release 1.0.1
+
+## [1.0.0](https://github.com/alloy-rs/alloy/releases/tag/v1.0.0) - 2025-05-13
+
+### Features
+
+- Add source to recovery err ([#2424](https://github.com/alloy-rs/alloy/issues/2424))
+- [consensus] Generic sidecar for 4844 ([#2434](https://github.com/alloy-rs/alloy/issues/2434))
+
+### Miscellaneous Tasks
+
+- Release 1.0.0
+- Remove shadowed recovery fn ([#2438](https://github.com/alloy-rs/alloy/issues/2438))
+
 ## [0.15.11](https://github.com/alloy-rs/alloy/releases/tag/v0.15.11) - 2025-05-12
 
 ### Documentation
@@ -14,6 +255,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Impl Signerrecoverable trait ([#2423](https://github.com/alloy-rs/alloy/issues/2423))
+
+### Miscellaneous Tasks
+
+- Release 0.15.11
 
 ### Refactor
 

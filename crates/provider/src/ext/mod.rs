@@ -8,7 +8,7 @@ pub use admin::AdminApi;
 #[cfg(feature = "anvil-api")]
 mod anvil;
 #[cfg(feature = "anvil-api")]
-pub use anvil::AnvilApi;
+pub use anvil::{AnvilApi, ImpersonateConfig};
 
 #[cfg(feature = "engine-api")]
 mod engine;
@@ -44,6 +44,12 @@ pub use txpool::TxPoolApi;
 mod erc4337;
 #[cfg(feature = "erc4337-api")]
 pub use erc4337::Erc4337Api;
+
+#[cfg(feature = "mev-api")]
+mod mev;
+
+#[cfg(feature = "mev-api")]
+pub use mev::{sign_flashbots_payload, MevApi, MevBuilder, FLASHBOTS_SIGNATURE_HEADER};
 
 #[cfg(test)]
 pub(crate) mod test {

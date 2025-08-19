@@ -32,7 +32,7 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
     /// The `address` is used to set the `from` field in the transaction requests.
     ///
     /// The remote signer's address _must_ be the same as the signer address provided here.
-    pub fn new(provider: P, address: Address) -> Self {
+    pub const fn new(provider: P, address: Address) -> Self {
         Self { provider, address, _pd: std::marker::PhantomData }
     }
 
@@ -73,7 +73,7 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
 mod tests {
     use super::*;
     use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
-    use alloy_consensus::TxEnvelope;
+    use alloy_consensus::{transaction::SignerRecoverable, TxEnvelope};
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{Address, U256};
 

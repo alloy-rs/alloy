@@ -4,7 +4,7 @@ use alloy_consensus::{
     EthereumTxEnvelope, EthereumTypedTransaction, Signed, TxEip1559, TxEip2930, TxEip4844,
     TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718,
 };
-use alloy_eips::{eip2718::Encodable2718, eip7702::SignedAuthorization};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
@@ -16,7 +16,7 @@ pub use alloy_consensus::{
 pub use alloy_consensus_any::AnyReceiptEnvelope;
 pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
-    eip7702::Authorization,
+    eip7702::{Authorization, SignedAuthorization},
 };
 
 mod error;
@@ -26,7 +26,13 @@ mod receipt;
 pub use receipt::TransactionReceipt;
 
 pub mod request;
-pub use request::{TransactionInput, TransactionRequest};
+pub use request::{TransactionInput, TransactionInputKind, TransactionRequest};
+
+/// Serde-bincode-compat
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    pub use super::request::serde_bincode_compat::*;
+}
 
 /// Transaction object used in RPC.
 ///
@@ -88,7 +94,7 @@ impl<T> Transaction<T> {
     }
 
     /// Returns a `Recovered<&T>` with the transaction and the sender.
-    pub fn as_recovered(&self) -> Recovered<&T> {
+    pub const fn as_recovered(&self) -> Recovered<&T> {
         self.inner.as_recovered_ref()
     }
 
@@ -148,6 +154,26 @@ where
     /// Returns true if the transaction is a legacy or 2930 transaction.
     pub fn is_legacy_gas(&self) -> bool {
         self.inner.gas_price().is_some()
+    }
+
+    /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
+    pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
+        let TransactionInfo {
+            block_hash, block_number, index: transaction_index, base_fee, ..
+        } = tx_info;
+        let effective_gas_price = base_fee
+            .map(|base_fee| {
+                tx.effective_tip_per_gas(base_fee).unwrap_or_default() + base_fee as u128
+            })
+            .unwrap_or_else(|| tx.max_fee_per_gas());
+
+        Self {
+            inner: tx,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price: Some(effective_gas_price),
+        }
     }
 }
 
@@ -288,15 +314,22 @@ impl<Eip4844> TryFrom<Transaction<EthereumTxEnvelope<Eip4844>>> for Signed<TxEip
     }
 }
 
-impl<Eip4844> From<Transaction<Self>> for EthereumTxEnvelope<Eip4844> {
-    fn from(tx: Transaction<Self>) -> Self {
-        tx.inner.into_inner()
+impl<Eip4844, Other> From<Transaction<EthereumTxEnvelope<Eip4844>>> for EthereumTxEnvelope<Other>
+where
+    Self: From<EthereumTxEnvelope<Eip4844>>,
+{
+    fn from(tx: Transaction<EthereumTxEnvelope<Eip4844>>) -> Self {
+        tx.inner.into_inner().into()
     }
 }
 
-impl<Eip4844> From<Transaction<Self>> for EthereumTypedTransaction<Eip4844> {
-    fn from(tx: Transaction<Self>) -> Self {
-        tx.inner.into_inner()
+impl<Eip4844, Other> From<Transaction<EthereumTypedTransaction<Eip4844>>>
+    for EthereumTypedTransaction<Other>
+where
+    Self: From<EthereumTypedTransaction<Eip4844>>,
+{
+    fn from(tx: Transaction<EthereumTypedTransaction<Eip4844>>) -> Self {
+        tx.inner.into_inner().into()
     }
 }
 
@@ -508,6 +541,17 @@ mod tests {
 
     #[allow(unused)]
     fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
+        tx.into()
+    }
+    #[allow(unused)]
+    fn assert_convert_into_consensus(tx: Transaction) -> EthereumTxEnvelope<TxEip4844> {
+        tx.into()
+    }
+
+    #[allow(unused)]
+    fn assert_convert_into_typed(
+        tx: Transaction<EthereumTypedTransaction<TxEip4844>>,
+    ) -> EthereumTypedTransaction<TxEip4844> {
         tx.into()
     }
 

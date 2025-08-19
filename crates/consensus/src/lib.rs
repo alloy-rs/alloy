@@ -20,7 +20,7 @@ pub use alloy_trie::TrieAccount;
 pub use alloy_trie::TrieAccount as Account;
 
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header};
+pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
@@ -38,9 +38,9 @@ pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
-    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction, TxEip1559,
-    TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
-    TxType, TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction,
+    TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
+    TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
 pub use alloy_eips::{
@@ -59,8 +59,13 @@ pub use alloy_primitives::{Sealable, Sealed};
 mod signed;
 pub use signed::Signed;
 
+pub use alloy_tx_macros::TransactionEnvelope;
+
 pub mod crypto;
 pub mod error;
+
+pub mod extended;
+pub use extended::Extended;
 
 /// Bincode-compatible serde implementations for consensus types.
 ///
@@ -76,4 +81,16 @@ pub mod serde_bincode_compat {
         receipt::serde_bincode_compat::*,
         transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
+}
+
+#[doc(hidden)]
+pub mod private {
+    pub use alloy_eips;
+    pub use alloy_primitives;
+    pub use alloy_rlp;
+    pub use alloy_trie;
+    #[cfg(feature = "arbitrary")]
+    pub use arbitrary;
+    #[cfg(feature = "serde")]
+    pub use serde;
 }

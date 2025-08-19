@@ -7,12 +7,34 @@ use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Eip1559Estimation {
-    /// The base fee per gas.
+    /// The max fee per gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_fee_per_gas: u128,
     /// The max priority fee per gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_priority_fee_per_gas: u128,
+}
+
+impl Eip1559Estimation {
+    /// Scales the [`Eip1559Estimation`] by the given percentage value.
+    ///
+    /// ```
+    /// use alloy_eips::eip1559::Eip1559Estimation;
+    /// let est =
+    ///     Eip1559Estimation { max_fee_per_gas: 100, max_priority_fee_per_gas: 100 }.scaled_by_pct(10);
+    /// assert_eq!(est.max_fee_per_gas, 110);
+    /// assert_eq!(est.max_priority_fee_per_gas, 110);
+    /// ```
+    pub const fn scale_by_pct(&mut self, pct: u64) {
+        self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
+        self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
+    }
+
+    /// Consumes the type and returns the scaled estimation.
+    pub const fn scaled_by_pct(mut self, pct: u64) -> Self {
+        self.scale_by_pct(pct);
+        self
+    }
 }
 
 /// Calculate the base fee for the next block based on the EIP-1559 specification.

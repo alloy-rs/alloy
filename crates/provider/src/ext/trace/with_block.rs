@@ -27,7 +27,7 @@ where
     Map: Fn(Resp) -> Output + Clone,
 {
     /// Create a new [`TraceBuilder`] from a [`RpcCall`].
-    pub fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
+    pub const fn new_rpc(inner: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self { inner: WithBlockInner::RpcCall(inner), block_id: None, trace_types: None }
     }
 
@@ -227,7 +227,7 @@ impl<Params: RpcSend> TraceParams<Params> {
     /// Create a new `TraceParams` with the given parameters.
     ///
     /// The `method` is used to determine which parameters to ignore according to the `trace_*` api
-    /// spec. See <https://reth.rs/jsonrpc/trace.html>.
+    /// spec. See <https://reth.rs/jsonrpc/trace>.
     pub fn new(
         method: &String,
         params: Params,

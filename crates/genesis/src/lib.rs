@@ -11,10 +11,10 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use alloy_eips::{eip7840::BlobParams, BlobScheduleBlobParams};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
-use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
+use alloy_serde::{storage::deserialize_storage_map, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use core::str::FromStr;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
@@ -283,28 +283,6 @@ impl From<GenesisAccount> for TrieAccount {
     }
 }
 
-/// Custom deserialization function for the private key.
-///
-/// This function allows the private key to be deserialized from a string or a `null` value.
-///
-/// We need a custom function here especially to handle the case where the private key is `0x` and
-/// should be deserialized as `None`.
-fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let opt_str: Option<String> = Option::deserialize(deserializer)?;
-
-    if let Some(ref s) = opt_str {
-        if s == "0x" {
-            return Ok(None);
-        }
-        B256::from_str(s).map(Some).map_err(D::Error::custom)
-    } else {
-        Ok(None)
-    }
-}
-
 /// Defines core blockchain settings per block.
 ///
 /// Tailors unique settings for each network based on its genesis block.
@@ -323,146 +301,106 @@ pub struct ChainConfig {
     pub chain_id: u64,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub homestead_block: Option<u64>,
 
     /// The DAO fork switch block (None = no fork).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub dao_fork_block: Option<u64>,
 
     /// Whether or not the node supports the DAO hard-fork.
     pub dao_fork_support: bool,
 
     /// The [EIP-150](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md) hard fork block (None = no fork).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub eip150_block: Option<u64>,
 
     /// The [EIP-155](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md) hard fork block.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub eip155_block: Option<u64>,
 
     /// The [EIP-158](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-158.md) hard fork block.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub eip158_block: Option<u64>,
 
     /// The Byzantium hard fork block (None = no fork, 0 = already on byzantium).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub byzantium_block: Option<u64>,
 
     /// The Constantinople hard fork block (None = no fork, 0 = already on constantinople).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub constantinople_block: Option<u64>,
 
     /// The Petersburg hard fork block (None = no fork, 0 = already on petersburg).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub petersburg_block: Option<u64>,
 
     /// The Istanbul hard fork block (None = no fork, 0 = already on istanbul).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub istanbul_block: Option<u64>,
 
     /// The Muir Glacier hard fork block (None = no fork, 0 = already on muir glacier).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub muir_glacier_block: Option<u64>,
 
     /// The Berlin hard fork block (None = no fork, 0 = already on berlin).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub berlin_block: Option<u64>,
 
     /// The London hard fork block (None = no fork, 0 = already on london).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub london_block: Option<u64>,
 
     /// The Arrow Glacier hard fork block (None = no fork, 0 = already on arrow glacier).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub arrow_glacier_block: Option<u64>,
 
     /// The Gray Glacier hard fork block (None = no fork, 0 = already on gray glacier).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub gray_glacier_block: Option<u64>,
 
     /// Virtual fork after the merge to use as a network splitter.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub merge_netsplit_block: Option<u64>,
 
     /// Shanghai switch time (None = no fork, 0 = already on shanghai).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub shanghai_time: Option<u64>,
 
     /// Cancun switch time (None = no fork, 0 = already on cancun).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub cancun_time: Option<u64>,
 
     /// Prague switch time (None = no fork, 0 = already on prague).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub prague_time: Option<u64>,
 
     /// Osaka switch time (None = no fork, 0 = already on osaka).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::quantity::opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
     pub osaka_time: Option<u64>,
 
+    /// BPO1 switch time (None = no fork, 0 = already on BPO1).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bpo1_time: Option<u64>,
+
+    /// BPO2 switch time (None = no fork, 0 = already on BPO2).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bpo2_time: Option<u64>,
+
+    /// BPO3 switch time (None = no fork, 0 = already on BPO3).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bpo3_time: Option<u64>,
+
+    /// BPO4 switch time (None = no fork, 0 = already on BPO4).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bpo4_time: Option<u64>,
+
+    /// BPO5 switch time (None = no fork, 0 = already on BPO5).
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_u64_opt")]
+    pub bpo5_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_json_ttd_opt"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::ttd")]
     pub terminal_total_difficulty: Option<U256>,
 
     /// A flag specifying that the network already passed the terminal total difficulty. Its
@@ -496,10 +434,462 @@ pub struct ChainConfig {
     pub blob_schedule: BTreeMap<String, BlobParams>,
 }
 
+/// Bincode-compatible [`ChainConfig`] serde implementation.
+#[cfg(feature = "serde-bincode-compat")]
+pub mod serde_bincode_compat {
+    use alloc::{
+        borrow::Cow,
+        collections::BTreeMap,
+        string::{String, ToString},
+    };
+    use alloy_primitives::{Address, U256};
+    use alloy_serde::OtherFields;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::ChainConfig`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_genesis::{serde_bincode_compat, ChainConfig};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::ChainConfig")]
+    ///     config: ChainConfig,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct ChainConfig<'a> {
+        chain_id: u64,
+        #[serde(default)]
+        homestead_block: Option<u64>,
+        #[serde(default)]
+        dao_fork_block: Option<u64>,
+        #[serde(default)]
+        dao_fork_support: bool,
+        #[serde(default)]
+        eip150_block: Option<u64>,
+        #[serde(default)]
+        eip155_block: Option<u64>,
+        #[serde(default)]
+        eip158_block: Option<u64>,
+        #[serde(default)]
+        byzantium_block: Option<u64>,
+        #[serde(default)]
+        constantinople_block: Option<u64>,
+        #[serde(default)]
+        petersburg_block: Option<u64>,
+        #[serde(default)]
+        istanbul_block: Option<u64>,
+        #[serde(default)]
+        muir_glacier_block: Option<u64>,
+        #[serde(default)]
+        berlin_block: Option<u64>,
+        #[serde(default)]
+        london_block: Option<u64>,
+        #[serde(default)]
+        arrow_glacier_block: Option<u64>,
+        #[serde(default)]
+        gray_glacier_block: Option<u64>,
+        #[serde(default)]
+        merge_netsplit_block: Option<u64>,
+        #[serde(default)]
+        shanghai_time: Option<u64>,
+        #[serde(default)]
+        cancun_time: Option<u64>,
+        #[serde(default)]
+        prague_time: Option<u64>,
+        #[serde(default)]
+        osaka_time: Option<u64>,
+        #[serde(default)]
+        bpo1_time: Option<u64>,
+        #[serde(default)]
+        bpo2_time: Option<u64>,
+        #[serde(default)]
+        bpo3_time: Option<u64>,
+        #[serde(default)]
+        bpo4_time: Option<u64>,
+        #[serde(default)]
+        bpo5_time: Option<u64>,
+        #[serde(default)]
+        terminal_total_difficulty: Option<U256>,
+        #[serde(default)]
+        terminal_total_difficulty_passed: bool,
+        #[serde(default)]
+        ethash: Option<super::EthashConfig>,
+        #[serde(default)]
+        clique: Option<super::CliqueConfig>,
+        #[serde(default)]
+        parlia: Option<super::ParliaConfig>,
+        #[serde(default)]
+        deposit_contract_address: Option<Address>,
+        #[serde(default)]
+        blob_schedule: Cow<'a, BTreeMap<String, super::BlobParams>>,
+        /// Extra fields as string key-value pairs (bincode-compatible alternative to OtherFields)
+        #[serde(default)]
+        extra_fields: BTreeMap<String, String>,
+    }
+
+    impl<'a> From<&'a super::ChainConfig> for ChainConfig<'a> {
+        fn from(value: &'a super::ChainConfig) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                homestead_block: value.homestead_block,
+                dao_fork_block: value.dao_fork_block,
+                dao_fork_support: value.dao_fork_support,
+                eip150_block: value.eip150_block,
+                eip155_block: value.eip155_block,
+                eip158_block: value.eip158_block,
+                byzantium_block: value.byzantium_block,
+                constantinople_block: value.constantinople_block,
+                petersburg_block: value.petersburg_block,
+                istanbul_block: value.istanbul_block,
+                muir_glacier_block: value.muir_glacier_block,
+                berlin_block: value.berlin_block,
+                london_block: value.london_block,
+                arrow_glacier_block: value.arrow_glacier_block,
+                gray_glacier_block: value.gray_glacier_block,
+                merge_netsplit_block: value.merge_netsplit_block,
+                shanghai_time: value.shanghai_time,
+                cancun_time: value.cancun_time,
+                prague_time: value.prague_time,
+                osaka_time: value.osaka_time,
+                bpo1_time: value.bpo1_time,
+                bpo2_time: value.bpo2_time,
+                bpo3_time: value.bpo3_time,
+                bpo4_time: value.bpo4_time,
+                bpo5_time: value.bpo5_time,
+                terminal_total_difficulty: value.terminal_total_difficulty,
+                terminal_total_difficulty_passed: value.terminal_total_difficulty_passed,
+                ethash: value.ethash,
+                clique: value.clique,
+                parlia: value.parlia,
+                deposit_contract_address: value.deposit_contract_address,
+                blob_schedule: Cow::Borrowed(&value.blob_schedule),
+                extra_fields: {
+                    let mut extra_fields = BTreeMap::new();
+                    for (k, v) in value.extra_fields.clone().into_iter() {
+                        // Convert all serde_json::Value types to string for bincode compatibility
+                        extra_fields.insert(k, v.to_string());
+                    }
+                    extra_fields
+                },
+            }
+        }
+    }
+
+    impl From<ChainConfig<'_>> for super::ChainConfig {
+        fn from(value: ChainConfig<'_>) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                homestead_block: value.homestead_block,
+                dao_fork_block: value.dao_fork_block,
+                dao_fork_support: value.dao_fork_support,
+                eip150_block: value.eip150_block,
+                eip155_block: value.eip155_block,
+                eip158_block: value.eip158_block,
+                byzantium_block: value.byzantium_block,
+                constantinople_block: value.constantinople_block,
+                petersburg_block: value.petersburg_block,
+                istanbul_block: value.istanbul_block,
+                muir_glacier_block: value.muir_glacier_block,
+                berlin_block: value.berlin_block,
+                london_block: value.london_block,
+                arrow_glacier_block: value.arrow_glacier_block,
+                gray_glacier_block: value.gray_glacier_block,
+                merge_netsplit_block: value.merge_netsplit_block,
+                shanghai_time: value.shanghai_time,
+                cancun_time: value.cancun_time,
+                prague_time: value.prague_time,
+                osaka_time: value.osaka_time,
+                bpo1_time: value.bpo1_time,
+                bpo2_time: value.bpo2_time,
+                bpo3_time: value.bpo3_time,
+                bpo4_time: value.bpo4_time,
+                bpo5_time: value.bpo5_time,
+                terminal_total_difficulty: value.terminal_total_difficulty,
+                terminal_total_difficulty_passed: value.terminal_total_difficulty_passed,
+                ethash: value.ethash,
+                clique: value.clique,
+                parlia: value.parlia,
+                extra_fields: {
+                    let mut extra_fields = OtherFields::default();
+                    for (k, v) in value.extra_fields {
+                        // Parse strings back to serde_json::Value
+                        extra_fields.insert(
+                            k,
+                            v.parse().expect("Failed to parse extra field value back to JSON"),
+                        );
+                    }
+                    extra_fields
+                },
+                deposit_contract_address: value.deposit_contract_address,
+                blob_schedule: value.blob_schedule.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::ChainConfig> for ChainConfig<'a> {
+        fn serialize_as<S>(source: &super::ChainConfig, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            ChainConfig::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::ChainConfig> for ChainConfig<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::ChainConfig, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            ChainConfig::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::ChainConfig;
+        use bincode::config;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        #[test]
+        fn test_chain_config_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: ChainConfig,
+            }
+
+            // Create a test config with mixed Some/None values to test serialization
+            let config = ChainConfig {
+                chain_id: 1,
+                homestead_block: None,
+                dao_fork_block: Some(100),
+                dao_fork_support: false,
+                eip150_block: None,
+                eip155_block: Some(200),
+                eip158_block: None,
+                byzantium_block: Some(300),
+                constantinople_block: None,
+                petersburg_block: None,
+                istanbul_block: None,
+                muir_glacier_block: None,
+                berlin_block: None,
+                london_block: None,
+                arrow_glacier_block: None,
+                gray_glacier_block: None,
+                merge_netsplit_block: None,
+                shanghai_time: None,
+                cancun_time: None,
+                prague_time: None,
+                osaka_time: None,
+                bpo1_time: None,
+                bpo2_time: None,
+                bpo3_time: None,
+                bpo4_time: None,
+                bpo5_time: None,
+                terminal_total_difficulty: None,
+                terminal_total_difficulty_passed: false,
+                ethash: None,
+                clique: None,
+                parlia: None,
+                extra_fields: Default::default(),
+                deposit_contract_address: None,
+                blob_schedule: Default::default(),
+            };
+
+            let data = Data { config };
+
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, config::legacy()).unwrap();
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_chain_config_serde_bincode_compat() {
+            use serde_with::serde_as;
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: crate::ChainConfig,
+            }
+
+            let mut config = crate::ChainConfig {
+                chain_id: 1,
+                homestead_block: None,
+                dao_fork_block: Some(100),
+                dao_fork_support: false,
+                eip150_block: None,
+                eip155_block: Some(200),
+                eip158_block: None,
+                byzantium_block: Some(300),
+                constantinople_block: None,
+                petersburg_block: None,
+                istanbul_block: None,
+                muir_glacier_block: None,
+                berlin_block: None,
+                london_block: None,
+                arrow_glacier_block: None,
+                gray_glacier_block: None,
+                merge_netsplit_block: None,
+                shanghai_time: None,
+                cancun_time: None,
+                prague_time: None,
+                osaka_time: None,
+                bpo1_time: None,
+                bpo2_time: None,
+                bpo3_time: None,
+                bpo4_time: None,
+                bpo5_time: None,
+                terminal_total_difficulty: None,
+                terminal_total_difficulty_passed: false,
+                ethash: None,
+                clique: None,
+                parlia: None,
+                extra_fields: Default::default(),
+                deposit_contract_address: None,
+                blob_schedule: Default::default(),
+            };
+
+            // Add some extra fields with different serde_json::Value types
+            config.extra_fields.insert(
+                "string_field".to_string(),
+                serde_json::Value::String("test_value".to_string()),
+            );
+            config.extra_fields.insert(
+                "number_field".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(42)),
+            );
+            config.extra_fields.insert("bool_field".to_string(), serde_json::Value::Bool(true));
+
+            let data = Data { config };
+
+            // Test bincode serialization with serde_bincode_compat
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_default_genesis_chain_config_bincode() {
+            use serde_with::serde_as;
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: crate::ChainConfig,
+            }
+
+            // Create a default genesis and extract its chain config
+            let genesis = crate::Genesis::default();
+            let config = genesis.config;
+
+            let data = Data { config };
+
+            // Test bincode serialization with serde_bincode_compat
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+
+            assert_eq!(decoded, data);
+        }
+
+        #[test]
+        fn test_mainnet_genesis_chain_config_bincode() {
+            use serde_with::serde_as;
+
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            struct Data {
+                #[serde_as(as = "super::ChainConfig")]
+                config: crate::ChainConfig,
+            }
+
+            // Parse the mainnet genesis JSON
+            let mainnet_genesis_json = include_str!("../dumpgenesis/mainnet.json");
+
+            // Parse the genesis JSON
+            let genesis: crate::Genesis = serde_json::from_str(mainnet_genesis_json).unwrap();
+            let config = genesis.config;
+
+            let data = Data { config };
+
+            // Test bincode serialization with serde_bincode_compat
+            let encoded = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+            let (decoded, _) =
+                bincode::serde::decode_from_slice::<Data, _>(&encoded, bincode::config::legacy())
+                    .unwrap();
+
+            assert_eq!(decoded, data);
+        }
+    }
+}
+
 impl ChainConfig {
     /// Returns the [`BlobScheduleBlobParams`] from the configured blob schedule values.
     pub fn blob_schedule_blob_params(&self) -> BlobScheduleBlobParams {
-        BlobScheduleBlobParams::from_schedule(&self.blob_schedule)
+        let mut cancun = None;
+        let mut prague = None;
+        let mut osaka = None;
+        let mut scheduled = Vec::new();
+
+        for (key, params) in &self.blob_schedule {
+            match key.as_str() {
+                "cancun" => cancun = Some(*params),
+                "prague" => prague = Some(*params),
+                "osaka" => osaka = Some(*params),
+                "bpo1" => {
+                    if let Some(timestamp) = self.bpo1_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo2" => {
+                    if let Some(timestamp) = self.bpo2_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo3" => {
+                    if let Some(timestamp) = self.bpo3_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo4" => {
+                    if let Some(timestamp) = self.bpo4_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                "bpo5" => {
+                    if let Some(timestamp) = self.bpo5_time {
+                        scheduled.push((timestamp, *params));
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        scheduled.sort_by_key(|(timestamp, _)| *timestamp);
+
+        BlobScheduleBlobParams {
+            cancun: cancun.unwrap_or_else(BlobParams::cancun),
+            prague: prague.unwrap_or_else(BlobParams::prague),
+            osaka: osaka.unwrap_or_else(BlobParams::osaka),
+            scheduled,
+        }
     }
 
     /// Checks if the blockchain is active at or after the Homestead fork block.
@@ -617,6 +1007,11 @@ impl Default for ChainConfig {
             cancun_time: None,
             prague_time: None,
             osaka_time: None,
+            bpo1_time: None,
+            bpo2_time: None,
+            bpo3_time: None,
+            bpo4_time: None,
+            bpo5_time: None,
             terminal_total_difficulty: None,
             terminal_total_difficulty_passed: false,
             ethash: None,
@@ -659,6 +1054,46 @@ pub struct ParliaConfig {
     /// Epoch length to update validator set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epoch: Option<u64>,
+}
+
+/// Custom deserialization function for the private key.
+///
+/// This function allows the private key to be deserialized from a string or a `null` value.
+///
+/// We need a custom function here especially to handle the case where the private key is `0x` and
+/// should be deserialized as `None`.
+fn deserialize_private_key<'de, D>(deserializer: D) -> Result<Option<B256>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        match Option::<String>::deserialize(deserializer)? {
+            Some(ref s) => {
+                if s == "0x" {
+                    return Ok(None);
+                }
+                B256::from_str(s).map(Some).map_err(D::Error::custom)
+            }
+            None => Ok(None),
+        }
+    } else {
+        Option::<B256>::deserialize(deserializer)
+    }
+}
+
+/// Custom deserialization function for `Option<u64>`.
+///
+/// This function allows it to be deserialized from a number or a "quantity" hex string.
+/// We need a custom function as this should only be used for non-human-readable formats.
+fn deserialize_u64_opt<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        alloy_serde::quantity::opt::deserialize(deserializer)
+    } else {
+        Option::<u64>::deserialize(deserializer)
+    }
 }
 
 #[cfg(test)]
@@ -1563,28 +1998,28 @@ mod tests {
     #[test]
     fn parse_dump_genesis_mainnet() {
         let mainnet = include_str!("../dumpgenesis/mainnet.json");
-        let gen = serde_json::from_str::<Genesis>(mainnet).unwrap();
-        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen1 = serde_json::from_str::<Genesis>(mainnet).unwrap();
+        let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
-        assert_eq!(gen, gen2);
+        assert_eq!(gen1, gen2);
     }
 
     #[test]
     fn parse_dump_genesis_sepolia() {
         let sepolia = include_str!("../dumpgenesis/sepolia.json");
-        let gen = serde_json::from_str::<Genesis>(sepolia).unwrap();
-        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen1 = serde_json::from_str::<Genesis>(sepolia).unwrap();
+        let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
-        assert_eq!(gen, gen2);
+        assert_eq!(gen1, gen2);
     }
 
     #[test]
     fn parse_dump_genesis_holesky() {
         let holesky = include_str!("../dumpgenesis/holesky.json");
-        let gen = serde_json::from_str::<Genesis>(holesky).unwrap();
-        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen1 = serde_json::from_str::<Genesis>(holesky).unwrap();
+        let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
-        assert_eq!(gen, gen2);
+        assert_eq!(gen1, gen2);
     }
 
     #[test]

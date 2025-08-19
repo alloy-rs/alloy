@@ -70,6 +70,12 @@ impl From<TxType> for AnyTxType {
     }
 }
 
+impl Typed2718 for AnyTxType {
+    fn ty(&self) -> u8 {
+        self.0
+    }
+}
+
 /// Memoization for deserialization of [`UnknownTxEnvelope`],
 /// [`UnknownTypedTransaction`] [`AnyTxEnvelope`], [`AnyTypedTransaction`].
 /// Setting these manually is discouraged, however the fields are left public

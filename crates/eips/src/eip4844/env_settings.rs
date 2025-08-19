@@ -6,10 +6,10 @@ pub use c_kzg::KzgSettings;
 
 /// Precompute value that optimizes computing cell kzg proofs.
 ///
-/// Set to 0 as we do not use `compute_cells_and_kzg_proofs` or `recover_cells_and_kzg_proofs`.
+/// Set to 8 as the recommended default for computing proofs.
 ///
 /// Learn more: <https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112>
-const PRECOMPUTE: u64 = 0;
+const PRECOMPUTE: u64 = 8;
 
 /// KZG settings.
 #[derive(Clone, Debug, Default, Eq)]
@@ -45,7 +45,13 @@ impl Hash for EnvKzgSettings {
 impl EnvKzgSettings {
     /// Returns the KZG settings.
     ///
-    /// This will initialize the default settings if it is not already loaded.
+    /// If this is [`EnvKzgSettings::Default`], this will initialize the default settings if it is
+    /// not already loaded, see also [`c_kzg::ethereum_kzg_settings`].
+    ///
+    /// To configure a different [precompute] value, [`c_kzg::ethereum_kzg_settings`] must be called
+    /// directly once. The default precompute value is `0`.
+    ///
+    /// [precompute]: https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112
     #[inline]
     pub fn get(&self) -> &KzgSettings {
         match self {

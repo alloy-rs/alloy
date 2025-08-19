@@ -11,7 +11,7 @@ use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{ClientBuilder, RpcClient};
-use alloy_transport::{TransportError, TransportResult};
+use alloy_transport::{TransportConnect, TransportError, TransportResult};
 use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
@@ -152,6 +152,19 @@ impl
 impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     fn default() -> Self {
         Self { layer: Identity, filler: Identity, network: PhantomData }
+    }
+}
+
+impl ProviderBuilder<Identity, Identity, Ethereum> {
+    /// Create a new [`ProviderBuilder`] with the [`RecommendedFillers`] for the provided
+    /// [`Network`].
+    pub fn new_with_network<Net: RecommendedFillers>(
+    ) -> ProviderBuilder<Identity, JoinFill<Identity, Net::RecommendedFillers>, Net> {
+        ProviderBuilder {
+            layer: Identity,
+            filler: JoinFill::new(Identity, Net::recommended_fillers()),
+            network: PhantomData,
+        }
     }
 }
 
@@ -399,6 +412,36 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         Ok(self.connect_client(client))
     }
 
+    /// Finish the layer stack by providing a [`TransportConnect`] instance.
+    pub async fn connect_with<C>(self, connect: &C) -> Result<F::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        C: TransportConnect,
+    {
+        connect
+            .get_transport()
+            .await
+            .map(|t| RpcClient::new(t, connect.is_local()))
+            .map(|client| self.connect_client(client))
+    }
+
+    /// Finish the layer stack by providing a [`PubSubConnect`] instance,
+    /// producing a [`Provider`] with pubsub capabilities.
+    ///
+    /// [`PubSubConnect`]: alloy_pubsub::PubSubConnect
+    #[cfg(feature = "pubsub")]
+    pub async fn connect_pubsub_with<C>(self, connect: C) -> Result<F::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        C: alloy_pubsub::PubSubConnect,
+    {
+        ClientBuilder::default().pubsub(connect).await.map(|client| self.connect_client(client))
+    }
+
     /// Finish the layer stack by providing a connection string for a built-in
     /// transport type, outputting the final [`Provider`] type with all stack
     /// components.
@@ -487,6 +530,31 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().http(url);
         self.connect_client(client)
+    }
+
+    /// Build this provider with a pre-built Reqwest client.
+    #[cfg(any(test, feature = "reqwest"))]
+    pub fn connect_reqwest<C>(self, client: C, url: reqwest::Url) -> F::Provider
+    where
+        L: ProviderLayer<crate::RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        C: Into<reqwest::Client>,
+    {
+        let client = ClientBuilder::default().http_with_client(client.into(), url);
+        self.connect_client(client)
+    }
+
+    /// Build this provider with a provided Reqwest client builder.
+    #[cfg(any(test, feature = "reqwest"))]
+    pub fn with_reqwest<B>(self, url: reqwest::Url, builder: B) -> F::Provider
+    where
+        L: ProviderLayer<crate::RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+        B: FnOnce(reqwest::ClientBuilder) -> reqwest::Client,
+    {
+        self.connect_reqwest(builder(reqwest::ClientBuilder::default()), url)
     }
 
     /// Build this provider with an Reqwest HTTP transport.
@@ -699,6 +767,7 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 mod tests {
     use super::*;
     use crate::Provider;
+    use alloy_network::AnyNetwork;
 
     #[tokio::test]
     async fn basic() {
@@ -709,5 +778,45 @@ mod tests {
         let _ = provider.get_account(Default::default());
         let provider = provider.erased();
         let _ = provider.get_account(Default::default());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "reqwest")]
+    async fn test_connect_reqwest() {
+        let provider = ProviderBuilder::new()
+            .with_cached_nonce_management()
+            .with_call_batching()
+            .connect_reqwest(
+                reqwest::Client::new(),
+                reqwest::Url::parse("http://localhost:8545").unwrap(),
+            );
+        let _ = provider.get_account(Default::default());
+        let provider = provider.erased();
+        let _ = provider.get_account(Default::default());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "reqwest")]
+    async fn test_with_reqwest() {
+        let provider = ProviderBuilder::new()
+            .with_cached_nonce_management()
+            .with_call_batching()
+            .with_reqwest(reqwest::Url::parse("http://localhost:8545").unwrap(), |builder| {
+                builder
+                    .user_agent("alloy/test")
+                    .timeout(std::time::Duration::from_secs(10))
+                    .build()
+                    .expect("failed to build reqwest client")
+            });
+        let _ = provider.get_account(Default::default());
+        let provider = provider.erased();
+        let _ = provider.get_account(Default::default());
+    }
+
+    #[tokio::test]
+    async fn compile_with_network() {
+        let p = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
+        let num = p.get_block_number().await.unwrap();
+        assert_eq!(num, 0);
     }
 }

@@ -1,6 +1,8 @@
 use alloy_eips::BlockId;
 use alloy_network::Network;
-use alloy_rpc_types_eth::{state::StateOverride, Bundle, StateContext, TransactionIndex};
+use alloy_rpc_types_eth::{
+    state::StateOverride, BlockOverrides, Bundle, StateContext, TransactionIndex,
+};
 use serde::ser::SerializeSeq;
 use std::borrow::Cow;
 
@@ -10,6 +12,7 @@ pub struct EthCallParams<N: Network> {
     data: N::TransactionRequest,
     pub(crate) block: Option<BlockId>,
     pub(crate) overrides: Option<StateOverride>,
+    pub(crate) block_overrides: Option<BlockOverrides>,
 }
 
 impl<N> EthCallParams<N>
@@ -18,7 +21,7 @@ where
 {
     /// Instantiates a new `EthCallParams` with the given data (transaction).
     pub const fn new(data: N::TransactionRequest) -> Self {
-        Self { data, block: None, overrides: None }
+        Self { data, block: None, overrides: None, block_overrides: None }
     }
 
     /// Sets the block to use for this call.
@@ -33,13 +36,19 @@ where
         self
     }
 
+    /// Sets the state overrides for this call, if any.
+    pub fn with_overrides_opt(mut self, overrides: Option<StateOverride>) -> Self {
+        self.overrides = overrides;
+        self
+    }
+
     /// Returns a reference to the state overrides if set.
-    pub fn overrides(&self) -> Option<&StateOverride> {
+    pub const fn overrides(&self) -> Option<&StateOverride> {
         self.overrides.as_ref()
     }
 
     /// Returns a reference to the transaction data.
-    pub fn data(&self) -> &N::TransactionRequest {
+    pub const fn data(&self) -> &N::TransactionRequest {
         &self.data
     }
 
@@ -52,16 +61,43 @@ where
     pub const fn block(&self) -> Option<BlockId> {
         self.block
     }
+
+    /// Sets the block overrides for this call.
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the block overrides for this call, if any.
+    pub fn with_block_overrides_opt(mut self, overrides: Option<BlockOverrides>) -> Self {
+        self.block_overrides = overrides;
+        self
+    }
+
+    /// Returns a reference to the block overrides if set.
+    pub const fn block_overrides(&self) -> Option<&BlockOverrides> {
+        self.block_overrides.as_ref()
+    }
 }
 
 impl<N: Network> serde::Serialize for EthCallParams<N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if self.overrides().is_some() { 3 } else { 2 };
+        let len = if self.block_overrides().is_some() {
+            4
+        } else if self.overrides().is_some() {
+            3
+        } else {
+            2
+        };
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&self.data())?;
 
-        if let Some(overrides) = self.overrides() {
+        if let Some(block_overrides) = self.block_overrides() {
+            seq.serialize_element(&self.block().unwrap_or_default())?;
+            seq.serialize_element(self.overrides().unwrap_or(&StateOverride::default()))?;
+            seq.serialize_element(block_overrides)?;
+        } else if let Some(overrides) = self.overrides() {
             seq.serialize_element(&self.block().unwrap_or_default())?;
             seq.serialize_element(overrides)?;
         } else if let Some(block) = self.block() {
@@ -82,7 +118,7 @@ pub struct EthCallManyParams<'req> {
 
 impl<'req> EthCallManyParams<'req> {
     /// Instantiates a new `EthCallManyParams` with the given bundles.
-    pub fn new(bundles: &'req [Bundle]) -> Self {
+    pub const fn new(bundles: &'req [Bundle]) -> Self {
         Self { bundles: Cow::Borrowed(bundles), context: None, overrides: None }
     }
 

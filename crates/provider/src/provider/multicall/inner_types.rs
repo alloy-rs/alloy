@@ -27,10 +27,21 @@ pub trait MulticallItem {
     /// Decoder for the return data of the call.
     type Decoder: SolCall;
 
+    /// Returns the value to send with the call.
+    fn value(&self) -> U256;
+
     /// The target address of the call.
     fn target(&self) -> Address;
     /// ABI-encoded input data for the call.
     fn input(&self) -> Bytes;
+
+    /// Converts `self` to a [`CallItem`] while specifying whether it can fail.
+    fn into_call(self, allow_failure: bool) -> CallItem<Self::Decoder>
+    where
+        Self: Sized,
+    {
+        CallItem::<Self::Decoder>::from(self).allow_failure(allow_failure)
+    }
 }
 
 /// Helper type to build a [`CallItem`]
@@ -69,18 +80,23 @@ impl<D: SolCall> Debug for CallItem<D> {
 
 impl<D: SolCall> CallItem<D> {
     /// Create a new [`CallItem`] instance.
-    pub fn new(target: Address, input: Bytes) -> Self {
+    pub const fn new(target: Address, input: Bytes) -> Self {
         Self { target, input, allow_failure: false, value: U256::ZERO, decoder: PhantomData }
     }
 
     /// Set whether the call should be allowed to fail or not.
-    pub fn allow_failure(mut self, allow_failure: bool) -> Self {
+    pub const fn allow_failure(mut self, allow_failure: bool) -> Self {
         self.allow_failure = allow_failure;
         self
     }
 
+    /// Convenience function for `allow_failure(true)`
+    pub const fn with_failure_allowed(self) -> Self {
+        self.allow_failure(true)
+    }
+
     /// Set the value to send with the call.
-    pub fn value(mut self, value: U256) -> Self {
+    pub const fn value(mut self, value: U256) -> Self {
         self.value = value;
         self
     }
@@ -117,6 +133,22 @@ pub trait CallInfoTrait: std::fmt::Debug {
     fn to_call3_value(&self) -> Call3Value;
 }
 
+impl<T, D> From<T> for CallItem<D>
+where
+    T: MulticallItem,
+    D: SolCall,
+{
+    /// Converts a [`MulticallItem`] into a [`CallItem`]
+    ///
+    /// By default, it doesn't allow for failure when used in
+    /// [`aggregate3`][crate::MulticallBuilder::aggregate3].
+    /// Call [`allow_failure`][CallItem::allow_failure] on the result to specify the failure
+    /// behavior, or use [`into_call`][MulticallItem::into_call] instead.
+    fn from(value: T) -> Self {
+        Self::new(value.target(), value.input()).value(value.value())
+    }
+}
+
 /// Marker for Dynamic Calls i.e where in SolCall type is locked to one specific type and multicall
 /// returns a Vec of the corresponding return type instead of a tuple.
 #[derive(Debug)]
@@ -136,9 +168,10 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
         let mut ret = vec![];
         for (idx, res) in results.iter().enumerate() {
             if res.success {
-                ret.push(Ok(
-                    D::abi_decode_returns(&res.returnData).map_err(MulticallError::DecodeError)?
-                ));
+                ret.push(
+                    D::abi_decode_returns(&res.returnData)
+                        .map_err(|_| Failure { idx, return_data: res.returnData.clone() }),
+                )
             } else {
                 ret.push(Err(Failure { idx, return_data: res.returnData.clone() }));
             }

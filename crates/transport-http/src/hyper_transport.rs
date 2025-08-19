@@ -92,16 +92,22 @@ where
 {
     async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         debug!(count = req.len(), "sending request packet to server");
+
+        let mut builder = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri(self.url.as_str())
+            .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"));
+
+        // Add any additional headers from the request packet.
+        for (name, value) in req.headers().iter() {
+            builder = builder.header(name, value);
+        }
+
         let ser = req.serialize().map_err(TransportError::ser_err)?;
         // convert the Box<RawValue> into a hyper request<B>
         let body = ser.get().as_bytes().to_owned().into();
 
-        let req = hyper::Request::builder()
-            .method(hyper::Method::POST)
-            .uri(self.url.as_str())
-            .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"))
-            .body(body)
-            .expect("request parts are invalid");
+        let req = builder.body(body).expect("request parts are invalid");
 
         let mut service = self.client.service;
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
@@ -115,8 +121,11 @@ where
         // if there is one.
         let body = resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
 
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
+        if tracing::enabled!(tracing::Level::TRACE) {
+            trace!(body = %String::from_utf8_lossy(&body), "response body");
+        } else {
+            debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        }
 
         if !status.is_success() {
             return Err(TransportErrorKind::http_error(

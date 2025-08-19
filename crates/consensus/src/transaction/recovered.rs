@@ -3,7 +3,7 @@ use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
 };
-use alloy_primitives::{bytes, Address, Bytes, B256};
+use alloy_primitives::{bytes, Address, Bytes, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable};
 use derive_more::{AsRef, Deref};
 
@@ -38,7 +38,7 @@ impl<T> Recovered<T> {
     }
 
     /// Reference to the inner recovered object.
-    pub fn inner_mut(&mut self) -> &mut T {
+    pub const fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
@@ -183,6 +183,11 @@ impl<T> Recovered<&T> {
         let Self { inner, signer } = self;
         Recovered::new_unchecked(inner.clone(), signer)
     }
+
+    /// Helper function to explicitly create a new copy of `Recovered<&T>`
+    pub const fn copied(&self) -> Self {
+        *self
+    }
 }
 
 impl<T: Encodable> Encodable for Recovered<T> {
@@ -248,6 +253,19 @@ pub trait SignerRecoverable {
     /// Returns an error if the transaction's signature is invalid.
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError>;
 
+    /// Same as [`SignerRecoverable::recover_signer_unchecked`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of historical transactions to avoid
+    /// allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations clear this buffer.
+    fn recover_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Address, RecoveryError> {
+        let _ = buf;
+        self.recover_signer()
+    }
+
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
     /// `Recovered<Self>`
     fn try_into_recovered(self) -> Result<Recovered<Self>, RecoveryError>
@@ -280,5 +298,45 @@ pub trait SignerRecoverable {
     fn try_to_recovered_ref_unchecked(&self) -> Result<Recovered<&Self>, RecoveryError> {
         let signer = self.recover_signer_unchecked()?;
         Ok(Recovered::new_unchecked(self, signer))
+    }
+}
+
+impl<T> SignerRecoverable for WithEncoded<T>
+where
+    T: SignerRecoverable,
+{
+    fn recover_signer(&self) -> Result<Address, RecoveryError> {
+        self.1.recover_signer()
+    }
+
+    fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
+        self.1.recover_signer_unchecked()
+    }
+
+    fn recover_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Address, RecoveryError> {
+        self.1.recover_unchecked_with_buf(buf)
+    }
+}
+
+impl<T> SignerRecoverable for Sealed<T>
+where
+    T: SignerRecoverable,
+{
+    fn recover_signer(&self) -> Result<Address, RecoveryError> {
+        self.inner().recover_signer()
+    }
+
+    fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
+        self.inner().recover_signer_unchecked()
+    }
+
+    fn recover_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Address, RecoveryError> {
+        self.inner().recover_unchecked_with_buf(buf)
     }
 }

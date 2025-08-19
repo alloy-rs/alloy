@@ -25,10 +25,9 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["map"] }
 alloy-json-rpc.workspace = true
-alloy-transport-http.workspace = true
+alloy-transport-http = { workspace = true, optional = true }
 alloy-transport.workspace = true
 
-async-stream.workspace = true
 futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
@@ -37,7 +36,6 @@ tokio = { workspace = true, features = ["sync"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 tower.workspace = true
 tracing.workspace = true
-tracing-futures = { workspace = true, features = ["futures-03"] }
 
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }

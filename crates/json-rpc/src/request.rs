@@ -1,5 +1,6 @@
 use crate::{common::Id, RpcBorrow, RpcSend};
 use alloy_primitives::{keccak256, B256};
+use http::Extensions;
 use serde::{
     de::{DeserializeOwned, MapAccess},
     ser::SerializeMap,
@@ -9,7 +10,7 @@ use serde_json::value::RawValue;
 use std::{borrow::Cow, marker::PhantomData, mem::MaybeUninit};
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct RequestMeta {
     /// The method name.
     pub method: Cow<'static, str>,
@@ -17,12 +18,15 @@ pub struct RequestMeta {
     pub id: Id,
     /// Whether the request is a subscription, other than `eth_subscribe`.
     is_subscription: bool,
+    /// Optional extensions for the request that can be used by middleware
+    /// or other components to attach additional metadata.
+    extensions: Extensions,
 }
 
 impl RequestMeta {
     /// Create a new `RequestMeta`.
-    pub const fn new(method: Cow<'static, str>, id: Id) -> Self {
-        Self { method, id, is_subscription: false }
+    pub fn new(method: Cow<'static, str>, id: Id) -> Self {
+        Self { method, id, is_subscription: false, extensions: Extensions::new() }
     }
 
     /// Returns `true` if the request is a subscription.
@@ -32,16 +36,42 @@ impl RequestMeta {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.set_subscription_status(true);
     }
 
     /// Setter for `is_subscription`. Indicates to RPC clients that the request
     /// triggers a stream of notifications.
-    pub fn set_subscription_status(&mut self, sub: bool) {
+    pub const fn set_subscription_status(&mut self, sub: bool) {
         self.is_subscription = sub;
     }
+
+    /// Returns a reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub const fn extensions(&self) -> &Extensions {
+        &self.extensions
+    }
+
+    /// Returns a mutable reference to the request extensions.
+    ///
+    /// These can be used to attach additional metadata to the request
+    /// that can be used by middleware or other components.
+    pub const fn extensions_mut(&mut self) -> &mut Extensions {
+        &mut self.extensions
+    }
 }
+
+impl PartialEq for RequestMeta {
+    fn eq(&self, other: &Self) -> bool {
+        self.method == other.method
+            && self.id == other.id
+            && self.is_subscription == other.is_subscription
+    }
+}
+
+impl Eq for RequestMeta {}
 
 /// A JSON-RPC 2.0 request object.
 ///
@@ -73,13 +103,13 @@ impl<Params> Request<Params> {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription()
     }
 
     /// Setter for `is_subscription`. Indicates to RPC clients that the request
     /// triggers a stream of notifications.
-    pub fn set_subscription_status(&mut self, sub: bool) {
+    pub const fn set_subscription_status(&mut self, sub: bool) {
         self.meta.set_subscription_status(sub);
     }
 
@@ -89,6 +119,14 @@ impl<Params> Request<Params> {
         map: impl FnOnce(Params) -> NewParams,
     ) -> Request<NewParams> {
         Request { meta: self.meta, params: map(self.params) }
+    }
+
+    /// Change the metadata of the request.
+    pub fn map_meta<F>(self, f: F) -> Self
+    where
+        F: FnOnce(RequestMeta) -> RequestMeta,
+    {
+        Self { meta: f(self.meta), params: self.params }
     }
 }
 
@@ -311,6 +349,11 @@ impl SerializedRequest {
         &self.meta
     }
 
+    /// Returns a mutable reference to the request metadata (ID and Method).
+    pub const fn meta_mut(&mut self) -> &mut RequestMeta {
+        &mut self.meta
+    }
+
     /// Returns the request ID.
     pub const fn id(&self) -> &Id {
         &self.meta.id
@@ -323,7 +366,7 @@ impl SerializedRequest {
 
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
-    pub fn set_is_subscription(&mut self) {
+    pub const fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription();
     }
 

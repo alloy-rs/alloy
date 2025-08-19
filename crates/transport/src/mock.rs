@@ -99,12 +99,12 @@ pub struct MockTransport {
 
 impl MockTransport {
     /// Create a new [`MockTransport`] with the given [`Asserter`].
-    pub fn new(asserter: Asserter) -> Self {
+    pub const fn new(asserter: Asserter) -> Self {
         Self { asserter }
     }
 
     /// Return a reference to the associated [`Asserter`].
-    pub fn asserter(&self) -> &Asserter {
+    pub const fn asserter(&self) -> &Asserter {
         &self.asserter
     }
 
@@ -122,10 +122,13 @@ impl MockTransport {
     fn map_request(&self, req: j::SerializedRequest) -> TransportResult<j::Response> {
         Ok(j::Response {
             id: req.id().clone(),
-            payload: self
-                .asserter
-                .pop_response()
-                .ok_or_else(|| TransportErrorKind::custom_str("empty asserter response queue"))?,
+            payload: self.asserter.pop_response().ok_or_else(|| {
+                TransportErrorKind::custom_str(&format!(
+                    "empty asserter response queue for request with id {id} and method {method}",
+                    id = req.id(),
+                    method = req.method()
+                ))
+            })?,
         })
     }
 }

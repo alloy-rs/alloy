@@ -1,6 +1,6 @@
 //! Ethereum JSON-RPC provider.
 
-#![allow(unknown_lints, elided_named_lifetimes)]
+#![allow(unknown_lints, mismatched_lifetime_syntaxes)]
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
@@ -74,7 +74,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<N>;
 
-    /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
+    /// Returns the [`ProviderBuilder`] to build on.
     fn builder() -> ProviderBuilder<Identity, Identity, N>
     where
         Self: Sized,
@@ -141,6 +141,24 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
+    /// Get the block number for a given block identifier.
+    ///
+    /// This is a convenience function that fetches the full block when the block identifier is not
+    /// a number.
+    async fn get_block_number_by_id(
+        &self,
+        block_id: BlockId,
+    ) -> TransportResult<Option<BlockNumber>> {
+        match block_id {
+            BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
+            BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
+            _ => {
+                let block = self.get_block(block_id).await?;
+                Ok(block.map(|b| b.header().number()))
+            }
+        }
+    }
+
     /// Execute a smart contract call with a transaction request and state
     /// overrides, without publishing a transaction.
     ///
@@ -151,9 +169,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
-    /// ## Example
+    /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// # use alloy_provider::Provider;
     /// # use alloy_eips::BlockId;
     /// # use alloy_rpc_types_eth::state::StateOverride;
@@ -192,41 +210,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Execute a multicall by leveraging the [`MulticallBuilder`].
     ///
-    /// This function returns a [`MulticallBuilder`] which is used to add multiple calls and execute
-    /// them.
+    /// Call [`MulticallBuilder::dynamic`] to add calls dynamically instead.
     ///
-    /// ## Example
-    ///
-    /// ```ignore
-    /// use alloy_primitives::address;
-    /// use alloy_provider::{MulticallBuilder, Provider, ProviderBuilder};
-    /// use alloy_sol_types::sol;
-    ///
-    /// sol! {
-    ///    #[sol(rpc)]
-    ///    #[derive(Debug, PartialEq)]
-    ///    interface ERC20 {
-    ///        function totalSupply() external view returns (uint256 totalSupply);
-    ///        function balanceOf(address owner) external view returns (uint256 balance);
-    ///    }
-    /// }
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let weth = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    ///     let provider = ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
-    ///     let erc20 = ERC20::new(weth, &provider);
-    ///
-    ///     let ts_call = erc20.totalSupply();
-    ///     let balance_call = erc20.balanceOf(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"));
-    ///
-    ///     let multicall = provider.multicall().add(ts_call).add(balance_call);
-    ///
-    ///     let (_block_num, (total_supply, balance)) = multicall.aggregate().await.unwrap();
-    ///
-    ///     println!("Total Supply: {:?}, Balance: {:?}", total_supply, balance);
-    /// }
-    /// ```
+    /// See the [`MulticallBuilder`] documentation for more details.
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     fn multicall(&self) -> MulticallBuilder<Empty, &Self, N>
     where
@@ -395,9 +381,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// By default this fetches the block with only the transaction hashes populated in the block,
     /// and not the full transactions.
     ///
-    ///
-    ///
-    /// # Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::{Provider, ProviderBuilder};
@@ -425,7 +409,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// By default this fetches the block with only the transaction hashes populated in the block,
     /// and not the full transactions.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::{Provider, ProviderBuilder};
@@ -945,7 +929,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
-    /// APIs. Generally implementors should NOT override this method.
+    /// APIs. Generally implementers should NOT override this method.
     ///
     /// [`send_transaction`]: Self::send_transaction
     /// [`ProviderLayer`]: crate::ProviderLayer
@@ -1324,6 +1308,7 @@ mod tests {
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
+    use alloy_consensus::transaction::SignerRecoverable;
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
         hyper,
@@ -1422,7 +1407,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
 
-        // Setup tower serive with multiple layers modifying request headers
+        // Setup tower service with multiple layers modifying request headers
         let service = tower::ServiceBuilder::new()
             .layer(SetRequestHeaderLayer::if_not_present(
                 header::USER_AGENT,
@@ -1712,6 +1697,29 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num)
+    }
+
+    #[tokio::test]
+    async fn gets_block_number_for_id() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let block_num = provider
+            .get_block_number_by_id(BlockId::Number(BlockNumberOrTag::Number(0)))
+            .await
+            .unwrap();
+        assert_eq!(block_num, Some(0));
+
+        let block_num = provider
+            .get_block_number_by_id(BlockId::Number(BlockNumberOrTag::Latest))
+            .await
+            .unwrap();
+        assert_eq!(block_num, Some(0));
+
+        let block =
+            provider.get_block_by_number(BlockNumberOrTag::Number(0)).await.unwrap().unwrap();
+        let hash = block.header.hash;
+        let block_num = provider.get_block_number_by_id(BlockId::Hash(hash.into())).await.unwrap();
+        assert_eq!(block_num, Some(0));
     }
 
     #[tokio::test]

@@ -3,7 +3,10 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
-use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
+use alloy_rpc_types_eth::{
+    state::{AccountOverride, StateOverride},
+    BlockOverrides,
+};
 use alloy_sol_types::SolCall;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -237,6 +240,12 @@ where
         self
     }
 
+    /// Set the state overrides for this call, if any.
+    pub fn overrides_opt(mut self, overrides: Option<StateOverride>) -> Self {
+        self.params.overrides = overrides;
+        self
+    }
+
     /// Appends a single [AccountOverride] to the state override.
     ///
     /// Creates a new [`StateOverride`] if none has been set yet.
@@ -261,6 +270,18 @@ where
         self
     }
 
+    /// Sets the block overrides for this call.
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.params.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the block overrides for this call, if any.
+    pub fn with_block_overrides_opt(mut self, overrides: Option<BlockOverrides>) -> Self {
+        self.params.block_overrides = overrides;
+        self
+    }
+
     /// Set the block to use for this call.
     pub const fn block(mut self, block: BlockId) -> Self {
         self.params.block = Some(block);
@@ -279,7 +300,7 @@ where
     /// The result of the `eth_call` will be [`alloy_sol_types::Result`] with the Ok variant
     /// containing the decoded [`SolCall::Return`] type.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```ignore
     /// let call = EthCall::call(provider, data).decode_resp::<MySolCall>().await?.unwrap();

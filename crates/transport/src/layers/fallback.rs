@@ -1,16 +1,16 @@
+use crate::time::Instant;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
+use core::time::Duration;
+use derive_more::{Deref, DerefMut};
+use futures::{stream::FuturesUnordered, StreamExt};
+use parking_lot::RwLock;
 use std::{
     collections::VecDeque,
     fmt::Debug,
     num::NonZeroUsize,
     sync::Arc,
     task::{Context, Poll},
-    time::{Duration, Instant},
 };
-
-use alloy_json_rpc::{RequestPacket, ResponsePacket};
-use derive_more::{Deref, DerefMut};
-use futures::{stream::FuturesUnordered, StreamExt};
-use parking_lot::RwLock;
 use tower::{Layer, Service};
 use tracing::trace;
 
@@ -201,7 +201,7 @@ pub struct FallbackLayer {
 
 impl FallbackLayer {
     /// Set the number of active transports to use (must be greater than 0)
-    pub fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
+    pub const fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
         self.active_transport_count = count.get();
         self
     }

@@ -3,7 +3,7 @@ use crate::{
     TransactionBuilderError,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types_eth::{AccessList, TransactionRequest};
+use alloy_rpc_types_eth::{AccessList, TransactionInputKind, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use std::ops::{Deref, DerefMut};
 
@@ -24,12 +24,20 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_nonce(nonce)
     }
 
+    fn take_nonce(&mut self) -> Option<u64> {
+        self.deref_mut().nonce.take()
+    }
+
     fn input(&self) -> Option<&Bytes> {
         self.deref().input()
     }
 
     fn set_input<T: Into<Bytes>>(&mut self, input: T) {
         self.deref_mut().set_input(input);
+    }
+
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+        self.deref_mut().set_input_kind(input, kind)
     }
 
     fn from(&self) -> Option<Address> {
@@ -138,7 +146,6 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         }
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys").into())
     }
-
     async fn build<W: NetworkWallet<AnyNetwork>>(
         self,
         wallet: &W,

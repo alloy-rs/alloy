@@ -1,5 +1,6 @@
 use crate::{ErrorPayload, Id, Response, ResponsePayload, SerializedRequest};
 use alloy_primitives::map::HashSet;
+use http::HeaderMap;
 use serde::{
     de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
     Deserialize, Serialize,
@@ -113,7 +114,7 @@ impl RequestPacket {
         }
     }
 
-    /// Returns a all [`SerializedRequest`].
+    /// Returns all [`SerializedRequest`].
     pub fn requests(&self) -> &[SerializedRequest] {
         match self {
             Self::Single(req) => std::slice::from_ref(req),
@@ -121,9 +122,32 @@ impl RequestPacket {
         }
     }
 
+    /// Returns a mutable reference to all [`SerializedRequest`].
+    pub fn requests_mut(&mut self) -> &mut [SerializedRequest] {
+        match self {
+            Self::Single(req) => std::slice::from_mut(req),
+            Self::Batch(req) => req.as_mut_slice(),
+        }
+    }
+
     /// Returns an iterator over the requests' method names
     pub fn method_names(&self) -> impl Iterator<Item = &str> + '_ {
         self.requests().iter().map(|req| req.method())
+    }
+
+    /// Retrieves the [`HeaderMap`] from the request metadata if available;
+    /// otherwise, returns an empty map. This functionality is only supported for single requests.
+    pub fn headers(&self) -> HeaderMap {
+        // If this is a batch request, we cannot return headers.
+        let Some(single_req) = self.as_single() else {
+            return HeaderMap::new();
+        };
+        // If the request provides a `HeaderMap` return it.
+        if let Some(http_header_extension) = single_req.meta().extensions().get::<HeaderMap>() {
+            return http_header_extension.clone();
+        };
+
+        HeaderMap::new()
     }
 }
 

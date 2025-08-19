@@ -4,12 +4,14 @@ use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{
     eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilderError, TxSigner,
+    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
+use alloy_rpc_types_eth::{
+    state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
+};
 use alloy_sol_types::SolCall;
 use std::{self, marker::PhantomData};
 
@@ -141,7 +143,7 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
 
     /// Builds and returns a RLP-encoded unsigned transaction from the call that can be signed.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::ProviderBuilder;
@@ -182,7 +184,7 @@ impl<P, D, N: Network> CallBuilder<P, D, N> {
     /// Build a RLP-encoded signed raw transaction for the call that can be sent to the network
     /// using [`Provider::send_raw_transaction`].
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```no_run
     /// # use alloy_provider::{ProviderBuilder, Provider};
@@ -468,6 +470,15 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         self
     }
 
+    /// Sets the `authorization_list` in the transaction to the provided value
+    pub fn authorization_list(mut self, authorization_list: Vec<SignedAuthorization>) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder7702,
+    {
+        self.request.set_authorization_list(authorization_list);
+        self
+    }
+
     /// Sets the `value` field in the transaction to the provided value
     pub fn value(mut self, value: U256) -> Self {
         self.request.set_value(value);
@@ -621,7 +632,7 @@ mod tests {
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{Provider, ProviderBuilder, WalletProvider};
-    use alloy_rpc_types_eth::AccessListItem;
+    use alloy_rpc_types_eth::{AccessListItem, Authorization};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_sol_types::sol;
     use futures::Future;
@@ -718,6 +729,22 @@ mod tests {
             call_builder.request.max_fee_per_blob_gas.expect("max_fee_per_blob_gas should be set"),
             50,
             "max_fee_per_blob_gas of request should be '50'"
+        );
+    }
+
+    #[test]
+    fn change_authorization_list() {
+        let authorization_list = vec![SignedAuthorization::new_unchecked(
+            Authorization { chain_id: U256::from(1337), address: Address::ZERO, nonce: 0 },
+            0,
+            U256::ZERO,
+            U256::ZERO,
+        )];
+        let call_builder = build_call_builder().authorization_list(authorization_list.clone());
+        assert_eq!(
+            call_builder.request.authorization_list.expect("authorization_list should be set"),
+            authorization_list,
+            "Authorization list of the transaction should have been set to our authorization list"
         );
     }
 

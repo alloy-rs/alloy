@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_primitives::Bloom;
 use alloy_rlp::BufMut;
 use core::fmt;
@@ -76,11 +77,26 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
         ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
     }
 
+    /// Consumes the type and converts it into [`ReceiptWithBloom`] with the given bloom filter.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn into_with_bloom_unchecked(self, logs_bloom: Bloom) -> ReceiptWithBloom<Self> {
+        ReceiptWithBloom { logs_bloom, receipt: self }
+    }
+
     /// Returns the cumulative gas used in the block after this transaction was executed.
     fn cumulative_gas_used(&self) -> u64;
 
     /// Returns the logs emitted by this transaction.
     fn logs(&self) -> &[Self::Log];
+
+    /// Consumes the type and returns the logs emitted by this transaction as a vector.
+    #[auto_impl(keep_default_for(&, Arc))]
+    fn into_logs(self) -> Vec<Self::Log>
+    where
+        Self::Log: Clone,
+    {
+        self.logs().to_vec()
+    }
 }
 
 /// Receipt type that knows how to encode itself with a [`Bloom`] value.
@@ -102,7 +118,7 @@ pub trait RlpDecodableReceipt: Sized {
 /// Receipt type that knows its EIP-2718 encoding.
 ///
 /// Main consumer of this trait is [`ReceiptWithBloom`]. It is expected that [`RlpEncodableReceipt`]
-/// implementation for this type produces network encoding whcih is used by [`alloy_rlp::Encodable`]
+/// implementation for this type produces network encoding which is used by [`alloy_rlp::Encodable`]
 /// implementation for [`ReceiptWithBloom`].
 #[auto_impl::auto_impl(&)]
 pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {

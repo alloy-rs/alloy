@@ -42,7 +42,7 @@ ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.24", optional = true }
+jsonrpsee-types = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -61,8 +61,7 @@ std = [
 	"alloy-serde?/std",
 	"alloy-primitives/std",
 	"alloy-rlp/std",
-	"serde?/std",
-	"serde_json/std"
+	"serde?/std"
 ]
 serde = [
 	"dep:serde",
@@ -85,7 +84,7 @@ alloy-primitives = { workspace = true, features = [
     "serde",
     "arbitrary",
 ] }
-
+alloy-consensus = { workspace = true, features = ["arbitrary"] }
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
 serde_json.workspace = true

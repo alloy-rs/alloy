@@ -1,6 +1,6 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_ok, Request, RequestPacket, ResponsePacket, RpcRecv,
-    RpcResult, RpcSend,
+    transform_response, try_deserialize_ok, Request, RequestMeta, RequestPacket, ResponsePacket,
+    RpcRecv, RpcResult, RpcSend,
 };
 use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
 use core::panic;
@@ -78,8 +78,11 @@ where
                     }
 
                     let request = request.take().expect("no request");
-                    debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
-                    trace!(params_ty=%std::any::type_name::<Params>(), ?request, "full request");
+                    if tracing::enabled!(tracing::Level::TRACE) {
+                        trace!(?request, "sending request");
+                    } else {
+                        debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+                    }
                     let request = request.serialize();
                     let fut = match request {
                         Ok(request) => {
@@ -276,6 +279,19 @@ where
             _pd: PhantomData,
         }
     }
+
+    /// Maps the metadata of the request using the provided function.
+    pub fn map_meta(self, f: impl FnOnce(RequestMeta) -> RequestMeta) -> Self {
+        let CallState::Prepared { request, connection } = self.state else {
+            panic!("Cannot get request after request has been sent");
+        };
+        let request = request.expect("no request in prepared").map_meta(f);
+        Self {
+            state: CallState::Prepared { request: Some(request), connection },
+            map: self.map,
+            _pd: PhantomData,
+        }
+    }
 }
 
 impl<Params, Resp, Output, Map> RpcCall<&Params, Resp, Output, Map>
@@ -326,11 +342,8 @@ where
     type Output = TransportResult<Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        trace!(?self.state, "polling RpcCall");
-
         let this = self.get_mut();
         let resp = try_deserialize_ok(ready!(this.state.poll_unpin(cx)));
-
         Ready(resp.map(this.map.take().expect("polled after completion")))
     }
 }
