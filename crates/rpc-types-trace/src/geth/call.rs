@@ -440,9 +440,7 @@ mod tests {
 
         let call_1 = call_iter.next().unwrap();
         if call_1.frame().is_delegate_call() {
-            println!("Here: {:?}", call_iter.stack.len());
             call_iter.skip_children();
-            println!("Here: {:?}", call_iter.stack.len());
         }
 
         let call_2 = call_iter.next();
