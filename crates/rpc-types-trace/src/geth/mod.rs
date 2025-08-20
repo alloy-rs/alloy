@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Ser
 use std::{collections::BTreeMap, time::Duration};
 // re-exports
 pub use self::{
-    call::{CallConfig, CallFrame, CallLogFrame, FlatCallConfig},
+    call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
     four_byte::FourByteFrame,
     noop::NoopFrame,
     pre_state::{
