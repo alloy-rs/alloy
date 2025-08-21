@@ -40,6 +40,10 @@ pub enum Error {
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
+#[derive(Debug, Error)]
+#[error("{0}")]
+struct MessageError(String);
+
 impl Error {
     /// Constructs a new [`Other`](Self::Other) error.
     #[cold]
@@ -50,7 +54,7 @@ impl Error {
     /// Constructs a new [`Other`](Self::Other) with an error message.
     #[cold]
     pub fn message(err: impl Display) -> Self {
-        Self::Other(err.to_string().into())
+        Self::Other(MessageError(err.to_string()).into())
     }
 
     /// Returns `true` if the error is [`UnsupportedOperation`](Self::UnsupportedOperation).
