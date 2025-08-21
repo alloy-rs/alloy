@@ -1,6 +1,6 @@
 //! Block heartbeat and pending transaction watcher.
 
-use crate::{Provider, RootProvider};
+use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};
@@ -14,10 +14,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
     future::Future,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::Duration,
 };
 use tokio::{
@@ -468,21 +465,21 @@ pub(crate) struct Heartbeat<N, S> {
     reap_at: BTreeMap<Instant, B256>,
 
     /// Whether the heartbeat is currently paused.
-    is_paused: Arc<AtomicBool>,
+    paused: Arc<Paused>,
 
     _network: std::marker::PhantomData<N>,
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Create a new heartbeat task.
-    pub(crate) fn new(stream: S, is_paused: Arc<AtomicBool>) -> Self {
+    pub(crate) fn new(stream: S, is_paused: Arc<Paused>) -> Self {
         Self {
             stream: stream.fuse(),
             past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
             reap_at: Default::default(),
-            is_paused,
+            paused: is_paused,
             _network: Default::default(),
         }
     }
@@ -547,10 +544,9 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Update the pause state based on whether we have pending transactions.
     fn update_pause_state(&mut self) {
         let should_pause = !self.has_pending_transactions();
-        let is_paused = self.is_paused.load(Ordering::Relaxed);
-        if is_paused != should_pause {
+        if self.paused.is_paused() != should_pause {
             debug!(paused = should_pause, "updating heartbeat pause state");
-            self.is_paused.store(should_pause, Ordering::Relaxed);
+            self.paused.set_paused(should_pause);
         }
     }
 

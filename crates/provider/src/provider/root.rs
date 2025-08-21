@@ -115,9 +115,9 @@ impl<N: Network> RootProvider<N> {
     pub(crate) fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
             let new_blocks = NewBlocks::<N>::new(self.inner.weak_client());
-            let is_paused = new_blocks.is_paused.clone();
+            let paused = new_blocks.paused.clone();
             let stream = new_blocks.into_stream();
-            Heartbeat::<N, _>::new(Box::pin(stream), is_paused).spawn()
+            Heartbeat::<N, _>::new(Box::pin(stream), paused).spawn()
         })
     }
 }
