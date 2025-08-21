@@ -60,7 +60,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
                 let domain_sep = data
                     .get(..32)
                     .ok_or_else(|| {
-                        alloy_signer::Error::other(
+                        alloy_signer::Error::message(
                             "eip712 encoded data did not have a domain separator",
                         )
                     })
@@ -69,7 +69,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
                 let hash = data[32..]
                     .get(..32)
                     .ok_or_else(|| {
-                        alloy_signer::Error::other("eip712 encoded data did not have hash struct")
+                        alloy_signer::Error::message("eip712 encoded data did not have hash struct")
                     })
                     .map(B256::from_slice)?;
 
