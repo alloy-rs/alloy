@@ -110,7 +110,7 @@ impl EthereumWallet {
     ) -> alloy_signer::Result<Signature> {
         self.signer_by_address(sender)
             .ok_or_else(|| {
-                alloy_signer::Error::other(format!("Missing signing credential for {sender}"))
+                alloy_signer::Error::message(format!("Missing signing credential for {sender}"))
             })?
             .sign_transaction(tx)
             .await
@@ -187,7 +187,7 @@ impl NetworkWallet<AnyNetwork> for EthereumWallet {
             AnyTypedTransaction::Ethereum(t) => Ok(AnyTxEnvelope::Ethereum(
                 NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?,
             )),
-            _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
+            _ => Err(alloy_signer::Error::message("cannot sign UnknownTypedTransaction")),
         }
     }
 }
