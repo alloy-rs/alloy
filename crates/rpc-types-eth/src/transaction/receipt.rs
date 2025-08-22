@@ -242,6 +242,11 @@ impl<T: TxReceipt<Log: AsRef<alloy_primitives::Log>>> TransactionReceipt<T> {
     pub fn decode_nth_log<E: SolEvent>(&self, idx: usize) -> Option<alloy_primitives::Log<E>> {
         self.logs().get(idx).and_then(|log| E::decode_log(log.as_ref()).ok())
     }
+
+    /// Decode the last log in the receipt.
+    pub fn decode_last_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().last().and_then(|log| E::decode_log(log.as_ref()).ok())
+    }
 }
 
 impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
