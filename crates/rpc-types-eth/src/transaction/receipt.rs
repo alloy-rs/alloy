@@ -232,6 +232,16 @@ impl<T: TxReceipt<Log: AsRef<alloy_primitives::Log>>> TransactionReceipt<T> {
     pub fn decoded_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
         self.logs().iter().find_map(|log| E::decode_log(log.as_ref()).ok())
     }
+    /// Attempts to decode the first log in the receipt to the provided log type.
+    /// Returns `None` if there are no logs or if decoding fails.
+    pub fn decode_first_log<E: SolEvent>(&self) -> Option<alloy_primitives::Log<E>> {
+        self.logs().first().and_then(|log| E::decode_log(log.as_ref()).ok())
+    }
+
+    /// Decode the log at the given index as the given SolEvent type.
+    pub fn decode_nth_log<E: SolEvent>(&self, idx: usize) -> Option<alloy_primitives::Log<E>> {
+        self.logs().get(idx).and_then(|log| E::decode_log(log.as_ref()).ok())
+    }
 }
 
 impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
