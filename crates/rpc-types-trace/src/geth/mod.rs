@@ -135,7 +135,7 @@ pub enum GethTrace {
 }
 
 impl GethTrace {
-    /// Returns true if this is a default structlog trace
+    /// Returns true if this is a default structlog frame.
     pub const fn is_default(&self) -> bool {
         matches!(self, Self::Default(_))
     }
