@@ -724,13 +724,13 @@ mod test {
     {
       "failed": false,
       "gas": 21000,
-      "returnValue": "",
+      "returnValue": "0x",
       "structLogs": []
     },
     {
       "failed": false,
       "gas": 21000,
-      "returnValue": "",
+      "returnValue": "0x",
       "structLogs": []
     }
   ]
