@@ -3,6 +3,7 @@
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256, U64};
+use alloy_rpc_types_eth::BlockNumHash;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -379,6 +380,26 @@ pub struct RewardAction {
     pub reward_type: RewardType,
     /// Reward amount.
     pub value: U256,
+}
+
+impl RewardAction {
+    /// Helper to construct a [`LocalizedTransactionTrace`] that describes a reward to the block
+    /// beneficiary.
+    pub fn into_localized_trace(self, block: BlockNumHash) -> LocalizedTransactionTrace {
+        LocalizedTransactionTrace {
+            block_hash: Some(block.hash),
+            block_number: Some(block.number),
+            transaction_hash: None,
+            transaction_position: None,
+            trace: TransactionTrace {
+                trace_address: vec![],
+                subtraces: 0,
+                action: Action::Reward(self),
+                error: None,
+                result: None,
+            },
+        }
+    }
 }
 
 /// Represents a _selfdestruct_ action fka `suicide`.
