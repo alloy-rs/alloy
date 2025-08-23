@@ -223,11 +223,15 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> Result<N::ReceiptResponse, PendingTransactionError> {
         let hash = self.config.tx_hash;
+        let required_confirmation = self.config.required_confirmations();
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
 
         // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
         // block the tx was mined in
         let mut interval = interval(self.provider.client().poll_interval());
+
+        // the receipt we fetched
+        let mut receipt = None;
 
         loop {
             let mut confirmed = false;
@@ -241,9 +245,15 @@ impl<N: Network> PendingTransactionBuilder<N> {
             }
 
             // try to fetch the receipt
-            let receipt = self.provider.get_transaction_receipt(hash).await?;
+            if receipt.is_none() {
+                receipt = self.provider.get_transaction_receipt(hash).await?;
+            }
+
             if let Some(receipt) = receipt {
-                return Ok(receipt);
+                if confirmed || required_confirmation <= 1 {
+                    return Ok(receipt);
+                }
+
             }
 
             if confirmed {
