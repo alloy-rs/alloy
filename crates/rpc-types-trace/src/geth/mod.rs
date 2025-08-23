@@ -135,38 +135,38 @@ pub enum GethTrace {
 }
 
 impl GethTrace {
-    /// Returns true if this is a default trace
+    /// Returns true if this is a default structlog trace
     pub const fn is_default(&self) -> bool {
         matches!(self, Self::Default(_))
     }
 
-    /// Returns true if this is a call trace
-    pub const fn is_call_tracer(&self) -> bool {
+    /// Returns true if this is a call frame.
+    pub const fn is_call(&self) -> bool {
         matches!(self, Self::CallTracer(_))
     }
 
-    /// Returns true if this is a flat call trace
-    pub const fn is_flat_call_tracer(&self) -> bool {
+    /// Returns true if this is a flat call frame.
+    pub const fn is_flat_call(&self) -> bool {
         matches!(self, Self::FlatCallTracer(_))
     }
 
-    /// Returns true if this is a four byte trace
-    pub const fn is_four_byte_tracer(&self) -> bool {
+    /// Returns true if this is a four byte frame.
+    pub const fn is_four_byte(&self) -> bool {
         matches!(self, Self::FourByteTracer(_))
     }
 
-    /// Returns true if this is a pre-state trace
-    pub const fn is_pre_state_tracer(&self) -> bool {
+    /// Returns true if this is a pre-state frame.
+    pub const fn is_pre_state(&self) -> bool {
         matches!(self, Self::PreStateTracer(_))
     }
 
-    /// Returns true if this is a noop trace
-    pub const fn is_noop_tracer(&self) -> bool {
+    /// Returns true if this is a noop frame.
+    pub const fn is_noop(&self) -> bool {
         matches!(self, Self::NoopTracer(_))
     }
 
-    /// Returns true if this is a mux trace
-    pub const fn is_mux_tracer(&self) -> bool {
+    /// Returns true if this is a mux trace.
+    pub const fn is_mux(&self) -> bool {
         matches!(self, Self::MuxTracer(_))
     }
 
@@ -988,6 +988,6 @@ mod tests {
     ]"#;
 
         let traces = serde_json::from_str::<Vec<Vec<GethTrace>>>(s).unwrap();
-        assert!(traces[0][0].is_pre_state_tracer());
+        assert!(traces[0][0].is_pre_state());
     }
 }
