@@ -10,14 +10,14 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
-pub struct NonceChanges {
+pub struct NonceChange {
     /// The index of bal that stores this nonce change.
     pub block_access_index: BlockAccessIndex,
     /// The new code of the account.
     pub new_nonce: u64,
 }
 
-impl NonceChanges {
+impl NonceChange {
     /// Creates a new `NonceChange`.
     pub const fn new(block_access_index: BlockAccessIndex, new_nonce: u64) -> Self {
         Self { block_access_index, new_nonce }

@@ -8,8 +8,8 @@ use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    balance_change::BalanceChanges, code_change::CodeChanges, nonce_change::NonceChanges,
-    SlotChanges, MAX_SLOTS, MAX_TXS,
+    balance_change::BalanceChange, code_change::CodeChange, nonce_change::NonceChange, SlotChanges,
+    MAX_SLOTS, MAX_TXS,
 };
 
 /// This struct is used to track the changes across accounts in a block.
@@ -24,11 +24,11 @@ pub struct AccountChanges {
     /// List of storage reads for this account.
     pub storage_reads: Vec<StorageKey>,
     /// List of balance changes for this account.
-    pub balance_changes: Vec<BalanceChanges>,
+    pub balance_changes: Vec<BalanceChange>,
     /// List of nonce changes for this account.
-    pub nonce_changes: Vec<NonceChanges>,
+    pub nonce_changes: Vec<NonceChange>,
     /// List of code changes for this account.
-    pub code_changes: Vec<CodeChanges>,
+    pub code_changes: Vec<CodeChange>,
 }
 
 impl AccountChanges {
@@ -65,19 +65,19 @@ impl AccountChanges {
 
     /// Returns the balance changes for this account.
     #[inline]
-    pub fn balance_changes(&self) -> &[BalanceChanges] {
+    pub fn balance_changes(&self) -> &[BalanceChange] {
         &self.balance_changes
     }
 
     /// Returns the nonce changes for this account.
     #[inline]
-    pub fn nonce_changes(&self) -> &[NonceChanges] {
+    pub fn nonce_changes(&self) -> &[NonceChange] {
         &self.nonce_changes
     }
 
     /// Returns the code changes for this account.
     #[inline]
-    pub fn code_changes(&self) -> &[CodeChanges] {
+    pub fn code_changes(&self) -> &[CodeChange] {
         &self.code_changes
     }
 
@@ -100,19 +100,19 @@ impl AccountChanges {
     }
 
     /// Add a balance change.
-    pub fn with_balance_change(mut self, change: BalanceChanges) -> Self {
+    pub fn with_balance_change(mut self, change: BalanceChange) -> Self {
         self.balance_changes.push(change);
         self
     }
 
     /// Add a nonce change.
-    pub fn with_nonce_change(mut self, change: NonceChanges) -> Self {
+    pub fn with_nonce_change(mut self, change: NonceChange) -> Self {
         self.nonce_changes.push(change);
         self
     }
 
     /// Add a code change.
-    pub fn with_code_change(mut self, change: CodeChanges) -> Self {
+    pub fn with_code_change(mut self, change: CodeChange) -> Self {
         self.code_changes.push(change);
         self
     }

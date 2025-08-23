@@ -10,13 +10,13 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
-pub struct CodeChanges {
+pub struct CodeChange {
     /// The index of bal that stores this code change.
     pub block_access_index: BlockAccessIndex,
     /// The new code of the account.
     pub new_code: Bytes,
 }
-impl CodeChanges {
+impl CodeChange {
     /// Creates a new `CodeChange`.
     pub fn new(block_access_index: BlockAccessIndex, new_code: Bytes) -> Self {
         Self { block_access_index, new_code }
