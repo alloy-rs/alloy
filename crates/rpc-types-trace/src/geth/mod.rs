@@ -903,4 +903,28 @@ mod tests {
       }"#;
         let _tracer = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
     }
+
+    #[test]
+    fn serde_debug_tracing_call_options() {
+        let opts =  GethDebugTracingCallOptions {
+            tracing_options: GethDebugTracingOptions {
+                config: GethDefaultTracingOptions {
+                    enable_return_data: Some(true),
+                    ..Default::default()
+                },
+                tracer: Some(GethDebugTracerType::BuiltInTracer(
+                    GethDebugBuiltInTracerType::PreStateTracer,
+                )),
+                tracer_config: GethDebugTracerConfig::default(),
+                timeout: None,
+            },
+            state_overrides: None,
+            block_overrides: None,
+        };
+
+        let s = serde_json::to_string(&opts).unwrap();
+        assert_eq!(s, r#"{"enableReturnData":true,"tracer":"prestateTracer"}"#);
+        let from_json = serde_json::from_str::<GethDebugTracingCallOptions>(&s).unwrap();
+        assert_eq!(opts, from_json);
+    }
 }
