@@ -385,7 +385,7 @@ pub struct RewardAction {
 impl RewardAction {
     /// Helper to construct a [`LocalizedTransactionTrace`] that describes a reward to the block
     /// beneficiary.
-    pub fn into_localized_trace(self, block: BlockNumHash) -> LocalizedTransactionTrace {
+    pub const fn into_localized_trace(self, block: BlockNumHash) -> LocalizedTransactionTrace {
         LocalizedTransactionTrace {
             block_hash: Some(block.hash),
             block_number: Some(block.number),
