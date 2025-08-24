@@ -629,6 +629,9 @@ pub trait BlockHeader {
     /// Retrieves the requests hash of the block, if available
     fn requests_hash(&self) -> Option<B256>;
 
+    /// Retrieves the block access list hash of the block, if available
+    fn block_access_list_hash(&self) -> Option<B256>;
+
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
 
@@ -811,6 +814,10 @@ impl BlockHeader for Header {
         self.requests_hash
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.block_access_list_hash
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
@@ -896,6 +903,10 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
 
     fn requests_hash(&self) -> Option<B256> {
         self.inner.requests_hash()
+    }
+
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.inner.block_access_list_hash()
     }
 
     fn extra_data(&self) -> &Bytes {

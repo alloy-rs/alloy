@@ -313,6 +313,10 @@ impl BlockHeader for AnyHeader {
         self.requests_hash
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.block_access_list_hash
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }

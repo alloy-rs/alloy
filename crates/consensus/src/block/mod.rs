@@ -268,6 +268,11 @@ impl<T, H> BlockBody<T, H> {
             block_access_list: self.block_access_list,
         })
     }
+
+    /// Returns the block access list for the block, if available.
+    pub fn block_access_list(&self) -> &Option<BlockAccessList> {
+        &self.block_access_list
+    }
 }
 
 impl<T: Transaction, H> BlockBody<T, H> {
