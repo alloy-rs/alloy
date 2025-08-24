@@ -1,7 +1,7 @@
 //! Contains the `SlotChanges` struct, which represents all changes made to a single storage slot
 //! across
 
-use crate::{StorageChange, MAX_TXS};
+use crate::StorageChange;
 use alloc::vec::Vec;
 use alloy_primitives::StorageKey;
 use alloy_rlp::{RlpDecodable, RlpEncodable};
@@ -23,8 +23,8 @@ impl SlotChanges {
     ///
     /// Preallocates capacity for up to 300,000 changes.
     #[inline]
-    pub fn new(slot: StorageKey) -> Self {
-        Self { slot, changes: Vec::with_capacity(MAX_TXS) }
+    pub fn new(slot: StorageKey, changes: Vec<StorageChange>) -> Self {
+        Self { slot, changes }
     }
 
     /// Appends a storage change to the list.
@@ -43,5 +43,19 @@ impl SlotChanges {
     #[inline]
     pub fn len(&self) -> usize {
         self.changes.len()
+    }
+
+    /// Creates a new `SlotChanges` for the given slot with a single change.
+    #[inline]
+    pub fn with_slot(mut self, slot: StorageKey) -> Self {
+        self.slot = slot;
+        self
+    }
+
+    /// Builder-style: add a change and return self.
+    #[inline]
+    pub fn with_change(mut self, change: StorageChange) -> Self {
+        self.changes.push(change);
+        self
     }
 }

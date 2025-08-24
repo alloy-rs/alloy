@@ -11,14 +11,14 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
-pub struct BalanceChanges {
+pub struct BalanceChange {
     /// The index of bal that stores balance change.
     pub block_access_index: BlockAccessIndex,
     /// The post-transaction balance of the account.
     pub post_balance: U256,
 }
 
-impl BalanceChanges {
+impl BalanceChange {
     /// Creates a new `BalanceChange`.
     pub const fn new(block_access_index: BlockAccessIndex, post_balance: U256) -> Self {
         Self { block_access_index, post_balance }

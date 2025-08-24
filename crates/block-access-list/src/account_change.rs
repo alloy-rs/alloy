@@ -8,8 +8,8 @@ use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    balance_change::BalanceChanges, code_change::CodeChanges, nonce_change::NonceChanges,
-    SlotChanges, MAX_SLOTS, MAX_TXS,
+    balance_change::BalanceChange, code_change::CodeChange, nonce_change::NonceChange, SlotChanges,
+    MAX_SLOTS, MAX_TXS,
 };
 
 /// This struct is used to track the changes across accounts in a block.
@@ -24,11 +24,11 @@ pub struct AccountChanges {
     /// List of storage reads for this account.
     pub storage_reads: Vec<StorageKey>,
     /// List of balance changes for this account.
-    pub balance_changes: Vec<BalanceChanges>,
+    pub balance_changes: Vec<BalanceChange>,
     /// List of nonce changes for this account.
-    pub nonce_changes: Vec<NonceChanges>,
+    pub nonce_changes: Vec<NonceChange>,
     /// List of code changes for this account.
-    pub code_changes: Vec<CodeChanges>,
+    pub code_changes: Vec<CodeChange>,
 }
 
 impl AccountChanges {
@@ -65,19 +65,73 @@ impl AccountChanges {
 
     /// Returns the balance changes for this account.
     #[inline]
-    pub fn balance_changes(&self) -> &[BalanceChanges] {
+    pub fn balance_changes(&self) -> &[BalanceChange] {
         &self.balance_changes
     }
 
     /// Returns the nonce changes for this account.
     #[inline]
-    pub fn nonce_changes(&self) -> &[NonceChanges] {
+    pub fn nonce_changes(&self) -> &[NonceChange] {
         &self.nonce_changes
     }
 
     /// Returns the code changes for this account.
     #[inline]
-    pub fn code_changes(&self) -> &[CodeChanges] {
+    pub fn code_changes(&self) -> &[CodeChange] {
         &self.code_changes
+    }
+
+    /// Set the address.
+    pub fn with_address(mut self, address: Address) -> Self {
+        self.address = address;
+        self
+    }
+
+    /// Add a storage read slot.
+    pub fn with_storage_read(mut self, key: StorageKey) -> Self {
+        self.storage_reads.push(key);
+        self
+    }
+
+    /// Add a storage change (multiple writes to a slot grouped in `SlotChanges`).
+    pub fn with_storage_change(mut self, change: SlotChanges) -> Self {
+        self.storage_changes.push(change);
+        self
+    }
+
+    /// Add a balance change.
+    pub fn with_balance_change(mut self, change: BalanceChange) -> Self {
+        self.balance_changes.push(change);
+        self
+    }
+
+    /// Add a nonce change.
+    pub fn with_nonce_change(mut self, change: NonceChange) -> Self {
+        self.nonce_changes.push(change);
+        self
+    }
+
+    /// Add a code change.
+    pub fn with_code_change(mut self, change: CodeChange) -> Self {
+        self.code_changes.push(change);
+        self
+    }
+
+    /// Add multiple storage reads at once.
+    pub fn extend_storage_reads<I>(mut self, iter: I) -> Self
+    where
+        I: IntoIterator<Item = StorageKey>,
+    {
+        self.storage_reads.extend(iter);
+        self
+    }
+
+    /// Add multiple slot changes at once.
+    pub fn extend_storage_changes<I>(mut self, iter: I) -> Self
+    where
+        I: IntoIterator<Item = SlotChanges>,
+    {
+        self.storage_changes.extend(iter);
+        self
     }
 }
