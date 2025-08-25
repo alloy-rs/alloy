@@ -3,5 +3,5 @@
 use crate::account_change::AccountChanges;
 use alloc::vec::Vec;
 
-///
+/// Vector of account changes.
 pub type BlockAccessList = Vec<AccountChanges>;

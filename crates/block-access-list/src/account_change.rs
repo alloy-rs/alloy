@@ -17,7 +17,7 @@ use crate::{
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
 pub struct AccountChanges {
-    /// The address of the account whoose changes are stored.
+    /// The address of the account whose changes are stored.
     pub address: Address,
     /// List of slot changes for this account.
     pub storage_changes: Vec<SlotChanges>,
