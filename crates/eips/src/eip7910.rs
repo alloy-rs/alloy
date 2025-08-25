@@ -145,35 +145,29 @@ impl str::FromStr for SystemContract {
 
 impl SystemContract {
     /// Enumeration of all [`SystemContract`] variants.
-    pub const ALL: [SystemContract; 5] = [
-        SystemContract::BeaconRoots,
-        SystemContract::ConsolidationRequestPredeploy,
-        SystemContract::DepositContract,
-        SystemContract::HistoryStorage,
-        SystemContract::WithdrawalRequestPredeploy,
+    pub const ALL: [Self; 5] = [
+        Self::BeaconRoots,
+        Self::ConsolidationRequestPredeploy,
+        Self::DepositContract,
+        Self::HistoryStorage,
+        Self::WithdrawalRequestPredeploy,
     ];
 
     /// Returns Cancun system contracts.
-    pub fn cancun() -> [(SystemContract, Address); 1] {
-        [(SystemContract::BeaconRoots, eip4788::BEACON_ROOTS_ADDRESS)]
+    pub const fn cancun() -> [(Self, Address); 1] {
+        [(Self::BeaconRoots, eip4788::BEACON_ROOTS_ADDRESS)]
     }
 
     /// Returns Prague system contracts.
     /// Takes an optional deposit contract address. If it's `None`, mainnet deposit contract address
     /// will be used instead.
-    pub fn prague(deposit_contract: Option<Address>) -> [(SystemContract, Address); 4] {
+    pub fn prague(deposit_contract: Option<Address>) -> [(Self, Address); 4] {
         [
-            (SystemContract::HistoryStorage, eip2935::HISTORY_STORAGE_ADDRESS),
+            (Self::HistoryStorage, eip2935::HISTORY_STORAGE_ADDRESS),
+            (Self::ConsolidationRequestPredeploy, eip7251::CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS),
+            (Self::WithdrawalRequestPredeploy, eip7002::WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS),
             (
-                SystemContract::ConsolidationRequestPredeploy,
-                eip7251::CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS,
-            ),
-            (
-                SystemContract::WithdrawalRequestPredeploy,
-                eip7002::WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS,
-            ),
-            (
-                SystemContract::DepositContract,
+                Self::DepositContract,
                 deposit_contract.unwrap_or(eip6110::MAINNET_DEPOSIT_CONTRACT_ADDRESS),
             ),
         ]
