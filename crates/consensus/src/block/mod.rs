@@ -7,6 +7,9 @@ pub use header::{BlockHeader, Header};
 mod traits;
 pub use traits::EthBlock;
 
+mod meta;
+pub use meta::HeaderInfo;
+
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
@@ -141,20 +144,43 @@ impl<T, H> Block<T, H> {
         self
     }
 
+    /// Encodes the [`Block`] given header and block body.
+    ///
+    /// Returns the rlp encoded block.
+    ///
+    /// This is equivalent to `block.encode`.
+    pub fn rlp_encoded_from_parts(header: &H, body: &BlockBody<T, H>) -> Vec<u8>
+    where
+        H: Encodable,
+        T: Encodable,
+    {
+        let helper = block_rlp::HelperRef::from_parts(header, body);
+        let mut buf = Vec::with_capacity(helper.length());
+        helper.encode(&mut buf);
+        buf
+    }
+
+    /// Encodes the [`Block`] given header and block body
+    ///
+    /// This is equivalent to `block.encode`.
+    pub fn rlp_encode_from_parts(
+        header: &H,
+        body: &BlockBody<T, H>,
+        out: &mut dyn alloy_rlp::bytes::BufMut,
+    ) where
+        H: Encodable,
+        T: Encodable,
+    {
+        block_rlp::HelperRef::from_parts(header, body).encode(out)
+    }
+
     /// Returns the RLP encoded length of the block's header and body.
     pub fn rlp_length_for(header: &H, body: &BlockBody<T, H>) -> usize
     where
         H: Encodable,
         T: Encodable,
     {
-        block_rlp::HelperRef {
-            header,
-            transactions: &body.transactions,
-            ommers: &body.ommers,
-            withdrawals: body.withdrawals.as_ref(),
-            block_access_list: body.block_access_list.as_ref(),
-        }
-        .length()
+        block_rlp::HelperRef::from_parts(header, body).length()
     }
 }
 
@@ -326,6 +352,18 @@ mod block_rlp {
         pub(crate) ommers: &'a Vec<H>,
         pub(crate) withdrawals: Option<&'a Withdrawals>,
         pub(crate) block_access_list: Option<&'a BlockAccessList>,
+    }
+
+    impl<'a, T, H> HelperRef<'a, T, H> {
+        pub(crate) const fn from_parts(header: &'a H, body: &'a BlockBody<T, H>) -> Self {
+            Self {
+                header,
+                transactions: &body.transactions,
+                ommers: &body.ommers,
+                withdrawals: body.withdrawals.as_ref(),
+                block_access_list: body.block_access_list.as_ref(),
+            }
+        }
     }
 
     impl<'a, T, H> From<&'a Block<T, H>> for HelperRef<'a, T, H> {

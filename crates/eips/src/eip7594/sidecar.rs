@@ -132,6 +132,15 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
+    /// Returns the [`Self::rlp_encode_fields`] RLP bytes.
+    #[inline]
+    #[doc(hidden)]
+    pub fn rlp_encoded_fields(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.rlp_encoded_fields_length());
+        self.rlp_encode_fields(&mut buf);
+        buf
+    }
+
     /// Encodes the inner [BlobTransactionSidecarVariant] fields as RLP bytes, __without__ a RLP
     /// header.
     #[inline]

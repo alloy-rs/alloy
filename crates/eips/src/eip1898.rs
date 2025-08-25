@@ -1777,6 +1777,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_lenient_block_number_or_tag_wrapper() {
         // Test the LenientBlockNumberOrTag wrapper directly
         let block_number: LenientBlockNumberOrTag = serde_json::from_str("\"latest\"").unwrap();

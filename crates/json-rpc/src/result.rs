@@ -59,10 +59,11 @@ where
     ErrResp: RpcRecv,
 {
     let json = result?;
+    let _guard = debug_span!("deserialize_response", ty=%std::any::type_name::<T>()).entered();
     let json = json.borrow().get();
-    trace!(ty=%std::any::type_name::<T>(), %json, "deserializing response");
+    trace!(%json, "deserializing");
     serde_json::from_str(json)
-        .inspect(|response| trace!(?response, "deserialized response"))
-        .inspect_err(|err| trace!(?err, "failed to deserialize response"))
+        .inspect(|response| trace!(?response, "deserialized"))
+        .inspect_err(|err| trace!(?err, "failed to deserialize"))
         .map_err(|err| RpcError::deser_err(err, json))
 }
