@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{borrow::ToOwned, collections::BTreeMap, string::String};
 use alloy_eips::{eip2124::ForkHash, eip7840::BlobParams};
 use alloy_primitives::{Address, U64};
 use core::{fmt, str};
