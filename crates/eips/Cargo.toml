@@ -85,6 +85,8 @@ std = [
 	"derive_more/std",
 	"sha2?/std",
 	"either/std",
+	"serde_with?/std",
+	"thiserror/std"
 ]
 serde = [
 	"dep:alloy-serde",
