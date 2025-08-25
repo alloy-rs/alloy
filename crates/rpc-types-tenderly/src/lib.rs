@@ -367,7 +367,7 @@ pub struct StorageSlotChange {
     pub new_value: FixedBytes<32>,
 }
 
-/// Describes the change of a value due to a trasnaction.
+/// Describes the change of a value due to a transaction.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ValueChange {
