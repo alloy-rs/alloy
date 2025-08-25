@@ -20,7 +20,7 @@ pub use alloy_trie::TrieAccount;
 pub use alloy_trie::TrieAccount as Account;
 
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header};
+pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
@@ -88,6 +88,7 @@ pub mod private {
     pub use alloy_eips;
     pub use alloy_primitives;
     pub use alloy_rlp;
+    pub use alloy_trie;
     #[cfg(feature = "arbitrary")]
     pub use arbitrary;
     #[cfg(feature = "serde")]

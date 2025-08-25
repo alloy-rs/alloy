@@ -110,21 +110,6 @@ struct BeaconPayloadAttributes {
     parent_beacon_block_root: Option<B256>,
 }
 
-/// Optimism Payload Attributes
-#[serde_as]
-#[derive(Serialize, Deserialize)]
-struct BeaconOptimismPayloadAttributes {
-    #[serde(flatten)]
-    payload_attributes: BeaconPayloadAttributes,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    transactions: Option<Vec<Bytes>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    no_tx_pool: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    gas_limit: Option<u64>,
-}
-
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
 ///
 /// The beacon API encoded object has equivalent fields to the
