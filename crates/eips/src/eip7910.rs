@@ -1,9 +1,9 @@
 //! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
 
 use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
+use alloc::{borrow::ToOwned, collections::BTreeMap, string::String};
 use alloy_primitives::{Address, Bytes, U64};
 use core::{fmt, str};
-use std::collections::BTreeMap;
 
 /// Response type for `eth_config`
 #[derive(Clone, Debug, PartialEq)]
@@ -86,7 +86,7 @@ pub struct EthBaseForkConfig {
     /// This is a JSON object with three members — `baseFeeUpdateFraction`, `max`, and `target` —
     /// all represented as JSON numbers.
     pub blob_schedule: BlobParams,
-    ///     The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
+    /// The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
     /// hexadecimal number, with all leading zeros removed. This specification does not support
     /// chains without a chain ID or with a chain ID of zero.
     ///
