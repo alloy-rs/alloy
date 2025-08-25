@@ -54,6 +54,7 @@ alloy-rpc-types-debug = { version = "1.0.25", path = "crates/rpc-types-debug", d
 alloy-rpc-types-engine = { version = "1.0.25", path = "crates/rpc-types-engine", default-features = false }
 alloy-rpc-types-eth = { version = "1.0.25", path = "crates/rpc-types-eth", default-features = false }
 alloy-rpc-types-mev = { version = "1.0.25", path = "crates/rpc-types-mev", default-features = false }
+alloy-rpc-types-tenderly = { version = "1.0.25", path = "crates/rpc-types-tenderly", default-features = false }
 alloy-rpc-types-trace = { version = "1.0.25", path = "crates/rpc-types-trace", default-features = false }
 alloy-rpc-types-txpool = { version = "1.0.25", path = "crates/rpc-types-txpool", default-features = false }
 alloy-rpc-types = { version = "1.0.25", path = "crates/rpc-types", default-features = false }
