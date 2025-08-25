@@ -1,9 +1,9 @@
 //! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
 
 use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
+use alloc::{borrow::ToOwned, collections::BTreeMap, string::String};
 use alloy_primitives::{Address, Bytes, U64};
 use core::{fmt, str};
-use std::collections::BTreeMap;
 
 /// Response type for `eth_config`
 #[derive(Clone, Debug, PartialEq)]
@@ -86,7 +86,7 @@ pub struct EthBaseForkConfig {
     /// This is a JSON object with three members — `baseFeeUpdateFraction`, `max`, and `target` —
     /// all represented as JSON numbers.
     pub blob_schedule: BlobParams,
-    ///     The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
+    /// The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
     /// hexadecimal number, with all leading zeros removed. This specification does not support
     /// chains without a chain ID or with a chain ID of zero.
     ///
@@ -145,35 +145,29 @@ impl str::FromStr for SystemContract {
 
 impl SystemContract {
     /// Enumeration of all [`SystemContract`] variants.
-    pub const ALL: [SystemContract; 5] = [
-        SystemContract::BeaconRoots,
-        SystemContract::ConsolidationRequestPredeploy,
-        SystemContract::DepositContract,
-        SystemContract::HistoryStorage,
-        SystemContract::WithdrawalRequestPredeploy,
+    pub const ALL: [Self; 5] = [
+        Self::BeaconRoots,
+        Self::ConsolidationRequestPredeploy,
+        Self::DepositContract,
+        Self::HistoryStorage,
+        Self::WithdrawalRequestPredeploy,
     ];
 
     /// Returns Cancun system contracts.
-    pub fn cancun() -> [(SystemContract, Address); 1] {
-        [(SystemContract::BeaconRoots, eip4788::BEACON_ROOTS_ADDRESS)]
+    pub const fn cancun() -> [(Self, Address); 1] {
+        [(Self::BeaconRoots, eip4788::BEACON_ROOTS_ADDRESS)]
     }
 
     /// Returns Prague system contracts.
     /// Takes an optional deposit contract address. If it's `None`, mainnet deposit contract address
     /// will be used instead.
-    pub fn prague(deposit_contract: Option<Address>) -> [(SystemContract, Address); 4] {
+    pub fn prague(deposit_contract: Option<Address>) -> [(Self, Address); 4] {
         [
-            (SystemContract::HistoryStorage, eip2935::HISTORY_STORAGE_ADDRESS),
+            (Self::HistoryStorage, eip2935::HISTORY_STORAGE_ADDRESS),
+            (Self::ConsolidationRequestPredeploy, eip7251::CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS),
+            (Self::WithdrawalRequestPredeploy, eip7002::WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS),
             (
-                SystemContract::ConsolidationRequestPredeploy,
-                eip7251::CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS,
-            ),
-            (
-                SystemContract::WithdrawalRequestPredeploy,
-                eip7002::WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS,
-            ),
-            (
-                SystemContract::DepositContract,
+                Self::DepositContract,
                 deposit_contract.unwrap_or(eip6110::MAINNET_DEPOSIT_CONTRACT_ADDRESS),
             ),
         ]

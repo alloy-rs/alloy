@@ -36,7 +36,6 @@ thiserror.workspace = true
 # serde
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 
 # kzg
@@ -69,6 +68,7 @@ alloy-primitives = { workspace = true, features = [
 	"arbitrary",
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 rand.workspace = true
 
 [features]
@@ -83,14 +83,14 @@ std = [
 	"alloy-eip2930/std",
 	"alloy-eip7702/std",
 	"derive_more/std",
-	"serde_json/std",
 	"sha2?/std",
 	"either/std",
+	"serde_with?/std",
+	"thiserror/std"
 ]
 serde = [
 	"dep:alloy-serde",
 	"dep:serde",
-	"dep:serde_json",
 	"dep:serde_with",
 	"alloy-primitives/serde",
 	"c-kzg?/serde",
