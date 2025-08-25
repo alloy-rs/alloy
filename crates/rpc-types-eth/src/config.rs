@@ -1,7 +1,7 @@
+use alloc::{collections::BTreeMap, string::String};
 use alloy_eips::{eip2124::ForkHash, eip7840::BlobParams};
 use alloy_primitives::{Address, U64};
 use core::{fmt, str};
-use std::collections::BTreeMap;
 
 /// Response type for `eth_config`
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +46,7 @@ pub struct EthForkConfig {
     /// This is a JSON object with three members — `baseFeeUpdateFraction`, `max`, and `target` —
     /// all represented as JSON numbers.
     pub blob_schedule: BlobParams,
-    ///     The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
+    /// The chain ID of the current network, presented as a string with an unsigned 0x-prefixed
     /// hexadecimal number, with all leading zeros removed. This specification does not support
     /// chains without a chain ID or with a chain ID of zero.
     ///
