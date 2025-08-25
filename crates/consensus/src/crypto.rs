@@ -248,7 +248,7 @@ pub mod secp256k1 {
     }
 }
 
-#[cfg(any(test, feature = "secp256k1"))]
+#[cfg(feature = "secp256k1")]
 mod impl_secp256k1 {
     pub(crate) use ::secp256k1::Error;
     use ::secp256k1::{

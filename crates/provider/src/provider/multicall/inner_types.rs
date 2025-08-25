@@ -27,6 +27,9 @@ pub trait MulticallItem {
     /// Decoder for the return data of the call.
     type Decoder: SolCall;
 
+    /// Returns the value to send with the call.
+    fn value(&self) -> U256;
+
     /// The target address of the call.
     fn target(&self) -> Address;
     /// ABI-encoded input data for the call.
@@ -87,6 +90,11 @@ impl<D: SolCall> CallItem<D> {
         self
     }
 
+    /// Convenience function for `allow_failure(true)`
+    pub const fn with_failure_allowed(self) -> Self {
+        self.allow_failure(true)
+    }
+
     /// Set the value to send with the call.
     pub const fn value(mut self, value: U256) -> Self {
         self.value = value;
@@ -137,7 +145,7 @@ where
     /// Call [`allow_failure`][CallItem::allow_failure] on the result to specify the failure
     /// behavior, or use [`into_call`][MulticallItem::into_call] instead.
     fn from(value: T) -> Self {
-        Self::new(value.target(), value.input())
+        Self::new(value.target(), value.input()).value(value.value())
     }
 }
 

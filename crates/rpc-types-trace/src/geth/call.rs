@@ -1,7 +1,7 @@
 //! Geth call tracer types.
 
-use crate::parity::LocalizedTransactionTrace;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use crate::parity::{ActionType, CallType, CreationMethod, LocalizedTransactionTrace};
+use alloy_primitives::{Address, Bytes, Selector, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`.
@@ -45,6 +45,41 @@ pub struct CallFrame {
     pub typ: String,
 }
 
+impl CallFrame {
+    /// Error selector is the first 4 bytes of calldata
+    pub fn selector(&self) -> Option<Selector> {
+        if self.input.len() < 4 {
+            return None;
+        }
+        Some(Selector::from_slice(&self.input[..4]))
+    }
+
+    /// Returns true if this call reverted.
+    pub const fn is_revert(&self) -> bool {
+        self.revert_reason.is_some()
+    }
+
+    /// Returns true if this is a regular call
+    pub fn is_call(&self) -> bool {
+        self.typ == CallKind::Call
+    }
+
+    /// Returns true if this is a delegate call
+    pub fn is_delegate_call(&self) -> bool {
+        self.typ == CallKind::DelegateCall
+    }
+
+    /// Returns true if this is a static call
+    pub fn is_static_call(&self) -> bool {
+        self.typ == CallKind::StaticCall
+    }
+
+    /// Returns true if this is a auth call
+    pub fn is_auth_call(&self) -> bool {
+        self.typ == CallKind::AuthCall
+    }
+}
+
 /// Represents a recorded log that is emitted during a trace call.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallLogFrame {
@@ -60,6 +95,23 @@ pub struct CallLogFrame {
     /// The position of the log relative to subcalls within the same trace.
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub position: Option<u64>,
+}
+
+impl CallLogFrame {
+    /// Converts this log frame into a primitives log object
+    pub fn into_log(self) -> alloy_primitives::Log {
+        alloy_primitives::Log::new_unchecked(
+            self.address.unwrap_or_default(),
+            self.topics.unwrap_or_default(),
+            self.data.unwrap_or_default(),
+        )
+    }
+}
+
+impl From<CallLogFrame> for alloy_primitives::Log {
+    fn from(value: CallLogFrame) -> Self {
+        value.into_log()
+    }
 }
 
 /// The configuration for the call tracer.
@@ -118,6 +170,132 @@ impl FlatCallConfig {
     pub const fn with_precompiles(mut self) -> Self {
         self.include_precompiles = Some(true);
         self
+    }
+}
+
+/// A unified representation of a call.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum CallKind {
+    /// Represents a regular call.
+    #[default]
+    Call,
+    /// Represents a static call.
+    StaticCall,
+    /// Represents a call code operation.
+    CallCode,
+    /// Represents a delegate call.
+    DelegateCall,
+    /// Represents an authorized call.
+    AuthCall,
+    /// Represents a contract creation operation.
+    Create,
+    /// Represents a contract creation operation using the CREATE2 opcode.
+    Create2,
+}
+
+impl CallKind {
+    /// Returns the string representation of the call kind.
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::Call => "CALL",
+            Self::StaticCall => "STATICCALL",
+            Self::CallCode => "CALLCODE",
+            Self::DelegateCall => "DELEGATECALL",
+            Self::AuthCall => "AUTHCALL",
+            Self::Create => "CREATE",
+            Self::Create2 => "CREATE2",
+        }
+    }
+
+    /// Returns true if the call is a create
+    #[inline]
+    pub const fn is_any_create(&self) -> bool {
+        matches!(self, Self::Create | Self::Create2)
+    }
+
+    /// Returns true if the call is a delegate of some sorts
+    #[inline]
+    pub const fn is_delegate(&self) -> bool {
+        matches!(self, Self::DelegateCall | Self::CallCode)
+    }
+
+    /// Returns true if the call is [CallKind::StaticCall].
+    #[inline]
+    pub const fn is_static_call(&self) -> bool {
+        matches!(self, Self::StaticCall)
+    }
+
+    /// Returns true if the call is [CallKind::AuthCall].
+    #[inline]
+    pub const fn is_auth_call(&self) -> bool {
+        matches!(self, Self::AuthCall)
+    }
+}
+
+impl core::fmt::Display for CallKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl PartialEq<String> for CallKind {
+    fn eq(&self, other: &String) -> bool {
+        self.to_str() == other.as_str()
+    }
+}
+
+impl PartialEq<CallKind> for String {
+    fn eq(&self, other: &CallKind) -> bool {
+        self.as_str() == other.to_str()
+    }
+}
+
+impl PartialEq<&str> for CallKind {
+    fn eq(&self, other: &&str) -> bool {
+        self.to_str() == *other
+    }
+}
+
+impl PartialEq<CallKind> for &str {
+    fn eq(&self, other: &CallKind) -> bool {
+        *self == other.to_str()
+    }
+}
+
+impl From<CallKind> for CreationMethod {
+    fn from(kind: CallKind) -> Self {
+        match kind {
+            CallKind::Create => Self::Create,
+            CallKind::Create2 => Self::Create2,
+            _ => Self::None,
+        }
+    }
+}
+
+impl From<CallKind> for ActionType {
+    fn from(kind: CallKind) -> Self {
+        match kind {
+            CallKind::Call
+            | CallKind::StaticCall
+            | CallKind::DelegateCall
+            | CallKind::CallCode
+            | CallKind::AuthCall => Self::Call,
+            CallKind::Create | CallKind::Create2 => Self::Create,
+        }
+    }
+}
+
+impl From<CallKind> for CallType {
+    fn from(ty: CallKind) -> Self {
+        match ty {
+            CallKind::Call => Self::Call,
+            CallKind::StaticCall => Self::StaticCall,
+            CallKind::CallCode => Self::CallCode,
+            CallKind::DelegateCall => Self::DelegateCall,
+            CallKind::Create | CallKind::Create2 => Self::None,
+            CallKind::AuthCall => Self::AuthCall,
+        }
     }
 }
 

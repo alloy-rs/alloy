@@ -3,7 +3,8 @@
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxHash, TxKind, B256, U256};
+use auto_impl::auto_impl;
 use core::{any, fmt};
 
 mod eip1559;
@@ -554,6 +555,31 @@ where
             Self::Left(tx) => tx.authorization_count(),
             Self::Right(tx) => tx.authorization_count(),
         }
+    }
+}
+
+/// Trait for types that provide access to a transaction hash reference.
+///
+/// This trait is implemented by types that contain or can provide a reference to a
+/// transaction hash ([`TxHash`]). It provides a standard interface for accessing
+/// transaction hashes without requiring ownership.
+#[auto_impl(&, &mut, Box)]
+pub trait TxHashRef {
+    /// Returns a reference to the transaction hash.
+    ///
+    /// This assumes the implementing type already owns or has computed the transaction hash.
+    fn tx_hash(&self) -> &TxHash;
+}
+
+impl<T: TxHashRef> TxHashRef for Recovered<T> {
+    fn tx_hash(&self) -> &TxHash {
+        self.inner().tx_hash()
+    }
+}
+
+impl<T: TxHashRef> TxHashRef for alloy_eips::eip2718::WithEncoded<T> {
+    fn tx_hash(&self) -> &TxHash {
+        self.value().tx_hash()
     }
 }
 

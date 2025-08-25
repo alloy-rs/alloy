@@ -3,7 +3,7 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        RlpEcdsaEncodableTx,
+        RlpEcdsaEncodableTx, TxHashRef,
     },
     EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
@@ -445,6 +445,12 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     }
 }
 
+impl<Eip4844: RlpEcdsaEncodableTx> TxHashRef for EthereumTxEnvelope<Eip4844> {
+    fn tx_hash(&self) -> &B256 {
+        Self::tx_hash(self)
+    }
+}
+
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
 impl<Eip4844> crate::transaction::SignerRecoverable for EthereumTxEnvelope<Eip4844>
 where
@@ -814,7 +820,7 @@ mod tests {
         );
 
         let from = tx.recover_signer().unwrap();
-        assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
+        assert_eq!(from, address!("0xA83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
     fn test_encode_decode_roundtrip<T: SignableTransaction<Signature>>(

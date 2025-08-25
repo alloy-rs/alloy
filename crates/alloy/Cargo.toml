@@ -62,6 +62,9 @@ alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 
+# trie
+alloy-trie = { workspace = true, optional = true }
+
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
@@ -74,6 +77,7 @@ std = [
     "alloy-genesis?/std",
     "alloy-serde?/std",
     "alloy-consensus?/std",
+    "alloy-trie?/std",
 ]
 
 # essential features that enable basic network interactions out of the box.
@@ -274,6 +278,9 @@ transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
 
+# trie
+trie = ["dep:alloy-trie"]
+
 # ---------------------------------------- Core re-exports --------------------------------------- #
 
 dyn-abi = ["alloy-core/dyn-abi"]
@@ -299,6 +306,7 @@ serde = [
     "alloy-eips?/serde",
     "alloy-consensus?/serde",
     "dep:alloy-serde",
+    "alloy-trie?/serde",
 ]
 serde-bincode-compat = ["alloy-consensus/serde-bincode-compat"]
 ssz = ["alloy-rpc-types?/ssz", "alloy-eips?/ssz"]
@@ -326,5 +334,6 @@ arbitrary = [
     "alloy-eips?/arbitrary",
     "alloy-rpc-types?/arbitrary",
     "alloy-serde?/arbitrary",
+    "alloy-trie?/arbitrary",
 ]
 postgres = ["alloy-core/postgres"]
