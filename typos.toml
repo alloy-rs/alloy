@@ -1,0 +1,19 @@
+[files]
+extend-exclude = [
+    ".git",
+    "target",
+    "testdata",
+    "Cargo.toml",
+    "Cargo.lock",
+    "*.json",
+    "**/tests/**",
+    "**/test/**",
+    "**/*_test.*",
+    "**/*_tests.*",
+    "CHANGELOG.md",
+    "crates/rpc-types-admin/src/admin.rs", # ENR
+]
+
+[default.extend-words]
+ser = "ser"
+typ = "typ"

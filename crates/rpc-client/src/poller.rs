@@ -1,7 +1,7 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
-use futures::{ready, Future, FutureExt, Stream, StreamExt};
+use futures::{ready, stream::FusedStream, Future, FutureExt, Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
@@ -192,6 +192,9 @@ enum PollState<Resp> {
     ),
     /// Sleeping between polls.
     Sleeping(Pin<Box<Sleep>>),
+
+    /// Polling has finished due to an error.
+    Finished,
 }
 
 /// A stream of responses from polling an RPC method.
@@ -268,6 +271,11 @@ impl<Resp> PollerStream<Resp> {
         }
     }
 
+    /// Get a reference to the [`WeakClient`] used by this poller.
+    pub fn client(&self) -> WeakClient {
+        self.client.clone()
+    }
+
     /// Pauses the poller until it's unpaused.
     ///
     /// While paused the poller will not initiate new rpc requests
@@ -327,13 +335,15 @@ where
                     // Check if we've reached the limit
                     if this.poll_count >= this.limit {
                         debug!("poll limit reached");
-                        return Poll::Ready(None);
+                        this.state = PollState::Finished;
+                        continue;
                     }
 
                     // Check if client is still alive
                     let Some(client) = this.client.upgrade() else {
                         debug!("client dropped");
-                        return Poll::Ready(None);
+                        this.state = PollState::Finished;
+                        continue;
                     };
 
                     // Start polling
@@ -355,8 +365,22 @@ where
                         }
                         Err(err) => {
                             error!(%err, "failed to poll");
+
+                            // If the error is a filter not found error, stop
+                            // the poller. Error codes are not consistent
+                            // across reth/geth/nethermind, so we check
+                            // just the message.
+                            if let Some(resp) = err.as_error_resp() {
+                                if resp.message.contains("filter not found") {
+                                    warn!("server has dropped the filter, stopping poller");
+                                    this.state = PollState::Finished;
+                                    continue;
+                                }
+                            }
+
                             // Start sleeping before retry
                             trace!(duration=?this.poll_interval, "sleeping after error");
+
                             let sleep = Box::pin(sleep(this.poll_interval));
                             this.state = PollState::Sleeping(sleep);
                         }
@@ -366,8 +390,21 @@ where
                     ready!(sleep.as_mut().poll(cx));
                     this.state = PollState::Waiting;
                 }
+                PollState::Finished => {
+                    return Poll::Ready(None);
+                }
             }
         }
+    }
+}
+
+impl<Resp, Output, Map> FusedStream for PollerStream<Resp, Output, Map>
+where
+    Resp: RpcRecv + 'static,
+    Map: Fn(Resp) -> Output + Unpin,
+{
+    fn is_terminated(&self) -> bool {
+        matches!(self.state, PollState::Finished)
     }
 }
 

@@ -321,7 +321,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
 
-        let name = "deployd.eth";
+        let name = "vitalik.eth";
         let node = namehash(name);
         let res = provider.get_resolver(node, name).await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));

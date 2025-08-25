@@ -239,7 +239,7 @@ where
     /// Pending Block Call
     ///
     /// This has been made explicit to handle cases where fields such as `hash`, `nonce`, `miner`
-    /// are either missing or set to null causing deserilization issues. See: <https://github.com/alloy-rs/alloy/issues/2117>
+    /// are either missing or set to null causing deserialization issues. See: <https://github.com/alloy-rs/alloy/issues/2117>
     ///
     /// This is specifically true in case of the response is returned from a geth node. See: <https://github.com/ethereum/go-ethereum/blob/ebff2f42c0fbb4ebee43b0e73e39b658305a8a9b/internal/ethapi/api.go#L470-L471>
     ///
