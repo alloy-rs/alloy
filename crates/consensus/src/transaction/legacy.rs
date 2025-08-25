@@ -1,5 +1,5 @@
 use crate::{
-    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
+    transaction::{hashable::TxHashable, RlpEcdsaDecodableTx, RlpEcdsaEncodableTx},
     SignableTransaction, Signed, Transaction, TxType,
 };
 use alloc::vec::Vec;
@@ -109,6 +109,15 @@ impl TxLegacy {
     }
 }
 
+impl TxHashable<Signature> for TxLegacy {
+    /// Calculate the transaction hash for the given signature and type.
+    fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
+        let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
+        self.rlp_encode_signed(signature, &mut buf);
+        keccak256(&buf)
+    }
+}
+
 // Legacy transaction network and 2718 encodings are identical to the RLP
 // encoding.
 impl RlpEcdsaEncodableTx for TxLegacy {
@@ -167,12 +176,6 @@ impl RlpEcdsaEncodableTx for TxLegacy {
 
     fn network_encode_with_type(&self, signature: &Signature, _ty: u8, out: &mut dyn BufMut) {
         self.rlp_encode_signed(signature, out);
-    }
-
-    fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
-        let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
-        self.rlp_encode_signed(signature, &mut buf);
-        keccak256(&buf)
     }
 }
 
