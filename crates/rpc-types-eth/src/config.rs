@@ -82,15 +82,6 @@ pub struct EthForkConfig {
     pub system_contracts: BTreeMap<SystemContract, Address>,
 }
 
-impl EthForkConfig {
-    /// Generate a fork hash, a CRC-32 hash of JSON object representing the fork configuration is
-    /// converted into canonical form as per RFC-8785 (in short no whitespace, sorted keys, and
-    /// numeric values in their simplest form)
-    pub fn fork_hash(&self) -> serde_json::Result<ForkHash> {
-        Ok(ForkHash::from(&serde_json::to_vec(&self)?[..]))
-    }
-}
-
 /// System-level contracts for [`EthForkConfig`].
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
@@ -138,12 +129,12 @@ impl str::FromStr for SystemContract {
 
 impl SystemContract {
     /// Enumeration of all [`SystemContract`] variants.
-    pub const ALL: [SystemContract; 5] = [
-        SystemContract::BeaconRoots,
-        SystemContract::ConsolidationRequestPredeploy,
-        SystemContract::DepositContract,
-        SystemContract::HistoryStorage,
-        SystemContract::WithdrawalRequestPredeploy,
+    pub const ALL: [Self; 5] = [
+        Self::BeaconRoots,
+        Self::ConsolidationRequestPredeploy,
+        Self::DepositContract,
+        Self::HistoryStorage,
+        Self::WithdrawalRequestPredeploy,
     ];
 }
 
@@ -187,7 +178,6 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn hoodie_prague_eth_config() {
-        let expected_fork_hash = ForkHash([0x10, 0x36, 0x84, 0x96]);
         let raw = r#"
             {
                 "activationTime": 1742999832,
@@ -231,6 +221,5 @@ mod tests {
             serde_json::to_string(&fork_config).unwrap(),
             raw.chars().filter(|c| !c.is_whitespace()).collect::<String>()
         );
-        assert_eq!(fork_config.fork_hash().unwrap(), expected_fork_hash);
     }
 }
