@@ -862,7 +862,7 @@ impl ChainConfig {
                     prague = Some(*params);
                     continue;
                 }
-                _ => {},
+                _ => {}
             };
 
             // Apply values relevant after Osaka hardfork.
