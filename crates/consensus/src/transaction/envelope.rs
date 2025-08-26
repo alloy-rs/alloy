@@ -445,7 +445,9 @@ impl<Eip4844: RlpEcdsaEncodableTx + TxHashable<Signature>> EthereumTxEnvelope<Ei
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx> TxHashRef for EthereumTxEnvelope<Eip4844> {
+impl<Eip4844: RlpEcdsaEncodableTx + TxHashable<Signature>> TxHashRef
+    for EthereumTxEnvelope<Eip4844>
+{
     fn tx_hash(&self) -> &B256 {
         Self::tx_hash(self)
     }
