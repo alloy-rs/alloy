@@ -253,8 +253,12 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    eip7840::BlobParams::cancun()
-        .next_block_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used)
+    eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
+        parent_excess_blob_gas,
+        parent_blob_gas_used,
+        // base fee is not used in EIP-4844 excess blob gas calculation
+        0,
+    )
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.

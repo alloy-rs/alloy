@@ -12,7 +12,11 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
-use alloy_eips::{eip7840::BlobParams, BlobScheduleBlobParams};
+use alloy_eips::{
+    eip7594,
+    eip7840::{self, BlobParams},
+    BlobScheduleBlobParams,
+};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
@@ -850,32 +854,47 @@ impl ChainConfig {
 
         for (key, params) in &self.blob_schedule {
             match key.as_str() {
-                "cancun" => cancun = Some(*params),
-                "prague" => prague = Some(*params),
-                "osaka" => osaka = Some(*params),
+                "cancun" => {
+                    cancun = Some(*params);
+                    continue;
+                }
+                "prague" => {
+                    prague = Some(*params);
+                    continue;
+                }
+                _ => {}
+            };
+
+            // Apply values relevant after Osaka hardfork.
+            let params = params
+                .with_blob_base_cost(eip7840::BLOB_BASE_COST)
+                .with_max_blobs_per_tx(eip7594::MAX_BLOBS_PER_TX_FUSAKA);
+
+            match key.as_str() {
+                "osaka" => osaka = Some(params),
                 "bpo1" => {
                     if let Some(timestamp) = self.bpo1_time {
-                        scheduled.push((timestamp, *params));
+                        scheduled.push((timestamp, params));
                     }
                 }
                 "bpo2" => {
                     if let Some(timestamp) = self.bpo2_time {
-                        scheduled.push((timestamp, *params));
+                        scheduled.push((timestamp, params));
                     }
                 }
                 "bpo3" => {
                     if let Some(timestamp) = self.bpo3_time {
-                        scheduled.push((timestamp, *params));
+                        scheduled.push((timestamp, params));
                     }
                 }
                 "bpo4" => {
                     if let Some(timestamp) = self.bpo4_time {
-                        scheduled.push((timestamp, *params));
+                        scheduled.push((timestamp, params));
                     }
                 }
                 "bpo5" => {
                     if let Some(timestamp) = self.bpo5_time {
-                        scheduled.push((timestamp, *params));
+                        scheduled.push((timestamp, params));
                     }
                 }
                 _ => (),
