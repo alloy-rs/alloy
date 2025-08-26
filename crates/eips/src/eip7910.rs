@@ -2,7 +2,7 @@
 
 use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
 use alloc::{borrow::ToOwned, collections::BTreeMap, string::String};
-use alloy_primitives::{Address, Bytes, U64};
+use alloy_primitives::{Address, Bytes};
 use core::{fmt, str};
 
 /// Response type for `eth_config`
