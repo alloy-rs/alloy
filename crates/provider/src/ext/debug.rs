@@ -7,7 +7,7 @@ use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, CallFrame, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
-    TraceResult,
+    PreStateFrame, TraceResult,
 };
 use alloy_transport::TransportResult;
 
@@ -171,6 +171,23 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<CallFrame>;
 
+    /// Reruns the transaction specified by the hash and returns the pre-state trace.
+    ///
+    /// This method provides the trace in the form of a `PreStateFrame`, which can be useful for
+    /// analyzing the state before execution.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_call_prestate(
+        &self,
+        tx: N::TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<PreStateFrame>;
+
     /// Return a full stack trace of all invoked opcodes of all transaction that were included in
     /// this block.
     ///
@@ -231,7 +248,77 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
         bundles: Vec<Bundle>,
         state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<Vec<GethTrace>>;
+    ) -> TransportResult<Vec<Vec<GethTrace>>>;
+
+    /// Same as `debug_trace_call_many` but returns the traces as a type that implements `RpcRecv`.
+    ///
+    /// This method allows for the traces to be returned as a type that implements `RpcRecv` and
+    /// `serde::de::DeserializeOwned`.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_call_many_as<R>(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<R>>>
+    where
+        R: RpcRecv + serde::de::DeserializeOwned;
+
+    /// Same as `debug_trace_call_many` but returns the traces as JSON objects.
+    ///
+    /// This method provides the traces in a JSON format, which can be useful for further processing
+    /// or inspection.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_call_many_js(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<serde_json::Value>>>;
+
+    /// Same as `debug_trace_call_many` but returns the traces as call frames.
+    ///
+    /// This method provides the traces in the form of `CallFrame`s, which can be useful for
+    /// analyzing the call stack and execution details.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_call_many_callframe(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<CallFrame>>>;
+
+    /// Same as `debug_trace_call_many` but returns the pre-state traces.
+    ///
+    /// This method provides the traces in the form of `PreStateFrame`s, which can be useful for
+    /// analyzing the state before execution.
+    ///
+    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn debug_trace_call_many_prestate(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<PreStateFrame>>>;
 
     /// The `debug_executionWitness` method allows for re-execution of a block with the purpose of
     /// generating an execution witness. The witness comprises of a map of all hashed trie nodes to
@@ -371,6 +458,15 @@ where
         self.debug_trace_call_as::<CallFrame>(tx, block, trace_options).await
     }
 
+    async fn debug_trace_call_prestate(
+        &self,
+        tx: N::TransactionRequest,
+        block: BlockId,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<PreStateFrame> {
+        self.debug_trace_call_as::<PreStateFrame>(tx, block, trace_options).await
+    }
+
     async fn debug_trace_block_by_hash(
         &self,
         block: B256,
@@ -401,8 +497,48 @@ where
         bundles: Vec<Bundle>,
         state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<Vec<GethTrace>> {
+    ) -> TransportResult<Vec<Vec<GethTrace>>> {
         self.client().request("debug_traceCallMany", (bundles, state_context, trace_options)).await
+    }
+
+    async fn debug_trace_call_many_as<R>(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<R>>>
+    where
+        R: RpcRecv,
+    {
+        self.client().request("debug_traceCallMany", (bundles, state_context, trace_options)).await
+    }
+
+    async fn debug_trace_call_many_js(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<serde_json::Value>>> {
+        self.debug_trace_call_many_as::<serde_json::Value>(bundles, state_context, trace_options)
+            .await
+    }
+
+    async fn debug_trace_call_many_callframe(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<CallFrame>>> {
+        self.debug_trace_call_many_as::<CallFrame>(bundles, state_context, trace_options).await
+    }
+
+    async fn debug_trace_call_many_prestate(
+        &self,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<Vec<Vec<PreStateFrame>>> {
+        self.debug_trace_call_many_as::<PreStateFrame>(bundles, state_context, trace_options).await
     }
 
     async fn debug_execution_witness(
@@ -588,13 +724,13 @@ mod test {
     {
       "failed": false,
       "gas": 21000,
-      "returnValue": "",
+      "returnValue": "0x",
       "structLogs": []
     },
     {
       "failed": false,
       "gas": 21000,
-      "returnValue": "",
+      "returnValue": "0x",
       "structLogs": []
     }
   ]
