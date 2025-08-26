@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Add changelog
+- Release 1.0.26
 - [rpc-types-trace] Re-export `CallKind` ([#2801](https://github.com/alloy-rs/alloy/issues/2801))
 
 ### Testing

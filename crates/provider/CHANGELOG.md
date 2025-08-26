@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tenderly provider ext ([#2699](https://github.com/alloy-rs/alloy/issues/2699))
 - Add specialized debug trace methods ([#2815](https://github.com/alloy-rs/alloy/issues/2815))
 
+### Miscellaneous Tasks
+
+- Release 1.0.26
+
 ## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
 
 ### Bug Fixes

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Tenderly provider ext ([#2699](https://github.com/alloy-rs/alloy/issues/2699))
 
+### Miscellaneous Tasks
+
+- Add changelog
+
 [`alloy`]: https://crates.io/crates/alloy
 [alloy]: https://crates.io/crates/alloy
 [`alloy-core`]: https://crates.io/crates/alloy-core
