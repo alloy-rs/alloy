@@ -1500,7 +1500,11 @@ impl ExecutionPayload {
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
-        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
+        Some(blob_params.next_block_excess_blob_gas_osaka(
+            self.excess_blob_gas()?,
+            self.blob_gas_used()?,
+            self.as_v1().base_fee_per_gas.to(),
+        ))
     }
 
     /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional

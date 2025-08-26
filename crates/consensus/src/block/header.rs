@@ -229,7 +229,7 @@ impl Header {
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
-        Some(blob_params.next_block_excess_blob_gas(
+        Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas?,
             self.blob_gas_used?,
             self.base_fee_per_gas?,
@@ -656,7 +656,7 @@ pub trait BlockHeader {
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
-        Some(blob_params.next_block_excess_blob_gas(
+        Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas()?,
             self.blob_gas_used()?,
             self.base_fee_per_gas()?,
