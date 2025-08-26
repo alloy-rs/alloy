@@ -34,6 +34,7 @@ alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-rpc-types-debug = { workspace = true, optional = true }
+alloy-rpc-types-tenderly = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true, features = [
@@ -126,6 +127,7 @@ debug-api = ["dep:alloy-rpc-types-trace", "dep:alloy-rpc-types-debug"]
 erc4337-api = []
 engine-api = ["dep:alloy-rpc-types-engine"]
 net-api = []
+tenderly-api = ["dep:alloy-rpc-types-tenderly", "dep:alloy-rpc-types-trace"]
 trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]

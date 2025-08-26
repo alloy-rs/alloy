@@ -2,6 +2,7 @@
 
 use crate::BlockOverrides;
 use alloc::boxed::Box;
+use alloy_eips::eip7702::constants::EIP7702_DELEGATION_DESIGNATOR;
 use alloy_primitives::{
     map::{AddressHashMap, B256HashMap},
     Address, Bytes, B256, U256,
@@ -80,6 +81,19 @@ impl StateOverridesBuilder {
     pub fn with_code(mut self, address: Address, code: impl Into<Bytes>) -> Self {
         self.overrides.entry(address).or_default().set_code(code);
         self
+    }
+
+    /// Convenience function that sets overrides the `address` code with the EIP-7702 delegation
+    /// designator for `delegation_address`
+    pub fn with_7702_delegation_designator(
+        self,
+        address: Address,
+        delegation_address: Address,
+    ) -> Self {
+        self.with_code(
+            address,
+            Bytes::from([&EIP7702_DELEGATION_DESIGNATOR, delegation_address.as_slice()].concat()),
+        )
     }
 
     /// Configures an account override with state overrides.
@@ -168,6 +182,14 @@ impl AccountOverride {
         self
     }
 
+    /// Convenience function that sets overrides the code with the EIP-7702 delegation designator
+    /// for `delegation_address`
+    pub fn with_7702_delegation_designator(self, delegation_address: Address) -> Self {
+        self.with_code(Bytes::from(
+            [&EIP7702_DELEGATION_DESIGNATOR, delegation_address.as_slice()].concat(),
+        ))
+    }
+
     /// Configures the state overrides
     pub fn with_state(mut self, state: impl IntoIterator<Item = (B256, B256)>) -> Self {
         self.state = Some(state.into_iter().collect());
@@ -228,6 +250,16 @@ impl AccountOverride {
             self.code = Some(code.into());
         }
         self
+    }
+
+    /// Convenience function that sets overrides the code with the EIP-7702 delegation designator
+    /// for `delegation_address` if it is provided
+    pub fn with_7702_delegation_designator_opt(self, delegation_address: Option<Address>) -> Self {
+        if let Some(delegation_address) = delegation_address {
+            self.with_7702_delegation_designator(delegation_address)
+        } else {
+            self
+        }
     }
 
     /// Conditionally sets the balance override and returns self.

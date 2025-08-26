@@ -9,5 +9,10 @@
 
 extern crate alloc;
 
-mod debug;
-pub use debug::*;
+mod execution_witness;
+mod state_dump;
+mod storage_range;
+
+pub use execution_witness::*;
+pub use state_dump::*;
+pub use storage_range::*;

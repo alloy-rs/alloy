@@ -45,6 +45,11 @@ mod erc4337;
 #[cfg(feature = "erc4337-api")]
 pub use erc4337::Erc4337Api;
 
+#[cfg(feature = "tenderly-api")]
+mod tenderly;
+#[cfg(feature = "tenderly-api")]
+pub use tenderly::TenderlyApi;
+
 #[cfg(feature = "mev-api")]
 mod mev;
 

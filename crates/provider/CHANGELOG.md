@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
+
+### Features
+
+- Tenderly provider ext ([#2699](https://github.com/alloy-rs/alloy/issues/2699))
+- Add specialized debug trace methods ([#2815](https://github.com/alloy-rs/alloy/issues/2815))
+
+### Miscellaneous Tasks
+
+- Release 1.0.26
+- Release 1.0.26
+
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Bug Fixes
+
+- [`CallBatchLayer`] Don't batch if single request ([#2397](https://github.com/alloy-rs/alloy/issues/2397))
+- Typo in code comment ([#2767](https://github.com/alloy-rs/alloy/issues/2767))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Release 1.0.25
+- Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
+
+### Styling
+
+- Multicall send support ([#2736](https://github.com/alloy-rs/alloy/issues/2736))
+
 ## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
 
 ### Bug Fixes
@@ -16,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow ProviderBuilder to use TransportConnect and PubSubConnect ([#2764](https://github.com/alloy-rs/alloy/issues/2764))
 - Add value to Multicallitem trait ([#2746](https://github.com/alloy-rs/alloy/issues/2746))
 - Add with_failure_allowed ([#2749](https://github.com/alloy-rs/alloy/issues/2749))
+
+### Miscellaneous Tasks
+
+- Release 1.0.24
 
 ## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
 
@@ -620,19 +653,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 - [`transport`] Allow `RetryPolicy` to be set via layer ([#1790](https://github.com/alloy-rs/alloy/issues/1790))
-
-### Miscellaneous Tasks
-
-- Release 0.8.1
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
 - Use `feeHistory` when estimating blob fee ([#1764](https://github.com/alloy-rs/alloy/issues/1764))
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
