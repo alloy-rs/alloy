@@ -31,11 +31,12 @@ pub struct BlobParams {
     /// [`eip4844::BLOB_TX_MIN_BLOB_GASPRICE`] if not set.
     pub min_blob_fee: u128,
     /// Maximum number of blobs per transaction.
+    ///
     /// Defaults to `max_blob_count` unless set otherwise.
-    #[cfg_attr(feature = "serde", serde(skip_serializing, default))]
     pub max_blobs_per_tx: u64,
     /// Minimum execution gas required to include a blob in a block.
-    #[cfg_attr(feature = "serde", serde(skip_serializing, default))]
+    ///
+    /// Defaults to `0` unless set otherwise.
     pub blob_base_cost: u64,
 }
 
