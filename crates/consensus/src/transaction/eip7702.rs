@@ -1,4 +1,4 @@
-use crate::{transaction::hashable::TxHashable, SignableTransaction, Transaction, TxType};
+use crate::{SignableTransaction, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::IsTyped2718,
@@ -6,7 +6,7 @@ use alloy_eips::{
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
     Typed2718,
 };
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
@@ -100,15 +100,6 @@ impl TxEip7702 {
         self.input.len() + // input
         self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>()
         // authorization_list
-    }
-}
-
-impl TxHashable<Signature> for TxEip7702 {
-    /// Calculate the transaction hash for the given signature and type.
-    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
-        let mut buf = Vec::with_capacity(self.eip2718_encoded_length(signature));
-        self.eip2718_encode_with_type(signature, ty, &mut buf);
-        keccak256(&buf)
     }
 }
 

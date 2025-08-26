@@ -3,7 +3,7 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        RlpEcdsaEncodableTx, TxHashRef, TxHashable,
+        RlpEcdsaEncodableTx, TxHashRef,
     },
     EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
     TxEip4844WithSidecar, TxEip7702, TxLegacy,
@@ -90,7 +90,7 @@ impl<T> EthereumTxEnvelope<T> {
         hash: B256,
     ) -> Self
     where
-        T: RlpEcdsaEncodableTx + TxHashable<Signature>,
+        T: RlpEcdsaEncodableTx,
     {
         Signed::new_unchecked(transaction, signature, hash).into()
     }
@@ -101,7 +101,7 @@ impl<T> EthereumTxEnvelope<T> {
     #[deprecated(note = "Use new_unchecked() instead")]
     pub fn new(transaction: EthereumTypedTransaction<T>, signature: Signature, hash: B256) -> Self
     where
-        T: RlpEcdsaEncodableTx + TxHashable<Signature>,
+        T: RlpEcdsaEncodableTx,
     {
         Self::new_unchecked(transaction, signature, hash)
     }
@@ -112,7 +112,7 @@ impl<T> EthereumTxEnvelope<T> {
     /// Note: this only calculates the hash on the first [`EthereumTxEnvelope::hash`] call.
     pub fn new_unhashed(transaction: EthereumTypedTransaction<T>, signature: Signature) -> Self
     where
-        T: RlpEcdsaEncodableTx + SignableTransaction<Signature> + TxHashable<Signature>,
+        T: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
     {
         transaction.into_signed(signature).into()
     }
@@ -121,7 +121,7 @@ impl<T> EthereumTxEnvelope<T> {
     #[inline]
     pub fn into_typed_transaction(self) -> EthereumTypedTransaction<T>
     where
-        T: RlpEcdsaEncodableTx + TxHashable<Signature>,
+        T: RlpEcdsaEncodableTx,
     {
         match self {
             Self::Legacy(tx) => EthereumTypedTransaction::Legacy(tx.into_parts().0),
@@ -189,7 +189,7 @@ pub enum EthereumTxEnvelope<Eip4844> {
 impl<T, Eip4844> From<Signed<T>> for EthereumTxEnvelope<Eip4844>
 where
     EthereumTypedTransaction<Eip4844>: From<T>,
-    T: RlpEcdsaEncodableTx + TxHashable<Signature>,
+    T: RlpEcdsaEncodableTx,
 {
     fn from(v: Signed<T>) -> Self {
         let (tx, sig, hash) = v.into_parts();
@@ -231,7 +231,7 @@ where
 
 impl<Eip4844> From<(EthereumTypedTransaction<Eip4844>, Signature)> for EthereumTxEnvelope<Eip4844>
 where
-    Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature> + TxHashable<Signature>,
+    Eip4844: RlpEcdsaEncodableTx + SignableTransaction<Signature>,
 {
     fn from(value: (EthereumTypedTransaction<Eip4844>, Signature)) -> Self {
         value.0.into_signed(value.1).into()
@@ -298,7 +298,7 @@ impl<Eip4844> EthereumTxEnvelope<Eip4844> {
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx + TxHashable<Signature>> EthereumTxEnvelope<Eip4844> {
+impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     /// Returns true if the transaction is a legacy transaction.
     #[inline]
     pub const fn is_legacy(&self) -> bool {
@@ -445,9 +445,7 @@ impl<Eip4844: RlpEcdsaEncodableTx + TxHashable<Signature>> EthereumTxEnvelope<Ei
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx + TxHashable<Signature>> TxHashRef
-    for EthereumTxEnvelope<Eip4844>
-{
+impl<Eip4844: RlpEcdsaEncodableTx> TxHashRef for EthereumTxEnvelope<Eip4844> {
     fn tx_hash(&self) -> &B256 {
         Self::tx_hash(self)
     }

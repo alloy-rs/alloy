@@ -1,9 +1,10 @@
 use crate::Signed;
+use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{Eip2718Error, Eip2718Result},
     Typed2718,
 };
-use alloy_primitives::{keccak256, Signature};
+use alloy_primitives::{keccak256, Signature, TxHash};
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 
 /// Helper trait for managing RLP encoding of transactions inside 2718
@@ -98,19 +99,19 @@ pub trait RlpEcdsaEncodableTx: Sized + Typed2718 {
     fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.network_encode_with_type(signature, self.ty(), out);
     }
-}
 
-// impl<T> TxHashable<Signature> for T
-// where
-//     T: RlpEcdsaEncodableTx,
-// {
-//     /// Calculate the transaction hash for the given signature and type.
-//     fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> alloy_primitives::TxHash {
-//         let mut buf = Vec::with_capacity(self.rlp_encoded_length_with_signature(signature));
-//         self.rlp_encode_signed(signature, &mut buf);
-//         keccak256(&buf)
-//     }
-// }
+    /// Calculate the transaction hash for the given signature and type.
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
+        let mut buf = Vec::with_capacity(self.eip2718_encoded_length(signature));
+        self.eip2718_encode_with_type(signature, ty, &mut buf);
+        keccak256(&buf)
+    }
+
+    /// Calculate the transaction hash for the given signature.
+    fn tx_hash(&self, signature: &Signature) -> TxHash {
+        self.tx_hash_with_type(signature, self.ty())
+    }
+}
 
 /// Helper trait for managing RLP decoding of transactions inside 2718 envelopes.
 #[doc(hidden)]
