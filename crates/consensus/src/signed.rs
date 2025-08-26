@@ -1,5 +1,7 @@
 use crate::{
-    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashable, TxHashRef},
+    transaction::{
+        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashRef, TxHashable,
+    },
     Transaction,
 };
 use alloy_eips::{
@@ -171,7 +173,7 @@ where
 
 impl<T> TxHashRef for Signed<T>
 where
-    T: RlpEcdsaEncodableTx,
+    T: RlpEcdsaEncodableTx + TxHashable<Signature>,
 {
     fn tx_hash(&self) -> &B256 {
         self.hash()
