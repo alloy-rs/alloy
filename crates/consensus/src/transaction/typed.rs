@@ -158,7 +158,7 @@ impl<Eip4844> EthereumTypedTransaction<Eip4844> {
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
+impl<Eip4844: RlpEcdsaEncodableTx + TxHashable<Signature>> EthereumTypedTransaction<Eip4844> {
     /// Return the [`TxType`] of the inner txn.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
@@ -447,7 +447,7 @@ impl<Eip4844: Typed2718> Typed2718 for EthereumTypedTransaction<Eip4844> {
     }
 }
 
-impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> TxHashable<Signature>
+impl<Eip4844: RlpEcdsaEncodableTx + Typed2718 + TxHashable<Signature>> TxHashable<Signature>
     for EthereumTypedTransaction<Eip4844>
 {
     fn tx_hash_with_type(&self, signature: &Signature, _ty: u8) -> TxHash {
@@ -527,16 +527,6 @@ impl<Eip4844: RlpEcdsaEncodableTx + Typed2718> RlpEcdsaEncodableTx
             Self::Eip1559(tx) => tx.network_encode(signature, out),
             Self::Eip4844(tx) => tx.network_encode(signature, out),
             Self::Eip7702(tx) => tx.network_encode(signature, out),
-        }
-    }
-
-    fn tx_hash(&self, signature: &Signature) -> TxHash {
-        match self {
-            Self::Legacy(tx) => tx.tx_hash(signature),
-            Self::Eip2930(tx) => tx.tx_hash(signature),
-            Self::Eip1559(tx) => tx.tx_hash(signature),
-            Self::Eip4844(tx) => tx.tx_hash(signature),
-            Self::Eip7702(tx) => tx.tx_hash(signature),
         }
     }
 }

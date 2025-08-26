@@ -1,5 +1,5 @@
 use crate::{
-    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashable},
     Transaction,
 };
 use alloy_eips::{
@@ -113,7 +113,7 @@ impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
 
 impl<T> Signed<T>
 where
-    T: RlpEcdsaEncodableTx,
+    T: RlpEcdsaEncodableTx + TxHashable<Signature>,
 {
     /// Returns a reference to the transaction hash.
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
@@ -201,7 +201,7 @@ where
 
 impl<T> Hash for Signed<T>
 where
-    T: RlpEcdsaDecodableTx + Hash,
+    T: RlpEcdsaDecodableTx + TxHashable<Signature> + Hash,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hash().hash(state);
@@ -210,13 +210,13 @@ where
     }
 }
 
-impl<T: RlpEcdsaEncodableTx + PartialEq> PartialEq for Signed<T> {
+impl<T: RlpEcdsaEncodableTx + TxHashable<Signature> + PartialEq> PartialEq for Signed<T> {
     fn eq(&self, other: &Self) -> bool {
         self.hash() == other.hash() && self.tx == other.tx && self.signature == other.signature
     }
 }
 
-impl<T: RlpEcdsaEncodableTx + PartialEq> Eq for Signed<T> {}
+impl<T: RlpEcdsaEncodableTx + TxHashable<Signature> + PartialEq> Eq for Signed<T> {}
 
 #[cfg(feature = "k256")]
 impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
@@ -482,7 +482,7 @@ where
 
 impl<T> Encodable2718 for Signed<T>
 where
-    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+    T: RlpEcdsaEncodableTx + TxHashable<Signature> + Typed2718 + Send + Sync,
 {
     fn encode_2718_len(&self) -> usize {
         self.eip2718_encoded_length()
@@ -518,9 +518,9 @@ where
 
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::transaction::RlpEcdsaEncodableTx;
+    use crate::transaction::{RlpEcdsaEncodableTx, TxHashable};
     use alloc::borrow::Cow;
-    use alloy_primitives::B256;
+    use alloy_primitives::{Signature, B256};
     use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
     #[derive(Serialize, Deserialize)]
@@ -534,7 +534,7 @@ mod serde {
 
     impl<T> Serialize for super::Signed<T>
     where
-        T: Clone + RlpEcdsaEncodableTx + Serialize,
+        T: Clone + RlpEcdsaEncodableTx + TxHashable<Signature> + Serialize,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
