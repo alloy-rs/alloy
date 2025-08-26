@@ -124,6 +124,30 @@ impl<T> Delta<T> {
     pub const fn is_changed(&self) -> bool {
         matches!(self, Self::Changed(_))
     }
+
+    /// Returns the value if the delta is [`Delta::Added`]
+    pub const fn as_added(&self) -> Option<&T> {
+        match self {
+            Self::Added(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns the value if the delta is [`Delta::Removed`]
+    pub const fn as_removed(&self) -> Option<&T> {
+        match self {
+            Self::Removed(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`ChangedType`] if the delta is [`Delta::Changed`]
+    pub const fn as_changed(&self) -> Option<&ChangedType<T>> {
+        match self {
+            Self::Changed(changed) => Some(changed),
+            _ => None,
+        }
+    }
 }
 
 /// The diff of an account after a transaction
