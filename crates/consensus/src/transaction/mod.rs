@@ -295,18 +295,6 @@ pub trait SignableTransaction<Signature>: Transaction {
     }
 }
 
-// TODO(MSRV-1.86): Remove in favor of dyn trait upcasting
-#[doc(hidden)]
-impl<S: 'static> dyn SignableTransaction<S> {
-    pub fn __downcast_ref<T: any::Any>(&self) -> Option<&T> {
-        if any::Any::type_id(self) == any::TypeId::of::<T>() {
-            unsafe { Some(&*(self as *const _ as *const T)) }
-        } else {
-            None
-        }
-    }
-}
-
 #[cfg(feature = "serde")]
 impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     #[inline]

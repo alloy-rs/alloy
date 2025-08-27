@@ -191,11 +191,7 @@ impl TrezorSigner {
         let data = tx.input().to_vec();
         let chain_id = tx.chain_id();
 
-        // TODO(MSRV-1.86): Uncomment once dyn trait upcasting is stable
-        /*
         let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
-        */
-        let signature = if let Some(tx) = tx.__downcast_ref::<TxEip1559>() {
             let max_gas_fee = tx.max_fee_per_gas;
             let max_gas_fee = u128_to_trezor(max_gas_fee);
 
