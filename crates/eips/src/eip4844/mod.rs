@@ -253,8 +253,12 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    eip7840::BlobParams::cancun()
-        .next_block_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used)
+    eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
+        parent_excess_blob_gas,
+        parent_blob_gas_used,
+        // base fee is not used in EIP-4844 excess blob gas calculation
+        0,
+    )
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -286,8 +290,13 @@ pub const fn fake_exponential(factor: u128, numerator: u128, denominator: u128) 
     while numerator_accum > 0 {
         output += numerator_accum;
 
+        // Use checked multiplication to prevent overflow
+        let Some(val) = numerator_accum.checked_mul(numerator) else {
+            break;
+        };
+
         // Denominator is asserted as not zero at the start of the function.
-        numerator_accum = (numerator_accum * numerator) / (denominator * i);
+        numerator_accum = val / (denominator * i);
         i += 1;
     }
     output / denominator
@@ -398,5 +407,24 @@ mod tests {
 
         let deserialized: HeapBlob = serde_json::from_str(&serialized).unwrap();
         assert_eq!(blob, deserialized);
+    }
+
+    #[test]
+    fn fake_exp_handles_overflow() {
+        // Test with very large excess blob gas values that would cause overflow
+        let factor = 1u128; // BLOB_TX_MIN_BLOB_GASPRICE
+        let numerator = u64::MAX as u128; // Very large excess blob gas
+        let denominator = 5007716u128; // BLOB_GASPRICE_UPDATE_FRACTION_PECTRA
+
+        // This should not panic even with very large inputs
+        let result = fake_exponential(factor, numerator, denominator);
+
+        // The result should be a valid value (not panic)
+        assert!(result > 0);
+
+        // Test with Prague parameters
+        let prague_params = crate::eip7840::BlobParams::prague();
+        // This should also not panic when excess_blob_gas is very large
+        let _blob_fee = prague_params.calc_blob_fee(u64::MAX);
     }
 }

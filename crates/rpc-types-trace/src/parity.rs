@@ -3,6 +3,7 @@
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256, U64};
+use alloy_rpc_types_eth::BlockNumHash;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -122,6 +123,30 @@ impl<T> Delta<T> {
     /// Returns true if the value is changed
     pub const fn is_changed(&self) -> bool {
         matches!(self, Self::Changed(_))
+    }
+
+    /// Returns the value if the delta is [`Delta::Added`]
+    pub const fn as_added(&self) -> Option<&T> {
+        match self {
+            Self::Added(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns the value if the delta is [`Delta::Removed`]
+    pub const fn as_removed(&self) -> Option<&T> {
+        match self {
+            Self::Removed(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`ChangedType`] if the delta is [`Delta::Changed`]
+    pub const fn as_changed(&self) -> Option<&ChangedType<T>> {
+        match self {
+            Self::Changed(changed) => Some(changed),
+            _ => None,
+        }
     }
 }
 
@@ -379,6 +404,26 @@ pub struct RewardAction {
     pub reward_type: RewardType,
     /// Reward amount.
     pub value: U256,
+}
+
+impl RewardAction {
+    /// Helper to construct a [`LocalizedTransactionTrace`] that describes a reward to the block
+    /// beneficiary.
+    pub const fn into_localized_trace(self, block: BlockNumHash) -> LocalizedTransactionTrace {
+        LocalizedTransactionTrace {
+            block_hash: Some(block.hash),
+            block_number: Some(block.number),
+            transaction_hash: None,
+            transaction_position: None,
+            trace: TransactionTrace {
+                trace_address: vec![],
+                subtraces: 0,
+                action: Action::Reward(self),
+                error: None,
+                result: None,
+            },
+        }
+    }
 }
 
 /// Represents a _selfdestruct_ action fka `suicide`.

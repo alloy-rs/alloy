@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
+
+### Bug Fixes
+
+- [eip4844] Prevent overflow panic in fake_exponential with large excess blob gas ([#2806](https://github.com/alloy-rs/alloy/issues/2806))
+
+### Dependencies
+
+- Bump actions/checkout to v5 ([#2774](https://github.com/alloy-rs/alloy/issues/2774))
+
+### Features
+
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+- Add TxHashRef trait and implementations ([#2751](https://github.com/alloy-rs/alloy/issues/2751))
+- Tenderly provider ext ([#2699](https://github.com/alloy-rs/alloy/issues/2699))
+- Add specialized debug trace methods ([#2815](https://github.com/alloy-rs/alloy/issues/2815))
+- Add into_localized_trace method to RewardAction ([#2813](https://github.com/alloy-rs/alloy/issues/2813))
+- Add helpers for encoding block from parts ([#2809](https://github.com/alloy-rs/alloy/issues/2809))
+- Add helper methods to decode logs in TransactionReceipt ([#2811](https://github.com/alloy-rs/alloy/issues/2811))
+- [rpc] Add cost() default function to ReceiptResponse trait ([#2808](https://github.com/alloy-rs/alloy/issues/2808))
+- Add fromstr for TransactionInputKind ([#2805](https://github.com/alloy-rs/alloy/issues/2805))
+- Add convenience fn for setting 7702 delegation designator ([#2802](https://github.com/alloy-rs/alloy/issues/2802))
+- Add debug state dump struct ([#2790](https://github.com/alloy-rs/alloy/issues/2790))
+
+### Miscellaneous Tasks
+
+- Release 1.0.26
+- Add changelog
+- Release 1.0.26
+- [rpc-types-trace] Re-export `CallKind` ([#2801](https://github.com/alloy-rs/alloy/issues/2801))
+
+### Testing
+
+- Add sanity GethDebugTracingCallOptions test ([#2814](https://github.com/alloy-rs/alloy/issues/2814))
+
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Bug Fixes
+
+- [docs] Correct typos in EIP reference ([#2759](https://github.com/alloy-rs/alloy/issues/2759))
+- [`CallBatchLayer`] Don't batch if single request ([#2397](https://github.com/alloy-rs/alloy/issues/2397))
+- [batch.rs] Reference BatchFuture in panic message ([#2771](https://github.com/alloy-rs/alloy/issues/2771))
+- Typo in code comment ([#2767](https://github.com/alloy-rs/alloy/issues/2767))
+
+### Features
+
+- Add scale helper ([#2797](https://github.com/alloy-rs/alloy/issues/2797))
+- Add authorization list to CallBuilder ([#2798](https://github.com/alloy-rs/alloy/issues/2798))
+- [rpc-types-trace] Move `CallKind` from `revm-inspector` ([#2779](https://github.com/alloy-rs/alloy/issues/2779))
+- Add orretrypolicyfn ([#2785](https://github.com/alloy-rs/alloy/issues/2785))
+- Complete execution payload getter methods ([#2782](https://github.com/alloy-rs/alloy/issues/2782))
+- Implement `Drop` for `MnemonicBuilder` make sure passphrase and password will be cleaned up ([#2756](https://github.com/alloy-rs/alloy/issues/2756))
+- Expose alloy trie ([#2773](https://github.com/alloy-rs/alloy/issues/2773))
+- Add callframe utils ([#2769](https://github.com/alloy-rs/alloy/issues/2769))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Release 1.0.25
+- Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
+- Add encode helper ([#2789](https://github.com/alloy-rs/alloy/issues/2789))
+- Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
+- Remove `BeaconOptimismPayloadAttributes` ([#2784](https://github.com/alloy-rs/alloy/issues/2784))
+- Reduce logs for requests ([#2783](https://github.com/alloy-rs/alloy/issues/2783))
+- Add more callframe utils ([#2777](https://github.com/alloy-rs/alloy/issues/2777))
+
+### Other
+
+- Clarify as_revert_data docs to reflect None on missing hex ([#2786](https://github.com/alloy-rs/alloy/issues/2786))
+
+### Styling
+
+- Multicall send support ([#2736](https://github.com/alloy-rs/alloy/issues/2736))
+
 ## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
 
 ### Bug Fixes
@@ -24,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.24
 - Feature gate serde test ([#2765](https://github.com/alloy-rs/alloy/issues/2765))
 - Serialize return data with prefix ([#2763](https://github.com/alloy-rs/alloy/issues/2763))
 
@@ -1408,11 +1483,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 - [`transport`] Allow `RetryPolicy` to be set via layer ([#1790](https://github.com/alloy-rs/alloy/issues/1790))
+- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
+- Use `feeHistory` when estimating blob fee ([#1764](https://github.com/alloy-rs/alloy/issues/1764))
 
 ### Documentation
 
 - Remove stray sentence ([#1804](https://github.com/alloy-rs/alloy/issues/1804))
 - Add note about deprecated total difficulty ([#1784](https://github.com/alloy-rs/alloy/issues/1784))
+- Add `consensus-any` and `rpc-types-any` to the README ([#1759](https://github.com/alloy-rs/alloy/issues/1759))
 
 ### Features
 
@@ -1422,6 +1500,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add info tx types ([#1793](https://github.com/alloy-rs/alloy/issues/1793))
 - Reth's block body fns ([#1775](https://github.com/alloy-rs/alloy/issues/1775))
 - Add serde for `TxType` ([#1780](https://github.com/alloy-rs/alloy/issues/1780))
+- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
+- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
+- [engine] Forkchoice Version ([#1744](https://github.com/alloy-rs/alloy/issues/1744))
+- Remove duplicated `to` method in `TransactionResponse` ([#1770](https://github.com/alloy-rs/alloy/issues/1770))
+- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
+- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
+- Relax RPC `Block` bounds ([#1757](https://github.com/alloy-rs/alloy/issues/1757))
 
 ### Miscellaneous Tasks
 
@@ -1434,35 +1519,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add TxReceipt default helpers ([#1783](https://github.com/alloy-rs/alloy/issues/1783))
 - Add consensus helper methods to BlockHeader ([#1781](https://github.com/alloy-rs/alloy/issues/1781))
 - Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
-
-### Other
-
-- Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
-- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
-- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
-- Use `feeHistory` when estimating blob fee ([#1764](https://github.com/alloy-rs/alloy/issues/1764))
-
-### Documentation
-
-- Add `consensus-any` and `rpc-types-any` to the README ([#1759](https://github.com/alloy-rs/alloy/issues/1759))
-
-### Features
-
-- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
-- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
-- [engine] Forkchoice Version ([#1744](https://github.com/alloy-rs/alloy/issues/1744))
-- Remove duplicated `to` method in `TransactionResponse` ([#1770](https://github.com/alloy-rs/alloy/issues/1770))
-- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
-- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
-- Relax RPC `Block` bounds ([#1757](https://github.com/alloy-rs/alloy/issues/1757))
-
-### Miscellaneous Tasks
-
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 - Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
 - Introduce recovered and recoverable ([#1768](https://github.com/alloy-rs/alloy/issues/1768))
@@ -1470,6 +1526,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
+- Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
+- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
 - Reapply "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1773](https://github.com/alloy-rs/alloy/issues/1773))
 - Move deny into ci ([#1774](https://github.com/alloy-rs/alloy/issues/1774))
 - Update deny.yml ([#1771](https://github.com/alloy-rs/alloy/issues/1771))
