@@ -34,12 +34,12 @@ pub(crate) struct Paused {
 
 impl Paused {
     pub(crate) fn is_paused(&self) -> bool {
-        self.is_paused.load(Ordering::Relaxed)
+        self.is_paused.load(Ordering::Acquire)
     }
 
     pub(crate) fn set_paused(&self, paused: bool) {
-        self.is_paused.store(paused, Ordering::Relaxed);
-        if paused {
+        self.is_paused.store(paused, Ordering::Release);
+        if !paused {
             self.notify.notify_waiters();
         }
     }
