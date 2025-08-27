@@ -617,7 +617,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             if *last_height + 1 != block_height {
                 // Move all the transactions that were reset by the reorg to the unconfirmed list.
                 // This can also happen if we unpaused the heartbeat after some time.
-                debug!(block_height, last_height, "reorg detected");
+                debug!(block_height, last_height, "reorg/unpause detected");
                 self.move_reorg_to_unconfirmed(block_height);
                 // Remove past blocks that are now invalid.
                 self.past_blocks.retain(|(h, _)| *h < block_height);
