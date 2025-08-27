@@ -45,6 +45,9 @@ impl Paused {
     }
 
     /// Waits until the paused state is changed to `false`.
+    ///
+    /// Returns `true` if the method actually waited for the paused state to become unpaused,
+    /// or `false` if it was already unpaused when called.
     async fn wait(&self) -> bool {
         if !self.is_paused() {
             return false;
