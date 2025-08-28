@@ -1819,7 +1819,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                     BlobGasUsed,
                     ExcessBlobGas,
                     // V4
-                    BlockAccessList,
+                   // BlockAccessList,
                 }
 
                 let mut parent_hash = None;
@@ -1839,7 +1839,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 let mut withdrawals = None;
                 let mut blob_gas_used = None;
                 let mut excess_blob_gas = None;
-                let mut block_access_list = None;
+                //let mut block_access_list = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -1878,7 +1878,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                             let raw = map.next_value::<U64>()?;
                             excess_blob_gas = Some(raw.to());
                         }
-                        Fields::BlockAccessList => block_access_list = Some(map.next_value()?),
+                       // Fields::BlockAccessList => block_access_list = Some(map.next_value()?),
                     }
                 }
 
@@ -1945,18 +1945,18 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         excess_blob_gas,
                     }));
                 }
-                if let (Some(blob_gas_used), Some(excess_blob_gas), Some(block_access_list)) =
-                    (blob_gas_used, excess_blob_gas, block_access_list)
-                {
-                    return Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
-                        payload_inner: ExecutionPayloadV3 {
-                            payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
-                            blob_gas_used,
-                            excess_blob_gas,
-                        },
-                        block_access_list,
-                    }));
-                }
+                // if let (Some(blob_gas_used), Some(excess_blob_gas), Some(block_access_list)) =
+                //     (blob_gas_used, excess_blob_gas, block_access_list)
+                // {
+                //     return Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
+                //         payload_inner: ExecutionPayloadV3 {
+                //             payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
+                //             blob_gas_used,
+                //             excess_blob_gas,
+                //         },
+                //         block_access_list,
+                //     }));
+                // }
 
                 // reject incomplete V3 payloads even if they could construct a valid V2
                 if blob_gas_used.is_some() || excess_blob_gas.is_some() {
@@ -1985,7 +1985,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             "withdrawals",
             "blobGasUsed",
             "excessBlobGas",
-            "blockAccessList",
+           // "blockAccessList",
         ];
         deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
     }
