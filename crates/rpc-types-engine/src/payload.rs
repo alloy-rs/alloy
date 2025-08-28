@@ -1936,15 +1936,6 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                     };
                 };
 
-                if let (Some(blob_gas_used), Some(excess_blob_gas)) =
-                    (blob_gas_used, excess_blob_gas)
-                {
-                    return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
-                        payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
-                        blob_gas_used,
-                        excess_blob_gas,
-                    }));
-                }
                 if let (Some(blob_gas_used), Some(excess_blob_gas), Some(block_access_list)) =
                     (blob_gas_used, excess_blob_gas, block_access_list)
                 {
@@ -1955,6 +1946,16 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                             excess_blob_gas,
                         },
                         block_access_list,
+                    }));
+                }
+
+                if let (Some(blob_gas_used), Some(excess_blob_gas)) =
+                    (blob_gas_used, excess_blob_gas)
+                {
+                    return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
+                        payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
+                        blob_gas_used,
+                        excess_blob_gas,
                     }));
                 }
 
