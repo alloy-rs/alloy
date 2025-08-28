@@ -217,8 +217,9 @@ impl<'a> CallFrameIter<'a> {
     /// Note: this would panic if there are no parent owning the children to
     /// skip. `next` must be called before `skip_children`.
     pub fn skip_children(&mut self) {
-        let parent = self.last_frame.unwrap();
-        let _ = self.stack.split_off(self.stack.len() - parent.calls.len());
+        if let Some(parent) = self.last_frame {
+            let _ = self.stack.split_off(self.stack.len() - parent.calls.len());
+        }
     }
 }
 
