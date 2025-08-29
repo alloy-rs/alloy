@@ -40,7 +40,7 @@ impl WsConnect {
             url: url.into(),
             auth: None,
             config: None,
-            max_retries: 10,
+            max_retries: 0,
             retry_interval: Duration::from_secs(3),
         }
     }
