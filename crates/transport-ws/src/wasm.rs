@@ -25,7 +25,7 @@ pub struct WsConnect {
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
-        Self { url: url.into(), max_retries: 10, retry_interval: Duration::from_secs(3) }
+        Self { url: url.into(), max_retries: 0, retry_interval: Duration::from_secs(3) }
     }
 
     /// Sets the max number of retries before failing and exiting the connection.
