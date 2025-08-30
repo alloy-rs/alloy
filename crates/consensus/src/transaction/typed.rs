@@ -4,7 +4,7 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
         RlpEcdsaEncodableTx,
     },
-    EthereumTxEnvelope, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip7702,
+    EthereumTxEnvelope, SignableTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702,
     TxLegacy, TxType,
 };
 use alloy_eips::{
@@ -154,6 +154,17 @@ impl<Eip4844> EthereumTypedTransaction<Eip4844> {
             Self::Eip1559(tx) => EthereumTypedTransaction::Eip1559(tx),
             Self::Eip4844(tx) => EthereumTypedTransaction::Eip4844(f(tx)),
             Self::Eip7702(tx) => EthereumTypedTransaction::Eip7702(tx),
+        }
+    }
+
+    /// Converts this typed transaction into a signed [`EthereumTxEnvelope`]
+    pub fn into_envelope(self, signature: Signature) -> EthereumTxEnvelope<Eip4844> {
+        match self {
+            Self::Legacy(tx) => EthereumTxEnvelope::Legacy(tx.into_signed(signature)),
+            Self::Eip2930(tx) => EthereumTxEnvelope::Eip2930(tx.into_signed(signature)),
+            Self::Eip1559(tx) => EthereumTxEnvelope::Eip1559(tx.into_signed(signature)),
+            Self::Eip4844(tx) => EthereumTxEnvelope::Eip4844(Signed::new_unhashed(tx, signature)),
+            Self::Eip7702(tx) => EthereumTxEnvelope::Eip7702(tx.into_signed(signature)),
         }
     }
 }
