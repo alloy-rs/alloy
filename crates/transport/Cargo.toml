@@ -34,7 +34,7 @@ thiserror = { workspace = true, features = ["std"] }
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
-governor = { version = "0.8.1", default-features = false, features = [
+governor = { version = "0.10", default-features = false, features = [
     "std",
     "quanta",
 ], optional = true }
@@ -45,7 +45,7 @@ auto_impl.workspace = true
 
 # non-WASM only
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-tokio = { workspace = true, features = ["rt", "time","sync","macros"] }
+tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
 
 # WASM only
 [target.'cfg(target_family = "wasm")'.dependencies]
