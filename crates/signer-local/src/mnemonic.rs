@@ -43,17 +43,6 @@ pub struct MnemonicBuilder<W: Wordlist = English> {
     _wordlist: PhantomData<W>,
 }
 
-/// Error produced by the mnemonic signer module.
-#[derive(Debug, Error)]
-pub enum MnemonicBuilderError {
-    /// Error suggests that a phrase (path or words) was expected but not found.
-    #[error("expected phrase not found")]
-    ExpectedPhraseNotFound,
-    /// Error suggests that a phrase (path or words) was not expected but found.
-    #[error("unexpected phrase found")]
-    UnexpectedPhraseFound,
-}
-
 impl<W: Wordlist> Default for MnemonicBuilder<W> {
     fn default() -> Self {
         Self {
@@ -64,6 +53,18 @@ impl<W: Wordlist> Default for MnemonicBuilder<W> {
             write_to: None,
             _wordlist: PhantomData,
         }
+    }
+}
+
+impl MnemonicBuilder<English> {
+    /// Creates a new [`MnemonicBuilder`] with the [`English`] wordlist.
+    pub fn english() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new  [`MnemonicBuilder`] with the [`English`] wordlist and the given phrase
+    pub fn from_phrase<P: Into<String>>(phrase: P) -> Self {
+        Self::english().phrase(phrase)
     }
 }
 
@@ -179,6 +180,17 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         let address = secret_key_to_address(&credential);
         Ok(LocalSigner::<SigningKey> { credential, address, chain_id: None })
     }
+}
+
+/// Error produced by the mnemonic signer module.
+#[derive(Debug, Error)]
+pub enum MnemonicBuilderError {
+    /// Error suggests that a phrase (path or words) was expected but not found.
+    #[error("expected phrase not found")]
+    ExpectedPhraseNotFound,
+    /// Error suggests that a phrase (path or words) was not expected but found.
+    #[error("unexpected phrase found")]
+    UnexpectedPhraseFound,
 }
 
 #[cfg(test)]

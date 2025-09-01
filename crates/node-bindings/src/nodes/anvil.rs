@@ -312,6 +312,12 @@ impl Anvil {
         self
     }
 
+    /// Instantiate `anvil` with the `--auto-impersonate` flag.
+    pub fn auto_impersonate(mut self) -> Self {
+        self = self.arg("--auto-impersonate");
+        self
+    }
+
     /// Adds an argument to pass to the `anvil`.
     pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
         self.args.push(arg.into());

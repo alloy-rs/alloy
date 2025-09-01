@@ -231,6 +231,12 @@ impl<T: Encodable2718> Encodable2718 for Recovered<T> {
     }
 }
 
+impl<T> AsRef<Self> for Recovered<T> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 /// A type that can recover the signer of a transaction.
 ///
 /// This is a helper trait that only provides the ability to recover the signer (address) of a

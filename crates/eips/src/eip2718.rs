@@ -442,6 +442,12 @@ impl<T> WithEncoded<T> {
     }
 }
 
+impl<T> AsRef<Self> for WithEncoded<T> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl<T: Encodable2718> WithEncoded<T> {
     /// Wraps the value with the [`Encodable2718::encoded_2718`] bytes.
     pub fn from_2718_encodable(value: T) -> Self {

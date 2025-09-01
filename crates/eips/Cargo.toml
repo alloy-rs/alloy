@@ -31,10 +31,12 @@ alloy-eip7702.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 either.workspace = true
+thiserror.workspace = true
 
 # serde
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, optional = true, features = [
@@ -81,13 +83,15 @@ std = [
 	"alloy-eip2930/std",
 	"alloy-eip7702/std",
 	"derive_more/std",
-	"serde_json/std",
 	"sha2?/std",
 	"either/std",
+	"serde_with?/std",
+	"thiserror/std"
 ]
 serde = [
 	"dep:alloy-serde",
 	"dep:serde",
+	"dep:serde_with",
 	"alloy-primitives/serde",
 	"c-kzg?/serde",
 	"alloy-eip2930/serde",

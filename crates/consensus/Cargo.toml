@@ -56,17 +56,27 @@ auto_impl.workspace = true
 thiserror.workspace = true
 either.workspace = true
 once_cell = { workspace = true, features = ["race", "alloc"] }
-secp256k1 = { workspace = true, optional = true, features = ["recovery", "global-context", "std"] }
+secp256k1 = { workspace = true, optional = true, features = [
+    "recovery",
+    "global-context",
+    "std",
+] }
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary", "kzg", "serde"] }
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
-secp256k1 = { workspace = true, features = ["recovery", "global-context", "std", "rand"] }
+secp256k1 = { workspace = true, features = [
+    "recovery",
+    "global-context",
+    "std",
+    "rand",
+] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 bincode = { workspace = true, features = ["serde"] }
 k256.workspace = true
 rand.workspace = true
+rand_09.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 assert_matches.workspace = true
@@ -88,34 +98,34 @@ std = [
     "thiserror/std",
     "either/std",
     "once_cell/std",
-    "secp256k1?/std"
+    "secp256k1?/std",
 ]
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 secp256k1 = ["dep:secp256k1"]
 crypto-backend = []
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
-	"std",
-	"dep:rand",
-	"dep:arbitrary",
-	"alloy-eips/arbitrary",
-	"alloy-primitives/arbitrary",
-	"alloy-serde?/arbitrary",
-	"alloy-trie/arbitrary",
-	"c-kzg?/arbitrary",
-	"alloy-tx-macros/arbitrary"
+    "std",
+    "dep:rand",
+    "dep:arbitrary",
+    "alloy-eips/arbitrary",
+    "alloy-primitives/arbitrary",
+    "alloy-serde?/arbitrary",
+    "alloy-trie/arbitrary",
+    "c-kzg?/arbitrary",
+    "alloy-tx-macros/arbitrary",
 ]
 serde = [
-	"dep:serde",
-	"alloy-primitives/serde",
-	"dep:alloy-serde",
-	"alloy-eips/serde",
-	"alloy-trie/serde",
-	"c-kzg?/serde",
-	"either/serde",
-	"k256?/serde",
-	"rand?/serde",
-	"secp256k1?/serde",
-	"alloy-tx-macros/serde"
+    "dep:serde",
+    "alloy-primitives/serde",
+    "dep:alloy-serde",
+    "alloy-eips/serde",
+    "alloy-trie/serde",
+    "c-kzg?/serde",
+    "either/serde",
+    "k256?/serde",
+    "rand?/serde",
+    "secp256k1?/serde",
+    "alloy-tx-macros/serde",
 ]
 serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]

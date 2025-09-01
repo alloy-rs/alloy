@@ -5,14 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
 
 ### Features
 
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+- Add TxHashRef trait and implementations ([#2751](https://github.com/alloy-rs/alloy/issues/2751))
+- Add helpers for encoding block from parts ([#2809](https://github.com/alloy-rs/alloy/issues/2809))
 - Expose alloy trie ([#2773](https://github.com/alloy-rs/alloy/issues/2773))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.26
+- Release 1.0.25
 - Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
 - Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
 
@@ -666,12 +671,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
+### Bug Fixes
+
+- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
+
 ### Features
 
 - Add some helper functions for blockbody ([#1796](https://github.com/alloy-rs/alloy/issues/1796))
 - Add info tx types ([#1793](https://github.com/alloy-rs/alloy/issues/1793))
 - Reth's block body fns ([#1775](https://github.com/alloy-rs/alloy/issues/1775))
 - Add serde for `TxType` ([#1780](https://github.com/alloy-rs/alloy/issues/1780))
+- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
+- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
 
 ### Miscellaneous Tasks
 
@@ -681,20 +692,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add clone_tx ([#1791](https://github.com/alloy-rs/alloy/issues/1791))
 - Add TxReceipt default helpers ([#1783](https://github.com/alloy-rs/alloy/issues/1783))
 - Add consensus helper methods to BlockHeader ([#1781](https://github.com/alloy-rs/alloy/issues/1781))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
-- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
-
-### Features
-
-- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
-- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
-
-### Miscellaneous Tasks
-
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 - Introduce recovered and recoverable ([#1768](https://github.com/alloy-rs/alloy/issues/1768))
 

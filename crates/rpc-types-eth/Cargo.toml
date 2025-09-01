@@ -36,8 +36,8 @@ thiserror.workspace = true
 # serde
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
-serde_json = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
@@ -81,6 +81,7 @@ std = [
 ]
 serde = [
 	"dep:serde",
+	"dep:serde_with",
 	"dep:serde_json",
 	"dep:alloy-serde",
 	"alloy-primitives/serde",
@@ -102,4 +103,4 @@ arbitrary = [
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
-serde-bincode-compat = ["serde_with", "alloy-eips/serde-bincode-compat"]
+serde-bincode-compat = ["dep:serde_with", "alloy-eips/serde-bincode-compat"]

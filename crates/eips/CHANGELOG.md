@@ -5,18 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
 
 ### Bug Fixes
 
+- [eip4844] Prevent overflow panic in fake_exponential with large excess blob gas ([#2806](https://github.com/alloy-rs/alloy/issues/2806))
 - [docs] Correct typos in EIP reference ([#2759](https://github.com/alloy-rs/alloy/issues/2759))
 
 ### Features
 
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
 - Add scale helper ([#2797](https://github.com/alloy-rs/alloy/issues/2797))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.26
+- Release 1.0.25
 - Add encode helper ([#2789](https://github.com/alloy-rs/alloy/issues/2789))
 
 ## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
@@ -530,29 +534,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [relay] ExecutionRequestsV4 with eip7685::Requests conversion ([#1787](https://github.com/alloy-rs/alloy/issues/1787))
 - Add requests with capacity ([#1794](https://github.com/alloy-rs/alloy/issues/1794))
+- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
+- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
 
 ### Miscellaneous Tasks
 
 - Release 0.8.1
 - Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
 - Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
+- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
+- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
+- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ### Other
 
 - Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Features
-
-- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
-- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
-
-### Miscellaneous Tasks
-
-- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
-- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
-- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
