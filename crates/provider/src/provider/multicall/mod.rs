@@ -32,6 +32,9 @@ pub use tuple::{CallTuple, Empty};
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE2a173976CA11");
 
+/// Default address for the ArbSys precompile on arbitrum rollups. See: <https://docs.arbitrum.io/build-decentralized-apps/precompiles/reference#arbsys>
+pub const ARB_SYS_ADDRESS: Address = address!("0x0000000000000000000000000000000000000064");
+
 /// A Multicall3 builder
 ///
 /// This builder implements a simple API interface to build and execute multicalls using the
