@@ -96,7 +96,7 @@ pub struct CallLogFrame {
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub position: Option<u64>,
     /// The index of the log in the trace.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub index: Option<u64>,
 }
 
