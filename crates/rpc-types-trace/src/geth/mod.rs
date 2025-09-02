@@ -108,6 +108,13 @@ pub struct StructLog {
     pub refund_counter: Option<u64>,
 }
 
+impl StructLog {
+    /// Returns the name of the opcode.
+    pub fn opcode(&self) -> &str {
+        self.op.as_ref()
+    }
+}
+
 /// Tracing response objects
 ///
 /// Note: This deserializes untagged, so it's possible that a custom javascript tracer response
