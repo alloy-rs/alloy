@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Features
+
+- [rpc] Add optional index field to CallLogFrame ([#2748](https://github.com/alloy-rs/alloy/issues/2748))
+- Add as_* helper methods to Delta<T> ([#2823](https://github.com/alloy-rs/alloy/issues/2823))
+
+### Miscellaneous Tasks
+
+- Use quantity for index ([#2837](https://github.com/alloy-rs/alloy/issues/2837))
+
+### Refactor
+
+- Change `op` in `StructLog` from `String` to Cow<'static, str> ([#2730](https://github.com/alloy-rs/alloy/issues/2730))
+
 ## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
 
 ### Features
@@ -13,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
 - Release 1.0.26
 - [rpc-types-trace] Re-export `CallKind` ([#2801](https://github.com/alloy-rs/alloy/issues/2801))
 
@@ -389,6 +405,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.8.1
+
+## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
+
+### Miscellaneous Tasks
+
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
