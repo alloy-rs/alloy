@@ -38,5 +38,6 @@ arbitrary = [
 	"alloy-primitives/arbitrary"
 ]
 serde = [
-	"alloy-primitives/serde"
+	"alloy-primitives/serde",
+	"darling/serde"
 ]
