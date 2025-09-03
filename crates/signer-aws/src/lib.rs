@@ -11,3 +11,6 @@ extern crate tracing;
 
 mod signer;
 pub use signer::{AwsSigner, AwsSignerError};
+
+pub use aws_config;
+pub use aws_sdk_kms;
