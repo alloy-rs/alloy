@@ -489,8 +489,8 @@ pub mod beacon_payload {
     }
 }
 
-
-/// Helper for deserializing an execution layer [`ExecutionPayload`] payload from the consensus layer format (snake_case)
+/// Helper for deserializing an execution layer [`ExecutionPayload`] payload from the consensus
+/// layer format (snake_case)
 pub fn execution_payload_from_beacon_str(val: &str) -> Result<ExecutionPayload, serde_json::Error> {
     #[derive(Deserialize)]
     #[serde(transparent)]
@@ -541,7 +541,7 @@ mod tests {
             "block_hash": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
             "transactions": ["0x02f878831469668303f51d843b9ac9f9843b9aca0082520894c93269b73096998db66be0441e836d873535cb9c8894a19041886f000080c001a031cc29234036afbf9a1fb9476b463367cb1f957ac0b919b69bbc798436e604aaa018c4e9c3914eb27aadd0b91e10b18655739fcf8c1fc398763a9f1beecb8ddc86"]
         }"#;
-        
+
         let payload = execution_payload_from_beacon_str(v1_payload_str).unwrap();
         match payload {
             ExecutionPayload::V1(v1) => {
@@ -580,7 +580,7 @@ mod tests {
                 }
             ]
         }"#;
-        
+
         let payload = execution_payload_from_beacon_str(v2_payload_str).unwrap();
         match payload {
             ExecutionPayload::V2(v2) => {
@@ -614,7 +614,7 @@ mod tests {
             "blob_gas_used": "131072",
             "excess_blob_gas": "262144"
         }"#;
-        
+
         let payload = execution_payload_from_beacon_str(v3_payload_str).unwrap();
         match payload {
             ExecutionPayload::V3(v3) => {
