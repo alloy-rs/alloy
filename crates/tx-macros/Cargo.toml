@@ -34,5 +34,10 @@ darling = "0.21"
 alloy-primitives.workspace = true
 
 [features]
-arbitrary = ["alloy-primitives/arbitrary"]
-serde = ["alloy-primitives/serde", "darling/serde"]
+arbitrary = [
+	"alloy-primitives/arbitrary"
+]
+serde = [
+	"alloy-primitives/serde",
+	"darling/serde"
+]

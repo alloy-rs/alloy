@@ -270,15 +270,15 @@ mod impl_secp256k1 {
         let sig =
             RecoverableSignature::from_compact(&sig[0..64], RecoveryId::try_from(sig[64] as i32)?)?;
 
-        let public = SECP256K1.recover_ecdsa(Message::from_digest(*msg), &sig)?;
+        let public = SECP256K1.recover_ecdsa(&Message::from_digest(*msg), &sig)?;
         Ok(public_key_to_address(public))
     }
 
     /// Signs message with the given secret key.
     /// Returns the corresponding signature.
     pub fn sign_message(secret: B256, message: B256) -> Result<Signature, Error> {
-        let sec = SecretKey::from_byte_array(secret.0)?;
-        let s = SECP256K1.sign_ecdsa_recoverable(Message::from_digest(message.0), &sec);
+        let sec = SecretKey::from_slice(secret.as_ref())?;
+        let s = SECP256K1.sign_ecdsa_recoverable(&Message::from_digest(message.0), &sec);
         let (rec_id, data) = s.serialize_compact();
 
         let signature = Signature::new(
@@ -350,13 +350,14 @@ mod impl_k256 {
 
 #[cfg(test)]
 mod tests {
+
     #[cfg(feature = "secp256k1")]
     #[test]
     fn sanity_ecrecover_call_secp256k1() {
         use super::impl_secp256k1::*;
         use alloy_primitives::B256;
 
-        let (secret, public) = secp256k1::generate_keypair(&mut rand_09::rng());
+        let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
         let signer = public_key_to_address(public);
 
         let message = b"hello world";
@@ -401,7 +402,8 @@ mod tests {
         use super::{impl_k256, impl_secp256k1};
         use alloy_primitives::B256;
 
-        let (secp256k1_secret, secp256k1_public) = secp256k1::generate_keypair(&mut rand_09::rng());
+        let (secp256k1_secret, secp256k1_public) =
+            secp256k1::generate_keypair(&mut rand::thread_rng());
         let k256_secret = k256::ecdsa::SigningKey::from_slice(&secp256k1_secret.secret_bytes())
             .expect("k256 secret");
         let k256_public = *k256_secret.verifying_key();
