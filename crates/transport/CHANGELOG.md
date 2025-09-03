@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Revert "chore(deps): internal dep bumps" ([#2839](https://github.com/alloy-rs/alloy/issues/2839))
 
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
 ## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
 
 ### Dependencies
