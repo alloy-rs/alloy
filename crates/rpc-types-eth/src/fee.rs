@@ -57,7 +57,10 @@ pub struct FeeHistory {
     pub base_fee_per_blob_gas: Vec<u128>,
     /// An array of block blob gas used ratios. These are calculated as the ratio of gasUsed and
     /// gasLimit.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(feature = "serde", serde(
+        deserialize_with = "alloy_serde::null_as_default_array", 
+        skip_serializing_if = "Vec::is_empty"
+    ))]
     pub blob_gas_used_ratio: Vec<f64>,
     /// Lowest number block of the returned range.
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
