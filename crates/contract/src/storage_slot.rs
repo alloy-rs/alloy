@@ -179,9 +179,7 @@ mod tests {
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
     const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
-    use alloy_rpc_types_eth::state::{AccountOverride, StateOverridesBuilder};
     use alloy_sol_types::SolCall;
-    use tracing_subscriber::fmt::init;
 
     async fn test_erc20_token_set_balance(token: Address) {
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
