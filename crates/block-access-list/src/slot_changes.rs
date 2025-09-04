@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SlotChanges {
     /// The storage slot key being modified.
     pub slot: StorageKey,

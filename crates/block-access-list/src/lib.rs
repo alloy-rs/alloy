@@ -1,5 +1,5 @@
 //! Block-level access lists for Reth.
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
 /// Module for handling storage changes within a block.

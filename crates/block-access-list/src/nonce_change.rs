@@ -10,6 +10,7 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct NonceChange {
     /// The index of bal that stores this nonce change.
     pub block_access_index: BlockAccessIndex,

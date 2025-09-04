@@ -10,9 +10,16 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp","serde","map"] }
+alloy-primitives = { workspace = true, features = ["rlp", "serde", "map"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+rand = { workspace = true, optional = true }
 
 [lints]
 workspace = true
+
+[features]
+default = ["std"]
+std = ["alloy-primitives/std", "serde/std"]
+arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-primitives/arbitrary"]

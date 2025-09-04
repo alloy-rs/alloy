@@ -265,6 +265,7 @@ impl Header {
         mem::size_of::<Option<u128>>() + // excess blob gas
         mem::size_of::<Option<B256>>() + // parent beacon block root
         mem::size_of::<Option<B256>>() + // requests root
+        mem::size_of::<Option<B256>>() + // block access list hash
         self.extra_data.len() // extra data
     }
 
@@ -312,6 +313,10 @@ impl Header {
 
         if let Some(requests_hash) = self.requests_hash {
             length += requests_hash.length();
+        }
+
+        if let Some(block_access_list_hash) = self.block_access_list_hash {
+            length += block_access_list_hash.length();
         }
 
         length
@@ -413,6 +418,10 @@ impl Encodable for Header {
         if let Some(ref requests_hash) = self.requests_hash {
             requests_hash.encode(out);
         }
+
+        if let Some(ref block_access_list_hash) = self.block_access_list_hash {
+            block_access_list_hash.encode(out);
+        }
     }
 
     fn length(&self) -> usize {
@@ -482,6 +491,10 @@ impl Decodable for Header {
             this.requests_hash = Some(B256::decode(buf)?);
         }
 
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.block_access_list_hash = Some(B256::decode(buf)?);
+        }
+
         let consumed = started_len - buf.len();
         if consumed != rlp_head.payload_length {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -527,6 +540,7 @@ pub(crate) const fn generate_valid_header(
 
     // Placeholder for future EIP adjustments
     header.requests_hash = None;
+    header.block_access_list_hash = None;
 
     header
 }

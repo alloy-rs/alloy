@@ -10,6 +10,7 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CodeChange {
     /// The index of bal that stores this code change.
     pub block_access_index: BlockAccessIndex,
