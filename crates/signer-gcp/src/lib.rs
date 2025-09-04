@@ -11,3 +11,5 @@ extern crate tracing;
 
 mod signer;
 pub use signer::{GcpKeyRingRef, GcpSigner, GcpSignerError, KeySpecifier};
+
+pub use gcloud_sdk;

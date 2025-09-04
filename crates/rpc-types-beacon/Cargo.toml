@@ -34,12 +34,12 @@ tree_hash = { workspace = true, optional = true }
 tree_hash_derive = { workspace = true, optional = true }
 
 serde.workspace = true
+serde_json.workspace = true
 serde_with = { workspace = true, features = ["alloc"] }
 
 thiserror.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
 similar-asserts.workspace = true
 
 [features]

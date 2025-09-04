@@ -7,7 +7,7 @@ use crate::geth::{
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, time::Duration};
+use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 // re-exports
 pub use self::{
     call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
@@ -72,7 +72,7 @@ pub struct StructLog {
     /// program counter
     pub pc: u64,
     /// opcode to be executed
-    pub op: String,
+    pub op: Cow<'static, str>,
     /// remaining gas
     pub gas: u64,
     /// cost for executing op
@@ -106,6 +106,13 @@ pub struct StructLog {
     /// Refund counter
     #[serde(default, rename = "refund", skip_serializing_if = "Option::is_none")]
     pub refund_counter: Option<u64>,
+}
+
+impl StructLog {
+    /// Returns the name of the opcode.
+    pub fn opcode(&self) -> &str {
+        self.op.as_ref()
+    }
 }
 
 /// Tracing response objects

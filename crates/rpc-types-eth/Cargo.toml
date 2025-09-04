@@ -76,8 +76,8 @@ std = [
 	"serde?/std",
 	"serde_json?/std",
 	"thiserror/std",
-	"serde_with?/std"
-
+	"serde_with?/std",
+	"alloy-block-access-list/std"
 ]
 serde = [
 	"dep:serde",
@@ -100,6 +100,8 @@ arbitrary = [
 	"alloy-eips/arbitrary",
 	"alloy-consensus-any/arbitrary",
 	"alloy-sol-types/arbitrary",
+	"alloy-block-access-list/arbitrary"
+
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]

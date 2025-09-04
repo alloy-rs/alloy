@@ -19,3 +19,5 @@ pub use types::{DerivationType as HDPath, LedgerError};
 #[doc(hidden)]
 #[deprecated(note = "use `LedgerSigner` instead")]
 pub type Ledger = LedgerSigner;
+
+pub use coins_ledger;
