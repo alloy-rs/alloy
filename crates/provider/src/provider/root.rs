@@ -10,6 +10,7 @@ use std::{
     fmt,
     marker::PhantomData,
     sync::{Arc, OnceLock},
+    time::Duration,
 };
 
 #[cfg(feature = "pubsub")]
@@ -78,6 +79,28 @@ impl<N: Network> RootProvider<N> {
     pub async fn connect_boxed<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
         Self::connect_with(conn).await
     }
+
+    /// Sets the mempool check configuration.
+    ///
+    /// Represents the configuration for checking the presence of transaction in the mempool.
+    /// Under certain circumstances, transaction can be evicted from the mempool, meaning that
+    /// an already submitted transaction will never get a receipt and won't be confirmed.
+    ///
+    /// This configuration allows to configure the interval at which transaction should be checked.
+    /// If set to `None`, no mempool checks will be performed.
+    ///
+    /// The mempool check is enabled by default, and it's only recommended to disable it if
+    /// there are other means to detect hanging transactions implemented by the caller.
+    /// By default, it will be chosen by heartbeat task based on the network polling interval.
+    ///
+    /// Returns `false` in case mempool check cannot be set (e.g. it was set previously or heartbeat
+    /// actor is already running).
+    pub fn set_mempool_check(&self, interval: Option<Duration>) -> bool {
+        if self.inner.mempool_check_interval.set(interval).is_err() {
+            return false;
+        }
+        true
+    }
 }
 
 impl<N: Network> RootProvider<N> {
@@ -114,9 +137,19 @@ impl<N: Network> RootProvider<N> {
     #[inline]
     pub(crate) fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
+            let mempool_check_interval = self
+                .inner
+                .mempool_check_interval
+                .get_or_init(|| Some(self.inner.client.poll_interval() * 10));
+
             let new_blocks = NewBlocks::<N>::new(self.inner.weak_client());
             let stream = new_blocks.into_stream();
-            Heartbeat::<N, _>::new(Box::pin(stream)).spawn()
+            Heartbeat::<N, _>::new(
+                Box::pin(stream),
+                self.inner.weak_client(),
+                *mempool_check_interval,
+            )
+            .spawn()
         })
     }
 }
@@ -125,19 +158,30 @@ impl<N: Network> RootProvider<N> {
 /// base of every provider stack.
 pub(crate) struct RootProviderInner<N: Network = Ethereum> {
     client: RpcClient,
+    mempool_check_interval: OnceLock<Option<Duration>>,
     heart: OnceLock<HeartbeatHandle>,
     _network: PhantomData<N>,
 }
 
 impl<N: Network> Clone for RootProviderInner<N> {
     fn clone(&self) -> Self {
-        Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
+        Self {
+            client: self.client.clone(),
+            mempool_check_interval: self.mempool_check_interval.clone(),
+            heart: self.heart.clone(),
+            _network: PhantomData,
+        }
     }
 }
 
 impl<N: Network> RootProviderInner<N> {
     pub(crate) fn new(client: RpcClient) -> Self {
-        Self { client, heart: Default::default(), _network: PhantomData }
+        Self {
+            client,
+            mempool_check_interval: Default::default(),
+            heart: Default::default(),
+            _network: PhantomData,
+        }
     }
 
     pub(crate) fn weak_client(&self) -> WeakClient {

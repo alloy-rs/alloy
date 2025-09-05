@@ -8,6 +8,7 @@ use alloy_primitives::{
     map::{B256HashMap, B256HashSet},
     TxHash, B256,
 };
+use alloy_rpc_client::WeakClient;
 use alloy_transport::{utils::Spawnable, TransportError};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
@@ -353,6 +354,9 @@ pub enum WatchTxError {
     /// Transaction was not confirmed after configured timeout.
     #[error("transaction was not confirmed within the timeout")]
     Timeout,
+    /// Transaction was dropped from the mempool.
+    #[error("transaction was dropped from the mempool")]
+    Dropped,
 }
 
 /// The type sent by the [`HeartbeatHandle`] to the [`Heartbeat`] background task.
@@ -362,6 +366,9 @@ struct TxWatcher {
     /// The block at which the transaction was received. To be filled once known.
     /// Invariant: any confirmed transaction in `Heart` has this value set.
     received_at_block: Option<u64>,
+    /// The time at which the transaction was added to the watcher.
+    /// Used to calculate the mempool checks.
+    checked_at: Instant,
     tx: oneshot::Sender<Result<(), WatchTxError>>,
 }
 
@@ -439,7 +446,9 @@ impl HeartbeatHandle {
     ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
-        match self.tx.send(TxWatcher { config, received_at_block, tx }).await {
+        let added_at = Instant::now();
+        match self.tx.send(TxWatcher { config, received_at_block, checked_at: added_at, tx }).await
+        {
             Ok(()) => Ok(PendingTransaction { tx_hash, rx }),
             Err(e) => Err(e.0.config),
         }
@@ -450,6 +459,12 @@ impl HeartbeatHandle {
 pub(crate) struct Heartbeat<N, S> {
     /// The stream of incoming blocks to watch.
     stream: futures::stream::Fuse<S>,
+
+    /// Client is needed to confirm the existence of transactions in the mempool.
+    client: WeakClient,
+
+    /// Interval between mempool checks.
+    mempool_check_interval: Option<Duration>,
 
     /// Lookbehind blocks in form of mapping block number -> vector of transaction hashes.
     past_blocks: VecDeque<(u64, B256HashSet)>,
@@ -468,9 +483,15 @@ pub(crate) struct Heartbeat<N, S> {
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Create a new heartbeat task.
-    pub(crate) fn new(stream: S) -> Self {
+    pub(crate) fn new(
+        stream: S,
+        client: WeakClient,
+        mempool_check_interval: Option<Duration>,
+    ) -> Self {
         Self {
             stream: stream.fuse(),
+            client,
+            mempool_check_interval,
             past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
@@ -491,10 +512,10 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Get the next time to reap a transaction. If no reaps, this is a very
     /// long time from now (i.e. will not be woken).
     fn next_reap(&self) -> Instant {
-        self.reap_at
-            .first_key_value()
-            .map(|(k, _)| *k)
-            .unwrap_or_else(|| Instant::now() + Duration::from_secs(60_000))
+        self.reap_at.first_key_value().map(|(k, _)| *k).unwrap_or_else(|| {
+            let offset = self.mempool_check_interval.unwrap_or(Duration::from_secs(60_000));
+            Instant::now() + offset
+        })
     }
 
     /// Reap any timeout
@@ -507,6 +528,52 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             if let Some(watcher) = self.unconfirmed.remove(tx_hash) {
                 debug!(tx=%tx_hash, "reaped");
                 watcher.notify(Err(WatchTxError::Timeout));
+            }
+        }
+    }
+
+    /// Reap any transactions that have been wiped from the mempool.
+    async fn reap_mempool_wipes(&mut self) {
+        let Some(check_interval) = self.mempool_check_interval else {
+            return;
+        };
+
+        let Some(client) = self.client.upgrade() else {
+            // No client available, nothing to do.
+            return;
+        };
+
+        // Collect the list of transactions that disappeared from the mempool.
+        let mut to_reap = Vec::new();
+        for (hash, tx) in
+            self.unconfirmed.iter_mut().filter(|(_, tx)| tx.checked_at.elapsed() > check_interval)
+        {
+            match client
+                .request::<_, Option<N::TransactionResponse>>("eth_getTransactionByHash", (*hash,))
+                .await
+            {
+                Ok(Some(_)) => {
+                    // Transaction exists, reschedule the check.
+                    tx.checked_at = Instant::now();
+                }
+                Err(err) => {
+                    // Some transport error; we can try on the next iteration.
+                    debug!(tx=%hash, %err, "failed to fetch transaction from mempool");
+                    break;
+                }
+                Ok(None) => {
+                    // Transaction is missing, must be removed.
+                    to_reap.push(*hash);
+                }
+            }
+        }
+        for tx_hash in to_reap {
+            if let Some(watcher) = self.unconfirmed.remove(&tx_hash) {
+                debug!(tx=%tx_hash, "reaped");
+                watcher.notify(Err(WatchTxError::Dropped));
+                // We don't remove the transaction from `reap_at`, since for that we need to do
+                // a full scan. The cost is one spurious wake up per transaction removed here,
+                // but mempool drops are rare, so it shouldn't have any noticeable impact.
             }
         }
     }
@@ -661,6 +728,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     }
 
     async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
+        let mut last_mempool_check = Instant::now();
         'shutdown: loop {
             {
                 let next_reap = self.next_reap();
@@ -690,6 +758,14 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
             // Always reap timeouts
             self.reap_timeouts();
+
+            // Only do mempool checks if it's enabled and enough time has passed.
+            if let Some(check_interval) = self.mempool_check_interval {
+                if last_mempool_check.elapsed() >= check_interval {
+                    self.reap_mempool_wipes().await;
+                    last_mempool_check = Instant::now();
+                }
+            }
         }
     }
 }
