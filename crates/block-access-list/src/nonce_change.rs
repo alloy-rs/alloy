@@ -10,11 +10,14 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct NonceChange {
     /// The index of bal that stores this nonce change.
+    #[serde(rename = "txIndex", with = "alloy_serde::quantity")]
     pub block_access_index: BlockAccessIndex,
     /// The new code of the account.
+    #[serde(rename = "postNonce", with = "alloy_serde::quantity")]
     pub new_nonce: u64,
 }
 

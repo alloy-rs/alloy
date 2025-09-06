@@ -11,11 +11,14 @@ use crate::BlockAccessIndex;
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct StorageChange {
     /// Index of the bal that stores the performed write.
+    #[serde(rename = "txIndex", with = "alloy_serde::quantity")]
     pub block_access_index: BlockAccessIndex,
     /// The new value written to the storage slot.
+    #[serde(rename = "postValue")]
     pub new_value: StorageValue,
 }
 

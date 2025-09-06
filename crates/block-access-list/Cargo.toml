@@ -15,15 +15,12 @@ alloy-rlp = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 rand = { workspace = true, optional = true }
-
+serde_json = { workspace = true }
+alloy-serde = { workspace = true }
 [lints]
 workspace = true
 
 [features]
 default = ["std"]
-std = [
-	"alloy-primitives/std",
-	"serde/std",
-	"alloy-rlp/std"
-]
+std = ["alloy-primitives/std", "serde/std", "alloy-rlp/std", "serde_json/std"]
 arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-primitives/arbitrary"]

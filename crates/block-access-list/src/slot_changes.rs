@@ -11,11 +11,13 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SlotChanges {
     /// The storage slot key being modified.
     pub slot: U256,
     /// A list of write operations to this slot, ordered by transaction index.
+    #[serde(rename = "slotChanges")]
     pub changes: Vec<StorageChange>,
 }
 

@@ -16,6 +16,7 @@ use crate::{
 #[derive(
     Debug, Clone, Default, PartialEq, Eq, RlpDecodable, RlpEncodable, Serialize, Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AccountChanges {
     /// The address of the account whose changes are stored.
