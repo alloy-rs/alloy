@@ -80,7 +80,6 @@ std = [
 ]
 serde = [
 	"dep:serde",
-	"dep:serde_with",
 	"dep:serde_json",
 	"dep:alloy-serde",
 	"alloy-primitives/serde",
@@ -102,4 +101,4 @@ arbitrary = [
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
-serde-bincode-compat = ["dep:serde_with", "alloy-eips/serde-bincode-compat"]
+serde-bincode-compat = ["serde", "dep:serde_with", "alloy-eips/serde-bincode-compat"]
