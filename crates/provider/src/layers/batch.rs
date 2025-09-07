@@ -416,7 +416,7 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
                 }
             }
             CallBatchMsgKind::ChainId => {
-                // Chain ID is independent of block, so we can always use the current chain ID
+                // Chain ID is network metadata, independent of block ID
                 self.inner.get_chain_id().await.map(|res| m3_res(true, res.abi_encode().into()))
             }
             CallBatchMsgKind::Balance(addr) => {
@@ -488,6 +488,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::U64,
         alloy_primitives::ChainId,
     > {
+        // Chain ID is network metadata, use latest but the block ID is effectively ignored
         crate::ProviderCall::BoxedFuture(Box::pin(
             self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::ChainId, BlockId::latest()),
         ))
