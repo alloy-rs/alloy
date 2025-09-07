@@ -1,7 +1,7 @@
 //! Contains the `StorageChange` struct, which represents a single storage write operation within a
 //! transaction.
 
-use alloy_primitives::StorageValue;
+use alloy_primitives::B256;
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
@@ -19,20 +19,20 @@ pub struct StorageChange {
     pub block_access_index: BlockAccessIndex,
     /// The new value written to the storage slot.
     #[serde(rename = "postValue")]
-    pub new_value: StorageValue,
+    pub new_value: B256,
 }
 
 impl StorageChange {
     /// Creates a new `StorageChange`.
     #[inline]
-    pub const fn new(block_access_index: BlockAccessIndex, new_value: StorageValue) -> Self {
+    pub const fn new(block_access_index: BlockAccessIndex, new_value: B256) -> Self {
         Self { block_access_index, new_value }
     }
 
     /// Returns true if the new value is zero.
     #[inline]
     pub fn is_zero(&self) -> bool {
-        self.new_value == StorageValue::ZERO
+        self.new_value == B256::ZERO
     }
 
     /// Returns true if this change was made by the given transaction.
@@ -43,7 +43,7 @@ impl StorageChange {
 
     /// Returns a copy with a different storage value.
     #[inline]
-    pub const fn with_value(&self, value: StorageValue) -> Self {
+    pub const fn with_value(&self, value: B256) -> Self {
         Self { block_access_index: self.block_access_index, new_value: value }
     }
 }
