@@ -1623,6 +1623,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_tx_dropped() {
+        let anvil = Anvil::new().spawn();
+        let client = RpcClient::builder()
+            .http(anvil.endpoint_url())
+            .with_poll_interval(Duration::from_millis(10));
+
+        let provider = RootProvider::<Ethereum>::new(client);
+        // Try getting some non-existent transaction.
+        let pending_tx = PendingTransactionBuilder::new(
+            provider,
+            b256!("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+        )
+        .get_receipt();
+
+        let receipt_err = tokio::time::timeout(Duration::from_secs(1), pending_tx)
+            .await
+            .expect("Waiting for receipt error timed out")
+            .expect_err("Expected error for non-existent transaction receipt");
+        assert!(
+            matches!(receipt_err, PendingTransactionError::TxWatcher(crate::WatchTxError::Dropped)),
+            "Expected Dropped error, got: {receipt_err:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn test_send_tx() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
         let tx = TransactionRequest {
