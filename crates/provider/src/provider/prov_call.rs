@@ -24,7 +24,7 @@ pub type BoxedFut<Output> = Pin<Box<dyn Future<Output = TransportResult<Output>>
 /// providers to:
 /// - produce data via an [`RpcCall`]
 /// - produce data by waiting on a batched RPC [`Waiter`]
-/// - proudce data via an arbitrary boxed future
+/// - produce data via an arbitrary boxed future
 /// - produce data in any synchronous way
 ///
 /// [`Provider`]: crate::Provider
