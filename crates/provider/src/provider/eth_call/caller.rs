@@ -5,7 +5,7 @@ use alloy_network::Network;
 use alloy_rpc_client::WeakClient;
 use alloy_transport::{TransportErrorKind, TransportResult};
 
-/// Trait that helpes convert `EthCall` into a `ProviderCall`.
+/// Trait that helps convert `EthCall` into a `ProviderCall`.
 pub trait Caller<N, Resp>: Send + Sync
 where
     N: Network,
@@ -13,7 +13,7 @@ where
 {
     /// Method that needs to be implemented to convert to a `ProviderCall`.
     ///
-    /// This method sends the request to relevant data source and returns a `ProviderCall`.
+    /// This method sends the request to the relevant data source and returns a `ProviderCall`.
     fn call(
         &self,
         params: EthCallParams<N>,
