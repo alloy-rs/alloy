@@ -9,7 +9,7 @@ use alloy_primitives::{
     TxHash, B256,
 };
 use alloy_transport::{utils::Spawnable, TransportError};
-use futures::{stream::StreamExt, FutureExt, Stream};
+use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
@@ -224,17 +224,28 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> Result<N::ReceiptResponse, PendingTransactionError> {
         let hash = self.config.tx_hash;
+        let required_confirmations = self.config.required_confirmations;
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
 
         // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
-        // block the tx was mined in
+        // block the tx was mined in. Only apply this for single confirmation to respect the
+        // confirmation setting.
         let mut interval = interval(self.provider.client().poll_interval());
 
         loop {
             let mut confirmed = false;
 
+            // If more than 1 block confirmations is specified then we can rely on the regular
+            // watch_pending_transaction and dont need this workaround for the above mentioned race
+            // condition
+            let tick_fut = if required_confirmations > 1 {
+                pending::<()>().right_future()
+            } else {
+                interval.tick().map(|_| ()).left_future()
+            };
+
             select! {
-                _ = interval.tick() => {},
+                _ = tick_fut => {},
                 res = &mut pending_tx => {
                     let _ = res?;
                     confirmed = true;
