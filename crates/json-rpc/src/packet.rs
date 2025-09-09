@@ -6,7 +6,7 @@ use serde::{
     Deserialize, Serialize,
 };
 use serde_json::value::RawValue;
-use std::{fmt, marker::PhantomData};
+use std::{borrow::Borrow, fmt, hash::Hash, marker::PhantomData};
 
 /// A [`RequestPacket`] is a [`SerializedRequest`] or a batch of serialized
 /// request.
@@ -370,7 +370,10 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// - Responses are not guaranteed to be in the same order.
     /// - Responses are not guaranteed to be in the set.
     /// - If the packet contains duplicate IDs, both will be found.
-    pub fn responses_by_ids(&self, ids: &HashSet<Id>) -> Vec<&Response<Payload, ErrData>> {
+    pub fn responses_by_ids<K>(&self, ids: &HashSet<K>) -> Vec<&Response<Payload, ErrData>>
+    where
+        K: Borrow<Id> + Eq + Hash,
+    {
         match self {
             Self::Single(single) if ids.contains(&single.id) => vec![single],
             Self::Batch(batch) => batch.iter().filter(|res| ids.contains(&res.id)).collect(),
