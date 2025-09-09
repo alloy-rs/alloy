@@ -55,11 +55,11 @@ impl BuiltInConnectionString {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_rpc_client::BuiltInConnectionString;
     ///
-    /// let transport = BuiltInConnectionString::parse_and_connect("http://localhost:8545").await?;
+    /// let transport = BuiltInConnectionString::connect("http://localhost:8545").await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn parse_and_connect(s: &str) -> Result<BoxTransport, TransportError> {
+    pub async fn connect(s: &str) -> Result<BoxTransport, TransportError> {
         let connection = Self::from_str(s)?;
         connection.connect_boxed().await
     }
