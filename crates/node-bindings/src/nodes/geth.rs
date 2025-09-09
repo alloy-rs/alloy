@@ -169,7 +169,21 @@ impl GethInstance {
 
 impl Drop for GethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill geth");
+        match self.pid.try_wait() {
+            Ok(Some(_)) => {
+                // Process already exited; nothing to do
+            }
+            Ok(None) => {
+                // Best-effort termination; ignore errors in Drop
+                let _ = self.pid.kill();
+                let _ = self.pid.wait();
+            }
+            Err(_) => {
+                // Unable to query process state; attempt to kill and wait anyway
+                let _ = self.pid.kill();
+                let _ = self.pid.wait();
+            }
+        }
     }
 }
 
