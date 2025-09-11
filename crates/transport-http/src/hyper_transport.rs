@@ -107,7 +107,7 @@ where
         // convert the Box<RawValue> into a hyper request<B>
         let body = ser.get().as_bytes().to_owned().into();
 
-        let req = builder.body(body).expect("request parts are invalid");
+        let req = builder.body(body).map_err(TransportErrorKind::custom)?;
 
         let mut service = self.client.service;
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
