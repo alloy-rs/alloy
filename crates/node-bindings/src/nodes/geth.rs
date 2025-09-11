@@ -112,12 +112,12 @@ impl GethInstance {
     /// Returns the HTTP endpoint url of this instance
     #[doc(alias = "http_endpoint_url")]
     pub fn endpoint_url(&self) -> Url {
-        Url::parse(&self.endpoint()).unwrap()
+        Url::parse(&self.endpoint()).expect("failed to parse HTTP localhost endpoint URL")
     }
 
     /// Returns the Websocket endpoint url of this instance
     pub fn ws_endpoint_url(&self) -> Url {
-        Url::parse(&self.ws_endpoint()).unwrap()
+        Url::parse(&self.ws_endpoint()).expect("failed to parse WS localhost endpoint URL")
     }
 
     /// Returns the path to this instances' data directory
