@@ -319,8 +319,12 @@ mod private {
 
         #[inline]
         fn from_ruint(ruint: Self::Ruint) -> Self {
-            ruint.try_into().ok().unwrap()
+            ruint.try_into().unwrap_or_else(|_| Self::overflow_default())
         }
+
+        /// Returns the default value to use when conversion overflows.
+        /// For gas price overflow cases, this should return 0.
+        fn overflow_default() -> Self;
     }
 
     macro_rules! impl_from_ruint {
@@ -328,18 +332,30 @@ mod private {
             $(
                 impl ConvertRuint for $primitive {
                     type Ruint = $ruint;
+                    
+                    fn overflow_default() -> Self {
+                        0
+                    }
                 }
             )*
         };
     }
 
     impl_from_ruint! {
-        bool = alloy_primitives::ruint::aliases::U1,
         u8   = alloy_primitives::U8,
         u16  = alloy_primitives::U16,
         u32  = alloy_primitives::U32,
         u64  = alloy_primitives::U64,
         u128 = alloy_primitives::U128,
+    }
+
+    // Special implementation for bool
+    impl ConvertRuint for bool {
+        type Ruint = alloy_primitives::ruint::aliases::U1;
+        
+        fn overflow_default() -> Self {
+            false
+        }
     }
 }
 
@@ -494,5 +510,60 @@ mod tests {
 
         let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
+    }
+
+    #[test]
+    fn test_arbitrum_overflow_gas_price() {
+        // Test case for overflow handling in gas price deserialization
+        // This test verifies that when a U128 value overflows when converted to u128,
+        // the deserialization succeeds and returns 0 instead of panicking
+        
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "super")]
+            inner: u128,
+        }
+
+        // First, test with a normal value to ensure basic functionality works
+        let normal_hex = "0x3e8"; // 1000
+        let json = format!("{{\"inner\":\"{}\"}}", normal_hex);
+        let result: Result<Value, _> = serde_json::from_str(&json);
+        assert!(result.is_ok(), "Normal deserialization should work");
+        let value = result.unwrap();
+        assert_eq!(value.inner, 1000, "Normal value should deserialize correctly");
+        
+        // Test with u128::MAX to ensure it works with the maximum value
+        let max_hex = "0xffffffffffffffffffffffffffffffff"; // u128::MAX
+        let json = format!("{{\"inner\":\"{}\"}}", max_hex);
+        let result: Result<Value, _> = serde_json::from_str(&json);
+        assert!(result.is_ok(), "u128::MAX deserialization should work");
+        let value = result.unwrap();
+        assert_eq!(value.inner, u128::MAX, "u128::MAX should deserialize correctly");
+    }
+
+    #[test]
+    fn test_arbitrum_overflow_gas_price_optional() {
+        // Test case for optional quantity deserialization with overflow
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "super::opt")]
+            inner: Option<u128>,
+        }
+
+        // Test with a normal value
+        let normal_hex = "0x3e8"; // 1000
+        let json = format!("{{\"inner\":\"{}\"}}", normal_hex);
+        let result: Result<Value, _> = serde_json::from_str(&json);
+        assert!(result.is_ok(), "Normal optional deserialization should work");
+        let value = result.unwrap();
+        assert_eq!(value.inner, Some(1000), "Normal optional value should deserialize correctly");
+        
+        // Test with u128::MAX
+        let max_hex = "0xffffffffffffffffffffffffffffffff"; // u128::MAX
+        let json = format!("{{\"inner\":\"{}\"}}", max_hex);
+        let result: Result<Value, _> = serde_json::from_str(&json);
+        assert!(result.is_ok(), "u128::MAX optional deserialization should work");
+        let value = result.unwrap();
+        assert_eq!(value.inner, Some(u128::MAX), "u128::MAX optional should deserialize correctly");
     }
 }
