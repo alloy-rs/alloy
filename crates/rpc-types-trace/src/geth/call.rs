@@ -338,4 +338,39 @@ mod tests {
         let _trace: CallFrame = serde_json::from_str(ONLY_TOP_CALL).unwrap();
         let _trace: CallFrame = serde_json::from_str(WITH_LOG).unwrap();
     }
+
+    #[test]
+    fn test_call_log_frame_serde_with_regular_json_number() {
+        // Test that CallLogFrame can deserialize index as a regular JSON number
+        let json = r#"{
+            "address": "0x0000000000000000000000000000000000000000",
+            "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"],
+            "data": "0x1234",
+            "position": 5,
+            "index": 10
+        }"#;
+
+        let log_frame: CallLogFrame = serde_json::from_str(json).unwrap();
+        assert_eq!(log_frame.position, Some(5));
+        assert_eq!(log_frame.index, Some(10));
+
+        // Test serialization back to JSON with quantity format
+        let serialized = serde_json::to_string(&log_frame).unwrap();
+        let deserialized: CallLogFrame = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(log_frame, deserialized);
+
+        // Test with hex values as well
+        let json_hex = r#"{
+            "address": "0x0000000000000000000000000000000000000000",
+            "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"],
+            "data": "0x1234",
+            "position": "0x5",
+            "index": "0xa"
+        }"#;
+
+        let log_frame_hex: CallLogFrame = serde_json::from_str(json_hex).unwrap();
+        assert_eq!(log_frame_hex.position, Some(5));
+        assert_eq!(log_frame_hex.index, Some(10));
+        assert_eq!(log_frame, log_frame_hex);
+    }
 }
