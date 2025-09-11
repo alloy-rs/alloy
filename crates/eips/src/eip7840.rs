@@ -106,7 +106,7 @@ impl BlobParams {
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas` and `blob_gas_used`.
     #[inline]
-    // #[deprecated(note = "Use `next_block_excess_blob_gas_osaka` instead")]
+    #[deprecated(note = "Use `next_block_excess_blob_gas_osaka` instead")]
     pub const fn next_block_excess_blob_gas(
         &self,
         excess_blob_gas: u64,
