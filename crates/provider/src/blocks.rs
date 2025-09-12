@@ -5,7 +5,14 @@ use alloy_transport::RpcError;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use std::{marker::PhantomData, num::NonZeroUsize};
+use std::{
+    marker::PhantomData,
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 #[cfg(feature = "pubsub")]
 use futures::{future::Either, FutureExt};
@@ -19,6 +26,38 @@ const MAX_RETRIES: usize = 3;
 /// Default block number for when we don't have a block yet.
 const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
+#[derive(Default)]
+pub(crate) struct Paused {
+    is_paused: AtomicBool,
+    notify: tokio::sync::Notify,
+}
+
+impl Paused {
+    pub(crate) fn is_paused(&self) -> bool {
+        self.is_paused.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn set_paused(&self, paused: bool) {
+        self.is_paused.store(paused, Ordering::Release);
+        if !paused {
+            self.notify.notify_waiters();
+        }
+    }
+
+    /// Waits until the paused state is changed to `false`.
+    ///
+    /// Returns `true` if the method actually waited for the paused state to become unpaused,
+    /// or `false` if it was already unpaused when called.
+    async fn wait(&self) -> bool {
+        if !self.is_paused() {
+            return false;
+        }
+        self.notify.notified().await;
+        debug_assert!(!self.is_paused());
+        true
+    }
+}
+
 /// Streams new blocks from the client.
 pub(crate) struct NewBlocks<N: Network = Ethereum> {
     client: WeakClient,
@@ -28,6 +67,7 @@ pub(crate) struct NewBlocks<N: Network = Ethereum> {
     next_yield: BlockNumber,
     /// LRU cache of known blocks. Only used by the polling task.
     known_blocks: LruCache<BlockNumber, N::BlockResponse>,
+    pub(crate) paused: Arc<Paused>,
     _phantom: PhantomData<N>,
 }
 
@@ -37,6 +77,7 @@ impl<N: Network> NewBlocks<N> {
             client,
             next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
+            paused: Arc::default(),
             _phantom: PhantomData,
         }
     }
@@ -123,13 +164,17 @@ impl<N: Network> NewBlocks<N> {
                 yield known_block;
             }
 
+            // If we're paused, wait until we're unpaused.
+            // Once unpaused, reset `self.next_yield` to ignore the blocks that were included while we were paused.
+            let unpaused = self.paused.wait().await;
+
             // Get the tip.
             let Some(block_number) = numbers_stream.next().await else {
                 debug!("polling stream ended");
                 break 'task;
             };
             trace!(%block_number, "got block number");
-            if self.next_yield == NO_BLOCK_NUMBER {
+            if self.next_yield == NO_BLOCK_NUMBER || unpaused {
                 assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
                 // this stream can be initialized after the first tx was sent,
                 // to avoid the edge case where the tx is mined immediately, we should apply an
