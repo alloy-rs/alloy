@@ -27,6 +27,22 @@ where
     Ok(value)
 }
 
+/// Deserializes a vector of optional `f64`, replacing `None` values with `0.0`.
+/// Returns an empty vector if the input is `null`.
+pub fn null_as_default_array<'de,D>(deserializer : D) -> Result<Vec<f64>, D::Error>
+where 
+    D : Deserializer<'de>
+{
+    let opt : Option<Vec<Option<f64>>> = Option::deserialize(deserializer)?;
+    match opt{
+        Some(vec) => {
+            // replace None with 0.0
+            Ok(vec.into_iter().map(|x| x.unwrap_or(0.0)).collect())
+        }
+        None => Ok(Vec::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,5 +90,32 @@ mod tests {
         let json_data = json!({ "should_be_none": "unexpected value" });
         let result: Result<TestStruct, _> = serde_json::from_value(json_data);
         assert!(result.is_err());
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Test {
+        #[serde(deserialize_with = "null_as_default_array")]
+        blob_gas_used_ratio: Vec<f64>,
+    }
+
+    #[test]
+    fn test_blob_gas_used_ratio_null_field() {
+        let json_data = json!({"blob_gas_used_ratio":null});
+        let result: Test = serde_json::from_value(json_data).unwrap();
+        assert_eq!(result.blob_gas_used_ratio, Vec::<f64>::new());
+    }
+
+    #[test]
+    fn test_blob_gas_used_ratio_null_elements() {
+        let json_data = json!({ "blob_gas_used_ratio": [0.5, null, 0.8] });
+        let result: Test = serde_json::from_value(json_data).unwrap();
+        assert_eq!(result.blob_gas_used_ratio, vec![0.5, 0.0, 0.8]);
+    }
+
+    #[test]
+    fn test_blob_gas_used_ratio_normal_array() {
+        let json_data = json!({ "blob_gas_used_ratio": [0.1, 0.2, 0.3] });
+        let result: Test = serde_json::from_value(json_data).unwrap();
+        assert_eq!(result.blob_gas_used_ratio, vec![0.1, 0.2, 0.3]);
     }
 }
