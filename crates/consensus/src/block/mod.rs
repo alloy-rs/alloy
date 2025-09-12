@@ -1,7 +1,7 @@
 //! Block-related consensus types.
 
 mod header;
-use alloy_eips::eip7928::BlockAccessList;
+use alloy_block_access_list::BlockAccessList;
 pub use header::{BlockHeader, Header};
 
 mod traits;
@@ -296,7 +296,7 @@ impl<T, H> BlockBody<T, H> {
     }
 
     /// Returns the block access list for the block, if available.
-    pub const fn block_access_list(&self) -> &Option<BlockAccessList> {
+    pub fn block_access_list(&self) -> &Option<BlockAccessList> {
         &self.block_access_list
     }
 }

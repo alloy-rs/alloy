@@ -1,0 +1,26 @@
+[package]
+name = "alloy-block-access-list"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["rlp", "serde", "map"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+rand = { workspace = true, optional = true }
+serde_json = { workspace = true }
+alloy-serde = { workspace = true }
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = ["alloy-primitives/std", "serde/std", "alloy-rlp/std", "serde_json/std"]
+arbitrary = ["std", "dep:rand", "dep:arbitrary", "alloy-primitives/arbitrary"]

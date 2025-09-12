@@ -33,6 +33,7 @@ large-enum-variant = "allow"
 result-large-err = "allow"
 
 [workspace.dependencies]
+alloy-block-access-list = { version = "1.0.30", path = "crates/block-access-list", default-features = false }
 alloy-consensus = { version = "1.0.30", path = "crates/consensus", default-features = false }
 alloy-consensus-any = { version = "1.0.30", path = "crates/consensus-any", default-features = false }
 alloy-contract = { version = "1.0.30", path = "crates/contract", default-features = false }
@@ -87,8 +88,6 @@ alloy-chains = { version = "0.2", default-features = false }
 alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.0", default-features = false }
 alloy-eip7702 = { version = "0.6.1", default-features = false }
-alloy-eip7928 = { git = "https://github.com/alloy-rs/eips", branch = "main", package = "alloy-eip7928", default-features = false }
-
 
 # hardforks
 alloy-hardforks = "0.2.0"
@@ -181,5 +180,3 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.20"
 tower-http = "0.6.1"
-
-# [patch.crates-io]
