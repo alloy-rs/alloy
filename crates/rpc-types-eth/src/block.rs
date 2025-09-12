@@ -2,9 +2,10 @@
 
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_block_access_list::BlockAccessList;
 use alloy_consensus::{error::ValueError, BlockBody, BlockHeader, Sealed, TxEnvelope};
-use alloy_eips::{eip4895::Withdrawals, eip7840::BlobParams, Encodable2718};
+use alloy_eips::{
+    eip4895::Withdrawals, eip7840::BlobParams, eip7928::BlockAccessList, Encodable2718,
+};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };

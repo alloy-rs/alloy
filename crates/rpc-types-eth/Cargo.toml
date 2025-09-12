@@ -29,7 +29,6 @@ alloy-consensus-any.workspace = true
 alloy-network-primitives.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "map"] }
-alloy-block-access-list.workspace = true
 itertools.workspace = true
 thiserror.workspace = true
 
@@ -77,7 +76,6 @@ std = [
 	"serde_json?/std",
 	"thiserror/std",
 	"serde_with?/std",
-	"alloy-block-access-list/std"
 ]
 serde = [
 	"dep:serde",
@@ -99,9 +97,12 @@ arbitrary = [
 	"alloy-eips/arbitrary",
 	"alloy-consensus-any/arbitrary",
 	"alloy-sol-types/arbitrary",
-	"alloy-block-access-list/arbitrary"
 
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
-serde-bincode-compat = ["serde", "dep:serde_with", "alloy-eips/serde-bincode-compat"]
+serde-bincode-compat = [
+	"serde",
+	"dep:serde_with",
+	"alloy-eips/serde-bincode-compat",
+]
