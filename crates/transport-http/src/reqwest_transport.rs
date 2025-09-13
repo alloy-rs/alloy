@@ -4,7 +4,7 @@ use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
     TransportFut, TransportResult,
 };
-use std::task;
+use std::{task, time::Duration};
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
@@ -24,14 +24,24 @@ impl TransportConnect for ReqwestConnect {
     }
 
     async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
-        Ok(BoxTransport::new(Http::with_client(Client::new(), self.url.clone())))
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .build()
+            .map_err(TransportErrorKind::custom)?;
+        Ok(BoxTransport::new(Http::with_client(client, self.url.clone())))
     }
 }
 
 impl Http<Client> {
     /// Create a new [`Http`] transport.
     pub fn new(url: Url) -> Self {
-        Self { client: Default::default(), url }
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+        Self { client, url }
     }
 
     async fn do_reqwest(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
