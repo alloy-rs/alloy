@@ -1530,11 +1530,12 @@ impl ExecutionPayload {
     pub fn decoded_transactions_with_encoded<T: Decodable2718>(
         &self,
     ) -> impl Iterator<Item = Eip2718Result<WithEncoded<T>>> + '_ {
+
         self.transactions()
             .iter()
             .cloned()
-            .zip(self.decoded_transactions())
-            .map(|(tx_bytes, result)| result.map(|tx| WithEncoded::new(tx_bytes, tx)))
+            .map(|tx_bytes| T::decode_2718_exact(tx_bytes.as_ref()).map(|tx| WithEncoded::new(tx_bytes, tx)))
+
     }
 
     /// Returns an iterator over the recovered transactions in this payload.
