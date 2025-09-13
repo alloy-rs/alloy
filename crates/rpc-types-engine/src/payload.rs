@@ -12,7 +12,7 @@ use alloy_consensus::{
 use alloy_eips::{
     calc_next_block_base_fee,
     eip1559::BaseFeeParams,
-    eip2718::{Decodable2718, Encodable2718, Eip2718Result, WithEncoded},
+    eip2718::{Decodable2718, Eip2718Result, Encodable2718, WithEncoded},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
@@ -1529,13 +1529,12 @@ impl ExecutionPayload {
     /// This iterator will decode transactions on the fly and return them with their bytes.
     pub fn decoded_transactions_with_encoded<T: Decodable2718>(
         &self,
-    ) -> impl Iterator<Item = Eip2718Result<WithEncoded<T>>> + '_
-    {
-        self.transactions().iter().cloned().zip(self.decoded_transactions()).map(
-            |(tx_bytes, result)| {
-                result.map(|tx| WithEncoded::new(tx_bytes, tx))
-            },
-        )
+    ) -> impl Iterator<Item = Eip2718Result<WithEncoded<T>>> + '_ {
+        self.transactions()
+            .iter()
+            .cloned()
+            .zip(self.decoded_transactions())
+            .map(|(tx_bytes, result)| result.map(|tx| WithEncoded::new(tx_bytes, tx)))
     }
 
     /// Returns an iterator over the recovered transactions in this payload.
@@ -1574,11 +1573,11 @@ impl ExecutionPayload {
     where
         T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
     {
-        self.transactions().iter().cloned().zip(self.recovered_transactions::<T>()).map(
-            |(tx_bytes, result)| {
-                result.map(|tx| WithEncoded::new(tx_bytes, tx))
-            },
-        )
+        self.transactions()
+            .iter()
+            .cloned()
+            .zip(self.recovered_transactions::<T>())
+            .map(|(tx_bytes, result)| result.map(|tx| WithEncoded::new(tx_bytes, tx)))
     }
 }
 
@@ -2925,9 +2924,8 @@ mod tests {
 
     #[test]
     fn test_decoded_transactions() {
-        // Use a valid transaction from one of the existing tests
         let transaction = Bytes::from_static(&hex!("f86d0a8458b20efd825208946177843db3138ae69679a54b95cf345ed759450d8806f3e8d87878800080820a95a0f8bddb1dcc4558b532ff747760a6f547dd275afdbe7bdecc90680e71de105757a014f34ba38c180913c0543b0ac2eccfb77cc3f801a535008dc50e533fbe435f53"));
-        
+
         let payload = ExecutionPayload::V1(ExecutionPayloadV1 {
             parent_hash: B256::default(),
             fee_recipient: Address::default(),
@@ -2951,7 +2949,8 @@ mod tests {
         assert!(decoded[0].is_ok(), "Failed to decode transaction: {:?}", decoded[0]);
 
         // Test decoded_transactions_with_encoded
-        let decoded_with_encoded: Vec<_> = payload.decoded_transactions_with_encoded::<TxEnvelope>().collect();
+        let decoded_with_encoded: Vec<_> =
+            payload.decoded_transactions_with_encoded::<TxEnvelope>().collect();
         assert_eq!(decoded_with_encoded.len(), 1);
         assert!(decoded_with_encoded[0].is_ok());
         if let Ok(with_encoded) = &decoded_with_encoded[0] {
