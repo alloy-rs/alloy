@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 /// A bit of hack to find an unused TCP port.
 ///
-/// Does not guarantee that the given port is unused after the function exists, just that it was
+/// Does not guarantee that the given port is unused after the function exits, just that it was
 /// unused before the function started (i.e., it does not reserve a port).
 pub(crate) fn unused_port() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0")
