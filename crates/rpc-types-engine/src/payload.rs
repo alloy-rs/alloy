@@ -1530,8 +1530,8 @@ impl ExecutionPayload {
     pub fn decoded_transactions_with_encoded<T: Decodable2718>(
         &self,
     ) -> impl Iterator<Item = Eip2718Result<WithEncoded<T>>> + '_ {
-        self.transactions().iter().cloned().map(|tx_bytes| {
-            T::decode_2718_exact(tx_bytes.as_ref()).map(|tx| WithEncoded::new(tx_bytes, tx))
+        self.transactions().iter().map(|tx_bytes| {
+            T::decode_2718_exact(tx_bytes.as_ref()).map(|tx| WithEncoded::new(tx_bytes.clone(), tx))
         })
     }
 
@@ -1571,11 +1571,12 @@ impl ExecutionPayload {
     where
         T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
     {
-        self.transactions().iter().cloned().map(|tx_bytes| {
+        self.transactions().iter().map(|tx_bytes| {
             T::decode_2718_exact(tx_bytes.as_ref())
                 .map_err(alloy_consensus::crypto::RecoveryError::from_source)
                 .and_then(|tx| {
-                    tx.try_into_recovered().map(|recovered| WithEncoded::new(tx_bytes, recovered))
+                    tx.try_into_recovered()
+                        .map(|recovered| WithEncoded::new(tx_bytes.clone(), recovered))
                 })
         })
     }
