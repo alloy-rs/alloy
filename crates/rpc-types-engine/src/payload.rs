@@ -1571,11 +1571,13 @@ impl ExecutionPayload {
     where
         T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
     {
-        self.transactions()
-            .iter()
-            .cloned()
-            .zip(self.recovered_transactions::<T>())
-            .map(|(tx_bytes, result)| result.map(|tx| WithEncoded::new(tx_bytes, tx)))
+        self.transactions().iter().cloned().map(|tx_bytes| {
+            T::decode_2718_exact(tx_bytes.as_ref())
+                .map_err(alloy_consensus::crypto::RecoveryError::from_source)
+                .and_then(|tx| {
+                    tx.try_into_recovered().map(|recovered| WithEncoded::new(tx_bytes, recovered))
+                })
+        })
     }
 }
 
