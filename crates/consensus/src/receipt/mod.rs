@@ -22,7 +22,6 @@ pub(crate) mod serde_bincode_compat {
 
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
-#[auto_impl::auto_impl(&, Arc)]
 pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     /// The associated log type.
     type Log;
@@ -65,20 +64,17 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
 
     /// Returns [`ReceiptWithBloom`] with the computed bloom filter [`Self::bloom`] and a reference
     /// to the receipt.
-    #[auto_impl(keep_default_for(&, Arc))]
     fn with_bloom_ref(&self) -> ReceiptWithBloom<&Self> {
         ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
     }
 
     /// Consumes the type and converts it into [`ReceiptWithBloom`] with the computed bloom filter
     /// [`Self::bloom`] and the receipt.
-    #[auto_impl(keep_default_for(&, Arc))]
     fn into_with_bloom(self) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom: self.bloom(), receipt: self }
     }
 
     /// Consumes the type and converts it into [`ReceiptWithBloom`] with the given bloom filter.
-    #[auto_impl(keep_default_for(&, Arc))]
     fn into_with_bloom_unchecked(self, logs_bloom: Bloom) -> ReceiptWithBloom<Self> {
         ReceiptWithBloom { logs_bloom, receipt: self }
     }
@@ -90,7 +86,6 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     fn logs(&self) -> &[Self::Log];
 
     /// Consumes the type and returns the logs emitted by this transaction as a vector.
-    #[auto_impl(keep_default_for(&, Arc))]
     fn into_logs(self) -> Vec<Self::Log>
     where
         Self::Log: Clone,

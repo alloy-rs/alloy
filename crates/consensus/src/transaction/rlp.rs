@@ -10,7 +10,6 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
 /// Helper trait for managing RLP encoding of transactions inside 2718
 #[doc(hidden)]
 #[doc(alias = "RlpEncodableTx", alias = "RlpTxEncoding")]
-#[auto_impl::auto_impl(&, Arc)]
 pub trait RlpEcdsaEncodableTx: Sized + Typed2718 {
     /// Calculate the encoded length of the transaction's fields, without a RLP
     /// header.

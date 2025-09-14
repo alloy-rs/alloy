@@ -83,7 +83,6 @@ use alloy_eips::Typed2718;
 /// We call these transactions "dynamic fee transactions".
 /// We call non dynamic fee transactions(EIP-155, EIP-2930) "legacy fee transactions".
 #[doc(alias = "Tx")]
-#[auto_impl::auto_impl(&, Arc)]
 pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static {
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;

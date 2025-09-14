@@ -564,7 +564,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 }
 
 /// Trait for extracting specific Ethereum block data from a header
-#[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
     /// Extracts essential information into one container type.
     fn header_info(&self) -> HeaderInfo {
