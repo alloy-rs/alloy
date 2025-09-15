@@ -722,6 +722,7 @@ impl GethDefaultTracingOptions {
         !self.disable_storage.unwrap_or(false)
     }
 }
+
 /// Bindings for additional `debug_traceCall` options
 ///
 /// See <https://geth.ethereum.org/docs/rpc/ns-debug#debug_tracecall>
@@ -737,12 +738,16 @@ pub struct GethDebugTracingCallOptions {
     /// The block overrides to apply
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_overrides: Option<BlockOverrides>,
+    /// The transaction index to trace within the block.
+    /// If set, the state at the given index will be used to trace the call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tx_index: Option<U256>,
 }
 
 impl GethDebugTracingCallOptions {
     /// Creates a new instance with the given tracing options
     pub const fn new(tracing_options: GethDebugTracingOptions) -> Self {
-        Self { tracing_options, state_overrides: None, block_overrides: None }
+        Self { tracing_options, state_overrides: None, block_overrides: None, tx_index: None }
     }
 
     /// Enables state overrides
@@ -760,6 +765,12 @@ impl GethDebugTracingCallOptions {
     /// Sets the tracing options
     pub fn with_tracing_options(mut self, options: GethDebugTracingOptions) -> Self {
         self.tracing_options = options;
+        self
+    }
+
+    /// Sets the tx index
+    pub fn with_tx_index(mut self, index: U256) -> Self {
+        self.tx_index = Some(index);
         self
     }
 }
@@ -967,6 +978,7 @@ mod tests {
             },
             state_overrides: None,
             block_overrides: None,
+            tx_index: None,
         };
 
         let s = serde_json::to_string(&opts).unwrap();
