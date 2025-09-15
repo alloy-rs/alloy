@@ -314,12 +314,12 @@ mod private {
 
         #[inline]
         fn into_ruint(self) -> Self::Ruint {
-            self.try_into().ok().unwrap()
+            self.try_into().unwrap_or_else(|_| unreachable!("infallible ConvertRuint::into_ruint conversion failed"))
         }
 
         #[inline]
         fn from_ruint(ruint: Self::Ruint) -> Self {
-            ruint.try_into().ok().unwrap()
+            ruint.try_into().unwrap_or_else(|_| unreachable!("infallible ConvertRuint::from_ruint conversion failed"))
         }
     }
 
