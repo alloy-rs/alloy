@@ -740,8 +740,8 @@ pub struct GethDebugTracingCallOptions {
     pub block_overrides: Option<BlockOverrides>,
     /// The transaction index to trace within the block.
     /// If set, the state at the given index will be used to trace the call.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tx_index: Option<U256>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub tx_index: Option<u64>,
 }
 
 impl GethDebugTracingCallOptions {
@@ -769,7 +769,7 @@ impl GethDebugTracingCallOptions {
     }
 
     /// Sets the tx index
-    pub const fn with_tx_index(mut self, index: U256) -> Self {
+    pub const fn with_tx_index(mut self, index: u64) -> Self {
         self.tx_index = Some(index);
         self
     }
