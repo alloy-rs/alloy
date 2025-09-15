@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add helper json deserde fn ([#2841](https://github.com/alloy-rs/alloy/issues/2841))
 
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
 ## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
 
 ### Miscellaneous Tasks

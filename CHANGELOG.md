@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Bug Fixes
+
+- Compilation issues ([#2875](https://github.com/alloy-rs/alloy/issues/2875))
+- Skip receipt fetch if more confirmations are requested ([#2851](https://github.com/alloy-rs/alloy/issues/2851))
+- Make responses_by_ids accept HashSet keys Borrow<Id> ([#2852](https://github.com/alloy-rs/alloy/issues/2852))
+
+### Documentation
+
+- Move EIP-4844 blob fee to BlobGasFiller ([#2857](https://github.com/alloy-rs/alloy/issues/2857))
+
+### Features
+
+- [rpc-types-engine] Add transaction helper methods to ExecutionPayload ([#2871](https://github.com/alloy-rs/alloy/issues/2871))
+- [rpc-client] Add connect convenience method ([#2854](https://github.com/alloy-rs/alloy/issues/2854))
+- [providers] Pause heartbeat when no transactions are pending ([#2800](https://github.com/alloy-rs/alloy/issues/2800))
+
+### Miscellaneous Tasks
+
+- Treat 1008 rpc error as retryable ([#2870](https://github.com/alloy-rs/alloy/issues/2870))
+- Add missing defaults ([#2867](https://github.com/alloy-rs/alloy/issues/2867))
+- Add reqwest-default-tls feature ([#2865](https://github.com/alloy-rs/alloy/issues/2865))
+- Avoid panic in HTTP transport: return error instead of expect ([#2862](https://github.com/alloy-rs/alloy/issues/2862))
+- Mark legacy blob gas fn deprecated ([#2863](https://github.com/alloy-rs/alloy/issues/2863))
+- Avoid panic on TempDir cleanup in node-bindings utils ([#2860](https://github.com/alloy-rs/alloy/issues/2860))
+- Fix unused warning ([#2849](https://github.com/alloy-rs/alloy/issues/2849))
+
+### Refactor
+
+- Consolidate effective gas price calculation into eip1559 module ([#2872](https://github.com/alloy-rs/alloy/issues/2872))
+
+### Testing
+
+- Add serde test for CallLogFrame with regular JSON numbers ([#2866](https://github.com/alloy-rs/alloy/issues/2866))
+
 ## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
 
 ### Bug Fixes
@@ -16,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add with_request to storage slot finder ([#2847](https://github.com/alloy-rs/alloy/issues/2847))
 - Re-export signer dep crates ([#2845](https://github.com/alloy-rs/alloy/issues/2845))
 - Add helper json deserde fn ([#2841](https://github.com/alloy-rs/alloy/issues/2841))
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
 
 ## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
 
