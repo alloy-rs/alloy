@@ -133,7 +133,9 @@ impl Drop for AnvilInstance {
                 }
             }
         }
-        self.child.kill().expect("could not kill anvil");
+        if let Err(err) = self.child.kill() {
+            eprintln!("alloy-node-bindings: failed to kill anvil process: {}", err);
+        }
     }
 }
 
