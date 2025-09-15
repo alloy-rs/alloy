@@ -386,7 +386,7 @@ where
             .collect::<arbitrary::Result<Vec<_>>>()?;
 
         // then generate up to 2 ommers
-        let ommers = (0..u.int_in_range(0..=1)?)
+        let ommers = (0..u.int_in_range(0..=2)?)
             .map(|_| H::arbitrary(u))
             .collect::<arbitrary::Result<Vec<_>>>()?;
 
