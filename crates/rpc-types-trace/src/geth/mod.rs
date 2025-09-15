@@ -769,7 +769,7 @@ impl GethDebugTracingCallOptions {
     }
 
     /// Sets the tx index
-    pub fn with_tx_index(mut self, index: U256) -> Self {
+    pub const fn with_tx_index(mut self, index: U256) -> Self {
         self.tx_index = Some(index);
         self
     }
