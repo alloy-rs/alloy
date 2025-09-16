@@ -2,11 +2,16 @@
 //!
 //! This is defined as a "hex encoded unsigned integer", with a special case of 0 being `0x0`.
 //!
-//! A regex for this format is: `^0x([1-9a-f]+[0-9a-f]*|0)$`.
+//! A regex for this canonical serialization format is: `^0x([1-9a-f]+[0-9a-f]*|0)$`.
 //!
-//! This is only valid for human-readable [`serde`] implementations.
-//! For non-human-readable implementations, the format is unspecified.
-//! Currently, it uses a fixed-width big-endian byte-array.
+//! Notes on (de)serialization behavior:
+//! - Serialization always produces canonical quantity hex strings (e.g., `"0x3e8"`).
+//! - Deserialization for human-readable formats is permissive and accepts:
+//!   - quantity hex strings with `0x` prefix,
+//!   - decimal strings (e.g., `"1000"`),
+//!   - JSON numbers (e.g., `1000`).
+//! - For non-human-readable implementations, the format is unspecified. Currently, it uses a
+//!   fixed-width big-endian byte-array.
 
 use private::ConvertRuint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -71,7 +76,7 @@ pub mod vec {
         Deserializer, Serializer,
     };
 
-    /// Serializes a vector of primitive numbers as a "quantity" hex string.
+    /// Serializes a vector of primitive numbers to an array of canonical quantity hex strings.
     pub fn serialize<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
     where
         T: ConvertRuint,
@@ -84,7 +89,8 @@ pub mod vec {
         seq.end()
     }
 
-    /// Deserializes a vector of primitive numbers from a "quantity" hex string.
+    /// Deserializes a vector of primitive numbers from an array whose elements may be quantity
+    /// hex strings (with `0x`), decimal strings, or JSON numbers (human-readable formats).
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
         T: ConvertRuint,
@@ -176,7 +182,8 @@ pub mod hashmap {
         de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
     };
 
-    /// Serializes a `HashMap` of primitive numbers as a "quantity" hex string.
+    /// Serializes a `HashMap` with primitive number keys by encoding keys as canonical quantity
+    /// hex strings.
     pub fn serialize<K, V, S, H>(map: &HashMap<K, V, H>, serializer: S) -> Result<S::Ok, S::Error>
     where
         K: ConvertRuint,
@@ -191,7 +198,8 @@ pub mod hashmap {
         map_ser.end()
     }
 
-    /// Deserializes a `HashMap` of primitive numbers from a "quantity" hex string.
+    /// Deserializes a `HashMap` whose keys may be quantity hex strings (with `0x`), decimal
+    /// strings, or JSON numbers (human-readable formats).
     pub fn deserialize<'de, K, V, D, H>(deserializer: D) -> Result<HashMap<K, V, H>, D::Error>
     where
         K: ConvertRuint + Eq + core::hash::Hash,
@@ -244,7 +252,8 @@ pub mod btreemap {
         de::MapAccess, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer,
     };
 
-    /// Serializes a `BTreeMap` of primitive numbers as a "quantity" hex string.
+    /// Serializes a `BTreeMap` with primitive number keys by encoding keys as canonical quantity
+    /// hex strings.
     pub fn serialize<K, V, S>(value: &BTreeMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         K: ConvertRuint + Ord,
@@ -258,7 +267,8 @@ pub mod btreemap {
         map.end()
     }
 
-    /// Deserializes a `BTreeMap` of primitive numbers from a "quantity" hex string.
+    /// Deserializes a `BTreeMap` whose keys may be quantity hex strings (with `0x`), decimal
+    /// strings, or JSON numbers (human-readable formats).
     pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<BTreeMap<K, V>, D::Error>
     where
         K: ConvertRuint + Ord,
