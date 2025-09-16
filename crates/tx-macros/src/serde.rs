@@ -232,7 +232,10 @@ impl<'a> SerdeGenerator<'a> {
                 where
                     D: #serde::Deserializer<'de>,
                 {
-                    let content = #serde::__private::de::Content::deserialize(deserializer)?;
+                    let content = #serde::de::DeserializeSeed::deserialize(
+                        #serde::__private::de::ContentVisitor::new(),
+                        deserializer
+                    )?;
                     let deserializer =
                         #serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
 

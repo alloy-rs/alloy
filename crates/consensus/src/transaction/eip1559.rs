@@ -207,17 +207,11 @@ impl Transaction for TxEip1559 {
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-            if tip > self.max_priority_fee_per_gas {
-                self.max_priority_fee_per_gas + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                self.max_fee_per_gas
-            }
-        })
+        alloy_eips::eip1559::calc_effective_gas_price(
+            self.max_fee_per_gas,
+            self.max_priority_fee_per_gas,
+            base_fee,
+        )
     }
 
     #[inline]
