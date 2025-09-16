@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.31
 - Treat 1008 rpc error as retryable ([#2870](https://github.com/alloy-rs/alloy/issues/2870))
 
 ## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.31
 - Avoid panic in HTTP transport: return error instead of expect ([#2862](https://github.com/alloy-rs/alloy/issues/2862))
 
 ## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03

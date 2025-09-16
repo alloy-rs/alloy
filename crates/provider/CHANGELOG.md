@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Bug Fixes
+
+- [provider] Use correct admin_peerEvents subscription method ([#2877](https://github.com/alloy-rs/alloy/issues/2877))
+
 ## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
 
 ### Bug Fixes
@@ -18,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - [providers] Pause heartbeat when no transactions are pending ([#2800](https://github.com/alloy-rs/alloy/issues/2800))
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
 
 ## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
 
