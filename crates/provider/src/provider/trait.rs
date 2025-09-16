@@ -30,9 +30,9 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, Filter, FilterBlockOption, FilterChanges, Index, Log, SyncStatus,
 };
-use alloy_transport::TransportResult;
+use alloy_transport::{TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
@@ -67,6 +67,40 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
 /// [`DebugApi`]: crate::ext::DebugApi
+
+#[derive(Clone, Debug, Default)]
+pub struct LogOptions {
+    /// If provided, fetches logs in batches of this size when querying a block range.
+    pub batch_size: Option<u64>,
+    /// If provided, stops fetching when this many logs have been collected.
+    pub max_count: Option<usize>,
+}
+
+/// Options for enhanced log retrieval.
+impl LogOptions {
+    /// Creates a new LogOptions with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the batch size for log fetching.
+    pub const fn with_batch_size(mut self, batch_size: u64) -> Self {
+        self.batch_size = Some(batch_size);
+        self
+    }
+
+    /// Sets the maximum count of logs to fetch.
+    pub const fn with_max_count(mut self, max_count: usize) -> Self {
+        self.max_count = Some(max_count);
+        self
+    }
+
+    /// Returns true if any options are set.
+    pub const fn has_options(&self) -> bool {
+        self.batch_size.is_some() || self.max_count.is_some()
+    }
+}
+
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -662,6 +696,84 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.client().request("eth_getLogs", (filter,)).await
+    }
+
+    /// Enhanced log retrieval with batch and count options.
+    async fn get_logs_with_options(
+        &self,
+        filter: &Filter,
+        options: &LogOptions,
+    ) -> TransportResult<Vec<Log>> {
+        // Validate options
+        if options.batch_size.is_some_and(|x| x == 0) {
+            return Err(
+                TransportErrorKind::Custom("LogOptions.batch_size must be > 0".into()).into()
+            );
+        }
+        if options.max_count.is_some_and(|x| x == 0) {
+            return Err(
+                TransportErrorKind::Custom("LogOptions.max_count must be > 0".into()).into()
+            );
+        }
+
+        // If no special options are provided, use the standard method
+        if !options.has_options() {
+            return self.get_logs(filter).await;
+        }
+
+        let mut all_logs = Vec::new();
+
+        // Check if we need to batch and have a range filter
+        if let (Some(batch_size), FilterBlockOption::Range { from_block, to_block }) =
+            (options.batch_size, &filter.block_option)
+        {
+            // Extract block range - only support Number, Earliest, and Latest
+            let from_num = match from_block {
+                Some(BlockNumberOrTag::Number(n)) => *n,
+                Some(BlockNumberOrTag::Earliest) => 0,
+                _ => return self.get_logs(filter).await, // Fall back to standard method
+            };
+
+            let to_num = match to_block {
+                Some(BlockNumberOrTag::Number(n)) => *n,
+                Some(BlockNumberOrTag::Latest) => self.get_block_number().await?,
+                _ => return self.get_logs(filter).await, // Fall back to standard method
+            };
+
+            let mut batch_start = from_num;
+            let mut batch_filter = filter.clone();
+            while batch_start <= to_num {
+                let batch_end = std::cmp::min(batch_start + batch_size - 1, to_num);
+
+                batch_filter.block_option = FilterBlockOption::Range {
+                    from_block: Some(BlockNumberOrTag::Number(batch_start)),
+                    to_block: Some(BlockNumberOrTag::Number(batch_end)),
+                };
+
+                all_logs.extend(self.get_logs(&batch_filter).await?);
+
+                // Check if we should stop early due to count limit
+                if let Some(max_count) = options.max_count {
+                    if all_logs.len() >= max_count {
+                        break;
+                    }
+                }
+
+                batch_start = batch_end + 1;
+            }
+        } else {
+            // No batching, fetch all logs at once
+            all_logs = self.get_logs(filter).await?;
+        }
+
+        // Apply count limit at the end (works for both batch and non-batch modes)
+        if let Some(max_count) = options.max_count {
+            if all_logs.len() > max_count {
+                all_logs.truncate(max_count);
+            }
+        }
+
+        Ok(all_logs)
     }
 
     /// Get the account and storage values of the specified account including the merkle proofs.
