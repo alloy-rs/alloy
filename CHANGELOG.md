@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Bug Fixes
+
+- Use serde private mod patch notation ([#2886](https://github.com/alloy-rs/alloy/issues/2886))
+- [consensus] Include EIP-7702 in ReceiptEnvelope Arbitrary range ([#2883](https://github.com/alloy-rs/alloy/issues/2883))
+- [provider] Use correct admin_peerEvents subscription method ([#2877](https://github.com/alloy-rs/alloy/issues/2877))
+
+### Other
+
+- Avoid panic in AnvilInstance::drop; fail soft on kill error ([#2878](https://github.com/alloy-rs/alloy/issues/2878))
+
 ## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
 
 ### Bug Fixes
@@ -25,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.31
 - Treat 1008 rpc error as retryable ([#2870](https://github.com/alloy-rs/alloy/issues/2870))
 - Add missing defaults ([#2867](https://github.com/alloy-rs/alloy/issues/2867))
 - Add reqwest-default-tls feature ([#2865](https://github.com/alloy-rs/alloy/issues/2865))
