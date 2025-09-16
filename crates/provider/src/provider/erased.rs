@@ -1,4 +1,4 @@
-use super::{EthCallMany, EthGetBlock, FilterPollerBuilder};
+use super::{EthCallMany, EthGetBlock, FilterPollerBuilder, LogOptions};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -225,6 +225,14 @@ impl<N: Network> Provider<N> for DynProvider<N> {
 
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.0.get_logs(filter).await
+    }
+
+    async fn get_logs_with_options(
+        &self,
+        filter: &Filter,
+        options: &LogOptions,
+    ) -> TransportResult<Vec<Log>> {
+        self.0.get_logs_with_options(filter, options).await
     }
 
     fn get_proof(

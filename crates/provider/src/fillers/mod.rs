@@ -34,10 +34,10 @@ use tracing::error;
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
-    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
-    SendableTxErr,
+    provider::{LogOptions, SendableTx},
+    EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity, PendingTransaction,
+    PendingTransactionBuilder, PendingTransactionConfig, PendingTransactionError, Provider,
+    ProviderCall, ProviderLayer, RootProvider, RpcWithBlock, SendableTxErr,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -510,6 +510,14 @@ where
 
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.inner.get_logs(filter).await
+    }
+
+    async fn get_logs_with_options(
+        &self,
+        filter: &Filter,
+        options: &LogOptions,
+    ) -> TransportResult<Vec<Log>> {
+        self.inner.get_logs_with_options(filter, options).await
     }
 
     fn get_proof(
