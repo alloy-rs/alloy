@@ -584,6 +584,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
+    /// Watch for new logs with pagination support to avoid memory issues with large block ranges.
+    ///
+    /// Returns a stream that fetches logs in pages of the specified size.
+    fn watch_logs_paginated(&self, filter: &Filter, page_size: u64) -> PaginatedLogsPoller
+    where
+        Self: Sized,
+    {
+        PaginatedLogsPoller::new(self.weak_client(), filter.clone(), page_size)
+    }
+
     /// Watch for new pending transaction bodies by polling the provider with
     /// [`eth_getFilterChanges`](Self::get_filter_changes).
     ///
@@ -2272,5 +2282,106 @@ mod tests {
         let p = ProviderBuilder::new().connect(&anvil.endpoint()).await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
+    }
+}
+
+// Paginated logs implementation
+use alloy_transport::TransportErrorKind;
+use futures::{Future, Stream};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+use tokio::time::{interval, Interval};
+
+/// Simple paginated logs poller
+#[derive(Debug)]
+pub struct PaginatedLogsPoller {
+    client: WeakClient,
+    filter: Filter,
+    page_size: u64,
+    current_from: Option<BlockNumber>,
+    end_block: Option<BlockNumber>,
+    interval: Interval,
+    finished: bool,
+}
+
+impl PaginatedLogsPoller {
+    /// Create a new paginated logs poller
+    pub fn new(client: WeakClient, filter: Filter, page_size: u64) -> Self {
+        let (from_block, to_block) = match &filter.block_option {
+            alloy_rpc_types_eth::FilterBlockOption::Range { from_block, to_block } => {
+                (from_block.and_then(|b| b.as_number()), to_block.and_then(|b| b.as_number()))
+            }
+            _ => (None, None),
+        };
+
+        Self {
+            client,
+            filter,
+            page_size,
+            current_from: from_block,
+            end_block: to_block,
+            interval: interval(Duration::from_secs(1)),
+            finished: false,
+        }
+    }
+
+    async fn next_page(&mut self) -> TransportResult<Vec<Log>> {
+        let Some(from) = self.current_from else {
+            self.finished = true;
+            return Ok(Vec::new());
+        };
+
+        let to = from + self.page_size - 1;
+        let actual_to = self.end_block.map_or(to, |end| to.min(end));
+
+        let mut page_filter = self.filter.clone();
+        page_filter.block_option = alloy_rpc_types_eth::FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(from)),
+            to_block: Some(BlockNumberOrTag::Number(actual_to)),
+        };
+
+        let client = self
+            .client
+            .upgrade()
+            .ok_or_else(|| TransportErrorKind::custom_str("Client dropped"))?;
+        let logs = client.request("eth_getLogs", (page_filter,)).await?;
+
+        // Update for next iteration
+        if let Some(end) = self.end_block {
+            if actual_to >= end {
+                self.finished = true;
+            } else {
+                self.current_from = Some(actual_to + 1);
+            }
+        } else {
+            self.current_from = Some(actual_to + 1);
+        }
+
+        Ok(logs)
+    }
+}
+
+impl Stream for PaginatedLogsPoller {
+    type Item = TransportResult<Vec<Log>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.finished {
+            return Poll::Ready(None);
+        }
+
+        match self.interval.poll_tick(cx) {
+            Poll::Ready(_) => {
+                let fut = self.next_page();
+                let mut fut = Box::pin(fut);
+                match fut.as_mut().poll(cx) {
+                    Poll::Ready(result) => Poll::Ready(Some(result)),
+                    Poll::Pending => Poll::Pending,
+                }
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 }

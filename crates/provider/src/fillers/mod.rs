@@ -483,6 +483,14 @@ where
         self.inner.watch_logs(filter).await
     }
 
+    fn watch_logs_paginated(
+        &self,
+        filter: &Filter,
+        page_size: u64,
+    ) -> crate::provider::PaginatedLogsPoller {
+        self.inner.watch_logs_paginated(filter, page_size)
+    }
+
     async fn watch_full_pending_transactions(
         &self,
     ) -> TransportResult<FilterPollerBuilder<N::TransactionResponse>> {
