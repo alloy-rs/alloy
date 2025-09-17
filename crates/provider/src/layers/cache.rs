@@ -1,6 +1,5 @@
 use crate::{
-    provider::LogOptions, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider,
-    RpcWithBlock,
+    EthLogs, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
 };
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
@@ -217,14 +216,10 @@ where
         Ok(result)
     }
 
-    async fn get_logs_with_options(
-        &self,
-        filter: &Filter,
-        options: &LogOptions,
-    ) -> TransportResult<Vec<Log>> {
+    fn logs(&self, filter: Filter) -> EthLogs<N, Vec<Log>> {
         // For cached layer, we delegate to the inner provider for advanced options
         // as caching complex batch operations might not be beneficial
-        self.inner.get_logs_with_options(filter, options).await
+        self.inner.logs(filter)
     }
 
     fn get_proof(

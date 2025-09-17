@@ -1,11 +1,11 @@
-use super::{EthCallMany, EthGetBlock, FilterPollerBuilder, LogOptions};
+use super::{EthCallMany, EthGetBlock, FilterPollerBuilder};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
     utils::{Eip1559Estimation, Eip1559Estimator},
-    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
-    ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    EthCall, EthLogs, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
@@ -227,12 +227,8 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_logs(filter).await
     }
 
-    async fn get_logs_with_options(
-        &self,
-        filter: &Filter,
-        options: &LogOptions,
-    ) -> TransportResult<Vec<Log>> {
-        self.0.get_logs_with_options(filter, options).await
+    fn logs(&self, filter: Filter) -> EthLogs<N, Vec<Log>> {
+        self.0.logs(filter)
     }
 
     fn get_proof(
