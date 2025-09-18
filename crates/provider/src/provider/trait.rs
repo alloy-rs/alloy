@@ -68,7 +68,6 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
 /// [`DebugApi`]: crate::ext::DebugApi
 
-
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
