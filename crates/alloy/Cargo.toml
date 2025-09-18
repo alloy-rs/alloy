@@ -68,7 +68,7 @@ alloy-trie = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "alloy-core/default", "essentials"]
+default = ["std", "reqwest", "reqwest-rustls-tls", "alloy-core/default", "essentials"]
 
 # std
 std = [
