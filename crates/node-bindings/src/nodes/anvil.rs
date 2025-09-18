@@ -236,7 +236,7 @@ impl Anvil {
 
     /// Sets the chain_id the `anvil` instance will use.
     ///
-    /// By default [`DEFAULT_IPC_ENDPOINT`] will be used.
+    /// If not set, the instance defaults to chain id `31337`.
     pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
