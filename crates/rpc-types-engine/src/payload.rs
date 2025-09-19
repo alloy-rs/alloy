@@ -1503,7 +1503,7 @@ impl ExecutionPayload {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas()?,
             self.blob_gas_used()?,
-            self.as_v1().base_fee_per_gas.to(),
+            self.as_v1().base_fee_per_gas.try_into().ok()?,
         ))
     }
 
