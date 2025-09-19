@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Bug Fixes
+
+- [eip4844] Clippy no warning ([#2898](https://github.com/alloy-rs/alloy/issues/2898))
+- [jwt] Jwt iat offset test flaky ([#2899](https://github.com/alloy-rs/alloy/issues/2899))
+- [signer-aws] Return structured error instead of panic on parity recovery failure ([#2880](https://github.com/alloy-rs/alloy/issues/2880))
+
+### Dependencies
+
+- [deps] Bump Swatinem/rust-cache from 2.8.0 to 2.8.1 ([#2902](https://github.com/alloy-rs/alloy/issues/2902))
+
+### Miscellaneous Tasks
+
+- Enable rustls by default ([#2905](https://github.com/alloy-rs/alloy/issues/2905))
+- [`ci`] Enable CodeQL as part of `ci.yml` ([#2903](https://github.com/alloy-rs/alloy/issues/2903))
+- [`ci`] Harden ci + add dependabot for managing pinned hashes ([#2900](https://github.com/alloy-rs/alloy/issues/2900))
+- Add missing helpers ([#2897](https://github.com/alloy-rs/alloy/issues/2897))
+- Re-export transport ([#2895](https://github.com/alloy-rs/alloy/issues/2895))
+- Mark cloudflare error as retryable ([#2894](https://github.com/alloy-rs/alloy/issues/2894))
+
 ## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
 
 ### Bug Fixes
@@ -12,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use serde private mod patch notation ([#2886](https://github.com/alloy-rs/alloy/issues/2886))
 - [consensus] Include EIP-7702 in ReceiptEnvelope Arbitrary range ([#2883](https://github.com/alloy-rs/alloy/issues/2883))
 - [provider] Use correct admin_peerEvents subscription method ([#2877](https://github.com/alloy-rs/alloy/issues/2877))
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
 
 ### Other
 

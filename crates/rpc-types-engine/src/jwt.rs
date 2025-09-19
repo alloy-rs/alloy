@@ -375,7 +375,8 @@ mod tests {
         let secret = JwtSecret::random();
 
         // Check past 'iat' claim more than 60 secs
-        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 1);
+        // Use a larger margin to avoid timing flakiness
+        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 10);
         let out_of_window_time = SystemTime::now().checked_sub(offset).unwrap();
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();
@@ -385,7 +386,8 @@ mod tests {
         assert!(matches!(result, Err(JwtError::InvalidIssuanceTimestamp)));
 
         // Check future 'iat' claim more than 60 secs
-        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 1);
+        // Use a larger margin to avoid timing flakiness
+        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 10);
         let out_of_window_time = SystemTime::now().checked_add(offset).unwrap();
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();

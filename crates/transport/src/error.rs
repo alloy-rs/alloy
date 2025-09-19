@@ -78,6 +78,37 @@ impl TransportErrorKind {
         RpcError::Transport(Self::HttpError(HttpError { status, body }))
     }
 
+    /// Returns true if this is [`TransportErrorKind::PubsubUnavailable`].
+    pub const fn is_pubsub_unavailable(&self) -> bool {
+        matches!(self, Self::PubsubUnavailable)
+    }
+
+    /// Returns true if this is [`TransportErrorKind::BackendGone`].
+    pub const fn is_backend_gone(&self) -> bool {
+        matches!(self, Self::BackendGone)
+    }
+
+    /// Returns true if this is [`TransportErrorKind::HttpError`].
+    pub const fn is_http_error(&self) -> bool {
+        matches!(self, Self::HttpError(_))
+    }
+
+    /// Returns the [`HttpError`] if this is [`TransportErrorKind::HttpError`].
+    pub const fn as_http_error(&self) -> Option<&HttpError> {
+        match self {
+            Self::HttpError(err) => Some(err),
+            _ => None,
+        }
+    }
+
+    /// Returns the custom error if this is [`TransportErrorKind::Custom`].
+    pub const fn as_custom(&self) -> Option<&(dyn StdError + Send + Sync + 'static)> {
+        match self {
+            Self::Custom(err) => Some(&**err),
+            _ => None,
+        }
+    }
+
     /// Analyzes the [TransportErrorKind] and decides if the request should be retried based on the
     /// variant.
     pub fn is_retry_err(&self) -> bool {

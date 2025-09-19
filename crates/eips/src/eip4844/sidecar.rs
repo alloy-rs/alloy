@@ -525,7 +525,6 @@ pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
 pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
     map_access: &mut M,
 ) -> Result<Vec<Blob>, M::Error> {
-    use serde::de::MapAccess;
     map_access.next_value()
 }
 

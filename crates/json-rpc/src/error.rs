@@ -139,4 +139,12 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
             _ => None,
         }
     }
+
+    /// Returns the transport error if this is a [`RpcError::Transport`]
+    pub const fn as_transport_err(&self) -> Option<&E> {
+        match self {
+            Self::Transport(err) => Some(err),
+            _ => None,
+        }
+    }
 }

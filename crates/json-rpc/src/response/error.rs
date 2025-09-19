@@ -117,6 +117,11 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
+        // This is retryable cloudflare error <https://github.com/foundry-rs/foundry/issues/11667>
+        if self.code == -32055 {
+            return true;
+        }
+
         match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,

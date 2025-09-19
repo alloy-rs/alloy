@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [consensus] Include EIP-7702 in ReceiptEnvelope Arbitrary range ([#2883](https://github.com/alloy-rs/alloy/issues/2883))
 
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
 ## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
 
 ### Miscellaneous Tasks
