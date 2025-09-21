@@ -137,7 +137,7 @@ tracing-subscriber = "0.3"
 tracing-futures = "0.2"
 
 # serde
-serde = { version = "1.0.225", default-features = false, features = [
+serde = { version = "1.0.226", default-features = false, features = [
     "derive",
     "alloc",
 ] }

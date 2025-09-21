@@ -233,11 +233,11 @@ impl<'a> SerdeGenerator<'a> {
                     D: #serde::Deserializer<'de>,
                 {
                     let content = #serde::de::DeserializeSeed::deserialize(
-                        #serde::__private225::de::ContentVisitor::new(),
+                        #serde::__private226::de::ContentVisitor::new(),
                         deserializer
                     )?;
                     let deserializer =
-                        #serde::__private225::de::ContentRefDeserializer::<D::Error>::new(&content);
+                        #serde::__private226::de::ContentRefDeserializer::<D::Error>::new(&content);
 
                     let tagged_res =
                         TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged);
