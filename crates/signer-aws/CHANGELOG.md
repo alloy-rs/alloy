@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [signer-aws] Return structured error instead of panic on parity recovery failure ([#2880](https://github.com/alloy-rs/alloy/issues/2880))
 
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
 ## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
 
 ### Miscellaneous Tasks
