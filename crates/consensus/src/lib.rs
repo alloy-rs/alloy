@@ -93,4 +93,6 @@ pub mod private {
     pub use arbitrary;
     #[cfg(feature = "serde")]
     pub use serde;
+    #[cfg(feature = "serde")]
+    pub use serde_json;
 }
