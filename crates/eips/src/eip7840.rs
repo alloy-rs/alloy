@@ -2,7 +2,7 @@
 
 use crate::{
     eip4844::{self, DATA_GAS_PER_BLOB},
-    eip7594, eip7691,
+    eip7594, eip7691, eip7892,
 };
 
 /// BLOB_BASE_COST represents the minimum execution gas required to include a blob in a block,
@@ -74,6 +74,24 @@ impl BlobParams {
             min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
             max_blobs_per_tx: eip7594::MAX_BLOBS_PER_TX_FUSAKA,
             blob_base_cost: BLOB_BASE_COST,
+        }
+    }
+
+    /// [`BlobParams`] for the [EIP-7892](https://eips.ethereum.org/EIPS/eip-7892) Blob parameter only hardfork BPO1.
+    pub const fn bpo1() -> Self {
+        Self {
+            target_blob_count: eip7892::BPO1_TARGET_BLOBS_PER_BLOCK,
+            max_blob_count: eip7892::BPO1_MAX_BLOBS_PER_BLOCK,
+            ..Self::osaka()
+        }
+    }
+
+    /// [`BlobParams`] for the [EIP-7892](https://eips.ethereum.org/EIPS/eip-7892) Blob parameter only hardfork BPO2
+    pub const fn bpo2() -> Self {
+        Self {
+            target_blob_count: eip7892::BPO2_TARGET_BLOBS_PER_BLOCK,
+            max_blob_count: eip7892::BPO2_MAX_BLOBS_PER_BLOCK,
+            ..Self::osaka()
         }
     }
 
