@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Bug Fixes
+
+- [provider] Require context in eth_callMany params ([#2910](https://github.com/alloy-rs/alloy/issues/2910))
+- Don't use serde private API ([#2909](https://github.com/alloy-rs/alloy/issues/2909))
+
+### Features
+
+- Add bpo initalizers ([#2914](https://github.com/alloy-rs/alloy/issues/2914))
+- [signer-local] Add mnemonic builder helpers and iterator ([#2864](https://github.com/alloy-rs/alloy/issues/2864))
+
+### Miscellaneous Tasks
+
+- Add helper for init blobparams ([#2913](https://github.com/alloy-rs/alloy/issues/2913))
+
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
 
 ### Bug Fixes
@@ -18,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - [eips] Add `MAX_TX_GAS_LIMIT_OSAKA` for EIP-7825 ([#2906](https://github.com/alloy-rs/alloy/issues/2906))
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
 
 ## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
 

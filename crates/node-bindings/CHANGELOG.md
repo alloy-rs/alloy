@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [node-bindings] Correct docs for Anvil chain_id, Geth new, and Reth chain_or_path ([#2904](https://github.com/alloy-rs/alloy/issues/2904))
 
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
 ## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
 
 ### Miscellaneous Tasks
