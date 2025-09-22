@@ -1,6 +1,9 @@
 //! Contains constants and utility functions for [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md)
 
-use crate::{eip4844::{self, DATA_GAS_PER_BLOB}, eip7594, eip7691, eip7892};
+use crate::{
+    eip4844::{self, DATA_GAS_PER_BLOB},
+    eip7594, eip7691, eip7892,
+};
 
 /// BLOB_BASE_COST represents the minimum execution gas required to include a blob in a block,
 /// as defined by [EIP-7918 (Decoupling Blob Gas from Execution Gas)](https://eips.ethereum.org/EIPS/eip-7918).
