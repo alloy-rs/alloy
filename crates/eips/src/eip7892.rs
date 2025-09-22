@@ -53,6 +53,15 @@ impl BlobScheduleBlobParams {
         }
     }
 
+    /// Configures the scheduled [`BlobParams`] with timestamps.
+    pub fn with_scheduled(
+        mut self,
+        scheduled: impl IntoIterator<Item = (u64, BlobParams)>,
+    ) -> Self {
+        self.scheduled = scheduled.into_iter().collect();
+        self
+    }
+
     /// Returns the highest active blob parameters at the given timestamp.
     ///
     /// Note: this does only scan the entries scheduled by timestamp and not cancun or prague.
