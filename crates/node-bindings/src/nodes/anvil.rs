@@ -455,6 +455,7 @@ impl Anvil {
         let mut is_private_key = false;
         let mut chain_id = None;
         let mut wallet = None;
+        let mut got_listening = false; // Tracks whether we've seen the listening line
         loop {
             if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
                 <= Instant::now()
@@ -471,7 +472,8 @@ impl Anvil {
                 if let Ok(addr) = SocketAddr::from_str(addr.trim()) {
                     port = addr.port();
                 }
-                break;
+                got_listening = true; // Don't break yet; wait for keys to be printed
+                continue;
             }
 
             if line.starts_with("Private Keys") {
@@ -495,18 +497,24 @@ impl Anvil {
                 };
             }
 
-            if !private_keys.is_empty() {
-                let mut private_keys = private_keys.iter().map(|key| {
-                    let mut signer = LocalSigner::from(key.clone());
-                    signer.set_chain_id(chain_id);
-                    signer
-                });
-                let mut w = EthereumWallet::new(private_keys.next().unwrap());
-                for pk in private_keys {
-                    w.register_signer(pk);
-                }
-                wallet = Some(w);
+           // Break once we have both endpoint info and at least one private key
+            if got_listening && !private_keys.is_empty() {
+                break;
             }
+        }
+
+        // Build wallet once after parsing is complete
+        if !private_keys.is_empty() {
+            let mut private_keys_iter = private_keys.iter().map(|key| {
+                let mut signer = LocalSigner::from(key.clone());
+                signer.set_chain_id(chain_id);
+                signer
+            });
+            let mut w = EthereumWallet::new(private_keys_iter.next().unwrap());
+            for pk in private_keys_iter {
+                w.register_signer(pk);
+            }
+            wallet = Some(w);
         }
 
         if self.keep_stdout {
