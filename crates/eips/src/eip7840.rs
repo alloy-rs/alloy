@@ -77,7 +77,7 @@ impl BlobParams {
         }
     }
 
-    /// [`BlobParams`] for the [EIP-7892](https://eips.ethereum.org/EIPS/eip-7892) Blob parameter only hardfork BPO2.
+    /// [`BlobParams`] for the [EIP-7892](https://eips.ethereum.org/EIPS/eip-7892) Blob parameter only hardfork BPO1.
     pub const fn bpo1() -> Self {
         Self {
             target_blob_count: eip7892::BPO1_TARGET_BLOBS_PER_BLOCK,
