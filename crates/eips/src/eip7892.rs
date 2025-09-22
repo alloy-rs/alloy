@@ -3,6 +3,18 @@
 use crate::eip7840::BlobParams;
 use alloc::vec::Vec;
 
+/// Targeted blob count with BPO1 activation
+pub const BPO1_TARGET_BLOBS_PER_BLOCK: u64 = 10;
+
+/// Max blob count with BPO1 activation
+pub const BPO1_MAX_BLOBS_PER_BLOCK: u64 = 15;
+
+/// Targeted blob count with BPO2 activation
+pub const BPO2_TARGET_BLOBS_PER_BLOCK: u64 = 14;
+
+/// Max blob count with BPO2 activation
+pub const BPO2_MAX_BLOBS_PER_BLOCK: u64 = 21;
+
 /// A scheduled blob parameter update entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
