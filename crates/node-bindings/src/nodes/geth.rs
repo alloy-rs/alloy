@@ -447,11 +447,15 @@ impl Geth {
         // Open the HTTP API
         cmd.arg("--http");
         cmd.arg("--http.port").arg(&port_s);
+        // Bind explicitly to localhost to avoid exposing the API on all interfaces
+        cmd.arg("--http.addr").arg("127.0.0.1");
         cmd.arg("--http.api").arg(API);
 
         // Open the WS API
         cmd.arg("--ws");
         cmd.arg("--ws.port").arg(port_s);
+        // Bind explicitly to localhost to avoid exposing the API on all interfaces
+        cmd.arg("--ws.addr").arg("127.0.0.1");
         cmd.arg("--ws.api").arg(API);
 
         // pass insecure unlock flag if set
