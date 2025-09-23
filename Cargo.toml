@@ -91,7 +91,7 @@ alloy-eip7928 = { git = "https://github.com/alloy-rs/eips", branch = "main", pac
 
 
 # hardforks
-alloy-hardforks = "0.2.0"
+alloy-hardforks = "0.3.1"
 
 # ethereum
 ethereum_ssz_derive = "0.9"
