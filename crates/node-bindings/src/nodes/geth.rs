@@ -211,8 +211,6 @@ pub struct Geth {
 
 impl Geth {
     /// Creates an empty Geth builder.
-    ///
-    /// The mnemonic is chosen randomly.
     pub fn new() -> Self {
         Self::default()
     }
