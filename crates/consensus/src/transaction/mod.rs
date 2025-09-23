@@ -169,7 +169,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     ///
     /// Returns `None` if this is a `CREATE` transaction.
     fn to(&self) -> Option<Address> {
-        self.kind().to().copied()
+        self.kind().into_to()
     }
 
     /// Get `value`.
