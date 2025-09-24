@@ -192,7 +192,11 @@ impl<N: Network> NewBlocks<N> {
             };
 
             // Then try to fill as many blocks as possible.
-            // TODO: Maybe use `join_all`
+            // We use sequential fetching instead of join_all for several reasons:
+            // 1. Better error handling with per-block retry logic
+            // 2. Respects cache size limits and can break early when cache is full
+            // 3. Avoids overwhelming RPC servers with too many concurrent requests
+            // 4. Maintains backpressure when consumer is slower than producer
             let mut retries = MAX_RETRIES;
             for number in self.next_yield..=block_number {
                 debug!(number, "fetching block");
