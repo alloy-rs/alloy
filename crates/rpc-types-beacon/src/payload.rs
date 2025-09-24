@@ -726,7 +726,9 @@ mod tests {
                         ]
                     }
                 }
-            }
+            },
+            "signature": "0x8a9cfe747dbb5d6ee1538638b2adfc304c8bcbeb03f489756ca7dc7a12081df892f38b924d19c9f5530c746b86a34beb019070bb7707de5a8efc8bdab8ca5668d7bb0e31c5ffd24913d23c80a6f6f70ba89e280dd46d19d6128ac7f42ffee93e"
+
         }"#;
 
         let beacon_block: BeaconBlockData =
@@ -745,7 +747,7 @@ mod tests {
                     "0x3a798cf01d2c58af71b4d00f6b343c1faa88a4e8350d763d181928205ece05fa"
                 );
                 assert_eq!(
-                    v1.fee_recipient.to_string(),
+                    v1.fee_recipient.to_string().to_lowercase(),
                     "0xdadb0d80178819f2319190d340ce9a924f783711"
                 );
                 assert_eq!(
@@ -756,9 +758,6 @@ mod tests {
                 // Verify 2 transaction were included
                 assert_eq!(v1.transactions.len(), 2);
                 assert!(v1.transactions[0].to_string().starts_with("0x02f901540182e094"));
-                println!("Block number: {}", v1.block_number);
-                println!("Gas used: {}", v1.gas_used);
-                println!("Transactions: {}", v1.transactions.len());
             }
             ExecutionPayload::V2(_) => panic!("Expected V1 payload, got V2"),
             ExecutionPayload::V3(_) => panic!("Expected V1 payload, got V3"),
