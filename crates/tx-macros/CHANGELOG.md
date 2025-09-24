@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Don't use serde private API ([#2909](https://github.com/alloy-rs/alloy/issues/2909))
 
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
 
 ### Dependencies

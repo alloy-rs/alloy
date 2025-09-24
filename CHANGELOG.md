@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Bug Fixes
+
+- [jwt] Report parent directory path in try_create_random ([#2921](https://github.com/alloy-rs/alloy/issues/2921))
+
+### Dependencies
+
+- [deps] Bump taiki-e/install-action from 2.61.9 to 2.62.1 ([#2915](https://github.com/alloy-rs/alloy/issues/2915))
+
+### Features
+
+- [rpc-types-beacon] Add `BeaconBlockData` conversion to execution payload ([#2919](https://github.com/alloy-rs/alloy/issues/2919))
+
+### Miscellaneous Tasks
+
+- Forward std optional ([#2917](https://github.com/alloy-rs/alloy/issues/2917))
+- Remove redundant copy ([#2916](https://github.com/alloy-rs/alloy/issues/2916))
+
 ## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
 
 ### Bug Fixes
@@ -19,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.35
 - Add helper for init blobparams ([#2913](https://github.com/alloy-rs/alloy/issues/2913))
 
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
