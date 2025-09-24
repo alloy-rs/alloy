@@ -57,6 +57,54 @@ pub struct ExecutionPayloadHeaderMessage {
     pub pubkey: BlsPublicKey,
 }
 
+/// Data structure representing the signed blinded block submitted to the builder, binding the
+/// proposer to the block. with its signature.
+///
+/// See <https://ethereum.github.io/builder-specs/#/Builder/submitBlindedBlockV2>.
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BeaconBlockData {
+    /// The message of the signed beacon block
+    pub message: BeaconBlockMessage,
+    /// The signature of the beacon block
+    pub signature: Bytes,
+}
+
+/// Block Body Message
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BeaconBlockMessage {
+    /// Slot number
+    pub slot: String,
+    /// Proposer index  
+    pub proposer_index: String,
+    /// Parent root
+    pub parent_root: String,
+    /// State root
+    pub state_root: String,
+    /// Block body
+    pub body: BeaconBlockBody,
+}
+
+/// Execution payload body
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BeaconBlockBody {
+    /// Execution payload
+    #[serde(
+        serialize_with = "beacon_payload::serialize",
+        deserialize_with = "beacon_payload::deserialize"
+    )]
+    pub execution_payload: ExecutionPayload,
+}
+
+impl BeaconBlockData {
+    /// Get the execution payload
+    pub const fn execution_payload(&self) -> &ExecutionPayload {
+        &self.message.body.execution_payload
+    }
+}
+
 /// The header of the execution payload.
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -630,5 +678,89 @@ mod tests {
         // Test invalid JSON should return error
         let invalid_json = r#"{ invalid json }"#;
         assert!(execution_payload_from_beacon_str(invalid_json).is_err());
+    }
+
+    #[test]
+    fn test_extract_payload_from_beacon_block() {
+        // Extracted from https://light-mainnet.beaconcha.in/slot/0x6ceadbf2a6adbbd64cbec33fdebbc582f25171cd30ac43f641cbe76ac7313ddf with only 2 transactions
+        let beacon_block_json = r#"{
+        "message": {
+            "slot": "12225729",
+            "proposer_index": "496520",
+            "parent_root": "0x462f4abf9b6881724e6489085b3bb3931312e31ffb43f7cec3d0ee624dc2b58e",
+            "state_root": "0x2c6e3ff0b0f7bc33b30a020e75e69c2bba26fb42a7e234e8275e655170925a71",
+            "body": {
+                "randao_reveal": "0x825dc181628713b55f40ed3f489be0c60f0513f88eecb25c7aa512ad24b912b3929bdf1930b50af4c18fb8b5f490352218a1c25adc01f7c3aaa50f982d762f589b4f5b6806e1d37e3f70af7afe990d1b1e8e337ac67b53bb7896f2052ecfccc1",
+                "eth1_data": {
+                    "deposit_root": "0x2ebc563cabdbbacbc56f0de1d2d1c2d5315a4b071fcd8566aabbf0a45161c64e",
+                    "deposit_count": "2045305",
+                    "block_hash": "0x0958d83550263ff0d9f9a0bc5ea3cd2a136e0933b6f43cbb17f36e4da8d809b1"
+                },
+                "graffiti": "0x52502d4e502076312e31372e3000000000000000000000000000000000000000",
+                "proposer_slashings": [],
+                "attester_slashings": [],
+                "attestations": [],
+                "deposits": [],
+                "voluntary_exits": [],
+                "sync_aggregate": {
+                    "sync_committee_bits": "0x71b7f7596e64ef7f7ef4f938e9f68abfbfe95bff09393315bb93bbec7f7ef27effa4c7f25ba7cbdb87efbbf73fdaebb9efefeb3ef7fff8effafdd7aff5677bfc",
+                    "sync_committee_signature": "0xb45afdccf46b3518c295407594d82fcfd7fbff767f1b7bb2e7c9bdc8a0229232d201247b449d4bddf01fc974ce0b57601987fb401bb346062e53981cfb81dd6f9c519d645248a46ceba695c2d9630cfc68b26efc35f6ca14c49af9170581ad90"
+                },
+                "execution_payload": {
+                    "parent_hash": "0x3a798cf01d2c58af71b4d00f6b343c1faa88a4e8350d763d181928205ece05fa",
+                    "fee_recipient": "0xdadB0d80178819F2319190D340ce9A924f783711",
+                    "state_root": "0xf258006fe790a654326ceb30933e4216cd8cc2087b16f5189c8ac316d22b918f",
+                    "receipts_root": "0xf8e75ccce80b590f6ac30b859f308edab28c9d87ed8ad50d257902df4ba05ca5",
+                    "logs_bloom": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                    "prev_randao": "0x6a4900e9b3958061c0d7fff943a7cd75d9c13f1ba16bd4f9b7dd31b72a82cc11",
+                    "block_number": "23003311",
+                    "gas_limit": "45043901",
+                    "gas_used": "41421505",
+                    "timestamp": "1753532771",
+                    "extra_data": "0x4275696c6465724e6574202842656176657229",
+                    "base_fee_per_gas": "236192093",
+                    "block_hash": "0xa46feca5c8c498c9bf9741f3716d935b25a1a7ff2961d5d1e692f1e97f93a2ca",
+                    "transactions": [
+                        "0x02f901540182e0948505dec6f0ec8505dec6f0ec8307a12094360e051a25ca6decd2f0e91ea4c179a96c0e565e80b8e4ccf22927000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000bc396689893d065f41bc2c6ecbee5e008523344700000000000000000000000000000000000000000000000012651a94c4e78f2200000000000000000000000000000000000000000000034519cd0a9daa3a356e000000000000000000000000cd83055557536eff25fd0eafbc56e74a1b4260b30000000000000000000000000000000000000000000000000000000000000bb80000000000000000000000000000000000000000000000000000000000000000c001a0c45c9362e16382b20cc8f04599743f8cdb52031868251c5e4baa8add569019f1a02558d71f50ed265f7d63dde46e8ae477d58d833c36dfe9b4e7eb8783732cbf63",
+                        "0x02f90405018265c38084151e020b8303ca8894a69babef1ca67a37ffaf7a485dfff3382056e78c83db9700b9014478e111f600000000000000000000000039807fc9a64a376b99b1cebde2e79e3826d39aa1000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000c42f1c6b50000000000000000000000000000000000000000000000000abd98bd97ba9e63c00000000000000000000000000000000000000000000000033f578d0b9b5b4000000000000000000000000000000000000000000000402d44ba9f99ee186b7d50000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000006884c963ff8000000000000000000000000000000000000000000000000000000001227b00000000000000000000000000000000000000000000000000000000f90251d69439807fc9a64a376b99b1cebde2e79e3826d39aa1c0f85994c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2f842a00cb865ff1951c90111975d77bc75fa8312f25b08bb19b908f6b9c43691ac0cafa075245230289a9f0bf73a6c59aef6651b98b3833a62a3c0bd9ab6b0dec8ed4d8ff8dd9411b815efb8f581194ae79006d24e0d814b7697f6f8c6a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000004a0000000000000000000000000000000000000000000000000000000000000001ba0000000000000000000000000000000000000000000000000000000000000001ca02f2606b2c0d121a5cc1b59088ba7234e9d1c805f41724c938a2661d69532e0e9f8fe94dac17f958d2ee523a2206206994597c13d831ec7f8e7a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000004a0000000000000000000000000000000000000000000000000000000000000000aa0169228ca33ea854d54aa1e506e59ec687f618a41074f5f5de937a0e9c6343e5aa035d7fb7665514f774d2c2df607e197eb8674b6e63d2638472758647a2e67406aa03ad2db55fe5657fe773e3b7111e43f4b662a181a20e875b3b8be52dd9f0e233380a00cc4b1ab039d330bff37a79b961104004056d1fdf24ecf370036b453fdd4f2c7a0197e3c66c1f3fbaf9cb07902e38ebb451fd9f98e5a5a283d21716cfe3dc761fa"
+                        ]
+                    }
+                }
+            },
+            "signature": "0x8a9cfe747dbb5d6ee1538638b2adfc304c8bcbeb03f489756ca7dc7a12081df892f38b924d19c9f5530c746b86a34beb019070bb7707de5a8efc8bdab8ca5668d7bb0e31c5ffd24913d23c80a6f6f70ba89e280dd46d19d6128ac7f42ffee93e"
+
+        }"#;
+
+        let beacon_block: BeaconBlockData =
+            serde_json::from_str(beacon_block_json).expect("Failed to deserialize beacon block");
+
+        let execution_payload = beacon_block.execution_payload();
+
+        match execution_payload {
+            ExecutionPayload::V1(v1) => {
+                assert_eq!(v1.block_number, 23003311);
+                assert_eq!(v1.gas_limit, 45043901);
+                assert_eq!(v1.gas_used, 41421505);
+                assert_eq!(v1.timestamp, 1753532771);
+                assert_eq!(
+                    v1.parent_hash.to_string(),
+                    "0x3a798cf01d2c58af71b4d00f6b343c1faa88a4e8350d763d181928205ece05fa"
+                );
+                assert_eq!(
+                    v1.fee_recipient.to_string().to_lowercase(),
+                    "0xdadb0d80178819f2319190d340ce9a924f783711"
+                );
+                assert_eq!(
+                    v1.block_hash.to_string(),
+                    "0xa46feca5c8c498c9bf9741f3716d935b25a1a7ff2961d5d1e692f1e97f93a2ca"
+                );
+
+                // Verify 2 transaction were included
+                assert_eq!(v1.transactions.len(), 2);
+                assert!(v1.transactions[0].to_string().starts_with("0x02f901540182e094"));
+            }
+            ExecutionPayload::V2(_) => panic!("Expected V1 payload, got V2"),
+            ExecutionPayload::V3(_) => panic!("Expected V1 payload, got V3"),
+        }
     }
 }
