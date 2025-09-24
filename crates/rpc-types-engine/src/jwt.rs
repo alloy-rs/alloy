@@ -199,7 +199,7 @@ impl JwtSecret {
         if let Some(dir) = fpath.parent() {
             // Create parent directory
             fs::create_dir_all(dir)
-                .map_err(|err| JwtError::CreateDir { source: err, path: fpath.into() })?
+                .map_err(|err| JwtError::CreateDir { source: err, path: dir.into() })?
         }
 
         let secret = Self::random();
