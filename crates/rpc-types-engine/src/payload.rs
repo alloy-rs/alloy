@@ -991,8 +991,6 @@ impl ssz::Decode for ExecutionPayloadV4 {
     }
 
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        use alloy_eips::eip4844::builder;
-
         let mut builder = ssz::SszDecoderBuilder::new(bytes);
 
         builder.register_type::<B256>()?;
