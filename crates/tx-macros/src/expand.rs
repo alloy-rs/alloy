@@ -860,7 +860,7 @@ impl Expander {
         }
     }
 
-    /// Extract the inner transaction type from a Signed<T> wrapper.
+    /// Extract the inner transaction type from a `Signed<T>` wrapper.
     fn extract_inner_transaction_type(&self, ty: &syn::Type) -> proc_macro2::TokenStream {
         // For most cases, we need to extract T from Signed<T>
         if let syn::Type::Path(type_path) = ty {
