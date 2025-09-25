@@ -183,7 +183,7 @@ mod test {
             StateOverridesBuilder::default().append(Address::ZERO, account_override).build();
 
         let _res = provider
-            .tenderly_simulate_bundle(&vec![tx.clone(), tx], block, Some(state_override), None)
+            .tenderly_simulate_bundle(&[tx.clone(), tx], block, Some(state_override), None)
             .await
             .unwrap();
     }
