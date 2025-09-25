@@ -1,6 +1,9 @@
 //! Error types for converting between `Any` types.
 
+use crate::{Network, TransactionBuilderError};
+use alloy_consensus::error::UnsupportedTransactionType;
 use core::{error::Error, fmt};
+use std::fmt::{Debug, Display};
 
 /// A ConversionError that can capture any error type that implements the `Error` trait.
 pub struct AnyConversionError {
@@ -37,5 +40,13 @@ impl fmt::Display for AnyConversionError {
 impl Error for AnyConversionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.inner.source()
+    }
+}
+
+impl<N: Network, TxType: Display + Debug + Sync + Send + 'static>
+    From<UnsupportedTransactionType<TxType>> for TransactionBuilderError<N>
+{
+    fn from(value: UnsupportedTransactionType<TxType>) -> Self {
+        Self::Custom(Box::new(value))
     }
 }
