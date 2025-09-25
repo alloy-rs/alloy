@@ -72,7 +72,6 @@ where
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum SubscriptionKind {
     /// New block headers subscription.
     ///
