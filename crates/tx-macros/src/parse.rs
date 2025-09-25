@@ -30,6 +30,11 @@ pub(crate) struct EnvelopeArgs {
     #[darling(default)]
     pub arbitrary_cfg: Option<syn::Meta>,
 
+    /// Optional typed transaction enum name to generate.
+    /// When specified, generates a corresponding TypedTransaction enum.
+    #[darling(default)]
+    pub typed: Option<Ident>,
+
     /// The enum data (variants).
     pub data: darling::ast::Data<EnvelopeVariant, ()>,
 }

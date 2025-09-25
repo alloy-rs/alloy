@@ -29,6 +29,8 @@ pub(crate) struct Expander {
     pub(crate) alloy_rlp: TokenStream,
     /// Grouped variants for code generation.
     pub(crate) variants: GroupedVariants,
+    /// Optional typed transaction enum name.
+    pub(crate) typed: Option<Ident>,
 }
 
 impl Expander {
@@ -39,6 +41,7 @@ impl Expander {
         let trait_impls = self.generate_trait_impls();
         let serde_impls = self.generate_serde_impls();
         let arbitrary_impls = self.generate_arbitrary_impls();
+        let typed_transaction = self.generate_typed_transaction();
 
         quote! {
             #imports
@@ -46,6 +49,7 @@ impl Expander {
             #trait_impls
             #serde_impls
             #arbitrary_impls
+            #typed_transaction
         }
     }
 
@@ -680,5 +684,197 @@ impl Expander {
                 }
             };
         }
+    }
+
+    /// Generate typed transaction enum if requested.
+    fn generate_typed_transaction(&self) -> TokenStream {
+        let Some(typed_name) = &self.typed else {
+            return quote! {};
+        };
+
+        let input_type_name = &self.input_type_name;
+        let alloy_consensus = &self.alloy_consensus;
+        let alloy_primitives = &self.alloy_primitives;
+        let alloy_eips = &self.alloy_eips;
+        let serde_cfg = &self.serde_cfg;
+        let arbitrary_cfg = &self.arbitrary_cfg;
+
+        // Generate variants for typed transaction - extract inner types from Signed wrappers
+        let variants = self.variants.all.iter().map(|v| {
+            let name = &v.name;
+            let serde_attrs = if let Some(attrs) = &v.serde_attrs {
+                quote! { #attrs }
+            } else {
+                quote! {}
+            };
+
+            // Extract the inner transaction type from Signed<T>
+            let inner_type = self.extract_inner_transaction_type(&v.ty);
+
+            quote! {
+                /// Transaction variant
+                #[cfg_attr(#serde_cfg, serde(#serde_attrs))]
+                #name(#inner_type),
+            }
+        });
+
+        let variant_names = self.variants.variant_names();
+        let _variant_types: Vec<_> =
+            self.variants.all.iter().map(|v| self.extract_inner_transaction_type(&v.ty)).collect();
+
+        let doc_comment = format!(
+            "Typed transaction enum corresponding to the [`{}`] envelope.",
+            self.input_type_name
+        );
+
+        quote! {
+            #[doc = #doc_comment]
+            #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+            #[cfg_attr(#serde_cfg, derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize))]
+            #[cfg_attr(#arbitrary_cfg, derive(#alloy_consensus::private::arbitrary::Arbitrary))]
+            pub enum #typed_name<Eip4844> {
+                #(#variants)*
+            }
+
+            impl<Eip4844> #typed_name<Eip4844> {
+                /// Convert this typed transaction into a signed envelope with the given signature.
+                pub fn into_envelope(self, signature: #alloy_primitives::Signature) -> #input_type_name<Eip4844>
+                where
+                    Eip4844: #alloy_consensus::SignableTransaction<#alloy_primitives::Signature> + #alloy_consensus::RlpEcdsaEncodableTx,
+                {
+                    match self {
+                        #(Self::#variant_names(tx) => #input_type_name::#variant_names(
+                            #alloy_consensus::Signed::new_unhashed(tx, signature)
+                        ),)*
+                    }
+                }
+            }
+
+            // Implement Transaction trait by delegating to inner types
+            impl<Eip4844: #alloy_consensus::Transaction> #alloy_consensus::Transaction for #typed_name<Eip4844> {
+                #[inline]
+                fn chain_id(&self) -> Option<u64> {
+                    match self { #(Self::#variant_names(tx) => tx.chain_id(),)* }
+                }
+
+                #[inline]
+                fn nonce(&self) -> u64 {
+                    match self { #(Self::#variant_names(tx) => tx.nonce(),)* }
+                }
+
+                #[inline]
+                fn gas_limit(&self) -> u64 {
+                    match self { #(Self::#variant_names(tx) => tx.gas_limit(),)* }
+                }
+
+                #[inline]
+                fn gas_price(&self) -> Option<u128> {
+                    match self { #(Self::#variant_names(tx) => tx.gas_price(),)* }
+                }
+
+                #[inline]
+                fn max_fee_per_gas(&self) -> u128 {
+                    match self { #(Self::#variant_names(tx) => tx.max_fee_per_gas(),)* }
+                }
+
+                #[inline]
+                fn max_priority_fee_per_gas(&self) -> Option<u128> {
+                    match self { #(Self::#variant_names(tx) => tx.max_priority_fee_per_gas(),)* }
+                }
+
+                #[inline]
+                fn max_fee_per_blob_gas(&self) -> Option<u128> {
+                    match self { #(Self::#variant_names(tx) => tx.max_fee_per_blob_gas(),)* }
+                }
+
+                #[inline]
+                fn priority_fee_or_price(&self) -> u128 {
+                    match self { #(Self::#variant_names(tx) => tx.priority_fee_or_price(),)* }
+                }
+
+                fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+                    match self { #(Self::#variant_names(tx) => tx.effective_gas_price(base_fee),)* }
+                }
+
+                #[inline]
+                fn is_dynamic_fee(&self) -> bool {
+                    match self { #(Self::#variant_names(tx) => tx.is_dynamic_fee(),)* }
+                }
+
+                #[inline]
+                fn kind(&self) -> #alloy_primitives::TxKind {
+                    match self { #(Self::#variant_names(tx) => tx.kind(),)* }
+                }
+
+                #[inline]
+                fn is_create(&self) -> bool {
+                    match self { #(Self::#variant_names(tx) => tx.is_create(),)* }
+                }
+
+                #[inline]
+                fn value(&self) -> #alloy_primitives::U256 {
+                    match self { #(Self::#variant_names(tx) => tx.value(),)* }
+                }
+
+                #[inline]
+                fn input(&self) -> &#alloy_primitives::Bytes {
+                    match self { #(Self::#variant_names(tx) => tx.input(),)* }
+                }
+
+                #[inline]
+                fn access_list(&self) -> Option<&#alloy_eips::eip2930::AccessList> {
+                    match self { #(Self::#variant_names(tx) => tx.access_list(),)* }
+                }
+
+                #[inline]
+                fn blob_versioned_hashes(&self) -> Option<&[#alloy_primitives::B256]> {
+                    match self { #(Self::#variant_names(tx) => tx.blob_versioned_hashes(),)* }
+                }
+
+                #[inline]
+                fn authorization_list(&self) -> Option<&[#alloy_eips::eip7702::SignedAuthorization]> {
+                    match self { #(Self::#variant_names(tx) => tx.authorization_list(),)* }
+                }
+            }
+
+            // Implement Typed2718 for type identification
+            impl<Eip4844: #alloy_eips::eip2718::Typed2718> #alloy_eips::eip2718::Typed2718 for #typed_name<Eip4844> {
+                fn ty(&self) -> u8 {
+                    match self {
+                        #(Self::#variant_names(tx) => tx.ty(),)*
+                    }
+                }
+            }
+
+            // Convert from envelope to typed transaction (strip signature)
+            impl<Eip4844> From<#input_type_name<Eip4844>> for #typed_name<Eip4844>
+            where
+                Eip4844: #alloy_consensus::RlpEcdsaEncodableTx,
+            {
+                fn from(envelope: #input_type_name<Eip4844>) -> Self {
+                    match envelope {
+                        #(#input_type_name::#variant_names(signed) => Self::#variant_names(signed.into_parts().0),)*
+                    }
+                }
+            }
+        }
+    }
+
+    /// Extract the inner transaction type from a Signed<T> wrapper.
+    fn extract_inner_transaction_type(&self, ty: &syn::Type) -> proc_macro2::TokenStream {
+        // For most cases, we need to extract T from Signed<T>
+        if let syn::Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident == "Signed" {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+                            return quote! { #inner_ty };
+                        }
+                    }
+                }
+            }
+        }
+        // Fallback to the original type if we can't extract from Signed<T>
+        quote! { #ty }
     }
 }
