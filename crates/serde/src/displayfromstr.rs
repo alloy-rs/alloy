@@ -22,7 +22,7 @@
 //! assert_eq!(val, deserialized);
 //! ```
 
-use crate::alloc::string::{String, ToString};
+use crate::alloc::string::String;
 use core::{fmt, str::FromStr};
 use serde::{Deserialize, Deserializer, Serializer};
 
