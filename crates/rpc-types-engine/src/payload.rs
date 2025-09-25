@@ -972,6 +972,9 @@ impl ExecutionPayloadV4 {
         base_block.body.block_access_list =
             Some(alloy_rlp::decode_exact(self.block_access_list.as_ref())?);
 
+        base_block.header.block_access_list_hash =
+            Some(alloy_primitives::keccak256(self.block_access_list.as_ref()).into());
+
         Ok(base_block)
     }
 }
