@@ -1,7 +1,7 @@
 //! Helper errors.
 
 use alloc::{borrow::Cow, boxed::Box, string::ToString};
-use core::fmt::Display;
+use core::{convert::Infallible, fmt::Display};
 
 /// Helper type that is [`core::error::Error`] and wraps a value and an error message.
 ///
@@ -53,3 +53,42 @@ impl<T> ValueError<T> {
 #[derive(Debug, thiserror::Error)]
 #[error("Unsupported transaction type: {0}")]
 pub struct UnsupportedTransactionType<TxType: Display>(TxType);
+
+impl<TxType: Display> UnsupportedTransactionType<TxType> {
+    /// Creates new `UnsupportedTransactionType` showing `ty` as the unsupported type.
+    pub const fn new(ty: TxType) -> Self {
+        Self(ty)
+    }
+
+    /// Converts the `UnsupportedTransactionType` into the `TxType` it contains, taking self.
+    pub fn into_inner(self) -> TxType {
+        self.0
+    }
+}
+
+impl<TxType: Display> AsRef<TxType> for UnsupportedTransactionType<TxType> {
+    fn as_ref(&self) -> &TxType {
+        &self.0
+    }
+}
+
+impl<TxType: Display> From<Infallible> for UnsupportedTransactionType<TxType> {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TxType;
+
+    #[test]
+    fn test_unsupported_tx_type_error_displays_itself_and_the_type() {
+        let error = UnsupportedTransactionType::new(TxType::Eip2930);
+        let actual_msg = error.to_string();
+        let expected_msg = "Unsupported transaction type: EIP-2930";
+
+        assert_eq!(actual_msg, expected_msg);
+    }
+}
