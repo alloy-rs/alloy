@@ -727,11 +727,29 @@ impl Expander {
             self.input_type_name
         );
 
+        // Generate serde derives only if serde is enabled
+        let serde_derives = if self.serde_enabled {
+            quote! {
+                #[cfg_attr(#serde_cfg, derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize))]
+            }
+        } else {
+            quote! {}
+        };
+
+        // Generate arbitrary derives only if arbitrary is enabled
+        let arbitrary_derives = if self.arbitrary_enabled {
+            quote! {
+                #[cfg_attr(#arbitrary_cfg, derive(#alloy_consensus::private::arbitrary::Arbitrary))]
+            }
+        } else {
+            quote! {}
+        };
+
         quote! {
             #[doc = #doc_comment]
             #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-            #[cfg_attr(#serde_cfg, derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize))]
-            #[cfg_attr(#arbitrary_cfg, derive(#alloy_consensus::private::arbitrary::Arbitrary))]
+            #serde_derives
+            #arbitrary_derives
             pub enum #typed_name<Eip4844> {
                 #(#variants)*
             }
