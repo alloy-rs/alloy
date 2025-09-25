@@ -32,7 +32,7 @@ where
     T: fmt::Display,
     S: Serializer,
 {
-    serializer.collect_str(&value.to_string())
+    serializer.collect_str(value)
 }
 
 /// Deserialize a quoted string to a type `T` using [FromStr].
