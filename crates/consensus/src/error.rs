@@ -1,6 +1,7 @@
 //! Helper errors.
 
 use alloc::{borrow::Cow, boxed::Box, string::ToString};
+use core::fmt::Display;
 
 /// Helper type that is [`core::error::Error`] and wraps a value and an error message.
 ///
@@ -14,7 +15,7 @@ pub struct ValueError<T> {
 
 impl<T> ValueError<T> {
     /// Creates a new error with the given value and error message.
-    pub fn new(value: T, msg: impl core::fmt::Display) -> Self {
+    pub fn new(value: T, msg: impl Display) -> Self {
         Self { msg: Cow::Owned(msg.to_string()), value: Box::new(value) }
     }
 
@@ -46,3 +47,9 @@ impl<T> ValueError<T> {
         &self.value
     }
 }
+
+/// The error for conversions or processing of transactions of type using components that lack the
+/// knowledge or capability to do so.
+#[derive(Debug, thiserror::Error)]
+#[error("Unsupported transaction type: {0}")]
+pub struct UnsupportedTransactionType<TxType: Display>(TxType);
