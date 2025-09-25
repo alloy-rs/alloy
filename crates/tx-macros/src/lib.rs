@@ -32,6 +32,8 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 /// # Variant Attributes
 /// - Each variant must be annotated with `envelope` attribute with one of the following options:
 ///   - `#[envelope(ty = N)]` - Specify the transaction type ID (0-255)
+///   - `#[envelope(ty = N, typed = CustomType)]` - Use a custom transaction type for this variant
+///     in the generated TypedTransaction (optional)
 ///   - `#[envelope(flatten)]` - Flatten this variant to delegate to inner envelope type
 ///
 /// # Generated Code

@@ -1,4 +1,4 @@
-use darling::{FromDeriveInput, FromMeta, FromVariant};
+use darling::{FromDeriveInput, FromVariant};
 use proc_macro2::TokenStream;
 use syn::{Ident, Path, Type};
 
@@ -49,23 +49,38 @@ pub(crate) struct EnvelopeVariant {
     /// The fields of the variant.
     pub fields: darling::ast::Fields<syn::Type>,
 
-    /// Kind of the variant.
-    #[darling(flatten)]
-    pub kind: VariantKind,
+    /// Transaction type ID (0-255) for typed variants.
+    #[darling(default)]
+    pub ty: Option<u8>,
+
+    /// Optional custom typed transaction type for this variant.
+    #[darling(default)]
+    pub typed: Option<Ident>,
+
+    /// Whether this is a flattened envelope.
+    #[darling(default)]
+    pub flatten: Option<bool>,
 
     /// Forwarded attributes.
     pub attrs: Vec<syn::Attribute>,
 }
 
 /// Kind of the envelope variant.
-#[derive(Debug, Clone, FromMeta)]
+#[derive(Debug, Clone)]
 pub(crate) enum VariantKind {
     /// A standalone transaction with a type tag.
-    #[darling(rename = "ty")]
-    Typed(u8),
+    Typed(TypedVariant),
     /// Flattened envelope.
-    #[darling(word, rename = "flatten")]
     Flattened,
+}
+
+/// Typed variant configuration.
+#[derive(Debug, Clone)]
+pub(crate) struct TypedVariant {
+    /// Transaction type ID (0-255).
+    pub ty: u8,
+    /// Optional custom typed transaction type for this variant.
+    pub typed: Option<Ident>,
 }
 
 /// Processed variant information.
@@ -84,7 +99,7 @@ pub(crate) struct ProcessedVariant {
 impl ProcessedVariant {
     /// Returns true if this is a legacy transaction variant (type 0).
     pub(crate) const fn is_legacy(&self) -> bool {
-        matches!(self.kind, VariantKind::Typed(0))
+        matches!(self.kind, VariantKind::Typed(ref typed_variant) if typed_variant.ty == 0)
     }
 }
 
@@ -114,7 +129,23 @@ impl GroupedVariants {
 
         let mut processed = Vec::new();
         for variant in variants {
-            let EnvelopeVariant { ident, fields, kind, attrs } = variant;
+            let EnvelopeVariant { ident, fields, ty, typed, flatten, attrs } = variant;
+
+            // Determine the variant kind from the attributes
+            let kind = match (ty, flatten) {
+                (Some(ty_val), _) => {
+                    // This is a typed variant
+                    VariantKind::Typed(TypedVariant { ty: ty_val, typed })
+                }
+                (None, Some(true)) => {
+                    // This is explicitly flattened
+                    VariantKind::Flattened
+                }
+                (None, None) | (None, Some(false)) => {
+                    // Default to flattened if no explicit type
+                    VariantKind::Flattened
+                }
+            };
 
             let serde_attrs =
                 if let Some(attr) = attrs.into_iter().find(|attr| attr.path().is_ident("serde")) {
