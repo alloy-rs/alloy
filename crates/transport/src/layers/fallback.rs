@@ -58,15 +58,9 @@ impl<S: Clone> FallbackService<S> {
         let mut transports = (*self.transports).clone();
         transports.sort_by(|a, b| b.cmp(a));
 
-        trace!(
-            target: "alloy::transport::fallback::rankings",
-            "Current transport rankings:"
-        );
+        trace!("Current transport rankings:");
         for (idx, transport) in transports.iter().enumerate() {
-            trace!(
-                target: "alloy::transport::fallback::rankings",
-                "  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary()
-            );
+            trace!("  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary());
         }
     }
 }
