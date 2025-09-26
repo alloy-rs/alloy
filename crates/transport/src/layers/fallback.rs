@@ -59,12 +59,12 @@ impl<S: Clone> FallbackService<S> {
         transports.sort_by(|a, b| b.cmp(a));
 
         trace!(
-            target: "alloy_fallback_transport_rankings",
+            target: "alloy::transport::fallback::rankings",
             "Current transport rankings:"
         );
         for (idx, transport) in transports.iter().enumerate() {
             trace!(
-                target: "alloy_fallback_transport_rankings",
+                target: "alloy::transport::fallback::rankings",
                 "  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary()
             );
         }
