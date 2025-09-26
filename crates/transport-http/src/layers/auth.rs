@@ -61,11 +61,15 @@ impl<S> AuthService<S> {
 
     /// Validate the token in the request headers.
     ///
-    /// Returns `true` if the token is still valid and `iat` is beyond the grace buffer.
+    /// Returns `true` if the token is still valid and `iat` is within the grace buffer.
+    /// A token is considered valid if the time difference between the current time
+    /// and the issued-at time is within the configured latency buffer.
     fn validate(&self) -> bool {
         if let Some(claim) = self.most_recent_claim.as_ref() {
             let curr_secs = get_current_timestamp();
-            if claim.iat.abs_diff(curr_secs) * 1000 > self.latency_buffer {
+            // Check if the token is not too old (within latency buffer)
+            // Convert seconds to milliseconds for comparison with latency_buffer
+            if claim.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
                 return true;
             }
         }
@@ -76,10 +80,11 @@ impl<S> AuthService<S> {
     /// Create a new token from the secret.
     ///
     /// Updates the most_recent_claim with the new claim.
+    /// The issued-at time is set to the current timestamp to ensure proper validation.
     fn create_token_from_secret(&mut self) -> Result<String, jsonwebtoken::errors::Error> {
         let claims = Claims {
-            iat: (SystemTime::now().duration_since(UNIX_EPOCH).unwrap() + Duration::from_secs(60))
-                .as_secs(),
+            // Set iat to current time (not future time) for proper validation
+            iat: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
             exp: None,
         };
 
