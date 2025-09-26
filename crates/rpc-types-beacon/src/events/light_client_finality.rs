@@ -28,12 +28,18 @@ pub struct AttestedHeader {
     pub beacon: BeaconBlockHeader,
 }
 
+/// Backwards-compatible alias for the previously local `Beacon` header type.
+pub type Beacon = BeaconBlockHeader;
+
 /// Contains the `Beacon2` header that was finalized.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedHeader {
     /// The `Beacon2` object representing the block header.
     pub beacon: BeaconBlockHeader,
 }
+
+/// Backwards-compatible alias for the previously local `Beacon2` header type.
+pub type Beacon2 = BeaconBlockHeader;
 
 /// Contains the sync committee bits and signature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
