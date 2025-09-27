@@ -20,7 +20,7 @@ pub trait RlpEcdsaEncodableTx: Sized + Typed2718 {
     /// a RLP header.
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut);
 
-    /// Create an list rlp header for the unsigned transaction.
+    /// Create a list rlp header for the unsigned transaction.
     fn rlp_header(&self) -> Header {
         Header { list: true, payload_length: self.rlp_encoded_fields_length() }
     }
