@@ -24,7 +24,12 @@ impl TransportConnect for ReqwestConnect {
     }
 
     async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
-        Ok(BoxTransport::new(Http::with_client(Client::new(), self.url.clone())))
+        // Configure a sane default timeout to avoid indefinitely hanging requests.
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(TransportErrorKind::custom)?;
+        Ok(BoxTransport::new(Http::with_client(client, self.url.clone())))
     }
 }
 
@@ -40,6 +45,9 @@ impl Http<Client> {
             .post(self.url)
             .json(&req)
             .headers(req.headers())
+            // Per-request timeout as a safeguard; ensures predictable behavior even if
+            // the client was constructed without a default timeout.
+            .timeout(std::time::Duration::from_secs(30))
             .send()
             .await
             .map_err(TransportErrorKind::custom)?;
