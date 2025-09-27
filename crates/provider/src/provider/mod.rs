@@ -1,6 +1,9 @@
 mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
+mod eth_logs;
+pub use eth_logs::{EthLogs, EthLogsParams, LogOptions, LogsCaller};
+
 mod get_block;
 #[cfg(feature = "pubsub")]
 pub use get_block::SubFullBlocks;
