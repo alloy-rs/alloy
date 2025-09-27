@@ -6,7 +6,7 @@ use jsonwebtoken::get_current_timestamp;
 use std::{
     future::Future,
     pin::Pin,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tower::{Layer, Service};
 
