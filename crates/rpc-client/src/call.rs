@@ -3,7 +3,6 @@ use alloy_json_rpc::{
     RpcRecv, RpcResult, RpcSend,
 };
 use alloy_transport::{BoxTransport, IntoBoxTransport, RpcFut, TransportError, TransportResult};
-use core::panic;
 use futures::FutureExt;
 use serde_json::value::RawValue;
 use std::{
