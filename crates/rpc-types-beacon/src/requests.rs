@@ -118,14 +118,30 @@ mod ssz_requests_conversions {
                     let (request_type, payload) =
                         request.split_first().expect("already checked for empty");
 
-                    let max_size = match *request_type {
-                        DEPOSIT_REQUEST_TYPE => MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD,
-                        WITHDRAWAL_REQUEST_TYPE => MAX_WITHDRAWAL_REQUESTS_PER_BLOCK,
-                        CONSOLIDATION_REQUEST_TYPE => MAX_CONSOLIDATION_REQUESTS_PER_BLOCK,
+                    match *request_type {
+                        DEPOSIT_REQUEST_TYPE => {
+                            self.deposits = Self::parse_request_payload(
+                                payload,
+                                MAX_DEPOSIT_RECEIPTS_PER_PAYLOAD,
+                                DEPOSIT_REQUEST_TYPE,
+                            )?;
+                        }
+                        WITHDRAWAL_REQUEST_TYPE => {
+                            self.withdrawals = Self::parse_request_payload(
+                                payload,
+                                MAX_WITHDRAWAL_REQUESTS_PER_BLOCK,
+                                WITHDRAWAL_REQUEST_TYPE,
+                            )?;
+                        }
+                        CONSOLIDATION_REQUEST_TYPE => {
+                            self.consolidations = Self::parse_request_payload(
+                                payload,
+                                MAX_CONSOLIDATION_REQUESTS_PER_BLOCK,
+                                CONSOLIDATION_REQUEST_TYPE,
+                            )?;
+                        }
                         unknown => return Err(TryFromRequestsError::UnknownRequestType(unknown)),
-                    };
-
-                    self.deposits = Self::parse_request_payload(payload, max_size, *request_type)?;
+                    }
 
                     Ok(self)
                 }
