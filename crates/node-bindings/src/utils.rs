@@ -27,16 +27,17 @@ pub(crate) fn unused_port() -> u16 {
 /// For keys end with '=', find value until ' ' is encountered or end of line
 /// For keys end with ':', find value until ',' is encountered or end of line
 pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
-    let mut key_equal = Cow::from(key);
-    let mut key_colon = Cow::from(key);
-
-    // Prepare both key variants
-    if !key_equal.ends_with('=') {
-        key_equal = format!("{key}=").into();
-    }
-    if !key_colon.ends_with(": ") {
-        key_colon = format!("{key}: ").into();
-    }
+    // Prepare both key variants - avoid unnecessary Cow cloning
+    let key_equal = if key.ends_with('=') { 
+        Cow::Borrowed(key) 
+    } else { 
+        Cow::Owned(format!("{key}="))
+    };
+    let key_colon = if key.ends_with(": ") { 
+        Cow::Borrowed(key) 
+    } else { 
+        Cow::Owned(format!("{key}: "))
+    };
 
     // Try to find the key with '='
     if let Some(pos) = line.find(key_equal.as_ref()) {
