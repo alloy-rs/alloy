@@ -464,7 +464,7 @@ impl Anvil {
 
             let mut line = String::new();
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
-            trace!(target: "anvil", line);
+            trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
                 // parse the actual port
