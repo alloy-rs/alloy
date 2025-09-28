@@ -121,8 +121,9 @@ pub struct ExecutionPayloadHeader {
     pub logs_bloom: Bloom,
     /// The previous Randao value of the execution payload.
     pub prev_randao: B256,
-    /// The block number of the execution payload, represented as a string.
-    pub block_number: String,
+    /// The block number of the execution payload, represented as a `u64`.
+    #[serde_as(as = "DisplayFromStr")]
+    pub block_number: u64,
     /// The gas limit of the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub gas_limit: u64,
