@@ -325,6 +325,36 @@ impl AnyTxEnvelope {
             _ => None,
         }
     }
+
+    /// Returns true if the transaction is a legacy transaction.
+    #[inline]
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Legacy(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-2930 transaction.
+    #[inline]
+    pub const fn is_eip2930(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip2930(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-1559 transaction.
+    #[inline]
+    pub const fn is_eip1559(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip1559(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-4844 transaction.
+    #[inline]
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip4844(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-7702 transaction.
+    #[inline]
+    pub const fn is_eip7702(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip7702(_)))
+    }
 }
 
 impl Typed2718 for AnyTxEnvelope {
