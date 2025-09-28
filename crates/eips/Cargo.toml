@@ -89,7 +89,8 @@ std = [
 	"sha2?/std",
 	"either/std",
 	"serde_with?/std",
-	"thiserror/std"
+	"thiserror/std",
+	"borsh?/std"
 ]
 serde = [
 	"dep:alloy-serde",

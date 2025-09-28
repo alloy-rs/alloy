@@ -49,6 +49,7 @@ std = [
 	"alloy-eips/std",
 	"serde_json/std",
 	"serde_with?/std",
+	"borsh?/std"
 ]
 serde-bincode-compat = ["dep:serde_with", "alloy-eips/serde-bincode-compat"]
 borsh = [
