@@ -196,7 +196,7 @@ pub enum MulticallError {
     #[error("batch contains a tx with a value, try using .send() instead")]
     ValueTx,
     /// Error decoding return data.
-    #[error("could not decode")]
+    #[error("could not decode: {0}")]
     DecodeError(alloy_sol_types::Error),
     /// No return data was found.
     #[error("no return data")]
