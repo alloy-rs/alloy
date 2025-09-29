@@ -76,14 +76,12 @@ impl RequestPacket {
     pub fn subscription_request_ids(&self) -> HashSet<&Id> {
         match self {
             Self::Single(single) => {
-                let id = (single.method() == "eth_subscribe").then(|| single.id());
+                let id = single.is_subscription().then(|| single.id());
                 HashSet::from_iter(id)
             }
-            Self::Batch(batch) => batch
-                .iter()
-                .filter(|req| req.method() == "eth_subscribe")
-                .map(|req| req.id())
-                .collect(),
+            Self::Batch(batch) => {
+                batch.iter().filter(|req| req.is_subscription()).map(|req| req.id()).collect()
+            }
         }
     }
 
