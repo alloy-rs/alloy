@@ -132,7 +132,7 @@ where
                 )));
             }
         }
-        
+
         // Unpack data from the response body. We do this regardless of
         // the status code, as we want to return the error in the body
         // if there is one.
