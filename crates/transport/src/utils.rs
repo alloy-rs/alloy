@@ -13,7 +13,7 @@ where
     to_raw_value(s).map_err(TransportError::ser_err)
 }
 
-// Guess whether the URL is local, based on the hostname or IP.
+/// Guess whether the URL is local, based on the hostname or IP.
 ///
 /// Best-effort heuristic: returns `true` if the connection has no hostname, or
 /// the host is `localhost`, `127.0.0.1`, or the IPv6 loopback `::1`.
