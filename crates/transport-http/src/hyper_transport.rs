@@ -116,6 +116,23 @@ where
 
         debug!(%status, "received response from server");
 
+        // Enforce an upper bound on response size to avoid unbounded memory usage.
+        // This is a conservative cap for JSON-RPC responses and can be revisited if needed.
+        const MAX_HTTP_BODY_BYTES: u64 = 10 * 1024 * 1024; // 10 MiB
+        if let Some(len) = resp
+            .headers()
+            .get(header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok())
+        {
+            if len > MAX_HTTP_BODY_BYTES {
+                return Err(TransportErrorKind::custom_str(&format!(
+                    "HTTP response too large: {} bytes (limit {} bytes)",
+                    len, MAX_HTTP_BODY_BYTES
+                )));
+            }
+        }
+        
         // Unpack data from the response body. We do this regardless of
         // the status code, as we want to return the error in the body
         // if there is one.
