@@ -1,4 +1,4 @@
-//! Defines the exact transaction variant that are allowed to be propagated over the eth p2p
+//! Defines the exact transaction variant that is allowed to be propagated over the eth p2p
 //! protocol.
 
 use super::EthereumTxEnvelope;

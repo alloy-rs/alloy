@@ -1321,7 +1321,6 @@ where
 /// Owned equivalent of a `SubscriptionId`
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum FilterId {
     /// Numeric id

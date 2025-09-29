@@ -113,10 +113,6 @@ impl ConnectionInterface {
             Err(TryRecvError::Empty) => {}
         }
 
-        if self.shutdown.try_recv().is_ok() {
-            return None;
-        }
-
         self.from_frontend.recv().await
     }
 

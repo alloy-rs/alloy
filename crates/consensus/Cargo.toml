@@ -83,7 +83,7 @@ std = [
     "derive_more/std",
     "k256?/std",
     "serde?/std",
-    "serde_json/std",
+    "serde_json?/std",
     "serde_with?/std",
     "thiserror/std",
     "either/std",

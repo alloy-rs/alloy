@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn test_serialization_order() {
-        let test_cases = vec![
+        let test_cases = [
             TraceTestCase {
                 trace: LocalizedTransactionTrace {
                     trace: TransactionTrace {

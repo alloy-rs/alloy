@@ -1,4 +1,5 @@
-use alloy_primitives::{Bytes, B256};
+use crate::header::BeaconBlockHeader;
+use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -24,51 +25,21 @@ pub struct LightClientFinalityData {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestedHeader {
     /// The `Beacon` object representing the block header.
-    pub beacon: Beacon,
+    pub beacon: BeaconBlockHeader,
 }
 
-/// Represents the header of a beacon block.
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Beacon {
-    /// The slot number of the beacon block, serialized as a string.
-    #[serde_as(as = "DisplayFromStr")]
-    pub slot: u64,
-    /// The index of the proposer of the beacon block, serialized as a string.
-    #[serde_as(as = "DisplayFromStr")]
-    pub proposer_index: u64,
-    /// The root of the parent block.
-    pub parent_root: B256,
-    /// The state root after the block is processed.
-    pub state_root: B256,
-    /// The root of the block body.
-    pub body_root: B256,
-}
+/// Backwards-compatible alias for the previously local `Beacon` header type.
+pub type Beacon = BeaconBlockHeader;
 
 /// Contains the `Beacon2` header that was finalized.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedHeader {
     /// The `Beacon2` object representing the block header.
-    pub beacon: Beacon2,
+    pub beacon: BeaconBlockHeader,
 }
 
-/// Represents the header of a finalized beacon block.
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Beacon2 {
-    /// The slot number of the beacon block, serialized as a string.
-    #[serde_as(as = "DisplayFromStr")]
-    pub slot: u64,
-    /// The index of the proposer of the beacon block, serialized as a string.
-    #[serde_as(as = "DisplayFromStr")]
-    pub proposer_index: u64,
-    /// The root of the parent block.
-    pub parent_root: B256,
-    /// The state root after the block is processed.
-    pub state_root: B256,
-    /// The root of the block body.
-    pub body_root: B256,
-}
+/// Backwards-compatible alias for the previously local `Beacon2` header type.
+pub type Beacon2 = BeaconBlockHeader;
 
 /// Contains the sync committee bits and signature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
