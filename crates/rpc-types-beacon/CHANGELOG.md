@@ -5,11 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- [beacon] Remove redundant DisplayFromStr on header.block_number ([#2943](https://github.com/alloy-rs/alloy/issues/2943))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+### Refactor
+
+- [beacon-events] Use BeaconBlockHeader in light client finality ([#2933](https://github.com/alloy-rs/alloy/issues/2933))
+
 ## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
 
 ### Features
 
 - [rpc-types-beacon] Add `BeaconBlockData` conversion to execution payload ([#2919](https://github.com/alloy-rs/alloy/issues/2919))
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
 
 ## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
 
