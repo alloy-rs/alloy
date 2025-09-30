@@ -82,6 +82,7 @@ impl BlobParams {
         Self {
             target_blob_count: eip7892::BPO1_TARGET_BLOBS_PER_BLOCK,
             max_blob_count: eip7892::BPO1_MAX_BLOBS_PER_BLOCK,
+            update_fraction: eip7892::BPO1_BASE_UPDATE_FRACTION as u128,
             ..Self::osaka()
         }
     }
@@ -91,6 +92,7 @@ impl BlobParams {
         Self {
             target_blob_count: eip7892::BPO2_TARGET_BLOBS_PER_BLOCK,
             max_blob_count: eip7892::BPO2_MAX_BLOBS_PER_BLOCK,
+            update_fraction: eip7892::BPO2_BASE_UPDATE_FRACTION as u128,
             ..Self::osaka()
         }
     }
