@@ -47,6 +47,14 @@ impl<S: Clone> FallbackService<S> {
             .map(|(id, transport)| ScoredTransport::new(id, transport))
             .collect::<Vec<_>>();
 
+        // Ensure a sane configuration: if there are transports, use at least one,
+        // and never exceed the available number of transports.
+        let active_transport_count = if scored_transports.is_empty() {
+            0
+        } else {
+            active_transport_count.max(1).min(scored_transports.len())
+        };
+
         Self { transports: Arc::new(scored_transports), active_transport_count }
     }
 
