@@ -95,9 +95,11 @@ impl<'a> SerdeGenerator<'a> {
                     let rename = format!("0x{tx_type:x}");
 
                     let mut aliases = vec![];
-                    // Add alias for single digit hex values (e.g., "0x0" for "0x00")
+                    // Add alias with leading zero for single digit hex values (e.g., "0x01" for "0x1")
                     if rename.len() == 3 {
-                        aliases.push(format!("0x0{}", rename.chars().last().unwrap()));
+                        if let Some(last_char) = rename.chars().last() {
+                            aliases.push(format!("0x0{last_char}"));
+                        }
                     }
 
                     // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
