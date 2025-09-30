@@ -7,9 +7,9 @@ use alloy_primitives::{Address, B256, U256};
 pub struct HeaderInfo {
     /// The number of ancestor blocks of this block (block height).
     pub number: u64,
-    /// Beneficiary (Coinbase or miner) is a address that have signed the block.
+    /// Beneficiary (coinbase) is the address that receives fees and rewards for the block.
     ///
-    /// This is the receiver address of all the gas spent in the block.
+    /// On the execution layer this does not imply the block was "signed" by this address.
     pub beneficiary: Address,
     /// The timestamp of the block in seconds since the UNIX epoch
     pub timestamp: u64,
@@ -18,7 +18,7 @@ pub struct HeaderInfo {
     /// The base fee per gas, added in the London upgrade with [EIP-1559]
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
-    pub base_fee_per_gas: Option<u64>,
+    pub base_fee_per_gas: Option<U256>,
     /// A running total of blob gas consumed in excess of the target, prior to the block. Blocks
     /// with above-target blob gas consumption increase this value, blocks with below-target blob
     /// gas consumption decrease it (bounded at 0). This was added in EIP-4844.
