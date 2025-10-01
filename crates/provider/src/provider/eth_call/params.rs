@@ -196,7 +196,7 @@ impl serde::Serialize for EthCallManyParams<'_> {
         if let Some(context) = self.context() {
             seq.serialize_element(context)?;
         } else if self.overrides().is_some() {
-            seq.serialize_element(&StateOverride::default())?;
+            seq.serialize_element(&StateContext::default())?;
         }
 
         if let Some(overrides) = self.overrides() {
