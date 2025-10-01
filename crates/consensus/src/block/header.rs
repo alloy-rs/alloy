@@ -14,7 +14,7 @@ use alloy_eips::{
 use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
 /// Ethereum Block header
@@ -262,7 +262,8 @@ impl Header {
         self.extra_data.len() // extra data
     }
 
-    fn header_payload_length(&self) -> usize {
+    /// Calculate the length of the header's RLP payload.
+    pub fn rlp_encoded_fields_length(&self) -> usize {
         let mut length = 0;
         length += self.parent_hash.length();
         length += self.ommers_hash.length();
@@ -360,13 +361,14 @@ impl Header {
     pub const fn prague_active(&self) -> bool {
         self.requests_hash.is_some()
     }
-}
 
-impl Encodable for Header {
-    fn encode(&self, out: &mut dyn BufMut) {
-        let list_header =
-            alloy_rlp::Header { list: true, payload_length: self.header_payload_length() };
-        list_header.encode(out);
+    /// Creates an RLP header for the [Header].
+    pub fn rlp_header(&self) -> alloy_rlp::Header {
+        alloy_rlp::Header { list: true, payload_length: self.rlp_encoded_fields_length() }
+    }
+
+    /// Encodes the header's fields into the desired buffer, without a RLP header.
+    pub fn rlp_encode_fields(&self, out: &mut dyn BufMut) {
         self.parent_hash.encode(out);
         self.ommers_hash.encode(out);
         self.beneficiary.encode(out);
@@ -409,22 +411,11 @@ impl Encodable for Header {
         }
     }
 
-    fn length(&self) -> usize {
-        let mut length = 0;
-        length += self.header_payload_length();
-        length += length_of_length(length);
-        length
-    }
-}
-
-impl Decodable for Header {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let rlp_head = alloy_rlp::Header::decode(buf)?;
-        if !rlp_head.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let started_len = buf.len();
-        let mut this = Self {
+    /// RLP decode the fields of a [Header].
+    ///
+    /// Does not expect an RLP header. Expects the buffer to only contain the fields of the header.
+    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
             parent_hash: Decodable::decode(buf)?,
             ommers_hash: Decodable::decode(buf)?,
             beneficiary: Decodable::decode(buf)?,
@@ -440,48 +431,49 @@ impl Decodable for Header {
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
             nonce: B64::decode(buf)?,
-            base_fee_per_gas: None,
-            withdrawals_root: None,
-            blob_gas_used: None,
-            excess_blob_gas: None,
-            parent_beacon_block_root: None,
-            requests_hash: None,
-        };
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.base_fee_per_gas = Some(u64::decode(buf)?);
+            base_fee_per_gas: (!buf.is_empty()).then(|| Decodable::decode(buf)).transpose()?,
+            withdrawals_root: (!buf.is_empty()).then(|| Decodable::decode(buf)).transpose()?,
+            blob_gas_used: (!buf.is_empty()).then(|| Decodable::decode(buf)).transpose()?,
+            excess_blob_gas: (!buf.is_empty()).then(|| Decodable::decode(buf)).transpose()?,
+            parent_beacon_block_root: (!buf.is_empty())
+                .then(|| Decodable::decode(buf))
+                .transpose()?,
+            requests_hash: (!buf.is_empty()).then(|| Decodable::decode(buf)).transpose()?,
+        })
+    }
+}
+
+impl Encodable for Header {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.rlp_header().encode(out);
+        self.rlp_encode_fields(out);
+    }
+
+    fn length(&self) -> usize {
+        self.rlp_header().length_with_payload()
+    }
+}
+
+impl Decodable for Header {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = alloy_rlp::Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        if header.payload_length > buf.len() {
+            return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        // Withdrawals root for post-shanghai headers
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.withdrawals_root = Some(Decodable::decode(buf)?);
-        }
+        let fields_buf = &mut &buf[..header.payload_length];
+        let this = Self::rlp_decode_fields(fields_buf)?;
 
-        // Blob gas used and excess blob gas for post-cancun headers
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.blob_gas_used = Some(u64::decode(buf)?);
-        }
-
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.excess_blob_gas = Some(u64::decode(buf)?);
-        }
-
-        // Decode parent beacon block root.
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.parent_beacon_block_root = Some(B256::decode(buf)?);
-        }
-
-        // Decode requests hash.
-        if started_len - buf.len() < rlp_head.payload_length {
-            this.requests_hash = Some(B256::decode(buf)?);
-        }
-
-        let consumed = started_len - buf.len();
-        if consumed != rlp_head.payload_length {
+        if !fields_buf.is_empty() {
             return Err(alloy_rlp::Error::ListLengthMismatch {
-                expected: rlp_head.payload_length,
-                got: consumed,
+                expected: header.payload_length,
+                got: header.payload_length - fields_buf.len(),
             });
         }
+
         Ok(this)
     }
 }
