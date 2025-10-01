@@ -825,6 +825,7 @@ mod tests {
             }
             ExecutionPayload::V2(_) => panic!("Expected V1 payload, got V2"),
             ExecutionPayload::V3(_) => panic!("Expected V1 payload, got V3"),
+            ExecutionPayload::V4(_) => panic!("Expected V1 payload, got V4"),
         }
     }
 }
