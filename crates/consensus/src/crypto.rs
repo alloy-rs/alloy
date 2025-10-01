@@ -183,14 +183,7 @@ pub mod backend {
 
     /// Try to get the currently installed default provider, returning None if none is installed.
     pub(super) fn try_get_provider() -> Option<&'static dyn CryptoProvider> {
-        #[cfg(feature = "std")]
-        {
-            DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
-        }
+        DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
     }
 }
 
