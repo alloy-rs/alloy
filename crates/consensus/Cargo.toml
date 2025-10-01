@@ -83,23 +83,23 @@ assert_matches.workspace = true
 [features]
 default = ["std"]
 std = [
-	"alloy-eips/std",
-	"c-kzg?/std",
-	"alloy-serde?/std",
-	"alloy-primitives/std",
-	"alloy-rlp/std",
-	"alloy-trie/std",
-	"derive_more/std",
-	"k256?/std",
-	"serde?/std",
-	"serde_json/std",
-	"serde_with?/std",
-	"thiserror/std",
-	"either/std",
-	"once_cell/std",
-	"secp256k1?/std",
-
+    "alloy-eips/std",
+    "c-kzg?/std",
+    "alloy-serde?/std",
+    "alloy-primitives/std",
+    "alloy-rlp/std",
+    "alloy-trie/std",
+    "derive_more/std",
+    "k256?/std",
+    "serde?/std",
+    "serde_json?/std",
+    "serde_with?/std",
+    "thiserror/std",
+    "either/std",
+    "once_cell/std",
+    "secp256k1?/std"
 ]
+
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 secp256k1 = ["dep:secp256k1"]
 crypto-backend = []

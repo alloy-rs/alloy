@@ -107,7 +107,7 @@ impl<T> Recovered<T> {
     }
 
     /// Converts the transaction type to the given alternative that is `From<T>`
-    #[deprecated = "Use `convert_inner` instead"]
+    #[deprecated = "Use `convert` instead"]
     pub fn convert_transaction<Tx>(self) -> Recovered<Tx>
     where
         Tx: From<T>,
@@ -124,7 +124,7 @@ impl<T> Recovered<T> {
     }
 
     /// Converts the transaction to the given alternative that is `TryFrom<T>`
-    #[deprecated = "Use `try_convert_inner` instead"]
+    #[deprecated = "Use `try_convert` instead"]
     pub fn try_convert_transaction<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
         Tx: TryFrom<T>,
@@ -138,7 +138,7 @@ impl<T> Recovered<T> {
     }
 
     /// Applies the given closure to the inner transaction type.
-    #[deprecated = "Use `map_inner` instead"]
+    #[deprecated = "Use `map` instead"]
     pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.inner), self.signer)
     }
@@ -149,7 +149,7 @@ impl<T> Recovered<T> {
     }
 
     /// Applies the given fallible closure to the inner transaction type.
-    #[deprecated = "Use `try_map_inner` instead"]
+    #[deprecated = "Use `try_map` instead"]
     pub fn try_map_transaction<Tx, E>(
         self,
         f: impl FnOnce(T) -> Result<Tx, E>,

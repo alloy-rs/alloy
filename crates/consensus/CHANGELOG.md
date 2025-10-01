@@ -5,11 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- [consensus] Correct deprecated method references in Recovered<T> ([#2950](https://github.com/alloy-rs/alloy/issues/2950))
+- [consensus] Replace redundant set_chain_id call with comment in set_chain_id_checked ([#2948](https://github.com/alloy-rs/alloy/issues/2948))
+
+### Features
+
+- Add `UnsupportedTransactionType` error ([#2928](https://github.com/alloy-rs/alloy/issues/2928))
+
+### Miscellaneous Tasks
+
+- Use fqs for tx_hash_with_type forwarding ([#2944](https://github.com/alloy-rs/alloy/issues/2944))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+- Fix a couple of grammatical errors ([#2931](https://github.com/alloy-rs/alloy/issues/2931))
+
+### Testing
+
+- Test display of `UnsupportedTransactionType` error and its conversion into `TransactionBuilderError` ([#2929](https://github.com/alloy-rs/alloy/issues/2929))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+- Forward std optional ([#2917](https://github.com/alloy-rs/alloy/issues/2917))
+- Remove redundant copy ([#2916](https://github.com/alloy-rs/alloy/issues/2916))
+
 ## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
 
 ### Bug Fixes
 
 - Don't use serde private API ([#2909](https://github.com/alloy-rs/alloy/issues/2909))
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
 
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
 

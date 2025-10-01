@@ -5,11 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- Convert static vectors to arrays ([#2926](https://github.com/alloy-rs/alloy/issues/2926))
+
+### Features
+
+- [provider] Include inner cause in DecodeError message ([#2945](https://github.com/alloy-rs/alloy/issues/2945))
+
+### Miscellaneous Tasks
+
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+### Other
+
+- Do not cache tag-based BlockId requests in provider cache ([#2942](https://github.com/alloy-rs/alloy/issues/2942))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
 ## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
 
 ### Bug Fixes
 
 - [provider] Require context in eth_callMany params ([#2910](https://github.com/alloy-rs/alloy/issues/2910))
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
 
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
 

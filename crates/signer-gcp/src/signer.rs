@@ -15,7 +15,7 @@ use gcloud_sdk::{
 };
 use k256::ecdsa::{self, VerifyingKey};
 use spki::DecodePublicKey;
-use std::{fmt, fmt::Debug};
+use std::fmt;
 use thiserror::Error;
 
 type Client = GoogleApi<KeyManagementServiceClient<GoogleAuthMiddleware>>;

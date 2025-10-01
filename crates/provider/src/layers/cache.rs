@@ -100,10 +100,13 @@ macro_rules! rpc_call_with_block {
             });
 
             let res = result.await?;
-            // Insert into cache.
-            let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
-            let hash = $req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+            // Insert into cache only for deterministic block identifiers (exclude tag-based ids
+            // like latest/pending/earliest). Caching tag-based results can lead to stale data.
+            if !$req.has_block_tag() {
+                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+                let hash = $req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(res)
         }))
