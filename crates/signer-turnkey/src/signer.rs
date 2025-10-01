@@ -1,15 +1,15 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, ChainId, Signature, B256};
+use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, B256, U256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use std::fmt;
-use turnkey_client::{
-    generated::{
-        immutable::common::v1::{HashFunction, PayloadEncoding},
-        SignRawPayloadIntentV2,
-    },
-    TurnkeyClient, TurnkeyClientError,
+use tracing::instrument;
+use turnkey_client::generated::{
+    immutable::common::v1::{HashFunction, PayloadEncoding},
+    SignRawPayloadIntentV2,
 };
+
+use crate::{TurnkeyClient, TurnkeyClientError, TurnkeyP256ApiKey};
 /// Turnkey signer implementation for Alloy.
 ///
 /// The Turnkey Signer passes signing requests to the Turnkey secure key management infrastructure.
@@ -26,17 +26,14 @@ use turnkey_client::{
 /// ```no_run
 /// use alloy_primitives::Address;
 /// use alloy_signer::Signer;
-/// use alloy_signer_turnkey::{
-///     turnkey_client::{TurnkeyClient, TurnkeyP256ApiKey},
-///     TurnkeySigner,
-/// };
+/// use alloy_signer_turnkey::{TurnkeyClient, TurnkeyP256ApiKey, TurnkeySigner};
 ///
 /// # async fn test() {
 /// let api_key =
 ///     TurnkeyP256ApiKey::from_strings("private_key_hex", None).expect("api key creation failed");
 /// let client = TurnkeyClient::builder().api_key(api_key).build().expect("client builder failed");
 /// let org_id = "your-org-id".to_string();
-/// let address = "0x1234567890123456789012345678901234567890".parse::<Address>().unwrap();
+/// let address = alloy_primitives::address!("0x1234567890123456789012345678901234567890");
 /// let chain_id = Some(1);
 /// let signer = TurnkeySigner::new(client, org_id, address, chain_id);
 ///
@@ -100,7 +97,6 @@ impl alloy_network::TxSigner<Signature> for TurnkeySigner {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for TurnkeySigner {
     #[instrument(err)]
-    #[allow(clippy::blocks_in_conditions)]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         let response = self
             .client
@@ -125,17 +121,22 @@ impl Signer for TurnkeySigner {
         let v_bytes = hex::decode(&response.v)
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::Hex(e)))?;
 
-        if r_bytes.len() != 32 || s_bytes.len() != 32 || v_bytes.is_empty() {
+        if r_bytes.len() != 32 || s_bytes.len() != 32 || v_bytes.len() != 1 {
             return Err(alloy_signer::Error::other(TurnkeySignerError::InvalidSignature));
         }
 
-        let v = v_bytes[0];
-        let mut sig_bytes = [0u8; 65];
-        sig_bytes[..32].copy_from_slice(&r_bytes);
-        sig_bytes[32..64].copy_from_slice(&s_bytes);
-        sig_bytes[64] = v;
+        let mut r_arr = [0u8; 32];
+        r_arr.copy_from_slice(&r_bytes);
+        let r = U256::from_be_bytes(r_arr);
 
-        Signature::try_from(&sig_bytes[..]).map_err(alloy_signer::Error::other)
+        let mut s_arr = [0u8; 32];
+        s_arr.copy_from_slice(&s_bytes);
+        let s = U256::from_be_bytes(s_arr);
+
+        let parity = normalize_v(v_bytes[0] as u64)
+            .ok_or_else(|| alloy_signer::Error::other(TurnkeySignerError::InvalidSignature))?;
+
+        Ok(Signature::new(r, s, parity))
     }
 
     #[inline]
@@ -158,9 +159,6 @@ alloy_network::impl_into_wallet!(TurnkeySigner);
 
 impl TurnkeySigner {
     /// Instantiate a new signer from an existing client, organization ID, and address.
-    ///
-    /// This follows Turnkey team's recommendation: use the address directly for signing
-    /// via sign_raw_payload, avoiding the need for async key fetching.
     pub const fn new(
         client: TurnkeyClient,
         organization_id: String,
@@ -180,7 +178,7 @@ impl TurnkeySigner {
         address: Address,
         chain_id: Option<ChainId>,
     ) -> Result<Self, TurnkeySignerError> {
-        let api_key = turnkey_client::TurnkeyP256ApiKey::from_strings(api_private_key, None)
+        let api_key = TurnkeyP256ApiKey::from_strings(api_private_key, None)
             .map_err(|err| TurnkeySignerError::TurnkeyClient(TurnkeyClientError::from(err)))?;
         let client = TurnkeyClient::builder().api_key(api_key).build()?;
         Ok(Self::new(client, organization_id, address, chain_id))
@@ -191,7 +189,6 @@ impl TurnkeySigner {
 mod tests {
     use super::*;
     use k256::ecdsa::VerifyingKey;
-    use turnkey_client::TurnkeyP256ApiKey;
 
     #[tokio::test]
     async fn sign_message() {
