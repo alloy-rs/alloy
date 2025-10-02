@@ -933,7 +933,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// [`send_transaction`]: Self::send_transaction
     /// [`ProviderLayer`]: crate::ProviderLayer
-    /// [`TxFiller`]: crate::TxFiller
+    /// [`TxFiller`]: crate::fillers::TxFiller
     #[doc(hidden)]
     async fn send_transaction_internal(
         &self,
