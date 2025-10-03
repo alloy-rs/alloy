@@ -97,7 +97,10 @@ impl Signer for LedgerSigner {
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         let mut payload = Self::path_to_bytes(&self.derivation);
-        payload.extend_from_slice(&(message.len() as u32).to_be_bytes());
+        // Ensure message length fits into u32 as required by Ledger APDU format.
+        let msg_len_u32 = u32::try_from(message.len())
+            .map_err(|_| alloy_signer::Error::other("message too long (>4GiB)"))?;
+        payload.extend_from_slice(&msg_len_u32.to_be_bytes());
         payload.extend_from_slice(message);
 
         self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload)
