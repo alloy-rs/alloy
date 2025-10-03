@@ -122,7 +122,8 @@ impl RethInstance {
 
 impl Drop for RethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill reth");
+        // Best-effort: the child process may already have exited; avoid panicking in Drop.
+        let _ = self.pid.kill();
     }
 }
 
