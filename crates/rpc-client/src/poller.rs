@@ -58,7 +58,6 @@ use tokio::time::{sleep, Sleep};
 /// # Ok(())
 /// # }
 /// ```
-// TODO: make this be able to be spawned on the current thread instead of forcing a task.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
 pub struct PollerBuilder<Params, Resp> {
