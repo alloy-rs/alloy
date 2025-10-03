@@ -584,7 +584,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         for (block_height, txs) in self.past_blocks.iter().rev() {
             if txs.contains(&to_watch.config.tx_hash) {
                 let confirmations = to_watch.config.required_confirmations;
-                let confirmed_at = *block_height + confirmations - 1;
+                // Use saturating arithmetic to avoid underflow when confirmations == 0
+                let confirmed_at = block_height.saturating_add(confirmations.saturating_sub(1));
                 let current_height = self.past_blocks.back().map(|(h, _)| *h).unwrap();
 
                 if confirmed_at <= current_height {
@@ -603,7 +604,12 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     fn add_to_waiting_list(&mut self, watcher: TxWatcher, block_height: u64) {
         let confirmations = watcher.config.required_confirmations;
         debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-        self.waiting_confs.entry(block_height + confirmations - 1).or_default().push(watcher);
+        // Use saturating arithmetic to avoid underflow when confirmations == 0
+        self
+            .waiting_confs
+            .entry(block_height.saturating_add(confirmations.saturating_sub(1)))
+            .or_default()
+            .push(watcher);
     }
 
     /// Handle a new block by checking if any of the transactions we're
