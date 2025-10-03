@@ -628,8 +628,6 @@ mod tests {
         // compat mode returns correct block
         let block_compat = b.unwrap();
 
-        dbg!(block, block_wrong, block_compat);
-
         // arbitrum blocks move fast so we assert with some error margin
         assert!(block.abs_diff(block_compat) < 10);
         assert!(block.abs_diff(block_wrong) > 100_000);
