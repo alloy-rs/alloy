@@ -254,7 +254,6 @@ impl<N: Network> CallBatchProviderInner<N> {
     ///
     /// Ref: <https://github.com/wevm/viem/blob/ba8319f71503af8033fd3c77cfb64c7eb235c6a9/src/actions/public/call.ts#L295>
     fn should_batch_call(&self, params: &crate::EthCallParams<N>) -> bool {
-        // TODO: block ID is not yet implemented
         if params.block().is_some_and(|block| block != BlockId::latest()) {
             return false;
         }
