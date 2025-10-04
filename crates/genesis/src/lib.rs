@@ -452,7 +452,7 @@ pub mod serde_bincode_compat {
     };
     use alloy_primitives::{Address, U256};
     use alloy_serde::OtherFields;
-    use serde::{de::value, Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
     /// Bincode-compatible [`super::ChainConfig`] serde implementation.
