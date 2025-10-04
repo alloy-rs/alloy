@@ -449,9 +449,6 @@ mod tests {
             gas_price: 400e9 as u128,
             gas_limit: 1000000,
             to: address!("2ed7afa17473e17ac59908f088b4371d28585476").into(),
-            // TODO: this fails for some reason with 6a80 APDU_CODE_BAD_KEY_HANDLE
-            // approve uni v2 router 0xff
-            // input: bytes!("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
             input: bytes!("01020304"),
             value: U256::from(100e18 as u128),
             chain_id: Some(69420),
