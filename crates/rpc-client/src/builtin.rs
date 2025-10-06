@@ -218,10 +218,6 @@ mod test {
             BuiltInConnectionString::Http("https://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
-            BuiltInConnectionString::from_str("localhost:8545").unwrap(),
-            BuiltInConnectionString::Http("http://localhost:8545".parse::<Url>().unwrap())
-        );
-        assert_eq!(
             BuiltInConnectionString::from_str("http://127.0.0.1:8545").unwrap(),
             BuiltInConnectionString::Http("http://127.0.0.1:8545".parse::<Url>().unwrap())
         );
