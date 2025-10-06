@@ -27,6 +27,7 @@ workspace = true
 alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
+alloy-eip7928 = { workspace = true, features = ["rlp"] }
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
@@ -82,11 +83,12 @@ std = [
 	"alloy-eip2124/std",
 	"alloy-eip2930/std",
 	"alloy-eip7702/std",
+	"alloy-eip7928/std",
 	"derive_more/std",
 	"sha2?/std",
 	"either/std",
 	"serde_with?/std",
-	"thiserror/std"
+	"thiserror/std",
 ]
 serde = [
 	"dep:alloy-serde",
@@ -97,6 +99,7 @@ serde = [
 	"alloy-eip2930/serde",
 	"alloy-eip7702/serde",
 	"alloy-eip2124/serde",
+	"alloy-eip7928/serde",
 	"either/serde",
 	"rand/serde",
 ]
@@ -115,6 +118,7 @@ arbitrary = [
 	"alloy-eip2124/arbitrary",
 	"alloy-eip2930/arbitrary",
 	"alloy-eip7702/arbitrary",
+	"alloy-eip7928/arbitrary",
 	"alloy-eip7702/k256",
-	"c-kzg?/arbitrary"
+	"c-kzg?/arbitrary",
 ]
