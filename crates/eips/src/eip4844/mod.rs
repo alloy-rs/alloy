@@ -133,17 +133,30 @@ where
     Ok(blob)
 }
 
-/// Helper function to deserialize boxed blobs.
-#[cfg(feature = "serde")]
-pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<alloc::boxed::Box<Blob>>, D::Error>
+/// Helper function to deserialize boxed blobs from a serde deserializer.
+#[cfg(all(debug_assertions, feature = "serde"))]
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
     use serde::Deserialize;
-    <Vec<alloy_primitives::Bytes>>::deserialize(deserializer)?
-        .into_iter()
-        .map(|blob| Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom))
-        .collect()
+
+    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let mut blobs = Vec::with_capacity(raw_blobs.len());
+    for blob in raw_blobs {
+        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
+    }
+    Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    Vec::<Blob>::deserialize(deserializer)
 }
 
 /// A heap allocated blob that serializes as 0x-prefixed hex string
