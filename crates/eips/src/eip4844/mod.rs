@@ -135,10 +135,11 @@ where
 
 /// Helper function to deserialize boxed blobs from a serde deserializer.
 #[cfg(all(debug_assertions, feature = "serde"))]
-pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
+    use alloc::vec::Vec;
     use serde::Deserialize;
 
     let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
@@ -151,12 +152,11 @@ where
 
 #[cfg(all(not(debug_assertions), feature = "serde"))]
 #[inline(always)]
-pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
-    use serde::Deserialize;
-    Vec::<Blob>::deserialize(deserializer)
+    serde::Deserialize::deserialize(deserializer)
 }
 
 /// A heap allocated blob that serializes as 0x-prefixed hex string

@@ -50,7 +50,7 @@ pub struct GetBlobsResponse {
     /// Vec of individual blobs
     #[serde(deserialize_with = "deserialize_blobs")]
     #[into_iterator]
-    pub data: Vec<Box<Blob>>,
+    pub data: Vec<Blob>,
 }
 
 /// Intermediate type for BlobTransactionSidecar matching
