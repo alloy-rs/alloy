@@ -79,7 +79,7 @@ pub struct PollerBuilder<Params, Resp> {
 impl<Params, Resp> PollerBuilder<Params, Resp>
 where
     Params: RpcSend + 'static,
-    Resp: RpcRecv + Clone,
+    Resp: RpcRecv,
 {
     /// Create a new poller task.
     pub fn new(client: WeakClient, method: impl Into<Cow<'static, str>>, params: Params) -> Self {
@@ -145,13 +145,19 @@ where
     }
 
     /// Starts the poller in a new task, returning a channel to receive the responses on.
-    pub fn spawn(self) -> PollChannel<Resp> {
+    pub fn spawn(self) -> PollChannel<Resp>
+    where
+        Resp: Clone,
+    {
         let (tx, rx) = broadcast::channel(self.channel_size);
         self.into_future(tx).spawn_task();
         rx.into()
     }
 
-    async fn into_future(self, tx: broadcast::Sender<Resp>) {
+    async fn into_future(self, tx: broadcast::Sender<Resp>)
+    where
+        Resp: Clone,
+    {
         let mut stream = self.into_stream();
         while let Some(resp) = stream.next().await {
             if tx.send(resp).is_err() {
