@@ -1,5 +1,7 @@
 use crate::header::Header;
-use alloy_eips::eip4844::{deserialize_blob, Blob, BlobTransactionSidecar, Bytes48};
+use alloy_eips::eip4844::{
+    deserialize_blob, deserialize_blobs, Blob, BlobTransactionSidecar, Bytes48,
+};
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -7,7 +9,7 @@ use std::vec::IntoIter;
 
 /// Bundle of blobs for a given block
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::IntoIterator)]
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
     pub data: Vec<BlobData>,
@@ -35,14 +37,20 @@ impl BeaconBlobBundle {
     }
 }
 
-/// Yields an iterator for BlobData
-impl IntoIterator for BeaconBlobBundle {
-    type Item = BlobData;
-    type IntoIter = IntoIter<BlobData>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
-    }
+/// Response from `eth/v1/beacon/blobs`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::IntoIterator)]
+pub struct GetBlobsResponse {
+    /// True if the response references an unverified execution payload. Optimistic information may
+    /// be invalidated at a later time. If the field is not present, assume the False value.
+    pub execution_optimistic: bool,
+    /// True if the response references the finalized history of the chain, as determined by fork
+    /// choice. If the field is not present, additional calls are necessary to compare the epoch of
+    /// the requested information with the finalized checkpoint.
+    pub finalized: bool,
+    /// Vec of individual blobs
+    #[serde(deserialize_with = "deserialize_blobs")]
+    #[into_iterator]
+    pub data: Vec<Box<Blob>>,
 }
 
 /// Intermediate type for BlobTransactionSidecar matching
