@@ -797,7 +797,7 @@ impl TransactionRequest {
     ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if sidecar or max_blob_fee_per_gas is set
+    /// - EIP-4844 if sidecar, blob_versioned_hashes, or max_blob_fee_per_gas is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
