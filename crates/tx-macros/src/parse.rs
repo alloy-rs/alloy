@@ -1,4 +1,4 @@
-use darling::{FromDeriveInput, FromVariant};
+use darling::{FromDeriveInput, FromMeta, FromVariant};
 use proc_macro2::TokenStream;
 use syn::{Ident, Path, Type};
 
@@ -41,7 +41,7 @@ pub(crate) struct EnvelopeArgs {
 
 /// Variant of transaction envelope enum.
 #[derive(Debug, FromVariant)]
-#[darling(attributes(envelope), forward_attrs(serde))]
+#[darling(attributes(envelope), forward_attrs(serde, doc))]
 pub(crate) struct EnvelopeVariant {
     /// The identifier of the variant.
     pub ident: Ident,
@@ -49,38 +49,27 @@ pub(crate) struct EnvelopeVariant {
     /// The fields of the variant.
     pub fields: darling::ast::Fields<syn::Type>,
 
-    /// Transaction type ID (0-255) for typed variants.
-    #[darling(default)]
-    pub ty: Option<u8>,
+    /// Kind of the variant.
+    #[darling(flatten)]
+    pub kind: VariantKind,
 
     /// Optional custom typed transaction type for this variant.
     #[darling(default)]
     pub typed: Option<Ident>,
-
-    /// Whether this is a flattened envelope.
-    #[darling(default)]
-    pub flatten: Option<bool>,
 
     /// Forwarded attributes.
     pub attrs: Vec<syn::Attribute>,
 }
 
 /// Kind of the envelope variant.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromMeta)]
 pub(crate) enum VariantKind {
     /// A standalone transaction with a type tag.
-    Typed(TypedVariant),
+    #[darling(rename = "ty")]
+    Typed(u8),
     /// Flattened envelope.
+    #[darling(word, rename = "flatten")]
     Flattened,
-}
-
-/// Typed variant configuration.
-#[derive(Debug, Clone)]
-pub(crate) struct TypedVariant {
-    /// Transaction type ID (0-255).
-    pub ty: u8,
-    /// Optional custom typed transaction type for this variant.
-    pub typed: Option<Ident>,
 }
 
 /// Processed variant information.
@@ -94,12 +83,16 @@ pub(crate) struct ProcessedVariant {
     pub kind: VariantKind,
     /// The serde attributes for the variant.
     pub serde_attrs: Option<TokenStream>,
+    /// The doc attributes for the variant.
+    pub doc_attrs: Vec<syn::Attribute>,
+    /// Optional custom typed transaction type for this variant.
+    pub typed: Option<Ident>,
 }
 
 impl ProcessedVariant {
     /// Returns true if this is a legacy transaction variant (type 0).
     pub(crate) const fn is_legacy(&self) -> bool {
-        matches!(self.kind, VariantKind::Typed(ref typed_variant) if typed_variant.ty == 0)
+        matches!(self.kind, VariantKind::Typed(0))
     }
 }
 
@@ -129,34 +122,20 @@ impl GroupedVariants {
 
         let mut processed = Vec::new();
         for variant in variants {
-            let EnvelopeVariant { ident, fields, ty, typed, flatten, attrs } = variant;
+            let EnvelopeVariant { ident, fields, kind, attrs, typed } = variant;
 
-            // Determine the variant kind from the attributes
-            let kind = match (ty, flatten) {
-                (Some(ty_val), _) => {
-                    // This is a typed variant
-                    VariantKind::Typed(TypedVariant { ty: ty_val, typed })
-                }
-                (None, Some(true)) => {
-                    // This is explicitly flattened
-                    VariantKind::Flattened
-                }
-                (None, None) | (None, Some(false)) => {
-                    // Default to flattened if no explicit type
-                    VariantKind::Flattened
-                }
-            };
+            let mut serde_attrs = None;
+            let mut doc_attrs = Vec::new();
 
-            let serde_attrs =
-                if let Some(attr) = attrs.into_iter().find(|attr| attr.path().is_ident("serde")) {
+            for attr in attrs {
+                if attr.path().is_ident("serde") {
                     if let syn::Meta::List(list) = attr.meta {
-                        Some(list.tokens.clone())
-                    } else {
-                        None
+                        serde_attrs = Some(list.tokens);
                     }
-                } else {
-                    None
-                };
+                } else if attr.path().is_ident("doc") {
+                    doc_attrs.push(attr);
+                }
+            }
 
             // Check that variant has exactly one unnamed field
             let ty = match &fields.style {
@@ -176,7 +155,14 @@ impl GroupedVariants {
                 }
             };
 
-            processed.push(ProcessedVariant { name: ident, ty, kind, serde_attrs });
+            processed.push(ProcessedVariant {
+                name: ident,
+                ty,
+                kind,
+                serde_attrs,
+                doc_attrs,
+                typed,
+            });
         }
 
         let typed =

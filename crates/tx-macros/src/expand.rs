@@ -140,12 +140,11 @@ impl Expander {
                         #name(<#ty as #alloy_consensus::TransactionEnvelope>::TxType)
                     }
                 }
-                VariantKind::Typed(typed_variant) => {
+                VariantKind::Typed(ty_id) => {
                     let doc_comment = format!("Transaction type of `{}`.", ty.to_token_stream());
-                    let ty_value = typed_variant.ty;
                     quote! {
                         #[doc = #doc_comment]
-                        #name = #ty_value
+                        #name = #ty_id
                     }
                 }
             }
@@ -163,10 +162,7 @@ impl Expander {
         let from_arms = self.variants.all.iter().map(|v| {
             let name = &v.name;
             match &v.kind {
-                VariantKind::Typed(typed_variant) => {
-                    let ty_value = typed_variant.ty;
-                    quote! { #tx_type_enum_name::#name => #ty_value }
-                }
+                VariantKind::Typed(ty_id) => quote! { #tx_type_enum_name::#name => #ty_id },
                 VariantKind::Flattened => {
                     quote! { #tx_type_enum_name::#name(inner) => inner.into() }
                 }
@@ -181,14 +177,11 @@ impl Expander {
                         return Ok(Self::#name(inner))
                     }
                 },
-                VariantKind::Typed(typed_variant) => {
-                    let ty_value = typed_variant.ty;
-                    quote! {
-                        if value == #ty_value {
-                            return Ok(Self::#name)
-                        }
+                VariantKind::Typed(ty_id) => quote! {
+                    if value == #ty_id {
+                        return Ok(Self::#name)
                     }
-                }
+                },
             }
         });
 
@@ -255,10 +248,9 @@ impl Expander {
                 VariantKind::Flattened => quote! {
                     Self::#name(inner) => #alloy_consensus::Typed2718::ty(inner)
                 },
-                VariantKind::Typed(typed_variant) => {
-                    let ty_value = typed_variant.ty;
-                    quote! { Self::#name => #ty_value }
-                }
+                VariantKind::Typed(ty_id) => quote! {
+                    Self::#name => #ty_id
+                },
             }
         });
 
@@ -707,48 +699,32 @@ impl Expander {
         let arbitrary_cfg = &self.arbitrary_cfg;
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
 
-        // Generate variants for typed transaction - extract inner types from Signed wrappers
-        let variants = self.variants.all.iter().map(|v| {
-            let name = &v.name;
-
-            // Extract inner type from wrapper or use custom type
-            let inner_type = match &v.kind {
-                VariantKind::Typed(typed_variant) if typed_variant.typed.is_some() => {
-                    // Custom type specified
-                    let custom_type = typed_variant.typed.as_ref().unwrap();
-                    quote! { #custom_type }
-                }
-                _ => {
-                    // Extract from wrapper
-                    self.extract_inner_transaction_type(&v.ty)
-                }
-            };
-
-            quote! {
-                /// Transaction variant
-                #name(#inner_type),
-            }
-        });
-
         let variant_names = self.variants.variant_names();
         let variant_types: Vec<_> = self
             .variants
             .all
             .iter()
             .map(|v| {
-                match &v.kind {
-                    VariantKind::Typed(typed_variant) if typed_variant.typed.is_some() => {
-                        // Use custom typed transaction type for this variant
-                        let custom_type = typed_variant.typed.as_ref().unwrap();
-                        quote! { #custom_type }
-                    }
-                    _ => {
-                        // Default: extract from Signed<T>
-                        self.extract_inner_transaction_type(&v.ty)
-                    }
+                // Extract inner type from wrapper or use custom type
+                if let Some(ty) = &v.typed {
+                    quote! { #ty }
+                } else {
+                    self.extract_inner_transaction_type(&v.ty)
                 }
             })
             .collect();
+
+        // Generate variants for typed transaction - extract inner types from Signed wrappers
+        let variants =
+            variant_names.iter().zip(variant_types.iter()).zip(self.variants.all.iter()).map(
+                |((name, inner_type), v)| {
+                    let doc_attrs = &v.doc_attrs;
+                    quote! {
+                        #(#doc_attrs)*
+                        #name(#inner_type),
+                    }
+                },
+            );
 
         let doc_comment = format!(
             "Typed transaction enum corresponding to the [`{}`] envelope.",
@@ -923,12 +899,8 @@ impl Expander {
             .iter()
             .map(|v| {
                 let name = &v.name;
-                let typed_variant = match &v.kind {
-                    VariantKind::Typed(tv) => tv,
-                    _ => unreachable!(),
-                };
+                let VariantKind::Typed(ty_value) = v.kind else { unreachable!() };
 
-                let ty_value = typed_variant.ty;
                 let rename = format!("0x{ty_value:02x}");
                 let alias_attr = if rename.len() == 4 {
                     let alias = format!("0x{ty_value:x}");
@@ -938,9 +910,10 @@ impl Expander {
                 };
 
                 // Custom type or extract from wrapper
-                let inner_type = match &typed_variant.typed {
-                    Some(custom_type) => quote! { #custom_type },
-                    None => self.extract_inner_transaction_type(&v.ty),
+                let inner_type = if let Some(ty) = &v.typed {
+                    quote! { #ty }
+                } else {
+                    self.extract_inner_transaction_type(&v.ty)
                 };
 
                 quote! {
@@ -951,9 +924,7 @@ impl Expander {
             .collect();
 
         // Legacy variant for untagged handling
-        let legacy_variant = self.variants.all.iter().find(
-            |v| matches!(v.kind, VariantKind::Typed(ref typed_variant) if typed_variant.ty == 0),
-        );
+        let legacy_variant = self.variants.all.iter().find(|v| v.is_legacy());
 
         let tagged_enum_name = syn::Ident::new(&format!("Tagged{}", typed_name), typed_name.span());
         let maybe_tagged_enum_name =
@@ -962,12 +933,10 @@ impl Expander {
         let (_legacy_inner_type, legacy_untagged, legacy_conversion) =
             if let Some(legacy) = legacy_variant {
                 let legacy_name = &legacy.name;
-                let inner_type = match &legacy.kind {
-                    VariantKind::Typed(typed_variant) => match &typed_variant.typed {
-                        Some(custom_type) => quote! { #custom_type },
-                        None => self.extract_inner_transaction_type(&legacy.ty),
-                    },
-                    _ => unreachable!(),
+                let inner_type = if let Some(ty) = &legacy.typed {
+                    quote! { #ty }
+                } else {
+                    self.extract_inner_transaction_type(&legacy.ty)
                 };
                 (
                     inner_type.clone(),
