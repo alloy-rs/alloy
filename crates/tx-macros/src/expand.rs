@@ -568,7 +568,7 @@ impl Expander {
                 #(#variant_types: #alloy_eips::Decodable2718),*
             {
                 fn typed_decode(ty: u8, buf: &mut &[u8]) -> #alloy_eips::eip2718::Eip2718Result<Self> {
-                    match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
+                    match ty.try_into().map_err(|_| #alloy_rlp::Error::Custom("unexpected tx type"))? {
                         #(#typed_decode_arms,)*
                     }
                 }
