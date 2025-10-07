@@ -8,8 +8,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
-
-use alloc::format;
 use alloy_primitives::{hex, B256};
 use serde::Serializer;
 
@@ -46,5 +44,5 @@ pub fn serialize_b256_hex_string_no_prefix<S>(x: &B256, s: S) -> Result<S::Ok, S
 where
     S: Serializer,
 {
-    s.serialize_str(&format!("{x:x}"))
+    s.collect_str(&format_args!("{x:x}"))
 }
