@@ -156,6 +156,7 @@ impl Expander {
     /// Generate conversion implementations for the transaction type enum.
     fn generate_tx_type_conversions(&self) -> TokenStream {
         let tx_type_enum_name = &self.tx_type_enum_name;
+        let alloy_primitives = &self.alloy_primitives;
         let alloy_eips = &self.alloy_eips;
 
         let from_arms = self.variants.all.iter().map(|v| {
@@ -698,7 +699,6 @@ impl Expander {
         };
 
         let alloy_consensus = &self.alloy_consensus;
-        let alloy_primitives = &self.alloy_primitives;
         let alloy_eips = &self.alloy_eips;
         let arbitrary_cfg = &self.arbitrary_cfg;
         let tx_type_enum_name = &self.tx_type_enum_name;
