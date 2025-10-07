@@ -156,7 +156,6 @@ impl Expander {
     /// Generate conversion implementations for the transaction type enum.
     fn generate_tx_type_conversions(&self) -> TokenStream {
         let tx_type_enum_name = &self.tx_type_enum_name;
-        let alloy_primitives = &self.alloy_primitives;
         let alloy_eips = &self.alloy_eips;
 
         let from_arms = self.variants.all.iter().map(|v| {
@@ -289,7 +288,7 @@ impl Expander {
     fn generate_trait_impls(&self) -> TokenStream {
         let eq_impl = self.generate_eq_impl();
         let hash_impl = self.generate_hash_impl();
-        let transaction_impl = self.generate_transaction_impl();
+        let transaction_impl = self.generate_transaction_impl(false);
         let typed_impl = self.generate_typed_impl();
         let encodable_impl = self.generate_encodable_impl();
         let decodable_impl = self.generate_decodable_impl();
@@ -350,15 +349,20 @@ impl Expander {
     }
 
     /// Generate Transaction trait implementation.
-    fn generate_transaction_impl(&self) -> TokenStream {
-        let input_type_name = &self.input_type_name;
+    fn generate_transaction_impl(&self, for_typed: bool) -> TokenStream {
+        let input_type_name =
+            if for_typed { self.typed.as_ref().unwrap() } else { &self.input_type_name };
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
         let alloy_consensus = &self.alloy_consensus;
         let alloy_primitives = &self.alloy_primitives;
         let alloy_eips = &self.alloy_eips;
 
         let variant_names = self.variants.variant_names();
-        let variant_types = self.variants.variant_types();
+        let variant_types = if for_typed {
+            self.variants.typed.iter().map(|v| v.inner_type()).collect::<Vec<_>>()
+        } else {
+            self.variants.variant_types().iter().map(|v| v.to_token_stream()).collect()
+        };
 
         quote! {
             impl #impl_generics #alloy_consensus::Transaction for #input_type_name #ty_generics
@@ -735,6 +739,8 @@ impl Expander {
             quote! {}
         };
 
+        let transaction_impl = self.generate_transaction_impl(true);
+
         quote! {
             #[doc = #doc_comment]
             #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -743,96 +749,8 @@ impl Expander {
                 #(#variants)*
             }
 
+            #transaction_impl
             #serde_implementation
-
-            impl #impl_generics #alloy_consensus::Transaction for #typed_name #ty_generics
-            where
-                #(#variant_types: #alloy_consensus::Transaction,)*
-            {
-                #[inline]
-                fn chain_id(&self) -> Option<u64> {
-                    match self { #(Self::#variant_names(tx) => tx.chain_id(),)* }
-                }
-
-                #[inline]
-                fn nonce(&self) -> u64 {
-                    match self { #(Self::#variant_names(tx) => tx.nonce(),)* }
-                }
-
-                #[inline]
-                fn gas_limit(&self) -> u64 {
-                    match self { #(Self::#variant_names(tx) => tx.gas_limit(),)* }
-                }
-
-                #[inline]
-                fn gas_price(&self) -> Option<u128> {
-                    match self { #(Self::#variant_names(tx) => tx.gas_price(),)* }
-                }
-
-                #[inline]
-                fn max_fee_per_gas(&self) -> u128 {
-                    match self { #(Self::#variant_names(tx) => tx.max_fee_per_gas(),)* }
-                }
-
-                #[inline]
-                fn max_priority_fee_per_gas(&self) -> Option<u128> {
-                    match self { #(Self::#variant_names(tx) => tx.max_priority_fee_per_gas(),)* }
-                }
-
-                #[inline]
-                fn max_fee_per_blob_gas(&self) -> Option<u128> {
-                    match self { #(Self::#variant_names(tx) => tx.max_fee_per_blob_gas(),)* }
-                }
-
-                #[inline]
-                fn priority_fee_or_price(&self) -> u128 {
-                    match self { #(Self::#variant_names(tx) => tx.priority_fee_or_price(),)* }
-                }
-
-                fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-                    match self { #(Self::#variant_names(tx) => tx.effective_gas_price(base_fee),)* }
-                }
-
-                #[inline]
-                fn is_dynamic_fee(&self) -> bool {
-                    match self { #(Self::#variant_names(tx) => tx.is_dynamic_fee(),)* }
-                }
-
-                #[inline]
-                fn kind(&self) -> #alloy_primitives::TxKind {
-                    match self { #(Self::#variant_names(tx) => tx.kind(),)* }
-                }
-
-                #[inline]
-                fn is_create(&self) -> bool {
-                    match self { #(Self::#variant_names(tx) => tx.is_create(),)* }
-                }
-
-                #[inline]
-                fn value(&self) -> #alloy_primitives::U256 {
-                    match self { #(Self::#variant_names(tx) => tx.value(),)* }
-                }
-
-                #[inline]
-                fn input(&self) -> &#alloy_primitives::Bytes {
-                    match self { #(Self::#variant_names(tx) => tx.input(),)* }
-                }
-
-                #[inline]
-                fn access_list(&self) -> Option<&#alloy_eips::eip2930::AccessList> {
-                    match self { #(Self::#variant_names(tx) => tx.access_list(),)* }
-                }
-
-                #[inline]
-                fn blob_versioned_hashes(&self) -> Option<&[#alloy_primitives::B256]> {
-                    match self { #(Self::#variant_names(tx) => tx.blob_versioned_hashes(),)* }
-                }
-
-                #[inline]
-                fn authorization_list(&self) -> Option<&[#alloy_eips::eip7702::SignedAuthorization]> {
-                    match self { #(Self::#variant_names(tx) => tx.authorization_list(),)* }
-                }
-            }
 
             impl #impl_generics #alloy_eips::eip2718::Typed2718 for #typed_name #ty_generics
             where
