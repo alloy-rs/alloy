@@ -26,12 +26,6 @@ impl TryFrom<u8> for AnyTxType {
     }
 }
 
-impl From<&AnyTxType> for u8 {
-    fn from(value: &AnyTxType) -> Self {
-        value.0
-    }
-}
-
 impl From<AnyTxType> for u8 {
     fn from(value: AnyTxType) -> Self {
         value.0
