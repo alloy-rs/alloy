@@ -88,7 +88,7 @@ impl<'a> SerdeGenerator<'a> {
             .typed
             .iter()
             .filter_map(|v| {
-                let ProcessedVariant { name, ty, kind, serde_attrs } = v;
+                let ProcessedVariant { name, ty, kind, serde_attrs, typed: _, doc_attrs: _ } = v;
 
                 if let VariantKind::Typed(tx_type) = kind {
                     let tx_type = U8::from(*tx_type);

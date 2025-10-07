@@ -5,8 +5,7 @@ use crate::{
         eip4844::{TxEip4844, TxEip4844Variant},
         RlpEcdsaEncodableTx, TxHashRef,
     },
-    EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
-    TxEip4844WithSidecar, TxEip7702, TxLegacy,
+    Signed, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
 use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
 use alloy_primitives::{Bytes, Signature, B256};
@@ -160,7 +159,12 @@ impl<T> EthereumTxEnvelope<T> {
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]
-#[envelope(alloy_consensus = crate, tx_type_name = TxType, arbitrary_cfg(feature = "arbitrary"))]
+#[envelope(
+    alloy_consensus = crate,
+    tx_type_name = TxType,
+    typed = EthereumTypedTransaction,
+    arbitrary_cfg(feature = "arbitrary")
+)]
 #[doc(alias = "TransactionEnvelope")]
 pub enum EthereumTxEnvelope<Eip4844> {
     /// An untagged [`TxLegacy`].

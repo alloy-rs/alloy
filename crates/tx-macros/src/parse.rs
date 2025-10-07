@@ -1,5 +1,6 @@
 use darling::{FromDeriveInput, FromMeta, FromVariant};
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{Ident, Path, Type};
 
 /// Container-level arguments for the TransactionEnvelope derive macro.
@@ -30,13 +31,18 @@ pub(crate) struct EnvelopeArgs {
     #[darling(default)]
     pub arbitrary_cfg: Option<syn::Meta>,
 
+    /// Optional typed transaction enum name to generate.
+    /// When specified, generates a corresponding TypedTransaction enum.
+    #[darling(default)]
+    pub typed: Option<Ident>,
+
     /// The enum data (variants).
     pub data: darling::ast::Data<EnvelopeVariant, ()>,
 }
 
 /// Variant of transaction envelope enum.
 #[derive(Debug, FromVariant)]
-#[darling(attributes(envelope), forward_attrs(serde))]
+#[darling(attributes(envelope), forward_attrs(serde, doc))]
 pub(crate) struct EnvelopeVariant {
     /// The identifier of the variant.
     pub ident: Ident,
@@ -47,6 +53,10 @@ pub(crate) struct EnvelopeVariant {
     /// Kind of the variant.
     #[darling(flatten)]
     pub kind: VariantKind,
+
+    /// Optional custom typed transaction type for this variant.
+    #[darling(default)]
+    pub typed: Option<Ident>,
 
     /// Forwarded attributes.
     pub attrs: Vec<syn::Attribute>,
@@ -74,12 +84,41 @@ pub(crate) struct ProcessedVariant {
     pub kind: VariantKind,
     /// The serde attributes for the variant.
     pub serde_attrs: Option<TokenStream>,
+    /// The doc attributes for the variant.
+    pub doc_attrs: Vec<syn::Attribute>,
+    /// Optional custom typed transaction type for this variant.
+    pub typed: Option<Ident>,
 }
 
 impl ProcessedVariant {
     /// Returns true if this is a legacy transaction variant (type 0).
     pub(crate) const fn is_legacy(&self) -> bool {
         matches!(self.kind, VariantKind::Typed(0))
+    }
+
+    /// Returns the inner type to use as unsigned type for the typed transaction enum.
+    pub(crate) fn inner_type(&self) -> TokenStream {
+        // If a custom type is provided, use it
+        if let Some(custom) = &self.typed {
+            return quote! { #custom };
+        }
+
+        let ty = &self.ty;
+
+        // For most cases, we need to extract T from Signed<T>
+        if let syn::Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident == "Signed" || segment.ident == "Sealed" {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+                            return quote! { #inner_ty };
+                        }
+                    }
+                }
+            }
+        }
+        // Fallback to original type
+        quote! { #ty }
     }
 }
 
@@ -109,18 +148,20 @@ impl GroupedVariants {
 
         let mut processed = Vec::new();
         for variant in variants {
-            let EnvelopeVariant { ident, fields, kind, attrs } = variant;
+            let EnvelopeVariant { ident, fields, kind, attrs, typed } = variant;
 
-            let serde_attrs =
-                if let Some(attr) = attrs.into_iter().find(|attr| attr.path().is_ident("serde")) {
+            let mut serde_attrs = None;
+            let mut doc_attrs = Vec::new();
+
+            for attr in attrs {
+                if attr.path().is_ident("serde") {
                     if let syn::Meta::List(list) = attr.meta {
-                        Some(list.tokens.clone())
-                    } else {
-                        None
+                        serde_attrs = Some(list.tokens);
                     }
-                } else {
-                    None
-                };
+                } else if attr.path().is_ident("doc") {
+                    doc_attrs.push(attr);
+                }
+            }
 
             // Check that variant has exactly one unnamed field
             let ty = match &fields.style {
@@ -140,7 +181,14 @@ impl GroupedVariants {
                 }
             };
 
-            processed.push(ProcessedVariant { name: ident, ty, kind, serde_attrs });
+            processed.push(ProcessedVariant {
+                name: ident,
+                ty,
+                kind,
+                serde_attrs,
+                doc_attrs,
+                typed,
+            });
         }
 
         let typed =
