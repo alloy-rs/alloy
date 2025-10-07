@@ -37,7 +37,7 @@ pub struct IndexedBlobHash {
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_blobs"))]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "crate::eip4844::deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -477,32 +477,6 @@ impl Decodable7594 for BlobTransactionSidecar {
     fn decode_7594(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode_fields(buf)
     }
-}
-
-/// Helper function to deserialize boxed blobs from a serde deserializer.
-#[cfg(all(debug_assertions, feature = "serde"))]
-pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    use serde::Deserialize;
-
-    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
-    let mut blobs = Vec::with_capacity(raw_blobs.len());
-    for blob in raw_blobs {
-        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
-    }
-    Ok(blobs)
-}
-
-#[cfg(all(not(debug_assertions), feature = "serde"))]
-#[inline(always)]
-pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    use serde::Deserialize;
-    Vec::<Blob>::deserialize(deserializer)
 }
 
 /// Helper function to deserialize boxed blobs from an existing [`MapAccess`]

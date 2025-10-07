@@ -152,7 +152,7 @@ where
         &self,
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
-        let req = RequestType::new("eth_getBlockReceipts", (block,));
+        let req = RequestType::new("eth_getBlockReceipts", (block,)).with_block_id(block);
 
         let redirect = req.has_block_tag();
 
