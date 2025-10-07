@@ -1,5 +1,6 @@
 use darling::{FromDeriveInput, FromMeta, FromVariant};
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{Ident, Path, Type};
 
 /// Container-level arguments for the TransactionEnvelope derive macro.
@@ -93,6 +94,31 @@ impl ProcessedVariant {
     /// Returns true if this is a legacy transaction variant (type 0).
     pub(crate) const fn is_legacy(&self) -> bool {
         matches!(self.kind, VariantKind::Typed(0))
+    }
+
+    /// Returns the inner type to use as unsigned type for the typed transaction enum.
+    pub(crate) fn inner_type(&self) -> TokenStream {
+        // If a custom type is provided, use it
+        if let Some(custom) = &self.typed {
+            return quote! { #custom };
+        }
+
+        let ty = &self.ty;
+
+        // For most cases, we need to extract T from Signed<T>
+        if let syn::Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident == "Signed" || segment.ident == "Sealed" {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+                            return quote! { #inner_ty };
+                        }
+                    }
+                }
+            }
+        }
+        // Fallback to original type
+        quote! { #ty }
     }
 }
 

@@ -8,7 +8,7 @@ use crate::{
     EthereumTxEnvelope, SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
     TxType,
 };
-use alloy_eips::{eip2718::IsTyped2718, Typed2718};
+use alloy_eips::Typed2718;
 use alloy_primitives::{bytes::BufMut, ChainId, Signature, TxHash};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
@@ -209,12 +209,6 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
             Self::Eip4844(tx) => tx.tx_hash(signature),
             Self::Eip7702(tx) => tx.tx_hash(signature),
         }
-    }
-}
-
-impl<T> IsTyped2718 for EthereumTypedTransaction<T> {
-    fn is_type(type_id: u8) -> bool {
-        <TxType as IsTyped2718>::is_type(type_id)
     }
 }
 

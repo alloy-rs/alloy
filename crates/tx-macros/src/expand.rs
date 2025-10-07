@@ -697,22 +697,11 @@ impl Expander {
         let alloy_primitives = &self.alloy_primitives;
         let alloy_eips = &self.alloy_eips;
         let arbitrary_cfg = &self.arbitrary_cfg;
+        let tx_type_enum_name = &self.tx_type_enum_name;
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
 
         let variant_names = self.variants.variant_names();
-        let variant_types: Vec<_> = self
-            .variants
-            .all
-            .iter()
-            .map(|v| {
-                // Extract inner type from wrapper or use custom type
-                if let Some(ty) = &v.typed {
-                    quote! { #ty }
-                } else {
-                    self.extract_inner_transaction_type(&v.ty)
-                }
-            })
-            .collect();
+        let variant_types: Vec<_> = self.variants.all.iter().map(|v| v.inner_type()).collect();
 
         // Generate variants for typed transaction - extract inner types from Signed wrappers
         let variants =
@@ -756,7 +745,6 @@ impl Expander {
 
             #serde_implementation
 
-            // Transaction trait delegation to inner types
             impl #impl_generics #alloy_consensus::Transaction for #typed_name #ty_generics
             where
                 #(#variant_types: #alloy_consensus::Transaction,)*
@@ -846,7 +834,6 @@ impl Expander {
                 }
             }
 
-            // Typed2718 for type identification
             impl #impl_generics #alloy_eips::eip2718::Typed2718 for #typed_name #ty_generics
             where
                 #(#variant_types: #alloy_eips::eip2718::Typed2718,)*
@@ -857,25 +844,13 @@ impl Expander {
                     }
                 }
             }
-        }
-    }
 
-    /// Extract the inner transaction type from a `Signed<T>` wrapper.
-    fn extract_inner_transaction_type(&self, ty: &syn::Type) -> proc_macro2::TokenStream {
-        // For most cases, we need to extract T from Signed<T>
-        if let syn::Type::Path(type_path) = ty {
-            if let Some(segment) = type_path.path.segments.last() {
-                if segment.ident == "Signed" || segment.ident == "Sealed" {
-                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                            return quote! { #inner_ty };
-                        }
-                    }
+            impl #impl_generics #alloy_eips::eip2718::IsTyped2718 for #typed_name #ty_generics {
+                fn is_type(type_id: u8) -> bool {
+                    <#tx_type_enum_name as #alloy_eips::eip2718::IsTyped2718>::is_type(type_id)
                 }
             }
         }
-        // Fallback to original type
-        quote! { #ty }
     }
 
     /// Serde impl
@@ -910,11 +885,7 @@ impl Expander {
                 };
 
                 // Custom type or extract from wrapper
-                let inner_type = if let Some(ty) = &v.typed {
-                    quote! { #ty }
-                } else {
-                    self.extract_inner_transaction_type(&v.ty)
-                };
+                let inner_type = v.inner_type();
 
                 quote! {
                     #[serde(rename = #rename #alias_attr)]
@@ -933,11 +904,7 @@ impl Expander {
         let (_legacy_inner_type, legacy_untagged, legacy_conversion) =
             if let Some(legacy) = legacy_variant {
                 let legacy_name = &legacy.name;
-                let inner_type = if let Some(ty) = &legacy.typed {
-                    quote! { #ty }
-                } else {
-                    self.extract_inner_transaction_type(&legacy.ty)
-                };
+                let inner_type = legacy.inner_type();
                 (
                     inner_type.clone(),
                     quote! {
