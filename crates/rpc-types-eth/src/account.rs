@@ -1,6 +1,6 @@
-#![allow(unused_imports)]
-
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+#[cfg(feature = "serde")]
+use alloc::vec::Vec;
 use alloy_primitives::{Address, Bytes, B256, B512, KECCAK256_EMPTY, U256};
 
 // re-export account type for `eth_getAccount`
