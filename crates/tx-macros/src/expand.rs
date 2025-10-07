@@ -724,7 +724,7 @@ impl Expander {
             self.input_type_name
         );
 
-        let serde_implementation = if self.serde_enabled {
+        let serde_impl = if self.serde_enabled {
             self.generate_typed_transaction_serde(typed_name)
         } else {
             quote! {}
@@ -750,7 +750,7 @@ impl Expander {
             }
 
             #transaction_impl
-            #serde_implementation
+            #serde_impl
 
             impl #impl_generics #alloy_eips::eip2718::Typed2718 for #typed_name #ty_generics
             where
@@ -782,7 +782,6 @@ impl Expander {
         let reject_if_some =
             quote! { #alloy_consensus::private::alloy_serde::reject_if_some }.to_string();
 
-        // Direct iteration for quote! macros
         let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
 
         // Serde attributes and inner types for typed variants
@@ -819,27 +818,25 @@ impl Expander {
         let maybe_tagged_enum_name =
             syn::Ident::new(&format!("MaybeTagged{}", typed_name), typed_name.span());
 
-        let (_legacy_inner_type, legacy_untagged, legacy_conversion) =
-            if let Some(legacy) = legacy_variant {
-                let legacy_name = &legacy.name;
-                let inner_type = legacy.inner_type();
-                (
-                    inner_type.clone(),
-                    quote! {
-                        Untagged {
-                            #[serde(default, rename = "type", deserialize_with = #reject_if_some)]
-                            _ty: Option<()>,
-                            #[serde(flatten)]
-                            tx: #inner_type,
-                        }
-                    },
-                    quote! {
-                        #maybe_tagged_enum_name::Untagged { tx, .. } => Self::#legacy_name(tx),
-                    },
-                )
-            } else {
-                (quote! { () }, quote! {}, quote! {})
-            };
+        let (legacy_untagged, legacy_conversion) = if let Some(legacy) = legacy_variant {
+            let legacy_name = &legacy.name;
+            let inner_type = legacy.inner_type();
+            (
+                quote! {
+                    Untagged {
+                        #[serde(default, rename = "type", deserialize_with = #reject_if_some)]
+                        _ty: Option<()>,
+                        #[serde(flatten)]
+                        tx: #inner_type,
+                    }
+                },
+                quote! {
+                    #maybe_tagged_enum_name::Untagged { tx, .. } => Self::#legacy_name(tx),
+                },
+            )
+        } else {
+            (quote! {}, quote! {})
+        };
 
         quote! {
             #[cfg(#serde_cfg)]
