@@ -229,9 +229,9 @@ where
     }
 
     fn call(&mut self, request: RequestPacket) -> Self::Future {
-        let inner = self.inner.clone();
+        let new_inner = self.inner.clone();
         let this = self.clone();
-        let mut inner = std::mem::replace(&mut self.inner, inner);
+        let mut inner = std::mem::replace(&mut self.inner, new_inner);
         Box::pin(async move {
             let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
             let mut rate_limit_retry_number: u32 = 0;
