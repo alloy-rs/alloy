@@ -280,11 +280,12 @@ impl Expander {
             let alloy_consensus = &self.alloy_consensus;
             let u8_path = quote! { #alloy_primitives::U8 }.to_string();
             let u64_path = quote! { #alloy_primitives::U64 }.to_string();
-            let serde_str = quote! { #alloy_consensus::private::serde }.to_string();
+            let serde = quote! { #alloy_consensus::private::serde };
+            let serde_str = serde.to_string();
             let serde_cfg = &self.serde_cfg;
 
             quote! {
-                #[cfg_attr(#serde_cfg, derive(#alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize))]
+                #[cfg_attr(#serde_cfg, derive(#serde::Serialize, #serde::Deserialize))]
                 #[cfg_attr(#serde_cfg, serde(into = #u8_path, try_from = #u64_path, crate = #serde_str))]
             }
         } else {
@@ -700,44 +701,15 @@ impl Expander {
             return quote! {};
         };
 
-        let input_type_name = &self.input_type_name;
         let alloy_consensus = &self.alloy_consensus;
         let alloy_primitives = &self.alloy_primitives;
         let alloy_eips = &self.alloy_eips;
-        let serde_cfg = &self.serde_cfg;
         let arbitrary_cfg = &self.arbitrary_cfg;
-        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
+        let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
 
         // Generate variants for typed transaction - extract inner types from Signed wrappers
         let variants = self.variants.all.iter().map(|v| {
             let name = &v.name;
-
-            // Serde attributes based on variant type
-            let serde_attrs = if self.serde_enabled {
-                match &v.kind {
-                    VariantKind::Typed(typed_variant) => {
-                        let ty_value = typed_variant.ty;
-                        let rename = format!("0x{ty_value:02x}");
-                        let alias = if rename.len() == 4 {
-                            // Create "0xN" alias for "0x0N"
-                            Some(format!("0x{ty_value:x}"))
-                        } else {
-                            None
-                        };
-
-                        if let Some(alias) = alias {
-                            quote! { #[cfg_attr(#serde_cfg, serde(rename = #rename, alias = #alias))] }
-                        } else {
-                            quote! { #[cfg_attr(#serde_cfg, serde(rename = #rename))] }
-                        }
-                    }
-                    VariantKind::Flattened => {
-                        quote! {}
-                    }
-                }
-            } else {
-                quote! {}
-            };
 
             // Extract inner type from wrapper or use custom type
             let inner_type = match &v.kind {
@@ -745,7 +717,7 @@ impl Expander {
                     // Custom type specified
                     let custom_type = typed_variant.typed.as_ref().unwrap();
                     quote! { #custom_type }
-                },
+                }
                 _ => {
                     // Extract from wrapper
                     self.extract_inner_transaction_type(&v.ty)
@@ -754,7 +726,6 @@ impl Expander {
 
             quote! {
                 /// Transaction variant
-                #serde_attrs
                 #name(#inner_type),
             }
         });
@@ -785,12 +756,7 @@ impl Expander {
         );
 
         let serde_implementation = if self.serde_enabled {
-            let (serde_impl_generics, serde_ty_generics, serde_where_clause) =
-                self.generics.split_for_impl();
-            self.generate_typed_transaction_serde(
-                typed_name,
-                &(serde_impl_generics, serde_ty_generics, serde_where_clause),
-            )
+            self.generate_typed_transaction_serde(typed_name)
         } else {
             quote! {}
         };
@@ -813,20 +779,6 @@ impl Expander {
             }
 
             #serde_implementation
-
-            impl #impl_generics #typed_name #ty_generics #where_clause {
-                /// Convert this typed transaction into a signed envelope with the given signature.
-                pub fn into_envelope(self, signature: #alloy_primitives::Signature) -> #input_type_name #ty_generics
-                where
-                    Self: #alloy_consensus::SignableTransaction<#alloy_primitives::Signature> + #alloy_consensus::transaction::RlpEcdsaEncodableTx,
-                {
-                    match self {
-                        #(Self::#variant_names(tx) => #input_type_name::#variant_names(
-                            #alloy_consensus::Signed::new_unhashed(tx, signature)
-                        ),)*
-                    }
-                }
-            }
 
             // Transaction trait delegation to inner types
             impl #impl_generics #alloy_consensus::Transaction for #typed_name #ty_generics
@@ -929,19 +881,6 @@ impl Expander {
                     }
                 }
             }
-
-            // Envelope to typed transaction conversion
-            impl #impl_generics From<#input_type_name #ty_generics> for #typed_name #ty_generics
-            where
-                Self: Clone,
-                #where_clause
-            {
-                fn from(envelope: #input_type_name #ty_generics) -> Self {
-                    match envelope {
-                        #(#input_type_name::#variant_names(signed) => Self::#variant_names(signed.into_parts().0),)*
-                    }
-                }
-            }
         }
     }
 
@@ -964,14 +903,15 @@ impl Expander {
     }
 
     /// Serde impl
-    fn generate_typed_transaction_serde(
-        &self,
-        typed_name: &Ident,
-        generics: &(syn::ImplGenerics<'_>, syn::TypeGenerics<'_>, Option<&syn::WhereClause>),
-    ) -> TokenStream {
-        let (impl_generics, ty_generics, where_clause) = generics;
+    fn generate_typed_transaction_serde(&self, typed_name: &Ident) -> TokenStream {
+        let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
+        let unwrapped_generics = &self.generics.params;
         let alloy_consensus = &self.alloy_consensus;
         let serde_cfg = &self.serde_cfg;
+        let serde = quote! { #alloy_consensus::private::serde };
+        let serde_str = serde.to_string();
+        let reject_if_some =
+            quote! { #alloy_consensus::private::alloy_serde::reject_if_some }.to_string();
 
         // Direct iteration for quote! macros
         let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
@@ -1019,98 +959,101 @@ impl Expander {
         let maybe_tagged_enum_name =
             syn::Ident::new(&format!("MaybeTagged{}", typed_name), typed_name.span());
 
-        let (_legacy_inner_type, legacy_untagged, legacy_conversion) = if let Some(legacy) =
-            legacy_variant
-        {
-            let legacy_name = &legacy.name;
-            let inner_type = match &legacy.kind {
-                VariantKind::Typed(typed_variant) => match &typed_variant.typed {
-                    Some(custom_type) => quote! { #custom_type },
-                    None => self.extract_inner_transaction_type(&legacy.ty),
-                },
-                _ => unreachable!(),
+        let (_legacy_inner_type, legacy_untagged, legacy_conversion) =
+            if let Some(legacy) = legacy_variant {
+                let legacy_name = &legacy.name;
+                let inner_type = match &legacy.kind {
+                    VariantKind::Typed(typed_variant) => match &typed_variant.typed {
+                        Some(custom_type) => quote! { #custom_type },
+                        None => self.extract_inner_transaction_type(&legacy.ty),
+                    },
+                    _ => unreachable!(),
+                };
+                (
+                    inner_type.clone(),
+                    quote! {
+                        Untagged {
+                            #[serde(default, rename = "type", deserialize_with = #reject_if_some)]
+                            _ty: Option<()>,
+                            #[serde(flatten)]
+                            tx: #inner_type,
+                        }
+                    },
+                    quote! {
+                        #maybe_tagged_enum_name::Untagged { tx, .. } => Self::#legacy_name(tx),
+                    },
+                )
+            } else {
+                (quote! { () }, quote! {}, quote! {})
             };
-            (
-                inner_type.clone(),
-                quote! {
-                    Untagged {
-                        #[serde(default, rename = "type", deserialize_with = "#alloy_consensus::private::serde_json::reject_if_some")]
-                        _ty: Option<()>,
-                        #[serde(flatten)]
-                        tx: #inner_type,
-                    }
-                },
-                quote! {
-                    #maybe_tagged_enum_name::Untagged { tx, .. } => Self::#legacy_name(tx),
-                },
-            )
-        } else {
-            (quote! { () }, quote! {}, quote! {})
-        };
 
         quote! {
             #[cfg(#serde_cfg)]
             const _: () = {
-                mod serde_from {
-                    use super::*;
+                use super::*;
 
-                    /// Tagged variant with type field
-                    #[derive(Debug, #alloy_consensus::private::serde::Serialize, #alloy_consensus::private::serde::Deserialize)]
-                    #[serde(tag = "type", crate = #alloy_consensus::private::serde)]
-                    enum #tagged_enum_name #impl_generics {
-                        #(
-                            #typed_variants
-                        ),*
-                    }
+                /// Tagged variant with type field
+                #[derive(Debug, #serde::Serialize, #serde::Deserialize)]
+                #[serde(tag = "type", crate = #serde_str)]
+                enum #tagged_enum_name #impl_generics {
+                    #(
+                        #typed_variants
+                    ),*
+                }
 
-                    /// Maybe tagged variant to handle untagged legacy transactions
-                    #[derive(Debug, #alloy_consensus::private::serde::Deserialize)]
-                    #[serde(untagged, crate = #alloy_consensus::private::serde)]
-                    enum #maybe_tagged_enum_name #impl_generics {
-                        Tagged(#tagged_enum_name #ty_generics),
-                        #legacy_untagged
-                    }
+                /// Maybe tagged variant to handle untagged legacy transactions
+                #[derive(Debug, #serde::Deserialize)]
+                #[serde(untagged, crate = #serde_str)]
+                enum #maybe_tagged_enum_name #impl_generics {
+                    Tagged(#tagged_enum_name #ty_generics),
+                    #legacy_untagged
+                }
 
-                    impl #impl_generics From<#maybe_tagged_enum_name #ty_generics> for #typed_name #ty_generics #where_clause {
-                        fn from(value: #maybe_tagged_enum_name #ty_generics) -> Self {
-                            match value {
-                                #maybe_tagged_enum_name::Tagged(tagged) => tagged.into(),
-                                #legacy_conversion
-                            }
-                        }
-                    }
-
-                    impl #impl_generics From<#tagged_enum_name #ty_generics> for #typed_name #ty_generics #where_clause {
-                        fn from(value: #tagged_enum_name #ty_generics) -> Self {
-                            match value {
-                                #(
-                                    #tagged_enum_name::#typed_names(tx) => Self::#typed_names(tx),
-                                )*
-                            }
-                        }
-                    }
-
-                    impl #impl_generics From<#typed_name #ty_generics> for #tagged_enum_name #ty_generics #where_clause {
-                        fn from(value: #typed_name #ty_generics) -> Self {
-                            match value {
-                                #(
-                                    #typed_name::#typed_names(tx) => Self::#typed_names(tx),
-                                )*
-                            }
+                impl #impl_generics From<#maybe_tagged_enum_name #ty_generics> for #typed_name #ty_generics {
+                    fn from(value: #maybe_tagged_enum_name #ty_generics) -> Self {
+                        match value {
+                            #maybe_tagged_enum_name::Tagged(tagged) => tagged.into(),
+                            #legacy_conversion
                         }
                     }
                 }
 
-                // Main serde impls
-                impl #impl_generics #alloy_consensus::private::serde::Serialize for #typed_name #ty_generics #where_clause {
-                    fn serialize<S: #alloy_consensus::private::serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                        serde_from::#tagged_enum_name::from(self.clone()).serialize(serializer)
+                impl #impl_generics From<#tagged_enum_name #ty_generics> for #typed_name #ty_generics {
+                    fn from(value: #tagged_enum_name #ty_generics) -> Self {
+                        match value {
+                            #(
+                                #tagged_enum_name::#typed_names(tx) => Self::#typed_names(tx),
+                            )*
+                        }
                     }
                 }
 
-                impl<'de> #alloy_consensus::private::serde::Deserialize<'de> for #typed_name #ty_generics #where_clause {
-                    fn deserialize<D: #alloy_consensus::private::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                        serde_from::#maybe_tagged_enum_name::deserialize(deserializer).map(Into::into)
+                impl #impl_generics From<#typed_name #ty_generics> for #tagged_enum_name #ty_generics {
+                    fn from(value: #typed_name #ty_generics) -> Self {
+                        match value {
+                            #(
+                                #typed_name::#typed_names(tx) => Self::#typed_names(tx),
+                            )*
+                        }
+                    }
+                }
+
+                impl #impl_generics #serde::Serialize for #typed_name #ty_generics
+                where
+                    #tagged_enum_name #ty_generics: #serde::Serialize,
+                    Self: Clone,
+                {
+                    fn serialize<S: #serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                        #tagged_enum_name::from(self.clone()).serialize(serializer)
+                    }
+                }
+
+                impl<'de, #unwrapped_generics> #serde::Deserialize<'de> for #typed_name #ty_generics
+                where
+                    #maybe_tagged_enum_name #ty_generics: #serde::Deserialize<'de>
+                {
+                    fn deserialize<D: #serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                        #maybe_tagged_enum_name::deserialize(deserializer).map(Into::into)
                     }
                 }
             };
