@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Features
+
+- Generate TypedTransaction enum in envelope macro ([#2925](https://github.com/alloy-rs/alloy/issues/2925))
+
+### Refactor
+
+- [consensus] Unify try_get_provider body across std/no_std ([#2963](https://github.com/alloy-rs/alloy/issues/2963))
+
 ## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
 
 ### Bug Fixes
@@ -18,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.37
 - Use fqs for tx_hash_with_type forwarding ([#2944](https://github.com/alloy-rs/alloy/issues/2944))
 - Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
 - Fix a couple of grammatical errors ([#2931](https://github.com/alloy-rs/alloy/issues/2931))
@@ -101,21 +112,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Add Asref for recovered withencoded ([#2828](https://github.com/alloy-rs/alloy/issues/2828))
-
-### Miscellaneous Tasks
-
-- Release 1.0.28
-- Add into_envelope helper ([#2832](https://github.com/alloy-rs/alloy/issues/2832))
-- Use trait upcasting ([#2827](https://github.com/alloy-rs/alloy/issues/2827))
-
-### Styling
-
-- [Feature] Implement support different signatures in envelope macro ([#2794](https://github.com/alloy-rs/alloy/issues/2794))
-
-## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
-
-### Features
-
 - Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
 - Add TxHashRef trait and implementations ([#2751](https://github.com/alloy-rs/alloy/issues/2751))
 - Add helpers for encoding block from parts ([#2809](https://github.com/alloy-rs/alloy/issues/2809))
@@ -123,11 +119,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.28
+- Add into_envelope helper ([#2832](https://github.com/alloy-rs/alloy/issues/2832))
+- Use trait upcasting ([#2827](https://github.com/alloy-rs/alloy/issues/2827))
 - Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
 - Release 1.0.26
 - Release 1.0.25
 - Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
 - Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
+
+### Styling
+
+- [Feature] Implement support different signatures in envelope macro ([#2794](https://github.com/alloy-rs/alloy/issues/2794))
 
 ## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
 
@@ -779,12 +782,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
+### Bug Fixes
+
+- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
+
 ### Features
 
 - Add some helper functions for blockbody ([#1796](https://github.com/alloy-rs/alloy/issues/1796))
 - Add info tx types ([#1793](https://github.com/alloy-rs/alloy/issues/1793))
 - Reth's block body fns ([#1775](https://github.com/alloy-rs/alloy/issues/1775))
 - Add serde for `TxType` ([#1780](https://github.com/alloy-rs/alloy/issues/1780))
+- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
+- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
 
 ### Miscellaneous Tasks
 
@@ -794,20 +803,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add clone_tx ([#1791](https://github.com/alloy-rs/alloy/issues/1791))
 - Add TxReceipt default helpers ([#1783](https://github.com/alloy-rs/alloy/issues/1783))
 - Add consensus helper methods to BlockHeader ([#1781](https://github.com/alloy-rs/alloy/issues/1781))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
-- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
-
-### Features
-
-- [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
-- Port reth pooled tx type ([#1767](https://github.com/alloy-rs/alloy/issues/1767))
-
-### Miscellaneous Tasks
-
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 - Introduce recovered and recoverable ([#1768](https://github.com/alloy-rs/alloy/issues/1768))
 
