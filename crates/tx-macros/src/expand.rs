@@ -1,4 +1,5 @@
 use crate::parse::{GroupedVariants, VariantKind};
+use alloy_primitives::U8;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Ident, Path};
@@ -699,6 +700,7 @@ impl Expander {
         };
 
         let alloy_consensus = &self.alloy_consensus;
+        let arbitrary = quote! { #alloy_consensus::private::arbitrary };
         let alloy_eips = &self.alloy_eips;
         let arbitrary_cfg = &self.arbitrary_cfg;
         let tx_type_enum_name = &self.tx_type_enum_name;
@@ -731,9 +733,27 @@ impl Expander {
         };
 
         // Generate arbitrary derives only if arbitrary is enabled
-        let arbitrary_derives = if self.arbitrary_enabled {
+        let arbitrary_impl = if self.arbitrary_enabled {
+            let num_variants = variant_names.len();
+            let arms = variant_names.iter().enumerate().map(|(i, name)| {
+                quote! { #i => Ok(Self::#name(u.arbitrary()?)) }
+            });
+
             quote! {
-                #[cfg_attr(#arbitrary_cfg, derive(#alloy_consensus::private::arbitrary::Arbitrary))]
+                #[cfg(#arbitrary_cfg)]
+                const _: () = {
+                    impl #impl_generics #arbitrary::Arbitrary<'_> for #typed_name #ty_generics
+                    where
+                        #(#variant_types: for<'a> #arbitrary::Arbitrary<'a>),*
+                    {
+                        fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                            match u.int_in_range(0..=#num_variants-1)? {
+                                #(#arms,)*
+                                _ => unreachable!(),
+                            }
+                        }
+                    }
+                };
             }
         } else {
             quote! {}
@@ -744,13 +764,13 @@ impl Expander {
         quote! {
             #[doc = #doc_comment]
             #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-            #arbitrary_derives
             pub enum #typed_name #impl_generics {
                 #(#variants)*
             }
 
             #transaction_impl
             #serde_impl
+            #arbitrary_impl
 
             impl #impl_generics #alloy_eips::eip2718::Typed2718 for #typed_name #ty_generics
             where
@@ -793,19 +813,25 @@ impl Expander {
                 let name = &v.name;
                 let VariantKind::Typed(ty_value) = v.kind else { unreachable!() };
 
-                let rename = format!("0x{ty_value:02x}");
-                let alias_attr = if rename.len() == 4 {
-                    let alias = format!("0x{ty_value:x}");
-                    quote! { , alias = #alias }
-                } else {
-                    quote! {}
-                };
+                let tx_type = U8::from(ty_value);
+                let rename = format!("0x{tx_type:x}");
+
+                let mut aliases = vec![];
+                // Add alias for single digit hex values (e.g., "0x0" for "0x00")
+                if rename.len() == 3 {
+                    aliases.push(format!("0x0{}", rename.chars().last().unwrap()));
+                }
+
+                // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
+                if rename != rename.to_uppercase() {
+                    aliases.push(rename.to_uppercase());
+                }
 
                 // Custom type or extract from wrapper
                 let inner_type = v.inner_type();
 
                 quote! {
-                    #[serde(rename = #rename #alias_attr)]
+                    #[serde(rename = #rename, #(alias = #aliases,)*)]
                     #name(#inner_type)
                 }
             })
