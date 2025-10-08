@@ -6,7 +6,10 @@ use std::{fmt::Debug, sync::Arc};
 use super::Ethereum;
 
 /// A wallet capable of signing any transaction for the Ethereum network.
-#[derive(Clone, Default)]
+///
+/// Invariant: this wallet always contains at least one signing credential and the
+/// `default` address MUST be present in `signers`.
+#[derive(Clone)]
 pub struct EthereumWallet {
     default: Address,
     signers: AddressHashMap<Arc<dyn TxSigner<Signature> + Send + Sync>>,
@@ -36,9 +39,12 @@ impl EthereumWallet {
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
     {
-        let mut this = Self::default();
-        this.register_default_signer(signer);
-        this
+        let mut signers: AddressHashMap<Arc<dyn TxSigner<Signature> + Send + Sync>> =
+            AddressHashMap::default();
+        let address = signer.address();
+        signers.insert(address, Arc::new(signer));
+
+        Self { default: address, signers }
     }
 
     /// Register a new signer on this object. This signer will be used to sign
@@ -91,6 +97,7 @@ impl EthereumWallet {
 
     /// Get the default signer.
     pub fn default_signer(&self) -> Arc<dyn TxSigner<Signature> + Send + Sync + 'static> {
+        debug_assert!(self.signers.contains_key(&self.default), "default signer must exist");
         self.signers.get(&self.default).cloned().expect("invalid signer")
     }
 
