@@ -1,6 +1,6 @@
 //! Support for capturing other fields.
 
-use alloc::{collections::BTreeMap, format, string::String};
+use alloc::{collections::BTreeMap, string::String};
 use core::{
     fmt,
     ops::{Deref, DerefMut},
@@ -84,7 +84,7 @@ impl OtherFields {
     ) -> serde_json::Result<V> {
         let key = key.as_ref();
         self.get_deserialized(key)
-            .ok_or_else(|| serde::de::Error::custom(format!("Missing field `{key}`")))?
+            .ok_or_else(|| serde::de::Error::custom(alloc::format!("Missing field `{key}`")))?
     }
 
     /// Removes the deserialized value of the field, if it exists
