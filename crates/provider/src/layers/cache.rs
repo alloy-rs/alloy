@@ -391,7 +391,9 @@ impl<Params: RpcSend> RequestType<Params> {
                 BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
             );
         }
-        false
+        // Treat absence of BlockId as tag-based (e.g., 'latest'), which is non-deterministic
+        // and should not be cached.
+        true
     }
 }
 
