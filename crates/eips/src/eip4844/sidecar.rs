@@ -5,7 +5,7 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{Decodable7594, Encodable7594},
+    eip7594::{BlobTransactionSidecarEip7594, Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -77,6 +77,39 @@ impl BlobTransactionSidecar {
                 None
             })
         })
+    }
+
+    /// Converts this EIP-4844 sidecar into an EIP-7594 sidecar.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        use crate::eip7594::CELLS_PER_EXT_BLOB;
+
+        let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
+
+        for blob in self.blobs.iter() {
+            // SAFETY: Blob and c_kzg::Blob have the same memory layout
+            let blob_kzg = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+
+            // Compute cells and their KZG proofs for this blob
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                for kzg_proof in kzg_proofs.iter() {
+                    cell_proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(BlobTransactionSidecarEip7594::new(self.blobs, self.commitments, cell_proofs))
     }
 }
 
