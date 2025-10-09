@@ -32,7 +32,7 @@ pub fn public_key_to_address(pubkey: &VerifyingKey) -> Address {
 #[inline]
 #[track_caller]
 pub fn raw_public_key_to_address(pubkey: &[u8]) -> Address {
-    assert_eq!(pubkey.len(), 64, "raw public key must be 64 bytes");
+    assert_eq!(pubkey.len(), 64, "raw public key must be 32 bytes, which is 64 characters");
     let digest = keccak256(pubkey);
     Address::from_slice(&digest[12..])
 }
