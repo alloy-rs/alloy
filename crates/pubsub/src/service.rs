@@ -136,11 +136,12 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
-            let brv = req.serialize().expect("no ser error").take_request();
-
-            self.dispatch_request(brv)?;
+            // Use a unique, service-private id to avoid collisions and track the response.
+            let uid = Id::String(format!("unsubscribe-{local_id}"));
+            let req = Request::new("eth_unsubscribe", uid, [server_id]);
+            let serialized = req.try_into().expect("no ser error");
+            let (in_flight, _) = InFlight::new(serialized, 0);
+            self.service_request(in_flight)?;
         }
         self.subs.remove_sub(local_id);
         Ok(())
