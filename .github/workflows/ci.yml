@@ -122,6 +122,7 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-local \
             --exclude alloy-signer-trezor \
+            --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
 
   wasm-wasi:
@@ -149,6 +150,7 @@ jobs:
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
+            --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
       # Ledger signer requires one of `browser` or `node` features.
       - name: build ledger
