@@ -21,6 +21,7 @@ use core::mem;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Header {
     /// The Keccak 256-bit hash of the parent
     /// block’s header, in its entirety; formally Hp.
