@@ -37,7 +37,11 @@ pub struct TxLegacy {
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
     /// 340282366920938463463374607431768211455
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    ///
+    /// However, this is unfortunately not true for all chains at all points in time.
+    /// See <https://github.com/alloy-rs/alloy/issues/2842> for example.
+    /// We saturate to `u128::MAX` if the value is too large instead of failing deserialization.
+    #[cfg_attr(feature = "serde", serde(with = "gas_price"))]
     pub gas_price: u128,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -420,6 +424,39 @@ pub const fn from_eip155_value(value: u128) -> Option<(bool, Option<ChainId>)> {
             Some((y_parity, Some(chain_id as u64)))
         }
         _ => None,
+    }
+}
+
+#[cfg(feature = "serde")]
+mod gas_price {
+    use alloy_primitives::U256;
+    use serde::{Deserialize, Deserializer};
+
+    pub(super) use alloy_serde::quantity::serialize;
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<u128, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        U256::deserialize(deserializer).map(|x| x.saturating_to())
+    }
+
+    #[test]
+    fn test_gas_price() {
+        #[derive(Debug, PartialEq, Eq, serde::Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "self")]
+            inner: u128,
+        }
+
+        let json = r#"{"inner":"0x3e8"}"#;
+        let value = serde_json::from_str::<Value>(json).unwrap();
+        assert_eq!(value.inner, 1000);
+
+        let json =
+            r#"{"inner":"0x30783134626639633464372e3333333333333333333333333333333333333333"}"#;
+        let value = serde_json::from_str::<Value>(json).unwrap();
+        assert_eq!(value.inner, u128::MAX);
     }
 }
 
