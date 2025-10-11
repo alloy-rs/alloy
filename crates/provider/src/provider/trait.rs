@@ -4,7 +4,7 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+use super::{DynProvider, Empty, EthCallMany, EthLogs, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -67,6 +67,7 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
 /// [`DebugApi`]: crate::ext::DebugApi
+
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -660,8 +661,37 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
+    ///
+    /// For enhanced batch retrieval with options, use [`Provider::logs`] instead.
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.client().request("eth_getLogs", (filter,)).await
+    }
+
+    /// Creates an [`EthLogs`] builder for enhanced log retrieval with batch and count options.
+    ///
+    /// This method returns an [`EthLogs`] builder which allows you to configure batch size,
+    /// maximum count, and other options before executing the log retrieval.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Simple log retrieval
+    /// let logs = provider.logs(filter).await?;
+    ///
+    /// // With batching (fetch logs in chunks of 1000 blocks)
+    /// let logs = provider.logs(filter).with_batch_size(1000).await?;
+    ///
+    /// // With count limit (stop after 500 logs)
+    /// let logs = provider.logs(filter).with_max_count(500).await?;
+    ///
+    /// // Combined options
+    /// let logs = provider.logs(filter)
+    ///     .with_batch_size(1000)
+    ///     .with_max_count(500)
+    ///     .await?;
+    /// ```
+    fn logs(&self, filter: Filter) -> EthLogs<N, Vec<Log>> {
+        EthLogs::new(self.weak_client(), filter)
     }
 
     /// Get the account and storage values of the specified account including the merkle proofs.

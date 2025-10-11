@@ -1,4 +1,6 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    EthLogs, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
@@ -215,6 +217,12 @@ where
         let _ = self.cache.put(hash, json_str);
 
         Ok(result)
+    }
+
+    fn logs(&self, filter: Filter) -> EthLogs<N, Vec<Log>> {
+        // For cached layer, we delegate to the inner provider for advanced options
+        // as caching complex batch operations might not be beneficial
+        self.inner.logs(filter)
     }
 
     fn get_proof(
