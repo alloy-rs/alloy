@@ -5,7 +5,7 @@ use crate::{
         kzg_to_versioned_hash, Blob, BlobAndProofV1, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT,
         BYTES_PER_PROOF,
     },
-    eip7594::{BlobTransactionSidecarEip7594, Decodable7594, Encodable7594},
+    eip7594::{Decodable7594, Encodable7594},
 };
 use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{bytes::BufMut, B256};
@@ -87,7 +87,7 @@ impl BlobTransactionSidecar {
     pub fn try_into_7594(
         self,
         settings: &c_kzg::KzgSettings,
-    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+    ) -> Result<crate::eip7594::BlobTransactionSidecarEip7594, c_kzg::Error> {
         use crate::eip7594::CELLS_PER_EXT_BLOB;
 
         let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
@@ -109,7 +109,11 @@ impl BlobTransactionSidecar {
             }
         }
 
-        Ok(BlobTransactionSidecarEip7594::new(self.blobs, self.commitments, cell_proofs))
+        Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
+            self.blobs,
+            self.commitments,
+            cell_proofs,
+        ))
     }
 }
 
