@@ -872,6 +872,17 @@ pub struct BlobsBundleV1 {
 }
 
 #[cfg(feature = "serde")]
+/// Lightweight wrapper implementing `serde::de::Expected` without allocation.
+struct ExpectedNum(pub usize);
+
+#[cfg(feature = "serde")]
+impl serde::de::Expected for ExpectedNum {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -890,7 +901,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
-                &format_args!("{}", raw.commitments.len()),
+                &ExpectedNum(raw.commitments.len()),
             ))
         }
     }
@@ -1020,7 +1031,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
-                &format_args!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB),
+                &ExpectedNum(raw.commitments.len() * CELLS_PER_EXT_BLOB),
             ))
         }
     }
