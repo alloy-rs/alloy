@@ -671,6 +671,9 @@ impl Expander {
             const _: () = {
                 impl #arbitrary::Arbitrary<'_> for #tx_type_enum_name {
                     fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                        if #num_variants == 0 {
+                            return Err(#arbitrary::Error::NotEnoughData);
+                        }
                         match u.int_in_range(0..=#num_variants-1)? {
                             #(#tx_type_arms,)*
                             _ => unreachable!(),
@@ -683,6 +686,9 @@ impl Expander {
                     #(#variant_types: for<'a> #arbitrary::Arbitrary<'a>),*
                 {
                     fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                        if #num_variants == 0 {
+                            return Err(#arbitrary::Error::NotEnoughData);
+                        }
                         match u.int_in_range(0..=#num_variants-1)? {
                             #(#enum_variant_arms,)*
                             _ => unreachable!(),
@@ -747,6 +753,9 @@ impl Expander {
                         #(#variant_types: for<'a> #arbitrary::Arbitrary<'a>),*
                     {
                         fn arbitrary(u: &mut #arbitrary::Unstructured<'_>) -> #arbitrary::Result<Self> {
+                            if #num_variants == 0 {
+                                return Err(#arbitrary::Error::NotEnoughData);
+                            }
                             match u.int_in_range(0..=#num_variants-1)? {
                                 #(#arms,)*
                                 _ => unreachable!(),
