@@ -200,6 +200,14 @@ impl GroupedVariants {
             .cloned()
             .collect();
 
+        // Validate that the enum has at least one variant
+        if processed.is_empty() {
+            return Err(darling::Error::custom(
+                "`TransactionEnvelope` enum must have at least one variant",
+            )
+            .with_span(&args.ident));
+        }
+
         Ok(Self { all: processed, typed, flattened })
     }
 
