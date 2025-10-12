@@ -1020,7 +1020,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
-                &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
+                &format_args!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB),
             ))
         }
     }
