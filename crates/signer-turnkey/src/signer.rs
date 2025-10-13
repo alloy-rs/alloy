@@ -10,6 +10,7 @@ use turnkey_client::generated::{
 };
 
 use crate::{TurnkeyClient, TurnkeyClientError, TurnkeyP256ApiKey};
+
 /// Turnkey signer implementation for Alloy.
 ///
 /// The Turnkey Signer passes signing requests to the Turnkey secure key management infrastructure.
