@@ -1,13 +1,21 @@
 use crate::{
-    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
+    transaction::{
+        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction, TxHashRef, TxHashable,
+    },
     Transaction,
 };
 use alloy_eips::{
-    eip2718::Eip2718Result, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+    eip2718::{Eip2718Error, Eip2718Result},
+    eip2930::AccessList,
+    eip7702::SignedAuthorization,
+    Decodable2718, Encodable2718, Typed2718,
 };
 use alloy_primitives::{Bytes, Sealed, Signature, TxKind, B256, U256};
 use alloy_rlp::BufMut;
-use core::hash::{Hash, Hasher};
+use core::{
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 #[cfg(not(feature = "std"))]
 use once_cell::race::OnceBox as OnceLock;
 #[cfg(feature = "std")]
@@ -108,9 +116,9 @@ impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     }
 }
 
-impl<T> Signed<T>
+impl<T, Sig> Signed<T, Sig>
 where
-    T: RlpEcdsaEncodableTx,
+    T: TxHashable<Sig>,
 {
     /// Returns a reference to the transaction hash.
     #[doc(alias = "tx_hash", alias = "transaction_hash")]
@@ -118,7 +126,12 @@ where
         #[allow(clippy::useless_conversion)]
         self.hash.get_or_init(|| self.tx.tx_hash(&self.signature).into())
     }
+}
 
+impl<T> Signed<T>
+where
+    T: RlpEcdsaEncodableTx,
+{
     /// Splits the transaction into parts.
     pub fn into_parts(self) -> (T, Signature, B256) {
         let hash = *self.hash();
@@ -166,6 +179,15 @@ where
     }
 }
 
+impl<T, Sig> TxHashRef for Signed<T, Sig>
+where
+    T: TxHashable<Sig>,
+{
+    fn tx_hash(&self) -> &B256 {
+        self.hash()
+    }
+}
+
 impl<T> Signed<T>
 where
     T: RlpEcdsaDecodableTx,
@@ -196,9 +218,10 @@ where
     }
 }
 
-impl<T> Hash for Signed<T>
+impl<T, Sig> Hash for Signed<T, Sig>
 where
-    T: RlpEcdsaDecodableTx + Hash,
+    T: TxHashable<Sig> + Hash,
+    Sig: Hash,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hash().hash(state);
@@ -207,13 +230,13 @@ where
     }
 }
 
-impl<T: RlpEcdsaEncodableTx + PartialEq> PartialEq for Signed<T> {
+impl<T: TxHashable<Sig> + PartialEq, Sig: PartialEq> PartialEq for Signed<T, Sig> {
     fn eq(&self, other: &Self) -> bool {
         self.hash() == other.hash() && self.tx == other.tx && self.signature == other.signature
     }
 }
 
-impl<T: RlpEcdsaEncodableTx + PartialEq> Eq for Signed<T> {}
+impl<T: TxHashable<Sig> + PartialEq, Sig: PartialEq> Eq for Signed<T, Sig> {}
 
 #[cfg(feature = "k256")]
 impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
@@ -268,7 +291,7 @@ impl<'a, T: SignableTransaction<Signature> + arbitrary::Arbitrary<'a>> arbitrary
     }
 }
 
-impl<T> Typed2718 for Signed<T>
+impl<T, Sig> Typed2718 for Signed<T, Sig>
 where
     T: Typed2718,
 {
@@ -277,7 +300,7 @@ where
     }
 }
 
-impl<T: Transaction> Transaction for Signed<T> {
+impl<T: Transaction, Sig: Debug + Send + Sync + 'static> Transaction for Signed<T, Sig> {
     #[inline]
     fn chain_id(&self) -> Option<u64> {
         self.tx.chain_id()
@@ -477,9 +500,45 @@ where
     }
 }
 
+impl<T> Encodable2718 for Signed<T>
+where
+    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
+{
+    fn encode_2718_len(&self) -> usize {
+        self.eip2718_encoded_length()
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.eip2718_encode(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        *self.hash()
+    }
+}
+
+impl<T> Decodable2718 for Signed<T>
+where
+    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        let decoded = T::rlp_decode_signed(buf)?;
+
+        if decoded.ty() != ty {
+            return Err(Eip2718Error::UnexpectedType(ty));
+        }
+
+        Ok(decoded)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::rlp_decode_signed(buf).map_err(Into::into)
+    }
+}
+
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::transaction::RlpEcdsaEncodableTx;
+    use crate::transaction::TxHashable;
     use alloc::borrow::Cow;
     use alloy_primitives::B256;
     use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
@@ -493,9 +552,10 @@ mod serde {
         hash: Cow<'a, B256>,
     }
 
-    impl<T> Serialize for super::Signed<T>
+    impl<T, Sig> Serialize for super::Signed<T, Sig>
     where
-        T: Clone + RlpEcdsaEncodableTx + Serialize,
+        T: Clone + TxHashable<Sig> + Serialize,
+        Sig: Clone + Serialize,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where

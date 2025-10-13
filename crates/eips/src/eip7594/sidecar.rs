@@ -107,6 +107,22 @@ impl BlobTransactionSidecarVariant {
         VersionedHashIter::new(self.commitments())
     }
 
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        match self {
+            Self::Eip4844(s) => s.versioned_hash_index(hash),
+            Self::Eip7594(s) => s.versioned_hash_index(hash),
+        }
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        match self {
+            Self::Eip4844(s) => s.blob_by_versioned_hash(hash),
+            Self::Eip7594(s) => s.blob_by_versioned_hash(hash),
+        }
+    }
+
     /// Outputs the RLP length of the [BlobTransactionSidecarVariant] fields, without a RLP header.
     #[doc(hidden)]
     pub fn rlp_encoded_fields_length(&self) -> usize {
@@ -114,6 +130,15 @@ impl BlobTransactionSidecarVariant {
             Self::Eip4844(sidecar) => sidecar.rlp_encoded_fields_length(),
             Self::Eip7594(sidecar) => sidecar.rlp_encoded_fields_length(),
         }
+    }
+
+    /// Returns the [`Self::rlp_encode_fields`] RLP bytes.
+    #[inline]
+    #[doc(hidden)]
+    pub fn rlp_encoded_fields(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.rlp_encoded_fields_length());
+        self.rlp_encode_fields(&mut buf);
+        buf
     }
 
     /// Encodes the inner [BlobTransactionSidecarVariant] fields as RLP bytes, __without__ a RLP
@@ -197,7 +222,9 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(serde::Deserialize)]
+        use core::fmt;
+
+        #[derive(serde::Deserialize, fmt::Debug)]
         #[serde(field_identifier, rename_all = "camelCase")]
         enum Field {
             Blobs,
@@ -227,7 +254,9 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        Field::Blobs => blobs = Some(map.next_value()?),
+                        Field::Blobs => {
+                            blobs = Some(crate::eip4844::deserialize_blobs_map(&mut map)?);
+                        }
                         Field::Commitments => commitments = Some(map.next_value()?),
                         Field::Proofs => proofs = Some(map.next_value()?),
                         Field::CellProofs => cell_proofs = Some(map.next_value()?),
@@ -277,10 +306,7 @@ impl<'de> serde::Deserialize<'de> for BlobTransactionSidecarVariant {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BlobTransactionSidecarEip7594 {
     /// The blob data.
-    #[cfg_attr(
-        all(debug_assertions, feature = "serde"),
-        serde(deserialize_with = "crate::eip4844::deserialize_blobs")
-    )]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "crate::eip4844::deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -412,6 +438,18 @@ impl BlobTransactionSidecarEip7594 {
     /// Returns an iterator over the versioned hashes of the commitments.
     pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
         VersionedHashIter::new(&self.commitments)
+    }
+
+    /// Returns the index of the versioned hash in the commitments vector.
+    pub fn versioned_hash_index(&self, hash: &B256) -> Option<usize> {
+        self.commitments.iter().position(|commitment| {
+            crate::eip4844::kzg_to_versioned_hash(commitment.as_slice()) == *hash
+        })
+    }
+
+    /// Returns the blob corresponding to the versioned hash, if it exists.
+    pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
+        self.versioned_hash_index(hash).and_then(|index| self.blobs.get(index))
     }
 
     /// Matches versioned hashes and returns an iterator of (index, [`BlobAndProofV2`]) pairs
@@ -604,14 +642,17 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn sidecar_variant_json_deserialize_sanity() {
-        let eip4844 = BlobTransactionSidecar::default();
+        let mut eip4844 = BlobTransactionSidecar::default();
+        eip4844.blobs.push(Blob::repeat_byte(0x2));
+
         let json = serde_json::to_string(&eip4844).unwrap();
         let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
         assert!(variant.is_eip4844());
         let jsonvariant = serde_json::to_string(&variant).unwrap();
         assert_eq!(json, jsonvariant);
 
-        let eip7594 = BlobTransactionSidecarEip7594::default();
+        let mut eip7594 = BlobTransactionSidecarEip7594::default();
+        eip7594.blobs.push(Blob::repeat_byte(0x4));
         let json = serde_json::to_string(&eip7594).unwrap();
         let variant: BlobTransactionSidecarVariant = serde_json::from_str(&json).unwrap();
         assert!(variant.is_eip7594());

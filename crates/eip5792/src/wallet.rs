@@ -7,21 +7,21 @@ use serde::{Deserialize, Serialize};
 /// account delegates to one of the addresses specified within this capability.
 ///
 /// [eip-7702]: https://eips.ethereum.org/EIPS/eip-7702
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct DelegationCapability {
     /// A list of valid delegation contracts.
     pub addresses: Vec<Address>,
 }
 
 /// Wallet capabilities for a specific chain.
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Capabilities {
     /// The capability to delegate.
     pub delegation: DelegationCapability,
 }
 
 /// A map of wallet capabilities per chain ID.
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct WalletCapabilities(
     #[serde(with = "alloy_serde::quantity::hashmap")] pub HashMap<ChainId, Capabilities>,
 );

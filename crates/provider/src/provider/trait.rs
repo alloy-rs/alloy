@@ -933,7 +933,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// [`send_transaction`]: Self::send_transaction
     /// [`ProviderLayer`]: crate::ProviderLayer
-    /// [`TxFiller`]: crate::TxFiller
+    /// [`TxFiller`]: crate::fillers::TxFiller
     #[doc(hidden)]
     async fn send_transaction_internal(
         &self,
@@ -1412,7 +1412,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
 
-        // Setup tower serive with multiple layers modifying request headers
+        // Setup tower service with multiple layers modifying request headers
         let service = tower::ServiceBuilder::new()
             .layer(SetRequestHeaderLayer::if_not_present(
                 header::USER_AGENT,

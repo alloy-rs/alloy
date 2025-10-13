@@ -106,7 +106,6 @@ pub enum BatchFuture {
         requests: RequestPacket,
         channels: ChannelMap,
     },
-    SerError(Option<TransportError>),
     AwaitingResponse {
         channels: ChannelMap,
         #[pin]
@@ -244,20 +243,6 @@ impl BatchFuture {
         self.set(Self::Complete);
         Poll::Ready(Ok(()))
     }
-
-    fn poll_ser_error(
-        mut self: Pin<&mut Self>,
-        _cx: &mut task::Context<'_>,
-    ) -> Poll<<Self as Future>::Output> {
-        let e = if let CallStateProj::SerError(e) = self.as_mut().project() {
-            e.take().expect("no error")
-        } else {
-            unreachable!("Called poll_ser_error in incorrect state")
-        };
-
-        self.set(Self::Complete);
-        Poll::Ready(Err(e))
-    }
 }
 
 impl Future for BatchFuture {
@@ -272,10 +257,6 @@ impl Future for BatchFuture {
             return self.poll_awaiting_response(cx);
         }
 
-        if matches!(*self.as_mut(), Self::SerError(_)) {
-            return self.poll_ser_error(cx);
-        }
-
-        panic!("Called poll on CallState in invalid state")
+        panic!("Called poll on BatchFuture in invalid state")
     }
 }

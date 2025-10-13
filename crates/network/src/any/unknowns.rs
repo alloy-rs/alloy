@@ -165,22 +165,16 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
             return gas_price;
         }
 
-        base_fee.map_or(self.max_fee_per_gas(), |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let max_fee = self.max_fee_per_gas();
-            if max_fee == 0 {
-                return 0;
-            }
-            let Some(max_prio_fee) = self.max_priority_fee_per_gas() else { return max_fee };
-            let tip = max_fee.saturating_sub(base_fee as u128);
-            if tip > max_prio_fee {
-                max_prio_fee + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                max_fee
-            }
-        })
+        let max_fee = self.max_fee_per_gas();
+        if max_fee == 0 {
+            return 0;
+        }
+
+        let Some(max_prio_fee) = self.max_priority_fee_per_gas() else {
+            return max_fee;
+        };
+
+        alloy_eips::eip1559::calc_effective_gas_price(max_fee, max_prio_fee, base_fee)
     }
 
     #[inline]

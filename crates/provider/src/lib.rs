@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 // For features.
 #[cfg(any(feature = "reqwest", feature = "hyper"))]
@@ -50,6 +50,8 @@ pub mod utils;
 
 #[doc(no_inline)]
 pub use alloy_network::{self as network, Network};
+
+pub use alloy_transport as transport;
 
 #[cfg(feature = "ws")]
 pub use alloy_rpc_client::WsConnect;

@@ -34,6 +34,7 @@ alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-rpc-types-debug = { workspace = true, optional = true }
+alloy-rpc-types-tenderly = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true, features = [
@@ -67,7 +68,7 @@ tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
 either.workspace = true
-http.workspace = true
+http = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
@@ -126,8 +127,9 @@ debug-api = ["dep:alloy-rpc-types-trace", "dep:alloy-rpc-types-debug"]
 erc4337-api = []
 engine-api = ["dep:alloy-rpc-types-engine"]
 net-api = []
+tenderly-api = ["dep:alloy-rpc-types-tenderly", "dep:alloy-rpc-types-trace"]
 trace-api = ["dep:alloy-rpc-types-trace"]
 rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
-mev-api = ["dep:alloy-rpc-types-mev"]
+mev-api = ["dep:alloy-rpc-types-mev", "dep:http"]

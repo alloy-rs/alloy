@@ -5,6 +5,163 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Bug Fixes
+
+- [jwt] Report parent directory path in try_create_random ([#2921](https://github.com/alloy-rs/alloy/issues/2921))
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Bug Fixes
+
+- [jwt] Jwt iat offset test flaky ([#2899](https://github.com/alloy-rs/alloy/issues/2899))
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Features
+
+- [rpc-types-engine] Add transaction helper methods to ExecutionPayload ([#2871](https://github.com/alloy-rs/alloy/issues/2871))
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Features
+
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Features
+
+- Complete execution payload getter methods ([#2782](https://github.com/alloy-rs/alloy/issues/2782))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Release 1.0.25
+
+## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
+
+### Features
+
+- Add headerinfo helper type ([#2766](https://github.com/alloy-rs/alloy/issues/2766))
+
+### Miscellaneous Tasks
+
+- Release 1.0.24
+
+## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.23
+- Add tx getters ([#2720](https://github.com/alloy-rs/alloy/issues/2720))
+
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Miscellaneous Tasks
+
+- Release 1.0.22
+
+## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
+
+### Features
+
+- [rpc-types-engine] Add into_block_raw methods for payload types ([#2684](https://github.com/alloy-rs/alloy/issues/2684))
+- [rpc-types-engine] Custom ssz decode to distinguish Fulu and Electra payload ([#2679](https://github.com/alloy-rs/alloy/issues/2679))
+
+### Miscellaneous Tasks
+
+- Release 1.0.21
+
+## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
+
+### Miscellaneous Tasks
+
+- Release 1.0.20
+
+## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.19
+
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
+
+### Features
+
+- Add BuilderBlockValidationV5 for relay for Fusaka ([#2638](https://github.com/alloy-rs/alloy/issues/2638))
+- Add helper conversion for blobsbundlev1 ([#2639](https://github.com/alloy-rs/alloy/issues/2639))
+
+### Miscellaneous Tasks
+
+- Release 1.0.18
+- Avoid redundant collect ([#2652](https://github.com/alloy-rs/alloy/issues/2652))
+- Release 1.0.17
+- Add try_into_sidecar helper ([#2644](https://github.com/alloy-rs/alloy/issues/2644))
+- Fix missing arbitrary in tests ([#2643](https://github.com/alloy-rs/alloy/issues/2643))
+
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
+
 ## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
 
 ### Miscellaneous Tasks
@@ -373,19 +530,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
-### Miscellaneous Tasks
-
-- Release 0.8.1
-- Reuse v3 envelope in v4 envelope ([#1795](https://github.com/alloy-rs/alloy/issues/1795))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
 ### Features
 
 - [engine] Forkchoice Version ([#1744](https://github.com/alloy-rs/alloy/issues/1744))
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
+- Reuse v3 envelope in v4 envelope ([#1795](https://github.com/alloy-rs/alloy/issues/1795))
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05

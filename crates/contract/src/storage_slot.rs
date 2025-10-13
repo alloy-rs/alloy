@@ -43,6 +43,7 @@ where
     contract: Address,
     calldata: Bytes,
     expected_value: U256,
+    base_request: N::TransactionRequest,
     _phantom: std::marker::PhantomData<N>,
 }
 
@@ -61,13 +62,15 @@ where
     /// * `expected_value` - The value we expect the function to return
     ///
     /// For common ERC20 use cases, consider using [`Self::balance_of`] instead.
-    pub const fn new(
-        provider: P,
-        contract: Address,
-        calldata: Bytes,
-        expected_value: U256,
-    ) -> Self {
-        Self { provider, contract, calldata, expected_value, _phantom: std::marker::PhantomData }
+    pub fn new(provider: P, contract: Address, calldata: Bytes, expected_value: U256) -> Self {
+        Self {
+            provider,
+            contract,
+            calldata,
+            expected_value,
+            base_request: N::TransactionRequest::default(),
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// Convenience constructor for finding the storage slot of an ERC20 `balanceOf(address)`
@@ -97,6 +100,15 @@ where
         self
     }
 
+    /// Overrides the base request object that will be used for slot detection.
+    ///
+    /// For slot detection the target address of that request is set to the configured contract and
+    /// the input to the configured input.
+    pub fn with_request(mut self, base_request: N::TransactionRequest) -> Self {
+        self.base_request = base_request;
+        self
+    }
+
     /// Finds the storage slot containing the expected value.
     ///
     /// This method:
@@ -118,9 +130,7 @@ where
     /// any encoding or hashing. For mappings, the actual storage location might be
     /// computed using keccak256 hashing.
     pub async fn find_slot(self) -> Result<Option<B256>, TransportError> {
-        let tx = N::TransactionRequest::default()
-            .with_to(self.contract)
-            .with_input(self.calldata.clone());
+        let tx = self.base_request.clone().with_to(self.contract).with_input(self.calldata.clone());
 
         // first collect all the slots that are used by the function call
         let access_list_result = self.provider.create_access_list(&tx.clone()).await?;
@@ -164,26 +174,22 @@ where
 mod tests {
     use crate::StorageSlotFinder;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::{address, B256, U256};
+    use alloy_primitives::{address, ruint::uint, Address, B256, U256};
     use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
     const FORK_URL: &str = "https://reth-ethereum.ithaca.xyz/rpc";
     use alloy_sol_types::SolCall;
-    use tracing_subscriber::fmt::init;
 
-    #[tokio::test]
-    async fn test_erc20_set_balance() {
-        init();
+    async fn test_erc20_token_set_balance(token: Address) {
         let provider = ProviderBuilder::new().connect_anvil_with_config(|a| a.fork(FORK_URL));
-        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
         let user = address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
         let amount = U256::from(500u64);
-        let finder = StorageSlotFinder::balance_of(provider.clone(), dai, user);
+        let finder = StorageSlotFinder::balance_of(provider.clone(), token, user);
         let storage_slot = U256::from_be_bytes(finder.find_slot().await.unwrap().unwrap().0);
 
         provider
-            .anvil_set_storage_at(dai, storage_slot, B256::from(amount.to_be_bytes()))
+            .anvil_set_storage_at(token, storage_slot, B256::from(amount.to_be_bytes()))
             .await
             .unwrap();
 
@@ -195,11 +201,45 @@ mod tests {
         let input = balanceOfCall::abi_encode(&balance_of_call);
 
         let result = provider
-            .call(TransactionRequest::default().with_to(dai).with_input(input))
+            .call(TransactionRequest::default().with_to(token).with_input(input))
             .await
             .unwrap();
         let balance = balanceOfCall::abi_decode_returns(&result).unwrap();
 
         assert_eq!(balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_erc20_dai_set_balance() {
+        let dai = address!("0x6B175474E89094C44Da98b954EedeAC495271d0F");
+        test_erc20_token_set_balance(dai).await
+    }
+
+    #[tokio::test]
+    async fn test_erc20_usdc_set_balance() {
+        let usdc = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        test_erc20_token_set_balance(usdc).await
+    }
+
+    #[tokio::test]
+    async fn test_erc20_tether_set_balance() {
+        let tether = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
+        test_erc20_token_set_balance(tether).await
+    }
+    #[tokio::test]
+    async fn test_erc20_token_polygon() {
+        let provider =
+            ProviderBuilder::new().connect_http("https://polygon-rpc.com".parse().unwrap());
+        let usdt = address!("0xc2132D05D31c914a87C6611C10748AEb04B58e8F"); // https://polygonscan.com/address/0xc2132D05D31c914a87C6611C10748AEb04B58e8F
+        let user = address!("0x0aD71c9106455801eAe0e11D5A1Dd5232537E662");
+        let finder = StorageSlotFinder::balance_of(provider.clone(), usdt, user)
+            .with_request(TransactionRequest::default().gas_limit(100000));
+        let storage_slot = U256::from_be_bytes(finder.find_slot().await.unwrap().unwrap().0);
+        assert_eq!(
+            storage_slot,
+            uint!(
+                38414845661641411266428303013962925072609060211040678298987263275302781786590_U256
+            )
+        );
     }
 }

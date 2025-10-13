@@ -4,12 +4,11 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-use alloc::format;
 use alloy_primitives::{hex, B256};
 use serde::Serializer;
 
@@ -46,5 +45,5 @@ pub fn serialize_b256_hex_string_no_prefix<S>(x: &B256, s: S) -> Result<S::Ok, S
 where
     S: Serializer,
 {
-    s.serialize_str(&format!("{x:x}"))
+    s.collect_str(&format_args!("{x:x}"))
 }

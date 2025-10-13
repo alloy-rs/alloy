@@ -36,6 +36,7 @@ tokio-stream = { workspace = true, features = ["sync"] }
 tower.workspace = true
 tracing.workspace = true
 parking_lot.workspace = true
+auto_impl.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasmtimer.workspace = true

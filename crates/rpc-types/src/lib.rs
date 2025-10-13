@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[doc(hidden)]
 pub use alloy_serde as serde_helpers;
@@ -17,6 +17,9 @@ pub use alloy_rpc_types_admin as admin;
 
 #[cfg(feature = "anvil")]
 pub use alloy_rpc_types_anvil as anvil;
+
+#[cfg(feature = "any")]
+pub use alloy_rpc_types_any as any;
 
 #[cfg(feature = "beacon")]
 pub use alloy_rpc_types_beacon as beacon;

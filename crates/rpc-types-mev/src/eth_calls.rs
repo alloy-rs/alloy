@@ -1,3 +1,6 @@
+// Allow to keep the deprecated items for compatibility
+#![allow(deprecated)]
+
 use crate::{u256_numeric_string, Privacy, Validity};
 
 use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};
@@ -210,15 +213,28 @@ pub struct EthCallBundleTransactionResult {
 /// Request for `eth_cancelBundle`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct EthCancelBundle {
+    /// The replacement UUID of the bundle to be canceled
+    pub replacement_uuid: String,
+}
+
+/// Request for `eth_cancelBundle`
+#[deprecated = "Use `EthCancelBundle` instead"]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct CancelBundleRequest {
     /// Bundle hash of the bundle to be canceled
     pub bundle_hash: String,
 }
 
 /// Request for `eth_cancelPrivateTransaction`
+#[deprecated = "Use `EthCancelPrivateTransaction` instead"]
+pub type CancelPrivateTransactionRequest = EthCancelPrivateTransaction;
+
+/// Request for `eth_cancelPrivateTransaction`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct CancelPrivateTransactionRequest {
+pub struct EthCancelPrivateTransaction {
     /// Transaction hash of the transaction to be canceled
     pub tx_hash: B256,
 }
@@ -324,9 +340,13 @@ pub struct EthBundleHash {
 }
 
 /// Request for `eth_sendPrivateTransaction`
+#[deprecated = "Use `EthSendPrivateTransaction` instead"]
+pub type PrivateTransactionRequest = EthSendPrivateTransaction;
+
+/// Request for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct PrivateTransactionRequest {
+pub struct EthSendPrivateTransaction {
     /// raw signed transaction
     pub tx: Bytes,
     /// Hex-encoded number string, optional. Highest block number in which the transaction should
@@ -338,8 +358,8 @@ pub struct PrivateTransactionRequest {
     pub preferences: PrivateTransactionPreferences,
 }
 
-impl PrivateTransactionRequest {
-    /// Creates new [`PrivateTransactionRequest`] from the given encodable transaction.
+impl EthSendPrivateTransaction {
+    /// Creates new [`EthSendPrivateTransaction`] from the given encodable transaction.
     pub fn new<T: Encodable2718>(tx: &T) -> Self {
         Self {
             tx: tx.encoded_2718().into(),
@@ -369,7 +389,7 @@ impl PrivateTransactionRequest {
     }
 }
 
-impl<T: Encodable2718> From<T> for PrivateTransactionRequest {
+impl<T: Encodable2718> From<T> for EthSendPrivateTransaction {
     fn from(envelope: T) -> Self {
         Self::new(&envelope)
     }
@@ -417,6 +437,48 @@ impl PrivateTransactionPreferences {
         self.privacy = Some(privacy);
         self
     }
+}
+
+/// Bundle of blob transaction permutations for `eth_sendBlobs`
+///
+/// Sends multiple blob transaction permutations with the same nonce. These are conflicting
+/// transactions with different amounts of blobs where only one may be included.
+///
+/// For more details see:
+/// <https://docs.titanbuilder.xyz/api/eth_sendblobs>
+/// See also EIP-7925 draft:
+/// <https://ethereum-magicians.org/t/23333>
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EthSendBlobs {
+    /// A list of hex-encoded signed blob transactions (permutations with same nonce, different
+    /// blob counts)
+    pub txs: Vec<Bytes>,
+    /// Hex-encoded number string, optional. Highest block number in which one of the transactions
+    /// should be included.
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub max_block_number: Option<u64>,
+}
+
+/// Bundle of transactions for `eth_sendEndOfBlockBundle`
+///
+/// For more details see:
+/// <https://docs.titanbuilder.xyz/api/eth_sendendofblockbundle> or
+/// <https://docs.quasar.win/eth_sendendofblockbundle>
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EthSendEndOfBlockBundle {
+    /// A list of hex-encoded signed transactions
+    pub txs: Vec<Bytes>,
+    /// Hex-encoded block number for which this bundle is valid on
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub block_number: Option<u64>,
+    /// List of hashes of possibly reverting txs
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reverting_tx_hashes: Vec<TxHash>,
+    /// Pool addresses targeted by the bundle
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_pools: Vec<Address>,
 }
 
 #[cfg(test)]

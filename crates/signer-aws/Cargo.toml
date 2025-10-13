@@ -29,6 +29,7 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
+aws-config = { version = "1", default-features = false }
 aws-sdk-kms = { version = "1", default-features = false }
 k256.workspace = true
 spki = { workspace = true, features = ["std"] }
@@ -37,7 +38,6 @@ tracing.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-aws-config = { version = "1", default-features = false }
 
 [features]
 eip712 = ["alloy-signer/eip712"]

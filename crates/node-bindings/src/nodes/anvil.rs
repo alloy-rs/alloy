@@ -121,7 +121,21 @@ impl AnvilInstance {
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
-        self.child.kill().expect("could not kill anvil");
+        #[cfg(unix)]
+        {
+            // anvil has settings for dumping thing the state,cache on SIGTERM, so we try to kill it
+            // with sigterm
+            if let Ok(out) =
+                Command::new("kill").arg("-SIGTERM").arg(self.child.id().to_string()).output()
+            {
+                if out.status.success() {
+                    return;
+                }
+            }
+        }
+        if let Err(err) = self.child.kill() {
+            eprintln!("alloy-node-bindings: failed to kill anvil process: {}", err);
+        }
     }
 }
 
@@ -160,6 +174,7 @@ pub struct Anvil {
     fork: Option<String>,
     fork_block_number: Option<u64>,
     args: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
     timeout: Option<u64>,
     keep_stdout: bool,
 }
@@ -221,7 +236,7 @@ impl Anvil {
 
     /// Sets the chain_id the `anvil` instance will use.
     ///
-    /// By default [`DEFAULT_IPC_ENDPOINT`] will be used.
+    /// If not set, the instance defaults to chain id `31337`.
     pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
@@ -299,6 +314,12 @@ impl Anvil {
         self
     }
 
+    /// Instantiate `anvil` with the `--auto-impersonate` flag.
+    pub fn auto_impersonate(mut self) -> Self {
+        self = self.arg("--auto-impersonate");
+        self
+    }
+
     /// Adds an argument to pass to the `anvil`.
     pub fn push_arg<T: Into<OsString>>(&mut self, arg: T) {
         self.args.push(arg.into());
@@ -333,6 +354,29 @@ impl Anvil {
         self
     }
 
+    /// Adds an environment variable to pass to the `anvil`.
+    pub fn env<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        self.envs.push((key.into(), value.into()));
+        self
+    }
+
+    /// Adds multiple environment variables to pass to the `anvil`.
+    pub fn envs<I, K, V>(mut self, envs: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<OsString>,
+        V: Into<OsString>,
+    {
+        for (key, value) in envs {
+            self = self.env(key, value);
+        }
+        self
+    }
+
     /// Sets the timeout which will be used when the `anvil` instance is launched.
     pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
@@ -363,7 +407,12 @@ impl Anvil {
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
 
         // disable nightly warning
-        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "");
+        cmd.env("FOUNDRY_DISABLE_NIGHTLY_WARNING", "")
+            // disable color in logs
+            .env("NO_COLOR", "1");
+
+        // set additional environment variables
+        cmd.envs(self.envs);
 
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
@@ -415,7 +464,7 @@ impl Anvil {
 
             let mut line = String::new();
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
-            trace!(target: "anvil", line);
+            trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
                 // parse the actual port
@@ -487,5 +536,10 @@ mod test {
         //even though the block time is a f64, it should be passed as a whole number
         let anvil = Anvil::new().block_time(12);
         assert_eq!(anvil.block_time.unwrap().to_string(), "12");
+    }
+
+    #[test]
+    fn spawn_and_drop() {
+        let _ = Anvil::new().block_time(12).try_spawn().map(drop);
     }
 }

@@ -7,10 +7,10 @@ use crate::geth::{
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, time::Duration};
+use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 // re-exports
 pub use self::{
-    call::{CallConfig, CallFrame, CallLogFrame, FlatCallConfig},
+    call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
     four_byte::FourByteFrame,
     noop::NoopFrame,
     pre_state::{
@@ -20,6 +20,7 @@ pub use self::{
 };
 
 pub mod call;
+pub mod erc7562;
 pub mod four_byte;
 pub mod mux;
 pub mod noop;
@@ -58,7 +59,6 @@ pub struct DefaultFrame {
     /// How much gas was used.
     pub gas: u64,
     /// Output of the transaction
-    #[serde(serialize_with = "alloy_serde::serialize_hex_string_no_prefix")]
     pub return_value: Bytes,
     /// Recorded traces of the transaction
     pub struct_logs: Vec<StructLog>,
@@ -72,7 +72,7 @@ pub struct StructLog {
     /// program counter
     pub pc: u64,
     /// opcode to be executed
-    pub op: String,
+    pub op: Cow<'static, str>,
     /// remaining gas
     pub gas: u64,
     /// cost for executing op
@@ -108,6 +108,13 @@ pub struct StructLog {
     pub refund_counter: Option<u64>,
 }
 
+impl StructLog {
+    /// Returns the name of the opcode.
+    pub fn opcode(&self) -> &str {
+        self.op.as_ref()
+    }
+}
+
 /// Tracing response objects
 ///
 /// Note: This deserializes untagged, so it's possible that a custom javascript tracer response
@@ -135,6 +142,46 @@ pub enum GethTrace {
 }
 
 impl GethTrace {
+    /// Returns true if this is a default structlog frame.
+    pub const fn is_default(&self) -> bool {
+        matches!(self, Self::Default(_))
+    }
+
+    /// Returns true if this is a call frame.
+    pub const fn is_call(&self) -> bool {
+        matches!(self, Self::CallTracer(_))
+    }
+
+    /// Returns true if this is a flat call frame.
+    pub const fn is_flat_call(&self) -> bool {
+        matches!(self, Self::FlatCallTracer(_))
+    }
+
+    /// Returns true if this is a four byte frame.
+    pub const fn is_four_byte(&self) -> bool {
+        matches!(self, Self::FourByteTracer(_))
+    }
+
+    /// Returns true if this is a pre-state frame.
+    pub const fn is_pre_state(&self) -> bool {
+        matches!(self, Self::PreStateTracer(_))
+    }
+
+    /// Returns true if this is a noop frame.
+    pub const fn is_noop(&self) -> bool {
+        matches!(self, Self::NoopTracer(_))
+    }
+
+    /// Returns true if this is a mux trace.
+    pub const fn is_mux(&self) -> bool {
+        matches!(self, Self::MuxTracer(_))
+    }
+
+    /// Returns true if this is a JS trace
+    pub const fn is_js(&self) -> bool {
+        matches!(self, Self::JS(_))
+    }
+
     /// Try to convert the inner tracer to [DefaultFrame]
     pub fn try_into_default_frame(self) -> Result<DefaultFrame, UnexpectedTracerError> {
         match self {
@@ -749,6 +796,19 @@ mod tests {
     use similar_asserts::assert_eq;
 
     #[test]
+    fn test_return_data_prefix() {
+        let raw = r#"{
+  "failed": false,
+  "gas": 0,
+  "returnValue": "",
+  "structLogs": []
+}"#;
+
+        let frame = serde_json::from_str::<DefaultFrame>(raw).unwrap();
+        assert_eq!(frame, DefaultFrame::default());
+    }
+
+    #[test]
     fn test_tracer_config() {
         let s = "{\"tracer\": \"callTracer\"}";
         let opts = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
@@ -881,5 +941,82 @@ mod tests {
         let s = include_str!("../../test_data/call_tracer/json-call-tracer16289.json");
         let opts: GethDebugTracingCallOptions = serde_json::from_str(s).unwrap();
         assert!(opts.tracing_options.tracer.unwrap().is_js());
+    }
+
+    #[test]
+    fn deserde_jstracer() {
+        let s = r#"{
+      "tracer": "{fault: function(log) {}, step: function(log) { const memToHex = mem => mem.reduce((s, byte) => s + byte.toString(16).padStart(2, '0'), ''); }, result: function() { return this.data; }}"
+      }"#;
+        let _tracer = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
+    }
+
+    #[test]
+    fn serde_debug_tracing_call_options() {
+        let opts = GethDebugTracingCallOptions {
+            tracing_options: GethDebugTracingOptions {
+                config: GethDefaultTracingOptions {
+                    enable_return_data: Some(true),
+                    ..Default::default()
+                },
+                tracer: Some(GethDebugTracerType::BuiltInTracer(
+                    GethDebugBuiltInTracerType::PreStateTracer,
+                )),
+                tracer_config: GethDebugTracerConfig::default(),
+                timeout: None,
+            },
+            state_overrides: None,
+            block_overrides: None,
+        };
+
+        let s = serde_json::to_string(&opts).unwrap();
+        assert_eq!(s, r#"{"enableReturnData":true,"tracer":"prestateTracer"}"#);
+        let from_json = serde_json::from_str::<GethDebugTracingCallOptions>(&s).unwrap();
+        assert_eq!(opts, from_json);
+    }
+
+    #[test]
+    fn serde_prestate_response() {
+        let s = r#"[
+        [
+            {
+                "0x0000000000000000000000000000000000000000": {
+                    "balance": "0xcf13a3dbf538f7410"
+                },
+                "0x2ee4823855d1c4c0753ea19fd3548d64a79b73a5": {
+                    "balance": "0x0"
+                },
+                "0x670b24610df99b1685aeac0dfd5307b92e0cf4d7": {
+                    "balance": "0x38eaef3250efa03774",
+                    "nonce": 2
+                }
+            }
+        ]
+    ]"#;
+
+        let traces = serde_json::from_str::<Vec<Vec<GethTrace>>>(s).unwrap();
+        assert!(traces[0][0].is_pre_state());
+    }
+
+    #[test]
+    fn serde_geth_debug_tracing_options_prestate_tracer() {
+        let s = r#"{
+      "tracer": "prestateTracer",
+      "tracerConfig": {
+        "diffMode": true,
+        "disableCode": true,
+        "disableStorage": true
+      }
+    }"#;
+        let opts: GethDebugTracingOptions = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            opts.tracer,
+            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer))
+        );
+        let config = opts.tracer_config.into_pre_state_config().unwrap();
+        assert_eq!(config.diff_mode, Some(true));
+        assert_eq!(config.disable_code, Some(true));
+        assert_eq!(config.disable_storage, Some(true));
+        assert!(!config.code_enabled());
     }
 }

@@ -3,7 +3,9 @@ mod either;
 
 pub mod error;
 
-use alloy_consensus::TxEnvelope;
+use alloy_consensus::{
+    Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
+};
 use alloy_eips::{eip7702::SignedAuthorization, Typed2718};
 use alloy_primitives::{Bytes, ChainId, TxKind, B256, U256};
 pub use either::{AnyTxEnvelope, AnyTypedTransaction};
@@ -178,11 +180,9 @@ impl DerefMut for AnyRpcBlock {
 
 impl From<Block> for AnyRpcBlock {
     fn from(value: Block) -> Self {
-        let block = value
-            .map_header(|h| h.map(|h| alloy_consensus_any::AnyHeader { ..h.into() }))
-            .map_transactions(|tx| {
-                AnyRpcTransaction::new(WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)))
-            });
+        let block = value.map_header(|h| h.map(|h| h.into())).map_transactions(|tx| {
+            AnyRpcTransaction::new(WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)))
+        });
 
         Self(WithOtherFields::new(block))
     }
@@ -242,6 +242,61 @@ impl AnyRpcTransaction {
     /// If the transaction is not an Ethereum transaction, it is returned as an error.
     pub fn try_into_envelope(self) -> Result<TxEnvelope, ValueError<AnyTxEnvelope>> {
         self.0.inner.inner.into_inner().try_into_envelope()
+    }
+
+    /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
+    pub fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
+        self.0.inner().inner.as_legacy()
+    }
+
+    /// Returns the [`TxEip2930`] variant if the transaction is an EIP-2930 transaction.
+    pub fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
+        self.0.inner().inner.as_eip2930()
+    }
+
+    /// Returns the [`TxEip1559`] variant if the transaction is an EIP-1559 transaction.
+    pub fn as_eip1559(&self) -> Option<&Signed<TxEip1559>> {
+        self.0.inner().inner.as_eip1559()
+    }
+
+    /// Returns the [`TxEip4844Variant`] variant if the transaction is an EIP-4844 transaction.
+    pub fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
+        self.0.inner().inner.as_eip4844()
+    }
+
+    /// Returns the [`TxEip7702`] variant if the transaction is an EIP-7702 transaction.
+    pub fn as_eip7702(&self) -> Option<&Signed<TxEip7702>> {
+        self.0.inner().inner.as_eip7702()
+    }
+
+    /// Returns true if the transaction is a legacy transaction.
+    #[inline]
+    pub fn is_legacy(&self) -> bool {
+        self.0.inner().inner.is_legacy()
+    }
+
+    /// Returns true if the transaction is an EIP-2930 transaction.
+    #[inline]
+    pub fn is_eip2930(&self) -> bool {
+        self.0.inner().inner.is_eip2930()
+    }
+
+    /// Returns true if the transaction is an EIP-1559 transaction.
+    #[inline]
+    pub fn is_eip1559(&self) -> bool {
+        self.0.inner().inner.is_eip1559()
+    }
+
+    /// Returns true if the transaction is an EIP-4844 transaction.
+    #[inline]
+    pub fn is_eip4844(&self) -> bool {
+        self.0.inner().inner.is_eip4844()
+    }
+
+    /// Returns true if the transaction is an EIP-7702 transaction.
+    #[inline]
+    pub fn is_eip7702(&self) -> bool {
+        self.0.inner().inner.is_eip7702()
     }
 
     /// Attempts to convert the [`AnyRpcTransaction`] into `Either::Right` if this is an unknown

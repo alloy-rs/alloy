@@ -27,6 +27,9 @@ pub trait MulticallItem {
     /// Decoder for the return data of the call.
     type Decoder: SolCall;
 
+    /// Returns the value to send with the call.
+    fn value(&self) -> U256;
+
     /// The target address of the call.
     fn target(&self) -> Address;
     /// ABI-encoded input data for the call.
@@ -87,6 +90,11 @@ impl<D: SolCall> CallItem<D> {
         self
     }
 
+    /// Convenience function for `allow_failure(true)`
+    pub const fn with_failure_allowed(self) -> Self {
+        self.allow_failure(true)
+    }
+
     /// Set the value to send with the call.
     pub const fn value(mut self, value: U256) -> Self {
         self.value = value;
@@ -137,7 +145,7 @@ where
     /// Call [`allow_failure`][CallItem::allow_failure] on the result to specify the failure
     /// behavior, or use [`into_call`][MulticallItem::into_call] instead.
     fn from(value: T) -> Self {
-        Self::new(value.target(), value.input())
+        Self::new(value.target(), value.input()).value(value.value())
     }
 }
 
@@ -160,9 +168,10 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
         let mut ret = vec![];
         for (idx, res) in results.iter().enumerate() {
             if res.success {
-                ret.push(Ok(
-                    D::abi_decode_returns(&res.returnData).map_err(MulticallError::DecodeError)?
-                ));
+                ret.push(
+                    D::abi_decode_returns(&res.returnData)
+                        .map_err(|_| Failure { idx, return_data: res.returnData.clone() }),
+                )
             } else {
                 ret.push(Err(Failure { idx, return_data: res.returnData.clone() }));
             }
@@ -187,7 +196,7 @@ pub enum MulticallError {
     #[error("batch contains a tx with a value, try using .send() instead")]
     ValueTx,
     /// Error decoding return data.
-    #[error("could not decode")]
+    #[error("could not decode: {0}")]
     DecodeError(alloy_sol_types::Error),
     /// No return data was found.
     #[error("no return data")]

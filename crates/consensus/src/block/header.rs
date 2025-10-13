@@ -1,4 +1,5 @@
 use crate::{
+    block::HeaderInfo,
     constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
     Block, BlockBody,
 };
@@ -228,7 +229,11 @@ impl Header {
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
-        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
+        Some(blob_params.next_block_excess_blob_gas_osaka(
+            self.excess_blob_gas?,
+            self.blob_gas_used?,
+            self.base_fee_per_gas?,
+        ))
     }
 
     /// Calculate a heuristic for the in-memory size of the [Header].
@@ -561,6 +566,21 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 /// Trait for extracting specific Ethereum block data from a header
 #[auto_impl::auto_impl(&, Arc)]
 pub trait BlockHeader {
+    /// Extracts essential information into one container type.
+    fn header_info(&self) -> HeaderInfo {
+        HeaderInfo {
+            number: self.number(),
+            beneficiary: self.beneficiary(),
+            timestamp: self.timestamp(),
+            gas_limit: self.gas_limit(),
+            base_fee_per_gas: self.base_fee_per_gas(),
+            excess_blob_gas: self.excess_blob_gas(),
+            blob_gas_used: self.blob_gas_used(),
+            difficulty: self.difficulty(),
+            mix_hash: self.mix_hash(),
+        }
+    }
+
     /// Retrieves the parent hash of the block
     fn parent_hash(&self) -> B256;
 
@@ -636,7 +656,11 @@ pub trait BlockHeader {
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
-        Some(blob_params.next_block_excess_blob_gas(self.excess_blob_gas()?, self.blob_gas_used()?))
+        Some(blob_params.next_block_excess_blob_gas_osaka(
+            self.excess_blob_gas()?,
+            self.blob_gas_used()?,
+            self.base_fee_per_gas()?,
+        ))
     }
 
     /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional

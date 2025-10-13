@@ -107,7 +107,7 @@ where
         // convert the Box<RawValue> into a hyper request<B>
         let body = ser.get().as_bytes().to_owned().into();
 
-        let req = builder.body(body).expect("request parts are invalid");
+        let req = builder.body(body).map_err(TransportErrorKind::custom)?;
 
         let mut service = self.client.service;
         let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
@@ -121,8 +121,11 @@ where
         // if there is one.
         let body = resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
 
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
+        if tracing::enabled!(tracing::Level::TRACE) {
+            trace!(body = %String::from_utf8_lossy(&body), "response body");
+        } else {
+            debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        }
 
         if !status.is_success() {
             return Err(TransportErrorKind::http_error(

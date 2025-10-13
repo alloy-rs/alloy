@@ -13,6 +13,7 @@ use futures_utils_wasm::impl_future;
 /// - You need to provide special authentication information to a remote provider.
 /// - You have implemented a custom [`Transport`](crate::Transport).
 /// - You require a specific websocket reconnection strategy.
+#[auto_impl::auto_impl(&, &mut, Box, Arc)]
 pub trait TransportConnect: Sized + Send + Sync + 'static {
     /// Returns `true` if the transport connects to a local resource.
     fn is_local(&self) -> bool;

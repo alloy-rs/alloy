@@ -5,6 +5,156 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Align tracing targets ([#2932](https://github.com/alloy-rs/alloy/issues/2932))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+### Other
+
+- Recognize IPv6 loopback in guess_local_url (treat `::1` as local) ([#2954](https://github.com/alloy-rs/alloy/issues/2954))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+- Add missing helpers ([#2897](https://github.com/alloy-rs/alloy/issues/2897))
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Dependencies
+
+- Revert "chore(deps): internal dep bumps" ([#2839](https://github.com/alloy-rs/alloy/issues/2839))
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Dependencies
+
+- [deps] Internal dep bumps ([#2834](https://github.com/alloy-rs/alloy/issues/2834))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Use trait upcasting ([#2827](https://github.com/alloy-rs/alloy/issues/2827))
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Features
+
+- Add orretrypolicyfn ([#2785](https://github.com/alloy-rs/alloy/issues/2785))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Release 1.0.25
+
+## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
+
+### Bug Fixes
+
+- With_avg_unit_cost ([#2757](https://github.com/alloy-rs/alloy/issues/2757))
+
+### Features
+
+- Auto-impl for transport connect types ([#2758](https://github.com/alloy-rs/alloy/issues/2758))
+
+### Miscellaneous Tasks
+
+- Release 1.0.24
+
+## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.23
+
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Miscellaneous Tasks
+
+- Release 1.0.22
+
+## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
+
+### Bug Fixes
+
+- Use correct wasm instant ([#2693](https://github.com/alloy-rs/alloy/issues/2693))
+
+### Miscellaneous Tasks
+
+- Release 1.0.21
+
+## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
+
+### Miscellaneous Tasks
+
+- Release 1.0.20
+
+## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.19
+
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.18
+- Release 1.0.17
+
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
+
 ## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
 
 ### Miscellaneous Tasks
@@ -311,11 +461,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.8.1
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Miscellaneous Tasks
-
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05

@@ -1,5 +1,34 @@
 use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 
+/// Calculates the effective gas price for a dynamic fee transaction.
+///
+/// This is a utility function for EIP-1559 and similar transactions that use dynamic fees.
+///
+/// For EIP-1559 transactions, the effective gas price is calculated as:
+/// - If no base fee: returns `max_fee_per_gas`
+/// - If base fee exists: returns `min(max_fee_per_gas, max_priority_fee_per_gas + base_fee)`
+///
+/// This ensures that the total fee doesn't exceed the maximum fee per gas, while also
+/// ensuring that the priority fee doesn't exceed the maximum priority fee per gas.
+#[inline]
+pub fn calc_effective_gas_price(
+    max_fee_per_gas: u128,
+    max_priority_fee_per_gas: u128,
+    base_fee: Option<u64>,
+) -> u128 {
+    base_fee.map_or(max_fee_per_gas, |base_fee| {
+        // if the tip is greater than the max priority fee per gas, set it to the max
+        // priority fee per gas + base fee
+        let tip = max_fee_per_gas.saturating_sub(base_fee as u128);
+        if tip > max_priority_fee_per_gas {
+            max_priority_fee_per_gas + base_fee as u128
+        } else {
+            // otherwise return the max fee per gas
+            max_fee_per_gas
+        }
+    })
+}
+
 /// Return type of EIP1155 gas fee estimator.
 ///
 /// Contains EIP-1559 fields
@@ -13,6 +42,28 @@ pub struct Eip1559Estimation {
     /// The max priority fee per gas.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_priority_fee_per_gas: u128,
+}
+
+impl Eip1559Estimation {
+    /// Scales the [`Eip1559Estimation`] by the given percentage value.
+    ///
+    /// ```
+    /// use alloy_eips::eip1559::Eip1559Estimation;
+    /// let est =
+    ///     Eip1559Estimation { max_fee_per_gas: 100, max_priority_fee_per_gas: 100 }.scaled_by_pct(10);
+    /// assert_eq!(est.max_fee_per_gas, 110);
+    /// assert_eq!(est.max_priority_fee_per_gas, 110);
+    /// ```
+    pub const fn scale_by_pct(&mut self, pct: u64) {
+        self.max_fee_per_gas = self.max_fee_per_gas * (100 + pct as u128) / 100;
+        self.max_priority_fee_per_gas = self.max_priority_fee_per_gas * (100 + pct as u128) / 100;
+    }
+
+    /// Consumes the type and returns the scaled estimation.
+    pub const fn scaled_by_pct(mut self, pct: u64) -> Self {
+        self.scale_by_pct(pct);
+        self
+    }
 }
 
 /// Calculate the base fee for the next block based on the EIP-1559 specification.

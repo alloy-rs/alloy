@@ -111,6 +111,17 @@ impl<E> ErrorPayload<E> {
             return true;
         }
 
+        // This is a websocket specific error for too many concurrent requests on the same
+        // connection <https://github.com/ithacaxyz/relay/issues/1352>
+        if self.code == 1008 {
+            return true;
+        }
+
+        // This is retryable cloudflare error <https://github.com/foundry-rs/foundry/issues/11667>
+        if self.code == -32055 {
+            return true;
+        }
+
         match self.message.as_ref() {
             // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
             "header not found" => true,
@@ -122,6 +133,7 @@ impl<E> ErrorPayload<E> {
                     || msg.contains("too many requests")
                     || msg.contains("credits limited")
                     || msg.contains("request limit")
+                    || msg.contains("maximum number of concurrent requests")
             }
         }
     }
@@ -329,14 +341,14 @@ where
         }
     }
 
-    /// Attempt to extract revert data from the JsonRpcError be recursively
+    /// Attempt to extract revert data from the JSON-RPC error by recursively
     /// traversing the error's data field
     ///
-    /// This returns the first hex it finds in the data object, and its
-    /// behavior may change with `serde_json` internal changes.
+    /// Returns the first hex string found in the data object; behavior may change
+    /// with `serde_json` internal changes.
     ///
-    /// If no hex object is found, it will return an empty bytes IFF the error
-    /// is a revert
+    /// If no hex value is found, returns `None` even if the message indicates a
+    /// revert.
     ///
     /// Inspired by ethers-js logic:
     /// <https://github.com/ethers-io/ethers.js/blob/9f990c57f0486728902d4b8e049536f2bb3487ee/packages/providers/src.ts/json-rpc-provider.ts#L25-L53>
@@ -424,5 +436,12 @@ mod test {
         let decoded_err = payload.as_decoded_error::<Errors::SomeCustomError>().unwrap();
 
         assert_eq!(decoded_err, Errors::SomeCustomError { a: U256::from(1) });
+    }
+
+    #[test]
+    fn max_concurrent_requests() {
+        let json = r#"{"code":1008,"message":"You have exceeded the maximum number of concurrent requests on a single WebSocket. At most 200 concurrent requests are allowed per WebSocket."}"#;
+        let payload: ErrorPayload = serde_json::from_str(json).unwrap();
+        assert!(payload.is_retry_err());
     }
 }

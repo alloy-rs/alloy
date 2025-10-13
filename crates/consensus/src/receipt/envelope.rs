@@ -52,6 +52,20 @@ pub enum ReceiptEnvelope<T = Log> {
 }
 
 impl<T> ReceiptEnvelope<T> {
+    /// Creates the envelope for a given type and receipt.
+    pub fn from_typed<R>(tx_type: TxType, receipt: R) -> Self
+    where
+        R: Into<ReceiptWithBloom<Receipt<T>>>,
+    {
+        match tx_type {
+            TxType::Legacy => Self::Legacy(receipt.into()),
+            TxType::Eip2930 => Self::Eip2930(receipt.into()),
+            TxType::Eip1559 => Self::Eip1559(receipt.into()),
+            TxType::Eip4844 => Self::Eip4844(receipt.into()),
+            TxType::Eip7702 => Self::Eip7702(receipt.into()),
+        }
+    }
+
     /// Converts the receipt's log type by applying a function to each log.
     ///
     /// Returns the receipt with the new log type.
@@ -298,7 +312,7 @@ where
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let receipt = ReceiptWithBloom::<Receipt<T>>::arbitrary(u)?;
 
-        match u.int_in_range(0..=3)? {
+        match u.int_in_range(0..=4)? {
             0 => Ok(Self::Legacy(receipt)),
             1 => Ok(Self::Eip2930(receipt)),
             2 => Ok(Self::Eip1559(receipt)),
@@ -447,12 +461,14 @@ pub(crate) mod serde_bincode_compat {
 
 #[cfg(test)]
 mod test {
+    use crate::{Receipt, ReceiptEnvelope, TxType};
+    use alloy_primitives::Log;
+
     #[cfg(feature = "serde")]
     #[test]
     fn deser_pre658_receipt_envelope() {
-        use alloy_primitives::b256;
-
         use crate::Receipt;
+        use alloy_primitives::b256;
 
         let receipt = super::ReceiptWithBloom::<Receipt<()>> {
             receipt: super::Receipt {
@@ -477,5 +493,11 @@ mod test {
                 "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
             ))
         );
+    }
+
+    #[test]
+    fn convert_envelope() {
+        let receipt = Receipt::<Log>::default();
+        let _envelope = ReceiptEnvelope::from_typed(TxType::Eip7702, receipt);
     }
 }

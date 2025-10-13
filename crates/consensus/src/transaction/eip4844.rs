@@ -146,12 +146,28 @@ impl<T> TxEip4844Variant<T> {
         }
     }
 
+    /// Returns the [`TxEip4844WithSidecar`] if it has a sidecar
+    pub const fn as_with_sidecar(&self) -> Option<&TxEip4844WithSidecar<T>> {
+        match self {
+            Self::TxEip4844WithSidecar(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
     /// Tries to unwrap the [`TxEip4844WithSidecar`] returns the transaction as error if it is not a
     /// [`TxEip4844WithSidecar`]
     pub fn try_into_4844_with_sidecar(self) -> Result<TxEip4844WithSidecar<T>, Self> {
         match self {
             Self::TxEip4844WithSidecar(tx) => Ok(tx),
             _ => Err(self),
+        }
+    }
+
+    /// Returns the sidecar if this is [`TxEip4844Variant::TxEip4844WithSidecar`].
+    pub const fn sidecar(&self) -> Option<&T> {
+        match self {
+            Self::TxEip4844WithSidecar(tx) => Some(tx.sidecar()),
+            _ => None,
         }
     }
 }
@@ -694,17 +710,11 @@ impl Transaction for TxEip4844 {
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-            if tip > self.max_priority_fee_per_gas {
-                self.max_priority_fee_per_gas + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                self.max_fee_per_gas
-            }
-        })
+        alloy_eips::eip1559::calc_effective_gas_price(
+            self.max_fee_per_gas,
+            self.max_priority_fee_per_gas,
+            base_fee,
+        )
     }
 
     #[inline]
@@ -827,6 +837,19 @@ impl<T> TxEip4844WithSidecar<T> {
     /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844] and a sidecar.
     pub fn into_parts(self) -> (TxEip4844, T) {
         (self.tx, self.sidecar)
+    }
+
+    /// Maps the sidecar to a new type.
+    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844WithSidecar<U> {
+        TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar) }
+    }
+
+    /// Maps the sidecar to a new type, returning an error if the mapping fails.
+    pub fn try_map_sidecar<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<TxEip4844WithSidecar<U>, E> {
+        Ok(TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar)? })
     }
 }
 

@@ -3,16 +3,11 @@ use crate::{
     error::ValueError,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant},
-        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
+        RlpEcdsaEncodableTx, TxHashRef,
     },
-    EthereumTypedTransaction, Signed, TransactionEnvelope, TxEip1559, TxEip2930,
-    TxEip4844WithSidecar, TxEip7702, TxLegacy,
+    Signed, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
-use alloy_eips::{
-    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
-    eip7594::Encodable7594,
-    Typed2718,
-};
+use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
 use alloy_primitives::{Bytes, Signature, B256};
 use core::fmt::Debug;
 
@@ -164,7 +159,12 @@ impl<T> EthereumTxEnvelope<T> {
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, TransactionEnvelope)]
-#[envelope(alloy_consensus = crate, tx_type_name = TxType, arbitrary_cfg(feature = "arbitrary"))]
+#[envelope(
+    alloy_consensus = crate,
+    tx_type_name = TxType,
+    typed = EthereumTypedTransaction,
+    arbitrary_cfg(feature = "arbitrary")
+)]
 #[doc(alias = "TransactionEnvelope")]
 pub enum EthereumTxEnvelope<Eip4844> {
     /// An untagged [`TxLegacy`].
@@ -272,6 +272,21 @@ impl<Eip4844> EthereumTxEnvelope<Eip4844> {
             Self::Eip1559(tx) => EthereumTxEnvelope::Eip1559(tx),
             Self::Eip4844(tx) => EthereumTxEnvelope::Eip4844(tx.map(f)),
             Self::Eip7702(tx) => EthereumTxEnvelope::Eip7702(tx),
+        }
+    }
+
+    /// Converts the EIP-4844 variant of this transaction with the given closure, returning an error
+    /// if the mapping fails.
+    pub fn try_map_eip4844<U, E>(
+        self,
+        f: impl FnOnce(Eip4844) -> Result<U, E>,
+    ) -> Result<EthereumTxEnvelope<U>, E> {
+        match self {
+            Self::Legacy(tx) => Ok(EthereumTxEnvelope::Legacy(tx)),
+            Self::Eip2930(tx) => Ok(EthereumTxEnvelope::Eip2930(tx)),
+            Self::Eip1559(tx) => Ok(EthereumTxEnvelope::Eip1559(tx)),
+            Self::Eip4844(tx) => tx.try_map(f).map(EthereumTxEnvelope::Eip4844),
+            Self::Eip7702(tx) => Ok(EthereumTxEnvelope::Eip7702(tx)),
         }
     }
 
@@ -449,6 +464,12 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
     }
 }
 
+impl<Eip4844: RlpEcdsaEncodableTx> TxHashRef for EthereumTxEnvelope<Eip4844> {
+    fn tx_hash(&self) -> &B256 {
+        Self::tx_hash(self)
+    }
+}
+
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
 impl<Eip4844> crate::transaction::SignerRecoverable for EthereumTxEnvelope<Eip4844>
 where
@@ -505,42 +526,6 @@ where
                 crate::transaction::SignerRecoverable::recover_unchecked_with_buf(tx, buf)
             }
         }
-    }
-}
-
-impl<T> Encodable2718 for Signed<T>
-where
-    T: RlpEcdsaEncodableTx + Typed2718 + Send + Sync,
-{
-    fn encode_2718_len(&self) -> usize {
-        self.eip2718_encoded_length()
-    }
-
-    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.eip2718_encode(out)
-    }
-
-    fn trie_hash(&self) -> B256 {
-        *self.hash()
-    }
-}
-
-impl<T> Decodable2718 for Signed<T>
-where
-    T: RlpEcdsaDecodableTx + Typed2718 + Send + Sync,
-{
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        let decoded = T::rlp_decode_signed(buf)?;
-
-        if decoded.ty() != ty {
-            return Err(Eip2718Error::UnexpectedType(ty));
-        }
-
-        Ok(decoded)
-    }
-
-    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        T::rlp_decode_signed(buf).map_err(Into::into)
     }
 }
 
@@ -854,7 +839,7 @@ mod tests {
         );
 
         let from = tx.recover_signer().unwrap();
-        assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
+        assert_eq!(from, address!("0xA83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
     fn test_encode_decode_roundtrip<T: SignableTransaction<Signature>>(
@@ -1500,6 +1485,7 @@ mod tests {
 
     // <https://github.com/succinctlabs/kona/issues/31>
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block_tx() {
         let rpc_tx = r#"{
       "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",
@@ -1526,6 +1512,7 @@ mod tests {
 
     // <https://github.com/succinctlabs/kona/issues/31>
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block_tx_legacy_chain_id() {
         let rpc_tx = r#"{
       "blockHash": "0xc0c3190292a82c2ee148774e37e5665f6a205f5ef0cd0885e84701d90ebd442e",

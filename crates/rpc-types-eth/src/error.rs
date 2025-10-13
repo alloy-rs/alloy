@@ -19,6 +19,9 @@ pub enum EthRpcErrorCode {
     /// Thrown when historical data is not available.
     /// <https://eips.ethereum.org/EIPS/eip-4444#json-rpc-changes>
     PrunedHistory,
+    /// Transaction confirmation timed out.
+    /// Specs <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7966.md#method-name>
+    TransactionConfirmationTimeout,
 }
 
 impl EthRpcErrorCode {
@@ -31,6 +34,7 @@ impl EthRpcErrorCode {
             Self::ResourceNotFound => -32001,
             Self::UnknownBlock => -39001,
             Self::PrunedHistory => 4444,
+            Self::TransactionConfirmationTimeout => 4,
         }
     }
 }

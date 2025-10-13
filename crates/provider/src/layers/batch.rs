@@ -1,5 +1,6 @@
 use crate::{
-    bindings::IMulticall3, Caller, Provider, ProviderCall, ProviderLayer, RootProvider,
+    bindings::{ArbSys, IMulticall3},
+    Caller, Provider, ProviderCall, ProviderLayer, RootProvider, ARB_SYS_ADDRESS,
     MULTICALL3_ADDRESS,
 };
 use alloy_eips::BlockId;
@@ -73,6 +74,7 @@ const DEFAULT_WAIT: Duration = Duration::from_millis(1);
 pub struct CallBatchLayer {
     m3a: Address,
     wait: Duration,
+    arbsys: bool,
 }
 
 impl Default for CallBatchLayer {
@@ -84,7 +86,7 @@ impl Default for CallBatchLayer {
 impl CallBatchLayer {
     /// Create a new `CallBatchLayer` with a default wait of 1ms.
     pub const fn new() -> Self {
-        Self { m3a: MULTICALL3_ADDRESS, wait: DEFAULT_WAIT }
+        Self { m3a: MULTICALL3_ADDRESS, wait: DEFAULT_WAIT, arbsys: false }
     }
 
     /// Set the amount of time to wait before sending the batch.
@@ -107,6 +109,20 @@ impl CallBatchLayer {
         self.m3a = m3a;
         self
     }
+
+    /// Use the Arbitrum `ArbSys` precompile for block number queries.
+    ///
+    /// On Arbitrum, `block.number` returns the parent chain’s block number (L1).
+    /// Without this setting, batched `eth_blockNumber` calls through Multicall3
+    /// will therefore return the wrong value. Enabling this queries the L2 block
+    /// number via `ArbSys` instead.
+    ///
+    /// The default is `false`.
+    /// This should only be enabled when interacting with Arbitrum rollups.
+    pub const fn arbitrum_compat(mut self) -> Self {
+        self.arbsys = true;
+        self
+    }
 }
 
 impl<P, N> ProviderLayer<P, N> for CallBatchLayer
@@ -123,15 +139,29 @@ where
 
 type CallBatchMsgTx = TransportResult<IMulticall3::Result>;
 
-struct CallBatchMsg {
-    call: IMulticall3::Call3,
+struct CallBatchMsg<N: Network> {
+    kind: CallBatchMsgKind<N>,
     tx: oneshot::Sender<CallBatchMsgTx>,
 }
 
-impl fmt::Debug for CallBatchMsg {
+impl<N: Network> Clone for CallBatchMsgKind<N>
+where
+    N::TransactionRequest: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Call(tx) => Self::Call(tx.clone()),
+            Self::BlockNumber => Self::BlockNumber,
+            Self::ChainId => Self::ChainId,
+            Self::Balance(addr) => Self::Balance(*addr),
+        }
+    }
+}
+
+impl<N: Network> fmt::Debug for CallBatchMsg<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("BatchProviderMessage(")?;
-        self.call.fmt(f)?;
+        self.kind.fmt(f)?;
         f.write_str(")")
     }
 }
@@ -144,18 +174,15 @@ enum CallBatchMsgKind<N: Network = Ethereum> {
     Balance(Address),
 }
 
-impl CallBatchMsg {
-    fn new<N: Network>(
-        kind: CallBatchMsgKind<N>,
-        m3a: Address,
-    ) -> (Self, oneshot::Receiver<CallBatchMsgTx>) {
+impl<N: Network> CallBatchMsg<N> {
+    fn new(kind: CallBatchMsgKind<N>) -> (Self, oneshot::Receiver<CallBatchMsgTx>) {
         let (tx, rx) = oneshot::channel();
-        (Self { call: kind.into_call3(m3a), tx }, rx)
+        (Self { kind, tx }, rx)
     }
 }
 
 impl<N: Network> CallBatchMsgKind<N> {
-    fn into_call3(self, m3a: Address) -> IMulticall3::Call3 {
+    fn to_call3(&self, m3a: Address, arbsys: bool) -> IMulticall3::Call3 {
         let m3a_call = |data: Vec<u8>| IMulticall3::Call3 {
             target: m3a,
             allowFailure: true,
@@ -167,9 +194,18 @@ impl<N: Network> CallBatchMsgKind<N> {
                 allowFailure: true,
                 callData: tx.input().cloned().unwrap_or_default(),
             },
-            Self::BlockNumber => m3a_call(IMulticall3::getBlockNumberCall {}.abi_encode()),
+            Self::BlockNumber => {
+                if arbsys {
+                    return IMulticall3::Call3 {
+                        target: ARB_SYS_ADDRESS,
+                        allowFailure: false,
+                        callData: ArbSys::arbBlockNumberCall {}.abi_encode().into(),
+                    };
+                }
+                m3a_call(IMulticall3::getBlockNumberCall {}.abi_encode())
+            }
             Self::ChainId => m3a_call(IMulticall3::getChainIdCall {}.abi_encode()),
-            Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr }.abi_encode()),
+            &Self::Balance(addr) => m3a_call(IMulticall3::getEthBalanceCall { addr }.abi_encode()),
         }
     }
 }
@@ -179,7 +215,7 @@ impl<N: Network> CallBatchMsgKind<N> {
 /// See [`CallBatchLayer`] for more information.
 pub struct CallBatchProvider<P, N: Network = Ethereum> {
     provider: Arc<P>,
-    inner: CallBatchProviderInner,
+    inner: CallBatchProviderInner<N>,
     _pd: PhantomData<N>,
 }
 
@@ -201,28 +237,23 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchProvider<P, N> {
     fn new(inner: P, layer: &CallBatchLayer) -> Self {
         let inner = Arc::new(inner);
         let tx = CallBatchBackend::spawn(inner.clone(), layer);
-        Self {
-            provider: inner,
-            inner: CallBatchProviderInner { tx, m3a: layer.m3a },
-            _pd: PhantomData,
-        }
+        Self { provider: inner, inner: CallBatchProviderInner { tx }, _pd: PhantomData }
     }
 }
 
 #[derive(Clone)]
-struct CallBatchProviderInner {
-    tx: mpsc::UnboundedSender<CallBatchMsg>,
-    m3a: Address,
+struct CallBatchProviderInner<N: Network> {
+    tx: mpsc::UnboundedSender<CallBatchMsg<N>>,
 }
 
-impl CallBatchProviderInner {
+impl<N: Network> CallBatchProviderInner<N> {
     /// We only want to perform a scheduled multicall if:
     /// - The request has no block ID or state overrides,
     /// - The request has a target address,
     /// - The request has no other properties (`nonce`, `gas`, etc cannot be sent with a multicall).
     ///
     /// Ref: <https://github.com/wevm/viem/blob/ba8319f71503af8033fd3c77cfb64c7eb235c6a9/src/actions/public/call.ts#L295>
-    fn should_batch_call<N: Network>(&self, params: &crate::EthCallParams<N>) -> bool {
+    fn should_batch_call(&self, params: &crate::EthCallParams<N>) -> bool {
         // TODO: block ID is not yet implemented
         if params.block().is_some_and(|block| block != BlockId::latest()) {
             return false;
@@ -242,25 +273,28 @@ impl CallBatchProviderInner {
         true
     }
 
-    async fn schedule<N: Network>(self, msg: CallBatchMsgKind<N>) -> TransportResult<Bytes> {
-        let (msg, rx) = CallBatchMsg::new(msg, self.m3a);
+    async fn schedule(self, msg: CallBatchMsgKind<N>) -> TransportResult<Bytes> {
+        let (msg, rx) = CallBatchMsg::new(msg);
         self.tx.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
 
-        let IMulticall3::Result { success, returnData: data } =
+        let IMulticall3::Result { success, returnData } =
             rx.await.map_err(|_| TransportErrorKind::backend_gone())??;
+
         if !success {
-            let revert_data = if data.is_empty() { "" } else { &format!(" with data: {data}") };
-            return Err(TransportErrorKind::custom_str(&format!(
+            let revert_data = if returnData.is_empty() {
+                "".to_string()
+            } else {
+                format!(" with data: {returnData}")
+            };
+            Err(TransportErrorKind::custom_str(&format!(
                 "multicall batched call reverted{revert_data}"
-            )));
+            )))
+        } else {
+            Ok(returnData)
         }
-        Ok(data)
     }
 
-    async fn schedule_and_decode<N: Network, T>(
-        self,
-        msg: CallBatchMsgKind<N>,
-    ) -> TransportResult<T>
+    async fn schedule_and_decode<T>(self, msg: CallBatchMsgKind<N>) -> TransportResult<T>
     where
         T: SolValue + From<<T::SolType as SolType>::RustType>,
     {
@@ -273,16 +307,17 @@ struct CallBatchBackend<P, N: Network = Ethereum> {
     inner: Arc<P>,
     m3a: Address,
     wait: Duration,
-    rx: mpsc::UnboundedReceiver<CallBatchMsg>,
-    pending: Vec<CallBatchMsg>,
+    arbsys: bool,
+    rx: mpsc::UnboundedReceiver<CallBatchMsg<N>>,
+    pending: Vec<CallBatchMsg<N>>,
     _pd: PhantomData<N>,
 }
 
 impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
-    fn spawn(inner: Arc<P>, layer: &CallBatchLayer) -> mpsc::UnboundedSender<CallBatchMsg> {
-        let CallBatchLayer { m3a, wait } = *layer;
+    fn spawn(inner: Arc<P>, layer: &CallBatchLayer) -> mpsc::UnboundedSender<CallBatchMsg<N>> {
+        let CallBatchLayer { m3a, wait, arbsys } = *layer;
         let (tx, rx) = mpsc::unbounded_channel();
-        let this = Self { inner, m3a, wait, rx, pending: Vec::new(), _pd: PhantomData };
+        let this = Self { inner, m3a, wait, arbsys, rx, pending: Vec::new(), _pd: PhantomData };
         this.run().spawn_task();
         tx
     }
@@ -311,13 +346,22 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         }
     }
 
-    fn process_msg(&mut self, msg: CallBatchMsg) {
+    fn process_msg(&mut self, msg: CallBatchMsg<N>) {
         self.pending.push(msg);
     }
 
     async fn send_batch(&mut self) {
-        let result = self.send_batch_inner().await;
         let pending = std::mem::take(&mut self.pending);
+
+        // If there's only a single call, avoid batching and perform the request directly.
+        if pending.len() == 1 {
+            let msg = pending.into_iter().next().unwrap();
+            let result = self.call_one(msg.kind).await;
+            let _ = msg.tx.send(result);
+            return;
+        }
+
+        let result = self.send_batch_inner(&pending).await;
         match result {
             Ok(results) => {
                 debug_assert_eq!(results.len(), pending.len());
@@ -333,10 +377,34 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
         }
     }
 
-    async fn send_batch_inner(&mut self) -> TransportResult<Vec<IMulticall3::Result>> {
-        debug_assert!(!self.pending.is_empty());
-        debug!(len = self.pending.len(), "sending multicall");
-        let tx = N::TransactionRequest::default().with_to(self.m3a).with_input(self.make_payload());
+    async fn call_one(&mut self, msg: CallBatchMsgKind<N>) -> TransportResult<IMulticall3::Result> {
+        let m3_res =
+            |success, return_data| IMulticall3::Result { success, returnData: return_data };
+        match msg {
+            CallBatchMsgKind::Call(tx) => self.inner.call(tx).await.map(|res| m3_res(true, res)),
+            CallBatchMsgKind::BlockNumber => {
+                self.inner.get_block_number().await.map(|res| m3_res(true, res.abi_encode().into()))
+            }
+            CallBatchMsgKind::ChainId => {
+                self.inner.get_chain_id().await.map(|res| m3_res(true, res.abi_encode().into()))
+            }
+            CallBatchMsgKind::Balance(addr) => {
+                self.inner.get_balance(addr).await.map(|res| m3_res(true, res.abi_encode().into()))
+            }
+        }
+    }
+
+    async fn send_batch_inner(
+        &self,
+        pending: &[CallBatchMsg<N>],
+    ) -> TransportResult<Vec<IMulticall3::Result>> {
+        let calls: Vec<_> =
+            pending.iter().map(|msg| msg.kind.to_call3(self.m3a, self.arbsys)).collect();
+
+        let tx = N::TransactionRequest::default()
+            .with_to(self.m3a)
+            .with_input(IMulticall3::aggregate3Call { calls }.abi_encode());
+
         let bytes = self.inner.call(tx).await?;
         if bytes.is_empty() {
             return Err(TransportErrorKind::custom_str(&format!(
@@ -344,16 +412,10 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
                 self.m3a
             )));
         }
+
         let ret = IMulticall3::aggregate3Call::abi_decode_returns(&bytes)
             .map_err(TransportErrorKind::custom)?;
         Ok(ret)
-    }
-
-    fn make_payload(&self) -> Vec<u8> {
-        IMulticall3::aggregate3Call {
-            calls: self.pending.iter().map(|msg| msg.call.clone()).collect(),
-        }
-        .abi_encode()
     }
 }
 
@@ -374,7 +436,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::BlockNumber,
     > {
         crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule_and_decode::<N, u64>(CallBatchMsgKind::BlockNumber),
+            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::BlockNumber),
         ))
     }
 
@@ -386,7 +448,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::ChainId,
     > {
         crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule_and_decode::<N, u64>(CallBatchMsgKind::ChainId),
+            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::ChainId),
         ))
     }
 
@@ -399,25 +461,25 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
                 ProviderCall::BoxedFuture(Box::pin(
                     this.inner
                         .clone()
-                        .schedule_and_decode::<N, U256>(CallBatchMsgKind::Balance(address)),
+                        .schedule_and_decode::<U256>(CallBatchMsgKind::Balance(address)),
                 ))
             }
         })
     }
 }
 
-struct CallBatchCaller {
-    inner: CallBatchProviderInner,
+struct CallBatchCaller<N: Network> {
+    inner: CallBatchProviderInner<N>,
     weak: WeakClient,
 }
 
-impl CallBatchCaller {
-    fn new<P: Provider<N>, N: Network>(provider: &CallBatchProvider<P, N>) -> Self {
+impl<N: Network> CallBatchCaller<N> {
+    fn new<P: Provider<N>>(provider: &CallBatchProvider<P, N>) -> Self {
         Self { inner: provider.inner.clone(), weak: provider.provider.weak_client() }
     }
 }
 
-impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
+impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
     fn call(
         &self,
         params: crate::EthCallParams<N>,
@@ -427,7 +489,7 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller {
         }
 
         Ok(crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule::<N>(CallBatchMsgKind::Call(params.into_data())),
+            self.inner.clone().schedule(CallBatchMsgKind::Call(params.into_data())),
         )))
     }
 
@@ -541,5 +603,35 @@ mod tests {
         assert_eq!(block_number.unwrap(), 1);
         assert_eq!(chain_id.unwrap(), alloy_chains::NamedChain::AnvilHardhat as u64);
         assert_eq!(balance.unwrap(), U256::from(123));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn arbitrum() {
+        let url = "https://arbitrum.rpc.subquery.network/public";
+
+        let batched = ProviderBuilder::new().with_call_batching().connect(url).await.unwrap();
+
+        let batch_layer = CallBatchLayer::new().arbitrum_compat();
+        let batched_compat = ProviderBuilder::new().layer(batch_layer).connect(url).await.unwrap();
+
+        // single call so won't go through multicall3
+        let block = batched.get_block_number().await.unwrap();
+
+        // force batching
+        let (b, _) = tokio::join!(batched.get_block_number(), batched.get_chain_id());
+        // we expect this to be the L1 block number
+        let block_wrong = b.unwrap();
+
+        // force batch transaction
+        let (b, _) = tokio::join!(batched_compat.get_block_number(), batched.get_chain_id());
+        // compat mode returns correct block
+        let block_compat = b.unwrap();
+
+        dbg!(block, block_wrong, block_compat);
+
+        // arbitrum blocks move fast so we assert with some error margin
+        assert!(block.abs_diff(block_compat) < 10);
+        assert!(block.abs_diff(block_wrong) > 100_000);
     }
 }

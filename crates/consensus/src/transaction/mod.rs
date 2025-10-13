@@ -3,7 +3,8 @@
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, Selector, TxHash, TxKind, B256, U256};
+use auto_impl::auto_impl;
 use core::{any, fmt};
 
 mod eip1559;
@@ -58,6 +59,9 @@ pub use meta::{TransactionInfo, TransactionMeta};
 
 mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
+
+mod hashable;
+pub use hashable::TxHashable;
 
 #[cfg(feature = "serde")]
 pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
@@ -165,7 +169,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     ///
     /// Returns `None` if this is a `CREATE` transaction.
     fn to(&self) -> Option<Address> {
-        self.kind().to().copied()
+        self.kind().into_to()
     }
 
     /// Get `value`.
@@ -253,7 +257,7 @@ pub trait SignableTransaction<Signature>: Transaction {
                 if tx_chain_id != chain_id {
                     return false;
                 }
-                self.set_chain_id(chain_id);
+                // Chain ID already matches, no need to set it again
             }
             None => {
                 self.set_chain_id(chain_id);
@@ -288,18 +292,6 @@ pub trait SignableTransaction<Signature>: Transaction {
         Self: Sized,
     {
         Signed::new_unhashed(self, signature)
-    }
-}
-
-// TODO(MSRV-1.86): Remove in favor of dyn trait upcasting
-#[doc(hidden)]
-impl<S: 'static> dyn SignableTransaction<S> {
-    pub fn __downcast_ref<T: any::Any>(&self) -> Option<&T> {
-        if any::Any::type_id(self) == any::TypeId::of::<T>() {
-            unsafe { Some(&*(self as *const _ as *const T)) }
-        } else {
-            None
-        }
     }
 }
 
@@ -557,15 +549,42 @@ where
     }
 }
 
+/// Trait for types that provide access to a transaction hash reference.
+///
+/// This trait is implemented by types that contain or can provide a reference to a
+/// transaction hash ([`TxHash`]). It provides a standard interface for accessing
+/// transaction hashes without requiring ownership.
+#[auto_impl(&, &mut, Box)]
+pub trait TxHashRef {
+    /// Returns a reference to the transaction hash.
+    ///
+    /// This assumes the implementing type already owns or has computed the transaction hash.
+    fn tx_hash(&self) -> &TxHash;
+}
+
+impl<T: TxHashRef> TxHashRef for Recovered<T> {
+    fn tx_hash(&self) -> &TxHash {
+        self.inner().tx_hash()
+    }
+}
+
+impl<T: TxHashRef> TxHashRef for alloy_eips::eip2718::WithEncoded<T> {
+    fn tx_hash(&self) -> &TxHash {
+        self.value().tx_hash()
+    }
+}
+
 #[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
     use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
     use alloy_primitives::Signature;
     use rand::Rng;
-    use serde::{Serialize, Serializer};
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_custom_envelope() {
+        use serde::{Serialize, Serializer};
         fn serialize_with<S: Serializer>(
             tx: &Signed<TxEip1559>,
             serializer: S,

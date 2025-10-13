@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
@@ -20,7 +20,7 @@ pub use alloy_trie::TrieAccount;
 pub use alloy_trie::TrieAccount as Account;
 
 mod block;
-pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header};
+pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo};
 
 pub mod constants;
 pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
@@ -88,8 +88,13 @@ pub mod private {
     pub use alloy_eips;
     pub use alloy_primitives;
     pub use alloy_rlp;
+    #[cfg(feature = "serde")]
+    pub use alloy_serde;
+    pub use alloy_trie;
     #[cfg(feature = "arbitrary")]
     pub use arbitrary;
     #[cfg(feature = "serde")]
     pub use serde;
+    #[cfg(feature = "serde")]
+    pub use serde_json;
 }

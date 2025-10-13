@@ -5,6 +5,181 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Documentation
+
+- [rpc-types-eth] Clarify EIP-4844 preferred_type docs to include blob_versioned_hashes ([#2978](https://github.com/alloy-rs/alloy/issues/2978))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+- [rpc-types-eth] Remove useless serde deny_unknown_fields on enums ([#2927](https://github.com/alloy-rs/alloy/issues/2927))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+- Fix unused warning ([#2849](https://github.com/alloy-rs/alloy/issues/2849))
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Bug Fixes
+
+- [rpc] Add missing error code `eth_sendRawTransactionSync` timeout ([#2846](https://github.com/alloy-rs/alloy/issues/2846))
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Features
+
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+- Add helper methods to decode logs in TransactionReceipt ([#2811](https://github.com/alloy-rs/alloy/issues/2811))
+- Add fromstr for TransactionInputKind ([#2805](https://github.com/alloy-rs/alloy/issues/2805))
+- Add convenience fn for setting 7702 delegation designator ([#2802](https://github.com/alloy-rs/alloy/issues/2802))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Features
+
+- Add authorization list to CallBuilder ([#2798](https://github.com/alloy-rs/alloy/issues/2798))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Release 1.0.25
+- Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
+
+## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
+
+### Miscellaneous Tasks
+
+- Release 1.0.24
+
+## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.23
+- Add helper to collect rpc logs ([#2712](https://github.com/alloy-rs/alloy/issues/2712))
+
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Bug Fixes
+
+- No-std for serde-bincode-compat ([#2711](https://github.com/alloy-rs/alloy/issues/2711))
+
+### Features
+
+- Add filter_receipts iterator for filtering logs from receipts ([#2701](https://github.com/alloy-rs/alloy/issues/2701))
+
+### Miscellaneous Tasks
+
+- Release 1.0.22
+
+## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
+
+### Bug Fixes
+
+- Flaky bincode sigs ([#2694](https://github.com/alloy-rs/alloy/issues/2694))
+
+### Features
+
+- Impl AsRef<Self> for TransactionRequest ([#2708](https://github.com/alloy-rs/alloy/issues/2708))
+- Added bincodable version of a TransactionRequest struct ([#2687](https://github.com/alloy-rs/alloy/issues/2687))
+
+### Miscellaneous Tasks
+
+- Release 1.0.21
+
+## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
+
+### Miscellaneous Tasks
+
+- Release 1.0.20
+
+## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.19
+
+### Refactor
+
+- [rpc] Add handwritten bounds on generic `TxReq` using `serde` attributes ([#2674](https://github.com/alloy-rs/alloy/issues/2674))
+
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
+
+### Features
+
+- [rpc] Implement `Default` for types with `TxReq` generic without `Default` bound ([#2662](https://github.com/alloy-rs/alloy/issues/2662))
+- Make build_{eip} functions public ([#2519](https://github.com/alloy-rs/alloy/issues/2519))
+- [rpc] Add generic `TxReq` to `SimulatePayload` ([#2631](https://github.com/alloy-rs/alloy/issues/2631))
+
+### Miscellaneous Tasks
+
+- Release 1.0.18
+- Release 1.0.17
+
+### Other
+
+- Make tx build fns public ([#2635](https://github.com/alloy-rs/alloy/issues/2635))
+
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
+
 ## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
 
 ### Miscellaneous Tasks
@@ -461,6 +636,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.1](https://github.com/alloy-rs/alloy/releases/tag/v0.8.1) - 2024-12-16
 
+### Bug Fixes
+
+- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
+
 ### Documentation
 
 - Add note about deprecated total difficulty ([#1784](https://github.com/alloy-rs/alloy/issues/1784))
@@ -468,33 +647,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Add info tx types ([#1793](https://github.com/alloy-rs/alloy/issues/1793))
-
-### Miscellaneous Tasks
-
-- Release 0.8.1
-
-### Other
-
-- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
-- Use asref impl for receipt ([#1758](https://github.com/alloy-rs/alloy/issues/1758))
-
-### Features
-
 - [consensus] Require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))
 - Relax RPC `Block` bounds ([#1757](https://github.com/alloy-rs/alloy/issues/1757))
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 - Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ### Other
 
+- Improve doc clarity around build functions ([#1782](https://github.com/alloy-rs/alloy/issues/1782))
 - Reapply "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1773](https://github.com/alloy-rs/alloy/issues/1773))
 - Revert "feat(consensus): require typed2718 for transaction ([#1746](https://github.com/alloy-rs/alloy/issues/1746))" ([#1772](https://github.com/alloy-rs/alloy/issues/1772))
 

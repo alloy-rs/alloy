@@ -61,8 +61,7 @@ std = [
 	"alloy-serde?/std",
 	"alloy-primitives/std",
 	"alloy-rlp/std",
-	"serde?/std",
-	"serde_json/std"
+	"serde?/std"
 ]
 serde = [
 	"dep:serde",

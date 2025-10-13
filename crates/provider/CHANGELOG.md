@@ -5,6 +5,236 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Bug Fixes
+
+- [cache] Prevent caching for tag-based BlockId in get_block_receipts ([#2969](https://github.com/alloy-rs/alloy/issues/2969))
+- [provider] Correct TxFiller rustdoc link ([#2973](https://github.com/alloy-rs/alloy/issues/2973))
+- [provider] Use StateContext::default() placeholder in eth_callMany serialization ([#2968](https://github.com/alloy-rs/alloy/issues/2968))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.36.3 to 1.37.2 ([#2990](https://github.com/alloy-rs/alloy/issues/2990))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- Convert static vectors to arrays ([#2926](https://github.com/alloy-rs/alloy/issues/2926))
+
+### Features
+
+- [provider] Include inner cause in DecodeError message ([#2945](https://github.com/alloy-rs/alloy/issues/2945))
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+### Other
+
+- Do not cache tag-based BlockId requests in provider cache ([#2942](https://github.com/alloy-rs/alloy/issues/2942))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Bug Fixes
+
+- [provider] Require context in eth_callMany params ([#2910](https://github.com/alloy-rs/alloy/issues/2910))
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+- Re-export transport ([#2895](https://github.com/alloy-rs/alloy/issues/2895))
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Bug Fixes
+
+- [provider] Use correct admin_peerEvents subscription method ([#2877](https://github.com/alloy-rs/alloy/issues/2877))
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Bug Fixes
+
+- Skip receipt fetch if more confirmations are requested ([#2851](https://github.com/alloy-rs/alloy/issues/2851))
+
+### Documentation
+
+- Move EIP-4844 blob fee to BlobGasFiller ([#2857](https://github.com/alloy-rs/alloy/issues/2857))
+
+### Features
+
+- [providers] Pause heartbeat when no transactions are pending ([#2800](https://github.com/alloy-rs/alloy/issues/2800))
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+
+### Other
+
+- Return correct arbitrum block numbers w/ BatchLayer ([#2835](https://github.com/alloy-rs/alloy/issues/2835))
+
+## [1.0.26](https://github.com/alloy-rs/alloy/releases/tag/v1.0.26) - 2025-08-26
+
+### Features
+
+- Tenderly provider ext ([#2699](https://github.com/alloy-rs/alloy/issues/2699))
+- Add specialized debug trace methods ([#2815](https://github.com/alloy-rs/alloy/issues/2815))
+
+### Miscellaneous Tasks
+
+- Release 1.0.26
+- Release 1.0.26
+
+## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+
+### Bug Fixes
+
+- [`CallBatchLayer`] Don't batch if single request ([#2397](https://github.com/alloy-rs/alloy/issues/2397))
+- Typo in code comment ([#2767](https://github.com/alloy-rs/alloy/issues/2767))
+
+### Miscellaneous Tasks
+
+- Release 1.0.25
+- Release 1.0.25
+- Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
+
+### Styling
+
+- Multicall send support ([#2736](https://github.com/alloy-rs/alloy/issues/2736))
+
+## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
+
+### Bug Fixes
+
+- Poller breaks if server drops the filter ([#2755](https://github.com/alloy-rs/alloy/issues/2755))
+
+### Features
+
+- Allow ProviderBuilder to use TransportConnect and PubSubConnect ([#2764](https://github.com/alloy-rs/alloy/issues/2764))
+- Add value to Multicallitem trait ([#2746](https://github.com/alloy-rs/alloy/issues/2746))
+- Add with_failure_allowed ([#2749](https://github.com/alloy-rs/alloy/issues/2749))
+
+### Miscellaneous Tasks
+
+- Release 1.0.24
+
+## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
+
+### Bug Fixes
+
+- Return abi decoding errors as multicall failures ([#2724](https://github.com/alloy-rs/alloy/issues/2724))
+- Start head - 1 for heartbeat block stream ([#2715](https://github.com/alloy-rs/alloy/issues/2715))
+
+### Features
+
+- [mev] Implement `send_mev_bundle` method ([#2728](https://github.com/alloy-rs/alloy/issues/2728))
+- [mev] Implement `send_end_of_block_bundle` method ([#2727](https://github.com/alloy-rs/alloy/issues/2727))
+- [mev] Implement `send_private_raw_transaction` method ([#2726](https://github.com/alloy-rs/alloy/issues/2726))
+- [mev] Implement call_bundle and send/cancel_private_transaction ([#2725](https://github.com/alloy-rs/alloy/issues/2725))
+- [mev] Add support for `eth_sendBlobs` method to mev api ([#2723](https://github.com/alloy-rs/alloy/issues/2723))
+- Add helpers for obtaining the tx requests ([#2716](https://github.com/alloy-rs/alloy/issues/2716))
+
+### Miscellaneous Tasks
+
+- Release 1.0.23
+- Added blob endpoints for anvil ([#2731](https://github.com/alloy-rs/alloy/issues/2731))
+
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Miscellaneous Tasks
+
+- Release 1.0.22
+
+## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
+
+### Bug Fixes
+
+- Correct broken doc links ([#2703](https://github.com/alloy-rs/alloy/issues/2703))
+
+### Miscellaneous Tasks
+
+- Release 1.0.21
+
+## [1.0.20](https://github.com/alloy-rs/alloy/releases/tag/v1.0.20) - 2025-07-09
+
+### Miscellaneous Tasks
+
+- Release 1.0.20
+
+## [1.0.19](https://github.com/alloy-rs/alloy/releases/tag/v1.0.19) - 2025-07-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.19
+
+## [1.0.18](https://github.com/alloy-rs/alloy/releases/tag/v1.0.18) - 2025-07-08
+
+### Features
+
+- Added helper AnvilApi future type for oneshot impersonations ([#2645](https://github.com/alloy-rs/alloy/issues/2645))
+- [mev-api] Add support for eth_cancelBundle ([#2654](https://github.com/alloy-rs/alloy/issues/2654))
+- Added new eth_sendSync functions to AnvilApi ([#2650](https://github.com/alloy-rs/alloy/issues/2650))
+- [`network`] Use `FullSigner` in `EthereumWallet` to sign data ([#2523](https://github.com/alloy-rs/alloy/issues/2523))
+- [provider,rpc-client] Add connect_reqwest to ProviderBuilder ([#2615](https://github.com/alloy-rs/alloy/issues/2615))
+
+### Miscellaneous Tasks
+
+- Release 1.0.18
+- Release 1.0.17
+
+### Other
+
+- Revert "feat(`network`): use `FullSigner` in `EthereumWallet` to sign data" ([#2647](https://github.com/alloy-rs/alloy/issues/2647))
+
+## [1.0.16](https://github.com/alloy-rs/alloy/releases/tag/v1.0.16) - 2025-06-27
+
+### Miscellaneous Tasks
+
+- Release 1.0.16
+
 ## [1.0.15](https://github.com/alloy-rs/alloy/releases/tag/v1.0.15) - 2025-06-27
 
 ### Miscellaneous Tasks
@@ -534,19 +764,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 - [`transport`] Allow `RetryPolicy` to be set via layer ([#1790](https://github.com/alloy-rs/alloy/issues/1790))
-
-### Miscellaneous Tasks
-
-- Release 0.8.1
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Bug Fixes
-
 - Use `feeHistory` when estimating blob fee ([#1764](https://github.com/alloy-rs/alloy/issues/1764))
 
 ### Miscellaneous Tasks
 
+- Release 0.8.1
 - Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
