@@ -68,6 +68,9 @@ pub struct Genesis {
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
+    /// The parent hash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_hash: Option<B256>,
 }
 
 impl Genesis {
@@ -1580,6 +1583,7 @@ mod tests {
             extra_data: Bytes::new(),
             gas_limit: 0x4c4b40,
             difficulty: U256::from(1),
+            parent_hash: None,
             ..Default::default()
         };
 
@@ -1652,6 +1656,7 @@ mod tests {
             extra_data: Bytes::new(),
             gas_limit: 0x4c4b40,
             difficulty: U256::from(1),
+            parent_hash: None,
             ..Default::default()
         };
 
@@ -2004,6 +2009,7 @@ mod tests {
                     deposit_contract_address: None,
                     ..Default::default()
                 },
+                parent_hash: None,
             };
 
         let deserialized_genesis: Genesis = serde_json::from_str(hive_genesis).unwrap();
