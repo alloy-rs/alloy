@@ -586,8 +586,10 @@ pub mod serde_bincode_compat {
         }
     }
 
-    impl From<ChainConfig<'_>> for super::ChainConfig {
-        fn from(value: ChainConfig<'_>) -> Self {
+    impl TryFrom<ChainConfig<'_>> for super::ChainConfig {
+        type Error = serde::de::Error;
+
+        fn try_from(value: ChainConfig<'_>) -> Result<Self, Self::Error> {
             Self {
                 chain_id: value.chain_id,
                 homestead_block: value.homestead_block,
@@ -624,10 +626,17 @@ pub mod serde_bincode_compat {
                     let mut extra_fields = OtherFields::default();
                     for (k, v) in value.extra_fields {
                         // Parse strings back to serde_json::Value
-                        extra_fields.insert(
-                            k,
-                            v.parse().expect("Failed to parse extra field value back to JSON"),
-                        );
+                        match v.parse() {
+                            Ok(json_value) => {
+                                extra_fields.insert(k, json_value);
+                            }
+                            Err(e) => {
+                                return Err(serde::de::Error::custom(format!(
+                                    "Failed to parse extra field '{}' back to JSON: {}",
+                                    k, e
+                                )));
+                            }
+                        }
                     }
                     extra_fields
                 },
@@ -651,7 +660,8 @@ pub mod serde_bincode_compat {
         where
             D: Deserializer<'de>,
         {
-            ChainConfig::deserialize(deserializer).map(Into::into)
+            ChainConfig::deserialize(deserializer)
+                .and_then(|config| config.try_into().map_err(|e| D::Error::custom(e)))
         }
     }
 
