@@ -1148,6 +1148,38 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 
+    /// Subscribe to a non-standard subscription method without parameters.
+    ///
+    /// This is a helper method for creating subscriptions to methods that are not
+    /// "eth_subscribe" and don't require parameters. It automatically marks the
+    /// request as a subscription.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_to::<alloy_rpc_types_admin::PeerEvent>("admin_peerEvents").await?;
+    /// let mut stream = sub.into_stream().take(5);
+    /// while let Some(event) = stream.next().await {
+    ///    println!("peer event: {event:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    fn subscribe_to<R>(&self, method: &'static str) -> GetSubscription<NoParams, R>
+    where
+        R: RpcRecv,
+        Self: Sized,
+    {
+        let mut rpc_call = self.client().request_noparams(method);
+        rpc_call.set_is_subscription();
+        GetSubscription::new(self.weak_client(), rpc_call)
+    }
+
     /// Cancels a subscription given the subscription ID.
     #[cfg(feature = "pubsub")]
     async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
