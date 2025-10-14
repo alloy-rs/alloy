@@ -838,6 +838,19 @@ impl<T> TxEip4844WithSidecar<T> {
     pub fn into_parts(self) -> (TxEip4844, T) {
         (self.tx, self.sidecar)
     }
+
+    /// Maps the sidecar to a new type.
+    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844WithSidecar<U> {
+        TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar) }
+    }
+
+    /// Maps the sidecar to a new type, returning an error if the mapping fails.
+    pub fn try_map_sidecar<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<TxEip4844WithSidecar<U>, E> {
+        Ok(TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar)? })
+    }
 }
 
 impl<T: TxEip4844Sidecar> TxEip4844WithSidecar<T> {

@@ -997,4 +997,26 @@ mod tests {
         let traces = serde_json::from_str::<Vec<Vec<GethTrace>>>(s).unwrap();
         assert!(traces[0][0].is_pre_state());
     }
+
+    #[test]
+    fn serde_geth_debug_tracing_options_prestate_tracer() {
+        let s = r#"{
+      "tracer": "prestateTracer",
+      "tracerConfig": {
+        "diffMode": true,
+        "disableCode": true,
+        "disableStorage": true
+      }
+    }"#;
+        let opts: GethDebugTracingOptions = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            opts.tracer,
+            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer))
+        );
+        let config = opts.tracer_config.into_pre_state_config().unwrap();
+        assert_eq!(config.diff_mode, Some(true));
+        assert_eq!(config.disable_code, Some(true));
+        assert_eq!(config.disable_storage, Some(true));
+        assert!(!config.code_enabled());
+    }
 }
