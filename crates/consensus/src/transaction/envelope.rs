@@ -275,6 +275,21 @@ impl<Eip4844> EthereumTxEnvelope<Eip4844> {
         }
     }
 
+    /// Converts the EIP-4844 variant of this transaction with the given closure, returning an error
+    /// if the mapping fails.
+    pub fn try_map_eip4844<U, E>(
+        self,
+        f: impl FnOnce(Eip4844) -> Result<U, E>,
+    ) -> Result<EthereumTxEnvelope<U>, E> {
+        match self {
+            Self::Legacy(tx) => Ok(EthereumTxEnvelope::Legacy(tx)),
+            Self::Eip2930(tx) => Ok(EthereumTxEnvelope::Eip2930(tx)),
+            Self::Eip1559(tx) => Ok(EthereumTxEnvelope::Eip1559(tx)),
+            Self::Eip4844(tx) => tx.try_map(f).map(EthereumTxEnvelope::Eip4844),
+            Self::Eip7702(tx) => Ok(EthereumTxEnvelope::Eip7702(tx)),
+        }
+    }
+
     /// Return the [`TxType`] of the inner txn.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
