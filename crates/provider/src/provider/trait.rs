@@ -1170,7 +1170,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    fn subscribe_noparams<R>(&self, method: &str) -> GetSubscription<NoParams, R>
+    fn subscribe_noparams<R>(&self, method: &'static str) -> GetSubscription<NoParams, R>
     where
         R: RpcRecv,
         Self: Sized,
