@@ -54,7 +54,7 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 ///
 /// ## Special treatment of EIP-1559
 ///
-/// While many RPC features are encapsulated by traits like [`DebugApi`],
+/// While many RPC features are encapsulated by extension traits,
 /// EIP-1559 fee estimation is generally assumed to be on by default. We
 /// generally assume that EIP-1559 is supported by the client and will
 /// proactively use it by default.
@@ -66,7 +66,6 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 /// [`TransactionBuilder`] and Fillers to change this behavior.
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
-/// [`DebugApi`]: crate::ext::DebugApi
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
