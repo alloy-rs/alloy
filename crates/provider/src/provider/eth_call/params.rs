@@ -86,8 +86,10 @@ impl<N: Network> serde::Serialize for EthCallParams<N> {
             4
         } else if self.overrides().is_some() {
             3
-        } else {
+        } else if self.block().is_some() {
             2
+        } else {
+            1
         };
 
         let mut seq = serializer.serialize_seq(Some(len))?;
