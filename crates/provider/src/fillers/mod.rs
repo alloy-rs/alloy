@@ -34,8 +34,8 @@ use tracing::error;
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
-    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    provider::SendableTx, EthCall, EthCallMany, EthGetBlock, EthLogs, FilterPollerBuilder,
+    Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
     SendableTxErr,
 };
@@ -510,6 +510,10 @@ where
 
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.inner.get_logs(filter).await
+    }
+
+    fn logs(&self, filter: Filter) -> EthLogs<N, Vec<Log>> {
+        self.inner.logs(filter)
     }
 
     fn get_proof(
