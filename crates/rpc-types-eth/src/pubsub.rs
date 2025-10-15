@@ -241,8 +241,11 @@ impl<'de> serde::Deserialize<'de> for TransactionReceiptsParams {
 
                             transaction_hashes = Some(hashes);
                         }
-                        _ => {
-                            map.next_value::<serde_json::Value>()?;
+                        key => {
+                            return Err(serde::de::Error::unknown_field(
+                                key,
+                                &["transactionHashes"],
+                            ))
                         }
                     }
                 }
