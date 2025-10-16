@@ -76,10 +76,9 @@ impl<T: Encodable7594> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>
 
 #[cfg(test)]
 mod tests {
-    use crate::Transaction;
-
     use super::*;
-    use alloy_eips::{eip4844::env_settings::EnvKzgSettings, Decodable2718, Encodable2718};
+    use crate::Transaction;
+    use alloy_eips::{Decodable2718, Encodable2718};
     use alloy_primitives::{address, hex, Bytes};
     use alloy_rlp::Decodable;
     use std::path::PathBuf;
@@ -181,7 +180,7 @@ mod tests {
     #[test]
     #[cfg(feature = "kzg")]
     fn convert_to_eip7594() {
-        let kzg_settings = EnvKzgSettings::default();
+        let kzg_settings = alloy_eips::eip4844::env_settings::EnvKzgSettings::default();
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
         let dir = std::fs::read_dir(path).expect("Unable to read folder");
         for entry in dir {
