@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- Use correct base update fraction ([#2958](https://github.com/alloy-rs/alloy/issues/2958))
+- [consensus] Correct deprecated method references in Recovered<T> ([#2950](https://github.com/alloy-rs/alloy/issues/2950))
+- [consensus] Replace redundant set_chain_id call with comment in set_chain_id_checked ([#2948](https://github.com/alloy-rs/alloy/issues/2948))
+- JWT Token Validation Logic in AuthService ([#2935](https://github.com/alloy-rs/alloy/issues/2935))
+- Convert static vectors to arrays ([#2926](https://github.com/alloy-rs/alloy/issues/2926))
+- [pubsub] Remove redundant shutdown try_recv check in recv_from_frontend ([#2922](https://github.com/alloy-rs/alloy/issues/2922))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.36.2 to 1.36.3 ([#2953](https://github.com/alloy-rs/alloy/issues/2953))
+- [deps] Bump taiki-e/install-action from 2.62.1 to 2.62.13 ([#2952](https://github.com/alloy-rs/alloy/issues/2952))
+
+### Features
+
+- [provider] Include inner cause in DecodeError message ([#2945](https://github.com/alloy-rs/alloy/issues/2945))
+- [network] Add tx type helper methods to AnyTxEnvelope and AnyRpcTransaction ([#2936](https://github.com/alloy-rs/alloy/issues/2936))
+- Add `UnsupportedTransactionType` error ([#2928](https://github.com/alloy-rs/alloy/issues/2928))
+
+### Miscellaneous Tasks
+
+- Use fqs for tx_hash_with_type forwarding ([#2944](https://github.com/alloy-rs/alloy/issues/2944))
+- [beacon] Remove redundant DisplayFromStr on header.block_number ([#2943](https://github.com/alloy-rs/alloy/issues/2943))
+- Align tracing targets ([#2932](https://github.com/alloy-rs/alloy/issues/2932))
+- Remove unused core::panic import ([#2939](https://github.com/alloy-rs/alloy/issues/2939))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+- Fix a couple of grammatical errors ([#2931](https://github.com/alloy-rs/alloy/issues/2931))
+- [eip-7702] Remove the leading whitespace of predeployed contract ([#2937](https://github.com/alloy-rs/alloy/issues/2937))
+- [rpc-types-eth] Remove useless serde deny_unknown_fields on enums ([#2927](https://github.com/alloy-rs/alloy/issues/2927))
+
+### Other
+
+- Recognize IPv6 loopback in guess_local_url (treat `::1` as local) ([#2954](https://github.com/alloy-rs/alloy/issues/2954))
+- Use is_subscription() in RequestPacket::subscription_request_ids ([#2947](https://github.com/alloy-rs/alloy/issues/2947))
+- Do not cache tag-based BlockId requests in provider cache ([#2942](https://github.com/alloy-rs/alloy/issues/2942))
+- Avoid unnecessary String allocation in serde display serialization ([#2930](https://github.com/alloy-rs/alloy/issues/2930))
+
+### Refactor
+
+- [rpc-client] Remove dead SerError state from BatchFuture  ([#2934](https://github.com/alloy-rs/alloy/issues/2934))
+- [beacon-events] Use BeaconBlockHeader in light client finality ([#2933](https://github.com/alloy-rs/alloy/issues/2933))
+
+### Styling
+
+- [signer-gcp] Remove unused fmt::Debug import ([#2951](https://github.com/alloy-rs/alloy/issues/2951))
+
+### Testing
+
+- Test display of `UnsupportedTransactionType` error and its conversion into `TransactionBuilderError` ([#2929](https://github.com/alloy-rs/alloy/issues/2929))
+
 ## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
 
 ### Bug Fixes
@@ -21,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.36
 - Forward std optional ([#2917](https://github.com/alloy-rs/alloy/issues/2917))
 - Remove redundant copy ([#2916](https://github.com/alloy-rs/alloy/issues/2916))
 

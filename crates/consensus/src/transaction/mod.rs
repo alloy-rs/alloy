@@ -257,7 +257,7 @@ pub trait SignableTransaction<Signature>: Transaction {
                 if tx_chain_id != chain_id {
                     return false;
                 }
-                self.set_chain_id(chain_id);
+                // Chain ID already matches, no need to set it again
             }
             None => {
                 self.set_chain_id(chain_id);
