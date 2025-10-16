@@ -287,6 +287,48 @@ where
         self.params.block = Some(block);
         self
     }
+
+    /// Set the block id to "pending".
+    pub const fn pending(self) -> Self {
+        self.block(BlockId::pending())
+    }
+
+    /// Set the block id to "latest".
+    pub const fn latest(self) -> Self {
+        self.block(BlockId::latest())
+    }
+
+    /// Set the block id to "earliest".
+    pub const fn earliest(self) -> Self {
+        self.block(BlockId::earliest())
+    }
+
+    /// Set the block id to "finalized".
+    pub const fn finalized(self) -> Self {
+        self.block(BlockId::finalized())
+    }
+
+    /// Set the block id to "safe".
+    pub const fn safe(self) -> Self {
+        self.block(BlockId::safe())
+    }
+
+    /// Set the block id to a specific height.
+    pub const fn number(self, number: u64) -> Self {
+        self.block(BlockId::number(number))
+    }
+
+    /// Set the block id to a specific hash, without requiring the hash be part
+    /// of the canonical chain.
+    pub const fn hash(self, hash: alloy_primitives::B256) -> Self {
+        self.block(BlockId::hash(hash))
+    }
+
+    /// Set the block id to a specific hash and require the hash be part of the
+    /// canonical chain.
+    pub const fn hash_canonical(self, hash: alloy_primitives::B256) -> Self {
+        self.block(BlockId::hash_canonical(hash))
+    }
 }
 
 impl<N> EthCall<N, Bytes>
