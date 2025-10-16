@@ -406,8 +406,45 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         self.inner.blobs
     }
 
+    /// Build the sidecar for eip-7594 from the data, with default (Ethereum Mainnet)
+    /// settings.
+    #[cfg(feature = "kzg")]
+    pub fn build_7594(self) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        self.build_7594_with_settings(EnvKzgSettings::Default.get())
+    }
+
     /// Build the sidecar for eip-7594 from the data with the provided settings.
     #[cfg(feature = "kzg")]
+    pub fn build_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(self.inner.blobs.len());
+        let mut proofs = Vec::with_capacity(self.inner.blobs.len());
+        for blob in &self.inner.blobs {
+            // SAFETY: same size
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
+
+            // SAFETY: same size
+            unsafe {
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                for kzg_proof in kzg_proofs.iter() {
+                    proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(BlobTransactionSidecarEip7594::new(self.inner.blobs, commitments, proofs))
+    }
+
+    /// Build the sidecar for eip-7594 from the data with the provided settings.
+    #[cfg(feature = "kzg")]
+    #[deprecated = "Use `build_7594_with_settings` instead"]
     pub fn builder_7594_sidecar(
         self,
         settings: &c_kzg::KzgSettings,
