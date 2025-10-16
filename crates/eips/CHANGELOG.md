@@ -5,6 +5,142 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Features
+
+- [beacon-types] `GetBlobsResponse` ([#2994](https://github.com/alloy-rs/alloy/issues/2994))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- Use correct base update fraction ([#2958](https://github.com/alloy-rs/alloy/issues/2958))
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+- [eip-7702] Remove the leading whitespace of predeployed contract ([#2937](https://github.com/alloy-rs/alloy/issues/2937))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Features
+
+- Add bpo initalizers ([#2914](https://github.com/alloy-rs/alloy/issues/2914))
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+- Add helper for init blobparams ([#2913](https://github.com/alloy-rs/alloy/issues/2913))
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Features
+
+- [eips] Add `MAX_TX_GAS_LIMIT_OSAKA` for EIP-7825 ([#2906](https://github.com/alloy-rs/alloy/issues/2906))
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Bug Fixes
+
+- [eip4844] Clippy no warning ([#2898](https://github.com/alloy-rs/alloy/issues/2898))
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+- Mark legacy blob gas fn deprecated ([#2863](https://github.com/alloy-rs/alloy/issues/2863))
+
+### Refactor
+
+- Consolidate effective gas price calculation into eip1559 module ([#2872](https://github.com/alloy-rs/alloy/issues/2872))
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Bug Fixes
+
+- [eip4844] Prevent overflow panic in fake_exponential with large excess blob gas ([#2806](https://github.com/alloy-rs/alloy/issues/2806))
+- [docs] Correct typos in EIP reference ([#2759](https://github.com/alloy-rs/alloy/issues/2759))
+
+### Features
+
+- Add Asref for recovered withencoded ([#2828](https://github.com/alloy-rs/alloy/issues/2828))
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+- Add scale helper ([#2797](https://github.com/alloy-rs/alloy/issues/2797))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+- Release 1.0.25
+- Add encode helper ([#2789](https://github.com/alloy-rs/alloy/issues/2789))
+
+## [1.0.24](https://github.com/alloy-rs/alloy/releases/tag/v1.0.24) - 2025-08-06
+
+### Bug Fixes
+
+- Fix simple error `therefor` - `therefore` in eip1898.rs ([#2739](https://github.com/alloy-rs/alloy/issues/2739))
+
+### Miscellaneous Tasks
+
+- Release 1.0.24
+- Feature gate serde test ([#2765](https://github.com/alloy-rs/alloy/issues/2765))
+
+## [1.0.23](https://github.com/alloy-rs/alloy/releases/tag/v1.0.23) - 2025-07-22
+
+### Bug Fixes
+
+- Don't stack overflow when deserring new sidecars ([#2713](https://github.com/alloy-rs/alloy/issues/2713))
+
+### Dependencies
+
+- Bump precompute default to 8 ([#2732](https://github.com/alloy-rs/alloy/issues/2732))
+
+### Miscellaneous Tasks
+
+- Release 1.0.23
+
+## [1.0.22](https://github.com/alloy-rs/alloy/releases/tag/v1.0.22) - 2025-07-14
+
+### Miscellaneous Tasks
+
+- Release 1.0.22
+
 ## [1.0.21](https://github.com/alloy-rs/alloy/releases/tag/v1.0.21) - 2025-07-14
 
 ### Features
@@ -485,29 +621,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [relay] ExecutionRequestsV4 with eip7685::Requests conversion ([#1787](https://github.com/alloy-rs/alloy/issues/1787))
 - Add requests with capacity ([#1794](https://github.com/alloy-rs/alloy/issues/1794))
+- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
+- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
 
 ### Miscellaneous Tasks
 
 - Release 0.8.1
 - Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
 - Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
+- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
+- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
+- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ### Other
 
 - Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
-
-## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
-
-### Features
-
-- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
-- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
-
-### Miscellaneous Tasks
-
-- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
-- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
-- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 

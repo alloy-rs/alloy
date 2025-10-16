@@ -86,8 +86,10 @@ impl<N: Network> serde::Serialize for EthCallParams<N> {
             4
         } else if self.overrides().is_some() {
             3
-        } else {
+        } else if self.block().is_some() {
             2
+        } else {
+            1
         };
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -182,13 +184,21 @@ impl<'req> EthCallManyParams<'req> {
 
 impl serde::Serialize for EthCallManyParams<'_> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if self.overrides().is_some() { 3 } else { 2 };
+        let len = if self.overrides().is_some() {
+            3
+        } else if self.context().is_some() {
+            2
+        } else {
+            1
+        };
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&self.bundles())?;
 
         if let Some(context) = self.context() {
             seq.serialize_element(context)?;
+        } else if self.overrides().is_some() {
+            seq.serialize_element(&StateContext::default())?;
         }
 
         if let Some(overrides) = self.overrides() {

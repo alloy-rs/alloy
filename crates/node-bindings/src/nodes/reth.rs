@@ -269,7 +269,8 @@ impl Reth {
         self
     }
 
-    /// Sets the chain id for the Reth instance.
+    /// Sets the chain name or path to a chain spec for the Reth instance.
+    /// Passed through to `reth --chain <name-or-path>`.
     pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
         self.chain_or_path = Some(chain_or_path.to_string());
         self

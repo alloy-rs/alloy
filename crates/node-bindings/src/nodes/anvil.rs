@@ -133,7 +133,9 @@ impl Drop for AnvilInstance {
                 }
             }
         }
-        self.child.kill().expect("could not kill anvil");
+        if let Err(err) = self.child.kill() {
+            eprintln!("alloy-node-bindings: failed to kill anvil process: {}", err);
+        }
     }
 }
 
@@ -234,7 +236,7 @@ impl Anvil {
 
     /// Sets the chain_id the `anvil` instance will use.
     ///
-    /// By default [`DEFAULT_IPC_ENDPOINT`] will be used.
+    /// If not set, the instance defaults to chain id `31337`.
     pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
@@ -309,6 +311,12 @@ impl Anvil {
     /// Instantiate `anvil` with the `--odyssey` flag.
     pub fn odyssey(mut self) -> Self {
         self = self.arg("--odyssey");
+        self
+    }
+
+    /// Instantiate `anvil` with the `--auto-impersonate` flag.
+    pub fn auto_impersonate(mut self) -> Self {
+        self = self.arg("--auto-impersonate");
         self
     }
 
@@ -456,7 +464,7 @@ impl Anvil {
 
             let mut line = String::new();
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
-            trace!(target: "anvil", line);
+            trace!(target: "alloy::node::anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
                 // parse the actual port

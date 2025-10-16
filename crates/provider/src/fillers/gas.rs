@@ -25,7 +25,8 @@ pub enum GasFillable {
 /// unset.
 ///
 /// Gas related fields are gas_price, gas_limit, max_fee_per_gas
-/// max_priority_fee_per_gas and max_fee_per_blob_gas.
+/// and max_priority_fee_per_gas. For EIP-4844 `max_fee_per_blob_gas`,
+/// see [`BlobGasFiller`].
 ///
 /// The layer fetches the estimations for these via the
 /// [`Provider::get_gas_price`], [`Provider::estimate_gas`] and
@@ -38,8 +39,9 @@ pub enum GasFillable {
 ///   unset.
 /// - if `access_list` is set, it will process as a 2930 tx and populate the `gas_limit` and
 ///   `gas_price` field if unset.
-/// - if `blob_sidecar` is set, it will process as a 4844 tx and populate the `gas_limit`,
-///   `max_fee_per_gas`, `max_priority_fee_per_gas` and `max_fee_per_blob_gas` fields if unset.
+/// - if `blob_sidecar` is set, it will process as an EIP-4844 tx and populate the `gas_limit`,
+///   `max_fee_per_gas`, and `max_priority_fee_per_gas` fields if unset. The `max_fee_per_blob_gas`
+///   is populated by [`BlobGasFiller`].
 /// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`, `max_fee_per_gas`
 ///   and `max_priority_fee_per_gas` fields if unset.
 /// - If the network does not support EIP-1559, it will fallback to the legacy tx and populate the

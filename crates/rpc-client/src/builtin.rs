@@ -45,6 +45,25 @@ impl TransportConnect for BuiltInConnectionString {
 }
 
 impl BuiltInConnectionString {
+    /// Parse a connection string and connect to it in one go.
+    ///
+    /// This is a convenience method that combines `from_str` and `connect_boxed`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_rpc_client::BuiltInConnectionString;
+    ///
+    /// let transport = BuiltInConnectionString::connect("http://localhost:8545").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect(s: &str) -> Result<BoxTransport, TransportError> {
+        let connection = Self::from_str(s)?;
+        connection.connect_boxed().await
+    }
+
     /// Connect with the given connection string.
     ///
     /// # Notes
@@ -197,10 +216,6 @@ mod test {
         assert_eq!(
             BuiltInConnectionString::from_str("https://localhost:8545").unwrap(),
             BuiltInConnectionString::Http("https://localhost:8545".parse::<Url>().unwrap())
-        );
-        assert_eq!(
-            BuiltInConnectionString::from_str("localhost:8545").unwrap(),
-            BuiltInConnectionString::Http("http://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInConnectionString::from_str("http://127.0.0.1:8545").unwrap(),

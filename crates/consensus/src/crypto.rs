@@ -183,14 +183,7 @@ pub mod backend {
 
     /// Try to get the currently installed default provider, returning None if none is installed.
     pub(super) fn try_get_provider() -> Option<&'static dyn CryptoProvider> {
-        #[cfg(feature = "std")]
-        {
-            DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
-        }
-        #[cfg(not(feature = "std"))]
-        {
-            DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
-        }
+        DEFAULT_PROVIDER.get().map(|arc| arc.as_ref())
     }
 }
 
@@ -248,7 +241,7 @@ pub mod secp256k1 {
     }
 }
 
-#[cfg(any(test, feature = "secp256k1"))]
+#[cfg(feature = "secp256k1")]
 mod impl_secp256k1 {
     pub(crate) use ::secp256k1::Error;
     use ::secp256k1::{

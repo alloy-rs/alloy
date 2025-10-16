@@ -100,10 +100,13 @@ macro_rules! rpc_call_with_block {
             });
 
             let res = result.await?;
-            // Insert into cache.
-            let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
-            let hash = $req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+            // Insert into cache only for deterministic block identifiers (exclude tag-based ids
+            // like latest/pending/earliest). Caching tag-based results can lead to stale data.
+            if !$req.has_block_tag() {
+                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+                let hash = $req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(res)
         }))
@@ -149,7 +152,7 @@ where
         &self,
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
-        let req = RequestType::new("eth_getBlockReceipts", (block,));
+        let req = RequestType::new("eth_getBlockReceipts", (block,)).with_block_id(block);
 
         let redirect = req.has_block_tag();
 
@@ -388,7 +391,9 @@ impl<Params: RpcSend> RequestType<Params> {
                 BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
             );
         }
-        false
+        // Treat absence of BlockId as tag-based (e.g., 'latest'), which is non-deterministic
+        // and should not be cached.
+        true
     }
 }
 

@@ -7,14 +7,17 @@ use alloc::{
 };
 use alloy_consensus::{
     constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header,
-    Transaction, EMPTY_OMMER_ROOT_HASH,
+    HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{
-    eip2718::{Decodable2718, Encodable2718},
+    calc_next_block_base_fee,
+    eip1559::BaseFeeParams,
+    eip2718::{Decodable2718, Eip2718Result, Encodable2718, WithEncoded},
     eip4844::BlobTransactionSidecar,
     eip4895::{Withdrawal, Withdrawals},
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
     eip7685::Requests,
+    eip7840::BlobParams,
     BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
@@ -414,6 +417,18 @@ impl ExecutionPayloadV1 {
             block_hash,
             transactions,
         }
+    }
+
+    /// Calculate base fee for next block according to the EIP-1559 spec.
+    ///
+    /// Returns a `None` if no base fee is set, no EIP-1559 support
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+        Some(calc_next_block_base_fee(
+            self.gas_used,
+            self.gas_limit,
+            self.base_fee_per_gas.try_into().ok()?,
+            base_fee_params,
+        ))
     }
 }
 
@@ -1375,6 +1390,58 @@ impl ExecutionPayload {
         }
     }
 
+    /// Returns the transactions for the payload.
+    pub const fn transactions(&self) -> &Vec<Bytes> {
+        &self.as_v1().transactions
+    }
+
+    /// Returns a mutable reference to the transactions for the payload.
+    pub const fn transactions_mut(&mut self) -> &mut Vec<Bytes> {
+        &mut self.as_v1_mut().transactions
+    }
+
+    /// Extracts essential information into one container type.
+    pub fn header_info(&self) -> HeaderInfo {
+        HeaderInfo {
+            number: self.block_number(),
+            beneficiary: self.fee_recipient(),
+            timestamp: self.timestamp(),
+            gas_limit: self.gas_limit(),
+            base_fee_per_gas: Some(self.saturated_base_fee_per_gas()),
+            excess_blob_gas: self.excess_blob_gas(),
+            blob_gas_used: self.blob_gas_used(),
+            difficulty: U256::ZERO,
+            mix_hash: Some(self.prev_randao()),
+        }
+    }
+
+    /// Returns the gas limit for the payload.
+    ///
+    /// Note: this returns the u64 saturated base fee, but it is specified as [`U256`].
+    pub fn saturated_base_fee_per_gas(&self) -> u64 {
+        self.as_v1().base_fee_per_gas.saturating_to()
+    }
+
+    /// Returns the blob gas used for the payload.
+    pub fn blob_gas_used(&self) -> Option<u64> {
+        self.as_v3().map(|payload| payload.blob_gas_used)
+    }
+
+    /// Returns the excess blob gas for the payload.
+    pub fn excess_blob_gas(&self) -> Option<u64> {
+        self.as_v3().map(|payload| payload.excess_blob_gas)
+    }
+
+    /// Returns the gas limit for the payload.
+    pub const fn gas_limit(&self) -> u64 {
+        self.as_v1().gas_limit
+    }
+
+    /// Returns the fee recipient.
+    pub const fn fee_recipient(&self) -> Address {
+        self.as_v1().fee_recipient
+    }
+
     /// Returns the timestamp for the payload.
     pub const fn timestamp(&self) -> u64 {
         self.as_v1().timestamp
@@ -1403,6 +1470,115 @@ impl ExecutionPayload {
     /// Returns the prev randao for this payload.
     pub const fn prev_randao(&self) -> B256 {
         self.as_v1().prev_randao
+    }
+
+    /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None
+    pub fn blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.excess_blob_gas()?))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// See also [Self::next_block_excess_blob_gas]
+    pub fn next_block_blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.next_block_excess_blob_gas(blob_params)?))
+    }
+
+    /// Calculate base fee for next block according to the EIP-1559 spec.
+    ///
+    /// Returns a `None` if no base fee is set, no EIP-1559 support
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+        self.as_v1().next_block_base_fee(base_fee_params)
+    }
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
+        Some(blob_params.next_block_excess_blob_gas_osaka(
+            self.excess_blob_gas()?,
+            self.blob_gas_used()?,
+            self.as_v1().base_fee_per_gas.to(),
+        ))
+    }
+
+    /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional
+    /// [`BlobParams`] argument.
+    ///
+    /// Returns `None` if the `blob_params` are `None`.
+    pub fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
+        self.next_block_excess_blob_gas(blob_params?)
+    }
+
+    /// Returns an iterator over the decoded transactions in this payload.
+    ///
+    /// This iterator will decode transactions on the fly.
+    pub fn decoded_transactions<T: Decodable2718>(
+        &self,
+    ) -> impl Iterator<Item = Eip2718Result<T>> + '_ {
+        self.transactions().iter().map(|tx_bytes| T::decode_2718_exact(tx_bytes.as_ref()))
+    }
+
+    /// Returns iterator over decoded transactions with their original encoded bytes.
+    ///
+    /// This iterator will decode transactions on the fly and return them with their bytes.
+    pub fn decoded_transactions_with_encoded<T: Decodable2718>(
+        &self,
+    ) -> impl Iterator<Item = Eip2718Result<WithEncoded<T>>> + '_ {
+        self.transactions().iter().map(|tx_bytes| {
+            T::decode_2718_exact(tx_bytes.as_ref()).map(|tx| WithEncoded::new(tx_bytes.clone(), tx))
+        })
+    }
+
+    /// Returns an iterator over the recovered transactions in this payload.
+    ///
+    /// This iterator will decode and recover signer addresses for transactions on the fly.
+    pub fn recovered_transactions<T>(
+        &self,
+    ) -> impl Iterator<
+        Item = Result<
+            alloy_consensus::transaction::Recovered<T>,
+            alloy_consensus::crypto::RecoveryError,
+        >,
+    > + '_
+    where
+        T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
+    {
+        self.decoded_transactions::<T>().map(|res| {
+            res.map_err(alloy_consensus::crypto::RecoveryError::from_source)
+                .and_then(|tx| tx.try_into_recovered())
+        })
+    }
+
+    /// Returns an iterator over the recovered transactions in this payload with their
+    /// original encoded bytes.
+    ///
+    /// This iterator will decode and recover signer addresses for transactions on the fly
+    /// and return them with their bytes.
+    pub fn recovered_transactions_with_encoded<T>(
+        &self,
+    ) -> impl Iterator<
+        Item = Result<
+            WithEncoded<alloy_consensus::transaction::Recovered<T>>,
+            alloy_consensus::crypto::RecoveryError,
+        >,
+    > + '_
+    where
+        T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
+    {
+        self.transactions().iter().map(|tx_bytes| {
+            T::decode_2718_exact(tx_bytes.as_ref())
+                .map_err(alloy_consensus::crypto::RecoveryError::from_source)
+                .and_then(|tx| {
+                    tx.try_into_recovered()
+                        .map(|recovered| WithEncoded::new(tx_bytes.clone(), recovered))
+                })
+        })
     }
 }
 
@@ -2744,6 +2920,42 @@ mod tests {
                 "Block hash mismatch in {:?}: expected {}, got {}",
                 path, expected_hash, actual_hash
             );
+        }
+    }
+
+    #[test]
+    fn test_decoded_transactions() {
+        let transaction = Bytes::from_static(&hex!("f86d0a8458b20efd825208946177843db3138ae69679a54b95cf345ed759450d8806f3e8d87878800080820a95a0f8bddb1dcc4558b532ff747760a6f547dd275afdbe7bdecc90680e71de105757a014f34ba38c180913c0543b0ac2eccfb77cc3f801a535008dc50e533fbe435f53"));
+
+        let payload = ExecutionPayload::V1(ExecutionPayloadV1 {
+            parent_hash: B256::default(),
+            fee_recipient: Address::default(),
+            state_root: B256::default(),
+            receipts_root: B256::default(),
+            logs_bloom: Bloom::default(),
+            prev_randao: B256::default(),
+            block_number: 0,
+            gas_limit: 0,
+            gas_used: 0,
+            timestamp: 0,
+            extra_data: Bytes::default(),
+            base_fee_per_gas: U256::default(),
+            block_hash: B256::default(),
+            transactions: vec![transaction.clone()],
+        });
+
+        // Test decoded_transactions
+        let decoded: Vec<_> = payload.decoded_transactions::<TxEnvelope>().collect();
+        assert_eq!(decoded.len(), 1);
+        assert!(decoded[0].is_ok(), "Failed to decode transaction: {:?}", decoded[0]);
+
+        // Test decoded_transactions_with_encoded
+        let decoded_with_encoded: Vec<_> =
+            payload.decoded_transactions_with_encoded::<TxEnvelope>().collect();
+        assert_eq!(decoded_with_encoded.len(), 1);
+        assert!(decoded_with_encoded[0].is_ok());
+        if let Ok(with_encoded) = &decoded_with_encoded[0] {
+            assert_eq!(with_encoded.encoded_bytes(), &transaction);
         }
     }
 }

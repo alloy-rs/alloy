@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 /* --------------------------------------- Core re-exports -------------------------------------- */
 
@@ -186,3 +186,10 @@ pub mod transports {
     #[doc(inline)]
     pub use alloy_transport_ws as ws;
 }
+
+/// Fast Merkle-Patricia Trie (MPT) state root calculator and proof generator
+/// for prefix-sorted nibbles.
+///
+/// See [`alloy_trie`] for more details.
+#[cfg(feature = "trie")]
+pub use alloy_trie as trie;

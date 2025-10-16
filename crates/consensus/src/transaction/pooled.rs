@@ -1,4 +1,4 @@
-//! Defines the exact transaction variant that are allowed to be propagated over the eth p2p
+//! Defines the exact transaction variant that is allowed to be propagated over the eth p2p
 //! protocol.
 
 use super::EthereumTxEnvelope;
@@ -79,7 +79,7 @@ mod tests {
     use crate::Transaction;
 
     use super::*;
-    use alloy_eips::{Decodable2718, Encodable2718};
+    use alloy_eips::{eip4844::env_settings::EnvKzgSettings, Decodable2718, Encodable2718};
     use alloy_primitives::{address, hex, Bytes};
     use alloy_rlp::Decodable;
     use std::path::PathBuf;
@@ -175,6 +175,36 @@ mod tests {
             assert!(tx.is_eip4844());
             let encoded = tx.encoded_2718();
             assert_eq!(encoded.as_slice(), &raw[..], "{:?}", entry.path());
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn convert_to_eip7594() {
+        let kzg_settings = EnvKzgSettings::default();
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/4844rlp");
+        let dir = std::fs::read_dir(path).expect("Unable to read folder");
+        for entry in dir {
+            let entry = entry.unwrap();
+            let content = std::fs::read_to_string(entry.path()).unwrap();
+            let raw = hex::decode(content.trim()).unwrap();
+            let PooledTransaction::Eip4844(tx) = PooledTransaction::decode_2718(&mut raw.as_ref())
+                .map_err(|err| {
+                    panic!("Failed to decode transaction: {:?} {:?}", err, entry.path());
+                })
+                .unwrap()
+            else {
+                panic!("Expected EIP-4844 transaction");
+            };
+            let tx = tx.into_parts().0;
+            assert!(!tx.sidecar.blobs.is_empty());
+            assert!(tx.validate_blob(kzg_settings.get()).is_ok());
+
+            let tx =
+                tx.try_map_sidecar(|sidecar| sidecar.try_into_7594(kzg_settings.get())).unwrap();
+
+            assert!(!tx.sidecar.blobs.is_empty());
+            assert!(tx.validate_blob(kzg_settings.get()).is_ok());
         }
     }
 }

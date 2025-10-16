@@ -36,6 +36,11 @@ pub trait ReceiptResponse {
     /// Effective gas price.
     fn effective_gas_price(&self) -> u128;
 
+    /// Total cost of this transaction = gas_used * effective_gas_price.
+    fn cost(&self) -> u128 {
+        self.gas_used() as u128 * self.effective_gas_price()
+    }
+
     /// Blob gas used by the eip-4844 transaction.
     fn blob_gas_used(&self) -> Option<u64>;
 

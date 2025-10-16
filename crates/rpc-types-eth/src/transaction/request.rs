@@ -14,7 +14,7 @@ use alloy_consensus::{
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
-use core::hash::Hash;
+use core::{hash::Hash, str::FromStr};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -407,7 +407,7 @@ impl TransactionRequest {
 
     /// Build an EIP-1559 transaction.
     ///
-    /// Returns ane error if required fields are missing. Use `complete_1559` to check if the
+    /// Returns an error if required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
     pub fn build_1559(self) -> Result<TxEip1559, ValueError<Self>> {
         let Some(to) = self.to else {
@@ -797,7 +797,7 @@ impl TransactionRequest {
     ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if sidecar or max_blob_fee_per_gas is set
+    /// - EIP-4844 if sidecar, blob_versioned_hashes, or max_blob_fee_per_gas is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
@@ -1556,6 +1556,34 @@ pub enum TransactionInputKind {
     Data,
     /// Supports both 'input' and 'data' fields
     Both,
+}
+
+impl TransactionInputKind {
+    /// Constructor for [`TransactionInputKind::Both`] variant.
+    pub const fn both() -> Self {
+        Self::Both
+    }
+}
+
+/// Error type for parsing `TransactionInputKind`
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid TransactionInputKind: '{input}', expected 'input', 'data', or 'both'")]
+pub struct ParseTransactionInputKindError {
+    /// The invalid input string
+    input: String,
+}
+
+impl FromStr for TransactionInputKind {
+    type Err = ParseTransactionInputKindError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "input" => Ok(Self::Input),
+            "data" => Ok(Self::Data),
+            "both" => Ok(Self::Both),
+            _ => Err(ParseTransactionInputKindError { input: s.to_string() }),
+        }
+    }
 }
 
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.

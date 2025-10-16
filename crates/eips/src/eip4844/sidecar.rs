@@ -37,7 +37,7 @@ pub struct IndexedBlobHash {
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_blobs"))]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "crate::eip4844::deserialize_blobs"))]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -77,6 +77,43 @@ impl BlobTransactionSidecar {
                 None
             })
         })
+    }
+
+    /// Converts this EIP-4844 sidecar into an EIP-7594 sidecar.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<crate::eip7594::BlobTransactionSidecarEip7594, c_kzg::Error> {
+        use crate::eip7594::CELLS_PER_EXT_BLOB;
+
+        let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
+
+        for blob in self.blobs.iter() {
+            // SAFETY: Blob and c_kzg::Blob have the same memory layout
+            let blob_kzg = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+
+            // Compute cells and their KZG proofs for this blob
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                for kzg_proof in kzg_proofs.iter() {
+                    cell_proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(crate::eip7594::BlobTransactionSidecarEip7594::new(
+            self.blobs,
+            self.commitments,
+            cell_proofs,
+        ))
     }
 }
 
@@ -479,32 +516,6 @@ impl Decodable7594 for BlobTransactionSidecar {
     }
 }
 
-/// Helper function to deserialize boxed blobs from a serde deserializer.
-#[cfg(all(debug_assertions, feature = "serde"))]
-pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    use serde::Deserialize;
-
-    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
-    let mut blobs = Vec::with_capacity(raw_blobs.len());
-    for blob in raw_blobs {
-        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
-    }
-    Ok(blobs)
-}
-
-#[cfg(all(not(debug_assertions), feature = "serde"))]
-#[inline(always)]
-pub(crate) fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    use serde::Deserialize;
-    Vec::<Blob>::deserialize(deserializer)
-}
-
 /// Helper function to deserialize boxed blobs from an existing [`MapAccess`]
 ///
 /// [`MapAccess`]: serde::de::MapAccess
@@ -525,7 +536,6 @@ pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
 pub(crate) fn deserialize_blobs_map<'de, M: serde::de::MapAccess<'de>>(
     map_access: &mut M,
 ) -> Result<Vec<Blob>, M::Error> {
-    use serde::de::MapAccess;
     map_access.next_value()
 }
 

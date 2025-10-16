@@ -11,6 +11,7 @@ pub(crate) struct SerdeGenerator<'a> {
     variants: &'a GroupedVariants,
     alloy_consensus: &'a Path,
     serde: TokenStream,
+    serde_json: TokenStream,
     serde_cfg: &'a TokenStream,
 }
 
@@ -23,7 +24,8 @@ impl<'a> SerdeGenerator<'a> {
         serde_cfg: &'a TokenStream,
     ) -> Self {
         let serde = quote! { #alloy_consensus::private::serde };
-        Self { input_type_name, generics, variants, alloy_consensus, serde, serde_cfg }
+        let serde_json = quote! { #alloy_consensus::private::serde_json };
+        Self { input_type_name, generics, variants, alloy_consensus, serde, serde_json, serde_cfg }
     }
 
     /// Generate all serde-related code.
@@ -86,7 +88,7 @@ impl<'a> SerdeGenerator<'a> {
             .typed
             .iter()
             .filter_map(|v| {
-                let ProcessedVariant { name, ty, kind, serde_attrs } = v;
+                let ProcessedVariant { name, ty, kind, serde_attrs, typed: _, doc_attrs: _ } = v;
 
                 if let VariantKind::Typed(tx_type) = kind {
                     let tx_type = U8::from(*tx_type);
@@ -220,6 +222,7 @@ impl<'a> SerdeGenerator<'a> {
         let generics = self.generics;
         let unwrapped_generics = &generics.params;
         let serde = &self.serde;
+        let serde_json = &self.serde_json;
         let serde_bounds = self.generate_serde_bounds();
 
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name);
@@ -232,12 +235,11 @@ impl<'a> SerdeGenerator<'a> {
                 where
                     D: #serde::Deserializer<'de>,
                 {
-                    let content = #serde::__private::de::Content::deserialize(deserializer)?;
-                    let deserializer =
-                        #serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
+                    let value = #serde_json::Value::deserialize(deserializer)?;
+                    let deserializer = &value;
 
                     let tagged_res =
-                        TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged);
+                        TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged).map_err(#serde::de::Error::custom);
 
                     if tagged_res.is_ok() {
                         // return tagged if successful

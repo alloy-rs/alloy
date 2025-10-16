@@ -5,6 +5,7 @@ use alloy_transport::{impl_future, TransportResult};
 ///
 /// Implementers should contain configuration options for the underlying
 /// transport.
+#[auto_impl::auto_impl(Box)]
 pub trait PubSubConnect: Sized + Send + Sync + 'static {
     /// Returns `true` if the transport connects to a local resource.
     fn is_local(&self) -> bool;

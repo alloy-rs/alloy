@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! ENS Name resolving utilities.
 
@@ -321,7 +321,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .connect_http("https://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
 
-        let name = "deployd.eth";
+        let name = "vitalik.eth";
         let node = namehash(name);
         let res = provider.get_resolver(node, name).await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));

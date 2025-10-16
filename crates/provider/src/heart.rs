@@ -1,6 +1,6 @@
 //! Block heartbeat and pending transaction watcher.
 
-use crate::{Provider, RootProvider};
+use crate::{blocks::Paused, Provider, RootProvider};
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};
@@ -9,11 +9,12 @@ use alloy_primitives::{
     TxHash, B256,
 };
 use alloy_transport::{utils::Spawnable, TransportError};
-use futures::{stream::StreamExt, FutureExt, Stream};
+use futures::{future::pending, stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
     future::Future,
+    sync::Arc,
     time::Duration,
 };
 use tokio::{
@@ -223,17 +224,28 @@ impl<N: Network> PendingTransactionBuilder<N> {
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> Result<N::ReceiptResponse, PendingTransactionError> {
         let hash = self.config.tx_hash;
+        let required_confirmations = self.config.required_confirmations;
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
 
         // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
-        // block the tx was mined in
+        // block the tx was mined in. Only apply this for single confirmation to respect the
+        // confirmation setting.
         let mut interval = interval(self.provider.client().poll_interval());
 
         loop {
             let mut confirmed = false;
 
+            // If more than 1 block confirmations is specified then we can rely on the regular
+            // watch_pending_transaction and dont need this workaround for the above mentioned race
+            // condition
+            let tick_fut = if required_confirmations > 1 {
+                pending::<()>().right_future()
+            } else {
+                interval.tick().map(|_| ()).left_future()
+            };
+
             select! {
-                _ = interval.tick() => {},
+                _ = tick_fut => {},
                 res = &mut pending_tx => {
                     let _ = res?;
                     confirmed = true;
@@ -463,18 +475,22 @@ pub(crate) struct Heartbeat<N, S> {
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
 
+    /// Whether the heartbeat is currently paused.
+    paused: Arc<Paused>,
+
     _network: std::marker::PhantomData<N>,
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Create a new heartbeat task.
-    pub(crate) fn new(stream: S) -> Self {
+    pub(crate) fn new(stream: S, is_paused: Arc<Paused>) -> Self {
         Self {
             stream: stream.fuse(),
             past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
             reap_at: Default::default(),
+            paused: is_paused,
             _network: Default::default(),
         }
     }
@@ -531,6 +547,20 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
     }
 
+    /// Check if we have any pending transactions.
+    fn has_pending_transactions(&self) -> bool {
+        !self.unconfirmed.is_empty() || !self.waiting_confs.is_empty()
+    }
+
+    /// Update the pause state based on whether we have pending transactions.
+    fn update_pause_state(&mut self) {
+        let should_pause = !self.has_pending_transactions();
+        if self.paused.is_paused() != should_pause {
+            debug!(paused = should_pause, "updating heartbeat pause state");
+            self.paused.set_paused(should_pause);
+        }
+    }
+
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
     fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
@@ -540,9 +570,16 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         if let Some(received_at_block) = to_watch.received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
-            let current_block =
+            let confirmations = to_watch.config.required_confirmations;
+            let confirmed_at = received_at_block + confirmations - 1;
+            let current_height =
                 self.past_blocks.back().map(|(h, _)| *h).unwrap_or(received_at_block);
-            self.add_to_waiting_list(to_watch, current_block);
+
+            if confirmed_at <= current_height {
+                to_watch.notify(Ok(()));
+            } else {
+                self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+            }
             return;
         }
 
@@ -561,6 +598,11 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     to_watch.notify(Ok(()));
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+                    // Ensure reorg handling can move this watcher back if needed.
+                    let mut to_watch = to_watch;
+                    if to_watch.received_at_block.is_none() {
+                        to_watch.received_at_block = Some(*block_height);
+                    }
                     self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
                 }
                 return;
@@ -597,7 +639,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Check that the chain is continuous.
             if *last_height + 1 != block_height {
                 // Move all the transactions that were reset by the reorg to the unconfirmed list.
-                warn!(%block_height, last_height, "reorg detected");
+                // This can also happen if we unpaused the heartbeat after some time.
+                debug!(block_height, last_height, "reorg/unpause detected");
                 self.move_reorg_to_unconfirmed(block_height);
                 // Remove past blocks that are now invalid.
                 self.past_blocks.retain(|(h, _)| *h < block_height);
@@ -663,6 +706,8 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     async fn into_future(mut self, mut ixns: mpsc::Receiver<TxWatcher>) {
         'shutdown: loop {
             {
+                self.update_pause_state();
+
                 let next_reap = self.next_reap();
                 let sleep = std::pin::pin!(sleep_until(next_reap.into()));
 
