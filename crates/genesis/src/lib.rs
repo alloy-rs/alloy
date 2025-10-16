@@ -428,7 +428,7 @@ pub struct ChainConfig {
 
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
-    #[cfg_attr(feature = "borsh", borsh(skip))] // TODO: decide how to handle this
+    #[cfg_attr(feature = "borsh", borsh(skip))]
     pub extra_fields: OtherFields,
 
     /// The deposit contract address

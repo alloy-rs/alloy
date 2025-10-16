@@ -75,7 +75,7 @@ alloy-tx-macros = { version = "1.0.37", path = "crates/tx-macros", default-featu
 alloy-core = { version = "1.2.0", default-features = false }
 alloy-dyn-abi = { version = "1.2.0", default-features = false }
 alloy-json-abi = { version = "1.2.0", default-features = false }
-alloy-primitives = { version = "1.4.0", default-features = false }
+alloy-primitives = { version = "1.4.1", default-features = false }
 alloy-sol-types = { version = "1.2.0", default-features = false }
 
 alloy-rlp = { version = "0.3.9", default-features = false }
