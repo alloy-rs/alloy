@@ -5,10 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+
+### Other
+
+- Revert "chore: adds erc7562 tracer variant" ([#3037](https://github.com/alloy-rs/alloy/issues/3037))
+
 ## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
 
 ### Miscellaneous Tasks
 
+- Release 1.0.40
 - Release 1.0.40
 
 ## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
