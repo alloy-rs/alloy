@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixes for tx-envelope macro ([#3008](https://github.com/alloy-rs/alloy/issues/3008))
 
+### Miscellaneous Tasks
+
+- Release 1.0.39
+
 ## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
 
 ### Bug Fixes

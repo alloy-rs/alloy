@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Features
+
+- Add methods to build EIP-7594 sidecars with default and custom settings ([#3036](https://github.com/alloy-rs/alloy/issues/3036))
+- Add block helper methods to EthCall and EthCallMany ([#3035](https://github.com/alloy-rs/alloy/issues/3035))
+
 ## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
 
 ### Bug Fixes
@@ -32,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.39
 - Add changelog ([#3033](https://github.com/alloy-rs/alloy/issues/3033))
 - Adds erc7562 tracer variant ([#2690](https://github.com/alloy-rs/alloy/issues/2690))
 - Add rlp test ([#3032](https://github.com/alloy-rs/alloy/issues/3032))

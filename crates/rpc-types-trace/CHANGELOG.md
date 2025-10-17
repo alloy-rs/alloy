@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.39
 - Adds erc7562 tracer variant ([#2690](https://github.com/alloy-rs/alloy/issues/2690))
 
 ### Testing
