@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
 
+### Miscellaneous Tasks
+
+- Release 1.0.41
+
 ### Other
 
 - Revert "chore: adds erc7562 tracer variant" ([#3037](https://github.com/alloy-rs/alloy/issues/3037))
