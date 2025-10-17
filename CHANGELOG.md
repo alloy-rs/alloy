@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add methods to build EIP-7594 sidecars with default and custom settings ([#3036](https://github.com/alloy-rs/alloy/issues/3036))
 - Add block helper methods to EthCall and EthCallMany ([#3035](https://github.com/alloy-rs/alloy/issues/3035))
 
+### Miscellaneous Tasks
+
+- Release 1.0.40
+
 ## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
 
 ### Bug Fixes
