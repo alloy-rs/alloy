@@ -853,6 +853,39 @@ impl<T> TxEip4844WithSidecar<T> {
     }
 }
 
+impl TxEip4844WithSidecar<BlobTransactionSidecar> {
+    /// Converts this legacy EIP-4844 sidecar into an EIP-7594 sidecar with the default settings.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594(
+        self,
+    ) -> Result<
+        TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        c_kzg::Error,
+    > {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this legacy EIP-4844 sidecar into an EIP-7594 sidecar with the given settings.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<
+        TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        c_kzg::Error,
+    > {
+        self.try_map_sidecar(|sidecar| sidecar.try_into_7594(settings))
+    }
+}
+
 impl<T: TxEip4844Sidecar> TxEip4844WithSidecar<T> {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
