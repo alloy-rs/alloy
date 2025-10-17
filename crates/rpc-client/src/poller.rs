@@ -459,7 +459,6 @@ where
     }
 
     /// Converts the poll channel into a stream.
-    // TODO: can we name this type?
     pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
         self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok()))
     }
