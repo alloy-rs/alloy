@@ -23,6 +23,7 @@ rustdoc-args = [
 workspace = true
 
 [dependencies]
+
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-consensus-any = { workspace = true, features = ["std", "serde"] }
 alloy-eips = { workspace = true, features = ["serde"] }
@@ -47,3 +48,4 @@ thiserror.workspace = true
 
 [features]
 k256 = ["alloy-primitives/k256", "alloy-consensus/k256"]
+eip712 = ["alloy-signer/eip712"]
