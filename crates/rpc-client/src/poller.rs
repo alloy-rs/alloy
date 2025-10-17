@@ -449,6 +449,59 @@ impl<Resp> DerefMut for PollChannel<Resp> {
     }
 }
 
+/// A stream of poll responses that filters out errors.
+///
+/// This stream is created by [`PollChannel::into_stream`] and automatically filters out
+/// any broadcast lag errors, only yielding successful poll responses.
+///
+/// # Examples
+///
+/// ```no_run
+/// # async fn example(client: alloy_rpc_client::RpcClient) -> Result<(), Box<dyn std::error::Error>> {
+/// use alloy_primitives::U64;
+/// use alloy_rpc_client::PollerBuilder;
+/// use futures_util::StreamExt;
+///
+/// let poller: PollerBuilder<(), U64> = client
+///     .prepare_static_poller("eth_blockNumber", ());
+/// 
+/// // into_stream() now returns a named PollStream type
+/// let mut stream = poller.into_stream();
+/// 
+/// while let Some(block_number) = stream.next().await {
+///     println!("New block: {}", block_number);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+#[pin_project::pin_project]
+pub struct PollStream<T> {
+    #[pin]
+    inner: futures::stream::FilterMap<
+        BroadcastStream<T>,
+        fn(Result<T, tokio_stream::wrappers::errors::BroadcastStreamRecvError>) -> futures::future::Ready<Option<T>>,
+        futures::future::Ready<Option<T>>,
+    >,
+}
+
+impl<T> PollStream<T> {
+    /// Creates a new poll stream from a broadcast stream.
+    fn new(broadcast_stream: BroadcastStream<T>) -> Self {
+        Self {
+            inner: broadcast_stream.filter_map(|r| futures::future::ready(r.ok())),
+        }
+    }
+}
+
+impl<T> Stream for PollStream<T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().inner.poll_next(cx)
+    }
+}
+
 impl<Resp> PollChannel<Resp>
 where
     Resp: RpcRecv + Clone,
@@ -458,10 +511,14 @@ where
         Self { rx: self.rx.resubscribe() }
     }
 
-    /// Converts the poll channel into a stream.
-    // TODO: can we name this type?
-    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
-        self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok()))
+    /// Converts the poll channel into a stream that filters out errors.
+    ///
+    /// This is a convenience method that creates a [`PollStream`] which only yields
+    /// successful poll responses, automatically filtering out any broadcast lag errors.
+    ///
+    /// If you need to handle lag errors explicitly, use [`into_stream_raw`](Self::into_stream_raw).
+    pub fn into_stream(self) -> PollStream<Resp> {
+        PollStream::new(self.into_stream_raw())
     }
 
     /// Converts the poll channel into a stream that also yields
@@ -476,4 +533,5 @@ where
 fn _assert_unpin() {
     fn _assert<T: Unpin>() {}
     _assert::<PollChannel<()>>();
+    _assert::<PollStream<()>>();
 }

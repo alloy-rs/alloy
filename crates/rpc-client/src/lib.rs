@@ -25,7 +25,7 @@ mod client;
 pub use client::{ClientRef, NoParams, RpcClient, RpcClientInner, WeakClient};
 
 mod poller;
-pub use poller::{PollChannel, PollerBuilder, PollerStream};
+pub use poller::{PollChannel, PollerBuilder, PollerStream, PollStream};
 
 #[cfg(feature = "ws")]
 pub use alloy_transport_ws::WsConnect;
