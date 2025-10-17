@@ -843,6 +843,52 @@ impl<T> TxEip4844WithSidecar<T> {
     pub fn into_parts(self) -> (TxEip4844, T) {
         (self.tx, self.sidecar)
     }
+
+    /// Maps the sidecar to a new type.
+    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844WithSidecar<U> {
+        TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar) }
+    }
+
+    /// Maps the sidecar to a new type, returning an error if the mapping fails.
+    pub fn try_map_sidecar<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<TxEip4844WithSidecar<U>, E> {
+        Ok(TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar)? })
+    }
+}
+
+impl TxEip4844WithSidecar<BlobTransactionSidecar> {
+    /// Converts this legacy EIP-4844 sidecar into an EIP-7594 sidecar with the default settings.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594(
+        self,
+    ) -> Result<
+        TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        c_kzg::Error,
+    > {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this legacy EIP-4844 sidecar into an EIP-7594 sidecar with the given settings.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<
+        TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        c_kzg::Error,
+    > {
+        self.try_map_sidecar(|sidecar| sidecar.try_into_7594(settings))
+    }
 }
 
 impl<T: TxEip4844Sidecar> TxEip4844WithSidecar<T> {
