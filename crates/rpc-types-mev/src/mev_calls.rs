@@ -283,7 +283,7 @@ pub struct SimBundleLogs {
     pub tx_logs: Option<Vec<Log>>,
     /// Logs for bundles in bundle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bundle_logs: Option<Vec<SimBundleLogs>>,
+    pub bundle_logs: Option<Vec<Self>>,
 }
 
 #[cfg(test)]
