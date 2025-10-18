@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Bug Fixes
+
+- Saturate gas_price deser for TxLegacy ([#3010](https://github.com/alloy-rs/alloy/issues/3010))
+
+### Features
+
+- Add helper for legacy -> 7594 sidecar conversion ([#3013](https://github.com/alloy-rs/alloy/issues/3013))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Add rlp test ([#3032](https://github.com/alloy-rs/alloy/issues/3032))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Features
+
+- Generate TypedTransaction enum in envelope macro ([#2925](https://github.com/alloy-rs/alloy/issues/2925))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
+### Refactor
+
+- [consensus] Unify try_get_provider body across std/no_std ([#2963](https://github.com/alloy-rs/alloy/issues/2963))
+
 ## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
 
 ### Bug Fixes
@@ -18,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.37
 - Use fqs for tx_hash_with_type forwarding ([#2944](https://github.com/alloy-rs/alloy/issues/2944))
 - Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
 - Fix a couple of grammatical errors ([#2931](https://github.com/alloy-rs/alloy/issues/2931))

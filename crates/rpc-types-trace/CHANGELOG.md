@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+
+### Other
+
+- Revert "chore: adds erc7562 tracer variant" ([#3037](https://github.com/alloy-rs/alloy/issues/3037))
+
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Features
+
+- [rpc-trace] Add tx_index for traceCall ([#2881](https://github.com/alloy-rs/alloy/issues/2881))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Adds erc7562 tracer variant ([#2690](https://github.com/alloy-rs/alloy/issues/2690))
+
+### Testing
+
+- Add serde test for GethDebugTracingOptions with prestateTracer ([#3016](https://github.com/alloy-rs/alloy/issues/3016))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
+### Refactor
+
+- Simplify PreStateConfig initialization in tests ([#2964](https://github.com/alloy-rs/alloy/issues/2964))
+
 ## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
 
 ### Bug Fixes
@@ -13,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.37
 - Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
 
 ## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24

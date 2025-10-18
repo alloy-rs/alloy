@@ -26,10 +26,14 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 ///
 /// - `#[envelope(tx_type_name = MyTxType)]` - Custom name for the generated transaction type enum
 /// - `#[envelope(alloy_consensus = path::to::alloy)]` - Custom path to alloy_consensus crate
+/// - `#[envelope(typed = MyTypedTransaction)]` - Generate a corresponding TypedTransaction enum
+///   (optional)
 ///
 /// # Variant Attributes
 /// - Each variant must be annotated with `envelope` attribute with one of the following options:
 ///   - `#[envelope(ty = N)]` - Specify the transaction type ID (0-255)
+///   - `#[envelope(ty = N, typed = CustomType)]` - Use a custom transaction type for this variant
+///     in the generated TypedTransaction (optional)
 ///   - `#[envelope(flatten)]` - Flatten this variant to delegate to inner envelope type
 ///
 /// # Generated Code
@@ -39,6 +43,7 @@ use syn::{parse_macro_input, parse_quote, DeriveInput, Error, Ident};
 /// - Implementations of `Transaction`, `Typed2718`, `Encodable2718`, `Decodable2718`
 /// - Serde serialization/deserialization support (if `serde` feature is enabled)
 /// - Arbitrary implementations (if `arbitrary` feature is enabled)
+/// - Optionally, a TypedTransaction enum (if `typed` attribute is specified)
 #[proc_macro_derive(TransactionEnvelope, attributes(envelope, serde))]
 pub fn derive_transaction_envelope(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -66,6 +71,7 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
     let alloy_consensus =
         args.alloy_consensus.clone().unwrap_or_else(|| parse_quote!(::alloy_consensus));
     let generics = args.generics.clone();
+    let typed = args.typed.clone();
     let serde_cfg = match args.serde_cfg.as_ref() {
         Some(syn::Meta::List(list)) => list.tokens.clone(),
         Some(_) => {
@@ -109,6 +115,7 @@ fn expand_transaction_envelope(input: syn::DeriveInput) -> Result<proc_macro2::T
         alloy_eips,
         alloy_rlp,
         variants,
+        typed,
     };
     Ok(expander.expand())
 }

@@ -5,10 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Aggregate PRs ([#3011](https://github.com/alloy-rs/alloy/issues/3011))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Documentation
+
+- [rpc-types-eth] Clarify EIP-4844 preferred_type docs to include blob_versioned_hashes ([#2978](https://github.com/alloy-rs/alloy/issues/2978))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
 ## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
 
 ### Miscellaneous Tasks
 
+- Release 1.0.37
 - Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
 - [rpc-types-eth] Remove useless serde deny_unknown_fields on enums ([#2927](https://github.com/alloy-rs/alloy/issues/2927))
 
