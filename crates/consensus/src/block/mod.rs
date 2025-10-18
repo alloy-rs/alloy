@@ -27,6 +27,7 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 /// See p2p block encoding reference: <https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-encoding-and-validity>
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::Deref)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Block<T, H = Header> {
     /// Block header.
     #[deref]
@@ -212,6 +213,7 @@ where
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[rlp(trailing)]
 pub struct BlockBody<T, H = Header> {
     /// Transactions in this block.
