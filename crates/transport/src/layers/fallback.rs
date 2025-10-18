@@ -99,21 +99,20 @@ where
         let mut futures = FuturesUnordered::new();
 
         // Launch requests to all active transports in parallel
-        for transport in top_transports {
+        for mut transport in top_transports {
             let req_clone = req.clone();
-            let mut transport_clone = transport.clone();
 
             let future = async move {
                 let start = Instant::now();
-                let result = transport_clone.call(req_clone).await;
+                let result = transport.call(req_clone).await;
                 trace!(
                     "Transport[{}] completed: latency={:?}, status={}",
-                    transport_clone.id,
+                    transport.id,
                     start.elapsed(),
                     if result.is_ok() { "success" } else { "fail" }
                 );
 
-                (result, transport_clone, start.elapsed())
+                (result, transport, start.elapsed())
             };
 
             futures.push(future);
