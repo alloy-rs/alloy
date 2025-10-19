@@ -127,7 +127,7 @@ When updating this, also update:
 - .github/workflows/ci.yml
 -->
 
-The current MSRV (minimum supported rust version) is 1.86.
+The current MSRV (minimum supported rust version) is 1.88.
 
 Alloy will keep a rolling MSRV policy of **at least** two versions behind the
 latest stable release (so if the latest stable release is 1.58, we would
@@ -166,16 +166,14 @@ If you would like to add `no_std` support to a crate, please make sure to update
 
 None of these crates would have been possible without the great work done in:
 
-| Project | Description |
-|------------|-------------|
-| [`ethers.js`](https://github.com/ethers-io/ethers.js/) | A complete and compact JavaScript library for interacting with the Ethereum blockchain. |
-| [`rust-web3`](https://github.com/tomusdrw/rust-web3/) | Rust library for Ethereum JSON-RPC client communication, including support for async and WASM. |
-| [`ruint`](https://github.com/recmo/uint) | A fast, no-std, const-friendly implementation of fixed-size unsigned integers in Rust. |
-| [`ethabi`](https://github.com/rust-ethereum/ethabi) | Ethereum ABI encoding/decoding in Rust for contracts and transactions. |
-| [`ethcontract-rs`](https://github.com/gnosis/ethcontract-rs/) | Rust library to generate type-safe bindings to Ethereum smart contracts. |
-| [`guac_rs`](https://github.com/althea-net/guac_rs/) | Rust implementation of the GUAC protocol for Ethereum state channels. |
-
-
+| Project                                                       | Description                                                                                    |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [`ethers.js`](https://github.com/ethers-io/ethers.js/)        | A complete and compact JavaScript library for interacting with the Ethereum blockchain.        |
+| [`rust-web3`](https://github.com/tomusdrw/rust-web3/)         | Rust library for Ethereum JSON-RPC client communication, including support for async and WASM. |
+| [`ruint`](https://github.com/recmo/uint)                      | A fast, no-std, const-friendly implementation of fixed-size unsigned integers in Rust.         |
+| [`ethabi`](https://github.com/rust-ethereum/ethabi)           | Ethereum ABI encoding/decoding in Rust for contracts and transactions.                         |
+| [`ethcontract-rs`](https://github.com/gnosis/ethcontract-rs/) | Rust library to generate type-safe bindings to Ethereum smart contracts.                       |
+| [`guac_rs`](https://github.com/althea-net/guac_rs/)           | Rust implementation of the GUAC protocol for Ethereum state channels.                          |
 
 #### License
 
