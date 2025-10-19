@@ -106,7 +106,6 @@ impl<T> Recovered<T> {
         self.map(Tx::from)
     }
 
-
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
     pub fn try_convert<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
@@ -114,7 +113,6 @@ impl<T> Recovered<T> {
     {
         self.try_map(Tx::try_from)
     }
-
 
     /// Applies the given closure to the inner signed object.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
