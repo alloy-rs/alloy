@@ -106,14 +106,6 @@ impl<T> Recovered<T> {
         self.map(Tx::from)
     }
 
-    /// Converts the transaction type to the given alternative that is `From<T>`
-    #[deprecated = "Use `convert` instead"]
-    pub fn convert_transaction<Tx>(self) -> Recovered<Tx>
-    where
-        Tx: From<T>,
-    {
-        self.map(Tx::from)
-    }
 
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
     pub fn try_convert<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
@@ -123,14 +115,6 @@ impl<T> Recovered<T> {
         self.try_map(Tx::try_from)
     }
 
-    /// Converts the transaction to the given alternative that is `TryFrom<T>`
-    #[deprecated = "Use `try_convert` instead"]
-    pub fn try_convert_transaction<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
-    where
-        Tx: TryFrom<T>,
-    {
-        self.try_map(Tx::try_from)
-    }
 
     /// Applies the given closure to the inner signed object.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
