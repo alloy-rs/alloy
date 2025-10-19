@@ -206,7 +206,7 @@ impl GcpSigner {
         let key_name = key_specifier.0;
         let resp = request_get_pubkey(&client, &key_name).await?;
         let pubkey = decode_pubkey(resp)?;
-        let address = alloy_signer::utils::public_key_to_address(&pubkey);
+        let address = alloy_consensus::crypto::secp256k1::public_key_to_address(pubkey);
         debug!(?pubkey, %address, "instantiated GCP signer");
         Ok(Self { client, key_name, chain_id, pubkey, address })
     }
