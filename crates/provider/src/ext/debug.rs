@@ -2,7 +2,7 @@
 use crate::Provider;
 use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
-use alloy_primitives::{hex, Bytes, TxHash, B256};
+use alloy_primitives::{b256, hex, Bytes, TxHash, B256};
 use alloy_rpc_types_debug::ExecutionWitness;
 use alloy_rpc_types_eth::{BadBlock, BlockId, BlockNumberOrTag, Bundle, StateContext};
 use alloy_rpc_types_trace::geth::{
