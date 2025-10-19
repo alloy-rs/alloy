@@ -1009,7 +1009,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// use futures::StreamExt;
     ///
     /// let sub = provider.subscribe_full_blocks().full().channel_size(10);
-    /// let mut stream = sub.into_stream().await?.take(5);
+    /// let mut stream = sub.into_stream().await?.0.take(5);
     ///
     /// while let Some(block) = stream.next().await {
     ///   println!("{block:#?}");
