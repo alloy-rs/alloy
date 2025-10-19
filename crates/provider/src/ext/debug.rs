@@ -744,8 +744,6 @@ mod test {
         .await;
     }
 
-    // TODO: Enable for next reth release > v1.2.0
-    /*
     #[tokio::test]
     #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_debug_code_by_hash() {
@@ -765,5 +763,4 @@ mod test {
             }).await;
         }).await;
     }
-    */
 }
