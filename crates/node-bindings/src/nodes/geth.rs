@@ -488,9 +488,7 @@ impl Geth {
                     [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
                 genesis.extra_data = extra_data_bytes.into();
 
-                // we must set the etherbase if using clique
-                // need to use format! / Debug here because the Address Display impl doesn't show
-                // the entire address
+                // extra: etherbase is set once below after clique address resolution
                 cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
