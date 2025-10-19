@@ -1597,7 +1597,7 @@ mod tests {
 
         let sub = provider.subscribe_full_blocks().hashes().channel_size(10);
 
-        let mut stream = sub.into_stream().await.unwrap().take(5);
+        let mut stream = sub.into_stream().await.unwrap().0.take(5);
 
         let mut next = None;
         while let Some(Ok(block)) = stream.next().await {

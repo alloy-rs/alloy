@@ -5,6 +5,8 @@ use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_json_rpc::RpcRecv;
 use alloy_network::BlockResponse;
 use alloy_network_primitives::BlockTransactionsKind;
+#[cfg(feature = "pubsub")]
+use alloy_primitives::FixedBytes;
 use alloy_primitives::{Address, BlockHash, B256, B64};
 use alloy_rpc_client::{ClientRef, RpcCall};
 #[cfg(feature = "pubsub")]
@@ -397,11 +399,15 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
     /// Subscribe to the inner stream of headers and map them to block responses.
     pub async fn into_stream(
         self,
-    ) -> TransportResult<impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin> {
+    ) -> TransportResult<(
+        impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin,
+        FixedBytes<32>,
+    )> {
         use alloy_network_primitives::HeaderResponse;
         use futures::StreamExt;
 
         let sub = self.sub.await?;
+        let sub_id = *sub.local_id();
 
         let stream = sub
             .into_stream()
@@ -429,12 +435,12 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
 
         #[cfg(not(target_family = "wasm"))]
         {
-            Ok(stream.boxed())
+            Ok((stream.boxed(), sub_id))
         }
 
         #[cfg(target_family = "wasm")]
         {
-            Ok(stream.boxed_local())
+            Ok(stream.boxed_local(), sub_id)
         }
     }
 }
