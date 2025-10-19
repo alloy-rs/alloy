@@ -76,7 +76,7 @@ pub(crate) enum VariantKind {
 impl VariantKind {
     /// Returns serde transaction enum tag and aliases.
     pub(crate) fn serde_tag_and_aliases(&self) -> (String, Vec<String>) {
-        let VariantKind::Typed(ty) = self else { return Default::default() };
+        let Self::Typed(ty) = self else { return Default::default() };
 
         let tx_type_hex = format!("{ty:x}");
 
