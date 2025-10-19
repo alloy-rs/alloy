@@ -73,6 +73,28 @@ pub(crate) enum VariantKind {
     Flattened,
 }
 
+impl VariantKind {
+    /// Returns serde transaction enum tag and aliases.
+    pub(crate) fn serde_tag_and_aliases(&self) -> (String, Vec<String>) {
+        let VariantKind::Typed(ty) = self else { return Default::default() };
+
+        let tx_type_hex = format!("{ty:x}");
+
+        let mut aliases = vec![];
+        // Add alias for single digit hex values (e.g., "0x0" for "0x00")
+        if tx_type_hex.len() == 1 {
+            aliases.push(format!("0x0{}", tx_type_hex));
+        }
+
+        // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
+        if tx_type_hex != tx_type_hex.to_uppercase() {
+            aliases.push(format!("0x{}", tx_type_hex.to_uppercase()));
+        }
+
+        (format!("0x{tx_type_hex}"), aliases)
+    }
+}
+
 /// Processed variant information.
 #[derive(Debug, Clone)]
 pub(crate) struct ProcessedVariant {
@@ -216,5 +238,26 @@ impl GroupedVariants {
     /// Get all variant types.
     pub(crate) fn variant_types(&self) -> Vec<&syn::Type> {
         self.all.iter().map(|v| &v.ty).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_tag() {
+        assert_eq!(
+            VariantKind::Typed(126).serde_tag_and_aliases(),
+            ("0x7e".to_string(), vec!["0x7E".to_string()])
+        );
+        assert_eq!(
+            VariantKind::Typed(1).serde_tag_and_aliases(),
+            ("0x1".to_string(), vec!["0x01".to_string()])
+        );
+        assert_eq!(
+            VariantKind::Typed(10).serde_tag_and_aliases(),
+            ("0xa".to_string(), vec!["0x0a".to_string(), "0xA".to_string()])
+        );
     }
 }
