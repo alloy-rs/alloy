@@ -153,7 +153,7 @@ impl AwsSigner {
     ) -> Result<Self, AwsSignerError> {
         let resp = request_get_pubkey(&kms, key_id.clone()).await?;
         let pubkey = decode_pubkey(resp)?;
-        let address = alloy_signer::utils::public_key_to_address(&pubkey);
+         let address = alloy_consensus::crypto::secp256k1::public_key_to_address(pubkey);
         debug!(?pubkey, %address, "instantiated AWS signer");
         Ok(Self { kms, chain_id, key_id, pubkey, address })
     }
