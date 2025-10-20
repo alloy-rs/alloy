@@ -487,7 +487,6 @@ impl Geth {
                 let extra_data_bytes =
                     [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
                 genesis.extra_data = extra_data_bytes.into();
-                // extra: etherbase is set once below after clique address resolution
             }
 
             let clique_addr = self.clique_address().ok_or_else(|| {
