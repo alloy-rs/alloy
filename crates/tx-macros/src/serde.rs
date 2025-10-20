@@ -1,5 +1,4 @@
-use crate::parse::{GroupedVariants, ProcessedVariant, VariantKind};
-use alloy_primitives::U8;
+use crate::parse::{GroupedVariants, ProcessedVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, Path};
@@ -87,44 +86,28 @@ impl<'a> SerdeGenerator<'a> {
         self.variants
             .typed
             .iter()
-            .filter_map(|v| {
+            .map(|v| {
                 let ProcessedVariant { name, ty, kind, serde_attrs, typed: _, doc_attrs: _ } = v;
 
-                if let VariantKind::Typed(tx_type) = kind {
-                    let tx_type = U8::from(*tx_type);
-                    let rename = format!("0x{tx_type:x}");
+                let (rename, aliases) = kind.serde_tag_and_aliases();
 
-                    let mut aliases = vec![];
-                    // Add alias for single digit hex values (e.g., "0x0" for "0x00")
-                    if rename.len() == 3 {
-                        aliases.push(format!("0x0{}", rename.chars().last().unwrap()));
+                // Special handling for legacy transactions
+                let maybe_with = if v.is_legacy() {
+                    let alloy_consensus = &self.alloy_consensus;
+                    let path = quote! {
+                        #alloy_consensus::transaction::signed_legacy_serde
                     }
-
-                    // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
-                    if rename != rename.to_uppercase() {
-                        aliases.push(rename.to_uppercase());
-                    }
-
-                    // Special handling for legacy transactions
-                    let maybe_with = if v.is_legacy() {
-                        let alloy_consensus = &self.alloy_consensus;
-                        let path = quote! {
-                            #alloy_consensus::transaction::signed_legacy_serde
-                        }
-                        .to_string();
-                        quote! { with = #path, }
-                    } else {
-                        quote! {}
-                    };
-
-                    let maybe_other = serde_attrs.clone().unwrap_or_default();
-
-                    Some(quote! {
-                        #[serde(rename = #rename, #(alias = #aliases,)* #maybe_with #maybe_other)]
-                        #name(#ty)
-                    })
+                    .to_string();
+                    quote! { with = #path, }
                 } else {
-                    None
+                    quote! {}
+                };
+
+                let maybe_other = serde_attrs.clone().unwrap_or_default();
+
+                quote! {
+                    #[serde(rename = #rename, #(alias = #aliases,)* #maybe_with #maybe_other)]
+                    #name(#ty)
                 }
             })
             .collect()

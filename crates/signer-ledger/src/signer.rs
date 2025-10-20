@@ -274,7 +274,7 @@ impl LedgerSigner {
         // See comment for v1.6.0 requirement
         // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
         const EIP712_MIN_VERSION: &str = ">=1.6.0";
-        let req = semver::VersionReq::parse(EIP712_MIN_VERSION).unwrap();
+        let req = semver::VersionReq::parse(EIP712_MIN_VERSION)?;
         let version = self.version().await?;
 
         // Enforce app version is greater than EIP712_MIN_VERSION
