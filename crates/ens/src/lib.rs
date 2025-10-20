@@ -183,7 +183,7 @@ mod provider {
             Ok(name)
         }
 
-        /// Persforms a txt lookup of an address to an ENS name.
+        /// Performs a txt lookup of an address to an ENS name.
         async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
             let node = namehash(name);
             let resolver = self.get_resolver(node, name).await?;
