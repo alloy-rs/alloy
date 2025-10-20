@@ -105,6 +105,9 @@ mod contract {
 
             /// Returns the name associated with an ENS node, for reverse records.
             function name(bytes32 node) view returns (string);
+
+            /// Returns the txt associated with an ENS node
+            function text(bytes32 node,string calldata key) view virtual returns (string memory);
         }
 
         /// ENS Reverse Registrar contract
@@ -133,6 +136,9 @@ mod contract {
         /// Failed to resolve ENS name to an address.
         #[error("Failed to resolve ENS name to an address: {0}")]
         Resolve(alloy_contract::Error),
+        /// Failed to get txt records of ENS name.
+        #[error("Failed to resolve txt record")]
+        ResolveTxtRecord(alloy_contract::Error),
     }
 }
 
@@ -175,6 +181,18 @@ mod provider {
             let resolver = self.get_resolver(node, &name).await?;
             let name = resolver.name(node).call().await.map_err(EnsError::Lookup)?;
             Ok(name)
+        }
+
+        /// Persforms a txt lookup of an address to an ENS name.
+        async fn lookup_txt(&self, name: &str, key: &str) -> Result<String, EnsError> {
+            let node = namehash(name);
+            let resolver = self.get_resolver(node, name).await?;
+            let txt_value = resolver
+                .text(node, key.to_string())
+                .call()
+                .await
+                .map_err(|e| EnsError::ResolveTxtRecord(e))?;
+            Ok(txt_value)
         }
     }
 
@@ -305,7 +323,7 @@ mod test {
 mod tests {
     use super::*;
     use alloy_primitives::address;
-    use alloy_provider::ProviderBuilder;
+    use alloy_provider::{transport::layers::RetryBackoffService, ProviderBuilder};
 
     #[tokio::test]
     async fn test_reverse_registrar_fetching_mainnet() {
@@ -325,5 +343,26 @@ mod tests {
         let node = namehash(name);
         let res = provider.get_resolver(node, name).await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
+    }
+    #[tokio::test]
+    async fn test_pub_resolver_text() {
+        let provider = ProviderBuilder::new()
+            .connect_http("http://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+
+        let name = "vitalik.eth";
+        let node = namehash(name);
+        let res = provider.get_resolver(node, name).await.unwrap();
+        let txt = res.text(node, "avatar".to_string()).call().await.unwrap();
+        assert_eq!(txt, "https://euc.li/vitalik.eth")
+    }
+
+    #[tokio::test]
+    async fn test_pub_resolver_fetching_txt() {
+        let provider = ProviderBuilder::new()
+            .connect_http("http://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+
+        let name = "vitalik.eth";
+        let res = provider.lookup_txt(name, "avatar").await.unwrap();
+        assert_eq!(res, "https://euc.li/vitalik.eth")
     }
 }
