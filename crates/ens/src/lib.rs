@@ -191,7 +191,7 @@ mod provider {
                 .text(node, key.to_string())
                 .call()
                 .await
-                .map_err(|e| EnsError::ResolveTxtRecord(e))?;
+                .map_err(EnsError::ResolveTxtRecord)?;
             Ok(txt_value)
         }
     }
@@ -323,7 +323,7 @@ mod test {
 mod tests {
     use super::*;
     use alloy_primitives::address;
-    use alloy_provider::{transport::layers::RetryBackoffService, ProviderBuilder};
+    use alloy_provider::ProviderBuilder;
 
     #[tokio::test]
     async fn test_reverse_registrar_fetching_mainnet() {
