@@ -7,6 +7,7 @@ Send a JSON-RPC request through a mock transport using the `tower::Service` inte
 ```rust
 use alloy_transport::mock::{Asserter, MockTransport};
 use alloy_json_rpc as j;
+use tower_service::Service;
 
 // Prepare a mock response and a serialized request
 let asserter = Asserter::new();
