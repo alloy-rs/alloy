@@ -137,7 +137,7 @@ mod contract {
         #[error("Failed to resolve ENS name to an address: {0}")]
         Resolve(alloy_contract::Error),
         /// Failed to get txt records of ENS name.
-        #[error("Failed to resolve txt record")]
+        #[error("Failed to resolve txt record: {0}")]
         ResolveTxtRecord(alloy_contract::Error),
     }
 }
