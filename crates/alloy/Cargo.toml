@@ -55,6 +55,7 @@ alloy-signer-gcp = { workspace = true, optional = true }
 alloy-signer-ledger = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
 alloy-signer-trezor = { workspace = true, optional = true }
+alloy-signer-turnkey = { workspace = true, optional = true }
 
 # transport
 alloy-transport = { workspace = true, optional = true }
@@ -268,6 +269,7 @@ signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
 signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
 signer-local = ["signers", "dep:alloy-signer-local"]
 signer-trezor = ["signers", "dep:alloy-signer-trezor"]
+signer-turnkey = ["signers", "dep:alloy-signer-turnkey"]
 signer-keystore = ["signer-local", "alloy-signer-local?/keystore"]
 signer-mnemonic = ["signer-local", "alloy-signer-local?/mnemonic"]
 signer-mnemonic-all-languages = [
@@ -329,6 +331,7 @@ eip712 = [
     "alloy-signer-aws?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
+    "alloy-signer-turnkey?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
