@@ -1487,7 +1487,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = legacy_tx.try_into_legacy();
         assert!(result.is_ok());
     }
@@ -1499,7 +1499,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip1559_tx.try_into_legacy();
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -1516,7 +1516,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip2930_tx.try_into_eip2930();
         assert!(result.is_ok());
     }
@@ -1528,7 +1528,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = legacy_tx.try_into_eip2930();
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -1544,7 +1544,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip1559_tx.try_into_eip1559();
         assert!(result.is_ok());
     }
@@ -1556,7 +1556,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip2930_tx.try_into_eip1559();
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -1572,7 +1572,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip4844_tx.try_into_eip4844();
         assert!(result.is_ok());
     }
@@ -1584,7 +1584,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip1559_tx.try_into_eip4844();
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -1600,7 +1600,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip7702_tx.try_into_eip7702();
         assert!(result.is_ok());
     }
@@ -1612,7 +1612,7 @@ mod tests {
             Signature::test_signature(),
             Default::default(),
         ));
-        
+
         let result = eip4844_tx.try_into_eip7702();
         assert!(result.is_err());
         let error = result.unwrap_err();
