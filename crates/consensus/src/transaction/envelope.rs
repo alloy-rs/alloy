@@ -404,6 +404,51 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
+    /// Consumes the type and returns the [`TxLegacy`] variant if the transaction is a legacy
+    /// transaction. Returns an error otherwise.
+    pub fn try_into_legacy(self) -> Result<Signed<TxLegacy>, ValueError<Self>> {
+        match self {
+            Self::Legacy(tx) => Ok(tx),
+            _ => Err(ValueError::new_static(self, "Expected legacy transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the [`TxEip2930`] variant if the transaction is an EIP-2930
+    /// transaction. Returns an error otherwise.
+    pub fn try_into_eip2930(self) -> Result<Signed<TxEip2930>, ValueError<Self>> {
+        match self {
+            Self::Eip2930(tx) => Ok(tx),
+            _ => Err(ValueError::new_static(self, "Expected EIP-2930 transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the [`TxEip1559`] variant if the transaction is an EIP-1559
+    /// transaction. Returns an error otherwise.    
+    pub fn try_into_eip1559(self) -> Result<Signed<TxEip1559>, ValueError<Self>> {
+        match self {
+            Self::Eip1559(tx) => Ok(tx),
+            _ => Err(ValueError::new_static(self, "Expected EIP-1559 transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the [`TxEip4844`] variant if the transaction is an EIP-4844
+    /// transaction. Returns an error otherwise.
+    pub fn try_into_eip4844(self) -> Result<Signed<Eip4844>, ValueError<Self>> {
+        match self {
+            Self::Eip4844(tx) => Ok(tx),
+            _ => Err(ValueError::new_static(self, "Expected EIP-4844 transaction")),
+        }
+    }
+
+    /// Consumes the type and returns the [`TxEip7702`] variant if the transaction is an EIP-7702
+    /// transaction. Returns an error otherwise.
+    pub fn try_into_eip7702(self) -> Result<Signed<TxEip7702>, ValueError<Self>> {
+        match self {
+            Self::Eip7702(tx) => Ok(tx),
+            _ => Err(ValueError::new_static(self, "Expected EIP-7702 transaction")),
+        }
+    }
+
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256
     where
@@ -1433,6 +1478,147 @@ mod tests {
         assert_eq!(eip1559_tx.tx_type(), TxType::Eip1559);
         assert_eq!(eip4844_tx.tx_type(), TxType::Eip4844);
         assert_eq!(eip7702_tx.tx_type(), TxType::Eip7702);
+    }
+
+    #[test]
+    fn test_try_into_legacy_success() {
+        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = legacy_tx.try_into_legacy();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_try_into_legacy_failure() {
+        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip1559_tx.try_into_legacy();
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Expected legacy transaction"));
+        // Test that we can recover the original envelope
+        let recovered_envelope = error.into_value();
+        assert!(recovered_envelope.is_eip1559());
+    }
+
+    #[test]
+    fn test_try_into_eip2930_success() {
+        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
+            TxEip2930::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip2930_tx.try_into_eip2930();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_try_into_eip2930_failure() {
+        let legacy_tx = TxEnvelope::Legacy(Signed::new_unchecked(
+            TxLegacy::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = legacy_tx.try_into_eip2930();
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Expected EIP-2930 transaction"));
+        let recovered_envelope = error.into_value();
+        assert!(recovered_envelope.is_legacy());
+    }
+
+    #[test]
+    fn test_try_into_eip1559_success() {
+        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip1559_tx.try_into_eip1559();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_try_into_eip1559_failure() {
+        let eip2930_tx = TxEnvelope::Eip2930(Signed::new_unchecked(
+            TxEip2930::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip2930_tx.try_into_eip1559();
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Expected EIP-1559 transaction"));
+        let recovered_envelope = error.into_value();
+        assert!(recovered_envelope.is_eip2930());
+    }
+
+    #[test]
+    fn test_try_into_eip4844_success() {
+        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip4844_tx.try_into_eip4844();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_try_into_eip4844_failure() {
+        let eip1559_tx = TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip1559_tx.try_into_eip4844();
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Expected EIP-4844 transaction"));
+        let recovered_envelope = error.into_value();
+        assert!(recovered_envelope.is_eip1559());
+    }
+
+    #[test]
+    fn test_try_into_eip7702_success() {
+        let eip7702_tx = TxEnvelope::Eip7702(Signed::new_unchecked(
+            TxEip7702::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip7702_tx.try_into_eip7702();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_try_into_eip7702_failure() {
+        let eip4844_tx = TxEnvelope::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844(TxEip4844::default()),
+            Signature::test_signature(),
+            Default::default(),
+        ));
+        
+        let result = eip4844_tx.try_into_eip7702();
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Expected EIP-7702 transaction"));
+        let recovered_envelope = error.into_value();
+        assert!(recovered_envelope.is_eip4844());
     }
 
     // <https://sepolia.etherscan.io/getRawTx?tx=0xe5b458ba9de30b47cb7c0ea836bec7b072053123a7416c5082c97f959a4eebd6>
