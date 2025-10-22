@@ -31,13 +31,8 @@ quote = "1.0"
 proc-macro2 = "1.0"
 darling = "0.21"
 
-alloy-primitives.workspace = true
-
 [features]
-arbitrary = [
-	"alloy-primitives/arbitrary"
-]
+arbitrary = []
 serde = [
-	"alloy-primitives/serde",
 	"darling/serde"
 ]

@@ -58,7 +58,7 @@ pub struct Erc7562Frame {
     pub keccak: Vec<Bytes>,
     /// The call frames.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub calls: Vec<Erc7562Frame>,
+    pub calls: Vec<Self>,
 }
 
 /// The accessed slots.
