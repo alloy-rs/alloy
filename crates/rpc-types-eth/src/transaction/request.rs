@@ -1372,7 +1372,10 @@ pub(super) mod serde_bincode_compat {
     use crate::TransactionInput;
     use alloc::{borrow::Cow, vec::Vec};
     use alloy_consensus::BlobTransactionSidecarVariant;
-    use alloy_eips::eip2930::AccessList;
+    use alloy_eips::{
+        eip2930::AccessList, eip4844::BlobTransactionSidecar,
+        eip7594::BlobTransactionSidecarEip7594,
+    };
     use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
@@ -1424,11 +1427,24 @@ pub(super) mod serde_bincode_compat {
         pub transaction_type: Option<u8>,
         /// Blob versioned hashes for EIP-4844 transactions.
         pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
-        /// Blob sidecar for EIP-4844 transactions.
-        pub sidecar: Option<Cow<'a, BlobTransactionSidecarVariant>>,
+        /// Blob sidecar for EIP-4844/EIP-7594 transactions.
+        ///
+        /// Represented with an explicit tag so that bincode can unambiguously
+        /// deserialize it (untagged JSON shape is incompatible with bincode).
+        pub sidecar: Option<SidecarVariantCompat<'a>>,
         /// Authorization list for EIP-7702 transactions.
         pub authorization_list:
             Option<Vec<alloy_eips::eip7702::serde_bincode_compat::SignedAuthorization<'a>>>,
+    }
+
+    /// Bincode-friendly representation of [`BlobTransactionSidecarVariant`].
+    ///
+    /// This uses an explicit enum tag so bincode can encode/decode it
+    /// unambiguously, unlike the JSON-focused untagged variant.
+    #[derive(Debug, Serialize, Deserialize)]
+    pub enum SidecarVariantCompat<'a> {
+        Eip4844(Cow<'a, BlobTransactionSidecar>),
+        Eip7594(Cow<'a, BlobTransactionSidecarEip7594>),
     }
 
     impl<'a> From<&'a super::TransactionRequest> for TransactionRequest<'a> {
@@ -1449,7 +1465,14 @@ pub(super) mod serde_bincode_compat {
                 access_list: value.access_list.as_ref().map(Cow::Borrowed),
                 transaction_type: value.transaction_type,
                 blob_versioned_hashes: value.blob_versioned_hashes.as_ref().map(Cow::Borrowed),
-                sidecar: value.sidecar.as_ref().map(Cow::Borrowed),
+                sidecar: value.sidecar.as_ref().map(|sc| match sc {
+                    BlobTransactionSidecarVariant::Eip4844(s) => {
+                        SidecarVariantCompat::Eip4844(Cow::Borrowed(s))
+                    }
+                    BlobTransactionSidecarVariant::Eip7594(s) => {
+                        SidecarVariantCompat::Eip7594(Cow::Borrowed(s))
+                    }
+                }),
                 authorization_list: value
                     .authorization_list
                     .as_ref()
@@ -1480,7 +1503,14 @@ pub(super) mod serde_bincode_compat {
                 blob_versioned_hashes: value
                     .blob_versioned_hashes
                     .map(|hashes| hashes.into_owned()),
-                sidecar: value.sidecar.map(|sidecar| sidecar.into_owned()),
+                sidecar: value.sidecar.map(|sidecar| match sidecar {
+                    SidecarVariantCompat::Eip4844(s) => {
+                        BlobTransactionSidecarVariant::Eip4844(s.into_owned())
+                    }
+                    SidecarVariantCompat::Eip7594(s) => {
+                        BlobTransactionSidecarVariant::Eip7594(s.into_owned())
+                    }
+                }),
                 authorization_list: value
                     .authorization_list
                     .map(|list| list.into_iter().map(Into::into).collect()),
