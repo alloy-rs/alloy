@@ -17,6 +17,7 @@ use alloy_eips::{
     eip7840::{self, BlobParams},
     BlobScheduleBlobParams,
 };
+use alloy_hardforks::EthereumHardfork;
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
@@ -871,28 +872,28 @@ impl ChainConfig {
                 .with_max_blobs_per_tx(eip7594::MAX_BLOBS_PER_TX_FUSAKA);
 
             match key.as_str() {
-                "osaka" => osaka = Some(params),
-                "bpo1" => {
+                val if val == EthereumHardfork::Osaka.name() => osaka = Some(params),
+                val if val == EthereumHardfork::Bpo1.name() => {
                     if let Some(timestamp) = self.bpo1_time {
                         scheduled.push((timestamp, params));
                     }
                 }
-                "bpo2" => {
+                val if val == EthereumHardfork::Bpo2.name() => {
                     if let Some(timestamp) = self.bpo2_time {
                         scheduled.push((timestamp, params));
                     }
                 }
-                "bpo3" => {
+                val if val == EthereumHardfork::Bpo3.name() => {
                     if let Some(timestamp) = self.bpo3_time {
                         scheduled.push((timestamp, params));
                     }
                 }
-                "bpo4" => {
+                val if val == EthereumHardfork::Bpo4.name() => {
                     if let Some(timestamp) = self.bpo4_time {
                         scheduled.push((timestamp, params));
                     }
                 }
-                "bpo5" => {
+                val if val == EthereumHardfork::Bpo5.name() => {
                     if let Some(timestamp) = self.bpo5_time {
                         scheduled.push((timestamp, params));
                     }
