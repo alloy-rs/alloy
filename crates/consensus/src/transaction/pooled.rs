@@ -3,7 +3,6 @@
 
 use super::EthereumTxEnvelope;
 use crate::{error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
-use alloy_eips::eip7594::Encodable7594;
 
 /// All possible transactions that can be included in a response to `GetPooledTransactions`.
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
@@ -14,9 +13,9 @@ use alloy_eips::eip7594::Encodable7594;
 /// be propagated with the sidecar over p2p.
 pub type PooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
 
-impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
-    /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant<T>>`].
-    pub fn into_envelope(self) -> EthereumTxEnvelope<TxEip4844Variant<T>> {
+impl EthereumTxEnvelope<TxEip4844WithSidecar> {
+    /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant>`].
+    pub fn into_envelope(self) -> EthereumTxEnvelope<TxEip4844Variant> {
         match self {
             Self::Legacy(tx) => tx.into(),
             Self::Eip2930(tx) => tx.into(),
@@ -27,12 +26,10 @@ impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
     }
 }
 
-impl<T: Encodable7594> TryFrom<Signed<TxEip4844Variant<T>>>
-    for EthereumTxEnvelope<TxEip4844WithSidecar<T>>
-{
-    type Error = ValueError<Signed<TxEip4844Variant<T>>>;
+impl TryFrom<Signed<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844WithSidecar> {
+    type Error = ValueError<Signed<TxEip4844Variant>>;
 
-    fn try_from(value: Signed<TxEip4844Variant<T>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Signed<TxEip4844Variant>) -> Result<Self, Self::Error> {
         let (value, signature, hash) = value.into_parts();
         match value {
             tx @ TxEip4844Variant::TxEip4844(_) => Err(ValueError::new_static(
@@ -46,19 +43,15 @@ impl<T: Encodable7594> TryFrom<Signed<TxEip4844Variant<T>>>
     }
 }
 
-impl<T: Encodable7594> TryFrom<EthereumTxEnvelope<TxEip4844Variant<T>>>
-    for EthereumTxEnvelope<TxEip4844WithSidecar<T>>
-{
-    type Error = ValueError<EthereumTxEnvelope<TxEip4844Variant<T>>>;
+impl TryFrom<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844WithSidecar> {
+    type Error = ValueError<EthereumTxEnvelope<TxEip4844Variant>>;
 
-    fn try_from(value: EthereumTxEnvelope<TxEip4844Variant<T>>) -> Result<Self, Self::Error> {
+    fn try_from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Result<Self, Self::Error> {
         value.try_into_pooled()
     }
 }
 
-impl<T: Encodable7594> TryFrom<EthereumTxEnvelope<TxEip4844>>
-    for EthereumTxEnvelope<TxEip4844WithSidecar<T>>
-{
+impl TryFrom<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844WithSidecar> {
     type Error = ValueError<EthereumTxEnvelope<TxEip4844>>;
 
     fn try_from(value: EthereumTxEnvelope<TxEip4844>) -> Result<Self, Self::Error> {
@@ -66,10 +59,8 @@ impl<T: Encodable7594> TryFrom<EthereumTxEnvelope<TxEip4844>>
     }
 }
 
-impl<T: Encodable7594> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>
-    for EthereumTxEnvelope<TxEip4844Variant<T>>
-{
-    fn from(tx: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
+impl From<EthereumTxEnvelope<TxEip4844WithSidecar>> for EthereumTxEnvelope<TxEip4844Variant> {
+    fn from(tx: EthereumTxEnvelope<TxEip4844WithSidecar>) -> Self {
         tx.into_envelope()
     }
 }
@@ -78,7 +69,7 @@ impl<T: Encodable7594> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>>
 mod tests {
     use super::*;
     use crate::Transaction;
-    use alloy_eips::{Decodable2718, Encodable2718};
+    use alloy_eips::{eip7594::BlobTransactionSidecarVariant, Decodable2718, Encodable2718};
     use alloy_primitives::{address, hex, Bytes};
     use alloy_rlp::Decodable;
     use std::path::PathBuf;
@@ -196,13 +187,22 @@ mod tests {
                 panic!("Expected EIP-4844 transaction");
             };
             let tx = tx.into_parts().0;
-            assert!(!tx.sidecar.blobs.is_empty());
+            assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
 
-            let tx =
-                tx.try_map_sidecar(|sidecar| sidecar.try_into_7594(kzg_settings.get())).unwrap();
+            let tx = tx
+                .try_map_sidecar(|sidecar| {
+                    let BlobTransactionSidecarVariant::Eip4844(eip4844_sidecar) = sidecar else {
+                        panic!("it should be a eip4844 sidecar");
+                    };
+                    let eip_7594_sidecar = eip4844_sidecar.try_into_7594(kzg_settings.get())?;
+                    Ok::<BlobTransactionSidecarVariant, c_kzg::Error>(
+                        BlobTransactionSidecarVariant::Eip7594(eip_7594_sidecar),
+                    )
+                })
+                .unwrap();
 
-            assert!(!tx.sidecar.blobs.is_empty());
+            assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
         }
     }
