@@ -11,6 +11,8 @@
 use alloy_primitives::{address, Address, Keccak256, B256};
 use std::{borrow::Cow, str::FromStr};
 
+pub mod constants;
+pub mod utils;
 /// ENS registry address (`0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e`)
 pub const ENS_ADDRESS: Address = address!("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e");
 
@@ -145,8 +147,8 @@ mod contract {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{
-        namehash, reverse_address, EnsError, EnsRegistry, EnsResolver::EnsResolverInstance,
-        ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS,
+        namehash, reverse_address, utils::parse_avatar_uri, EnsError, EnsRegistry,
+        EnsResolver::EnsResolverInstance, ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS,
     };
     use alloy_primitives::{Address, B256};
     use alloy_provider::{Network, Provider};
@@ -193,6 +195,20 @@ mod provider {
                 .await
                 .map_err(EnsError::ResolveTxtRecord)?;
             Ok(txt_value)
+        }
+
+        async fn lookup_avatar(
+            &self,
+            name: &str,
+            gateway_urls: Option<HashMap<String, String>>,
+        ) -> Result<String, EnsError> {
+            let record = self.lookup_txt(name, "avatar").await?;
+            let gateway_urls = gateway_urls.unwrap_or_default();
+            if record.starts_with("eip155:") {
+                //TODO: Implement
+            }
+            let uri_item = parse_avatar_uri(uri, gateway_urls)?;
+            uri_item.uri
         }
     }
 
