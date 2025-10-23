@@ -1,6 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction, TransactionTrait};
+use crate::{transaction::AccessList, Transaction, TransactionTrait};
 use alloc::{
     string::{String, ToString},
     vec,
@@ -1066,11 +1066,11 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
         self.sidecar.as_ref()
     }
 
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {
         self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
     }
@@ -2022,8 +2022,11 @@ mod tests {
             use alloy_eips::eip4844::{Blob, BlobTransactionSidecar};
 
             // Positive case
-            let sidecar =
-                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar::new(
+                vec![Blob::repeat_byte(0xFA)],
+                Vec::new(),
+                Vec::new(),
+            ));
             let eip4844_request = TransactionRequest {
                 to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
                 max_fee_per_gas: Some(1234),
@@ -2043,8 +2046,11 @@ mod tests {
             sidecar, .. }))) if sidecar == sidecar);
 
             // with create to
-            let sidecar =
-                BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar::new(
+                vec![Blob::repeat_byte(0xFA)],
+                Vec::new(),
+                Vec::new(),
+            ));
             let eip4844_request = TransactionRequest {
                 to: Some(TxKind::Create),
                 max_fee_per_gas: Some(1234),
