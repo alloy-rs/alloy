@@ -11,7 +11,7 @@ use alloy_consensus::{
     TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType,
     Typed2718, TypedTransaction,
 };
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_eips::{eip7594::BlobTransactionSidecarVariant, eip7702::SignedAuthorization};
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
@@ -128,7 +128,7 @@ pub struct TransactionRequest {
         feature = "serde",
         serde(default, flatten, skip_serializing_if = "Option::is_none")
     )]
-    pub sidecar: Option<BlobTransactionSidecar>,
+    pub sidecar: Option<BlobTransactionSidecarVariant>,
     /// Authorization list for EIP-7702 transactions.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
