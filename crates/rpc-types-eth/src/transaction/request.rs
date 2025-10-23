@@ -1443,7 +1443,9 @@ pub(super) mod serde_bincode_compat {
     /// unambiguously, unlike the JSON-focused untagged variant.
     #[derive(Debug, Serialize, Deserialize)]
     pub enum SidecarVariantCompat<'a> {
+        /// Eip-4844 blob transaction sidecar.
         Eip4844(Cow<'a, BlobTransactionSidecar>),
+        /// Eip-7594 blob transaction sidecar.
         Eip7594(Cow<'a, BlobTransactionSidecarEip7594>),
     }
 
