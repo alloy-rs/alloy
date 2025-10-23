@@ -844,16 +844,16 @@ impl TxEip4844WithSidecar {
     pub fn map_sidecar(
         self,
         f: impl FnOnce(BlobTransactionSidecarVariant) -> BlobTransactionSidecarVariant,
-    ) -> TxEip4844WithSidecar {
-        TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar) }
+    ) -> Self {
+        Self { tx: self.tx, sidecar: f(self.sidecar) }
     }
 
     /// Maps the sidecar to a new type, returning an error if the mapping fails.
     pub fn try_map_sidecar<E>(
         self,
         f: impl FnOnce(BlobTransactionSidecarVariant) -> Result<BlobTransactionSidecarVariant, E>,
-    ) -> Result<TxEip4844WithSidecar, E> {
-        Ok(TxEip4844WithSidecar { tx: self.tx, sidecar: f(self.sidecar)? })
+    ) -> Result<Self, E> {
+        Ok(Self { tx: self.tx, sidecar: f(self.sidecar)? })
     }
 }
 
@@ -863,7 +863,7 @@ impl TxEip4844WithSidecar {
     /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
     /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
     #[cfg(feature = "kzg")]
-    pub fn try_into_7594(self) -> Result<TxEip4844WithSidecar, c_kzg::Error> {
+    pub fn try_into_7594(self) -> Result<Self, c_kzg::Error> {
         self.try_into_7594_with_settings(
             alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
         )
@@ -877,7 +877,7 @@ impl TxEip4844WithSidecar {
     pub fn try_into_7594_with_settings(
         self,
         settings: &c_kzg::KzgSettings,
-    ) -> Result<TxEip4844WithSidecar, c_kzg::Error> {
+    ) -> Result<Self, c_kzg::Error> {
         self.try_map_sidecar(|sidecar| match sidecar {
             BlobTransactionSidecarVariant::Eip4844(eip4844_sidecar) => {
                 let eip7594_sidecar = eip4844_sidecar.try_into_7594(settings)?;
