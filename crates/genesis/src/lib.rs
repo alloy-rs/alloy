@@ -71,6 +71,9 @@ pub struct Genesis {
     /// The parent hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_hash: Option<B256>,
+    /// For XLayer: legacyXLayerBlock
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub legacy_x_layer_block: Option<u64>,
 }
 
 impl Genesis {
@@ -1840,7 +1843,6 @@ mod tests {
         "mixHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
         "coinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "timestamp": "0x123456",
-        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "extraData": "0xfafbfcfd",
         "gasLimit": "0x2fefd8",
         "alloc": {
@@ -1905,6 +1907,7 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
+                legacy_x_layer_block: None,
                 alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -2205,5 +2208,72 @@ mod tests {
         assert_eq!(trie_account.storage_root, EMPTY_ROOT_HASH);
         // No code provided, so code hash should be KECCAK_EMPTY
         assert_eq!(trie_account.code_hash, KECCAK_EMPTY);
+    }
+
+    #[test]
+    fn test_xlayer_genesis_deserialize() {
+        let xlayer_genesis = r#"
+    {
+        "nonce": "0x0000000000000042",
+        "difficulty": "0x2123456",
+        "mixHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
+        "coinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "timestamp": "0x123456",
+        "extraData": "0xfafbfcfd",
+        "gasLimit": "0x2fefd8",
+        "legacyXLayerBlock": 12345,
+        "config": {
+            "ethash": {},
+            "chainId": 10,
+            "homesteadBlock": 0,
+            "eip150Block": 0,
+            "eip155Block": 0,
+            "eip158Block": 0,
+            "byzantiumBlock": 0,
+            "constantinopleBlock": 0,
+            "petersburgBlock": 0,
+            "istanbulBlock": 0
+        },
+        "alloc": {},
+        "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+    }"#;
+
+    let expected_genesis =
+            Genesis {
+                nonce: 0x0000000000000042,
+                difficulty: U256::from(0x2123456),
+                mix_hash: B256::from_str(
+                    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
+                )
+                .unwrap(),
+                coinbase: Address::from_str("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap(),
+                timestamp: 0x123456,
+                extra_data: Bytes::from_str("0xfafbfcfd").unwrap(),
+                gas_limit: 0x2fefd8,
+                base_fee_per_gas: None,
+                excess_blob_gas: None,
+                blob_gas_used: None,
+                number: None,
+                legacy_x_layer_block: Some(12345),
+                config: ChainConfig {
+                    ethash: Some(EthashConfig {}),
+                    chain_id: 10,
+                    homestead_block: Some(0),
+                    eip150_block: Some(0),
+                    eip155_block: Some(0),
+                    eip158_block: Some(0),
+                    byzantium_block: Some(0),
+                    constantinople_block: Some(0),
+                    petersburg_block: Some(0),
+                    istanbul_block: Some(0),
+                    deposit_contract_address: None,
+                    ..Default::default()
+                },
+                parent_hash: Some(B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234").unwrap()),
+                alloc: BTreeMap::new(),
+            };
+
+        let deserialized_genesis: Genesis = serde_json::from_str(xlayer_genesis).unwrap();
+        assert_eq!(deserialized_genesis, expected_genesis);
     }
 }
