@@ -71,9 +71,6 @@ pub struct Genesis {
     /// The parent hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_hash: Option<B256>,
-    /// For XLayer: legacyXLayerBlock
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub legacy_x_layer_block: Option<u64>,
 }
 
 impl Genesis {
@@ -442,6 +439,10 @@ pub struct ChainConfig {
     /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub blob_schedule: BTreeMap<String, BlobParams>,
+
+    /// For XLayer: legacyXLayerBlock
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub legacy_x_layer_block: Option<u64>,
 }
 
 /// Bincode-compatible [`ChainConfig`] serde implementation.
@@ -1045,6 +1046,7 @@ impl Default for ChainConfig {
             extra_fields: Default::default(),
             deposit_contract_address: None,
             blob_schedule: Default::default(),
+            legacy_x_layer_block: None,
         }
     }
 }
@@ -1907,7 +1909,6 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
-                legacy_x_layer_block: None,
                 alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -2010,6 +2011,7 @@ mod tests {
                     petersburg_block: Some(0),
                     istanbul_block: Some(0),
                     deposit_contract_address: None,
+                    legacy_x_layer_block: None,
                     ..Default::default()
                 },
                 parent_hash: None,
@@ -2221,7 +2223,6 @@ mod tests {
         "timestamp": "0x123456",
         "extraData": "0xfafbfcfd",
         "gasLimit": "0x2fefd8",
-        "legacyXLayerBlock": 12345,
         "config": {
             "ethash": {},
             "chainId": 10,
@@ -2232,7 +2233,8 @@ mod tests {
             "byzantiumBlock": 0,
             "constantinopleBlock": 0,
             "petersburgBlock": 0,
-            "istanbulBlock": 0
+            "istanbulBlock": 0,
+            "legacyXLayerBlock": 12345
         },
         "alloc": {},
         "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
@@ -2254,7 +2256,6 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
-                legacy_x_layer_block: Some(12345),
                 config: ChainConfig {
                     ethash: Some(EthashConfig {}),
                     chain_id: 10,
@@ -2267,6 +2268,7 @@ mod tests {
                     petersburg_block: Some(0),
                     istanbul_block: Some(0),
                     deposit_contract_address: None,
+                    legacy_x_layer_block: Some(12345),
                     ..Default::default()
                 },
                 parent_hash: Some(B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234").unwrap()),
