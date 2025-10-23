@@ -1371,7 +1371,7 @@ impl From<TxEnvelope> for TransactionRequest {
 pub(super) mod serde_bincode_compat {
     use crate::TransactionInput;
     use alloc::{borrow::Cow, vec::Vec};
-    use alloy_consensus::BlobTransactionSidecar;
+    use alloy_consensus::BlobTransactionSidecarVariant;
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -1425,7 +1425,7 @@ pub(super) mod serde_bincode_compat {
         /// Blob versioned hashes for EIP-4844 transactions.
         pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
         /// Blob sidecar for EIP-4844 transactions.
-        pub sidecar: Option<Cow<'a, BlobTransactionSidecar>>,
+        pub sidecar: Option<Cow<'a, BlobTransactionSidecarVariant>>,
         /// Authorization list for EIP-7702 transactions.
         pub authorization_list:
             Option<Vec<alloy_eips::eip7702::serde_bincode_compat::SignedAuthorization<'a>>>,
