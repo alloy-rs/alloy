@@ -95,7 +95,10 @@ impl RequestPacket {
 
     /// Check if the packet is empty.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        match self {
+            Self::Single(_) => false,
+            Self::Batch(batch) => batch.is_empty(),
+        }
     }
 
     /// Push a request into the packet.
