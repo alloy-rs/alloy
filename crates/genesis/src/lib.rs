@@ -543,6 +543,9 @@ pub mod serde_bincode_compat {
         /// Extra fields as string key-value pairs (bincode-compatible alternative to OtherFields)
         #[serde(default)]
         extra_fields: BTreeMap<String, String>,
+        // For XLayer: legacyXLayerBlock
+        #[serde(default)]
+        legacy_x_layer_block: Option<u64>,
     }
 
     impl<'a> From<&'a super::ChainConfig> for ChainConfig<'a> {
@@ -589,6 +592,8 @@ pub mod serde_bincode_compat {
                     }
                     extra_fields
                 },
+                // For XLayer: legacyXLayerBlock
+                legacy_x_layer_block: value.legacy_x_layer_block,
             }
         }
     }
@@ -640,6 +645,8 @@ pub mod serde_bincode_compat {
                 },
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: value.blob_schedule.into_owned(),
+                // For XLayer: legacyXLayerBlock
+                legacy_x_layer_block: value.legacy_x_layer_block,
             }
         }
     }
