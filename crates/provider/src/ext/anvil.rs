@@ -511,7 +511,7 @@ mod tests {
         ProviderBuilder,
     };
     use alloy_consensus::{SidecarBuilder, SimpleCoder};
-    use alloy_eips::BlockNumberOrTag;
+    use alloy_eips::{eip7594::BlobTransactionSidecarVariant, BlockNumberOrTag};
     use alloy_network::{TransactionBuilder, TransactionBuilder4844};
     use alloy_primitives::{address, B256};
     use alloy_rpc_types_eth::TransactionRequest;
@@ -1235,7 +1235,7 @@ mod tests {
                     let bob = accounts[1];
                     let sidecar: SidecarBuilder<SimpleCoder> =
                         SidecarBuilder::from_slice(b"Blobs are fun!");
-                    let sidecar = sidecar.build().unwrap();
+                    let sidecar = BlobTransactionSidecarVariant::Eip4844(sidecar.build().unwrap());
 
                     let tx = TransactionRequest::default()
                         .with_from(alice)
@@ -1249,7 +1249,7 @@ mod tests {
                     let blob =
                         provider.anvil_get_blob_by_versioned_hash(hash).await.unwrap().unwrap();
 
-                    assert_eq!(blob, sidecar.blobs[0]);
+                    assert_eq!(blob, sidecar.blobs()[0]);
                 });
             })
             .unwrap()
@@ -1275,7 +1275,7 @@ mod tests {
                     let bob = accounts[1];
                     let sidecar: SidecarBuilder<SimpleCoder> =
                         SidecarBuilder::from_slice(b"Blobs are fun!");
-                    let sidecar = sidecar.build().unwrap();
+                    let sidecar = BlobTransactionSidecarVariant::Eip4844(sidecar.build().unwrap());
 
                     let tx = TransactionRequest::default()
                         .with_from(alice)
@@ -1289,7 +1289,7 @@ mod tests {
                     let blobs =
                         provider.anvil_get_blobs_by_tx_hash(tx_hash).await.unwrap().unwrap();
 
-                    assert_eq!(blobs, sidecar.blobs);
+                    assert_eq!(blobs, sidecar.blobs());
                 });
             })
             .unwrap()

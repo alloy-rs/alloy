@@ -187,7 +187,9 @@ mod tests {
     use crate::{
         TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
     };
-    use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
+    use alloy_consensus::{
+        BlobTransactionSidecar, BlobTransactionSidecarVariant, TxEip1559, TxType, TypedTransaction,
+    };
     use alloy_eips::eip7702::Authorization;
     use alloy_primitives::{Address, Signature, U256};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
@@ -216,7 +218,9 @@ mod tests {
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO)
-            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .with_blob_sidecar(BlobTransactionSidecarVariant::Eip4844(
+                BlobTransactionSidecar::default(),
+            ))
             .with_max_fee_per_blob_gas(0);
 
         let tx = request.clone().build_unsigned().unwrap();
@@ -286,7 +290,9 @@ mod tests {
     #[test]
     fn test_fail_when_sidecar_and_access_list() {
         let request = TransactionRequest::default()
-            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .with_blob_sidecar(BlobTransactionSidecarVariant::Eip4844(
+                BlobTransactionSidecar::default(),
+            ))
             .with_access_list(AccessList::default());
 
         let error = request.build_unsigned().unwrap_err();
@@ -354,8 +360,9 @@ mod tests {
 
     #[test]
     fn test_invalid_4844_fields() {
-        let request =
-            TransactionRequest::default().with_blob_sidecar(BlobTransactionSidecar::default());
+        let request = TransactionRequest::default().with_blob_sidecar(
+            BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar::default()),
+        );
 
         let error = request.build_unsigned().unwrap_err();
 
