@@ -34,9 +34,8 @@ pub struct HeaderInfo {
     /// The output of the randomness beacon provided by the beacon chain
     ///
     /// Replaces `difficulty` after the Paris (AKA the merge) upgrade with [EIP-4399].
-    ///
-    /// Note: `prevrandao` can be found in a block in place of `mix_hash`.
+    /// This field contains the `prevrandao` value from the beacon chain.
     ///
     /// [EIP-4399]: https://eips.ethereum.org/EIPS/eip-4399
-    pub mix_hash: Option<B256>,
+    pub prevrandao: Option<B256>,
 }
