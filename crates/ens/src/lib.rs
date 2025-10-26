@@ -9,6 +9,7 @@
 //! ENS Name resolving utilities.
 
 use alloy_primitives::{address, Address, Keccak256, B256};
+use base64::{engine::general_purpose, Engine as _};
 use std::{borrow::Cow, str::FromStr};
 
 pub mod constants;
@@ -87,8 +88,11 @@ impl FromStr for NameOrAddress {
 mod contract {
     use alloy_sol_types::sol;
 
+    use crate::utils::{EnsAvatarNftInvalidMetadataError, ParseAvatarError, ParseNftError};
+
     // ENS Registry and Resolver contracts.
     sol! {
+
         /// ENS Registry contract.
         #[sol(rpc)]
         contract EnsRegistry {
@@ -115,6 +119,19 @@ mod contract {
         /// ENS Reverse Registrar contract
         #[sol(rpc)]
         contract ReverseRegistrar {}
+
+
+        /// ERC721 TokenURI contract for avatar resolution.
+        #[sol(rpc)]
+        contract ERC721TokenURI {
+            function tokenURI(uint256 tokenId) external view returns (string memory);
+        }
+        /// ERC1155 TokenURI contract for avatar resolution.
+        #[sol(rpc)]
+        contract ERC1155TokenURI {
+            function uri(uint256 id) external view returns (string memory);
+        }
+
     }
 
     /// Error type for ENS resolution.
@@ -141,18 +158,55 @@ mod contract {
         /// Failed to get txt records of ENS name.
         #[error("Failed to resolve txt record: {0}")]
         ResolveTxtRecord(alloy_contract::Error),
+        /// Failed to get avatar uri from erc721 of Ens Name.
+        #[error("Failed to get avatar uri from erc721/erc1155 of Ens Name: {0}")]
+        CallAvatarUri(alloy_contract::Error),
+        /// Failed to resolve avatar resolution of ENS name.
+        #[error("Failed to resolve avatar resolution of ENS name: {0}")]
+        ResolveAvatar(alloy_contract::Error),
+        /// Failed to parse NFT URI
+        #[error("Failed to parse NFT URI: {0}")]
+        ParseNftAvatar(alloy_contract::Error),
+        /// Failed to parse uri json from nft
+        #[error(transparent)]
+        InvalidMetadata(#[from] EnsAvatarNftInvalidMetadataError),
+    }
+    #[derive(Debug, thiserror::Error)]
+    pub enum AvatarError {
+        #[error(transparent)]
+        Ens(#[from] EnsError),
+        #[error(transparent)]
+        Parse(#[from] ParseAvatarError),
+        #[error(transparent)]
+        ParseNftUri(#[from] ParseNftError),
+        #[error(transparent)]
+        InvalidMetadata(#[from] EnsAvatarNftInvalidMetadataError),
+        #[error("Avatar URI resolution failed for: {uri}")]
+        UriResolution { uri: String },
     }
 }
 
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{
-        namehash, reverse_address, utils::parse_avatar_uri, EnsError, EnsRegistry,
-        EnsResolver::EnsResolverInstance, ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS,
+        constants::ID_URI_REGEX,
+        namehash, reverse_address,
+        utils::{
+            decode_base64_json, get_json_image, get_metadata_avatar_uri, parse_avatar_uri,
+            parse_nft_uri, EnsAvatarNftInvalidMetadataError, NftUriNamespace, ParseAvatarError,
+            ParseNftError, ParsedNftUri, UriItem,
+        },
+        AvatarError, ERC1155TokenURI, ERC721TokenURI, EnsError, EnsRegistry,
+        EnsResolver::EnsResolverInstance,
+        ReverseRegistrar::ReverseRegistrarInstance,
+        ENS_ADDRESS,
     };
-    use alloy_primitives::{Address, B256};
+    use alloy_primitives::{Address, ParseSignedError, B256, U256};
     use alloy_provider::{Network, Provider};
     use async_trait::async_trait;
+    use base64::engine::general_purpose;
+    use serde_json::Value;
+    use std::{collections::HashMap, str::FromStr};
 
     /// Extension trait for ENS contract calls.
     #[async_trait]
@@ -166,6 +220,20 @@ mod provider {
 
         /// Returns the reverse registrar for the specified node.
         async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError>;
+
+        /// Returns the ERC721 token URI string for the specified address.
+        async fn get_erc721_token_uri(
+            &self,
+            address: Address,
+            token_id: U256,
+        ) -> Result<String, EnsError>;
+
+        /// Returns the ERC1155 token URI string for the specified address.
+        async fn get_erc1155_token_uri(
+            &self,
+            address: Address,
+            token_id: U256,
+        ) -> Result<String, EnsError>;
 
         /// Performs a forward lookup of an ENS name to an address.
         async fn resolve_name(&self, name: &str) -> Result<Address, EnsError> {
@@ -201,14 +269,68 @@ mod provider {
             &self,
             name: &str,
             gateway_urls: Option<HashMap<String, String>>,
-        ) -> Result<String, EnsError> {
+        ) -> Result<String, AvatarError> {
             let record = self.lookup_txt(name, "avatar").await?;
-            let gateway_urls = gateway_urls.unwrap_or_default();
             if record.starts_with("eip155:") {
-                //TODO: Implement
+                let nft_decoded_uri = match parse_nft_uri(&record) {
+                    Ok(uri) => uri,
+                    Err(err) => return Err(AvatarError::ParseNftUri(err)),
+                };
+                let token_id = nft_decoded_uri.token_id;
+                let nft_uri_item =
+                    self.parse_nft_avatar_uri(nft_decoded_uri, gateway_urls.clone()).await?;
+                if nft_uri_item.is_on_chain
+                    && (nft_uri_item.uri.contains("data:application/json;base64,")
+                        || nft_uri_item.uri.starts_with("{"))
+                {
+                    let uri = if nft_uri_item.is_encoded {
+                        decode_base64_json(&nft_uri_item.uri).unwrap()
+                    } else {
+                        nft_uri_item.uri
+                    };
+                    let uri_image = get_json_image(&Value::String(uri)).map_err(|err| {
+                        AvatarError::Parse(ParseAvatarError::Other(err.to_string()))
+                    })?;
+
+                    return Ok(parse_avatar_uri(&uri_image, gateway_urls)?.uri);
+                }
+                let replace_all = ID_URI_REGEX.replace_all(&nft_uri_item.uri, token_id.to_string());
+                let final_uri = replace_all.into_owned();
+                println!("FINAL_URI {}", final_uri);
+                return Ok(get_metadata_avatar_uri(&final_uri, gateway_urls).await?);
             }
-            let uri_item = parse_avatar_uri(uri, gateway_urls)?;
-            uri_item.uri
+            let uri_item = parse_avatar_uri(&record, gateway_urls)?;
+            Ok(uri_item.uri)
+        }
+
+        async fn parse_nft_avatar_uri(
+            &self,
+            parsed_nft_uri: ParsedNftUri,
+            gateway_urls: Option<HashMap<String, String>>,
+        ) -> Result<UriItem, AvatarError> {
+            let nft_uri = {
+                let uri_result = match parsed_nft_uri.namespace {
+                    NftUriNamespace::ERC1155 => {
+                        self.get_erc1155_token_uri(
+                            parsed_nft_uri.contract_address,
+                            parsed_nft_uri.token_id,
+                        )
+                        .await
+                    }
+                    NftUriNamespace::ERC721 => {
+                        self.get_erc721_token_uri(
+                            parsed_nft_uri.contract_address,
+                            parsed_nft_uri.token_id,
+                        )
+                        .await
+                    }
+                };
+                uri_result.map_err(AvatarError::Ens)?
+            };
+
+            let avatar_uri = parse_avatar_uri(&nft_uri, gateway_urls)?;
+
+            Ok(avatar_uri)
         }
     }
 
@@ -242,6 +364,25 @@ mod provider {
                 return Err(EnsError::ReverseRegistrarNotFound);
             }
             Ok(ReverseRegistrarInstance::new(address, self))
+        }
+        async fn get_erc721_token_uri(
+            &self,
+            address: Address,
+            token_id: U256,
+        ) -> Result<String, EnsError> {
+            let token = ERC721TokenURI::new(address, self);
+            let uri = token.tokenURI(token_id).call().await.map_err(EnsError::CallAvatarUri)?;
+            Ok(uri)
+        }
+
+        async fn get_erc1155_token_uri(
+            &self,
+            address: Address,
+            token_id: U256,
+        ) -> Result<String, EnsError> {
+            let token = ERC1155TokenURI::new(address, self);
+            let uri = token.uri(token_id).call().await.map_err(EnsError::CallAvatarUri)?;
+            Ok(uri)
         }
     }
 }
@@ -380,5 +521,18 @@ mod tests {
         let name = "vitalik.eth";
         let res = provider.lookup_txt(name, "avatar").await.unwrap();
         assert_eq!(res, "https://euc.li/vitalik.eth")
+    }
+
+    #[tokio::test]
+    async fn test_pub_resolver_fetching_avatar() {
+        let provider = ProviderBuilder::new()
+            .connect_http("http://reth-ethereum.ithaca.xyz/rpc".parse().unwrap());
+
+        let name = "nick.eth";
+        let res = provider.lookup_avatar(name, None).await.unwrap();
+        assert_eq!(
+            res,
+            "https://i.seadn.io/gcs/files/3ae7be6c41ad4767bf3ecbc0493b4bfb.png?w=4000&auto=format"
+        );
     }
 }
