@@ -577,7 +577,7 @@ pub trait BlockHeader {
             excess_blob_gas: self.excess_blob_gas(),
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
-            mix_hash: self.mix_hash(),
+            prevrandao: self.mix_hash(),
         }
     }
 
