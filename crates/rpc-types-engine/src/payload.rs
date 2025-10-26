@@ -1411,7 +1411,7 @@ impl ExecutionPayload {
             excess_blob_gas: self.excess_blob_gas(),
             blob_gas_used: self.blob_gas_used(),
             difficulty: U256::ZERO,
-            mix_hash: Some(self.prev_randao()),
+            prevrandao: Some(self.prev_randao()),
         }
     }
 
