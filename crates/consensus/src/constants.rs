@@ -60,12 +60,3 @@ pub const GOERLI_BASE_GENESIS: B256 =
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
     b256!("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
-
-/// Transactions root of empty receipts set.
-pub const EMPTY_RECEIPTS: B256 = EMPTY_ROOT_HASH;
-
-/// Transactions root of empty transactions set.
-pub const EMPTY_TRANSACTIONS: B256 = EMPTY_ROOT_HASH;
-
-/// Withdrawals root of empty withdrawals set.
-pub const EMPTY_WITHDRAWALS: B256 = EMPTY_ROOT_HASH;
