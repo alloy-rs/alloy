@@ -30,6 +30,7 @@ alloy-core.workspace = true
 alloy-consensus = { workspace = true, optional = true }
 alloy-contract = { workspace = true, optional = true }
 alloy-eips = { workspace = true, optional = true }
+alloy-ens = { workspace = true, optional = true }
 alloy-genesis = { workspace = true, optional = true }
 alloy-network = { workspace = true, optional = true }
 alloy-node-bindings = { workspace = true, optional = true }
@@ -146,6 +147,7 @@ contract = [
     "sol-types",
 ]
 eips = ["dep:alloy-eips"]
+ens = ["dep:alloy-ens"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
