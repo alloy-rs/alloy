@@ -115,17 +115,6 @@ impl From<Vec<Address>> for AddressFilter {
     }
 }
 
-impl AddressFilter {
-    /// Returns `true` if the given address is in the filter or the filter address set is empty.
-    pub fn matches(&self, addr: &Address) -> bool {
-        self.is_empty() || self.0.contains(addr)
-    }
-
-    /// Returns `true` if the address set is empty.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
 
 /// `TraceFilterMatcher` is a filter used for matching `TransactionTrace` based on it's action and
 /// result (if available).
@@ -168,31 +157,34 @@ impl TraceFilterMatcher {
     /// - `Intersection` mode: The trace matches only if both the `from` and `to` addresses match.
     pub fn matches(&self, trace: &TransactionTrace) -> bool {
         let (from_matches, to_matches) = match trace.action {
-            Action::Call(CallAction { from, to, .. }) => {
-                (self.from_addresses.matches(&from), self.to_addresses.matches(&to))
-            }
+            Action::Call(CallAction { from, to, .. }) => (
+                self.from_addresses.0.is_empty() || self.from_addresses.0.contains(&from),
+                self.to_addresses.0.is_empty() || self.to_addresses.0.contains(&to),
+            ),
             Action::Create(CreateAction { from, .. }) => (
-                self.from_addresses.matches(&from),
+                self.from_addresses.0.is_empty() || self.from_addresses.0.contains(&from),
                 match trace.result {
                     Some(TraceOutput::Create(CreateOutput { address: to, .. })) => {
-                        self.to_addresses.matches(&to)
+                        self.to_addresses.0.is_empty() || self.to_addresses.0.contains(&to)
                     }
-                    _ => self.to_addresses.is_empty(),
+                    _ => self.to_addresses.0.is_empty(),
                 },
             ),
-            Action::Selfdestruct(SelfdestructAction { address, refund_address, .. }) => {
-                (self.from_addresses.matches(&address), self.to_addresses.matches(&refund_address))
-            }
-            Action::Reward(RewardAction { author, .. }) => {
-                (self.from_addresses.is_empty(), self.to_addresses.matches(&author))
-            }
+            Action::Selfdestruct(SelfdestructAction { address, refund_address, .. }) => (
+                self.from_addresses.0.is_empty() || self.from_addresses.0.contains(&address),
+                self.to_addresses.0.is_empty() || self.to_addresses.0.contains(&refund_address),
+            ),
+            Action::Reward(RewardAction { author, .. }) => (
+                self.from_addresses.0.is_empty(),
+                self.to_addresses.0.is_empty() || self.to_addresses.0.contains(&author),
+            ),
         };
 
         match self.mode {
             TraceFilterMode::Union => {
-                if self.from_addresses.is_empty() {
+                if self.from_addresses.0.is_empty() {
                     to_matches
-                } else if self.to_addresses.is_empty() {
+                } else if self.to_addresses.0.is_empty() {
                     from_matches
                 } else {
                     from_matches || to_matches
