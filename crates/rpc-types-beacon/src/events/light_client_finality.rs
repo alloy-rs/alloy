@@ -28,6 +28,7 @@ pub struct AttestedHeader {
     pub beacon: BeaconBlockHeader,
 }
 
+#[deprecated(note = "Use `BeaconBlockHeader` directly; this alias is redundant and will be removed in a future release.")]
 /// Backwards-compatible alias for the previously local `Beacon` header type.
 pub type Beacon = BeaconBlockHeader;
 
@@ -38,6 +39,7 @@ pub struct FinalizedHeader {
     pub beacon: BeaconBlockHeader,
 }
 
+#[deprecated(note = "Use `BeaconBlockHeader` directly; this alias is redundant and will be removed in a future release.")]
 /// Backwards-compatible alias for the previously local `Beacon2` header type.
 pub type Beacon2 = BeaconBlockHeader;
 
