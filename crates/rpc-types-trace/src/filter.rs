@@ -115,7 +115,6 @@ impl From<Vec<Address>> for AddressFilter {
     }
 }
 
-
 /// `TraceFilterMatcher` is a filter used for matching `TransactionTrace` based on it's action and
 /// result (if available).
 ///
