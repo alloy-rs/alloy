@@ -58,7 +58,7 @@ pub struct Erc7562Frame {
     pub keccak: Vec<Bytes>,
     /// The call frames.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub calls: Vec<Erc7562Frame>,
+    pub calls: Vec<Self>,
 }
 
 /// The accessed slots.
@@ -122,17 +122,7 @@ pub struct Erc7562Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geth::*;
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn test_serialize_erc7562_trace() {
-        let mut opts = GethDebugTracingCallOptions::default();
-        opts.tracing_options.tracer =
-            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::Erc7562Tracer));
-
-        assert_eq!(serde_json::to_string(&opts).unwrap(), r#"{"tracer":"erc7562Tracer"}"#);
-    }
 
     #[test]
     fn test_deserialize_erc7562_trace() {

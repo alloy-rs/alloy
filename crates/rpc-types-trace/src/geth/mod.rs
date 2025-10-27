@@ -2,7 +2,6 @@
 
 use crate::geth::{
     call::FlatCallFrame,
-    erc7562::{Erc7562Config, Erc7562Frame},
     mux::{MuxConfig, MuxFrame},
 };
 use alloy_primitives::{Bytes, B256, U256};
@@ -126,8 +125,6 @@ impl StructLog {
 pub enum GethTrace {
     /// The response for the default struct log tracer
     Default(DefaultFrame),
-    /// The response for ERC-7562 tracer
-    Erc7562Tracer(Erc7562Frame),
     /// The response for call tracer
     CallTracer(CallFrame),
     /// The response for the flat call tracer
@@ -241,14 +238,6 @@ impl GethTrace {
         }
     }
 
-    /// Try to convert the inner tracer to [Erc7562Frame]
-    pub fn try_into_erc7562_frame(self) -> Result<Erc7562Frame, UnexpectedTracerError> {
-        match self {
-            Self::Erc7562Tracer(inner) => Ok(inner),
-            _ => Err(UnexpectedTracerError(self)),
-        }
-    }
-
     /// Try to convert the inner tracer to [serde_json::Value]
     pub fn try_into_json_value(self) -> Result<serde_json::Value, UnexpectedTracerError> {
         match self {
@@ -306,12 +295,6 @@ impl From<MuxFrame> for GethTrace {
     }
 }
 
-impl From<Erc7562Frame> for GethTrace {
-    fn from(value: Erc7562Frame) -> Self {
-        Self::Erc7562Tracer(value)
-    }
-}
-
 /// Available built-in tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers>
@@ -352,10 +335,6 @@ pub enum GethDebugBuiltInTracerType {
     /// The mux tracer is a tracer that can run multiple tracers at once.
     #[serde(rename = "muxTracer")]
     MuxTracer,
-    /// The ERC-7562 tracer that checks validation rules defined in ERC-7562 (for ERC-4337 and
-    /// RIP-7560)
-    #[serde(rename = "erc7562Tracer")]
-    Erc7562Tracer,
 }
 
 /// Available tracers
@@ -389,7 +368,6 @@ impl GethDebugTracerType {
                 GethDebugBuiltInTracerType::PreStateTracer => "prestateTracer",
                 GethDebugBuiltInTracerType::NoopTracer => "noopTracer",
                 GethDebugBuiltInTracerType::MuxTracer => "muxTracer",
-                GethDebugBuiltInTracerType::Erc7562Tracer => "erc7562Tracer",
             },
             Self::JsTracer(code) => code,
         }
@@ -490,12 +468,6 @@ impl From<MuxConfig> for GethDebugTracerConfig {
     }
 }
 
-impl From<Erc7562Config> for GethDebugTracerConfig {
-    fn from(value: Erc7562Config) -> Self {
-        Self(serde_json::to_value(value).expect("is serializable"))
-    }
-}
-
 /// Bindings for additional `debug_traceTransaction` options
 ///
 /// See <https://geth.ethereum.org/docs/rpc/ns-debug#debug_tracetransaction>
@@ -566,11 +538,6 @@ impl GethDebugTracingOptions {
     /// Creates an [`GethDebugTracerType::JsTracer`] with the given js code.
     pub fn js_tracer(code: impl Into<String>) -> Self {
         Self::new_tracer(GethDebugTracerType::JsTracer(code.into()))
-    }
-
-    /// Creates new options for [`GethDebugBuiltInTracerType::Erc7562Tracer`]
-    pub fn erc7562_tracer(config: Erc7562Config) -> Self {
-        Self::new_tracer(GethDebugBuiltInTracerType::Erc7562Tracer).with_config(config)
     }
 
     /// Sets the timeout to use for tracing
@@ -964,10 +931,6 @@ mod tests {
 
         let geth_trace = GethTrace::MuxTracer(MuxFrame::default());
         let inner = geth_trace.try_into_mux_frame();
-        assert!(inner.is_ok());
-
-        let geth_trace = GethTrace::Erc7562Tracer(Erc7562Frame::default());
-        let inner = geth_trace.try_into_erc7562_frame();
         assert!(inner.is_ok());
 
         let geth_trace = GethTrace::JS(serde_json::Value::Null);
