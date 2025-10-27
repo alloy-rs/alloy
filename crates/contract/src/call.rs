@@ -424,16 +424,6 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         self
     }
 
-    /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
-    pub fn legacy(mut self) -> Self {
-        if self.request.gas_price().is_none() {
-            if let Some(max_fee) = self.request.max_fee_per_gas() {
-                self.request.set_gas_price(max_fee);
-            }
-        }
-        self
-    }
-
     /// Sets the `gas` field in the transaction to the provided value
     pub fn gas(mut self, gas: u64) -> Self {
         self.request.set_gas_limit(gas);
