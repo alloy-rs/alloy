@@ -30,6 +30,9 @@ pub use poller::{PollChannel, PollerBuilder, PollerStream};
 #[cfg(feature = "ws")]
 pub use alloy_transport_ws::WsConnect;
 
+#[cfg(all(feature = "ws", not(target_family = "wasm")))]
+pub use alloy_transport_ws::WebSocketConfig;
+
 #[cfg(all(feature = "ipc", not(target_family = "wasm")))]
 pub use alloy_transport_ipc::IpcConnect;
 
