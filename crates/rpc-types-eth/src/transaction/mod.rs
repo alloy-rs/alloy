@@ -447,8 +447,26 @@ mod tx_serde {
     //!
     //! This is needed because we might need to deserialize the `gasPrice` field into both
     //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    //!
+    //! Additionally, deserialization logic handles the case where the `gasPrice` field is larger
+    //! than `u128::MAX` by saturating it to `u128::MAX`. This is known to happen on some networks.
+    //!
+    //! See <https://github.com/alloy-rs/alloy/issues/2842> for example.
+
     use super::*;
-    use serde::{Deserialize, Serialize};
+
+    use serde::{Deserialize, Deserializer, Serialize};
+
+    use alloy_primitives::U256;
+    pub(super) use alloy_serde::quantity::opt::serialize;
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Option<u128>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Option::<U256>::deserialize(deserializer)
+            .map(|maybe_gas_price| maybe_gas_price.map(|gas_price| gas_price.saturating_to()))
+    }
 
     /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
     /// field if inner [`TxEnvelope`] did not consume it.
@@ -458,7 +476,7 @@ mod tx_serde {
             default,
             rename = "gasPrice",
             skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
+            with = "self"
         )]
         pub effective_gas_price: Option<u128>,
     }
@@ -532,6 +550,28 @@ mod tx_serde {
                 effective_gas_price,
             })
         }
+    }
+
+    #[test]
+    fn test_gas_price() {
+        #[derive(Debug, PartialEq, Eq, serde::Serialize, Deserialize)]
+        struct Value {
+            #[serde(with = "self")]
+            inner: Option<u128>,
+        }
+
+        let json = r#"{"inner":null}"#;
+        let value = serde_json::from_str::<Value>(json).unwrap();
+        assert_eq!(value.inner, None);
+
+        let json = r#"{"inner":"0x3e8"}"#;
+        let value = serde_json::from_str::<Value>(json).unwrap();
+        assert_eq!(value.inner, Some(1000));
+
+        let json =
+            r#"{"inner":"0x30783134626639633464372e3333333333333333333333333333333333333333"}"#;
+        let value = serde_json::from_str::<Value>(json).unwrap();
+        assert_eq!(value.inner, Some(u128::MAX));
     }
 }
 
