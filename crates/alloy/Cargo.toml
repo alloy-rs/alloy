@@ -70,7 +70,13 @@ alloy-trie = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "reqwest-rustls-tls", "alloy-core/default", "essentials"]
+default = [
+    "std",
+    "reqwest",
+    "reqwest-rustls-tls",
+    "alloy-core/default",
+    "essentials",
+]
 
 # std
 std = [
@@ -185,11 +191,7 @@ provider-engine-api = [
     "alloy-provider?/engine-api",
     "rpc-types-engine",
 ]
-provider-mev-api = [
-    "providers",
-    "alloy-provider?/mev-api",
-    "rpc-types-mev",
-]
+provider-mev-api = ["providers", "alloy-provider?/mev-api", "rpc-types-mev"]
 provider-net-api = ["providers", "alloy-provider?/net-api"]
 provider-trace-api = [
     "providers",
@@ -234,10 +236,7 @@ rpc-types-anvil = [
     "alloy-provider?/anvil-api",
 ]
 rpc-types-any = ["rpc-types", "alloy-rpc-types?/any"]
-rpc-types-beacon = [
-    "rpc-types",
-    "alloy-rpc-types?/beacon",
-]
+rpc-types-beacon = ["rpc-types", "alloy-rpc-types?/beacon"]
 rpc-types-debug = [
     "rpc-types",
     "alloy-rpc-types?/debug",
@@ -338,6 +337,7 @@ eip712 = [
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
+more-tuple-impls = ["alloy-core/more-tuple-impls"]
 
 arbitrary = [
     "alloy-core/arbitrary",
