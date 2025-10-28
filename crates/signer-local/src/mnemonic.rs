@@ -3,6 +3,9 @@
 //!
 //! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
+// TODO: https://github.com/rust-lang/rust/issues/148144
+#![allow(unused_assignments)]
+
 use crate::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
