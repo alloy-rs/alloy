@@ -140,14 +140,6 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
-    /// Returns the blobs of the inner sidecar variant.
-    pub fn blobs(&self) -> &[Blob] {
-        match self {
-            Self::Eip4844(s) => &s.blobs,
-            Self::Eip7594(s) => &s.blobs,
-        }
-    }
-
     /// Returns the blob corresponding to the versioned hash, if it exists.
     pub fn blob_by_versioned_hash(&self, hash: &B256) -> Option<&Blob> {
         match self {
