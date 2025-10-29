@@ -6,8 +6,6 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use alloy_primitives as _;
-
 mod boxed;
 pub use boxed::{BoxTransport, IntoBoxTransport};
 
