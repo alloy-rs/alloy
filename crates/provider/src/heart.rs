@@ -1,6 +1,7 @@
 //! Block heartbeat and pending transaction watcher.
 
-use crate::{blocks::Paused, Provider, RootProvider};
+use crate::{blocks::Paused, RootProvider};
+use crate::provider::Provider;
 use alloy_consensus::BlockHeader;
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, Network};
@@ -646,13 +647,14 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                 self.past_blocks.retain(|(h, _)| *h < block_height);
             }
         }
-        self.past_blocks.push_back((block_height, block.transactions().hashes().collect()));
+        let hashes: Vec<TxHash> = block.transactions().hashes().collect();
+        let hash_set: B256HashSet = hashes.iter().copied().collect();
+        self.past_blocks.push_back((block_height, hash_set));
 
         // Check if we are watching for any of the transactions in this block.
-        let to_check: Vec<_> = block
-            .transactions()
-            .hashes()
-            .filter_map(|tx_hash| self.unconfirmed.remove(&tx_hash))
+        let to_check: Vec<_> = hashes
+            .iter()
+            .filter_map(|tx_hash| self.unconfirmed.remove(tx_hash))
             .collect();
         for mut watcher in to_check {
             // If `confirmations` is not more than 1 we can notify the watcher immediately.
