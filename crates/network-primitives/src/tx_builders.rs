@@ -24,7 +24,7 @@ pub trait TransactionBuilder4844: Default + Sized + Send + Sync + 'static {
     /// Sets the EIP-4844 blob sidecar of the transaction.
     ///
     /// Note: This will also set the versioned blob hashes accordingly:
-    /// [BlobTransactionSidecar::versioned_hashes]
+    /// [BlobTransactionSidecarVariant::versioned_hashes]
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant);
 
     /// Builder-pattern method for setting the EIP-4844 blob sidecar of the transaction.
