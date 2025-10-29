@@ -360,6 +360,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     ///
     /// # References
     /// - [Reth implementation](https://github.com/paradigmxyz/reth/pull/19369)
+    /// - [Geth schema](https://github.com/ethereum/go-ethereum/blob/737ffd1bf0cbee378d0111a5b17ae4724fb2216c/core/rawdb/schema.go#L29)
     async fn debug_db_get(&self, key: &str) -> TransportResult<Bytes>;
 }
 
