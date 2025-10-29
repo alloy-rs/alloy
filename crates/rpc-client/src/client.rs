@@ -251,7 +251,7 @@ impl RpcClientInner {
         Self {
             #[cfg(feature = "pubsub")]
             pubsub,
-            ..Self::new(t.into_box_transport(), is_local)
+            ..Self::new(t, is_local)
         }
     }
 

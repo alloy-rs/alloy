@@ -5,11 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+
+### Features
+
+- Add methods to build EIP-7594 sidecars with default and custom settings ([#3036](https://github.com/alloy-rs/alloy/issues/3036))
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Features
+
+- Add helper for legacy -> 7594 sidecar conversion ([#3013](https://github.com/alloy-rs/alloy/issues/3013))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Fix unused import ([#3015](https://github.com/alloy-rs/alloy/issues/3015))
+
 ## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
 
 ### Features
 
 - [beacon-types] `GetBlobsResponse` ([#2994](https://github.com/alloy-rs/alloy/issues/2994))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
 
 ## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
 
@@ -91,6 +116,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
 
+### Features
+
+- Add Asref for recovered withencoded ([#2828](https://github.com/alloy-rs/alloy/issues/2828))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
+
 ### Bug Fixes
 
 - [eip4844] Prevent overflow panic in fake_exponential with large excess blob gas ([#2806](https://github.com/alloy-rs/alloy/issues/2806))
@@ -98,13 +133,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Add Asref for recovered withencoded ([#2828](https://github.com/alloy-rs/alloy/issues/2828))
 - Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
 - Add scale helper ([#2797](https://github.com/alloy-rs/alloy/issues/2797))
 
 ### Miscellaneous Tasks
 
-- Release 1.0.28
 - Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
 - Release 1.0.26
 - Release 1.0.25
@@ -621,21 +654,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [relay] ExecutionRequestsV4 with eip7685::Requests conversion ([#1787](https://github.com/alloy-rs/alloy/issues/1787))
 - Add requests with capacity ([#1794](https://github.com/alloy-rs/alloy/issues/1794))
-- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
-- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
 
 ### Miscellaneous Tasks
 
 - Release 0.8.1
 - Port calc block gas limit ([#1798](https://github.com/alloy-rs/alloy/issues/1798))
 - Add helper for loading custom trusted setup ([#1779](https://github.com/alloy-rs/alloy/issues/1779))
-- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
-- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
-- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ### Other
 
 - Calc_blob_gasprice made const ([#1788](https://github.com/alloy-rs/alloy/issues/1788))
+
+## [0.8.0](https://github.com/alloy-rs/alloy/releases/tag/v0.8.0) - 2024-12-10
+
+### Features
+
+- Add arbitrary for alloy types ([#1777](https://github.com/alloy-rs/alloy/issues/1777))
+- EIP-7691 ([#1762](https://github.com/alloy-rs/alloy/issues/1762))
+
+### Miscellaneous Tasks
+
+- Release 0.8.0 ([#1778](https://github.com/alloy-rs/alloy/issues/1778))
+- Derive Copy for BlockWithParent ([#1776](https://github.com/alloy-rs/alloy/issues/1776))
+- Improve Display and Debug for BlockId ([#1765](https://github.com/alloy-rs/alloy/issues/1765))
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
