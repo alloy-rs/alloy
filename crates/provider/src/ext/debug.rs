@@ -347,6 +347,20 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
         hash: B256,
         block: Option<BlockId>,
     ) -> TransportResult<Option<Bytes>>;
+
+    /// The `debug_dbGet` method retrieves a value from the database using the given key.
+    ///
+    /// The key can be provided in two formats:
+    /// - Hex-encoded string with `0x` prefix: `0x[hex_string]` - decoded as hex bytes
+    /// - Raw byte string without `0x` prefix: `[raw_byte_string]` - treated as raw bytes
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    ///
+    /// # References
+    /// - [Reth implementation](https://github.com/paradigmxyz/reth/pull/19369)
+    async fn debug_db_get(&self, key: &str) -> TransportResult<Bytes>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -554,6 +568,10 @@ where
         block: Option<BlockId>,
     ) -> TransportResult<Option<Bytes>> {
         self.client().request("debug_codeByHash", (hash, block)).await
+    }
+
+    async fn debug_db_get(&self, key: &str) -> TransportResult<Bytes> {
+        self.client().request("debug_dbGet", (key,)).await
     }
 }
 
