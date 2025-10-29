@@ -48,7 +48,7 @@ impl RequestPacket {
         Self::Batch(Vec::with_capacity(capacity))
     }
 
-    /// Returns the [`SerializedRequest`] if this packet is [`ResponsePacket::Single`]
+    /// Returns the [`SerializedRequest`] if this packet is [`RequestPacket::Single`]
     pub const fn as_single(&self) -> Option<&SerializedRequest> {
         match self {
             Self::Single(req) => Some(req),
@@ -56,7 +56,7 @@ impl RequestPacket {
         }
     }
 
-    /// Returns the batch of [`SerializedRequest`] if this packet is [`ResponsePacket::Batch`]
+    /// Returns the batch of [`SerializedRequest`] if this packet is [`RequestPacket::Batch`]
     pub fn as_batch(&self) -> Option<&[SerializedRequest]> {
         match self {
             Self::Batch(req) => Some(req.as_slice()),
