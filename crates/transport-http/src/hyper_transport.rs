@@ -11,7 +11,7 @@ use hyper::{
 };
 use hyper_util::client::legacy::Error;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
-use tower::Service;
+use tower::{Layer, Service};
 use tracing::{debug, debug_span, trace, Instrument};
 
 #[cfg(feature = "hyper-tls")]
@@ -77,6 +77,28 @@ impl<B, S> HyperClient<B, S> {
     /// Create a new [HyperClient] with the given URL and service.
     pub const fn with_service(service: S) -> Self {
         Self { service, _pd: PhantomData }
+    }
+
+    /// Apply a tower [`Layer`] to this client's service.
+    ///
+    /// This allows you to compose middleware layers following the tower pattern.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// #use alloy_transport_http::HyperClient;
+    /// #use alloy_transport_http::AuthLayer;
+    /// #use alloy_rpc_types_engine::JwtSecret;
+    ///
+    /// let secret = JwtSecret::random();
+    /// let client = HyperClient::new()
+    ///     .layer(AuthLayer::new(secret));
+    /// ```
+    pub fn layer<L>(self, layer: L) -> HyperClient<B, L::Service>
+    where
+        L: Layer<S>,
+    {
+        HyperClient::with_service(layer.layer(self.service))
     }
 }
 
