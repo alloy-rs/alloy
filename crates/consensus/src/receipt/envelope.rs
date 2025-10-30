@@ -145,7 +145,7 @@ impl<T> ReceiptEnvelope<T> {
     }
 
     /// Returns a mutable reference to the bloom.
-    pub fn as_receipt_with_bloom_mut(&mut self) -> &mut ReceiptWithBloom<Receipt<T>> {
+    pub const fn as_receipt_with_bloom_mut(&mut self) -> &mut ReceiptWithBloom<Receipt<T>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
