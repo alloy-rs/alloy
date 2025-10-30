@@ -255,8 +255,8 @@ impl Header {
         mem::size_of::<Bloom>() + // logs bloom
         mem::size_of::<U256>() + // difficulty
         mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u128>() + // gas limit
-        mem::size_of::<u128>() + // gas used
+        mem::size_of::<u64>() + // gas limit
+        mem::size_of::<u64>() + // gas used
         mem::size_of::<u64>() + // timestamp
         mem::size_of::<B256>() + // mix hash
         mem::size_of::<u64>() + // nonce

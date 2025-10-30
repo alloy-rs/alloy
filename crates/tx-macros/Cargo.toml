@@ -29,10 +29,10 @@ workspace = true
 syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"
-darling = "0.20"
-
-alloy-primitives.workspace = true
+darling = "0.21.3"
 
 [features]
-arbitrary = ["alloy-primitives/arbitrary"]
-serde = ["alloy-primitives/serde"]
+arbitrary = []
+serde = [
+	"darling/serde"
+]

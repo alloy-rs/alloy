@@ -72,6 +72,22 @@ impl BlobTransactionSidecarVariant {
         }
     }
 
+    /// Get a reference to the blobs
+    pub fn blobs(&self) -> &[Blob] {
+        match self {
+            Self::Eip4844(sidecar) => &sidecar.blobs,
+            Self::Eip7594(sidecar) => &sidecar.blobs,
+        }
+    }
+
+    /// Consume self and return the blobs
+    pub fn into_blobs(self) -> Vec<Blob> {
+        match self {
+            Self::Eip4844(sidecar) => sidecar.blobs,
+            Self::Eip7594(sidecar) => sidecar.blobs,
+        }
+    }
+
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarVariant].
     #[inline]
     pub fn size(&self) -> usize {

@@ -102,7 +102,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
-      - uses: taiki-e/install-action@e7ef886cf8f69c25ecef6bbc2858a42e273496ec # v2
+      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -138,7 +138,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-wasip1
-      - uses: taiki-e/install-action@e7ef886cf8f69c25ecef6bbc2858a42e273496ec # v2
+      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -168,7 +168,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@e7ef886cf8f69c25ecef6bbc2858a42e273496ec # v2
+      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -191,7 +191,7 @@ jobs:
         with:
           toolchain: stable
           targets: riscv32imac-unknown-none-elf
-      - uses: taiki-e/install-action@e7ef886cf8f69c25ecef6bbc2858a42e273496ec # v2
+      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
