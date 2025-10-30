@@ -168,7 +168,8 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Returns a reference to the inner receipt.
     ///
-    /// This method is infallible because all enum variants contain a `ReceiptWithBloom<Receipt<T>>`.
+    /// This method is infallible because all enum variants contain a
+    /// `ReceiptWithBloom<Receipt<T>>`.
     pub const fn as_receipt(&self) -> &Receipt<T> {
         match self {
             Self::Legacy(t)
