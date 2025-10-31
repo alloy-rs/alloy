@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Documentation
+
+- Add MEV API limitations and timing warnings ([#3098](https://github.com/alloy-rs/alloy/issues/3098))
+
+### Features
+
+- [provider] Add `debug_dbGet` method to retrieve values from db ([#3109](https://github.com/alloy-rs/alloy/issues/3109))
+- [provider] Add tenderly admin api bindings ([#3047](https://github.com/alloy-rs/alloy/issues/3047))
+
+### Miscellaneous Tasks
+
+- Expose WebSocketConfig in RPC client and provider for non-WASM builds ([#3088](https://github.com/alloy-rs/alloy/issues/3088))
+- Enable debug_code_by_hash test ([#3052](https://github.com/alloy-rs/alloy/issues/3052))
+- Release 1.0.41
+
+### Refactor
+
+- [provider] Simplify `HyperClient` init with `layer` method ([#3114](https://github.com/alloy-rs/alloy/issues/3114))
+
 ## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
 
 ### Features
