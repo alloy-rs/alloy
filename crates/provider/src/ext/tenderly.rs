@@ -2,7 +2,7 @@
 use crate::Provider;
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
-use alloy_primitives::{Address, Bytes, B256, TxHash};
+use alloy_primitives::{Address, Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use alloy_rpc_types_tenderly::{
     TenderlyDecodeInputResult, TenderlyEstimateGasResult, TenderlyFunctionSignature,
@@ -64,13 +64,22 @@ pub trait TenderlyApi<N: Network>: Send + Sync {
     ) -> TransportResult<Vec<TenderlyEstimateGasResult>>;
 
     /// Heuristically decodes external function calls. Use for unverified contracts.
-    async fn tenderly_decode_input(&self, call_data: Bytes) -> TransportResult<TenderlyDecodeInputResult>;
+    async fn tenderly_decode_input(
+        &self,
+        call_data: Bytes,
+    ) -> TransportResult<TenderlyDecodeInputResult>;
 
     /// Heuristically decodes custom errors. Use for unverified contracts.
-    async fn tenderly_decode_error(&self, error_data: Bytes) -> TransportResult<TenderlyDecodeInputResult>;
+    async fn tenderly_decode_error(
+        &self,
+        error_data: Bytes,
+    ) -> TransportResult<TenderlyDecodeInputResult>;
 
     /// Retrieve function interface based on 4-byte function selector.
-    async fn tenderly_function_signatures(&self, selector: Bytes) -> TransportResult<Vec<TenderlyFunctionSignature>>;
+    async fn tenderly_function_signatures(
+        &self,
+        selector: Bytes,
+    ) -> TransportResult<Vec<TenderlyFunctionSignature>>;
 
     /// Heuristically decodes emitted events. Use for unverified contracts.
     async fn tenderly_decode_event(
@@ -80,10 +89,16 @@ pub trait TenderlyApi<N: Network>: Send + Sync {
     ) -> TransportResult<TenderlyDecodeInputResult>;
 
     /// Retrieve error interface based on 4-byte error selector.
-    async fn tenderly_error_signatures(&self, selector: Bytes) -> TransportResult<Vec<TenderlyFunctionSignature>>;
+    async fn tenderly_error_signatures(
+        &self,
+        selector: Bytes,
+    ) -> TransportResult<Vec<TenderlyFunctionSignature>>;
 
     /// Retrieve event interface based on 32-byte event signature.
-    async fn tenderly_event_signature(&self, signature: B256) -> TransportResult<TenderlyFunctionSignature>;
+    async fn tenderly_event_signature(
+        &self,
+        signature: B256,
+    ) -> TransportResult<TenderlyFunctionSignature>;
 
     /// Returns an array of transactions between specified addresses within a given block range.
     async fn tenderly_get_transactions_range(
@@ -93,11 +108,15 @@ pub trait TenderlyApi<N: Network>: Send + Sync {
 
     /// Returns the ABI for a given contract address.
     ///
-    /// The ABI describes the contract's interface including function definitions, event definitions,
-    /// constructor arguments, and state variable definitions.
-    async fn tenderly_get_contract_abi(&self, address: Address) -> TransportResult<Vec<serde_json::Value>>;
+    /// The ABI describes the contract's interface including function definitions, event
+    /// definitions, constructor arguments, and state variable definitions.
+    async fn tenderly_get_contract_abi(
+        &self,
+        address: Address,
+    ) -> TransportResult<Vec<serde_json::Value>>;
 
-    /// Returns an array of storage changes for a given contract address starting from the specified offset.
+    /// Returns an array of storage changes for a given contract address starting from the specified
+    /// offset.
     ///
     /// This method returns storage slot changes, block numbers where changes occurred,
     /// transaction hashes that caused the changes, and previous and new values for each change.
@@ -167,20 +186,27 @@ where
         txs: &[N::TransactionRequest],
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<TenderlyEstimateGasResult>> {
-        self.client()
-            .request("tenderly_estimateGasBundle", (txs, block))
-            .await
+        self.client().request("tenderly_estimateGasBundle", (txs, block)).await
     }
 
-    async fn tenderly_decode_input(&self, call_data: Bytes) -> TransportResult<TenderlyDecodeInputResult> {
+    async fn tenderly_decode_input(
+        &self,
+        call_data: Bytes,
+    ) -> TransportResult<TenderlyDecodeInputResult> {
         self.client().request("tenderly_decodeInput", (call_data,)).await
     }
 
-    async fn tenderly_decode_error(&self, error_data: Bytes) -> TransportResult<TenderlyDecodeInputResult> {
+    async fn tenderly_decode_error(
+        &self,
+        error_data: Bytes,
+    ) -> TransportResult<TenderlyDecodeInputResult> {
         self.client().request("tenderly_decodeError", (error_data,)).await
     }
 
-    async fn tenderly_function_signatures(&self, selector: Bytes) -> TransportResult<Vec<TenderlyFunctionSignature>> {
+    async fn tenderly_function_signatures(
+        &self,
+        selector: Bytes,
+    ) -> TransportResult<Vec<TenderlyFunctionSignature>> {
         self.client().request("tenderly_functionSignatures", (selector,)).await
     }
 
@@ -192,11 +218,17 @@ where
         self.client().request("tenderly_decodeEvent", (topics, data)).await
     }
 
-    async fn tenderly_error_signatures(&self, selector: Bytes) -> TransportResult<Vec<TenderlyFunctionSignature>> {
+    async fn tenderly_error_signatures(
+        &self,
+        selector: Bytes,
+    ) -> TransportResult<Vec<TenderlyFunctionSignature>> {
         self.client().request("tenderly_errorSignatures", (selector,)).await
     }
 
-    async fn tenderly_event_signature(&self, signature: B256) -> TransportResult<TenderlyFunctionSignature> {
+    async fn tenderly_event_signature(
+        &self,
+        signature: B256,
+    ) -> TransportResult<TenderlyFunctionSignature> {
         self.client().request("tenderly_eventSignature", (signature,)).await
     }
 
@@ -207,7 +239,10 @@ where
         self.client().request("tenderly_getTransactionsRange", (params,)).await
     }
 
-    async fn tenderly_get_contract_abi(&self, address: Address) -> TransportResult<Vec<serde_json::Value>> {
+    async fn tenderly_get_contract_abi(
+        &self,
+        address: Address,
+    ) -> TransportResult<Vec<serde_json::Value>> {
         self.client().request("tenderly_getContractAbi", (address,)).await
     }
 

@@ -682,7 +682,7 @@ mod tests {
 
         assert_eq!(parsed.name, "transfer");
         assert_eq!(parsed.decoded_arguments.len(), 2);
-        
+
         // Test first argument (address)
         let arg0 = &parsed.decoded_arguments[0];
         assert_eq!(arg0.name, "arg0");
@@ -690,7 +690,7 @@ mod tests {
         assert!(matches!(typ0, DynSolType::Address));
         let value0 = arg0.value().expect("should parse address value");
         assert!(matches!(value0, DynSolValue::Address(_)));
-        
+
         // Test second argument (uint256)
         let arg1 = &parsed.decoded_arguments[1];
         assert_eq!(arg1.name, "arg1");
@@ -713,7 +713,7 @@ mod tests {
 
         assert_eq!(parsed.name, "ERC20InsufficientBalance");
         assert_eq!(parsed.decoded_arguments.len(), 3);
-        
+
         // Test first argument (address)
         let arg0 = &parsed.decoded_arguments[0];
         assert_eq!(arg0.name, "arg0");
@@ -721,7 +721,7 @@ mod tests {
         assert!(matches!(typ0, DynSolType::Address));
         let value0 = arg0.value().expect("should parse address value");
         assert!(matches!(value0, DynSolValue::Address(_)));
-        
+
         // Test second argument (uint256)
         let arg1 = &parsed.decoded_arguments[1];
         assert_eq!(arg1.name, "arg1");
@@ -729,7 +729,7 @@ mod tests {
         assert!(matches!(typ1, DynSolType::Uint(_)));
         let value1 = arg1.value().expect("should parse uint256 value");
         assert!(matches!(value1, DynSolValue::Uint(_, _)));
-        
+
         // Test third argument (uint256)
         let arg2 = &parsed.decoded_arguments[2];
         assert_eq!(arg2.name, "arg2");
