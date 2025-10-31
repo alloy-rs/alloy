@@ -188,7 +188,7 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 
 /// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
     inner: Arc<Mutex<S>>,
@@ -212,6 +212,23 @@ impl<S, P: RetryPolicy> RetryBackoffService<S, P> {
     }
 }
 
+impl<S, P> Clone for RetryBackoffService<S, P>
+where
+    P: RetryPolicy + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            policy: self.policy.clone(),
+            max_rate_limit_retries: self.max_rate_limit_retries,
+            initial_backoff: self.initial_backoff,
+            compute_units_per_second: self.compute_units_per_second,
+            requests_enqueued: self.requests_enqueued.clone(),
+            avg_cost: self.avg_cost,
+        }
+    }
+}
+
 impl<S, P> Service<RequestPacket> for RetryBackoffService<S, P>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
@@ -223,10 +240,9 @@ where
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Our middleware doesn't care about backpressure, so it's ready as long
-        // as the inner service is ready.
-        self.inner.poll_ready(cx)
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // The inner service is serialized through the mutex, so we optimistically report ready.
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: RequestPacket) -> Self::Future {
