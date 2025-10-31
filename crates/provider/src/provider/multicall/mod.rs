@@ -621,8 +621,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call =
-            tryBlockAndAggregateCall { requireSuccess: require_success, calls };
+        let call = tryBlockAndAggregateCall { requireSuccess: require_success, calls };
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
