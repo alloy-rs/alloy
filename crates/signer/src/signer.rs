@@ -53,8 +53,8 @@ pub trait Signer<Sig = Signature> {
 
     /// Encodes and signs the typed data according to [EIP-712] for unsized Signer types.
     ///
-    /// Unlike [`sign_typed_data`], this method does not require `Self: Sized`, making it suitable
-    /// for use with trait objects such as `Box<dyn Signer>` or `&dyn Signer`.
+    /// Unlike [`Signer::sign_typed_data`], this method does not require `Self: Sized`, making it
+    /// suitable for use with trait objects such as `Box<dyn Signer>` or `&dyn Signer`.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
@@ -124,8 +124,9 @@ pub trait SignerSync<Sig = Signature> {
 
     /// Encodes and signs the typed data according to [EIP-712] for unsized Signer types.
     ///
-    /// Unlike [`sign_typed_data_sync`], this method does not require `Self: Sized`, making it
-    /// suitable for use with trait objects such as `Box<dyn SignerSync>` or `&dyn SignerSync`.
+    /// Unlike [`SignerSync::sign_typed_data_sync`], this method does not require `Self: Sized`,
+    /// making it suitable for use with trait objects such as `Box<dyn SignerSync>` or
+    /// `&dyn SignerSync`.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
