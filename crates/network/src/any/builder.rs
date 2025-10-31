@@ -111,9 +111,6 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     }
 
     fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
-        // When the provided AnyNetwork TxType cannot be converted into the concrete
-        // request's TxType, surface a clear sentinel to distinguish type
-        // incompatibility from missing-field validation.
         self.deref().complete_type(ty.try_into().map_err(|_| vec!["unsupported_transaction_type"])?)
     }
 
