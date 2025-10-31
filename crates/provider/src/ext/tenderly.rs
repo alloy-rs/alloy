@@ -13,7 +13,6 @@ use alloy_transport::TransportResult;
 
 /// Tenderly namespace rpc interface that gives access to several non-standard RPC methods.
 ///
-/// Some methods are currently not implemented: (none)
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait TenderlyApi<N: Network>: Send + Sync {
