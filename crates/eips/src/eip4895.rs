@@ -15,6 +15,7 @@ pub const GWEI_TO_WEI: u64 = 1_000_000_000;
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Withdrawal {
     /// Monotonically increasing identifier issued by consensus layer.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
@@ -57,6 +58,7 @@ impl Withdrawal {
 )]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Withdrawals(pub Vec<Withdrawal>);
 
 impl Withdrawals {
