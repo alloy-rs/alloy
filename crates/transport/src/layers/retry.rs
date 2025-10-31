@@ -21,6 +21,8 @@ use wasmtimer::tokio::sleep;
 #[cfg(not(target_family = "wasm"))]
 use tokio::time::sleep;
 
+use tokio::sync::Mutex;
+
 /// The default average cost of a request in compute units (CU).
 const DEFAULT_AVG_COST: u64 = 17u64;
 
@@ -173,7 +175,7 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 
     fn layer(&self, inner: S) -> Self::Service {
         RetryBackoffService {
-            inner,
+            inner: Arc::new(Mutex::new(inner)),
             policy: self.policy.clone(),
             max_rate_limit_retries: self.max_rate_limit_retries,
             initial_backoff: self.initial_backoff,
@@ -189,7 +191,7 @@ impl<S, P: RetryPolicy + Clone> Layer<S> for RetryBackoffLayer<P> {
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S, P: RetryPolicy = RateLimitRetryPolicy> {
     /// The inner service
-    inner: S,
+    inner: Arc<Mutex<S>>,
     /// The [RetryPolicy] to use.
     policy: P,
     /// The maximum number of retries for rate limit errors
@@ -214,8 +216,7 @@ impl<S, P> Service<RequestPacket> for RetryBackoffService<S, P>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
-        + 'static
-        + Clone,
+        + 'static,
     P: RetryPolicy + Clone + 'static,
 {
     type Response = ResponsePacket;
@@ -231,10 +232,10 @@ where
     fn call(&mut self, request: RequestPacket) -> Self::Future {
         let inner = self.inner.clone();
         let this = self.clone();
-        let mut inner = std::mem::replace(&mut self.inner, inner);
         Box::pin(async move {
             let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
             let mut rate_limit_retry_number: u32 = 0;
+            let mut inner = inner.lock().await;
             loop {
                 let err;
                 let res = inner.call(request.clone()).await;
