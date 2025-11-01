@@ -15,6 +15,7 @@ use core::{fmt, mem};
 
 #[cfg(feature = "kzg")]
 use alloy_eips::eip4844::BlobTransactionValidationError;
+use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant};
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -70,6 +71,22 @@ impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip484
     fn from(value: Signed<TxEip4844WithSidecar<T>>) -> Self {
         let (tx, signature, hash) = value.into_parts();
         Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
+    }
+}
+
+impl From<TxEip4844Variant<BlobTransactionSidecar>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(value: TxEip4844Variant<BlobTransactionSidecar>) -> Self {
+        value.map_sidecar(Into::into)
+    }
+}
+
+impl From<TxEip4844Variant<BlobTransactionSidecarEip7594>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(value: TxEip4844Variant<BlobTransactionSidecarEip7594>) -> Self {
+        value.map_sidecar(Into::into)
     }
 }
 
