@@ -573,8 +573,9 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
             return Err(Error::NotADeploymentTransaction);
         }
         let pending_tx = self.send().await?;
+        let tx_hash = *pending_tx.tx_hash();
         let receipt = pending_tx.get_receipt().await?;
-        receipt.contract_address().ok_or(Error::ContractNotDeployed)
+        receipt.contract_address().ok_or_else(|| Error::ContractNotDeployed(tx_hash))
     }
 
     /// Broadcasts the underlying transaction to the network.
