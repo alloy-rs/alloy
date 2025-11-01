@@ -3,7 +3,7 @@ use crate::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
         NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
-    layers::{CallBatchLayer, ChainLayer},
+    layers::{BlockIdLayer, CallBatchLayer, ChainLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -307,6 +307,16 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// See [`CallBatchLayer`] for more information.
     pub fn with_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
         self.layer(CallBatchLayer::new())
+    }
+
+    /// Set a default [`BlockId`] for `eth_call` and `eth_estimateGas`.
+    ///
+    /// [`BlockId`]: alloy_eips::BlockId
+    pub fn with_default_block(
+        self,
+        block_id: alloy_eips::BlockId,
+    ) -> ProviderBuilder<Stack<BlockIdLayer, L>, F, N> {
+        self.layer(BlockIdLayer::new(block_id))
     }
 
     // --- Build to Provider ---
