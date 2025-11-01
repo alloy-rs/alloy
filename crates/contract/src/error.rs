@@ -1,5 +1,5 @@
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::{Bytes, Selector};
+use alloy_primitives::{Bytes, Selector, TxHash};
 use alloy_provider::PendingTransactionError;
 use alloy_sol_types::{SolError, SolInterface};
 use alloy_transport::{RpcError, TransportError, TransportErrorKind};
@@ -21,9 +21,9 @@ pub enum Error {
     /// Called `deploy` with a transaction that is not a deployment transaction.
     #[error("transaction is not a deployment transaction")]
     NotADeploymentTransaction,
-    /// `contractAddress` was not found in the deployment transaction’s receipt.
-    #[error("missing `contractAddress` from deployment transaction receipt")]
-    ContractNotDeployed,
+    /// `contractAddress` was not found in the deployment transaction's receipt.
+    #[error("missing `contractAddress` from deployment transaction receipt (tx: {0})")]
+    ContractNotDeployed(TxHash),
     /// The contract returned no data.
     #[error("contract call to `{0}` returned no data (\"0x\"); the called address might not be a contract")]
     ZeroData(String, #[source] AbiError),
