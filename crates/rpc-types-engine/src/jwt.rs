@@ -40,6 +40,8 @@ pub enum JwtError {
     InvalidIssuanceTimestamp,
 
     /// The Authorization header is missing or invalid in the context of JWT validation.
+    /// This includes cases where the header is empty, uses a wrong scheme, is malformed, or the
+    /// token is empty.
     #[display("Authorization header is missing or invalid")]
     MissingOrInvalidAuthorizationHeader,
 
@@ -261,6 +263,27 @@ impl JwtSecret {
     /// Returns the secret key as a byte slice.
     pub const fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+
+    /// Extracts a bearer token from a raw Authorization header value.
+    ///
+    /// This expects the header value to be in the form `"Bearer <token>"` (case-sensitive).
+    /// Leading and trailing whitespace are ignored.
+    ///
+    /// Returns `Ok(&str)` with a slice of the token portion on success, or
+    /// [`JwtError::MissingOrInvalidAuthorizationHeader`] if the header is empty,
+    /// uses a wrong scheme, is malformed, or the token is empty.
+    pub fn extract_bearer_token(auth_header: &str) -> Result<&str, JwtError> {
+        const PREFIX: &str = "Bearer ";
+        let s = auth_header.trim();
+        if !s.starts_with(PREFIX) {
+            return Err(JwtError::MissingOrInvalidAuthorizationHeader);
+        }
+        let token = &s[PREFIX.len()..];
+        if token.is_empty() {
+            return Err(JwtError::MissingOrInvalidAuthorizationHeader);
+        }
+        Ok(token)
     }
 }
 
@@ -515,5 +538,47 @@ mod tests {
 
     fn hex(secret: &JwtSecret) -> String {
         hex::encode(secret.0)
+    }
+
+    #[test]
+    fn extract_bearer_token_ok() {
+        let header = "Bearer abc.def.ghi";
+        let token = JwtSecret::extract_bearer_token(header).unwrap();
+        assert_eq!(token, "abc.def.ghi");
+    }
+
+    #[test]
+    fn extract_bearer_token_ok_with_whitespace() {
+        let header = "  Bearer abc  ";
+        let token = JwtSecret::extract_bearer_token(header).unwrap();
+        assert_eq!(token, "abc");
+    }
+
+    #[test]
+    fn extract_bearer_token_err_empty() {
+        let header = "";
+        let res = JwtSecret::extract_bearer_token(header);
+        assert!(matches!(res, Err(JwtError::MissingOrInvalidAuthorizationHeader)));
+    }
+
+    #[test]
+    fn extract_bearer_token_err_wrong_scheme() {
+        let header = "Basic abc";
+        let res = JwtSecret::extract_bearer_token(header);
+        assert!(matches!(res, Err(JwtError::MissingOrInvalidAuthorizationHeader)));
+    }
+
+    #[test]
+    fn extract_bearer_token_err_no_token() {
+        let header1 = "Bearer"; // no space and token
+        let header2 = "Bearer "; // space but empty token
+        assert!(matches!(
+            JwtSecret::extract_bearer_token(header1),
+            Err(JwtError::MissingOrInvalidAuthorizationHeader)
+        ));
+        assert!(matches!(
+            JwtSecret::extract_bearer_token(header2),
+            Err(JwtError::MissingOrInvalidAuthorizationHeader)
+        ));
     }
 }
