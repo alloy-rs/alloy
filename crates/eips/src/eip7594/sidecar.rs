@@ -1,7 +1,7 @@
 use crate::{
     eip4844::{
-        Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48, BYTES_PER_BLOB,
-        BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+        kzg_to_versioned_hash, Blob, BlobAndProofV2, BlobTransactionSidecar, Bytes48,
+        BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
     },
     eip7594::{CELLS_PER_EXT_BLOB, EIP_7594_WRAPPER_VERSION},
 };
@@ -121,6 +121,15 @@ impl BlobTransactionSidecarVariant {
     /// Returns an iterator over the versioned hashes of the commitments.
     pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
         VersionedHashIter::new(self.commitments())
+    }
+
+    /// Returns the versioned hash for the blob at the given index, if it
+    /// exists.
+    pub fn versioned_hash_for_blob(&self, blob_index: usize) -> Option<B256> {
+        match self {
+            Self::Eip4844(s) => s.versioned_hash_for_blob(blob_index),
+            Self::Eip7594(s) => s.versioned_hash_for_blob(blob_index),
+        }
     }
 
     /// Returns the index of the versioned hash in the commitments vector.
@@ -454,6 +463,12 @@ impl BlobTransactionSidecarEip7594 {
     /// Returns an iterator over the versioned hashes of the commitments.
     pub fn versioned_hashes(&self) -> VersionedHashIter<'_> {
         VersionedHashIter::new(&self.commitments)
+    }
+
+    /// Returns the versioned hash for the blob at the given index, if it
+    /// exists.
+    pub fn versioned_hash_for_blob(&self, blob_index: usize) -> Option<B256> {
+        self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
     }
 
     /// Returns the index of the versioned hash in the commitments vector.
