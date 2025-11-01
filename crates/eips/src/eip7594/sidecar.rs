@@ -90,7 +90,7 @@ impl BlobTransactionSidecarVariant {
 
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarVariant].
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         match self {
             Self::Eip4844(sidecar) => sidecar.size(),
             Self::Eip7594(sidecar) => sidecar.size(),
@@ -356,7 +356,7 @@ impl BlobTransactionSidecarEip7594 {
 
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip7594].
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.blobs.len() * BYTES_PER_BLOB + // blobs
                self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
                self.cell_proofs.len() * BYTES_PER_PROOF // proofs

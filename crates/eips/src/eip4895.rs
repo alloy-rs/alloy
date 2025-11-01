@@ -67,13 +67,13 @@ impl Withdrawals {
 
     /// Calculate the total size, including capacity, of the Withdrawals.
     #[inline]
-    pub fn total_size(&self) -> usize {
+    pub const fn total_size(&self) -> usize {
         self.0.capacity() * core::mem::size_of::<Withdrawal>()
     }
 
     /// Calculate a heuristic for the in-memory size of the [Withdrawals].
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.0.len() * core::mem::size_of::<Withdrawal>()
     }
 
