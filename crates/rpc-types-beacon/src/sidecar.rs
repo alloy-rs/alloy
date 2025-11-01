@@ -21,12 +21,12 @@ impl BeaconBlobBundle {
     }
 
     /// Returns the number of blobs in the bundle.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Returns if the bundle is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 

@@ -836,12 +836,12 @@ where
     }
 
     /// Get the number of calls in the builder
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.calls.len()
     }
 
     /// Check if the builder is empty
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.calls.is_empty()
     }
 
