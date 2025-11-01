@@ -170,6 +170,29 @@ impl<T> TxEip4844Variant<T> {
             _ => None,
         }
     }
+
+    /// Maps the sidecar to a new type.
+    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844Variant<U> {
+        match self {
+            Self::TxEip4844(tx) => TxEip4844Variant::TxEip4844(tx),
+            Self::TxEip4844WithSidecar(tx) => {
+                TxEip4844Variant::TxEip4844WithSidecar(tx.map_sidecar(f))
+            }
+        }
+    }
+
+    /// Maps the sidecar to a new type, returning an error if the mapping fails.
+    pub fn try_map_sidecar<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<TxEip4844Variant<U>, E> {
+        match self {
+            Self::TxEip4844(tx) => Ok(TxEip4844Variant::TxEip4844(tx)),
+            Self::TxEip4844WithSidecar(tx) => {
+                tx.try_map_sidecar(f).map(TxEip4844Variant::TxEip4844WithSidecar)
+            }
+        }
+    }
 }
 
 impl<T: TxEip4844Sidecar> TxEip4844Variant<T> {
