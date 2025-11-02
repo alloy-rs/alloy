@@ -6,10 +6,8 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[macro_use]
-extern crate tracing;
-
 use alloy_pubsub::ConnectionInterface;
+use tracing::{error, trace};
 
 #[cfg(not(target_family = "wasm"))]
 mod native;
