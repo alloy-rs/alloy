@@ -181,6 +181,7 @@ mod serde_impl {
         max_blob_count: u64,
         #[serde(rename = "target")]
         target_blob_count: u64,
+        #[serde(skip)]
         min_blob_fee: Option<u128>,
     }
 
