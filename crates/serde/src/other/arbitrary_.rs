@@ -18,8 +18,8 @@ enum ArbitraryValue {
     Bool(bool),
     Number(u64),
     String(String),
-    Array(Vec<ArbitraryValue>),
-    Object(BTreeMap<String, ArbitraryValue>),
+    Array(Vec<Self>),
+    Object(BTreeMap<String, Self>),
 }
 
 impl ArbitraryValue {

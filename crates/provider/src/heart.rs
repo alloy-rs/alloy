@@ -570,9 +570,16 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         if let Some(received_at_block) = to_watch.received_at_block {
             // Transaction is already confirmed, we just need to wait for the required
             // confirmations.
-            let current_block =
+            let confirmations = to_watch.config.required_confirmations;
+            let confirmed_at = received_at_block + confirmations - 1;
+            let current_height =
                 self.past_blocks.back().map(|(h, _)| *h).unwrap_or(received_at_block);
-            self.add_to_waiting_list(to_watch, current_block);
+
+            if confirmed_at <= current_height {
+                to_watch.notify(Ok(()));
+            } else {
+                self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+            }
             return;
         }
 
@@ -591,6 +598,11 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     to_watch.notify(Ok(()));
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+                    // Ensure reorg handling can move this watcher back if needed.
+                    let mut to_watch = to_watch;
+                    if to_watch.received_at_block.is_none() {
+                        to_watch.received_at_block = Some(*block_height);
+                    }
                     self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
                 }
                 return;

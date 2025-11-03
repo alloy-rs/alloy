@@ -30,6 +30,7 @@ alloy-core.workspace = true
 alloy-consensus = { workspace = true, optional = true }
 alloy-contract = { workspace = true, optional = true }
 alloy-eips = { workspace = true, optional = true }
+alloy-ens = { workspace = true, optional = true }
 alloy-genesis = { workspace = true, optional = true }
 alloy-network = { workspace = true, optional = true }
 alloy-node-bindings = { workspace = true, optional = true }
@@ -55,6 +56,7 @@ alloy-signer-gcp = { workspace = true, optional = true }
 alloy-signer-ledger = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
 alloy-signer-trezor = { workspace = true, optional = true }
+alloy-signer-turnkey = { workspace = true, optional = true }
 
 # transport
 alloy-transport = { workspace = true, optional = true }
@@ -68,7 +70,13 @@ alloy-trie = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "reqwest-rustls-tls", "alloy-core/default", "essentials"]
+default = [
+    "std",
+    "reqwest",
+    "reqwest-rustls-tls",
+    "alloy-core/default",
+    "essentials",
+]
 
 # std
 std = [
@@ -145,6 +153,7 @@ contract = [
     "sol-types",
 ]
 eips = ["dep:alloy-eips"]
+ens = ["dep:alloy-ens"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
@@ -182,11 +191,7 @@ provider-engine-api = [
     "alloy-provider?/engine-api",
     "rpc-types-engine",
 ]
-provider-mev-api = [
-    "providers",
-    "alloy-provider?/mev-api",
-    "rpc-types-mev",
-]
+provider-mev-api = ["providers", "alloy-provider?/mev-api", "rpc-types-mev"]
 provider-net-api = ["providers", "alloy-provider?/net-api"]
 provider-trace-api = [
     "providers",
@@ -231,10 +236,7 @@ rpc-types-anvil = [
     "alloy-provider?/anvil-api",
 ]
 rpc-types-any = ["rpc-types", "alloy-rpc-types?/any"]
-rpc-types-beacon = [
-    "rpc-types",
-    "alloy-rpc-types?/beacon",
-]
+rpc-types-beacon = ["rpc-types", "alloy-rpc-types?/beacon"]
 rpc-types-debug = [
     "rpc-types",
     "alloy-rpc-types?/debug",
@@ -268,6 +270,7 @@ signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
 signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
 signer-local = ["signers", "dep:alloy-signer-local"]
 signer-trezor = ["signers", "dep:alloy-signer-trezor"]
+signer-turnkey = ["signers", "dep:alloy-signer-turnkey"]
 signer-keystore = ["signer-local", "alloy-signer-local?/keystore"]
 signer-mnemonic = ["signer-local", "alloy-signer-local?/mnemonic"]
 signer-mnemonic-all-languages = [
@@ -282,6 +285,7 @@ transport-http = ["transports", "dep:alloy-transport-http"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
+transport-throttle = ["transports", "alloy-transport?/throttle"]
 
 # trie
 trie = ["dep:alloy-trie"]
@@ -329,9 +333,11 @@ eip712 = [
     "alloy-signer-aws?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
+    "alloy-signer-turnkey?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
+more-tuple-impls = ["alloy-core/more-tuple-impls"]
 
 arbitrary = [
     "alloy-core/arbitrary",

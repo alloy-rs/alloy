@@ -297,13 +297,13 @@ mod tests {
 
     #[test]
     fn test_disable_code() {
-        assert!(PreStateConfig { ..Default::default() }.code_enabled());
+        assert!(PreStateConfig::default().code_enabled());
         assert!(PreStateConfig { disable_code: Some(false), ..Default::default() }.code_enabled());
         assert!(!PreStateConfig { disable_code: Some(true), ..Default::default() }.code_enabled());
     }
     #[test]
     fn test_disable_storage() {
-        assert!(PreStateConfig { ..Default::default() }.storage_enabled());
+        assert!(PreStateConfig::default().storage_enabled());
         assert!(
             PreStateConfig { disable_storage: Some(false), ..Default::default() }.storage_enabled()
         );

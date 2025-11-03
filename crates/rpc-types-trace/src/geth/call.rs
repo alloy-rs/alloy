@@ -33,7 +33,7 @@ pub struct CallFrame {
     pub revert_reason: Option<String>,
     /// Recorded child calls.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub calls: Vec<CallFrame>,
+    pub calls: Vec<Self>,
     /// Logs emitted by this call.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub logs: Vec<CallLogFrame>,

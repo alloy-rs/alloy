@@ -347,6 +347,21 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
         hash: B256,
         block: Option<BlockId>,
     ) -> TransportResult<Option<Bytes>>;
+
+    /// The `debug_dbGet` method retrieves a value from the database using the given key.
+    ///
+    /// The key can be provided in two formats:
+    /// - Hex-encoded string with `0x` prefix: `0x[hex_string]` - decoded as hex bytes
+    /// - Raw byte string without `0x` prefix: `[raw_byte_string]` - treated as raw bytes
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    ///
+    /// # References
+    /// - [Reth implementation](https://github.com/paradigmxyz/reth/pull/19369)
+    /// - [Geth schema](https://github.com/ethereum/go-ethereum/blob/737ffd1bf0cbee378d0111a5b17ae4724fb2216c/core/rawdb/schema.go#L29)
+    async fn debug_db_get(&self, key: &str) -> TransportResult<Bytes>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
@@ -555,6 +570,10 @@ where
     ) -> TransportResult<Option<Bytes>> {
         self.client().request("debug_codeByHash", (hash, block)).await
     }
+
+    async fn debug_db_get(&self, key: &str) -> TransportResult<Bytes> {
+        self.client().request("debug_dbGet", (key,)).await
+    }
 }
 
 #[cfg(test)]
@@ -744,26 +763,44 @@ mod test {
         .await;
     }
 
-    // TODO: Enable for next reth release > v1.2.0
-    /*
     #[tokio::test]
     #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_debug_code_by_hash() {
+        use alloy_primitives::b256;
+
         async_ci_only(|| async move {
             run_with_tempdir("reth-test-", |temp_dir| async move {
                 let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
                 let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
 
-                // Contract (mainnet): 0x4e59b44847b379578588920ca78fbf26c0b4956c
-                let code = provider.debug_code_by_hash(
-                    b256!("2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989"),
-                    None
-                ).await.unwrap().unwrap();
-                assert_eq!(code,
-                           Bytes::from_static(&hex!("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
-                           e03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3")));
-            }).await;
-        }).await;
+                // Test 1: Empty code hash (keccak256 of empty bytes)
+                // This is a valid hash that exists for EOA accounts
+                let empty_code_hash =
+                    b256!("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
+                let empty_code = provider.debug_code_by_hash(empty_code_hash, None).await.unwrap();
+                // Reth might return Some(empty) or None for empty code
+                if let Some(code) = empty_code {
+                    assert!(
+                        code.is_empty() || code == Bytes::from_static(&[]),
+                        "Empty code hash should return empty bytes"
+                    );
+                }
+
+                // Test 2: Non-existent hash should return None
+                let non_existent_hash =
+                    b256!("0000000000000000000000000000000000000000000000000000000000000001");
+                let no_code = provider.debug_code_by_hash(non_existent_hash, None).await.unwrap();
+                assert!(no_code.is_none(), "Non-existent hash should return None");
+
+                // Test 3: Verify the API is callable and doesn't error
+                // This confirms Reth has the method implemented
+                let another_hash =
+                    b256!("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+                let result = provider.debug_code_by_hash(another_hash, None).await;
+                assert!(result.is_ok(), "API call should not error even for random hashes");
+            })
+            .await;
+        })
+        .await;
     }
-    */
 }

@@ -54,7 +54,7 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 ///
 /// ## Special treatment of EIP-1559
 ///
-/// While many RPC features are encapsulated by traits like [`DebugApi`],
+/// While many RPC features are encapsulated by extension traits,
 /// EIP-1559 fee estimation is generally assumed to be on by default. We
 /// generally assume that EIP-1559 is supported by the client and will
 /// proactively use it by default.
@@ -66,7 +66,6 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 /// [`TransactionBuilder`] and Fillers to change this behavior.
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
-/// [`DebugApi`]: crate::ext::DebugApi
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -933,7 +932,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// [`send_transaction`]: Self::send_transaction
     /// [`ProviderLayer`]: crate::ProviderLayer
-    /// [`TxFiller`]: crate::TxFiller
+    /// [`TxFiller`]: crate::fillers::TxFiller
     #[doc(hidden)]
     async fn send_transaction_internal(
         &self,
@@ -1145,6 +1144,38 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Self: Sized,
     {
         let rpc_call = self.client().request("eth_subscribe", params);
+        GetSubscription::new(self.weak_client(), rpc_call)
+    }
+
+    /// Subscribe to a non-standard subscription method without parameters.
+    ///
+    /// This is a helper method for creating subscriptions to methods that are not
+    /// "eth_subscribe" and don't require parameters. It automatically marks the
+    /// request as a subscription.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_to::<alloy_rpc_types_admin::PeerEvent>("admin_peerEvents").await?;
+    /// let mut stream = sub.into_stream().take(5);
+    /// while let Some(event) = stream.next().await {
+    ///    println!("peer event: {event:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    fn subscribe_to<R>(&self, method: &'static str) -> GetSubscription<NoParams, R>
+    where
+        R: RpcRecv,
+        Self: Sized,
+    {
+        let mut rpc_call = self.client().request_noparams(method);
+        rpc_call.set_is_subscription();
         GetSubscription::new(self.weak_client(), rpc_call)
     }
 
@@ -1453,28 +1484,14 @@ mod tests {
         crate::ext::test::async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
             use alloy_rpc_types_engine::JwtSecret;
-            use alloy_transport_http::{AuthLayer, AuthService, Http, HyperClient};
+            use alloy_transport_http::{AuthLayer, Http, HyperClient};
 
             let secret = JwtSecret::random();
 
             let reth =
                 Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
 
-            let hyper_client =
-                Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-
-            let service =
-                tower::ServiceBuilder::new().layer(AuthLayer::new(secret)).service(hyper_client);
-
-            let layer_transport: HyperClient<
-                Full<HyperBytes>,
-                AuthService<
-                    Client<
-                        alloy_transport_http::hyper_util::client::legacy::connect::HttpConnector,
-                        Full<HyperBytes>,
-                    >,
-                >,
-            > = HyperClient::with_service(service);
+            let layer_transport = HyperClient::new().layer(AuthLayer::new(secret));
 
             let http_hyper = Http::with_client(layer_transport, reth.endpoint_url());
 

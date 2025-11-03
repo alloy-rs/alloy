@@ -68,6 +68,10 @@ pub use alloy_consensus as consensus;
 #[doc(inline)]
 pub use alloy_eips as eips;
 
+#[cfg(feature = "ens")]
+#[doc(inline)]
+pub use alloy_ens as ens;
+
 #[cfg(feature = "network")]
 #[doc(inline)]
 pub use alloy_network as network;
@@ -155,6 +159,10 @@ pub mod signers {
     #[cfg(feature = "signer-trezor")]
     #[doc(inline)]
     pub use alloy_signer_trezor as trezor;
+
+    #[cfg(feature = "signer-turnkey")]
+    #[doc(inline)]
+    pub use alloy_signer_turnkey as turnkey;
 }
 
 /// Low-level Ethereum JSON-RPC transport abstraction and implementations.

@@ -50,6 +50,11 @@ mod tenderly;
 #[cfg(feature = "tenderly-api")]
 pub use tenderly::TenderlyApi;
 
+#[cfg(feature = "tenderly-admin-api")]
+mod tenderly_admin;
+#[cfg(feature = "tenderly-admin-api")]
+pub use tenderly_admin::TenderlyAdminApi;
+
 #[cfg(feature = "mev-api")]
 mod mev;
 

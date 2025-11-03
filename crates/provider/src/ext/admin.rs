@@ -76,9 +76,7 @@ where
     fn subscribe_peer_events(
         &self,
     ) -> GetSubscription<alloy_rpc_client::NoParams, alloy_rpc_types_admin::PeerEvent> {
-        let mut rpc_call = self.client().request_noparams("admin_peerEvents");
-        rpc_call.set_is_subscription();
-        GetSubscription::new(self.weak_client(), rpc_call)
+        self.subscribe_to("admin_peerEvents")
     }
 }
 

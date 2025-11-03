@@ -133,6 +133,32 @@ where
     Ok(blob)
 }
 
+/// Helper function to deserialize boxed blobs from a serde deserializer.
+#[cfg(all(debug_assertions, feature = "serde"))]
+pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use alloc::vec::Vec;
+    use serde::Deserialize;
+
+    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let mut blobs = Vec::with_capacity(raw_blobs.len());
+    for blob in raw_blobs {
+        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
+    }
+    Ok(blobs)
+}
+
+#[cfg(all(not(debug_assertions), feature = "serde"))]
+#[inline(always)]
+pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(deserializer)
+}
+
 /// A heap allocated blob that serializes as 0x-prefixed hex string
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, alloy_rlp::RlpEncodableWrapper)]
 pub struct HeapBlob(Bytes);

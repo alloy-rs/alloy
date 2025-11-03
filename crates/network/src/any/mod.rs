@@ -180,11 +180,9 @@ impl DerefMut for AnyRpcBlock {
 
 impl From<Block> for AnyRpcBlock {
     fn from(value: Block) -> Self {
-        let block = value
-            .map_header(|h| h.map(|h| alloy_consensus_any::AnyHeader { ..h.into() }))
-            .map_transactions(|tx| {
-                AnyRpcTransaction::new(WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)))
-            });
+        let block = value.map_header(|h| h.map(|h| h.into())).map_transactions(|tx| {
+            AnyRpcTransaction::new(WithOtherFields::new(tx.map(AnyTxEnvelope::Ethereum)))
+        });
 
         Self(WithOtherFields::new(block))
     }

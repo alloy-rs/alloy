@@ -135,7 +135,6 @@ pub trait SignerSync<Sig = Signature> {
 
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
-#[async_trait]
 impl<A, B, Sig> Signer<Sig> for Either<A, B>
 where
     A: Signer<Sig> + Send + Sync,

@@ -56,6 +56,9 @@ pub use alloy_transport as transport;
 #[cfg(feature = "ws")]
 pub use alloy_rpc_client::WsConnect;
 
+#[cfg(all(feature = "ws", not(target_family = "wasm")))]
+pub use alloy_rpc_client::WebSocketConfig;
+
 #[cfg(feature = "ipc")]
 pub use alloy_rpc_client::IpcConnect;
 

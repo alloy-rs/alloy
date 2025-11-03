@@ -5,6 +5,176 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Bug Fixes
+
+- [json-rpc] Correct RequestPacket doc references to RequestPacket::{Single,Batch} ([#3100](https://github.com/alloy-rs/alloy/issues/3100))
+- Correct gas field types in Header::size() method ([#3074](https://github.com/alloy-rs/alloy/issues/3074))
+- [rpc-client] Remove redundant into_box_transport ([#3071](https://github.com/alloy-rs/alloy/issues/3071))
+- [transport] Decrement request counter on retry limit exceeded ([#3069](https://github.com/alloy-rs/alloy/issues/3069))
+- Add defaults for blob response flags and drop unused serde_as ([#3057](https://github.com/alloy-rs/alloy/issues/3057))
+- [tx-macro] Correctly generate uppercase aliases ([#3053](https://github.com/alloy-rs/alloy/issues/3053))
+- [signer] Propagate semver parse errors instead of unwrap ([#3039](https://github.com/alloy-rs/alloy/issues/3039))
+
+### Dependencies
+
+- Move alloy_primitives to dev-deps ([#3106](https://github.com/alloy-rs/alloy/issues/3106))
+- [deps] Bump taiki-e/install-action from 2.62.33 to 2.62.38 ([#3086](https://github.com/alloy-rs/alloy/issues/3086))
+- [deps] Bump taiki-e/install-action from 2.62.28 to 2.62.33 ([#3056](https://github.com/alloy-rs/alloy/issues/3056))
+
+### Documentation
+
+- Clarify unsupported tx type in complete_type ([#3112](https://github.com/alloy-rs/alloy/issues/3112))
+- Add MEV API limitations and timing warnings ([#3098](https://github.com/alloy-rs/alloy/issues/3098))
+
+### Features
+
+- [provider] Add `debug_dbGet` method to retrieve values from db ([#3109](https://github.com/alloy-rs/alloy/issues/3109))
+- Forward more-tuple-impls to alloy-core ([#3090](https://github.com/alloy-rs/alloy/issues/3090))
+- Implement CallBuilder::legacy() to prefer legacy by setting gas_price ([#3085](https://github.com/alloy-rs/alloy/issues/3085))
+- [ens] Add `alloy-ens` to `alloy` metacrate ([#3083](https://github.com/alloy-rs/alloy/issues/3083))
+- [provider] Add tenderly admin api bindings ([#3047](https://github.com/alloy-rs/alloy/issues/3047))
+- Add blobs & into_blobs methods ([#3072](https://github.com/alloy-rs/alloy/issues/3072))
+- [signer-turnkey] Bump to 0.5 and add to main alloy package ([#3043](https://github.com/alloy-rs/alloy/issues/3043))
+- [envelope] Add try_into_* consuming helpers for EthereumTxEnvelope and tests ([#3062](https://github.com/alloy-rs/alloy/issues/3062))
+- [ens-txt] Added txt resolution functions to provider ([#3059](https://github.com/alloy-rs/alloy/issues/3059))
+- Add convenience fn for TxEip4844WithSidecar 7594 conversion ([#3040](https://github.com/alloy-rs/alloy/issues/3040))
+
+### Miscellaneous Tasks
+
+- Remove useless TODO comment in MEV stats module ([#3099](https://github.com/alloy-rs/alloy/issues/3099))
+- Add number value to MAX_TX_GAS_LIMIT_OSAKA ([#3093](https://github.com/alloy-rs/alloy/issues/3093))
+- [network] Remove outdated TODO about Ethereum-only block responses ([#3089](https://github.com/alloy-rs/alloy/issues/3089))
+- Expose WebSocketConfig in RPC client and provider for non-WASM builds ([#3088](https://github.com/alloy-rs/alloy/issues/3088))
+- [ens] Remove empty `ens.rs` file ([#3079](https://github.com/alloy-rs/alloy/issues/3079))
+- Enable debug_code_by_hash test ([#3052](https://github.com/alloy-rs/alloy/issues/3052))
+- Fix clippy ([#3044](https://github.com/alloy-rs/alloy/issues/3044))
+- Remove unnecessary todo ([#3042](https://github.com/alloy-rs/alloy/issues/3042))
+
+### Other
+
+- [rpc-types-beacon] Mark redundant Beacon/Beacon2 type aliases as deprecated ([#3081](https://github.com/alloy-rs/alloy/issues/3081))
+- Add transport-throttle feature ([#3046](https://github.com/alloy-rs/alloy/issues/3046))
+- Remove redundant clone in fallback transport ([#3045](https://github.com/alloy-rs/alloy/issues/3045))
+- [geth] Remove duplicate --miner.etherbase arg in Clique mode ([#3050](https://github.com/alloy-rs/alloy/issues/3050))
+
+### Refactor
+
+- [provider] Simplify `HyperClient` init with `layer` method ([#3114](https://github.com/alloy-rs/alloy/issues/3114))
+- [rpc-types-eth] Remove duplicate block range filtering logic ([#3077](https://github.com/alloy-rs/alloy/issues/3077))
+
+## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.41
+- Release 1.0.41
+
+### Other
+
+- Revert "chore: adds erc7562 tracer variant" ([#3037](https://github.com/alloy-rs/alloy/issues/3037))
+
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Features
+
+- Add methods to build EIP-7594 sidecars with default and custom settings ([#3036](https://github.com/alloy-rs/alloy/issues/3036))
+- Add block helper methods to EthCall and EthCallMany ([#3035](https://github.com/alloy-rs/alloy/issues/3035))
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Bug Fixes
+
+- [provider] Correct EthCallParams serialize length when no options set ([#3030](https://github.com/alloy-rs/alloy/issues/3030))
+- Saturate gas_price deser for TxLegacy ([#3010](https://github.com/alloy-rs/alloy/issues/3010))
+- Fixes for tx-envelope macro ([#3008](https://github.com/alloy-rs/alloy/issues/3008))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.37.2 to 1.38.1 ([#3023](https://github.com/alloy-rs/alloy/issues/3023))
+- [deps] Bump taiki-e/install-action from 2.62.21 to 2.62.28 ([#3024](https://github.com/alloy-rs/alloy/issues/3024))
+- [deps] Bump github/codeql-action from 3 to 4 ([#3025](https://github.com/alloy-rs/alloy/issues/3025))
+
+### Documentation
+
+- Fix broken intra-doc links in provider crate ([#3031](https://github.com/alloy-rs/alloy/issues/3031))
+
+### Features
+
+- [rpc-trace] Add tx_index for traceCall ([#2881](https://github.com/alloy-rs/alloy/issues/2881))
+- [provider] Add subscribe_noparams helper and use in admin ([#3028](https://github.com/alloy-rs/alloy/issues/3028))
+- [signer-turnkey] Add Turnkey signer implementation ([#2962](https://github.com/alloy-rs/alloy/issues/2962))
+- Add helper for legacy -> 7594 sidecar conversion ([#3013](https://github.com/alloy-rs/alloy/issues/3013))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Add changelog ([#3033](https://github.com/alloy-rs/alloy/issues/3033))
+- Adds erc7562 tracer variant ([#2690](https://github.com/alloy-rs/alloy/issues/2690))
+- Add rlp test ([#3032](https://github.com/alloy-rs/alloy/issues/3032))
+- Fix unused import ([#3015](https://github.com/alloy-rs/alloy/issues/3015))
+- Aggregate PRs ([#3011](https://github.com/alloy-rs/alloy/issues/3011))
+
+### Testing
+
+- Add serde test for GethDebugTracingOptions with prestateTracer ([#3016](https://github.com/alloy-rs/alloy/issues/3016))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Bug Fixes
+
+- [eip7547] InclusionListStatusV1 serialize_map size hint ([#3005](https://github.com/alloy-rs/alloy/issues/3005))
+- Use injected #alloy_rlp path in generated typed_decode error mapping ([#2996](https://github.com/alloy-rs/alloy/issues/2996))
+- [cache] Prevent caching for tag-based BlockId in get_block_receipts ([#2969](https://github.com/alloy-rs/alloy/issues/2969))
+- Silent truncation in Ledger message signing ([#2971](https://github.com/alloy-rs/alloy/issues/2971))
+- [provider] Correct TxFiller rustdoc link ([#2973](https://github.com/alloy-rs/alloy/issues/2973))
+- [provider] Use StateContext::default() placeholder in eth_callMany serialization ([#2968](https://github.com/alloy-rs/alloy/issues/2968))
+- [beacon] Use u64 for gas equality errors ([#2961](https://github.com/alloy-rs/alloy/issues/2961))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.36.3 to 1.37.2 ([#2990](https://github.com/alloy-rs/alloy/issues/2990))
+- [deps] Bump foundry-rs/foundry-toolchain from 1.4.0 to 1.5.0 ([#2991](https://github.com/alloy-rs/alloy/issues/2991))
+- [deps] Bump taiki-e/install-action from 2.62.13 to 2.62.21 ([#2992](https://github.com/alloy-rs/alloy/issues/2992))
+
+### Documentation
+
+- [rpc-types-eth] Clarify EIP-4844 preferred_type docs to include blob_versioned_hashes ([#2978](https://github.com/alloy-rs/alloy/issues/2978))
+
+### Features
+
+- Generate TypedTransaction enum in envelope macro ([#2925](https://github.com/alloy-rs/alloy/issues/2925))
+- [beacon-types] `GetBlobsResponse` ([#2994](https://github.com/alloy-rs/alloy/issues/2994))
+- Relax Clone bound for PollerBuilder and prepare_static_poller ([#2993](https://github.com/alloy-rs/alloy/issues/2993))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+- [meta] Add onbjerg + zerosnacks, remove yash as a code owner ([#3000](https://github.com/alloy-rs/alloy/issues/3000))
+- [rpc-client] Remove duplicate localhost:8545 parsing assertion ([#2989](https://github.com/alloy-rs/alloy/issues/2989))
+- Deduplicate Either async_trait attribute ([#2982](https://github.com/alloy-rs/alloy/issues/2982))
+- Remove outdated TODO about current-thread polling ([#2977](https://github.com/alloy-rs/alloy/issues/2977))
+
+### Other
+
+- Add grandizzy as codeowner ([#3002](https://github.com/alloy-rs/alloy/issues/3002))
+
+### Performance
+
+- [serde] Avoid allocation in B256 hex serialization ([#2998](https://github.com/alloy-rs/alloy/issues/2998))
+
+### Refactor
+
+- Remove redundant struct update syntax in AnyHeader construction ([#2980](https://github.com/alloy-rs/alloy/issues/2980))
+- Simplify PreStateConfig initialization in tests ([#2964](https://github.com/alloy-rs/alloy/issues/2964))
+- [consensus] Unify try_get_provider body across std/no_std ([#2963](https://github.com/alloy-rs/alloy/issues/2963))
+
 ## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
 
 ### Bug Fixes
@@ -29,6 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.37
 - Use fqs for tx_hash_with_type forwarding ([#2944](https://github.com/alloy-rs/alloy/issues/2944))
 - [beacon] Remove redundant DisplayFromStr on header.block_number ([#2943](https://github.com/alloy-rs/alloy/issues/2943))
 - Align tracing targets ([#2932](https://github.com/alloy-rs/alloy/issues/2932))
