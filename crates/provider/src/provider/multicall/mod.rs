@@ -411,7 +411,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        aggregateCall { calls: calls.to_vec() }
+        aggregateCall { calls }
     }
 
     /// Call the `tryAggregate` function
@@ -487,12 +487,12 @@ where
 
     /// Creates the [`tryAggregateCall`].
     fn to_try_aggregate_call(&self, require_success: bool) -> tryAggregateCall {
-        let calls = &self
+        let calls = self
             .calls
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() }
+        tryAggregateCall { requireSuccess: require_success, calls }
     }
 
     /// Call the `aggregate3` function
@@ -555,7 +555,7 @@ where
                 allowFailure: c.allowFailure,
             })
             .collect::<Vec<_>>();
-        aggregate3Call { calls: calls.to_vec() }
+        aggregate3Call { calls }
     }
 
     /// Call the `aggregate3Value` function
@@ -599,7 +599,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call = blockAndAggregateCall { calls: calls.to_vec() };
+        let call = blockAndAggregateCall { calls };
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         let result = T::decode_return_results(&returnData)?;
@@ -621,8 +621,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call =
-            tryBlockAndAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
+        let call = tryBlockAndAggregateCall { requireSuccess: require_success, calls };
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
