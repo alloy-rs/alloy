@@ -30,7 +30,7 @@ alloy-core.workspace = true
 alloy-consensus = { workspace = true, optional = true }
 alloy-contract = { workspace = true, optional = true }
 alloy-eips = { workspace = true, optional = true }
-alloy-ens = { workspace = true, optional = true, features = ["contract","provider"] }
+alloy-ens = { workspace = true, optional = true, features = ["contract", "provider"] }
 alloy-genesis = { workspace = true, optional = true }
 alloy-network = { workspace = true, optional = true }
 alloy-node-bindings = { workspace = true, optional = true }
