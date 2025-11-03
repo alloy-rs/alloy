@@ -5,7 +5,7 @@ use alloy_eips::{
     eip2718::IsTyped2718,
     eip2930::AccessList,
     eip4844::{BlobTransactionSidecar, DATA_GAS_PER_BLOB},
-    eip7594::{BlobTransactionSidecarVariant, Decodable7594, Encodable7594},
+    eip7594::{Decodable7594, Encodable7594},
     eip7702::SignedAuthorization,
     Typed2718,
 };
@@ -15,7 +15,7 @@ use core::mem;
 
 #[cfg(feature = "kzg")]
 use alloy_eips::eip4844::BlobTransactionValidationError;
-use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant};
+use alloy_eips::eip7594::BlobTransactionSidecarVariant;
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -74,24 +74,8 @@ impl From<Signed<TxEip4844WithSidecar>> for Signed<TxEip4844Variant> {
     }
 }
 
-impl From<TxEip4844Variant<BlobTransactionSidecar>>
-    for TxEip4844Variant<BlobTransactionSidecarVariant>
-{
-    fn from(value: TxEip4844Variant<BlobTransactionSidecar>) -> Self {
-        value.map_sidecar(Into::into)
-    }
-}
-
-impl From<TxEip4844Variant<BlobTransactionSidecarEip7594>>
-    for TxEip4844Variant<BlobTransactionSidecarVariant>
-{
-    fn from(value: TxEip4844Variant<BlobTransactionSidecarEip7594>) -> Self {
-        value.map_sidecar(Into::into)
-    }
-}
-
-impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844Variant<T> {
-    fn from(tx: TxEip4844WithSidecar<T>) -> Self {
+impl From<TxEip4844WithSidecar> for TxEip4844Variant {
+    fn from(tx: TxEip4844WithSidecar) -> Self {
         Self::TxEip4844WithSidecar(tx)
     }
 }
@@ -190,25 +174,24 @@ impl TxEip4844Variant {
     }
 
     /// Maps the sidecar to a new type.
-    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844Variant<U> {
+    pub fn map_sidecar(
+        self,
+        f: impl FnOnce(BlobTransactionSidecarVariant) -> BlobTransactionSidecarVariant,
+    ) -> Self {
         match self {
-            Self::TxEip4844(tx) => TxEip4844Variant::TxEip4844(tx),
-            Self::TxEip4844WithSidecar(tx) => {
-                TxEip4844Variant::TxEip4844WithSidecar(tx.map_sidecar(f))
-            }
+            Self::TxEip4844(tx) => Self::TxEip4844(tx),
+            Self::TxEip4844WithSidecar(tx) => Self::TxEip4844WithSidecar(tx.map_sidecar(f)),
         }
     }
 
     /// Maps the sidecar to a new type, returning an error if the mapping fails.
-    pub fn try_map_sidecar<U, E>(
+    pub fn try_map_sidecar<E>(
         self,
-        f: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<TxEip4844Variant<U>, E> {
+        f: impl FnOnce(BlobTransactionSidecarVariant) -> Result<BlobTransactionSidecarVariant, E>,
+    ) -> Result<Self, E> {
         match self {
-            Self::TxEip4844(tx) => Ok(TxEip4844Variant::TxEip4844(tx)),
-            Self::TxEip4844WithSidecar(tx) => {
-                tx.try_map_sidecar(f).map(TxEip4844Variant::TxEip4844WithSidecar)
-            }
+            Self::TxEip4844(tx) => Ok(Self::TxEip4844(tx)),
+            Self::TxEip4844WithSidecar(tx) => tx.try_map_sidecar(f).map(Self::TxEip4844WithSidecar),
         }
     }
 }
