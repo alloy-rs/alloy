@@ -68,6 +68,9 @@ pub struct Genesis {
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
+    /// The parent hash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_hash: Option<B256>,
 }
 
 impl Genesis {
@@ -436,6 +439,10 @@ pub struct ChainConfig {
     /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub blob_schedule: BTreeMap<String, BlobParams>,
+
+    /// For XLayer: legacyXLayerBlock
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub legacy_x_layer_block: Option<u64>,
 }
 
 /// Bincode-compatible [`ChainConfig`] serde implementation.
@@ -536,6 +543,9 @@ pub mod serde_bincode_compat {
         /// Extra fields as string key-value pairs (bincode-compatible alternative to OtherFields)
         #[serde(default)]
         extra_fields: BTreeMap<String, String>,
+        // For XLayer: legacyXLayerBlock
+        #[serde(default)]
+        legacy_x_layer_block: Option<u64>,
     }
 
     impl<'a> From<&'a super::ChainConfig> for ChainConfig<'a> {
@@ -582,6 +592,8 @@ pub mod serde_bincode_compat {
                     }
                     extra_fields
                 },
+                // For XLayer: legacyXLayerBlock
+                legacy_x_layer_block: value.legacy_x_layer_block,
             }
         }
     }
@@ -633,6 +645,8 @@ pub mod serde_bincode_compat {
                 },
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: value.blob_schedule.into_owned(),
+                // For XLayer: legacyXLayerBlock
+                legacy_x_layer_block: value.legacy_x_layer_block,
             }
         }
     }
@@ -1039,6 +1053,7 @@ impl Default for ChainConfig {
             extra_fields: Default::default(),
             deposit_contract_address: None,
             blob_schedule: Default::default(),
+            legacy_x_layer_block: None,
         }
     }
 }
@@ -1580,6 +1595,7 @@ mod tests {
             extra_data: Bytes::new(),
             gas_limit: 0x4c4b40,
             difficulty: U256::from(1),
+            parent_hash: None,
             ..Default::default()
         };
 
@@ -1652,6 +1668,7 @@ mod tests {
             extra_data: Bytes::new(),
             gas_limit: 0x4c4b40,
             difficulty: U256::from(1),
+            parent_hash: None,
             ..Default::default()
         };
 
@@ -1835,7 +1852,6 @@ mod tests {
         "mixHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
         "coinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "timestamp": "0x123456",
-        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "extraData": "0xfafbfcfd",
         "gasLimit": "0x2fefd8",
         "alloc": {
@@ -2002,8 +2018,10 @@ mod tests {
                     petersburg_block: Some(0),
                     istanbul_block: Some(0),
                     deposit_contract_address: None,
+                    legacy_x_layer_block: None,
                     ..Default::default()
                 },
+                parent_hash: None,
             };
 
         let deserialized_genesis: Genesis = serde_json::from_str(hive_genesis).unwrap();
@@ -2199,5 +2217,72 @@ mod tests {
         assert_eq!(trie_account.storage_root, EMPTY_ROOT_HASH);
         // No code provided, so code hash should be KECCAK_EMPTY
         assert_eq!(trie_account.code_hash, KECCAK_EMPTY);
+    }
+
+    #[test]
+    fn test_xlayer_genesis_deserialize() {
+        let xlayer_genesis = r#"
+    {
+        "nonce": "0x0000000000000042",
+        "difficulty": "0x2123456",
+        "mixHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
+        "coinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "timestamp": "0x123456",
+        "extraData": "0xfafbfcfd",
+        "gasLimit": "0x2fefd8",
+        "config": {
+            "ethash": {},
+            "chainId": 10,
+            "homesteadBlock": 0,
+            "eip150Block": 0,
+            "eip155Block": 0,
+            "eip158Block": 0,
+            "byzantiumBlock": 0,
+            "constantinopleBlock": 0,
+            "petersburgBlock": 0,
+            "istanbulBlock": 0,
+            "legacyXLayerBlock": 12345
+        },
+        "alloc": {},
+        "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+    }"#;
+
+    let expected_genesis =
+            Genesis {
+                nonce: 0x0000000000000042,
+                difficulty: U256::from(0x2123456),
+                mix_hash: B256::from_str(
+                    "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
+                )
+                .unwrap(),
+                coinbase: Address::from_str("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap(),
+                timestamp: 0x123456,
+                extra_data: Bytes::from_str("0xfafbfcfd").unwrap(),
+                gas_limit: 0x2fefd8,
+                base_fee_per_gas: None,
+                excess_blob_gas: None,
+                blob_gas_used: None,
+                number: None,
+                config: ChainConfig {
+                    ethash: Some(EthashConfig {}),
+                    chain_id: 10,
+                    homestead_block: Some(0),
+                    eip150_block: Some(0),
+                    eip155_block: Some(0),
+                    eip158_block: Some(0),
+                    byzantium_block: Some(0),
+                    constantinople_block: Some(0),
+                    petersburg_block: Some(0),
+                    istanbul_block: Some(0),
+                    deposit_contract_address: None,
+                    legacy_x_layer_block: Some(12345),
+                    ..Default::default()
+                },
+                parent_hash: Some(B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234").unwrap()),
+                alloc: BTreeMap::new(),
+            };
+
+        let deserialized_genesis: Genesis = serde_json::from_str(xlayer_genesis).unwrap();
+        assert_eq!(deserialized_genesis, expected_genesis);
     }
 }
