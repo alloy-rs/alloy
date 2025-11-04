@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Bug Fixes
+
+- Remove redundant Vec clones in multicall builders ([#3118](https://github.com/alloy-rs/alloy/issues/3118))
+- BlobParams bincode deserialization ([#3132](https://github.com/alloy-rs/alloy/issues/3132))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.38.1 to 1.39.0 ([#3135](https://github.com/alloy-rs/alloy/issues/3135))
+- [deps] Bump taiki-e/install-action from 2.62.38 to 2.62.45 ([#3134](https://github.com/alloy-rs/alloy/issues/3134))
+- Bump MSRV to 1.88 ([#3123](https://github.com/alloy-rs/alloy/issues/3123))
+
+### Documentation
+
+- [network] Add usage examples for try_into_either and try_map_unknown ([#3121](https://github.com/alloy-rs/alloy/issues/3121))
+
+### Features
+
+- Re-export `keystore-geth-compat` feature ([#3131](https://github.com/alloy-rs/alloy/issues/3131))
+- Add missing conversion fns ([#3124](https://github.com/alloy-rs/alloy/issues/3124))
+- Add map sidecar fns ([#3122](https://github.com/alloy-rs/alloy/issues/3122))
+- [serde] Add checksum helper ([#3117](https://github.com/alloy-rs/alloy/issues/3117))
+
+### Miscellaneous Tasks
+
+- [ens] Bumped ens crate with appropriate features ([#3128](https://github.com/alloy-rs/alloy/issues/3128))
+
+### Other
+
+- Restrict consensus transaction tests to the serde feature ([#3130](https://github.com/alloy-rs/alloy/issues/3130))
+
 ## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
 
 ### Bug Fixes
@@ -43,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.42
 - Remove useless TODO comment in MEV stats module ([#3099](https://github.com/alloy-rs/alloy/issues/3099))
 - Add number value to MAX_TX_GAS_LIMIT_OSAKA ([#3093](https://github.com/alloy-rs/alloy/issues/3093))
 - [network] Remove outdated TODO about Ethereum-only block responses ([#3089](https://github.com/alloy-rs/alloy/issues/3089))
