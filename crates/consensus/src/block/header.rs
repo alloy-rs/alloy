@@ -254,9 +254,9 @@ impl Header {
         mem::size_of::<u64>() + // timestamp
         mem::size_of::<B256>() + // mix hash
         mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u128>>() + // base fee per gas
-        mem::size_of::<Option<u128>>() + // blob gas used
-        mem::size_of::<Option<u128>>() + // excess blob gas
+        mem::size_of::<Option<u64>>() + // base fee per gas
+        mem::size_of::<Option<u64>>() + // blob gas used
+        mem::size_of::<Option<u64>>() + // excess blob gas
         mem::size_of::<Option<B256>>() + // parent beacon block root
         mem::size_of::<Option<B256>>() + // requests root
         self.extra_data.len() // extra data
