@@ -1,5 +1,4 @@
 use crate::parse::{GroupedVariants, VariantKind};
-use alloy_primitives::U8;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Ident, Path};
@@ -811,24 +810,11 @@ impl Expander {
             .iter()
             .map(|v| {
                 let name = &v.name;
-                let VariantKind::Typed(ty_value) = v.kind else { unreachable!() };
-
-                let tx_type = U8::from(ty_value);
-                let rename = format!("0x{tx_type:x}");
-
-                let mut aliases = vec![];
-                // Add alias for single digit hex values (e.g., "0x0" for "0x00")
-                if rename.len() == 3 {
-                    aliases.push(format!("0x0{}", rename.chars().last().unwrap()));
-                }
-
-                // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
-                if rename != rename.to_uppercase() {
-                    aliases.push(rename.to_uppercase());
-                }
 
                 // Custom type or extract from wrapper
                 let inner_type = v.inner_type();
+
+                let (rename, aliases) = v.kind.serde_tag_and_aliases();
 
                 quote! {
                     #[serde(rename = #rename, #(alias = #aliases,)*)]

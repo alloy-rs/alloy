@@ -424,11 +424,6 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         self
     }
 
-    /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
-    pub fn legacy(self) -> Self {
-        todo!()
-    }
-
     /// Sets the `gas` field in the transaction to the provided value
     pub fn gas(mut self, gas: u64) -> Self {
         self.request.set_gas_limit(gas);

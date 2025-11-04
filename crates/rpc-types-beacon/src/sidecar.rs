@@ -8,7 +8,6 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::vec::IntoIter;
 
 /// Bundle of blobs for a given block
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::IntoIterator)]
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
@@ -22,12 +21,12 @@ impl BeaconBlobBundle {
     }
 
     /// Returns the number of blobs in the bundle.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Returns if the bundle is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
@@ -42,10 +41,12 @@ impl BeaconBlobBundle {
 pub struct GetBlobsResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
     /// be invalidated at a later time. If the field is not present, assume the False value.
+    #[serde(default)]
     pub execution_optimistic: bool,
     /// True if the response references the finalized history of the chain, as determined by fork
     /// choice. If the field is not present, additional calls are necessary to compare the epoch of
     /// the requested information with the finalized checkpoint.
+    #[serde(default)]
     pub finalized: bool,
     /// Vec of individual blobs
     #[serde(deserialize_with = "deserialize_blobs")]

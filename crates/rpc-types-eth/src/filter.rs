@@ -1477,32 +1477,10 @@ impl FilteredParams {
 
     /// Returns true if the filter matches the given block number
     pub const fn filter_block_range(&self, block_number: u64) -> bool {
-        if self.filter.is_none() {
-            return true;
+        match &self.filter {
+            Some(filter) => filter.matches_block_range(block_number),
+            None => true,
         }
-        let filter = self.filter.as_ref().unwrap();
-        let mut res = true;
-
-        if let Some(BlockNumberOrTag::Number(num)) = filter.block_option.get_from_block() {
-            if *num > block_number {
-                res = false;
-            }
-        }
-
-        if let Some(to) = filter.block_option.get_to_block() {
-            match to {
-                BlockNumberOrTag::Number(num) => {
-                    if *num < block_number {
-                        res = false;
-                    }
-                }
-                BlockNumberOrTag::Earliest => {
-                    res = false;
-                }
-                _ => {}
-            }
-        }
-        res
     }
 
     /// Returns `true` if the filter matches the given block hash.

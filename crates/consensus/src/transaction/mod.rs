@@ -574,15 +574,13 @@ impl<T: TxHashRef> TxHashRef for alloy_eips::eip2718::WithEncoded<T> {
     }
 }
 
-#[cfg(test)]
-#[allow(unused_imports)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
     use alloy_primitives::Signature;
     use rand::Rng;
 
     #[test]
-    #[cfg(feature = "serde")]
     fn test_custom_envelope() {
         use serde::{Serialize, Serializer};
         fn serialize_with<S: Serializer>(

@@ -661,7 +661,10 @@ pub mod serde_bincode_compat {
 
     #[cfg(test)]
     mod tests {
+        use std::collections::BTreeMap;
+
         use super::super::ChainConfig;
+        use alloy_eips::eip7840::BlobParams;
         use bincode::config;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -674,6 +677,30 @@ pub mod serde_bincode_compat {
                 #[serde_as(as = "super::ChainConfig")]
                 config: ChainConfig,
             }
+
+            let mut blob_schedule = BTreeMap::new();
+            blob_schedule.insert(
+                "cancun".to_string(),
+                BlobParams {
+                    target_blob_count: 3,
+                    max_blob_count: 6,
+                    update_fraction: 3338477,
+                    min_blob_fee: 1,
+                    max_blobs_per_tx: 6,
+                    blob_base_cost: 0,
+                },
+            );
+            blob_schedule.insert(
+                "prague".to_string(),
+                BlobParams {
+                    target_blob_count: 6,
+                    max_blob_count: 9,
+                    update_fraction: 5007716,
+                    min_blob_fee: 1,
+                    max_blobs_per_tx: 9,
+                    blob_base_cost: 0,
+                },
+            );
 
             // Create a test config with mixed Some/None values to test serialization
             let config = ChainConfig {
@@ -710,7 +737,7 @@ pub mod serde_bincode_compat {
                 parlia: None,
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
-                blob_schedule: Default::default(),
+                blob_schedule,
             };
 
             let data = Data { config };

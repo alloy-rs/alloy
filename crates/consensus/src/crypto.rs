@@ -175,10 +175,9 @@ pub mod backend {
 
     /// Get the currently installed default provider, panicking if none is installed.
     pub fn get_default_provider() -> &'static dyn CryptoProvider {
-        try_get_provider().map_or_else(
-            || panic!("No crypto backend installed. Call install_default_provider() first."),
-            |provider| provider,
-        )
+        try_get_provider().unwrap_or_else(|| {
+            panic!("No crypto backend installed. Call install_default_provider() first.")
+        })
     }
 
     /// Try to get the currently installed default provider, returning None if none is installed.

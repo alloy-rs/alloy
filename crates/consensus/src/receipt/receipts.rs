@@ -197,12 +197,12 @@ pub struct Receipts<T> {
 
 impl<T> Receipts<T> {
     /// Returns the length of the [`Receipts`] vector.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.receipt_vec.len()
     }
 
     /// Returns `true` if the [`Receipts`] vector is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.receipt_vec.is_empty()
     }
 
