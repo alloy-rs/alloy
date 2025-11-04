@@ -18,13 +18,11 @@ where
 /// Best-effort heuristic: returns `true` if the connection has no hostname, or
 /// the host is `localhost`, `127.0.0.1`, or the IPv6 loopback `::1`.
 pub fn guess_local_url(s: impl AsRef<str>) -> bool {
-    fn _guess_local_url(url: &str) -> bool {
-        url.parse::<Url>().is_ok_and(|url| {
-            url.host_str()
-                .is_none_or(|host| host == "localhost" || host == "127.0.0.1" || host == "::1")
-        })
-    }
-    _guess_local_url(s.as_ref())
+    let url = s.as_ref();
+    url.parse::<Url>().is_ok_and(|url| {
+        url.host_str()
+            .is_none_or(|host| host == "localhost" || host == "127.0.0.1" || host == "::1")
+    })
 }
 
 #[doc(hidden)]
