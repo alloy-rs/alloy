@@ -145,10 +145,11 @@ pub struct ForkedNetwork {
 }
 
 /// Additional `evm_mine` options
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MineOptions {
     /// The options for mining
+    #[default]
     Options {
         /// The timestamp the block should be mined with
         #[serde(with = "alloy_serde::quantity::opt")]
@@ -160,12 +161,6 @@ pub enum MineOptions {
     /// The timestamp the block should be mined with
     #[serde(with = "alloy_serde::quantity::opt")]
     Timestamp(Option<u64>),
-}
-
-impl Default for MineOptions {
-    fn default() -> Self {
-        Self::Options { timestamp: None, blocks: None }
-    }
 }
 
 /// Represents the options used in `anvil_reorg`
