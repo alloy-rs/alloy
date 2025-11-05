@@ -177,9 +177,7 @@ impl BlobTransactionSidecarVariant {
         settings: &c_kzg::KzgSettings,
     ) -> Result<Self, c_kzg::Error> {
         match self {
-            BlobTransactionSidecarVariant::Eip4844(legacy) => {
-                legacy.try_into_7594(settings).map(Self::Eip7594)
-            }
+            Self::Eip4844(legacy) => legacy.try_into_7594(settings).map(Self::Eip7594),
             sidecar @ Self::Eip7594(_) => Ok(sidecar),
         }
     }
@@ -273,8 +271,8 @@ impl BlobTransactionSidecarVariant {
         settings: &c_kzg::KzgSettings,
     ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
         match self {
-            BlobTransactionSidecarVariant::Eip4844(legacy) => legacy.try_into_7594(settings),
-            BlobTransactionSidecarVariant::Eip7594(sidecar) => Ok(sidecar),
+            Self::Eip4844(legacy) => legacy.try_into_7594(settings),
+            Self::Eip7594(sidecar) => Ok(sidecar),
         }
     }
 
