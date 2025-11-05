@@ -27,6 +27,7 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarV
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionVariant")]
 pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
     /// A standalone transaction with blob hashes and max blob fee.
@@ -514,6 +515,7 @@ where
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844Transaction", alias = "TransactionEip4844", alias = "Eip4844Tx")]
 pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
@@ -566,6 +568,8 @@ pub struct TxEip4844 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
+    #[cfg_attr(feature = "borsh", borsh(skip))]
+    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
 
     /// It contains a vector of fixed size hash(32 bytes)
@@ -834,6 +838,7 @@ impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
 pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
     /// The actual transaction.
