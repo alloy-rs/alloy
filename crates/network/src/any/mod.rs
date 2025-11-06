@@ -562,13 +562,13 @@ impl AnyTransactionReceipt {
 
     /// Returns the contract address if this was a deployment transaction.
     #[inline]
-    pub fn deployed_contract(&self) -> Option<alloy_primitives::Address> {
+    pub const fn deployed_contract(&self) -> Option<alloy_primitives::Address> {
         self.0.inner.contract_address
     }
 
     /// Returns the transaction hash.
     #[inline]
-    pub fn transaction_hash(&self) -> alloy_primitives::TxHash {
+    pub const fn transaction_hash(&self) -> alloy_primitives::TxHash {
         self.0.inner.transaction_hash
     }
 
@@ -576,7 +576,7 @@ impl AnyTransactionReceipt {
     ///
     /// Alias for [`transaction_hash`](Self::transaction_hash).
     #[inline]
-    pub fn tx_hash(&self) -> alloy_primitives::TxHash {
+    pub const fn tx_hash(&self) -> alloy_primitives::TxHash {
         self.transaction_hash()
     }
 
@@ -588,19 +588,19 @@ impl AnyTransactionReceipt {
 
     /// Returns the block hash if available.
     #[inline]
-    pub fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
+    pub const fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
         self.0.inner.block_hash
     }
 
     /// Returns the block number if available.
     #[inline]
-    pub fn block_number(&self) -> Option<u64> {
+    pub const fn block_number(&self) -> Option<u64> {
         self.0.inner.block_number
     }
 
     /// Returns the gas used by this transaction.
     #[inline]
-    pub fn gas_used(&self) -> u64 {
+    pub const fn gas_used(&self) -> u64 {
         self.0.inner.gas_used
     }
 
@@ -612,19 +612,19 @@ impl AnyTransactionReceipt {
 
     /// Returns the effective gas price.
     #[inline]
-    pub fn effective_gas_price(&self) -> u128 {
+    pub const fn effective_gas_price(&self) -> u128 {
         self.0.inner.effective_gas_price
     }
 
     /// Returns a reference to the other fields.
     #[inline]
-    pub fn other_fields(&self) -> &alloy_serde::OtherFields {
+    pub const fn other_fields(&self) -> &alloy_serde::OtherFields {
         &self.0.other
     }
 
     /// Returns a mutable reference to the other fields.
     #[inline]
-    pub fn other_fields_mut(&mut self) -> &mut alloy_serde::OtherFields {
+    pub const fn other_fields_mut(&mut self) -> &mut alloy_serde::OtherFields {
         &mut self.0.other
     }
 
