@@ -309,7 +309,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         self.layer(CallBatchLayer::new())
     }
 
-    /// Aggregate multiple `eth_call` requests with block number queries done by calling Arbsym precompile.
+    /// Aggregate multiple `eth_call` requests with block number queries done by calling Arbsym
+    /// precompile.
     ///
     /// See [`CallBatchLayer`] for more information.
     pub fn with_arbitrum_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
