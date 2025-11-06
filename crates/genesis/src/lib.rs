@@ -891,6 +891,7 @@ impl ChainConfig {
         let mut cancun = None;
         let mut prague = None;
         let mut osaka = None;
+        let mut amsterdam = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in &self.blob_schedule {
@@ -938,10 +939,16 @@ impl ChainConfig {
                         scheduled.push((timestamp, params));
                     }
                 }
+                "amsterdam" => {
+                    if let Some(timestamp) = self.amsterdam_time {
+                        amsterdam = Some((timestamp, params));
+                    }
+                }
                 _ => (),
             }
         }
 
+        scheduled.extend(amsterdam);
         scheduled.sort_by_key(|(timestamp, _)| *timestamp);
 
         BlobScheduleBlobParams {
