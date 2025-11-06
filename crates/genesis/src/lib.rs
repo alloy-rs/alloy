@@ -881,6 +881,7 @@ impl ChainConfig {
         let mut cancun = None;
         let mut prague = None;
         let mut osaka = None;
+        let mut amsterdam = None;
         let mut scheduled = Vec::new();
 
         for (key, params) in &self.blob_schedule {
@@ -902,6 +903,7 @@ impl ChainConfig {
                 .with_max_blobs_per_tx(eip7594::MAX_BLOBS_PER_TX_FUSAKA);
 
             match key.as_str() {
+                "amsterdam" => amsterdam = Some(params),
                 "osaka" => osaka = Some(params),
                 "bpo1" => {
                     if let Some(timestamp) = self.bpo1_time {
@@ -938,6 +940,7 @@ impl ChainConfig {
             cancun: cancun.unwrap_or_else(BlobParams::cancun),
             prague: prague.unwrap_or_else(BlobParams::prague),
             osaka: osaka.unwrap_or_else(BlobParams::osaka),
+            amsterdam: amsterdam.unwrap_or_else(BlobParams::amsterdam),
             scheduled,
         }
     }
