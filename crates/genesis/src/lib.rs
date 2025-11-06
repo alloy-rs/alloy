@@ -26,6 +26,7 @@ use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 /// The genesis block specification.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Genesis {
     /// The fork configuration for this network.
     #[serde(default)]
@@ -199,6 +200,7 @@ impl Genesis {
 /// An account in the state of the genesis block.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
@@ -300,6 +302,7 @@ impl From<GenesisAccount> for TrieAccount {
 /// for the source of each field.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct ChainConfig {
     /// The network's chain ID.
     pub chain_id: u64,
@@ -425,6 +428,7 @@ pub struct ChainConfig {
 
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
+    #[cfg_attr(feature = "borsh", borsh(skip))]
     pub extra_fields: OtherFields,
 
     /// The deposit contract address
@@ -657,7 +661,10 @@ pub mod serde_bincode_compat {
 
     #[cfg(test)]
     mod tests {
+        use std::collections::BTreeMap;
+
         use super::super::ChainConfig;
+        use alloy_eips::eip7840::BlobParams;
         use bincode::config;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -670,6 +677,30 @@ pub mod serde_bincode_compat {
                 #[serde_as(as = "super::ChainConfig")]
                 config: ChainConfig,
             }
+
+            let mut blob_schedule = BTreeMap::new();
+            blob_schedule.insert(
+                "cancun".to_string(),
+                BlobParams {
+                    target_blob_count: 3,
+                    max_blob_count: 6,
+                    update_fraction: 3338477,
+                    min_blob_fee: 1,
+                    max_blobs_per_tx: 6,
+                    blob_base_cost: 0,
+                },
+            );
+            blob_schedule.insert(
+                "prague".to_string(),
+                BlobParams {
+                    target_blob_count: 6,
+                    max_blob_count: 9,
+                    update_fraction: 5007716,
+                    min_blob_fee: 1,
+                    max_blobs_per_tx: 9,
+                    blob_base_cost: 0,
+                },
+            );
 
             // Create a test config with mixed Some/None values to test serialization
             let config = ChainConfig {
@@ -706,7 +737,7 @@ pub mod serde_bincode_compat {
                 parlia: None,
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
-                blob_schedule: Default::default(),
+                blob_schedule,
             };
 
             let data = Data { config };
@@ -1045,10 +1076,12 @@ impl Default for ChainConfig {
 
 /// Empty consensus configuration for proof-of-work networks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct EthashConfig {}
 
 /// Consensus configuration for Clique.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct CliqueConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1065,6 +1098,7 @@ pub struct CliqueConfig {
 /// For the general introduction: <https://docs.bnbchain.org/docs/learn/consensus/>
 /// For the specification: <https://github.com/bnb-chain/bsc/blob/master/params/config.go#L558>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct ParliaConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(default, skip_serializing_if = "Option::is_none")]

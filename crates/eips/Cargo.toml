@@ -58,6 +58,9 @@ ethereum_ssz = { workspace = true, optional = true }
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 
+# borsh
+borsh = { workspace = true, optional = true, features = ["derive"] }
+
 # misc
 auto_impl.workspace = true
 
@@ -86,7 +89,8 @@ std = [
 	"sha2?/std",
 	"either/std",
 	"serde_with?/std",
-	"thiserror/std"
+	"thiserror/std",
+	"borsh?/std"
 ]
 serde = [
 	"dep:alloy-serde",
@@ -117,4 +121,8 @@ arbitrary = [
 	"alloy-eip7702/arbitrary",
 	"alloy-eip7702/k256",
 	"c-kzg?/arbitrary"
+]
+borsh = [
+	"dep:borsh",
+	"alloy-primitives/borsh",
 ]
