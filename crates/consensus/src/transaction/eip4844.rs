@@ -15,6 +15,7 @@ use core::{fmt, mem};
 
 #[cfg(feature = "kzg")]
 use alloy_eips::eip4844::BlobTransactionValidationError;
+use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant};
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -26,6 +27,7 @@ use alloy_eips::eip4844::BlobTransactionValidationError;
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionVariant")]
 pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
     /// A standalone transaction with blob hashes and max blob fee.
@@ -70,6 +72,22 @@ impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip484
     fn from(value: Signed<TxEip4844WithSidecar<T>>) -> Self {
         let (tx, signature, hash) = value.into_parts();
         Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
+    }
+}
+
+impl From<TxEip4844Variant<BlobTransactionSidecar>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(value: TxEip4844Variant<BlobTransactionSidecar>) -> Self {
+        value.map_sidecar(Into::into)
+    }
+}
+
+impl From<TxEip4844Variant<BlobTransactionSidecarEip7594>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(value: TxEip4844Variant<BlobTransactionSidecarEip7594>) -> Self {
+        value.map_sidecar(Into::into)
     }
 }
 
@@ -168,6 +186,29 @@ impl<T> TxEip4844Variant<T> {
         match self {
             Self::TxEip4844WithSidecar(tx) => Some(tx.sidecar()),
             _ => None,
+        }
+    }
+
+    /// Maps the sidecar to a new type.
+    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844Variant<U> {
+        match self {
+            Self::TxEip4844(tx) => TxEip4844Variant::TxEip4844(tx),
+            Self::TxEip4844WithSidecar(tx) => {
+                TxEip4844Variant::TxEip4844WithSidecar(tx.map_sidecar(f))
+            }
+        }
+    }
+
+    /// Maps the sidecar to a new type, returning an error if the mapping fails.
+    pub fn try_map_sidecar<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<TxEip4844Variant<U>, E> {
+        match self {
+            Self::TxEip4844(tx) => Ok(TxEip4844Variant::TxEip4844(tx)),
+            Self::TxEip4844WithSidecar(tx) => {
+                tx.try_map_sidecar(f).map(TxEip4844Variant::TxEip4844WithSidecar)
+            }
         }
     }
 }
@@ -474,6 +515,7 @@ where
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844Transaction", alias = "TransactionEip4844", alias = "Eip4844Tx")]
 pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
@@ -526,6 +568,8 @@ pub struct TxEip4844 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
+    #[cfg_attr(feature = "borsh", borsh(skip))]
+    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
 
     /// It contains a vector of fixed size hash(32 bytes)
@@ -548,7 +592,7 @@ pub struct TxEip4844 {
 impl TxEip4844 {
     /// Returns the total gas for all blobs in this transaction.
     #[inline]
-    pub fn blob_gas(&self) -> u64 {
+    pub const fn blob_gas(&self) -> u64 {
         // SAFETY: we don't expect u64::MAX / DATA_GAS_PER_BLOB hashes in a single transaction
         self.blob_versioned_hashes.len() as u64 * DATA_GAS_PER_BLOB
     }
@@ -794,6 +838,7 @@ impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
 pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
     /// The actual transaction.

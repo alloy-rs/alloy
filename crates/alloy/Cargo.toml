@@ -30,7 +30,7 @@ alloy-core.workspace = true
 alloy-consensus = { workspace = true, optional = true }
 alloy-contract = { workspace = true, optional = true }
 alloy-eips = { workspace = true, optional = true }
-alloy-ens = { workspace = true, optional = true }
+alloy-ens = { workspace = true, optional = true, features = ["contract", "provider"] }
 alloy-genesis = { workspace = true, optional = true }
 alloy-network = { workspace = true, optional = true }
 alloy-node-bindings = { workspace = true, optional = true }
@@ -272,6 +272,10 @@ signer-local = ["signers", "dep:alloy-signer-local"]
 signer-trezor = ["signers", "dep:alloy-signer-trezor"]
 signer-turnkey = ["signers", "dep:alloy-signer-turnkey"]
 signer-keystore = ["signer-local", "alloy-signer-local?/keystore"]
+signer-keystore-geth-compat = [
+    "signer-local",
+    "alloy-signer-local?/keystore-geth-compat",
+]
 signer-mnemonic = ["signer-local", "alloy-signer-local?/mnemonic"]
 signer-mnemonic-all-languages = [
     "signer-mnemonic",

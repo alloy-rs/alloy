@@ -6,7 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use alloy_consensus::{BlockHeader, TxReceipt};
+use alloy_consensus::{BlockHeader, Transaction, TxReceipt};
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use alloy_network_primitives::HeaderResponse;
@@ -62,7 +62,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The network transaction envelope type.
     #[doc(alias = "TransactionEnvelope")]
-    type TxEnvelope: Eip2718Envelope + Debug;
+    type TxEnvelope: Eip2718Envelope + Transaction + Debug;
 
     /// An enum over the various transaction types.
     #[doc(alias = "UnsignedTransaction")]

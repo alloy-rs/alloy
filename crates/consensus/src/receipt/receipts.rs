@@ -12,6 +12,7 @@ use core::fmt;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
 pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
@@ -196,12 +197,12 @@ pub struct Receipts<T> {
 
 impl<T> Receipts<T> {
     /// Returns the length of the [`Receipts`] vector.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.receipt_vec.len()
     }
 
     /// Returns `true` if the [`Receipts`] vector is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.receipt_vec.is_empty()
     }
 
@@ -254,6 +255,7 @@ impl<T> Default for Receipts<T> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceiptWithBloom", alias = "TxReceiptWithBloom")]
 pub struct ReceiptWithBloom<T = Receipt<Log>> {
     #[cfg_attr(feature = "serde", serde(flatten))]

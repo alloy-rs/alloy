@@ -15,6 +15,7 @@ use core::mem;
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "LegacyTransaction", alias = "TransactionLegacy", alias = "LegacyTx")]
 pub struct TxLegacy {
     /// Added as EIP-155: Simple replay attack protection

@@ -4,6 +4,7 @@ use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 /// Captures the result of a transaction execution.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub enum Eip658Value {
     /// A boolean `statusCode` introduced by [EIP-658].
     ///

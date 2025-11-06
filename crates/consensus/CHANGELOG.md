@@ -5,10 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Dependencies
+
+- Bump MSRV to 1.88 ([#3123](https://github.com/alloy-rs/alloy/issues/3123))
+
+### Features
+
+- Add missing conversion fns ([#3124](https://github.com/alloy-rs/alloy/issues/3124))
+- Add map sidecar fns ([#3122](https://github.com/alloy-rs/alloy/issues/3122))
+
+### Other
+
+- Restrict consensus transaction tests to the serde feature ([#3130](https://github.com/alloy-rs/alloy/issues/3130))
+
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Bug Fixes
+
+- Correct gas field types in Header::size() method ([#3074](https://github.com/alloy-rs/alloy/issues/3074))
+
+### Features
+
+- [envelope] Add try_into_* consuming helpers for EthereumTxEnvelope and tests ([#3062](https://github.com/alloy-rs/alloy/issues/3062))
+- Add convenience fn for TxEip4844WithSidecar 7594 conversion ([#3040](https://github.com/alloy-rs/alloy/issues/3040))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.42
+- Fix clippy ([#3044](https://github.com/alloy-rs/alloy/issues/3044))
+- Release 1.0.41
 - Release 1.0.40
 
 ## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
