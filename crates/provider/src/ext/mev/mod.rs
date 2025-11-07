@@ -27,6 +27,17 @@ pub const FLASHBOTS_SIGNATURE_HEADER: &str = "x-flashbots-signature";
 /// - Rate limiting may be enforced by MEV relays
 /// - Authentication is required for most operations
 ///
+/// ## Error Handling
+///
+/// All methods return a [`MevBuilder`] which implements [`IntoFuture`] and yields a
+/// [`TransportResult`]. Errors may occur at several levels:
+///
+/// - **Transport errors**: Network failures, connection issues, or serialization errors
+/// - **Authentication errors**: When using [`MevBuilder::with_auth`], signing failures are wrapped
+///   in [`TransportErrorKind::Custom`]
+/// - **RPC errors**: MEV relays may return specific error codes for invalid bundles, timeouts, rate
+///   limiting, or authentication failures
+///
 /// See [Flashbots documentation](https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint) for detailed limitations.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
@@ -44,6 +55,12 @@ pub trait MevApi<N>: Send + Sync {
     ///
     /// Bundle submission is extremely time-sensitive. Submit as early as possible
     /// in the block interval to maximize inclusion probability.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`TransportResult`]. When using [`MevBuilder::with_auth`], signing errors
+    /// are wrapped in [`TransportErrorKind::Custom`]. The relay may return errors for invalid
+    /// bundles, authentication failures, or rate limiting.
     fn send_bundle(
         &self,
         bundle: EthSendBundle,
@@ -56,12 +73,24 @@ pub trait MevApi<N>: Send + Sync {
     fn send_blobs(&self, blobs: EthSendBlobs) -> MevBuilder<(EthSendBlobs,), ()>;
 
     /// Sends a private transaction using the `eth_sendPrivateTransaction` RPC method.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`TransportResult`]. When using [`MevBuilder::with_auth`], signing errors
+    /// are wrapped in [`TransportErrorKind::Custom`]. The relay may return errors for invalid
+    /// transactions or authentication failures.
     fn send_private_transaction(
         &self,
         private_tx: EthSendPrivateTransaction,
     ) -> MevBuilder<(EthSendPrivateTransaction,), Option<TxHash>>;
 
     /// Sends a private transaction using the `eth_sendPrivateRawTransaction` RPC method.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`TransportResult`]. When using [`MevBuilder::with_auth`], signing errors
+    /// are wrapped in [`TransportErrorKind::Custom`]. The relay may return errors for invalid
+    /// transaction encoding or authentication failures.
     fn send_private_raw_transaction(
         &self,
         encoded_tx: &[u8],
@@ -89,6 +118,12 @@ pub trait MevApi<N>: Send + Sync {
     ///
     /// Bundle submission is extremely time-sensitive. Submit as early as possible
     /// in the block interval to maximize inclusion probability.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`TransportResult`]. When using [`MevBuilder::with_auth`], signing errors
+    /// are wrapped in [`TransportErrorKind::Custom`]. The relay may return errors for invalid
+    /// bundles, authentication failures, or rate limiting.
     fn send_mev_bundle(
         &self,
         bundle: MevSendBundle,
