@@ -29,8 +29,9 @@ pub const FLASHBOTS_SIGNATURE_HEADER: &str = "x-flashbots-signature";
 ///
 /// ## Error Handling
 ///
-/// All methods return a [`MevBuilder`] which implements [`IntoFuture`](std::future::IntoFuture) and yields a
-/// [`TransportResult`](alloy_transport::TransportResult). Errors may occur at several levels:
+/// All methods return a [`MevBuilder`] which implements [`IntoFuture`](std::future::IntoFuture) and
+/// yields a [`TransportResult`](alloy_transport::TransportResult). Errors may occur at several
+/// levels:
 ///
 /// - **Transport errors**: Network failures, connection issues, or serialization errors
 /// - **Authentication errors**: When using [`MevBuilder::with_auth`], signing failures are wrapped
@@ -58,9 +59,10 @@ pub trait MevApi<N>: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using [`MevBuilder::with_auth`], signing errors
-    /// are wrapped in [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may return errors for invalid
-    /// bundles, authentication failures, or rate limiting.
+    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using
+    /// [`MevBuilder::with_auth`], signing errors are wrapped in
+    /// [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may
+    /// return errors for invalid bundles, authentication failures, or rate limiting.
     fn send_bundle(
         &self,
         bundle: EthSendBundle,
@@ -76,9 +78,10 @@ pub trait MevApi<N>: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using [`MevBuilder::with_auth`], signing errors
-    /// are wrapped in [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may return errors for invalid
-    /// transactions or authentication failures.
+    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using
+    /// [`MevBuilder::with_auth`], signing errors are wrapped in
+    /// [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may
+    /// return errors for invalid transactions or authentication failures.
     fn send_private_transaction(
         &self,
         private_tx: EthSendPrivateTransaction,
@@ -88,9 +91,10 @@ pub trait MevApi<N>: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using [`MevBuilder::with_auth`], signing errors
-    /// are wrapped in [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may return errors for invalid
-    /// transaction encoding or authentication failures.
+    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using
+    /// [`MevBuilder::with_auth`], signing errors are wrapped in
+    /// [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may
+    /// return errors for invalid transaction encoding or authentication failures.
     fn send_private_raw_transaction(
         &self,
         encoded_tx: &[u8],
@@ -121,9 +125,10 @@ pub trait MevApi<N>: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using [`MevBuilder::with_auth`], signing errors
-    /// are wrapped in [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may return errors for invalid
-    /// bundles, authentication failures, or rate limiting.
+    /// Returns a [`TransportResult`](alloy_transport::TransportResult). When using
+    /// [`MevBuilder::with_auth`], signing errors are wrapped in
+    /// [`TransportErrorKind::Custom`](alloy_transport::TransportErrorKind::Custom). The relay may
+    /// return errors for invalid bundles, authentication failures, or rate limiting.
     fn send_mev_bundle(
         &self,
         bundle: MevSendBundle,
