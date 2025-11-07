@@ -388,7 +388,7 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTxEnvelope<Eip4844> {
         }
     }
 
-    /// Returns the [`TxEip4844Variant`] variant if the transaction is an EIP-4844 transaction.
+    /// Returns the EIP-4844 variant if the transaction is an EIP-4844 transaction.
     pub const fn as_eip4844(&self) -> Option<&Signed<Eip4844>> {
         match self {
             Self::Eip4844(tx) => Some(tx),
