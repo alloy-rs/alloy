@@ -108,7 +108,7 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Dispatch a request to the socket.
     fn dispatch_request(&self, brv: Box<RawValue>) -> TransportResult<()> {
-        self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
+        self.handle.to_socket.send(brv).map_err(|_| TransportErrorKind::backend_gone())
     }
 
     /// Service a request.
