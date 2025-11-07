@@ -568,8 +568,6 @@ pub struct TxEip4844 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
 
     /// It contains a vector of fixed size hash(32 bytes)

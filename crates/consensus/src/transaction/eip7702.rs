@@ -70,14 +70,10 @@ pub struct TxEip7702 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
     /// Authorizations are used to temporarily set the code of its signer to
     /// the code referenced by `address`. These also include a `chain_id` (which
     /// can be set to zero and not evaluated) as well as an optional `nonce`.
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for SignedAuthorization in alloy_eip7702
     pub authorization_list: Vec<SignedAuthorization>,
     /// An unlimited size byte array specifying the
     /// input data of the message call, formally Td.
