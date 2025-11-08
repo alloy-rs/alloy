@@ -284,8 +284,7 @@ where
                             id = Some(map.next_value()?);
                         }
                         Field::Unknown => {
-                            let _: serde::de::IgnoredAny = map.next_value()?; // ignore unknown
-                                                                              // fields
+                            let _: serde::de::IgnoredAny = map.next_value()?; // ignore
                         }
                     }
                 }
