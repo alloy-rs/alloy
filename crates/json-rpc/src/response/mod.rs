@@ -284,7 +284,8 @@ where
                             id = Some(map.next_value()?);
                         }
                         Field::Unknown => {
-                            let _: serde::de::IgnoredAny = map.next_value()?; // ignore
+                            let _: serde::de::IgnoredAny = map.next_value()?; // ignore unknown
+                                                                              // fields
                         }
                     }
                 }
@@ -356,6 +357,24 @@ mod test {
                 "message": "Invalid Request"
             },
             "id": null
+        }"#;
+        let response: super::Response = serde_json::from_str(response).unwrap();
+        assert_eq!(response.id, super::Id::None);
+        assert!(matches!(response.payload, super::ResponsePayload::Failure(_)));
+    }
+
+    #[test]
+    fn serde_unknown() {
+        let response = r#"{
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32600,
+                "message": "Invalid Request"
+            },
+            "id": null,
+            "dummy": null,
+            "abc": 5,
+            "value": "hello"
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
