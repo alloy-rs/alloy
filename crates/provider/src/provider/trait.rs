@@ -865,6 +865,27 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
+    /// Broadcasts a raw transaction RLP bytes to the network and returns the transaction receipt
+    /// after it has been mined.
+    ///
+    /// Unlike send_raw_transaction which returns immediately with
+    /// a transaction hash, this method waits on the server side until the transaction is included
+    /// in a block and returns the receipt directly. This is an optimization that reduces the number
+    /// of RPC calls needed to confirm a transaction.
+    ///
+    /// This method implements the `eth_sendRawTransactionSync` RPC method as defined in
+    /// [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966).
+    ///
+    /// Note: This is only available on certain clients that support the
+    /// `eth_sendRawTransactionSync` RPC method, such as Anvil.
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        self.client().request("eth_sendRawTransactionSync", (rlp_hex,)).await
+    }
+
     /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
     /// network.
     ///
@@ -1660,6 +1681,37 @@ mod tests {
         let hash2 =
             builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
+    }
+
+    #[tokio::test]
+    async fn test_send_raw_transaction_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create a transaction
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        // Build and sign the transaction to get the envelope
+        let tx_envelope = tx.build(&provider.wallet()).await.expect("failed to build tx");
+
+        // Encode the transaction
+        let encoded = tx_envelope.encoded_2718();
+
+        // Send using the sync method - this directly returns the receipt
+        let receipt =
+            provider.send_raw_transaction_sync(&encoded).await.expect("failed to send raw tx sync");
+
+        // Verify receipt
+        assert_eq!(receipt.to(), Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
+        // The main idea that returned receipt should be already mined
+        assert!(receipt.block_number().is_some(), "transaction should be mined");
+        assert!(receipt.transaction_hash() != B256::ZERO, "should have valid tx hash");
     }
 
     #[tokio::test]
