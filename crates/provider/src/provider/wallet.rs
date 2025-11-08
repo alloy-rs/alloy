@@ -93,7 +93,6 @@ where
 mod test {
     use super::*;
     use crate::ProviderBuilder;
-    use itertools::Itertools;
 
     #[test]
     fn basic_usage() {
