@@ -2088,10 +2088,9 @@ mod tests {
     #[test]
     fn test_parent_hash_serialization() {
         // Test that parent_hash can be serialized and deserialized correctly
-        let parent_hash = B256::from_str(
-            "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
-        )
-        .unwrap();
+        let parent_hash =
+            B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
+                .unwrap();
 
         let genesis_with_parent_hash = Genesis::default().with_parent_hash(Some(parent_hash));
         let json = serde_json::to_string(&genesis_with_parent_hash).unwrap();
@@ -2149,7 +2148,11 @@ mod tests {
         }
         "#;
         let genesis: Genesis = serde_json::from_str(genesis_json_with_zero_hash).unwrap();
-        assert_eq!(genesis.parent_hash, Some(B256::ZERO), "Zero hash should be preserved when explicitly set");
+        assert_eq!(
+            genesis.parent_hash,
+            Some(B256::ZERO),
+            "Zero hash should be preserved when explicitly set"
+        );
     }
 
     #[test]
