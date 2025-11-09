@@ -4,7 +4,37 @@ use crate::TransactionResponse;
 use alloc::{vec, vec::Vec};
 use alloy_consensus::error::ValueError;
 use alloy_eips::Encodable2718;
-use core::slice;
+use core::{iter, slice};
+
+/// Helper type to unify different iterator types.
+enum EitherIter<L, R> {
+    Left(L),
+    Right(R),
+}
+
+impl<L, R, T> Iterator for EitherIter<L, R>
+where
+    L: Iterator<Item = T>,
+    R: Iterator<Item = T>,
+{
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Left(iter) => iter.next(),
+            Self::Right(iter) => iter.next(),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Left(iter) => iter.size_hint(),
+            Self::Right(iter) => iter.size_hint(),
+        }
+    }
+}
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
@@ -110,7 +140,8 @@ impl<T> BlockTransactions<T> {
     /// hashes.
     #[doc(alias = "transactions")]
     pub fn txns(&self) -> impl Iterator<Item = &T> {
-        self.as_transactions().map(|txs| txs.iter()).unwrap_or_else(|| [].iter())
+        self.as_transactions()
+            .map_or_else(|| EitherIter::Right(iter::empty()), |txs| EitherIter::Left(txs.iter()))
     }
 
     /// Returns an iterator over the transactions (if any). This will be empty if the block is not
