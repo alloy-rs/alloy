@@ -28,8 +28,10 @@ pub struct TraceFilter {
     #[serde(default)]
     pub mode: TraceFilterMode,
     /// Output offset
+    #[serde(with = "alloy_serde::quantity::opt")]
     pub after: Option<u64>,
     /// Output amount
+    #[serde(with = "alloy_serde::quantity::opt")]
     pub count: Option<u64>,
 }
 
