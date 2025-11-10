@@ -197,6 +197,21 @@ where
     }
 
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+        if filter.block_hash.is_none() {
+            let from_is_number = filter
+                .from_block
+                .as_ref()
+                .is_some_and(|block| matches!(block, BlockNumberOrTag::Number(_)));
+            let to_is_number = filter
+                .to_block
+                .as_ref()
+                .is_some_and(|block| matches!(block, BlockNumberOrTag::Number(_)));
+
+            if !from_is_number || !to_is_number {
+                return self.inner.get_logs(filter).await;
+            }
+        }
+
         let req = RequestType::new("eth_getLogs", filter.clone());
 
         let params_hash = req.params_hash().ok();
