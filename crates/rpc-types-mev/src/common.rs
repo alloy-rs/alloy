@@ -226,6 +226,10 @@ impl Serialize for PrivacyHint {
     }
 }
 
+/// All supported privacy hint variants.
+const PRIVACY_HINT_VARIANTS: &[&str] =
+    &["calldata", "contract_address", "logs", "function_selector", "hash", "tx_hash"];
+
 impl<'de> Deserialize<'de> for PrivacyHint {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let hints = Vec::<String>::deserialize(deserializer)?;
@@ -238,7 +242,9 @@ impl<'de> Deserialize<'de> for PrivacyHint {
                 "function_selector" => privacy_hint.function_selector = true,
                 "hash" => privacy_hint.hash = true,
                 "tx_hash" => privacy_hint.tx_hash = true,
-                _ => return Err(serde::de::Error::custom("invalid privacy hint")),
+                _ => {
+                    return Err(serde::de::Error::unknown_variant(&hint, PRIVACY_HINT_VARIANTS));
+                }
             }
         }
         Ok(privacy_hint)
