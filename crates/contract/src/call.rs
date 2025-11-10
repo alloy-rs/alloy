@@ -1,5 +1,5 @@
 use crate::{CallDecoder, Error, EthCall, Result};
-use alloy_consensus::SignableTransaction;
+use alloy_consensus::{BlobTransactionSidecarVariant, SignableTransaction};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{
@@ -9,9 +9,7 @@ use alloy_network::{
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types_eth::{
-    state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
-};
+use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlockId, SignedAuthorization};
 use alloy_sol_types::SolCall;
 use std::{self, marker::PhantomData};
 
@@ -416,7 +414,7 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     }
 
     /// Sets the `sidecar` field in the transaction to the provided value.
-    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecarVariant) -> Self
     where
         N::TransactionRequest: TransactionBuilder4844,
     {

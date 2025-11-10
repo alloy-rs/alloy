@@ -252,7 +252,7 @@ mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_consensus::{SidecarBuilder, SimpleCoder, Transaction};
-    use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
+    use alloy_eips::{eip4844::DATA_GAS_PER_BLOB, eip7594::BlobTransactionSidecarVariant};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -300,7 +300,7 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(sidecar.build().unwrap());
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
@@ -327,7 +327,7 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(sidecar.build().unwrap());
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),

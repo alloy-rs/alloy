@@ -7,7 +7,7 @@ use crate::{
     },
     Signed, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844WithSidecar, TxEip7702, TxLegacy,
 };
-use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
+use alloy_eips::{eip2718::Encodable2718, eip7594::BlobTransactionSidecarVariant};
 use alloy_primitives::{Bytes, Signature, B256};
 use core::fmt::Debug;
 
@@ -24,14 +24,14 @@ use core::fmt::Debug;
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub type TxEnvelope = EthereumTxEnvelope<TxEip4844Variant>;
 
-impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844Variant<T>> {
+impl EthereumTxEnvelope<TxEip4844Variant> {
     /// Attempts to convert the envelope into the pooled variant.
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
     /// [`crate::TxEip4844`] without the sidecar.
     pub fn try_into_pooled(
         self,
-    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar>, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
             Self::Eip2930(tx) => Ok(tx.into()),
@@ -47,9 +47,9 @@ impl EthereumTxEnvelope<TxEip4844> {
     ///
     /// Returns an error if the envelope's variant is incompatible with the pooled format:
     /// [`crate::TxEip4844`] without the sidecar.
-    pub fn try_into_pooled<T>(
+    pub fn try_into_pooled(
         self,
-    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar>, ValueError<Self>> {
         match self {
             Self::Legacy(tx) => Ok(tx.into()),
             Self::Eip2930(tx) => Ok(tx.into()),
@@ -66,10 +66,10 @@ impl EthereumTxEnvelope<TxEip4844> {
     ///
     /// Returns an `Err` containing the original [`EthereumTxEnvelope`] if the transaction is not an
     /// EIP-4844 variant.
-    pub fn try_into_pooled_eip4844<T>(
+    pub fn try_into_pooled_eip4844(
         self,
-        sidecar: T,
-    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar<T>>, ValueError<Self>> {
+        sidecar: BlobTransactionSidecarVariant,
+    ) -> Result<EthereumTxEnvelope<TxEip4844WithSidecar>, ValueError<Self>> {
         match self {
             Self::Eip4844(tx) => {
                 Ok(EthereumTxEnvelope::Eip4844(tx.map(|tx| tx.with_sidecar(sidecar))))
@@ -242,19 +242,19 @@ where
     }
 }
 
-impl<T> From<EthereumTxEnvelope<TxEip4844WithSidecar<T>>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar<T>>) -> Self {
+impl From<EthereumTxEnvelope<TxEip4844WithSidecar>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844WithSidecar>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl<T> From<EthereumTxEnvelope<TxEip4844Variant<T>>> for EthereumTxEnvelope<TxEip4844> {
-    fn from(value: EthereumTxEnvelope<TxEip4844Variant<T>>) -> Self {
+impl From<EthereumTxEnvelope<TxEip4844Variant>> for EthereumTxEnvelope<TxEip4844> {
+    fn from(value: EthereumTxEnvelope<TxEip4844Variant>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
 }
 
-impl<T> From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant<T>> {
+impl From<EthereumTxEnvelope<TxEip4844>> for EthereumTxEnvelope<TxEip4844Variant> {
     fn from(value: EthereumTxEnvelope<TxEip4844>) -> Self {
         value.map_eip4844(|eip4844| eip4844.into())
     }
@@ -1008,11 +1008,11 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let sidecar = BlobTransactionSidecar {
+        let sidecar = BlobTransactionSidecarVariant::Eip4844(BlobTransactionSidecar {
             blobs: vec![[2; 131072].into()],
             commitments: vec![[3; 48].into()],
             proofs: vec![[4; 48].into()],
-        };
+        });
         let tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature().with_parity(true);
 
@@ -1235,7 +1235,7 @@ mod tests {
                 blob_versioned_hashes: vec![B256::random()],
                 max_fee_per_blob_gas: 0,
             },
-            sidecar: Default::default(),
+            sidecar: BlobTransactionSidecarVariant::Eip4844(Default::default()),
         });
         test_serde_roundtrip(tx);
     }

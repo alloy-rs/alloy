@@ -1,8 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
 use alloc::vec::Vec;
-use alloy_consensus::BlobTransactionSidecar;
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_eips::{eip7594::BlobTransactionSidecarVariant, eip7702::SignedAuthorization};
 use alloy_serde::WithOtherFields;
 
 /// Transaction builder type supporting EIP-4844 transaction fields.
@@ -20,16 +19,16 @@ pub trait TransactionBuilder4844: Default + Sized + Send + Sync + 'static {
     }
 
     /// Gets the EIP-4844 blob sidecar of the transaction.
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar>;
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant>;
 
     /// Sets the EIP-4844 blob sidecar of the transaction.
     ///
     /// Note: This will also set the versioned blob hashes accordingly:
-    /// [BlobTransactionSidecar::versioned_hashes]
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar);
+    /// [BlobTransactionSidecarVariant::versioned_hashes]
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant);
 
     /// Builder-pattern method for setting the EIP-4844 blob sidecar of the transaction.
-    fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecar) -> Self {
+    fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecarVariant) -> Self {
         self.set_blob_sidecar(sidecar);
         self
     }
@@ -62,11 +61,11 @@ where
         self.deref_mut().set_max_fee_per_blob_gas(max_fee_per_blob_gas)
     }
 
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
         self.deref().blob_sidecar()
     }
 
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {
         self.deref_mut().set_blob_sidecar(sidecar)
     }
 }
