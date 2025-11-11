@@ -491,17 +491,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         let id = self.new_block_filter().await?;
-        let builder = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,))
-            .with_reconnect(move |client| async move {
-                let Some(client) = client.upgrade() else {
-                    return Err(alloy_transport::TransportError::local_usage_str("client dropped"));
-                };
-                let filter_id: TransportResult<U256> =
-                    client.request_noparams("eth_newBlockFilter").await;
-                serde_json::value::to_raw_value(&(filter_id.unwrap(),))
-                    .map_err(alloy_transport::TransportError::ser_err)
-            });
-        Ok(builder)
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
     /// Watch for new blocks by polling the provider with
