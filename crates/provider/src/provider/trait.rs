@@ -23,7 +23,7 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
+use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, RpcClient, WeakClient};
 #[cfg(feature = "pubsub")]
 use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{
@@ -33,6 +33,7 @@ use alloy_rpc_types_eth::{
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
+use either::Either::Right;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
@@ -490,7 +491,17 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<B256>> {
         let id = self.new_block_filter().await?;
-        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+        let builder = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,))
+            .with_reconnect(move |client| async move {
+                let Some(client) = client.upgrade() else {
+                    return Err(alloy_transport::TransportError::local_usage_str("client dropped"));
+                };
+                let filter_id: TransportResult<U256> =
+                    client.request_noparams("eth_newBlockFilter").await;
+                serde_json::value::to_raw_value(&(filter_id.unwrap(),))
+                    .map_err(alloy_transport::TransportError::ser_err)
+            });
+        Ok(builder)
     }
 
     /// Watch for new blocks by polling the provider with
@@ -1336,6 +1347,7 @@ mod tests {
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
+    use futures::StreamExt;
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
