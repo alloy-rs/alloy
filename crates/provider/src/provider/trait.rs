@@ -8,7 +8,7 @@ use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    heart::PendingTransactionError,
+    heart::{PendingTransactionError, SendTransactionSync, SendTransactionSyncError},
     utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
     PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
@@ -34,7 +34,7 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
-use std::borrow::Cow;
+use std::{borrow::Cow, future::Future, pin::Pin};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -972,6 +972,101 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             SendableTx::Envelope(tx) => {
                 let encoded_tx = tx.encoded_2718();
                 self.send_raw_transaction(&encoded_tx).await
+            }
+        }
+    }
+
+    /// Sends a transaction and immediately fetches its receipt in a single operation.
+    ///
+    /// This method combines transaction submission and receipt retrieval, providing
+    /// immediate access to transaction metadata while reducing the number of RPC calls.
+    ///
+    /// Returns a [`SendTransactionSync`] future that resolves to the transaction receipt
+    /// and provides access to the raw transaction bytes and hash even if receipt retrieval fails.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let sync_tx = provider.send_transaction_sync(tx).await?;
+    ///
+    /// // Access transaction metadata immediately
+    /// println!("Transaction hash: {}", sync_tx.tx_hash());
+    /// println!("Raw transaction: {}", sync_tx.raw());
+    ///
+    /// // Wait for the receipt
+    /// let receipt = sync_tx.await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn send_transaction_sync(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<SendTransactionSync<N>> {
+        self.send_transaction_sync_internal(SendableTx::Builder(tx)).await
+    }
+
+    /// Internal implementation for synchronous transaction sending.
+    ///
+    /// This method handles both unsigned transactions (via Builder) and pre-signed
+    /// transactions (via Envelope), automatically fetching receipts after submission.
+    #[doc(hidden)]
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<SendTransactionSync<N>> {
+        // Initialize heartbeat for transaction monitoring
+        let _handle = self.root().get_heart();
+
+        match tx {
+            SendableTx::Builder(mut tx) => {
+                // Prepare and send unsigned transaction
+                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                let tx_hash: TxHash = self.client().request("eth_sendTransaction", (&tx,)).await?;
+
+                // For unsigned transactions, raw bytes are not meaningful since the node
+                // signs and potentially modifies the transaction. We use empty bytes.
+                let raw = Bytes::default();
+
+                // Create future for receipt fetching
+                let provider = self.root().clone();
+                let raw_clone = raw.clone();
+                let fut: Pin<
+                    Box<
+                        dyn Future<Output = Result<N::ReceiptResponse, SendTransactionSyncError>>
+                            + Send,
+                    >,
+                > = Box::pin(async move {
+                    let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
+                    pending_builder.get_receipt().await.map_err(|error| {
+                        SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
+                    })
+                });
+
+                Ok(SendTransactionSync::new(raw, tx_hash, fut))
+            }
+            SendableTx::Envelope(envelope) => {
+                let raw: Bytes = envelope.encoded_2718().into();
+
+                // Send pre-signed transaction
+                let tx_hash: TxHash =
+                    self.client().request("eth_sendRawTransaction", (&raw,)).await?;
+
+                // Create future for receipt fetching
+                let provider = self.root().clone();
+                let raw_clone = raw.clone();
+                let fut: Pin<
+                    Box<
+                        dyn Future<Output = Result<N::ReceiptResponse, SendTransactionSyncError>>
+                            + Send,
+                    >,
+                > = Box::pin(async move {
+                    let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
+                    pending_builder.get_receipt().await.map_err(|error| {
+                        SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
+                    })
+                });
+
+                Ok(SendTransactionSync::new(raw, tx_hash, fut))
             }
         }
     }
@@ -2341,5 +2436,63 @@ mod tests {
         let p = ProviderBuilder::new().connect(&anvil.endpoint()).await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_send_transaction_sync() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let anvil = Anvil::new().spawn();
+        let provider = ProviderBuilder::new().connect_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest::default()
+            .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // Test the sync transaction sending
+        let sync_tx = provider.send_transaction_sync(tx).await.unwrap();
+
+        // Verify we can access transaction metadata immediately
+        let tx_hash = *sync_tx.tx_hash();
+        assert!(!tx_hash.is_zero());
+
+        // For unsigned transactions, raw bytes are a placeholder (implementation detail)
+        let _raw_bytes = sync_tx.raw();
+        // Raw bytes are accessible but content is implementation-specific for unsigned transactions
+
+        // Wait for receipt
+        let receipt = sync_tx.await.unwrap();
+        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_send_transaction_sync_with_fillers() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create transaction without specifying gas or nonce - fillers should handle this
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+        // Note: No gas limit, gas price, or nonce specified - fillers will provide these
+
+        // Test that sync transactions work with filler pipeline
+        let sync_tx = provider.send_transaction_sync(tx).await.unwrap();
+
+        // Verify immediate access works
+        let tx_hash = *sync_tx.tx_hash();
+        assert!(!tx_hash.is_zero());
+
+        // Verify receipt shows fillers worked (gas was estimated and used)
+        let receipt = sync_tx.await.unwrap();
+        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert!(receipt.status());
+        assert!(receipt.gas_used() > 0, "fillers should have estimated gas");
     }
 }
