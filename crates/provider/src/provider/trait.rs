@@ -987,9 +987,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # Example
     /// ```no_run
+    /// # use alloy_network_primitives::ReceiptResponse;
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
     /// let receipt = provider.send_transaction_sync(tx).await?;
-    /// println!("Transaction hash: {}", receipt.transaction_hash);
+    /// println!("Transaction hash: {}", receipt.transaction_hash());
     /// # Ok(())
     /// # }
     /// ```
