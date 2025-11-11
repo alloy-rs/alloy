@@ -23,7 +23,7 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, RpcClient, WeakClient};
+use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 #[cfg(feature = "pubsub")]
 use alloy_rpc_types_eth::pubsub::{Params, SubscriptionKind};
 use alloy_rpc_types_eth::{
@@ -33,7 +33,6 @@ use alloy_rpc_types_eth::{
     EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
-use either::Either::Right;
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 

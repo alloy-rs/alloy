@@ -1,4 +1,4 @@
-use crate::{RpcCall, WeakClient};
+use crate::WeakClient;
 use alloy_json_rpc::{RpcRecv, RpcSend};
 use alloy_transport::utils::Spawnable;
 use futures::{ready, stream::FusedStream, Future, FutureExt, Stream, StreamExt};
@@ -22,6 +22,18 @@ use wasmtimer::tokio::{sleep, Sleep};
 
 #[cfg(not(target_family = "wasm"))]
 use tokio::time::{sleep, Sleep};
+
+/// A function that creates new parameters when reconnection is needed
+type ReconnectFn = Box<
+    dyn Fn(
+            WeakClient,
+        ) -> alloy_transport::Pbf<
+            'static,
+            Box<RawValue>,
+            alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
+        > + Send
+        + Sync,
+>;
 
 /// A poller task builder.
 ///
@@ -59,18 +71,6 @@ use tokio::time::{sleep, Sleep};
 /// # Ok(())
 /// # }
 /// ```
-
-/// A function that creates new parameters when reconnection is needed
-pub type ReconnectFn = Box<
-    dyn Fn(
-            WeakClient,
-        ) -> alloy_transport::Pbf<
-            'static,
-            Box<RawValue>,
-            alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
-        > + Send
-        + Sync,
->;
 
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
 pub struct PollerBuilder<Params, Resp> {
@@ -135,6 +135,7 @@ where
         self
     }
 
+    /// Sets the reconnect function which updates the poller params and runs when filter drops.
     pub fn with_reconnect<F, Fut>(mut self, reconnect_fn: F) -> Self
     where
         F: Fn(WeakClient) -> Fut + Send + Sync + 'static,
@@ -145,7 +146,6 @@ where
                 >,
             > + Send
             + 'static,
-        Params: Serialize,
     {
         let boxed_reconnect_fn: ReconnectFn = Box::new(move |client| {
             Box::pin(reconnect_fn(client))
