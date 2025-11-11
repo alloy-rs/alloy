@@ -71,7 +71,6 @@ type ReconnectFn = Box<
 /// # Ok(())
 /// # }
 /// ```
-
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
 pub struct PollerBuilder<Params, Resp> {
     /// The client to poll with.
