@@ -477,7 +477,7 @@ mod tests {
         let call_6 = call_iter.next();
         assert_eq!(call_6, None);
     }
-    
+
     #[test]
     fn test_call_log_frame_serde_with_regular_json_number() {
         // Test that CallLogFrame can deserialize index as a regular JSON number
