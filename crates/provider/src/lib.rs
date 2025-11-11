@@ -46,6 +46,9 @@ pub mod layers;
 mod provider;
 pub use provider::*;
 
+mod sync;
+pub use sync::*;
+
 pub mod utils;
 
 #[doc(no_inline)]

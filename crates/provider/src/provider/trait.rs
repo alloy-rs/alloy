@@ -8,7 +8,8 @@ use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
-    heart::{PendingTransactionError, SendTransactionSync, SendTransactionSyncError},
+    heart::PendingTransactionError,
+    sync::{SendTransactionSync, SendTransactionSyncError},
     utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
     PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
@@ -976,33 +977,33 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
-    /// Sends a transaction and immediately fetches its receipt in a single operation.
+    /// Sends a transaction and waits for its receipt in a single call.
     ///
-    /// This method combines transaction submission and receipt retrieval, providing
-    /// immediate access to transaction metadata while reducing the number of RPC calls.
+    /// This method combines transaction submission and receipt retrieval into a single
+    /// async operation, providing a simpler API compared to the two-step process of
+    /// [`send_transaction`](Self::send_transaction) followed by waiting for confirmation.
     ///
-    /// Returns a [`SendTransactionSync`] future that resolves to the transaction receipt
-    /// and provides access to the raw transaction bytes and hash even if receipt retrieval fails.
+    /// Returns the transaction receipt directly after submission and confirmation.
     ///
     /// # Example
     /// ```no_run
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
-    /// let sync_tx = provider.send_transaction_sync(tx).await?;
-    ///
-    /// // Access transaction metadata immediately
-    /// println!("Transaction hash: {}", sync_tx.tx_hash());
-    /// println!("Raw transaction: {}", sync_tx.raw());
-    ///
-    /// // Wait for the receipt
-    /// let receipt = sync_tx.await?;
+    /// let receipt = provider.send_transaction_sync(tx).await?;
+    /// println!("Transaction hash: {}", receipt.transaction_hash);
     /// # Ok(())
     /// # }
     /// ```
     async fn send_transaction_sync(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<SendTransactionSync<N>> {
-        self.send_transaction_sync_internal(SendableTx::Builder(tx)).await
+    ) -> Result<N::ReceiptResponse, SendTransactionSyncError> {
+        let sync_tx = self.send_transaction_sync_internal(SendableTx::Builder(tx)).await.map_err(
+            |transport_error| SendTransactionSyncError::SubmissionFailed {
+                raw: alloy_primitives::Bytes::default(), // Empty for unsigned transactions
+                error: transport_error,
+            },
+        )?;
+        sync_tx.await
     }
 
     /// Internal implementation for synchronous transaction sending.
@@ -2442,18 +2443,11 @@ mod tests {
             .with_value(U256::from(100));
 
         // Test the sync transaction sending
-        let sync_tx = provider.send_transaction_sync(tx).await.unwrap();
+        let receipt = provider.send_transaction_sync(tx).await.unwrap();
 
-        // Verify we can access transaction metadata immediately
-        let tx_hash = *sync_tx.tx_hash();
+        // Verify we can access transaction metadata from the receipt
+        let tx_hash = receipt.transaction_hash;
         assert!(!tx_hash.is_zero());
-
-        // For unsigned transactions, raw bytes are a placeholder (implementation detail)
-        let _raw_bytes = sync_tx.raw();
-        // Raw bytes are accessible but content is implementation-specific for unsigned transactions
-
-        // Wait for receipt
-        let receipt = sync_tx.await.unwrap();
         assert_eq!(receipt.transaction_hash, tx_hash);
         assert!(receipt.status());
     }
@@ -2473,14 +2467,13 @@ mod tests {
         // Note: No gas limit, gas price, or nonce specified - fillers will provide these
 
         // Test that sync transactions work with filler pipeline
-        let sync_tx = provider.send_transaction_sync(tx).await.unwrap();
+        let receipt = provider.send_transaction_sync(tx).await.unwrap();
 
         // Verify immediate access works
-        let tx_hash = *sync_tx.tx_hash();
+        let tx_hash = receipt.transaction_hash;
         assert!(!tx_hash.is_zero());
 
         // Verify receipt shows fillers worked (gas was estimated and used)
-        let receipt = sync_tx.await.unwrap();
         assert_eq!(receipt.transaction_hash, tx_hash);
         assert!(receipt.status());
         assert!(receipt.gas_used() > 0, "fillers should have estimated gas");
