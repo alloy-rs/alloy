@@ -435,6 +435,21 @@ impl Future for PendingTransaction {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+/// Future type for SendTransactionSync on non-wasm targets.
+type SendTransactionSyncFuture<N> = std::pin::Pin<
+    Box<
+        dyn Future<Output = Result<<N as Network>::ReceiptResponse, SendTransactionSyncError>>
+            + Send,
+    >,
+>;
+
+#[cfg(target_family = "wasm")]
+/// Future type for SendTransactionSync on wasm targets.
+type SendTransactionSyncFuture<N> = std::pin::Pin<
+    Box<dyn Future<Output = Result<<N as Network>::ReceiptResponse, SendTransactionSyncError>>>,
+>;
+
 /// A synchronous transaction sender that returns transaction receipt immediately.
 ///
 /// This future combines transaction submission and receipt fetching into a single operation,
@@ -446,9 +461,7 @@ pub struct SendTransactionSync<N: Network> {
     /// The transaction hash.
     pub tx_hash: TxHash,
     /// The future that will resolve to the transaction receipt.
-    fut: std::pin::Pin<
-        Box<dyn Future<Output = Result<N::ReceiptResponse, SendTransactionSyncError>> + Send>,
-    >,
+    fut: SendTransactionSyncFuture<N>,
 }
 
 impl<N: Network> SendTransactionSync<N> {
@@ -456,9 +469,7 @@ impl<N: Network> SendTransactionSync<N> {
     pub fn new(
         raw: alloy_primitives::Bytes,
         tx_hash: TxHash,
-        fut: std::pin::Pin<
-            Box<dyn Future<Output = Result<N::ReceiptResponse, SendTransactionSyncError>> + Send>,
-        >,
+        fut: SendTransactionSyncFuture<N>,
     ) -> Self {
         Self { raw, tx_hash, fut }
     }

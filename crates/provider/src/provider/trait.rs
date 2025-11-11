@@ -34,7 +34,7 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
-use std::{borrow::Cow, future::Future, pin::Pin};
+use std::borrow::Cow;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -1030,12 +1030,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
                 // Create future for receipt fetching
                 let provider = self.root().clone();
                 let raw_clone = raw.clone();
-                let fut: Pin<
-                    Box<
-                        dyn Future<Output = Result<N::ReceiptResponse, SendTransactionSyncError>>
-                            + Send,
-                    >,
-                > = Box::pin(async move {
+                let fut = Box::pin(async move {
                     let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
                     pending_builder.get_receipt().await.map_err(|error| {
                         SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
@@ -1054,12 +1049,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
                 // Create future for receipt fetching
                 let provider = self.root().clone();
                 let raw_clone = raw.clone();
-                let fut: Pin<
-                    Box<
-                        dyn Future<Output = Result<N::ReceiptResponse, SendTransactionSyncError>>
-                            + Send,
-                    >,
-                > = Box::pin(async move {
+                let fut = Box::pin(async move {
                     let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
                     pending_builder.get_receipt().await.map_err(|error| {
                         SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
