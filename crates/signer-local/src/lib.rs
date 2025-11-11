@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use alloy_consensus::SignableTransaction;
 use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
@@ -20,7 +20,7 @@ pub use error::LocalSignerError;
 #[cfg(feature = "mnemonic")]
 mod mnemonic;
 #[cfg(feature = "mnemonic")]
-pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError};
+pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError, MnemonicSignerIter};
 
 mod private_key;
 

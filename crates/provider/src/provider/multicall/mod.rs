@@ -32,6 +32,9 @@ pub use tuple::{CallTuple, Empty};
 /// Default address for the Multicall3 contract on most chains. See: <https://github.com/mds1/multicall>
 pub const MULTICALL3_ADDRESS: Address = address!("0xcA11bde05977b3631167028862bE2a173976CA11");
 
+/// Default address for the ArbSys precompile on arbitrum rollups. See: <https://docs.arbitrum.io/build-decentralized-apps/precompiles/reference#arbsys>
+pub const ARB_SYS_ADDRESS: Address = address!("0x0000000000000000000000000000000000000064");
+
 /// A Multicall3 builder
 ///
 /// This builder implements a simple API interface to build and execute multicalls using the
@@ -408,7 +411,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        aggregateCall { calls: calls.to_vec() }
+        aggregateCall { calls }
     }
 
     /// Call the `tryAggregate` function
@@ -484,12 +487,12 @@ where
 
     /// Creates the [`tryAggregateCall`].
     fn to_try_aggregate_call(&self, require_success: bool) -> tryAggregateCall {
-        let calls = &self
+        let calls = self
             .calls
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        tryAggregateCall { requireSuccess: require_success, calls: calls.to_vec() }
+        tryAggregateCall { requireSuccess: require_success, calls }
     }
 
     /// Call the `aggregate3` function
@@ -552,7 +555,7 @@ where
                 allowFailure: c.allowFailure,
             })
             .collect::<Vec<_>>();
-        aggregate3Call { calls: calls.to_vec() }
+        aggregate3Call { calls }
     }
 
     /// Call the `aggregate3Value` function
@@ -596,7 +599,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call = blockAndAggregateCall { calls: calls.to_vec() };
+        let call = blockAndAggregateCall { calls };
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         let result = T::decode_return_results(&returnData)?;
@@ -618,8 +621,7 @@ where
             .iter()
             .map(|c| Call { target: c.target, callData: c.callData.clone() })
             .collect::<Vec<_>>();
-        let call =
-            tryBlockAndAggregateCall { requireSuccess: require_success, calls: calls.to_vec() };
+        let call = tryBlockAndAggregateCall { requireSuccess: require_success, calls };
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
@@ -833,12 +835,12 @@ where
     }
 
     /// Get the number of calls in the builder
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.calls.len()
     }
 
     /// Check if the builder is empty
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.calls.is_empty()
     }
 

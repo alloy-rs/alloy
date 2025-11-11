@@ -91,6 +91,10 @@ pub enum AwsSignerError {
     /// Thrown when the AWS KMS API returns a response without a public key.
     #[error("public key not found in response")]
     PublicKeyNotFound,
+
+    /// Failed to recover signature parity for the given digest and public key.
+    #[error("failed to recover signature parity from KMS signature")]
+    SignatureRecoveryFailed,
 }
 
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
@@ -182,7 +186,7 @@ impl AwsSigner {
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
-        Ok(sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey))
+        sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey)
     }
 }
 
@@ -230,18 +234,18 @@ fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,
     pubkey: &VerifyingKey,
-) -> Signature {
+) -> Result<Signature, AwsSignerError> {
     let signature = Signature::from_signature_and_parity(sig, false);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
     let signature = signature.with_parity(true);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
-    panic!("bad sig");
+    Err(AwsSignerError::SignatureRecoveryFailed)
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.

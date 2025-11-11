@@ -1,5 +1,34 @@
 use crate::eip1559::{constants::GAS_LIMIT_BOUND_DIVISOR, BaseFeeParams};
 
+/// Calculates the effective gas price for a dynamic fee transaction.
+///
+/// This is a utility function for EIP-1559 and similar transactions that use dynamic fees.
+///
+/// For EIP-1559 transactions, the effective gas price is calculated as:
+/// - If no base fee: returns `max_fee_per_gas`
+/// - If base fee exists: returns `min(max_fee_per_gas, max_priority_fee_per_gas + base_fee)`
+///
+/// This ensures that the total fee doesn't exceed the maximum fee per gas, while also
+/// ensuring that the priority fee doesn't exceed the maximum priority fee per gas.
+#[inline]
+pub fn calc_effective_gas_price(
+    max_fee_per_gas: u128,
+    max_priority_fee_per_gas: u128,
+    base_fee: Option<u64>,
+) -> u128 {
+    base_fee.map_or(max_fee_per_gas, |base_fee| {
+        // if the tip is greater than the max priority fee per gas, set it to the max
+        // priority fee per gas + base fee
+        let tip = max_fee_per_gas.saturating_sub(base_fee as u128);
+        if tip > max_priority_fee_per_gas {
+            max_priority_fee_per_gas + base_fee as u128
+        } else {
+            // otherwise return the max fee per gas
+            max_fee_per_gas
+        }
+    })
+}
+
 /// Return type of EIP1155 gas fee estimator.
 ///
 /// Contains EIP-1559 fields

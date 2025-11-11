@@ -363,6 +363,24 @@ mod test {
     }
 
     #[test]
+    fn serde_unknown() {
+        let response = r#"{
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32600,
+                "message": "Invalid Request"
+            },
+            "id": null,
+            "dummy": null,
+            "abc": 5,
+            "value": "hello"
+        }"#;
+        let response: super::Response = serde_json::from_str(response).unwrap();
+        assert_eq!(response.id, super::Id::None);
+        assert!(matches!(response.payload, super::ResponsePayload::Failure(_)));
+    }
+
+    #[test]
     fn deser_complex_success() {
         let response = r#"{
             "result": {

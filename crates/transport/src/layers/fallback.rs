@@ -6,7 +6,6 @@ use futures::{stream::FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
 use std::{
     collections::VecDeque,
-    fmt::Debug,
     num::NonZeroUsize,
     sync::Arc,
     task::{Context, Poll},
@@ -51,22 +50,20 @@ impl<S: Clone> FallbackService<S> {
     }
 
     /// Log the current ranking of transports
-    fn log_transport_rankings(&self)
-    where
-        S: Debug,
-    {
-        let mut transports = (*self.transports).clone();
-        transports.sort_by(|a, b| b.cmp(a));
+    fn log_transport_rankings(&self) {
+        if !tracing::enabled!(tracing::Level::TRACE) {
+            return;
+        }
 
-        trace!(
-            target: "alloy_fallback_transport_rankings",
-            "Current transport rankings:"
-        );
-        for (idx, transport) in transports.iter().enumerate() {
-            trace!(
-                target: "alloy_fallback_transport_rankings",
-                "  #{}: Transport[{}] - {}", idx + 1, transport.id, transport.metrics_summary()
-            );
+        // Prepare lightweight ranking data without cloning transports
+        let mut ranked: Vec<(usize, f64, String)> =
+            self.transports.iter().map(|t| (t.id, t.score(), t.metrics_summary())).collect();
+
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        trace!("Current transport rankings:");
+        for (idx, (id, _score, summary)) in ranked.iter().enumerate() {
+            trace!("  #{}: Transport[{}] - {}", idx + 1, id, summary);
         }
     }
 }
@@ -76,7 +73,6 @@ where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + Clone
-        + Debug
         + 'static,
 {
     /// Make a request to the fallback service middleware.
@@ -103,21 +99,20 @@ where
         let mut futures = FuturesUnordered::new();
 
         // Launch requests to all active transports in parallel
-        for transport in top_transports {
+        for mut transport in top_transports {
             let req_clone = req.clone();
-            let mut transport_clone = transport.clone();
 
             let future = async move {
                 let start = Instant::now();
-                let result = transport_clone.call(req_clone).await;
+                let result = transport.call(req_clone).await;
                 trace!(
                     "Transport[{}] completed: latency={:?}, status={}",
-                    transport_clone.id,
+                    transport.id,
                     start.elapsed(),
                     if result.is_ok() { "success" } else { "fail" }
                 );
 
-                (result, transport_clone, start.elapsed())
+                (result, transport, start.elapsed())
             };
 
             futures.push(future);
@@ -157,7 +152,6 @@ where
         + Send
         + Sync
         + Clone
-        + Debug
         + 'static,
 {
     type Response = ResponsePacket;
@@ -212,7 +206,6 @@ where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
         + Send
         + Clone
-        + Debug
         + 'static,
 {
     type Service = FallbackService<S>;

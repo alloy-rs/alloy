@@ -5,10 +5,140 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Dependencies
+
+- Bump MSRV to 1.88 ([#3123](https://github.com/alloy-rs/alloy/issues/3123))
+
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Bug Fixes
+
+- Add defaults for blob response flags and drop unused serde_as ([#3057](https://github.com/alloy-rs/alloy/issues/3057))
+
+### Miscellaneous Tasks
+
+- Release 1.0.42
+- Release 1.0.41
+
+### Other
+
+- [rpc-types-beacon] Mark redundant Beacon/Beacon2 type aliases as deprecated ([#3081](https://github.com/alloy-rs/alloy/issues/3081))
+
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Bug Fixes
+
+- [beacon] Use u64 for gas equality errors ([#2961](https://github.com/alloy-rs/alloy/issues/2961))
+
+### Features
+
+- [beacon-types] `GetBlobsResponse` ([#2994](https://github.com/alloy-rs/alloy/issues/2994))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- [beacon] Remove redundant DisplayFromStr on header.block_number ([#2943](https://github.com/alloy-rs/alloy/issues/2943))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+### Refactor
+
+- [beacon-events] Use BeaconBlockHeader in light client finality ([#2933](https://github.com/alloy-rs/alloy/issues/2933))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Features
+
+- [rpc-types-beacon] Add `BeaconBlockData` conversion to execution payload ([#2919](https://github.com/alloy-rs/alloy/issues/2919))
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Features
+
+- Add helper json deserde fn ([#2841](https://github.com/alloy-rs/alloy/issues/2841))
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
+
+### Miscellaneous Tasks
+
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+
 ## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
 
 ### Miscellaneous Tasks
 
+- Release 1.0.25
 - Release 1.0.25
 - Remove `BeaconOptimismPayloadAttributes` ([#2784](https://github.com/alloy-rs/alloy/issues/2784))
 

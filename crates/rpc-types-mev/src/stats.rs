@@ -3,7 +3,6 @@ use crate::{u256_numeric_string, ConsideredByBuildersAt, SealedByBuildersAt};
 use alloy_primitives::U256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-// TODO(@optimiz-r): Revisit after <https://github.com/flashbots/flashbots-docs/issues/424> is closed.
 /// Response for `flashbots_getBundleStatsV2` represents stats for a single bundle
 ///
 /// Note: this is V2: <https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint#flashbots_getbundlestatsv2>

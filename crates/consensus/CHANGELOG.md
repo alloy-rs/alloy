@@ -5,14 +5,190 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Dependencies
+
+- Bump MSRV to 1.88 ([#3123](https://github.com/alloy-rs/alloy/issues/3123))
 
 ### Features
 
+- Add missing conversion fns ([#3124](https://github.com/alloy-rs/alloy/issues/3124))
+- Add map sidecar fns ([#3122](https://github.com/alloy-rs/alloy/issues/3122))
+
+### Other
+
+- Restrict consensus transaction tests to the serde feature ([#3130](https://github.com/alloy-rs/alloy/issues/3130))
+
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Bug Fixes
+
+- Correct gas field types in Header::size() method ([#3074](https://github.com/alloy-rs/alloy/issues/3074))
+
+### Features
+
+- [envelope] Add try_into_* consuming helpers for EthereumTxEnvelope and tests ([#3062](https://github.com/alloy-rs/alloy/issues/3062))
+- Add convenience fn for TxEip4844WithSidecar 7594 conversion ([#3040](https://github.com/alloy-rs/alloy/issues/3040))
+
+### Miscellaneous Tasks
+
+- Release 1.0.42
+- Fix clippy ([#3044](https://github.com/alloy-rs/alloy/issues/3044))
+- Release 1.0.41
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Bug Fixes
+
+- Saturate gas_price deser for TxLegacy ([#3010](https://github.com/alloy-rs/alloy/issues/3010))
+
+### Features
+
+- Add helper for legacy -> 7594 sidecar conversion ([#3013](https://github.com/alloy-rs/alloy/issues/3013))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Add rlp test ([#3032](https://github.com/alloy-rs/alloy/issues/3032))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Features
+
+- Generate TypedTransaction enum in envelope macro ([#2925](https://github.com/alloy-rs/alloy/issues/2925))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
+### Refactor
+
+- [consensus] Unify try_get_provider body across std/no_std ([#2963](https://github.com/alloy-rs/alloy/issues/2963))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- [consensus] Correct deprecated method references in Recovered<T> ([#2950](https://github.com/alloy-rs/alloy/issues/2950))
+- [consensus] Replace redundant set_chain_id call with comment in set_chain_id_checked ([#2948](https://github.com/alloy-rs/alloy/issues/2948))
+
+### Features
+
+- Add `UnsupportedTransactionType` error ([#2928](https://github.com/alloy-rs/alloy/issues/2928))
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Use fqs for tx_hash_with_type forwarding ([#2944](https://github.com/alloy-rs/alloy/issues/2944))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+- Fix a couple of grammatical errors ([#2931](https://github.com/alloy-rs/alloy/issues/2931))
+
+### Testing
+
+- Test display of `UnsupportedTransactionType` error and its conversion into `TransactionBuilderError` ([#2929](https://github.com/alloy-rs/alloy/issues/2929))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+- Forward std optional ([#2917](https://github.com/alloy-rs/alloy/issues/2917))
+- Remove redundant copy ([#2916](https://github.com/alloy-rs/alloy/issues/2916))
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Bug Fixes
+
+- Don't use serde private API ([#2909](https://github.com/alloy-rs/alloy/issues/2909))
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Bug Fixes
+
+- [consensus] Include EIP-7702 in ReceiptEnvelope Arbitrary range ([#2883](https://github.com/alloy-rs/alloy/issues/2883))
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+
+### Refactor
+
+- Consolidate effective gas price calculation into eip1559 module ([#2872](https://github.com/alloy-rs/alloy/issues/2872))
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Dependencies
+
+- Revert "chore(deps): internal dep bumps" ([#2839](https://github.com/alloy-rs/alloy/issues/2839))
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Dependencies
+
+- [deps] Internal dep bumps ([#2834](https://github.com/alloy-rs/alloy/issues/2834))
+
+### Features
+
+- Add Asref for recovered withencoded ([#2828](https://github.com/alloy-rs/alloy/issues/2828))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Add into_envelope helper ([#2832](https://github.com/alloy-rs/alloy/issues/2832))
+- Use trait upcasting ([#2827](https://github.com/alloy-rs/alloy/issues/2827))
+
+### Styling
+
+- [Feature] Implement support different signatures in envelope macro ([#2794](https://github.com/alloy-rs/alloy/issues/2794))
+
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
+
+### Features
+
+- Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+- Add TxHashRef trait and implementations ([#2751](https://github.com/alloy-rs/alloy/issues/2751))
+- Add helpers for encoding block from parts ([#2809](https://github.com/alloy-rs/alloy/issues/2809))
 - Expose alloy trie ([#2773](https://github.com/alloy-rs/alloy/issues/2773))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+- Release 1.0.25
 - Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
 - Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
 

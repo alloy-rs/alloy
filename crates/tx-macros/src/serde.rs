@@ -1,5 +1,4 @@
-use crate::parse::{GroupedVariants, ProcessedVariant, VariantKind};
-use alloy_primitives::U8;
+use crate::parse::{GroupedVariants, ProcessedVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, Path};
@@ -11,6 +10,7 @@ pub(crate) struct SerdeGenerator<'a> {
     variants: &'a GroupedVariants,
     alloy_consensus: &'a Path,
     serde: TokenStream,
+    serde_json: TokenStream,
     serde_cfg: &'a TokenStream,
 }
 
@@ -23,7 +23,8 @@ impl<'a> SerdeGenerator<'a> {
         serde_cfg: &'a TokenStream,
     ) -> Self {
         let serde = quote! { #alloy_consensus::private::serde };
-        Self { input_type_name, generics, variants, alloy_consensus, serde, serde_cfg }
+        let serde_json = quote! { #alloy_consensus::private::serde_json };
+        Self { input_type_name, generics, variants, alloy_consensus, serde, serde_json, serde_cfg }
     }
 
     /// Generate all serde-related code.
@@ -85,44 +86,28 @@ impl<'a> SerdeGenerator<'a> {
         self.variants
             .typed
             .iter()
-            .filter_map(|v| {
-                let ProcessedVariant { name, ty, kind, serde_attrs } = v;
+            .map(|v| {
+                let ProcessedVariant { name, ty, kind, serde_attrs, typed: _, doc_attrs: _ } = v;
 
-                if let VariantKind::Typed(tx_type) = kind {
-                    let tx_type = U8::from(*tx_type);
-                    let rename = format!("0x{tx_type:x}");
+                let (rename, aliases) = kind.serde_tag_and_aliases();
 
-                    let mut aliases = vec![];
-                    // Add alias for single digit hex values (e.g., "0x0" for "0x00")
-                    if rename.len() == 3 {
-                        aliases.push(format!("0x0{}", rename.chars().last().unwrap()));
+                // Special handling for legacy transactions
+                let maybe_with = if v.is_legacy() {
+                    let alloy_consensus = &self.alloy_consensus;
+                    let path = quote! {
+                        #alloy_consensus::transaction::signed_legacy_serde
                     }
-
-                    // Add alias for uppercase values (e.g., "0x7E" for "0x7e")
-                    if rename != rename.to_uppercase() {
-                        aliases.push(rename.to_uppercase());
-                    }
-
-                    // Special handling for legacy transactions
-                    let maybe_with = if v.is_legacy() {
-                        let alloy_consensus = &self.alloy_consensus;
-                        let path = quote! {
-                            #alloy_consensus::transaction::signed_legacy_serde
-                        }
-                        .to_string();
-                        quote! { with = #path, }
-                    } else {
-                        quote! {}
-                    };
-
-                    let maybe_other = serde_attrs.clone().unwrap_or_default();
-
-                    Some(quote! {
-                        #[serde(rename = #rename, #(alias = #aliases,)* #maybe_with #maybe_other)]
-                        #name(#ty)
-                    })
+                    .to_string();
+                    quote! { with = #path, }
                 } else {
-                    None
+                    quote! {}
+                };
+
+                let maybe_other = serde_attrs.clone().unwrap_or_default();
+
+                quote! {
+                    #[serde(rename = #rename, #(alias = #aliases,)* #maybe_with #maybe_other)]
+                    #name(#ty)
                 }
             })
             .collect()
@@ -220,6 +205,7 @@ impl<'a> SerdeGenerator<'a> {
         let generics = self.generics;
         let unwrapped_generics = &generics.params;
         let serde = &self.serde;
+        let serde_json = &self.serde_json;
         let serde_bounds = self.generate_serde_bounds();
 
         let flattened_names = self.variants.flattened.iter().map(|v| &v.name);
@@ -232,12 +218,11 @@ impl<'a> SerdeGenerator<'a> {
                 where
                     D: #serde::Deserializer<'de>,
                 {
-                    let content = #serde::__private::de::Content::deserialize(deserializer)?;
-                    let deserializer =
-                        #serde::__private::de::ContentRefDeserializer::<D::Error>::new(&content);
+                    let value = #serde_json::Value::deserialize(deserializer)?;
+                    let deserializer = &value;
 
                     let tagged_res =
-                        TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged);
+                        TaggedTxTypes::<#unwrapped_generics>::deserialize(deserializer).map(Self::Tagged).map_err(#serde::de::Error::custom);
 
                     if tagged_res.is_ok() {
                         // return tagged if successful

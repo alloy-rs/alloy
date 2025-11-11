@@ -5,6 +5,145 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Miscellaneous Tasks
+
+- Release 1.0.42
+- Fix clippy ([#3044](https://github.com/alloy-rs/alloy/issues/3044))
+- Release 1.0.41
+
+### Other
+
+- Revert "chore: adds erc7562 tracer variant" ([#3037](https://github.com/alloy-rs/alloy/issues/3037))
+
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Features
+
+- [rpc-trace] Add tx_index for traceCall ([#2881](https://github.com/alloy-rs/alloy/issues/2881))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Adds erc7562 tracer variant ([#2690](https://github.com/alloy-rs/alloy/issues/2690))
+
+### Testing
+
+- Add serde test for GethDebugTracingOptions with prestateTracer ([#3016](https://github.com/alloy-rs/alloy/issues/3016))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
+### Refactor
+
+- Simplify PreStateConfig initialization in tests ([#2964](https://github.com/alloy-rs/alloy/issues/2964))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- Convert static vectors to arrays ([#2926](https://github.com/alloy-rs/alloy/issues/2926))
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
+## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
+
+### Miscellaneous Tasks
+
+- Release 1.0.34
+
+## [1.0.33](https://github.com/alloy-rs/alloy/releases/tag/v1.0.33) - 2025-09-19
+
+### Miscellaneous Tasks
+
+- Release 1.0.33
+
+## [1.0.32](https://github.com/alloy-rs/alloy/releases/tag/v1.0.32) - 2025-09-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.32
+
+## [1.0.31](https://github.com/alloy-rs/alloy/releases/tag/v1.0.31) - 2025-09-15
+
+### Miscellaneous Tasks
+
+- Release 1.0.31
+
+### Testing
+
+- Add serde test for CallLogFrame with regular JSON numbers ([#2866](https://github.com/alloy-rs/alloy/issues/2866))
+
+## [1.0.30](https://github.com/alloy-rs/alloy/releases/tag/v1.0.30) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.30
+
+## [1.0.29](https://github.com/alloy-rs/alloy/releases/tag/v1.0.29) - 2025-09-03
+
+### Miscellaneous Tasks
+
+- Release 1.0.29
+
+## [1.0.28](https://github.com/alloy-rs/alloy/releases/tag/v1.0.28) - 2025-09-02
+
+### Features
+
+- [rpc] Add optional index field to CallLogFrame ([#2748](https://github.com/alloy-rs/alloy/issues/2748))
+- Add as_* helper methods to Delta<T> ([#2823](https://github.com/alloy-rs/alloy/issues/2823))
+
+### Miscellaneous Tasks
+
+- Release 1.0.28
+- Use quantity for index ([#2837](https://github.com/alloy-rs/alloy/issues/2837))
+
+### Refactor
+
+- Change `op` in `StructLog` from `String` to Cow<'static, str> ([#2730](https://github.com/alloy-rs/alloy/issues/2730))
+
+## [1.0.27](https://github.com/alloy-rs/alloy/releases/tag/v1.0.27) - 2025-08-26
+
+### Features
+
+- Add into_localized_trace method to RewardAction ([#2813](https://github.com/alloy-rs/alloy/issues/2813))
+
+### Miscellaneous Tasks
+
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
+- [rpc-types-trace] Re-export `CallKind` ([#2801](https://github.com/alloy-rs/alloy/issues/2801))
+
+### Testing
+
+- Add sanity GethDebugTracingCallOptions test ([#2814](https://github.com/alloy-rs/alloy/issues/2814))
+
 ## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
 
 ### Features
@@ -14,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.25
 - Release 1.0.25
 - Add more callframe utils ([#2777](https://github.com/alloy-rs/alloy/issues/2777))
 

@@ -13,6 +13,7 @@ use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip1559Transaction", alias = "TransactionEip1559", alias = "Eip1559Tx")]
 pub struct TxEip1559 {
     /// EIP-155: Simple replay attack protection
@@ -207,17 +208,11 @@ impl Transaction for TxEip1559 {
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
-        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
-            // if the tip is greater than the max priority fee per gas, set it to the max
-            // priority fee per gas + base fee
-            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
-            if tip > self.max_priority_fee_per_gas {
-                self.max_priority_fee_per_gas + base_fee as u128
-            } else {
-                // otherwise return the max fee per gas
-                self.max_fee_per_gas
-            }
-        })
+        alloy_eips::eip1559::calc_effective_gas_price(
+            self.max_fee_per_gas,
+            self.max_priority_fee_per_gas,
+            base_fee,
+        )
     }
 
     #[inline]

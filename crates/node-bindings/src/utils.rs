@@ -73,7 +73,9 @@ pub fn run_with_tempdir_sync(prefix: &str, f: impl FnOnce(PathBuf)) {
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path);
     #[cfg(not(windows))]
-    temp_dir.close().unwrap();
+    {
+        let _ = temp_dir.close();
+    }
 }
 
 /// Runs the given async closure with a temporary directory.
@@ -86,7 +88,9 @@ where
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path).await;
     #[cfg(not(windows))]
-    temp_dir.close().unwrap();
+    {
+        let _ = temp_dir.close();
+    }
 }
 
 #[cfg(test)]
