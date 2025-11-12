@@ -999,8 +999,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         tx: N::TransactionRequest,
     ) -> Result<N::ReceiptResponse, SendTransactionSyncError> {
         let sync_tx = self.send_transaction_sync_internal(SendableTx::Builder(tx)).await.map_err(
-            |transport_error| SendTransactionSyncError::SubmissionFailed {
-                raw: alloy_primitives::Bytes::default(), // Empty for unsigned transactions
+            |transport_error| SendTransactionSyncError::UnsignedSubmissionFailed {
                 error: transport_error,
             },
         )?;
@@ -1016,51 +1015,25 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         tx: SendableTx<N>,
     ) -> TransportResult<SendTransactionSync<N>> {
-        // Initialize heartbeat for transaction monitoring
-        let _handle = self.root().get_heart();
+        let raw = match &tx {
+            SendableTx::Builder(_) => Bytes::default(),
+            SendableTx::Envelope(envelope) => envelope.encoded_2718().into(),
+        };
 
-        match tx {
-            SendableTx::Builder(mut tx) => {
-                // Prepare and send unsigned transaction
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
-                let tx_hash: TxHash = self.client().request("eth_sendTransaction", (&tx,)).await?;
+        let pending_builder = self.send_transaction_internal(tx).await?;
 
-                // For unsigned transactions, raw bytes are not meaningful since the node
-                // signs and potentially modifies the transaction. We use empty bytes.
-                let raw = Bytes::default();
+        let tx_hash = *pending_builder.tx_hash();
+        let provider = self.root().clone();
+        let raw_clone = raw.clone();
 
-                // Create future for receipt fetching
-                let provider = self.root().clone();
-                let raw_clone = raw.clone();
-                let fut = Box::pin(async move {
-                    let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
-                    pending_builder.get_receipt().await.map_err(|error| {
-                        SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
-                    })
-                });
+        let fut = Box::pin(async move {
+            let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
+            pending_builder.get_receipt().await.map_err(|error| {
+                SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
+            })
+        });
 
-                Ok(SendTransactionSync::new(raw, tx_hash, fut))
-            }
-            SendableTx::Envelope(envelope) => {
-                let raw: Bytes = envelope.encoded_2718().into();
-
-                // Send pre-signed transaction
-                let tx_hash: TxHash =
-                    self.client().request("eth_sendRawTransaction", (&raw,)).await?;
-
-                // Create future for receipt fetching
-                let provider = self.root().clone();
-                let raw_clone = raw.clone();
-                let fut = Box::pin(async move {
-                    let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
-                    pending_builder.get_receipt().await.map_err(|error| {
-                        SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
-                    })
-                });
-
-                Ok(SendTransactionSync::new(raw, tx_hash, fut))
-            }
-        }
+        Ok(SendTransactionSync::new(raw, tx_hash, fut))
     }
 
     /// Signs a transaction that can be submitted to the network later using

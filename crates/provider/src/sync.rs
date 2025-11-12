@@ -77,9 +77,17 @@ impl<N: Network> Future for SendTransactionSync<N> {
 /// Errors that may occur when using synchronous transaction sending.
 #[derive(Debug, thiserror::Error)]
 pub enum SendTransactionSyncError {
-    /// The raw transaction bytes that failed to be sent.
-    #[error("transaction submission failed")]
-    SubmissionFailed {
+    /// Unsigned transaction submission failed.
+    #[error("unsigned transaction submission failed")]
+    UnsignedSubmissionFailed {
+        /// The underlying error.
+        #[source]
+        error: TransportError,
+    },
+
+    /// Signed transaction submission failed.
+    #[error("signed transaction submission failed")]
+    SignedSubmissionFailed {
         /// The raw transaction bytes.
         raw: Bytes,
         /// The underlying error.
@@ -115,7 +123,8 @@ impl SendTransactionSyncError {
     /// Returns the raw transaction bytes if available.
     pub const fn raw(&self) -> Option<&Bytes> {
         match self {
-            Self::SubmissionFailed { raw, .. }
+            Self::UnsignedSubmissionFailed { .. } => None,
+            Self::SignedSubmissionFailed { raw, .. }
             | Self::ReceiptFailed { raw, .. }
             | Self::TransactionFailed { raw, .. } => Some(raw),
         }
@@ -124,7 +133,7 @@ impl SendTransactionSyncError {
     /// Returns the transaction hash if available.
     pub const fn tx_hash(&self) -> Option<&TxHash> {
         match self {
-            Self::SubmissionFailed { .. } => None,
+            Self::UnsignedSubmissionFailed { .. } | Self::SignedSubmissionFailed { .. } => None,
             Self::ReceiptFailed { tx_hash, .. } | Self::TransactionFailed { tx_hash, .. } => {
                 Some(tx_hash)
             }
