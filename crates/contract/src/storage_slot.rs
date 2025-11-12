@@ -155,12 +155,10 @@ where
                     (*slot, B256::from(expected_value.to_be_bytes())),
                 ));
 
-                let state_override = StateOverridesBuilder::default()
-                    .append(contract, account_override)
-                    .build();
+                let state_override =
+                    StateOverridesBuilder::default().append(contract, account_override).build();
 
-                let Ok(result) = provider.call(tx.clone()).overrides(state_override).await
-                else {
+                let Ok(result) = provider.call(tx.clone()).overrides(state_override).await else {
                     // overriding this slot failed
                     continue;
                 };
