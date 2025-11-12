@@ -377,7 +377,10 @@ where
                             // just the message.
                             if let Some(resp) = err.as_error_resp() {
                                 if resp.message.contains("filter not found") {
-                                    warn!("server has dropped the filter, stopping poller");
+                                    let err_code = resp.code;
+                                    let err_msg = resp.message.clone();
+                                    let log_msg = format!("Server has dropped the filter, stopping poller. Error code; {}, error message: {}", err_code, err_msg);
+                                    warn!(log_msg);
                                     this.state = PollState::Finished;
                                     continue;
                                 }
