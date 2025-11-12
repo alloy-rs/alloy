@@ -130,14 +130,7 @@ where
     /// any encoding or hashing. For mappings, the actual storage location might be
     /// computed using keccak256 hashing.
     pub async fn find_slot(self) -> Result<Option<B256>, TransportError> {
-        let StorageSlotFinder {
-            provider,
-            contract,
-            calldata,
-            expected_value,
-            base_request,
-            _phantom: _,
-        } = self;
+        let Self { provider, contract, calldata, expected_value, base_request, _phantom: _ } = self;
 
         let tx = base_request.with_to(contract).with_input(calldata);
 
