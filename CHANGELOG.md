@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
+
+### Bug Fixes
+
+- [provider] Skip cache for eth_getLogs with dynamic block tags ([#3176](https://github.com/alloy-rs/alloy/issues/3176))
+- Use IgnoredAny for unknown fields in PubSubItem deserializer ([#3157](https://github.com/alloy-rs/alloy/issues/3157))
+- [pubsub] Avoid BiBTreeMap remove/insert in SubscriptionManager::notify ([#3141](https://github.com/alloy-rs/alloy/issues/3141))
+- [consensus] Correct Option type in Header::size() method ([#3143](https://github.com/alloy-rs/alloy/issues/3143))
+
+### Documentation
+
+- Fix EIP-2930 transaction handling documentation ([#3154](https://github.com/alloy-rs/alloy/issues/3154))
+
+### Features
+
+- Support send_transaction_sync ([#3177](https://github.com/alloy-rs/alloy/issues/3177))
+- Feature Arbsym Provider Builder ([#3156](https://github.com/alloy-rs/alloy/issues/3156))
+- Add EIP-7594 conversion and sidecar manipulation API ([#3144](https://github.com/alloy-rs/alloy/issues/3144))
+- Improve PrivacyHint deserialization error to include offending value ([#3174](https://github.com/alloy-rs/alloy/issues/3174))
+- [genesis] Add parent hash field in Genesis ([#3138](https://github.com/alloy-rs/alloy/issues/3138))
+- Genesis endpoint JSON types ([#3167](https://github.com/alloy-rs/alloy/issues/3167))
+- [provider] Add sendawsync to Provider trait ([#3164](https://github.com/alloy-rs/alloy/issues/3164))
+- Add Transaction bound to Network::TxEnvelope ([#3147](https://github.com/alloy-rs/alloy/issues/3147))
+- [consensus,eips,genesis] Add Borsh support ([#2946](https://github.com/alloy-rs/alloy/issues/2946))
+
+### Miscellaneous Tasks
+
+- Remove redundant UUID clone in signer-local keystore test ([#3185](https://github.com/alloy-rs/alloy/issues/3185))
+- Correct ExecutionPayload V3 method doc references ([#3181](https://github.com/alloy-rs/alloy/issues/3181))
+
+### Other
+
+- Avoid cloning EIP-4844 sidecar during request build ([#3179](https://github.com/alloy-rs/alloy/issues/3179))
+
+### Refactor
+
+- [consensus] Remove Borsh skip attributes from tx structs ([#3155](https://github.com/alloy-rs/alloy/issues/3155))
+
+### Styling
+
+- Refactor StorageSlotFinder::find_slot to avoid redundant clones ([#3180](https://github.com/alloy-rs/alloy/issues/3180))
+- Fmt ([#3170](https://github.com/alloy-rs/alloy/issues/3170))
+
 ## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
 
 ### Bug Fixes
@@ -31,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.1.0
 - [ens] Bumped ens crate with appropriate features ([#3128](https://github.com/alloy-rs/alloy/issues/3128))
 
 ### Other

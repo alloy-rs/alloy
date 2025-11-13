@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [serde] Add checksum helper ([#3117](https://github.com/alloy-rs/alloy/issues/3117))
 
+### Miscellaneous Tasks
+
+- Release 1.1.0
+
 ## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
 
 ### Miscellaneous Tasks
