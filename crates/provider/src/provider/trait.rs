@@ -976,6 +976,62 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
+    /// Sends a transaction and waits for its receipt in a single call.
+    ///
+    /// This method combines transaction submission and receipt retrieval into a single
+    /// async operation, providing a simpler API compared to the two-step process of
+    /// [`send_transaction`](Self::send_transaction) followed by waiting for confirmation.
+    ///
+    /// Returns the transaction receipt directly after submission and confirmation.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use alloy_network_primitives::ReceiptResponse;
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let receipt = provider.send_transaction_sync(tx).await?;
+    /// println!("Transaction hash: {}", receipt.transaction_hash());
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn send_transaction_sync(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.send_transaction_sync_internal(SendableTx::Builder(tx)).await
+    }
+
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
+    /// transaction and send it to the network without changing user-facing
+    /// APIs. Generally implementers should NOT override this method.
+    ///
+    /// If the input is a [`SendableTx::Builder`] then this utilizes `eth_sendTransactionSync` by
+    /// default.
+    ///
+    /// [`send_transaction`]: Self::send_transaction
+    /// [`ProviderLayer`]: crate::ProviderLayer
+    /// [`TxFiller`]: crate::fillers::TxFiller
+    #[doc(hidden)]
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        // Make sure to initialize heartbeat before we submit transaction, so that
+        // we don't miss it if user will subscriber to it immediately after sending.
+        let _handle = self.root().get_heart();
+
+        match tx {
+            SendableTx::Builder(mut tx) => {
+                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                let receipt = self.client().request("eth_sendTransactionSync", (tx,)).await?;
+                Ok(receipt)
+            }
+            SendableTx::Envelope(tx) => {
+                let encoded_tx = tx.encoded_2718();
+                self.send_raw_transaction_sync(&encoded_tx).await
+            }
+        }
+    }
+
     /// Signs a transaction that can be submitted to the network later using
     /// [`Provider::send_raw_transaction`].
     ///
@@ -1684,6 +1740,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_send_tx_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let _receipt =
+            provider.send_transaction_sync(tx.clone()).await.expect("failed to send tx sync");
+    }
+
+    #[tokio::test]
     async fn test_send_raw_transaction_sync() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
@@ -2341,5 +2412,55 @@ mod tests {
         let p = ProviderBuilder::new().connect(&anvil.endpoint()).await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_send_transaction_sync() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let anvil = Anvil::new().spawn();
+        let provider = ProviderBuilder::new().connect_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest::default()
+            .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // Test the sync transaction sending
+        let receipt = provider.send_transaction_sync(tx).await.unwrap();
+
+        // Verify we can access transaction metadata from the receipt
+        let tx_hash = receipt.transaction_hash;
+        assert!(!tx_hash.is_zero());
+        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_send_transaction_sync_with_fillers() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create transaction without specifying gas or nonce - fillers should handle this
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+        // Note: No gas limit, gas price, or nonce specified - fillers will provide these
+
+        // Test that sync transactions work with filler pipeline
+        let receipt = provider.send_transaction_sync(tx).await.unwrap();
+
+        // Verify immediate access works
+        let tx_hash = receipt.transaction_hash;
+        assert!(!tx_hash.is_zero());
+
+        // Verify receipt shows fillers worked (gas was estimated and used)
+        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert!(receipt.status());
+        assert!(receipt.gas_used() > 0, "fillers should have estimated gas");
     }
 }

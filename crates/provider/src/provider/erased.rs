@@ -369,6 +369,13 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.send_transaction_internal(tx).await
     }
 
+    async fn send_transaction_sync(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.0.send_transaction_sync_internal(SendableTx::Builder(tx)).await
+    }
+
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
         self.0.sign_transaction(tx).await
     }
