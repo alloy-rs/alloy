@@ -651,6 +651,23 @@ where
         self.inner.send_transaction_internal(tx).await
     }
 
+    async fn send_transaction_sync_internal(
+        &self,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        tx = self.fill_inner(tx).await?;
+
+        if let Some(builder) = tx.as_builder() {
+            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
+                let message = format!("missing properties: {missing:?}");
+                return Err(RpcError::local_usage_str(&message));
+            }
+        }
+
+        // Errors in tx building happen further down the stack.
+        self.inner.send_transaction_sync_internal(tx).await
+    }
+
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
         let tx = self.fill(tx).await?;
         let tx = tx.try_into_request().map_err(TransportError::local_usage)?;

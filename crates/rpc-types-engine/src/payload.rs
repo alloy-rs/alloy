@@ -1366,7 +1366,7 @@ impl ExecutionPayload {
         }
     }
 
-    /// Returns a reference to the V2 payload, if any.
+    /// Returns a reference to the V3 payload, if any.
     pub const fn as_v3(&self) -> Option<&ExecutionPayloadV3> {
         match self {
             Self::V1(_) | Self::V2(_) => None,
@@ -1374,7 +1374,7 @@ impl ExecutionPayload {
         }
     }
 
-    /// Returns a mutable reference to the V2 payload, if any.
+    /// Returns a mutable reference to the V3 payload, if any.
     pub const fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
         match self {
             Self::V1(_) | Self::V2(_) => None,

@@ -577,7 +577,7 @@ impl TransactionRequest {
     pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let Some(sidecar) = self.sidecar.clone() else {
+        let Some(sidecar) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
         };
 
