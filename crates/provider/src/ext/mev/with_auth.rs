@@ -122,7 +122,13 @@ pub async fn sign_flashbots_payload<S: Signer + Send + Sync>(
 ) -> Result<String, alloy_signer::Error> {
     let message_hash = keccak256(body.as_bytes()).to_string();
     let signature = signer.sign_message(message_hash.as_bytes()).await?;
-    Ok(format!("{}:{}", signer.address(), hex::encode_prefixed(signature.as_bytes())))
+
+    // Normalized recovery byte (0/1) following the canonical signature encoding
+    let mut sig_bytes = [0u8; 65];
+    sig_bytes[..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
+    sig_bytes[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
+    sig_bytes[64] = signature.v() as u8;
+    Ok(format!("{}:{}", signer.address(), hex::encode_prefixed(sig_bytes)))
 }
 
 #[cfg(test)]
