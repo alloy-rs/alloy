@@ -19,7 +19,7 @@ pub struct TraceCallRequest<TxReq = TransactionRequest> {
     /// Optional: StateOverride
     pub state_overrides: Option<StateOverride>,
     /// Optional: BlockOverrides
-    pub block_overrides: Option<Box<BlockOverrides>>,
+    pub block_overrides: Option<BlockOverrides>,
 }
 
 impl<TxReq> TraceCallRequest<TxReq> {
@@ -50,7 +50,7 @@ impl<TxReq> TraceCallRequest<TxReq> {
 
     /// Sets the [`BlockOverrides`]
     /// Note: this is optional
-    pub fn with_block_overrides(mut self, block_overrides: Box<BlockOverrides>) -> Self {
+    pub fn with_block_overrides(mut self, block_overrides: BlockOverrides) -> Self {
         self.block_overrides = Some(block_overrides);
         self
     }
