@@ -37,7 +37,7 @@ use crate::{
     provider::SendableTx, EthCall, EthCallMany, EthGetBlock, FilterPollerBuilder, Identity,
     PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     PendingTransactionError, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
-    SendTransactionSync, SendableTxErr,
+    SendableTxErr,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{AnyNetwork, Ethereum, Network};
@@ -654,7 +654,7 @@ where
     async fn send_transaction_sync_internal(
         &self,
         mut tx: SendableTx<N>,
-    ) -> TransportResult<SendTransactionSync<N>> {
+    ) -> TransportResult<N::ReceiptResponse> {
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {

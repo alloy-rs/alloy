@@ -9,7 +9,6 @@ use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 use crate::GetSubscription;
 use crate::{
     heart::PendingTransactionError,
-    sync::{SendTransactionSync, SendTransactionSyncError},
     utils::{self, Eip1559Estimation, Eip1559Estimator},
     EthCall, EthGetBlock, Identity, PendingTransaction, PendingTransactionBuilder,
     PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
@@ -997,43 +996,40 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn send_transaction_sync(
         &self,
         tx: N::TransactionRequest,
-    ) -> Result<N::ReceiptResponse, SendTransactionSyncError> {
-        let sync_tx = self.send_transaction_sync_internal(SendableTx::Builder(tx)).await.map_err(
-            |transport_error| SendTransactionSyncError::UnsignedSubmissionFailed {
-                error: transport_error,
-            },
-        )?;
-        sync_tx.await
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.send_transaction_sync_internal(SendableTx::Builder(tx)).await
     }
 
-    /// Internal implementation for synchronous transaction sending.
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
+    /// transaction and send it to the network without changing user-facing
+    /// APIs. Generally implementers should NOT override this method.
     ///
-    /// This method handles both unsigned transactions (via Builder) and pre-signed
-    /// transactions (via Envelope), automatically fetching receipts after submission.
+    /// If the input is a [`SendableTx::Builder`] then this utilizes `eth_sendTransactionSync` by
+    /// default.
+    ///
+    /// [`send_transaction`]: Self::send_transaction
+    /// [`ProviderLayer`]: crate::ProviderLayer
+    /// [`TxFiller`]: crate::fillers::TxFiller
     #[doc(hidden)]
     async fn send_transaction_sync_internal(
         &self,
         tx: SendableTx<N>,
-    ) -> TransportResult<SendTransactionSync<N>> {
-        let raw = match &tx {
-            SendableTx::Builder(_) => Bytes::default(),
-            SendableTx::Envelope(envelope) => envelope.encoded_2718().into(),
-        };
+    ) -> TransportResult<N::ReceiptResponse> {
+        // Make sure to initialize heartbeat before we submit transaction, so that
+        // we don't miss it if user will subscriber to it immediately after sending.
+        let _handle = self.root().get_heart();
 
-        let pending_builder = self.send_transaction_internal(tx).await?;
-
-        let tx_hash = *pending_builder.tx_hash();
-        let provider = self.root().clone();
-        let raw_clone = raw.clone();
-
-        let fut = Box::pin(async move {
-            let pending_builder = PendingTransactionBuilder::new(provider, tx_hash);
-            pending_builder.get_receipt().await.map_err(|error| {
-                SendTransactionSyncError::ReceiptFailed { tx_hash, raw: raw_clone, error }
-            })
-        });
-
-        Ok(SendTransactionSync::new(raw, tx_hash, fut))
+        match tx {
+            SendableTx::Builder(mut tx) => {
+                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                let receipt = self.client().request("eth_sendTransactionSync", (tx,)).await?;
+                Ok(receipt)
+            }
+            SendableTx::Envelope(tx) => {
+                let encoded_tx = tx.encoded_2718();
+                self.send_raw_transaction_sync(&encoded_tx).await
+            }
+        }
     }
 
     /// Signs a transaction that can be submitted to the network later using
@@ -1741,6 +1737,21 @@ mod tests {
         let hash2 =
             builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
+    }
+
+    #[tokio::test]
+    async fn test_send_tx_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let _receipt =
+            provider.send_transaction_sync(tx.clone()).await.expect("failed to send tx sync");
     }
 
     #[tokio::test]
