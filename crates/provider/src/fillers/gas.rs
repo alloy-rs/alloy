@@ -8,7 +8,7 @@ use crate::{
 };
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
+use alloy_network::{Network, TransactionBuilder4844};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
