@@ -1,16 +1,21 @@
 use crate::{
     error::ValueError,
+    private::alloy_eips::eip2718::Eip2718Error,
     transaction::{
         eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        RlpEcdsaEncodableTx,
+        RlpEcdsaDecodableTx, RlpEcdsaEncodableTx,
     },
     EthereumTxEnvelope, SignableTransaction, Signed, Transaction, TxEip1559, TxEip2930, TxEip7702,
     TxLegacy, TxType,
 };
 use alloy_eips::{
-    eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
+    eip2718::{Eip2718Result, IsTyped2718},
+    eip2930::AccessList,
+    eip7702::SignedAuthorization,
+    Typed2718,
 };
-use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, Signature, TxHash, TxKind, B256, U256};
+use alloy_rlp::{Buf, BufMut, Decodable};
 
 /// Basic typed transaction which can contain both [`TxEip4844`] and [`TxEip4844WithSidecar`].
 pub type TypedTransaction = EthereumTypedTransaction<TxEip4844Variant>;
@@ -254,6 +259,32 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
             Self::Eip1559(tx) => tx.tx_hash(signature),
             Self::Eip4844(tx) => tx.tx_hash(signature),
             Self::Eip7702(tx) => tx.tx_hash(signature),
+        }
+    }
+}
+
+impl TypedTransaction {
+    /// Decode an unsigned typed transaction from RLP bytes.
+    pub fn decode_unsigned(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        if buf.is_empty() {
+            return Err(alloy_rlp::Error::InputTooShort.into());
+        }
+
+        let first_byte = buf[0];
+
+        // Eip2718: legacy transactions start with >= 0xc0
+        if first_byte >= 0xc0 {
+            return Ok(Self::Legacy(TxLegacy::decode(buf)?));
+        }
+
+        let tx_type = buf.get_u8();
+        match tx_type {
+            0x00 => Ok(Self::Legacy(TxLegacy::decode(buf)?)),
+            0x01 => Ok(Self::Eip2930(TxEip2930::decode(buf)?)),
+            0x02 => Ok(Self::Eip1559(TxEip1559::decode(buf)?)),
+            0x03 => Ok(Self::Eip4844(TxEip4844Variant::rlp_decode(buf)?)),
+            0x04 => Ok(Self::Eip7702(TxEip7702::decode(buf)?)),
+            _ => Err(Eip2718Error::UnexpectedType(tx_type)),
         }
     }
 }
