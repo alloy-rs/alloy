@@ -339,7 +339,7 @@ where
     /// # use alloy_primitives::{address, U256};
     /// # use alloy_provider::ProviderBuilder;
     /// # use alloy_rpc_types_eth::TransactionRequest;
-    /// 
+    ///
     /// let provider = ProviderBuilder::new().on_anvil();
     ///
     /// // Create transaction request
@@ -351,15 +351,13 @@ where
     /// let filled_tx = provider.fill(tx_request).await?;
     ///
     /// // Build unsigned transaction
-    /// let typed_tx = filled_tx.as_builder()
-    ///     .expect("filled tx is a builder")
-    ///     .clone()
-    ///     .build_unsigned()?;
+    /// let typed_tx =
+    ///     filled_tx.as_builder().expect("filled tx is a builder").clone().build_unsigned()?;
     ///
     /// // Encode, e.g. for offline signing
     /// let mut encoded = Vec::new();
     /// typed_tx.encode_for_signing(&mut encoded);
-    /// 
+    ///
     /// // Decode unsigned transaction
     /// let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
     /// ```
