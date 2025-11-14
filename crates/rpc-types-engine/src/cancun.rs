@@ -22,7 +22,8 @@ pub struct CancunPayloadFields {
 
 impl CancunPayloadFields {
     /// Returns a new [`CancunPayloadFields`] instance.
-    pub const fn new(parent_beacon_block_root: B256, versioned_hashes: Vec<B256>) -> Self {
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn new(parent_beacon_block_root: B256, versioned_hashes: Vec<B256>) -> Self {
         Self { parent_beacon_block_root, versioned_hashes }
     }
 }
