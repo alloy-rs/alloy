@@ -618,7 +618,7 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     /// which returns the transaction receipt in the same request rather than just the transaction
     /// hash.
     ///
-    /// Returns [`N::ReceiptResponse`] containing the transaction receipt.
+    /// Returns the transaction receipt if the transaction was confirmed.
     ///
     /// See [`Provider::send_transaction_sync`] for more information.
     ///
