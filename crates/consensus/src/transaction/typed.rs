@@ -125,7 +125,7 @@ impl<Eip4844> EthereumTypedTransaction<Eip4844> {
     }
 }
 
-impl TypedTransaction {
+impl<Eip4844: RlpEcdsaDecodableTx> EthereumTypedTransaction<Eip4844> {
     /// Decode an unsigned typed transaction from RLP bytes.
     pub fn decode_unsigned(buf: &mut &[u8]) -> Eip2718Result<Self> {
         if buf.is_empty() {
@@ -144,7 +144,7 @@ impl TypedTransaction {
             0x00 => Ok(Self::Legacy(TxLegacy::decode(buf)?)),
             0x01 => Ok(Self::Eip2930(TxEip2930::decode(buf)?)),
             0x02 => Ok(Self::Eip1559(TxEip1559::decode(buf)?)),
-            0x03 => Ok(Self::Eip4844(TxEip4844Variant::rlp_decode(buf)?)),
+            0x03 => Ok(Self::Eip4844(Eip4844::rlp_decode(buf)?)),
             0x04 => Ok(Self::Eip7702(TxEip7702::decode(buf)?)),
             _ => Err(Eip2718Error::UnexpectedType(tx_type)),
         }
