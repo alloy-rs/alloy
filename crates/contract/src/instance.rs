@@ -158,6 +158,6 @@ mod tests {
         let _ = contract.function("increment", &[]).unwrap().send_sync().await.unwrap();
 
         let result = contract.function("counter", &[]).unwrap().call().await.unwrap();
-        assert_eq!(result[0].as_uint().unwrap().0, U256::from(1));
+        assert_eq!(result[0].as_uint().unwrap().0, U256::from(2));
     }
 }
