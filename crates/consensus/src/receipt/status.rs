@@ -165,6 +165,9 @@ impl Decodable for Eip658Value {
         match h.payload_length {
             0 => Ok(Self::Eip658(false)),
             1 => {
+                if buf.remaining() < 1 {
+                    return Err(Error::InputTooShort);
+                }
                 let status = buf.get_u8() != 0;
                 Ok(status.into())
             }
