@@ -93,10 +93,14 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
 
     async fn fill(
         &self,
-        _fillable: Self::Fillable,
+        fillable: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        self.fill_sync(&mut tx);
+        if let Some(builder) = tx.as_mut_builder() {
+            if builder.chain_id().is_none() {
+                builder.set_chain_id(fillable);
+            }
+        }
         Ok(tx)
     }
 }
