@@ -1,4 +1,5 @@
 use crate::{ErrorPayload, RpcRecv};
+use alloy_primitives::B256;
 use serde_json::value::RawValue;
 
 /// An RPC error.
@@ -145,6 +146,58 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
         match self {
             Self::Transport(err) => Some(err),
             _ => None,
+        }
+    }
+}
+
+impl<E> RpcError<E, Box<RawValue>> {
+    /// Extracts a transaction hash from the error data field.
+    ///
+    /// Useful for EIP-7966 `eth_sendRawTransactionSync` errors that return
+    /// the transaction hash even when the transaction fails.
+    ///
+    /// Returns `Some(hash)` if the data contains a valid 32-byte hex string.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use alloy_json_rpc::{RpcError, ErrorPayload};
+    /// use alloy_primitives::B256;
+    ///
+    /// // Simulate an EIP-7966 error response
+    /// let json = r#"{"code":5,"message":"insufficient funds","data":"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"}"#;
+    /// let error_payload: ErrorPayload = serde_json::from_str(json).unwrap();
+    /// let rpc_error: RpcError<(), _> = RpcError::ErrorResp(error_payload);
+    ///
+    /// if let Some(tx_hash) = rpc_error.extract_transaction_hash() {
+    ///     println!("Transaction hash: {}", tx_hash);
+    /// }
+    /// ```
+    pub fn extract_transaction_hash(&self) -> Option<B256> {
+        let error_payload = self.as_error_resp()?;
+        let data = error_payload.data.as_ref()?;
+        let data_str = data.get().trim_matches('"').trim();
+        let hex_str = data_str.strip_prefix("0x").unwrap_or(data_str);
+
+        if hex_str.len() == 64 {
+            hex_str.parse().ok()
+        } else {
+            None
+        }
+    }
+}
+
+impl<E> RpcError<E, String> {
+    /// Extracts a transaction hash from the error data field.
+    pub fn extract_transaction_hash(&self) -> Option<B256> {
+        let error_payload = self.as_error_resp()?;
+        let data = error_payload.data.as_ref()?;
+        let hex_str = data.strip_prefix("0x").unwrap_or(data);
+
+        if hex_str.len() == 64 {
+            hex_str.parse().ok()
+        } else {
+            None
         }
     }
 }

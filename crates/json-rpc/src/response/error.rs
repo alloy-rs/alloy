@@ -444,4 +444,61 @@ mod test {
         let payload: ErrorPayload = serde_json::from_str(json).unwrap();
         assert!(payload.is_retry_err());
     }
+
+    #[test]
+    fn extract_transaction_hash_box_raw_value() {
+        use crate::RpcError;
+        use alloy_primitives::B256;
+        use serde_json::value::RawValue;
+
+        let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
+
+        let error_payload: ErrorPayload = serde_json::from_str(&json).unwrap();
+        let rpc_error: RpcError<(), Box<RawValue>> = RpcError::ErrorResp(error_payload);
+
+        let extracted_hash = rpc_error.extract_transaction_hash();
+        assert!(extracted_hash.is_some());
+        assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
+    }
+
+    #[test]
+    fn extract_transaction_hash_from_error_with_data() {
+        use crate::RpcError;
+        use alloy_primitives::B256;
+
+        let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let json = format!(r#"{{"code":5,"message":"insufficient funds","data":"{}"}}"#, tx_hash);
+
+        let error_payload: ErrorPayload = serde_json::from_str(&json).unwrap();
+        let rpc_error: RpcError<(), String> = RpcError::ErrorResp(ErrorPayload {
+            code: error_payload.code,
+            message: error_payload.message,
+            data: error_payload.data.map(|d| d.get().trim_matches('"').to_string()),
+        });
+
+        let extracted_hash = rpc_error.extract_transaction_hash();
+        assert!(extracted_hash.is_some());
+        assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
+    }
+
+    #[test]
+    fn extract_transaction_hash_without_0x_prefix() {
+        use crate::RpcError;
+        use alloy_primitives::B256;
+
+        let tx_hash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let json = format!(r#"{{"code":5,"message":"Transaction failed","data":"{}"}}"#, tx_hash);
+
+        let error_payload: ErrorPayload = serde_json::from_str(&json).unwrap();
+        let rpc_error: RpcError<(), String> = RpcError::ErrorResp(ErrorPayload {
+            code: error_payload.code,
+            message: error_payload.message,
+            data: error_payload.data.map(|d| d.get().trim_matches('"').to_string()),
+        });
+
+        let extracted_hash = rpc_error.extract_transaction_hash();
+        assert!(extracted_hash.is_some());
+        assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
+    }
 }
