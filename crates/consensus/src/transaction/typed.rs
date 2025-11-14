@@ -503,3 +503,105 @@ pub(crate) mod serde_bincode_compat {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{Address, Bytes, U256};
+
+    #[test]
+    fn test_decode_unsigned_all_types() {
+        let transactions = [
+            TypedTransaction::Legacy(TxLegacy {
+                chain_id: Some(1),
+                nonce: 0,
+                gas_price: 1,
+                gas_limit: 2,
+                to: Address::ZERO.into(),
+                value: U256::ZERO,
+                input: Bytes::default(),
+            }),
+            TypedTransaction::Eip2930(TxEip2930 {
+                chain_id: 1,
+                nonce: 0,
+                gas_price: 1,
+                gas_limit: 2,
+                to: Address::ZERO.into(),
+                value: U256::ZERO,
+                input: Bytes::default(),
+                access_list: AccessList::default(),
+            }),
+            TypedTransaction::Eip1559(TxEip1559 {
+                chain_id: 1,
+                nonce: 0,
+                gas_limit: 1,
+                max_fee_per_gas: 2,
+                max_priority_fee_per_gas: 3,
+                to: Address::ZERO.into(),
+                value: U256::ZERO,
+                input: Bytes::default(),
+                access_list: AccessList::default(),
+            }),
+            TypedTransaction::Eip7702(TxEip7702 {
+                chain_id: 1,
+                nonce: 0,
+                gas_limit: 1,
+                max_fee_per_gas: 2,
+                max_priority_fee_per_gas: 3,
+                to: Address::ZERO,
+                value: U256::ZERO,
+                input: Bytes::default(),
+                access_list: AccessList::default(),
+                authorization_list: vec![],
+            }),
+        ];
+
+        for tx in transactions {
+            let mut encoded = Vec::new();
+            tx.encode_for_signing(&mut encoded);
+            let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
+            assert_eq!(decoded, tx);
+        }
+    }
+
+    #[test]
+    fn test_decode_unsigned_invalid_type() {
+        let invalid = vec![0x99, 0xc0];
+        let result = TypedTransaction::decode_unsigned(&mut invalid.as_slice());
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(matches!(err, alloy_eips::eip2718::Eip2718Error::UnexpectedType(0x99)));
+        }
+    }
+
+    #[test]
+    fn test_decode_unsigned_encode_stability() {
+        // Verify that decode(encode(tx)) == tx and encode(decode(encode(tx))) == encode(tx)
+        let tx = TypedTransaction::Eip1559(TxEip1559 {
+            chain_id: 1,
+            nonce: 100,
+            gas_limit: 50000,
+            max_fee_per_gas: 30_000_000_000,
+            max_priority_fee_per_gas: 2_000_000_000,
+            to: Address::random().into(),
+            value: U256::from(1_000_000),
+            input: Bytes::from(vec![1, 2, 3]),
+            access_list: AccessList::default(),
+        });
+
+        // Encode
+        let mut encoded = Vec::new();
+        tx.encode_for_signing(&mut encoded);
+
+        // Decode
+        let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice()).unwrap();
+        assert_eq!(decoded, tx);
+
+        // Re-encode
+        let mut re_encoded = Vec::new();
+        decoded.encode_for_signing(&mut re_encoded);
+
+        assert_eq!(encoded, re_encoded);
+    }
+}
