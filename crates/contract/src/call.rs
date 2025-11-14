@@ -906,7 +906,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(windows, ignore = "anvil 0.2.0 on Windows cannot handle sendRawTransactionSync")]
     async fn deploy_and_call_with_priority_sync() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
         let counter_address =
