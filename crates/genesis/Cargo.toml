@@ -32,6 +32,9 @@ alloy-trie = { workspace = true, features = ["ethereum"] }
 serde.workspace = true
 serde_with = { workspace = true, optional = true }
 
+# borsh
+borsh = { workspace = true, optional = true, features = ["derive"] }
+
 [dev-dependencies]
 bincode = { workspace = true, features = ["serde"] }
 serde_json.workspace = true
@@ -46,5 +49,11 @@ std = [
 	"alloy-eips/std",
 	"serde_json/std",
 	"serde_with?/std",
+	"borsh?/std"
 ]
 serde-bincode-compat = ["dep:serde_with", "alloy-eips/serde-bincode-compat"]
+borsh = [
+	"dep:borsh",
+	"alloy-primitives/borsh",
+	"alloy-eips/borsh",
+]

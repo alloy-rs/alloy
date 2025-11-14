@@ -28,7 +28,7 @@ jobs:
         rust:
           - "stable"
           - "nightly"
-          - "1.86" # MSRV
+          - "1.88" # MSRV
         flags:
           # No features
           - "--no-default-features -F reqwest-rustls-tls"
@@ -38,7 +38,7 @@ jobs:
           - "--all-features"
         exclude:
           # All features on MSRV
-          - rust: "1.85" # MSRV
+          - rust: "1.88" # MSRV
             flags: "--all-features"
     steps:
       - uses: actions/checkout@v5
@@ -48,7 +48,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - name: Install Anvil
-        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1
+        uses: foundry-rs/foundry-toolchain@50d5a8956f2e319df19e6b57539d7e2acb9f8c1e # v1
         with:
           version: nightly
       - name: Install test binaries
@@ -59,16 +59,16 @@ jobs:
           cache-on-failure: true
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
-        if: ${{ matrix.rust != '1.86' }} # MSRV
-        uses: taiki-e/install-action@d6912b47771be2c443ec90dbb3d28e023987e782 # v2
+        if: ${{ matrix.rust != '1.88' }} # MSRV
+        uses: taiki-e/install-action@81ee1d48d9194cdcab880cbdc7d36e87d39874cb # v2
         with:
           tool: nextest
       - name: build
-        if: ${{ matrix.rust == '1.86' }} # MSRV
+        if: ${{ matrix.rust == '1.88' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
         shell: bash
-        if: ${{ matrix.rust != '1.86' }} # MSRV
+        if: ${{ matrix.rust != '1.88' }} # MSRV
         run: cargo nextest run --workspace ${{ matrix.flags }}
 
   doctest:
@@ -102,7 +102,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
-      - uses: taiki-e/install-action@d6912b47771be2c443ec90dbb3d28e023987e782 # v2
+      - uses: taiki-e/install-action@81ee1d48d9194cdcab880cbdc7d36e87d39874cb # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -122,6 +122,7 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-local \
             --exclude alloy-signer-trezor \
+            --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
 
   wasm-wasi:
@@ -137,7 +138,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-wasip1
-      - uses: taiki-e/install-action@d6912b47771be2c443ec90dbb3d28e023987e782 # v2
+      - uses: taiki-e/install-action@81ee1d48d9194cdcab880cbdc7d36e87d39874cb # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -149,6 +150,7 @@ jobs:
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
+            --exclude alloy-signer-turnkey \
             --exclude alloy-transport-ipc
       # Ledger signer requires one of `browser` or `node` features.
       - name: build ledger
@@ -166,7 +168,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@d6912b47771be2c443ec90dbb3d28e023987e782 # v2
+      - uses: taiki-e/install-action@81ee1d48d9194cdcab880cbdc7d36e87d39874cb # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -189,7 +191,7 @@ jobs:
         with:
           toolchain: stable
           targets: riscv32imac-unknown-none-elf
-      - uses: taiki-e/install-action@d6912b47771be2c443ec90dbb3d28e023987e782 # v2
+      - uses: taiki-e/install-action@81ee1d48d9194cdcab880cbdc7d36e87d39874cb # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -206,7 +208,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: crate-ci/typos@85f62a8a84f939ae994ab3763f01a0296d61a7ee # v1
+      - uses: crate-ci/typos@07d900b8fa1097806b8adb6391b0d3e0ac2fdea7 # v1
 
   clippy:
     runs-on: ubuntu-latest
@@ -304,12 +306,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{matrix.language}}"
 

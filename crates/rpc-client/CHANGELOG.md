@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Miscellaneous Tasks
+
+- Release 1.1.0
+
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Bug Fixes
+
+- [rpc-client] Remove redundant into_box_transport ([#3071](https://github.com/alloy-rs/alloy/issues/3071))
+
+### Miscellaneous Tasks
+
+- Release 1.0.42
+- Expose WebSocketConfig in RPC client and provider for non-WASM builds ([#3088](https://github.com/alloy-rs/alloy/issues/3088))
+- Remove unnecessary todo ([#3042](https://github.com/alloy-rs/alloy/issues/3042))
+- Release 1.0.41
+
+## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.40
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Features
+
+- Relax Clone bound for PollerBuilder and prepare_static_poller ([#2993](https://github.com/alloy-rs/alloy/issues/2993))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+- [rpc-client] Remove duplicate localhost:8545 parsing assertion ([#2989](https://github.com/alloy-rs/alloy/issues/2989))
+- Remove outdated TODO about current-thread polling ([#2977](https://github.com/alloy-rs/alloy/issues/2977))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove unused core::panic import ([#2939](https://github.com/alloy-rs/alloy/issues/2939))
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+
+### Refactor
+
+- [rpc-client] Remove dead SerError state from BatchFuture  ([#2934](https://github.com/alloy-rs/alloy/issues/2934))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
+## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
+
+### Miscellaneous Tasks
+
+- Release 1.0.35
+
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21
 
 ### Miscellaneous Tasks

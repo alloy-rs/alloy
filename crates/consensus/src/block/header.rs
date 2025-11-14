@@ -21,6 +21,7 @@ use core::mem;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Header {
     /// The Keccak 256-bit hash of the parent
     /// block’s header, in its entirety; formally Hp.
@@ -249,14 +250,14 @@ impl Header {
         mem::size_of::<Bloom>() + // logs bloom
         mem::size_of::<U256>() + // difficulty
         mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u128>() + // gas limit
-        mem::size_of::<u128>() + // gas used
+        mem::size_of::<u64>() + // gas limit
+        mem::size_of::<u64>() + // gas used
         mem::size_of::<u64>() + // timestamp
         mem::size_of::<B256>() + // mix hash
         mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u128>>() + // base fee per gas
-        mem::size_of::<Option<u128>>() + // blob gas used
-        mem::size_of::<Option<u128>>() + // excess blob gas
+        mem::size_of::<Option<u64>>() + // base fee per gas
+        mem::size_of::<Option<u64>>() + // blob gas used
+        mem::size_of::<Option<u64>>() + // excess blob gas
         mem::size_of::<Option<B256>>() + // parent beacon block root
         mem::size_of::<Option<B256>>() + // requests root
         self.extra_data.len() // extra data
@@ -1083,8 +1084,25 @@ pub(crate) mod serde_bincode_compat {
     }
 }
 
-#[cfg(all(test, feature = "serde"))]
+#[cfg(test)]
 mod tests {
+    use super::*;
+    use alloy_primitives::{b256, hex};
+
+    #[test]
+    fn decode_header_rlp() {
+        // ronin header
+        let raw = hex!("0xf90212a00d84d79f59fc384a1f6402609a5b7253b4bfe7a4ae12608ed107273e5422b6dda01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d493479471562b71999873db5b286df957af199ec94617f7a0f496f3d199c51a1aaee67dac95f24d92ac13c60d25181e1eecd6eca5ddf32ac0a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000808206a4840365908a808468e975f09ad983011003846765746888676f312e32352e308664617277696ea06f485a167165ec12e0ab3e6ab59a7b88560b90306ac98a26eb294abf95a8c59b88000000000000000007");
+        let header = Header::decode(&mut raw.as_slice()).unwrap();
+        assert_eq!(
+            header.hash_slow(),
+            b256!("0x4f05e4392969fc82e41f6d6a8cea379323b0b2d3ddf7def1a33eec03883e3a33")
+        );
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
     use super::*;
     use alloy_primitives::b256;
 

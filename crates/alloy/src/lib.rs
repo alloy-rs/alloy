@@ -4,7 +4,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 /* --------------------------------------- Core re-exports -------------------------------------- */
 
@@ -67,6 +67,10 @@ pub use alloy_consensus as consensus;
 #[cfg(feature = "eips")]
 #[doc(inline)]
 pub use alloy_eips as eips;
+
+#[cfg(feature = "ens")]
+#[doc(inline)]
+pub use alloy_ens as ens;
 
 #[cfg(feature = "network")]
 #[doc(inline)]
@@ -155,6 +159,10 @@ pub mod signers {
     #[cfg(feature = "signer-trezor")]
     #[doc(inline)]
     pub use alloy_signer_trezor as trezor;
+
+    #[cfg(feature = "signer-turnkey")]
+    #[doc(inline)]
+    pub use alloy_signer_turnkey as turnkey;
 }
 
 /// Low-level Ethereum JSON-RPC transport abstraction and implementations.

@@ -52,7 +52,7 @@ impl PartialSidecar {
     }
 
     /// Get the number of unused field elements that have been allocated
-    fn free_fe(&self) -> usize {
+    const fn free_fe(&self) -> usize {
         self.blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize - self.fe
     }
 
@@ -406,9 +406,16 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         self.inner.blobs
     }
 
+    /// Build the sidecar for eip-7594 from the data, with default (Ethereum Mainnet)
+    /// settings.
+    #[cfg(feature = "kzg")]
+    pub fn build_7594(self) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        self.build_7594_with_settings(EnvKzgSettings::Default.get())
+    }
+
     /// Build the sidecar for eip-7594 from the data with the provided settings.
     #[cfg(feature = "kzg")]
-    pub fn builder_7594_sidecar(
+    pub fn build_7594_with_settings(
         self,
         settings: &c_kzg::KzgSettings,
     ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
@@ -433,6 +440,16 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         }
 
         Ok(BlobTransactionSidecarEip7594::new(self.inner.blobs, commitments, proofs))
+    }
+
+    /// Build the sidecar for eip-7594 from the data with the provided settings.
+    #[cfg(feature = "kzg")]
+    #[deprecated = "Use `build_7594_with_settings` instead"]
+    pub fn builder_7594_sidecar(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
+        self.build_7594_with_settings(settings)
     }
 }
 

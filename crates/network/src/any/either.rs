@@ -264,6 +264,29 @@ impl AnyTxEnvelope {
     ///
     /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
     /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::any::AnyTxEnvelope;
+    /// # use alloy_consensus::transaction::Either;
+    /// # // Assuming you have a custom type: struct CustomTx;
+    /// # // impl TryFrom<alloy_network::any::UnknownTxEnvelope> for CustomTx { ... }
+    /// # fn example(envelope: AnyTxEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    /// # struct CustomTx;
+    /// # impl TryFrom<alloy_network::any::UnknownTxEnvelope> for CustomTx {
+    /// #     type Error = String;
+    /// #     fn try_from(_: alloy_network::any::UnknownTxEnvelope) -> Result<Self, Self::Error> {
+    /// #         Ok(CustomTx)
+    /// #     }
+    /// # }
+    /// match envelope.try_into_either::<CustomTx>()? {
+    ///     Either::Left(eth_tx) => { /* Ethereum transaction */ }
+    ///     Either::Right(custom_tx) => { /* Custom transaction */ }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn try_into_either<T>(self) -> Result<Either<TxEnvelope, T>, T::Error>
     where
         T: TryFrom<UnknownTxEnvelope>,
@@ -276,6 +299,25 @@ impl AnyTxEnvelope {
     ///
     /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
     /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    ///
+    /// Use this for custom conversion logic when [`try_into_either`](Self::try_into_either) is
+    /// insufficient.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::any::AnyTxEnvelope;
+    /// # use alloy_consensus::transaction::Either;
+    /// # use alloy_primitives::B256;
+    /// # fn example(envelope: AnyTxEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    /// let result = envelope.try_map_unknown(|unknown| Ok::<B256, String>(unknown.hash))?;
+    /// match result {
+    ///     Either::Left(eth_tx) => { /* Ethereum */ }
+    ///     Either::Right(hash) => { /* Unknown tx hash */ }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn try_map_unknown<T, E>(
         self,
         f: impl FnOnce(UnknownTxEnvelope) -> Result<T, E>,
@@ -324,6 +366,36 @@ impl AnyTxEnvelope {
             Some(TxEnvelope::Eip7702(tx)) => Some(tx),
             _ => None,
         }
+    }
+
+    /// Returns true if the transaction is a legacy transaction.
+    #[inline]
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Legacy(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-2930 transaction.
+    #[inline]
+    pub const fn is_eip2930(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip2930(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-1559 transaction.
+    #[inline]
+    pub const fn is_eip1559(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip1559(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-4844 transaction.
+    #[inline]
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip4844(_)))
+    }
+
+    /// Returns true if the transaction is an EIP-7702 transaction.
+    #[inline]
+    pub const fn is_eip7702(&self) -> bool {
+        matches!(self.as_envelope(), Some(TxEnvelope::Eip7702(_)))
     }
 }
 

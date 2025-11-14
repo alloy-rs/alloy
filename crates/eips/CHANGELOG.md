@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
+
+### Features
+
+- Add EIP-7594 conversion and sidecar manipulation API ([#3144](https://github.com/alloy-rs/alloy/issues/3144))
+- [consensus,eips,genesis] Add Borsh support ([#2946](https://github.com/alloy-rs/alloy/issues/2946))
+
+### Refactor
+
+- [consensus] Remove Borsh skip attributes from tx structs ([#3155](https://github.com/alloy-rs/alloy/issues/3155))
+
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Bug Fixes
+
+- BlobParams bincode deserialization ([#3132](https://github.com/alloy-rs/alloy/issues/3132))
+
+### Dependencies
+
+- Bump MSRV to 1.88 ([#3123](https://github.com/alloy-rs/alloy/issues/3123))
+
+### Miscellaneous Tasks
+
+- Release 1.1.0
+
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Features
+
+- Add blobs & into_blobs methods ([#3072](https://github.com/alloy-rs/alloy/issues/3072))
+- Add methods to build EIP-7594 sidecars with default and custom settings ([#3036](https://github.com/alloy-rs/alloy/issues/3036))
+
+### Miscellaneous Tasks
+
+- Release 1.0.42
+- Add number value to MAX_TX_GAS_LIMIT_OSAKA ([#3093](https://github.com/alloy-rs/alloy/issues/3093))
+- Release 1.0.41
+- Release 1.0.40
+
+## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
+
+### Features
+
+- Add helper for legacy -> 7594 sidecar conversion ([#3013](https://github.com/alloy-rs/alloy/issues/3013))
+
+### Miscellaneous Tasks
+
+- Release 1.0.39
+- Fix unused import ([#3015](https://github.com/alloy-rs/alloy/issues/3015))
+
+## [1.0.38](https://github.com/alloy-rs/alloy/releases/tag/v1.0.38) - 2025-10-08
+
+### Features
+
+- [beacon-types] `GetBlobsResponse` ([#2994](https://github.com/alloy-rs/alloy/issues/2994))
+
+### Miscellaneous Tasks
+
+- Release 1.0.38 ([#3007](https://github.com/alloy-rs/alloy/issues/3007))
+
+## [1.0.37](https://github.com/alloy-rs/alloy/releases/tag/v1.0.37) - 2025-09-30
+
+### Bug Fixes
+
+- Use correct base update fraction ([#2958](https://github.com/alloy-rs/alloy/issues/2958))
+
+### Miscellaneous Tasks
+
+- Release 1.0.37
+- Remove feature(doc_auto_cfg) ([#2941](https://github.com/alloy-rs/alloy/issues/2941))
+- [eip-7702] Remove the leading whitespace of predeployed contract ([#2937](https://github.com/alloy-rs/alloy/issues/2937))
+
+## [1.0.36](https://github.com/alloy-rs/alloy/releases/tag/v1.0.36) - 2025-09-24
+
+### Miscellaneous Tasks
+
+- Release 1.0.36
+
 ## [1.0.35](https://github.com/alloy-rs/alloy/releases/tag/v1.0.35) - 2025-09-22
 
 ### Features
@@ -13,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.0.35
 - Add helper for init blobparams ([#2913](https://github.com/alloy-rs/alloy/issues/2913))
 
 ## [1.0.34](https://github.com/alloy-rs/alloy/releases/tag/v1.0.34) - 2025-09-21

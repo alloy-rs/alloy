@@ -577,7 +577,7 @@ impl TransactionRequest {
     pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let Some(sidecar) = self.sidecar.clone() else {
+        let Some(sidecar) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
         };
 
@@ -797,7 +797,7 @@ impl TransactionRequest {
     ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if sidecar or max_blob_fee_per_gas is set
+    /// - EIP-4844 if sidecar, blob_versioned_hashes, or max_blob_fee_per_gas is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases

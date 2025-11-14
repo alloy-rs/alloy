@@ -15,7 +15,7 @@ use gcloud_sdk::{
 };
 use k256::ecdsa::{self, VerifyingKey};
 use spki::DecodePublicKey;
-use std::{fmt, fmt::Debug};
+use std::fmt;
 use thiserror::Error;
 
 type Client = GoogleApi<KeyManagementServiceClient<GoogleAuthMiddleware>>;
@@ -143,6 +143,10 @@ pub enum GcpSignerError {
     /// [`ecdsa`] error.
     #[error(transparent)]
     K256(#[from] ecdsa::Error),
+
+    /// Failed to recover signature parity for the given digest and public key.
+    #[error("failed to recover signature parity from KMS signature")]
+    SignatureRecoveryFailed,
 }
 
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
@@ -222,7 +226,8 @@ impl GcpSigner {
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpSignerError> {
         let sig = self.sign_digest(digest).await?;
-        Ok(sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey))
+        let recovered = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey)?;
+        Ok(recovered)
     }
 }
 
@@ -282,18 +287,18 @@ fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,
     pubkey: &VerifyingKey,
-) -> Signature {
+) -> Result<Signature, GcpSignerError> {
     let signature = Signature::from_signature_and_parity(sig, false);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
     let signature = signature.with_parity(true);
     if check_candidate(&signature, hash, pubkey) {
-        return signature;
+        return Ok(signature);
     }
 
-    panic!("bad sig");
+    Err(GcpSignerError::SignatureRecoveryFailed)
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.

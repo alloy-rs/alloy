@@ -9,11 +9,17 @@ pub const BPO1_TARGET_BLOBS_PER_BLOCK: u64 = 10;
 /// Max blob count with BPO1 activation
 pub const BPO1_MAX_BLOBS_PER_BLOCK: u64 = 15;
 
+/// Update fraction for BPO1
+pub const BPO1_BASE_UPDATE_FRACTION: u64 = 8346193;
+
 /// Targeted blob count with BPO2 activation
 pub const BPO2_TARGET_BLOBS_PER_BLOCK: u64 = 14;
 
 /// Max blob count with BPO2 activation
 pub const BPO2_MAX_BLOBS_PER_BLOCK: u64 = 21;
+
+/// Update fraction for BPO2
+pub const BPO2_BASE_UPDATE_FRACTION: u64 = 11684671;
 
 /// A scheduled blob parameter update entry.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -18,6 +18,7 @@ pub const BLOB_BASE_COST: u64 = 2_u64.pow(13);
     feature = "serde",
     serde(from = "serde_impl::SerdeHelper", into = "serde_impl::SerdeHelper")
 )]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct BlobParams {
     /// Target blob count for the block.
     pub target_blob_count: u64,
@@ -82,6 +83,7 @@ impl BlobParams {
         Self {
             target_blob_count: eip7892::BPO1_TARGET_BLOBS_PER_BLOCK,
             max_blob_count: eip7892::BPO1_MAX_BLOBS_PER_BLOCK,
+            update_fraction: eip7892::BPO1_BASE_UPDATE_FRACTION as u128,
             ..Self::osaka()
         }
     }
@@ -91,6 +93,7 @@ impl BlobParams {
         Self {
             target_blob_count: eip7892::BPO2_TARGET_BLOBS_PER_BLOCK,
             max_blob_count: eip7892::BPO2_MAX_BLOBS_PER_BLOCK,
+            update_fraction: eip7892::BPO2_BASE_UPDATE_FRACTION as u128,
             ..Self::osaka()
         }
     }
@@ -179,7 +182,7 @@ mod serde_impl {
         max_blob_count: u64,
         #[serde(rename = "target")]
         target_blob_count: u64,
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         min_blob_fee: Option<u128>,
     }
 

@@ -27,7 +27,8 @@ use std::{borrow::Cow, sync::Arc};
 /// A wrapper struct around a type erased [`Provider`].
 ///
 /// This type will delegate all functions to the wrapped provider, with the exception of non
-/// object-safe functions (e.g. [`Provider::subscribe`]) which use the default trait implementation.
+/// object-safe functions (e.g. functions requiring `Self: Sized`) which use the default trait
+/// implementation.
 ///
 /// This is a convenience type for `Arc<dyn Provider<N> + 'static>`.
 #[derive(Clone)]
@@ -366,6 +367,13 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<N>> {
         self.0.send_transaction_internal(tx).await
+    }
+
+    async fn send_transaction_sync(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.0.send_transaction_sync_internal(SendableTx::Builder(tx)).await
     }
 
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {

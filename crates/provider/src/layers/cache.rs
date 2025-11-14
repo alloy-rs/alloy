@@ -100,10 +100,13 @@ macro_rules! rpc_call_with_block {
             });
 
             let res = result.await?;
-            // Insert into cache.
-            let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
-            let hash = $req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+            // Insert into cache only for deterministic block identifiers (exclude tag-based ids
+            // like latest/pending/earliest). Caching tag-based results can lead to stale data.
+            if !$req.has_block_tag() {
+                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+                let hash = $req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(res)
         }))
@@ -149,7 +152,7 @@ where
         &self,
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
-        let req = RequestType::new("eth_getBlockReceipts", (block,));
+        let req = RequestType::new("eth_getBlockReceipts", (block,)).with_block_id(block);
 
         let redirect = req.has_block_tag();
 
@@ -194,6 +197,21 @@ where
     }
 
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+        if filter.block_option.as_block_hash().is_none() {
+            // if block options have dynamic range we can't cache them
+            let from_is_number = filter
+                .block_option
+                .get_from_block()
+                .as_ref()
+                .is_some_and(|block| block.is_number());
+            let to_is_number =
+                filter.block_option.get_to_block().as_ref().is_some_and(|block| block.is_number());
+
+            if !from_is_number || !to_is_number {
+                return self.inner.get_logs(filter).await;
+            }
+        }
+
         let req = RequestType::new("eth_getLogs", filter.clone());
 
         let params_hash = req.params_hash().ok();
@@ -388,7 +406,9 @@ impl<Params: RpcSend> RequestType<Params> {
                 BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_))
             );
         }
-        false
+        // Treat absence of BlockId as tag-based (e.g., 'latest'), which is non-deterministic
+        // and should not be cached.
+        true
     }
 }
 
