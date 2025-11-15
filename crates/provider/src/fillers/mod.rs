@@ -426,7 +426,10 @@ where
         self.inner.get_account_info(address)
     }
 
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    fn get_account(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, Option<alloy_consensus::Account>> {
         self.inner.get_account(address)
     }
 
