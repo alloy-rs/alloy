@@ -1,7 +1,7 @@
 use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
 use serde::Deserialize;
 use serde_json::value::RawValue;
-use std::{error::Error as StdError, fmt::Debug};
+use std::error::Error as StdError;
 use thiserror::Error;
 
 /// A transport error is an [`RpcError`] containing a [`TransportErrorKind`].
