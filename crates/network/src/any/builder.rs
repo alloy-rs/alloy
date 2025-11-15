@@ -136,6 +136,21 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().prep_for_submission()
     }
 
+    /// Build an unsigned typed transaction.
+    ///
+    /// This method validates that all required fields are present and builds an
+    /// unsigned transaction. Returns an error if any required fields are missing.
+    ///
+    /// # Limitations
+    ///
+    /// The [`TransactionRequest`] can only build Ethereum transaction types
+    /// (Legacy, EIP-2930, EIP-1559, EIP-4844, EIP-7702). Attempting to build
+    /// unknown transaction types will result in an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TransactionBuilderError::InvalidTransactionRequest`] if required
+    /// fields are missing for the transaction type.
     fn build_unsigned(self) -> BuildResult<<AnyNetwork as Network>::UnsignedTx, AnyNetwork> {
         if let Err((tx_type, missing)) = self.missing_keys() {
             return Err(TransactionBuilderError::InvalidTransactionRequest(
@@ -146,6 +161,21 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         }
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys").into())
     }
+
+    /// Build and sign a transaction using the provided wallet.
+    ///
+    /// This method signs the transaction request with the given wallet and returns
+    /// a signed transaction envelope ready for submission to the network.
+    ///
+    /// # Limitations
+    ///
+    /// The [`TransactionRequest`] can only build Ethereum transaction types.
+    /// Unknown transaction types cannot be signed through this builder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signing fails or if the wallet cannot produce the
+    /// required signature type for the transaction.
     async fn build<W: NetworkWallet<AnyNetwork>>(
         self,
         wallet: &W,
