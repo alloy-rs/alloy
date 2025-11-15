@@ -3,7 +3,7 @@ use crate::{
     provider::SendableTx,
     Provider,
 };
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::Network;
 use alloy_primitives::Address;
 use alloy_transport::TransportResult;
 use async_trait::async_trait;
