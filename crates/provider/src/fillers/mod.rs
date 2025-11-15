@@ -331,6 +331,41 @@ where
     }
 
     /// Fills the transaction request, using the configured fillers
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use alloy_consensus::{TypedTransaction, SignableTransaction};
+    /// # use alloy_primitives::{address, U256};
+    /// # use alloy_provider::ProviderBuilder;
+    /// # use alloy_rpc_types_eth::TransactionRequest;
+    /// # use alloy_network::TransactionBuilder;
+    ///
+    /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    ///     // Create transaction request
+    ///     let tx_request = TransactionRequest::default()
+    ///         .with_from(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+    ///         .with_value(U256::from(1000));
+    ///
+    ///     let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+    ///
+    ///     // Fill transaction with provider data
+    ///     let filled_tx = provider.fill(tx_request).await?;
+    ///
+    ///     // Build unsigned transaction
+    ///     let typed_tx =
+    ///         filled_tx.as_builder().expect("filled tx is a builder").clone().build_unsigned()?;
+    ///
+    ///     // Encode, e.g. for offline signing
+    ///     let mut encoded = Vec::new();
+    ///     typed_tx.encode_for_signing(&mut encoded);
+    ///
+    ///     // Decode unsigned transaction
+    ///     let decoded = TypedTransaction::decode_unsigned(&mut encoded.as_slice())?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
     }
