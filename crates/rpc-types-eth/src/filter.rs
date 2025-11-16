@@ -43,10 +43,13 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
     }
 }
 
-impl<T: Eq + Hash> Hash for FilterSet<T> {
+impl<T: Eq + Hash + Ord> Hash for FilterSet<T> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.set {
-            value.hash(state);
+        state.write_usize(self.set.len());
+        let mut elems: Vec<&T> = self.set.iter().collect();
+        elems.sort_unstable();
+        for v in elems {
+            v.hash(state);
         }
     }
 }
@@ -704,7 +707,10 @@ impl Filter {
     /// Returns `true` if the filter matches the given block. Checks both the
     /// block number and hash.
     pub fn matches_block(&self, block: &BlockNumHash) -> bool {
-        self.matches_block_range(block.number) || self.matches_block_hash(block.hash)
+        match self.block_option {
+            FilterBlockOption::AtBlockHash(hash) => hash == block.hash,
+            FilterBlockOption::Range { .. } => self.matches_block_range(block.number),
+        }
     }
 
     /// Returns `true` if either of the following is true:
