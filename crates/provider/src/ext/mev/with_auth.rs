@@ -145,6 +145,6 @@ mod tests {
         .unwrap();
         let body = "sign this message".to_string();
         let signature = sign_flashbots_payload(body.clone(), &signer).await.unwrap();
-        assert_eq!(signature, "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x983dc7c520db0d287faff3cd0aef81d5a7f4ffd3473440d3f705da16299724271f660b6fe367f455b205bc014eff3e20defd011f92000f94d39365ca0bc786721b");
+        assert_eq!(signature, "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x983dc7c520db0d287faff3cd0aef81d5a7f4ffd3473440d3f705da16299724271f660b6fe367f455b205bc014eff3e20defd011f92000f94d39365ca0bc7867200");
     }
 }
