@@ -457,7 +457,7 @@ mod test {
         let error_payload: ErrorPayload = serde_json::from_str(&json).unwrap();
         let rpc_error: RpcError<(), Box<RawValue>> = RpcError::ErrorResp(error_payload);
 
-        let extracted_hash = rpc_error.extract_transaction_hash();
+        let extracted_hash = rpc_error.tx_hash_data();
         assert!(extracted_hash.is_some());
         assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
     }
@@ -477,7 +477,7 @@ mod test {
             data: error_payload.data.map(|d| d.get().trim_matches('"').to_string()),
         });
 
-        let extracted_hash = rpc_error.extract_transaction_hash();
+        let extracted_hash = rpc_error.tx_hash_data();
         assert!(extracted_hash.is_some());
         assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
     }
@@ -497,7 +497,7 @@ mod test {
             data: error_payload.data.map(|d| d.get().trim_matches('"').to_string()),
         });
 
-        let extracted_hash = rpc_error.extract_transaction_hash();
+        let extracted_hash = rpc_error.tx_hash_data();
         assert!(extracted_hash.is_some());
         assert_eq!(extracted_hash.unwrap(), tx_hash.parse::<B256>().unwrap());
     }

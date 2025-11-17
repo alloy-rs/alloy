@@ -151,6 +151,22 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
 }
 
 impl<E> RpcError<E, Box<RawValue>> {
+    /// Parses the error data field as a hex string of specified length.
+    ///
+    /// Returns `Some(T)` if the data contains a valid hex string of the expected length.
+    fn parse_data<T: std::str::FromStr>(&self, expected_hex_len: usize) -> Option<T> {
+        let error_payload = self.as_error_resp()?;
+        let data = error_payload.data.as_ref()?;
+        let data_str = data.get().trim_matches('"').trim();
+        let hex_str = data_str.strip_prefix("0x").unwrap_or(data_str);
+
+        if hex_str.len() == expected_hex_len {
+            hex_str.parse().ok()
+        } else {
+            None
+        }
+    }
+
     /// Extracts a transaction hash from the error data field.
     ///
     /// Useful for EIP-7966 `eth_sendRawTransactionSync` errors that return
@@ -169,35 +185,33 @@ impl<E> RpcError<E, Box<RawValue>> {
     /// let error_payload: ErrorPayload = serde_json::from_str(json).unwrap();
     /// let rpc_error: RpcError<(), _> = RpcError::ErrorResp(error_payload);
     ///
-    /// if let Some(tx_hash) = rpc_error.extract_transaction_hash() {
+    /// if let Some(tx_hash) = rpc_error.tx_hash_data() {
     ///     println!("Transaction hash: {}", tx_hash);
     /// }
     /// ```
-    pub fn extract_transaction_hash(&self) -> Option<B256> {
+    pub fn tx_hash_data(&self) -> Option<B256> {
+        self.parse_data(64)
+    }
+}
+
+impl<E> RpcError<E, String> {
+    /// Parses the error data field as a hex string of specified length.
+    ///
+    /// Returns `Some(T)` if the data contains a valid hex string of the expected length.
+    fn parse_data<T: std::str::FromStr>(&self, expected_hex_len: usize) -> Option<T> {
         let error_payload = self.as_error_resp()?;
         let data = error_payload.data.as_ref()?;
-        let data_str = data.get().trim_matches('"').trim();
-        let hex_str = data_str.strip_prefix("0x").unwrap_or(data_str);
+        let hex_str = data.strip_prefix("0x").unwrap_or(data);
 
-        if hex_str.len() == 64 {
+        if hex_str.len() == expected_hex_len {
             hex_str.parse().ok()
         } else {
             None
         }
     }
-}
 
-impl<E> RpcError<E, String> {
     /// Extracts a transaction hash from the error data field.
-    pub fn extract_transaction_hash(&self) -> Option<B256> {
-        let error_payload = self.as_error_resp()?;
-        let data = error_payload.data.as_ref()?;
-        let hex_str = data.strip_prefix("0x").unwrap_or(data);
-
-        if hex_str.len() == 64 {
-            hex_str.parse().ok()
-        } else {
-            None
-        }
+    pub fn tx_hash_data(&self) -> Option<B256> {
+        self.parse_data(64)
     }
 }
