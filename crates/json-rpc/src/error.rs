@@ -154,17 +154,11 @@ impl<E> RpcError<E, Box<RawValue>> {
     /// Parses the error data field as a hex string of specified length.
     ///
     /// Returns `Some(T)` if the data contains a valid hex string of the expected length.
-    fn parse_data<T: std::str::FromStr>(&self, expected_hex_len: usize) -> Option<T> {
+    fn parse_data<T: std::str::FromStr>(&self) -> Option<T> {
         let error_payload = self.as_error_resp()?;
         let data = error_payload.data.as_ref()?;
         let data_str = data.get().trim_matches('"').trim();
-        let hex_str = data_str.strip_prefix("0x").unwrap_or(data_str);
-
-        if hex_str.len() == expected_hex_len {
-            hex_str.parse().ok()
-        } else {
-            None
-        }
+        data_str.parse().ok()
     }
 
     /// Extracts a transaction hash from the error data field.
@@ -190,28 +184,6 @@ impl<E> RpcError<E, Box<RawValue>> {
     /// }
     /// ```
     pub fn tx_hash_data(&self) -> Option<B256> {
-        self.parse_data(64)
-    }
-}
-
-impl<E> RpcError<E, String> {
-    /// Parses the error data field as a hex string of specified length.
-    ///
-    /// Returns `Some(T)` if the data contains a valid hex string of the expected length.
-    fn parse_data<T: std::str::FromStr>(&self, expected_hex_len: usize) -> Option<T> {
-        let error_payload = self.as_error_resp()?;
-        let data = error_payload.data.as_ref()?;
-        let hex_str = data.strip_prefix("0x").unwrap_or(data);
-
-        if hex_str.len() == expected_hex_len {
-            hex_str.parse().ok()
-        } else {
-            None
-        }
-    }
-
-    /// Extracts a transaction hash from the error data field.
-    pub fn tx_hash_data(&self) -> Option<B256> {
-        self.parse_data(64)
+        self.parse_data()
     }
 }
