@@ -876,6 +876,28 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// This method implements the `eth_sendRawTransactionSync` RPC method as defined in
     /// [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966).
     ///
+    /// # Error Handling
+    ///
+    /// If the transaction fails, you can extract the transaction hash from the error using
+    /// [`RpcError::tx_hash_data`]:
+    ///
+    /// ```no_run
+    /// # use alloy_json_rpc::RpcError;
+    /// # use alloy_network_primitives::ReceiptResponse;
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, encoded_tx: &[u8]) {
+    /// match provider.send_raw_transaction_sync(encoded_tx).await {
+    ///     Ok(receipt) => {
+    ///         println!("Transaction successful: {}", receipt.transaction_hash());
+    ///     }
+    ///     Err(rpc_err) => {
+    ///         if let Some(tx_hash) = rpc_err.tx_hash_data() {
+    ///             println!("Transaction failed but hash available: {}", tx_hash);
+    ///         }
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    ///
     /// Note: This is only available on certain clients that support the
     /// `eth_sendRawTransactionSync` RPC method, such as Anvil.
     async fn send_raw_transaction_sync(
@@ -991,6 +1013,28 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// let receipt = provider.send_transaction_sync(tx).await?;
     /// println!("Transaction hash: {}", receipt.transaction_hash());
     /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Error Handling
+    ///
+    /// If the transaction fails, you can extract the transaction hash from the error using
+    /// [`RpcError::tx_hash_data`]:
+    ///
+    /// ```no_run
+    /// # use alloy_json_rpc::RpcError;
+    /// # use alloy_network_primitives::ReceiptResponse;
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) {
+    /// match provider.send_transaction_sync(tx).await {
+    ///     Ok(receipt) => {
+    ///         println!("Transaction successful: {}", receipt.transaction_hash());
+    ///     }
+    ///     Err(rpc_err) => {
+    ///         if let Some(tx_hash) = rpc_err.tx_hash_data() {
+    ///             println!("Transaction failed but hash available: {}", tx_hash);
+    ///         }
+    ///     }
+    /// }
     /// # }
     /// ```
     async fn send_transaction_sync(
