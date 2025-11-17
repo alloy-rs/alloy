@@ -883,6 +883,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # use alloy_json_rpc::RpcError;
+    /// # use alloy_network_primitives::ReceiptResponse;
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, encoded_tx: &[u8]) {
     /// match provider.send_raw_transaction_sync(encoded_tx).await {
     ///     Ok(receipt) => {
@@ -1022,6 +1023,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # use alloy_json_rpc::RpcError;
+    /// # use alloy_network_primitives::ReceiptResponse;
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) {
     /// match provider.send_transaction_sync(tx).await {
     ///     Ok(receipt) => {
