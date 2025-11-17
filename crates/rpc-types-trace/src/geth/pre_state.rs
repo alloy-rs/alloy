@@ -66,6 +66,18 @@ impl PreStateFrame {
     }
 }
 
+impl From<PreStateMode> for PreStateFrame {
+    fn from(mode: PreStateMode) -> Self {
+        Self::Default(mode)
+    }
+}
+
+impl From<DiffMode> for PreStateFrame {
+    fn from(mode: DiffMode) -> Self {
+        Self::Diff(mode)
+    }
+}
+
 /// Includes all the account states necessary to execute a given transaction.
 ///
 /// This corresponds to the default mode of the [PreStateConfig].
