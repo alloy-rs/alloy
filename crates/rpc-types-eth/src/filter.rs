@@ -2386,13 +2386,13 @@ mod tests {
 
         // Test 1: Filter by address
         let filter = Filter::new().address(addr1);
-        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        let logs: Vec<_> = filter.filter_receipts(&all_receipts).collect();
         assert_eq!(logs.len(), 3); // Should match 3 logs with addr1
         assert!(logs.iter().all(|log| log.address == addr1));
 
         // Test 2: Filter by topic
         let filter = Filter::new().event_signature(topic1);
-        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        let logs: Vec<_> = filter.filter_receipts(&all_receipts).collect();
 
         // Block 1, Receipt 1: topic1 (addr1), topic2 (addr2)
         // Block 1, Receipt 2: topic2 (addr1)
@@ -2403,19 +2403,19 @@ mod tests {
 
         // Test 3: Filter by address and topic
         let filter = Filter::new().address(addr1).event_signature(topic2);
-        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        let logs: Vec<_> = filter.filter_receipts(&all_receipts).collect();
         assert_eq!(logs.len(), 1); // Should match 1 log with addr1 and topic2
         assert_eq!(logs[0].address, addr1);
         assert_eq!(logs[0].topics()[0], topic2);
 
         // Test 4: No matches
         let filter = Filter::new().address(Address::from([0x99; 20]));
-        let logs: Vec<_> = filter.filter_receipts(all_receipts.clone()).collect();
+        let logs: Vec<_> = filter.filter_receipts(&all_receipts).collect();
         assert_eq!(logs.len(), 0);
 
         // Test 5: Empty filter matches all
         let filter = Filter::new();
-        let logs: Vec<_> = filter.filter_receipts(all_receipts).collect();
+        let logs: Vec<_> = filter.filter_receipts(&all_receipts).collect();
         assert_eq!(logs.len(), 5); // Should match all 5 logs
     }
 }
