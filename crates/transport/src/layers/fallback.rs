@@ -68,6 +68,73 @@ impl<S: Clone> FallbackService<S> {
     }
 }
 
+/// Determines if an RPC method requires sequential execution due to non-deterministic results.
+///
+/// Some RPC methods return different valid results when the same request is sent to multiple
+/// nodes in parallel. These methods must be executed sequentially to ensure correct results.
+///
+/// Methods in this list share a common pattern:
+/// - They wait for transaction confirmation before returning
+/// - First node: submits tx → waits → returns receipt
+/// - Other nodes: tx already in mempool → return "already known" error
+/// - Result: parallel execution returns error instead of receipt
+///
+/// # Example - Before Fix (Parallel Execution):
+/// ```text
+/// Time       Transport A               Transport B
+/// ─────────────────────────────────────────────────────────
+/// 0ms        🚀 START                  🚀 START (parallel!)
+///            │                         │
+/// 10ms       │ Processing...           ✓ "already_known"
+///            │                         └──> Returns ❌ WRONG!
+/// 50ms       ✓ Receipt {status: 0x1}
+///            └──> Discarded (too late)
+/// ```
+///
+/// # After Fix (Sequential Execution - Success Case):
+/// ```text
+/// Time       Transport A               Transport B
+/// ─────────────────────────────────────────────────────────
+/// 0ms        🚀 START
+///            │
+/// 10ms       │ Processing...           (not called yet)
+///            │
+/// 50ms       ✓ Receipt {status: 0x1}  (not called - A succeeded!)
+///            └──> Returns ✅ CORRECT!
+/// ```
+///
+/// # After Fix (Sequential Execution - Fallback Case):
+/// ```text
+/// Time       Transport A               Transport B
+/// ─────────────────────────────────────────────────────────
+/// 0ms        🚀 START
+///            │
+/// 10ms       │ Processing...           (waiting...)
+///            │
+/// 50ms       ❌ Connection timeout
+///            │
+/// 51ms       (A failed, trying B...)  🚀 START
+///                                      │
+/// 61ms                                 │ Processing...
+///                                      │
+/// 101ms                                ✓ Receipt {status: 0x1}
+///                                      └──> Returns ✅ CORRECT!
+/// ```
+/// Sequential execution tries transports one at a time, in order of their score.
+/// Only moves to the next transport if the previous one fails. This ensures we
+/// always get the correct result while maintaining fallback capability.
+fn requires_sequential_execution(method: &str) -> bool {
+    matches!(
+        method,
+        // EIP-7966: eth_sendRawTransactionSync - waits for receipt
+        // Parallel issue: returns receipt from first node, "already known" from others
+        "eth_sendRawTransactionSync" |
+        // eth_sendTransactionSync - same as above but for unsigned transactions
+        // Parallel issue: returns receipt from first node, "already known" from others
+        "eth_sendTransactionSync"
+    )
+}
+
 impl<S> FallbackService<S>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError>
@@ -79,14 +146,31 @@ where
     ///
     /// Here is a high-level overview of how requests are handled:
     ///
+    /// **For methods with non-deterministic results** (e.g., `eth_sendRawTransactionSync`):
+    /// - Methods are tried sequentially on each transport
+    /// - Returns the first successful response
+    /// - Prevents returning wrong results (e.g., "already known" instead of receipt)
+    ///
+    /// **For methods with deterministic results** (default - most methods):
     /// - At the start of each request, we sort transports by score
     /// - We take the top `self.active_transport_count` and call them in parallel
     /// - If any of them succeeds, we update the transport scores and return the response
     /// - If all transports fail, we update the scores and return the last error that occurred
     ///
     /// This strategy allows us to always make requests to the best available transports
-    /// while keeping them available.
+    /// while ensuring correctness for methods that return different results in parallel.
     async fn make_request(&self, req: RequestPacket) -> Result<ResponsePacket, TransportError> {
+        // Check if this method returns non-deterministic results and needs sequential execution
+        let method = match &req {
+            RequestPacket::Single(r) => r.method(),
+            RequestPacket::Batch(reqs) => reqs.first().map_or("", |first| first.method()),
+        };
+
+        if requires_sequential_execution(method) {
+            return self.make_request_sequential(req).await;
+        }
+
+        // Default: parallel execution for methods with deterministic results
         // Get the top transports to use for this request
         let top_transports = {
             // Clone the vec, sort it, and take the top `self.active_transport_count`
@@ -142,6 +226,58 @@ where
 
         Err(last_error.unwrap_or_else(|| {
             TransportErrorKind::custom_str("All transport futures failed to complete")
+        }))
+    }
+
+    /// Make a sequential request for methods with non-deterministic results.
+    ///
+    /// This method tries each transport one at a time, in order of their score.
+    /// It returns the first successful response, or an error if all transports fail.
+    ///
+    /// This approach ensures methods like `eth_sendRawTransactionSync` return the correct
+    /// receipt instead of "already known" errors from parallel execution.
+    async fn make_request_sequential(
+        &self,
+        req: RequestPacket,
+    ) -> Result<ResponsePacket, TransportError> {
+        trace!("Using sequential fallback for method with non-deterministic results");
+
+        // Get transports sorted by score (best first)
+        let top_transports = {
+            let mut transports_clone = (*self.transports).clone();
+            transports_clone.sort_by(|a, b| b.cmp(a));
+            transports_clone.into_iter().take(self.active_transport_count).collect::<Vec<_>>()
+        };
+
+        let mut last_error = None;
+
+        // Try each transport sequentially
+        for mut transport in top_transports {
+            let req_clone = req.clone();
+            let start = Instant::now();
+
+            trace!("Trying transport[{}] sequentially", transport.id);
+
+            match transport.call(req_clone).await {
+                Ok(response) => {
+                    // Record success and return immediately
+                    transport.track_success(start.elapsed());
+                    trace!("Transport[{}] succeeded in {:?}", transport.id, start.elapsed());
+                    self.log_transport_rankings();
+                    return Ok(response);
+                }
+                Err(error) => {
+                    // Record failure and try next transport
+                    transport.track_failure();
+                    trace!("Transport[{}] failed: {:?}, trying next", transport.id, error);
+                    last_error = Some(error);
+                }
+            }
+        }
+
+        // All transports failed
+        Err(last_error.unwrap_or_else(|| {
+            TransportErrorKind::custom_str("All transports failed for sequential request")
         }))
     }
 }
