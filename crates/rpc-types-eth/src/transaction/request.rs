@@ -1754,6 +1754,16 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
 #[non_exhaustive]
 pub struct TransactionInputError;
 
+/// Response type for `eth_fillTransaction`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FillTransaction<T = TypedTransaction> {
+    /// RLP-encoded signed transaction bytes.
+    pub raw: Bytes,
+    /// Filled transaction request with populated default values.
+    pub tx: T,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
