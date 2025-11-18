@@ -554,7 +554,7 @@ impl Filter {
     /// ```
     #[must_use]
     pub fn address<T: Into<ValueOrArray<Address>>>(mut self, address: T) -> Self {
-        self.address = address.into().into();
+        self.address = FilterSet::from(address.into());
         self
     }
 
