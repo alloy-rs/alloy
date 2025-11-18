@@ -147,8 +147,9 @@ impl RpcClient {
 
     /// Sets the poll interval for the client in milliseconds.
     ///
-    /// Note: This will only set the poll interval for the client if it is the only reference to the
-    /// inner client. If the reference is held by many, then it will not update the poll interval.
+    /// Note: This updates the shared poll interval on the underlying client and is visible to all
+    /// clones of this client. Existing pollers created via `prepare_static_poller(...)`
+    /// snapshot the interval at construction time and will not pick up subsequent changes.
     pub fn with_poll_interval(self, poll_interval: Duration) -> Self {
         self.inner().set_poll_interval(poll_interval);
         self
