@@ -545,3 +545,186 @@ impl Default for TransportMetrics {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_json_rpc::{Id, Request, Response, ResponsePayload};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::time::{sleep, Duration};
+    use tower::Service;
+
+    /// A mock transport that can be configured to return responses with delays
+    #[derive(Clone)]
+    struct DelayedMockTransport {
+        delay: Duration,
+        response: Arc<RwLock<Option<ResponsePayload>>>,
+        call_count: Arc<AtomicUsize>,
+    }
+
+    impl DelayedMockTransport {
+        fn new(delay: Duration, response: ResponsePayload) -> Self {
+            Self {
+                delay,
+                response: Arc::new(RwLock::new(Some(response))),
+                call_count: Arc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn call_count(&self) -> usize {
+            self.call_count.load(Ordering::SeqCst)
+        }
+    }
+
+    impl Service<RequestPacket> for DelayedMockTransport {
+        type Response = ResponsePacket;
+        type Error = TransportError;
+        type Future = TransportFut<'static>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, req: RequestPacket) -> Self::Future {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            let delay = self.delay;
+            let response = self.response.clone();
+
+            Box::pin(async move {
+                sleep(delay).await;
+
+                match req {
+                    RequestPacket::Single(single) => {
+                        let resp = response.read().clone().ok_or_else(|| {
+                            TransportErrorKind::custom_str("No response configured")
+                        })?;
+
+                        Ok(ResponsePacket::Single(Response {
+                            id: single.id().clone(),
+                            payload: resp,
+                        }))
+                    }
+                    RequestPacket::Batch(_) => {
+                        Err(TransportErrorKind::custom_str("Batch not supported in test"))
+                    }
+                }
+            })
+        }
+    }
+
+    /// Helper to create a successful response with given data
+    fn success_response(data: &str) -> ResponsePayload {
+        let raw = serde_json::value::RawValue::from_string(format!("\"{}\"", data)).unwrap();
+        ResponsePayload::Success(raw)
+    }
+
+    #[tokio::test]
+    async fn test_non_deterministic_method_uses_sequential_fallback() {
+        // Test that eth_sendRawTransactionSync (which returns non-deterministic results
+        // in parallel) uses sequential fallback and returns the correct receipt, not "already
+        // known"
+
+        let transport_a = DelayedMockTransport::new(
+            Duration::from_millis(50),
+            success_response("0x1234567890abcdef"), // Actual receipt
+        );
+
+        let transport_b = DelayedMockTransport::new(
+            Duration::from_millis(10),
+            success_response("already_known"), // Fast but wrong
+        );
+
+        let transports = vec![transport_a.clone(), transport_b.clone()];
+        let mut fallback_service = FallbackService::new(transports, 2);
+
+        let request = Request::new(
+            "eth_sendRawTransactionSync",
+            Id::Number(1),
+            [serde_json::Value::String("0xabcdef".to_string())],
+        );
+        let serialized = request.serialize().unwrap();
+        let request_packet = RequestPacket::Single(serialized);
+
+        let start = std::time::Instant::now();
+        let response = fallback_service.call(request_packet).await.unwrap();
+        let elapsed = start.elapsed();
+
+        let result = match response {
+            ResponsePacket::Single(resp) => match resp.payload {
+                ResponsePayload::Success(data) => data.get().to_string(),
+                ResponsePayload::Failure(err) => panic!("Unexpected error: {:?}", err),
+            },
+            ResponsePacket::Batch(_) => panic!("Unexpected batch response"),
+        };
+
+        // Should only call the first transport sequentially (succeeds immediately)
+        assert_eq!(transport_a.call_count(), 1, "First transport should be called");
+        // Should NOT call second transport since first succeeded
+        assert_eq!(transport_b.call_count(), 0, "Second transport should NOT be called");
+
+        // Should return the actual receipt, not "already_known"
+        assert_eq!(result, "\"0x1234567890abcdef\"");
+
+        // Should take ~50ms (first transport only), not ~10ms (second transport)
+        assert!(
+            elapsed >= Duration::from_millis(40),
+            "Should wait for first transport: {:?}",
+            elapsed
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deterministic_method_uses_parallel_execution() {
+        // Test that eth_sendRawTransaction (which returns deterministic results)
+        // uses parallel execution because the tx hash is the same from all nodes
+
+        let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+        let transport_a = DelayedMockTransport::new(
+            Duration::from_millis(100),
+            success_response(tx_hash), // Same hash
+        );
+
+        let transport_b = DelayedMockTransport::new(
+            Duration::from_millis(20),
+            success_response(tx_hash), // Same hash, faster
+        );
+
+        let transports = vec![transport_a.clone(), transport_b.clone()];
+        let mut fallback_service = FallbackService::new(transports, 2);
+
+        let request = Request::new(
+            "eth_sendRawTransaction",
+            Id::Number(1),
+            [serde_json::Value::String("0xabcdef".to_string())],
+        );
+        let serialized = request.serialize().unwrap();
+        let request_packet = RequestPacket::Single(serialized);
+
+        let start = std::time::Instant::now();
+        let response = fallback_service.call(request_packet).await.unwrap();
+        let elapsed = start.elapsed();
+
+        let result = match response {
+            ResponsePacket::Single(resp) => match resp.payload {
+                ResponsePayload::Success(data) => data.get().to_string(),
+                ResponsePayload::Failure(err) => panic!("Unexpected error: {:?}", err),
+            },
+            ResponsePacket::Batch(_) => panic!("Unexpected batch response"),
+        };
+
+        // Both transports should be called in parallel
+        assert_eq!(transport_a.call_count(), 1, "Transport A should be called");
+        assert_eq!(transport_b.call_count(), 1, "Transport B should be called");
+
+        // Should return the tx hash (same from both)
+        assert_eq!(result, format!("\"{}\"", tx_hash));
+
+        // Should complete in ~20ms (fast transport), not ~100ms (slow transport)
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "Should use parallel execution and return fast: {:?}",
+            elapsed
+        );
+    }
+}
