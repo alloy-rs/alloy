@@ -120,7 +120,7 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
     ///
     /// See [`Filter::address`].
     pub fn address<A: Into<ValueOrArray<Address>>>(mut self, address: A) -> Self {
-        self.filter.address = address.into().into();
+        self.filter.address = FilterSet::from(address.into());
         self
     }
 
