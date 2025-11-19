@@ -605,8 +605,18 @@ mod tests {
                             payload: resp,
                         }))
                     }
-                    RequestPacket::Batch(_) => {
-                        Err(TransportErrorKind::custom_str("Batch not supported in test"))
+                    RequestPacket::Batch(batch) => {
+                        let resp = response.read().clone().ok_or_else(|| {
+                            TransportErrorKind::custom_str("No response configured")
+                        })?;
+
+                        // Return the same response for each request in the batch
+                        let responses = batch
+                            .iter()
+                            .map(|req| Response { id: req.id().clone(), payload: resp.clone() })
+                            .collect();
+
+                        Ok(ResponsePacket::Batch(responses))
                     }
                 }
             })
@@ -725,6 +735,81 @@ mod tests {
         assert!(
             elapsed < Duration::from_millis(50),
             "Should use parallel execution and return fast: {:?}",
+            elapsed
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_with_any_sequential_method_uses_sequential_execution() {
+        // Test that if ANY method in a batch requires sequential execution,
+        // the entire batch is executed sequentially
+
+        let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+        // Transport A: Fast, returns success for both methods
+        let transport_a = DelayedMockTransport::new(
+            Duration::from_millis(10),
+            success_response(tx_hash),
+        );
+
+        // Transport B: Also fast, but would return error (but shouldn't be called in sequential mode)
+        let transport_b = DelayedMockTransport::new(
+            Duration::from_millis(10),
+            success_response("should_not_be_called"),
+        );
+
+        let transports = vec![transport_a.clone(), transport_b.clone()];
+        let mut fallback_service = FallbackService::new(transports, 2);
+
+        // Create a batch with:
+        // 1. eth_blockNumber (deterministic, normally parallel)
+        // 2. eth_sendRawTransactionSync (non-deterministic, requires sequential)
+        let request1 = Request::new("eth_blockNumber", Id::Number(1), ());
+        let request2 = Request::new(
+            "eth_sendRawTransactionSync",
+            Id::Number(2),
+            [serde_json::Value::String("0xabcdef".to_string())],
+        );
+
+        let batch = vec![request1.serialize().unwrap(), request2.serialize().unwrap()];
+        let request_packet = RequestPacket::Batch(batch);
+
+        let start = std::time::Instant::now();
+        let response = fallback_service.call(request_packet).await.unwrap();
+        let elapsed = start.elapsed();
+
+        // In sequential mode: only transport_a should be called (it succeeds)
+        // transport_b should NOT be called because transport_a already succeeded
+        assert_eq!(
+            transport_a.call_count(),
+            1,
+            "Transport A should be called once (first in sequence)"
+        );
+        assert_eq!(
+            transport_b.call_count(),
+            0,
+            "Transport B should NOT be called (transport A succeeded)"
+        );
+
+        // Verify we got the correct response
+        match response {
+            ResponsePacket::Batch(responses) => {
+                assert_eq!(responses.len(), 2, "Should get 2 responses in batch");
+                // Both should be successful responses from transport A
+                for resp in responses {
+                    match resp.payload {
+                        ResponsePayload::Success(_) => {}, // Expected
+                        ResponsePayload::Failure(err) => panic!("Unexpected error: {:?}", err),
+                    }
+                }
+            }
+            ResponsePacket::Single(_) => panic!("Expected batch response"),
+        }
+
+        // Should complete quickly since transport A is fast (10ms)
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "Sequential execution with fast first transport should be quick: {:?}",
             elapsed
         );
     }
