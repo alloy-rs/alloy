@@ -24,7 +24,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 /// // byte vector, or `add_response` to add a json-rpc response.
 /// server.add_reply("hello");
 /// // Run the server. The first request will get "hello" as a response.
-/// MockIpcServer::new().spawn();
+/// server.spawn();
 /// # Ok(())
 /// # }
 /// ```
@@ -73,16 +73,30 @@ impl MockIpcServer {
     pub async fn spawn(mut self) {
         tokio::spawn(async move {
             let tmp = self.path.into_temp_path();
-            let name = crate::connect::to_name(tmp.as_os_str()).unwrap();
-            let socket = LocalSocketStream::connect(name).await.unwrap();
+            let os = tmp.as_os_str().to_os_string();
+            drop(tmp);
+            let name = crate::connect::to_name(os.as_os_str()).unwrap();
+            let listener = interprocess::local_socket::ListenerOptions::new()
+                .name(name)
+                .create_tokio()
+                .unwrap();
 
-            let (mut reader, mut writer) = socket.split();
-
-            let mut buf = [0u8; 4096];
             loop {
-                let _ = reader.read(&mut buf).await.unwrap();
-                let reply = self.replies.pop_front().unwrap_or_default();
-                writer.write_all(&reply).await.unwrap();
+                let socket = listener.accept().await.unwrap();
+                let (mut reader, mut writer) = socket.split();
+                let mut buf = [0u8; 4096];
+                loop {
+                    match reader.read(&mut buf).await {
+                        Ok(0) => break,
+                        Ok(_) => {
+                            let reply = self.replies.pop_front().unwrap_or_default();
+                            if writer.write_all(&reply).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
             }
         });
     }
