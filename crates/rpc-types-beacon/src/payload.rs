@@ -383,7 +383,7 @@ pub mod beacon_payload_v2 {
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 struct BeaconExecutionPayloadV3<'a> {
-    /// Inner V1 payload
+    /// Inner V2 payload
     #[serde(flatten)]
     payload_inner: BeaconExecutionPayloadV2<'a>,
     #[serde_as(as = "DisplayFromStr")]
