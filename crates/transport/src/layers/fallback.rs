@@ -160,13 +160,14 @@ where
     /// This strategy allows us to always make requests to the best available transports
     /// while ensuring correctness for methods that return different results in parallel.
     async fn make_request(&self, req: RequestPacket) -> Result<ResponsePacket, TransportError> {
-        // Check if this method returns non-deterministic results and needs sequential execution
-        let method = match &req {
-            RequestPacket::Single(r) => r.method(),
-            RequestPacket::Batch(reqs) => reqs.first().map_or("", |first| first.method()),
+        // Check if any method in the request requires sequential execution
+        // For batch requests: if ANY method needs sequential execution, the entire batch must be sequential
+        let needs_sequential = match &req {
+            RequestPacket::Single(r) => requires_sequential_execution(r.method()),
+            RequestPacket::Batch(reqs) => reqs.iter().any(|r| requires_sequential_execution(r.method())),
         };
 
-        if requires_sequential_execution(method) {
+        if needs_sequential {
             return self.make_request_sequential(req).await;
         }
 
