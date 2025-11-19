@@ -30,7 +30,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -1082,6 +1082,18 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// The `"eth_signTransaction"` method is not supported by regular nodes.
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
         self.client().request("eth_signTransaction", (tx,)).await
+    }
+
+    /// Fills a transaction with missing fields using default values.
+    ///
+    /// This method prepares a transaction by populating missing fields such as gas limit,
+    /// gas price, or nonce with appropriate default values. The response includes both the
+    /// RLP-encoded signed transaction and the filled transaction.
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction> {
+        self.client().request("eth_fillTransaction", (tx,)).await
     }
 
     /// Subscribe to a stream of new block headers.
