@@ -57,11 +57,13 @@ where
 mod tests {
     use super::*;
     use crate::{
-        Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptWithBloom, RlpEncodableReceipt,
-        TxType, Typed2718,
+        Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptWithBloom,
+        RlpDecodableReceipt, RlpEncodableReceipt, TxType, Typed2718,
     };
+    use alloy_eips::{eip2718::Eip2718Result, Decodable2718, Encodable2718};
     use alloy_primitives::{b256, bloom, Address, Log, LogData};
 
+    #[derive(Debug, PartialEq, Eq)]
     struct TypedReceipt {
         ty: TxType,
         receipt: Receipt,
@@ -115,6 +117,23 @@ mod tests {
         }
     }
 
+    impl Eip2718DecodableReceipt for TypedReceipt {
+        fn typed_decode_with_bloom(
+            ty: u8,
+            buf: &mut &[u8],
+        ) -> Eip2718Result<ReceiptWithBloom<Self>> {
+            let ty =
+                TxType::try_from(ty).map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))?;
+
+            Ok(Receipt::rlp_decode_with_bloom(buf)?.map_receipt(|receipt| Self { ty, receipt }))
+        }
+
+        fn fallback_decode_with_bloom(buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
+            Ok(Receipt::rlp_decode_with_bloom(buf)?
+                .map_receipt(|receipt| Self { ty: TxType::Legacy, receipt }))
+        }
+    }
+
     impl Typed2718 for TypedReceipt {
         fn ty(&self) -> u8 {
             self.ty.ty()
@@ -139,8 +158,12 @@ mod tests {
             },
             logs_bloom,
         };
-        let receipt = vec![receipt];
-        let root = calculate_receipt_root(&receipt);
+        let root = calculate_receipt_root(&[&receipt]);
         assert_eq!(root, b256!("fe70ae4a136d98944951b2123859698d59ad251a381abc9960fa81cae3d0d4a0"));
+
+        let encoded = receipt.encoded_2718();
+        let decoded = ReceiptWithBloom::<TypedReceipt>::decode_2718_exact(&encoded).unwrap();
+
+        assert_eq!(decoded, receipt);
     }
 }
