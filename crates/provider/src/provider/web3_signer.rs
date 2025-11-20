@@ -71,11 +71,16 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    #[cfg(not(windows))]
     use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
-    use alloy_consensus::{transaction::SignerRecoverable, TxEnvelope};
+    #[cfg(not(windows))]
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    #[cfg(not(windows))]
+    use alloy_consensus::TxEnvelope;
+    #[cfg(not(windows))]
     use alloy_primitives::{Address, U256};
+    #[cfg(not(windows))]
+    use alloy_rlp::Decodable;
 
     #[tokio::test]
     #[cfg(not(windows))]
