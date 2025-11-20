@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [genesis] Add parent hash field in Genesis ([#3138](https://github.com/alloy-rs/alloy/issues/3138))
 - [consensus,eips,genesis] Add Borsh support ([#2946](https://github.com/alloy-rs/alloy/issues/2946))
 
+### Miscellaneous Tasks
+
+- Release 1.1.1
+
 ### Styling
 
 - Fmt ([#3170](https://github.com/alloy-rs/alloy/issues/3170))

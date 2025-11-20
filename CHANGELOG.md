@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
+
+### Bug Fixes
+
+- Use BlockHash for ForkedNetwork.fork_block_hash ([#3224](https://github.com/alloy-rs/alloy/issues/3224))
+- [rpc-types] Correct BeaconExecutionPayloadV3 doc ([#3216](https://github.com/alloy-rs/alloy/issues/3216))
+- Eliminate ambiguity regarding missing subscriptions ([#3206](https://github.com/alloy-rs/alloy/issues/3206))
+- Normalize recovery bytes in flashbots signature ([#3192](https://github.com/alloy-rs/alloy/issues/3192))
+- Increase average CU cost from `17` to `20` per updated Alchemy docs  ([#3208](https://github.com/alloy-rs/alloy/issues/3208))
+- Trezor derivation path ([#3148](https://github.com/alloy-rs/alloy/issues/3148))
+
+### Dependencies
+
+- [deps] Bump taiki-e/install-action from 2.62.45 to 2.62.49 ([#3173](https://github.com/alloy-rs/alloy/issues/3173))
+
+### Documentation
+
+- [rpc-types-engine] Correct ExecutionPayloadV3 spec URL and Execu… ([#3203](https://github.com/alloy-rs/alloy/issues/3203))
+
+### Features
+
+- `Eip2718DecodableReceipt` ([#3225](https://github.com/alloy-rs/alloy/issues/3225))
+- Add helper `TypedTransaction::decode_unsigned()` ([#3198](https://github.com/alloy-rs/alloy/issues/3198))
+- Add prestate helpers ([#3209](https://github.com/alloy-rs/alloy/issues/3209))
+- [rpc-types] Add `FillTransaction` response type ([#3210](https://github.com/alloy-rs/alloy/issues/3210))
+- Obtain the transaction hash if eth_sendrawSync ([#3202](https://github.com/alloy-rs/alloy/issues/3202))
+- Add CallBuilder::send,deploy_sync ([#3200](https://github.com/alloy-rs/alloy/issues/3200))
+
+### Miscellaneous Tasks
+
+- [node-bindings/anvil] Unify startup timeout with shared NODE_STARTUP_TIMEOUT ([#3193](https://github.com/alloy-rs/alloy/issues/3193))
+
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 
 ### Bug Fixes
@@ -32,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.1.1
 - Remove redundant UUID clone in signer-local keystore test ([#3185](https://github.com/alloy-rs/alloy/issues/3185))
 - Correct ExecutionPayload V3 method doc references ([#3181](https://github.com/alloy-rs/alloy/issues/3181))
 
