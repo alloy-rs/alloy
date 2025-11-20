@@ -5,7 +5,7 @@ use derive_more::{Deref, DerefMut};
 use futures::{stream::FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
 use std::{
-    collections::VecDeque,
+    collections::{HashSet, VecDeque},
     num::NonZeroUsize,
     sync::Arc,
     task::{Context, Poll},
@@ -32,6 +32,9 @@ pub struct FallbackService<S> {
     transports: Arc<Vec<ScoredTransport<S>>>,
     /// The maximum number of transports to use in parallel
     active_transport_count: usize,
+    /// Set of RPC methods that require sequential execution (non-deterministic results in
+    /// parallel)
+    sequential_methods: Arc<HashSet<String>>,
 }
 
 impl<S: Clone> FallbackService<S> {
@@ -39,14 +42,37 @@ impl<S: Clone> FallbackService<S> {
     ///
     /// The `active_transport_count` parameter controls how many transports are used for requests
     /// at any one time.
+    ///
+    /// Uses the default set of sequential methods (eth_sendRawTransactionSync,
+    /// eth_sendTransactionSync).
     pub fn new(transports: Vec<S>, active_transport_count: usize) -> Self {
+        Self::with_sequential_methods(
+            transports,
+            active_transport_count,
+            default_sequential_methods(),
+        )
+    }
+
+    /// Create a new fallback service with custom sequential methods.
+    ///
+    /// The `sequential_methods` parameter specifies which RPC methods require sequential execution
+    /// due to non-deterministic results in parallel execution.
+    pub fn with_sequential_methods(
+        transports: Vec<S>,
+        active_transport_count: usize,
+        sequential_methods: HashSet<String>,
+    ) -> Self {
         let scored_transports = transports
             .into_iter()
             .enumerate()
             .map(|(id, transport)| ScoredTransport::new(id, transport))
             .collect::<Vec<_>>();
 
-        Self { transports: Arc::new(scored_transports), active_transport_count }
+        Self {
+            transports: Arc::new(scored_transports),
+            active_transport_count,
+            sequential_methods: Arc::new(sequential_methods),
+        }
     }
 
     /// Log the current ranking of transports
@@ -68,10 +94,10 @@ impl<S: Clone> FallbackService<S> {
     }
 }
 
-/// Determines if an RPC method requires sequential execution due to non-deterministic results.
+/// Returns the default set of RPC methods that require sequential execution.
 ///
-/// Some RPC methods return different valid results when the same request is sent to multiple
-/// nodes in parallel. These methods must be executed sequentially to ensure correct results.
+/// These methods return different valid results when the same request is sent to multiple
+/// nodes in parallel, requiring sequential execution to ensure correct results.
 ///
 /// Methods in this list share a common pattern:
 /// - They wait for transaction confirmation before returning
@@ -123,16 +149,14 @@ impl<S: Clone> FallbackService<S> {
 /// Sequential execution tries transports one at a time, in order of their score.
 /// Only moves to the next transport if the previous one fails. This ensures we
 /// always get the correct result while maintaining fallback capability.
-fn requires_sequential_execution(method: &str) -> bool {
-    matches!(
-        method,
-        // EIP-7966: eth_sendRawTransactionSync - waits for receipt
-        // Parallel issue: returns receipt from first node, "already known" from others
-        "eth_sendRawTransactionSync" |
-        // eth_sendTransactionSync - same as above but for unsigned transactions
-        // Parallel issue: returns receipt from first node, "already known" from others
-        "eth_sendTransactionSync"
-    )
+///
+/// # Default Methods:
+/// - `eth_sendRawTransactionSync` (EIP-7966): waits for receipt
+/// - `eth_sendTransactionSync`: same as above but for unsigned transactions
+fn default_sequential_methods() -> HashSet<String> {
+    ["eth_sendRawTransactionSync".to_string(), "eth_sendTransactionSync".to_string()]
+        .into_iter()
+        .collect()
 }
 
 impl<S> FallbackService<S>
@@ -161,10 +185,13 @@ where
     /// while ensuring correctness for methods that return different results in parallel.
     async fn make_request(&self, req: RequestPacket) -> Result<ResponsePacket, TransportError> {
         // Check if any method in the request requires sequential execution
-        // For batch requests: if ANY method needs sequential execution, the entire batch must be sequential
+        // For batch requests: if ANY method needs sequential execution, the entire batch must be
+        // sequential
         let needs_sequential = match &req {
-            RequestPacket::Single(r) => requires_sequential_execution(r.method()),
-            RequestPacket::Batch(reqs) => reqs.iter().any(|r| requires_sequential_execution(r.method())),
+            RequestPacket::Single(r) => self.sequential_methods.contains(r.method()),
+            RequestPacket::Batch(reqs) => {
+                reqs.iter().any(|r| self.sequential_methods.contains(r.method()))
+            }
         };
 
         if needs_sequential {
@@ -328,12 +355,42 @@ where
 pub struct FallbackLayer {
     /// The maximum number of transports to use in parallel
     active_transport_count: usize,
+    /// Set of RPC methods that require sequential execution (non-deterministic results in
+    /// parallel)
+    sequential_methods: HashSet<String>,
 }
 
 impl FallbackLayer {
     /// Set the number of active transports to use (must be greater than 0)
     pub const fn with_active_transport_count(mut self, count: NonZeroUsize) -> Self {
         self.active_transport_count = count.get();
+        self
+    }
+
+    /// Add an RPC method that requires sequential execution.
+    ///
+    /// Sequential execution is needed for methods that return non-deterministic results
+    /// when executed in parallel across multiple nodes (e.g., methods that wait for confirmations).
+    pub fn with_sequential_method(mut self, method: impl Into<String>) -> Self {
+        self.sequential_methods.insert(method.into());
+        self
+    }
+
+    /// Set the complete list of RPC methods that require sequential execution.
+    ///
+    /// This replaces the default set. Use this if you want full control over which methods
+    /// use sequential execution.
+    pub fn with_sequential_methods(mut self, methods: HashSet<String>) -> Self {
+        self.sequential_methods = methods;
+        self
+    }
+
+    /// Clear all sequential methods (all requests will use parallel execution).
+    ///
+    /// **Warning**: Only use this if you're certain none of your RPC methods have
+    /// non-deterministic results in parallel execution.
+    pub fn without_sequential_methods(mut self) -> Self {
+        self.sequential_methods.clear();
         self
     }
 }
@@ -348,13 +405,20 @@ where
     type Service = FallbackService<S>;
 
     fn layer(&self, inner: Vec<S>) -> Self::Service {
-        FallbackService::new(inner, self.active_transport_count)
+        FallbackService::with_sequential_methods(
+            inner,
+            self.active_transport_count,
+            self.sequential_methods.clone(),
+        )
     }
 }
 
 impl Default for FallbackLayer {
     fn default() -> Self {
-        Self { active_transport_count: DEFAULT_ACTIVE_TRANSPORT_COUNT }
+        Self {
+            active_transport_count: DEFAULT_ACTIVE_TRANSPORT_COUNT,
+            sequential_methods: default_sequential_methods(),
+        }
     }
 }
 
