@@ -34,7 +34,7 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Debug};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -1092,7 +1092,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction> {
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv + Debug,
+    {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
