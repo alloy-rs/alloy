@@ -7,7 +7,6 @@ use crate::{
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
-use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
     Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
