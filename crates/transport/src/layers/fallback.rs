@@ -46,18 +46,21 @@ impl<S: Clone> FallbackService<S> {
     /// Uses the default set of sequential methods (eth_sendRawTransactionSync,
     /// eth_sendTransactionSync).
     pub fn new(transports: Vec<S>, active_transport_count: usize) -> Self {
-        Self::with_sequential_methods(
+        Self::new_with_sequential_methods(
             transports,
             active_transport_count,
             default_sequential_methods(),
         )
     }
 
-    /// Create a new fallback service with custom sequential methods.
+    /// Create a new fallback service from a list of transports.
     ///
-    /// The `sequential_methods` parameter specifies which RPC methods require sequential execution
-    /// due to non-deterministic results in parallel execution.
-    pub fn with_sequential_methods(
+    /// The `active_transport_count` parameter controls how many transports are used for requests
+    /// at any one time.
+    ///
+    /// Uses the given set of sequential methods (eth_sendRawTransactionSync,
+    /// eth_sendTransactionSync).
+    pub fn new_with_sequential_methods(
         transports: Vec<S>,
         active_transport_count: usize,
         sequential_methods: HashSet<String>,
@@ -73,6 +76,21 @@ impl<S: Clone> FallbackService<S> {
             active_transport_count,
             sequential_methods: Arc::new(sequential_methods),
         }
+    }
+
+    /// Inserts the sequential method into the set.
+    pub fn append_sequential_method(mut self, sequential_method: impl Into<String>) -> Self {
+        let mut methods = Arc::unwrap_or_clone(self.sequential_methods);
+        methods.insert(sequential_method.into());
+        self.sequential_methods = Arc::new(methods);
+        self
+    }
+
+    /// Configures the `sequential_methods` parameter specifies which RPC methods require sequential
+    /// execution due to non-deterministic results in parallel execution.
+    pub fn with_sequential_methods(mut self, sequential_methods: HashSet<String>) -> Self {
+        self.sequential_methods = Arc::new(sequential_methods);
+        self
     }
 
     /// Log the current ranking of transports
@@ -92,71 +110,6 @@ impl<S: Clone> FallbackService<S> {
             trace!("  #{}: Transport[{}] - {}", idx + 1, id, summary);
         }
     }
-}
-
-/// Returns the default set of RPC methods that require sequential execution.
-///
-/// These methods return different valid results when the same request is sent to multiple
-/// nodes in parallel, requiring sequential execution to ensure correct results.
-///
-/// Methods in this list share a common pattern:
-/// - They wait for transaction confirmation before returning
-/// - First node: submits tx → waits → returns receipt
-/// - Other nodes: tx already in mempool → return "already known" error
-/// - Result: parallel execution returns error instead of receipt
-///
-/// # Example - Before Fix (Parallel Execution):
-/// ```text
-/// Time       Transport A               Transport B
-/// ─────────────────────────────────────────────────────────
-/// 0ms        🚀 START                  🚀 START (parallel!)
-///            │                         │
-/// 10ms       │ Processing...           ✓ "already_known"
-///            │                         └──> Returns ❌ WRONG!
-/// 50ms       ✓ Receipt {status: 0x1}
-///            └──> Discarded (too late)
-/// ```
-///
-/// # After Fix (Sequential Execution - Success Case):
-/// ```text
-/// Time       Transport A               Transport B
-/// ─────────────────────────────────────────────────────────
-/// 0ms        🚀 START
-///            │
-/// 10ms       │ Processing...           (not called yet)
-///            │
-/// 50ms       ✓ Receipt {status: 0x1}  (not called - A succeeded!)
-///            └──> Returns ✅ CORRECT!
-/// ```
-///
-/// # After Fix (Sequential Execution - Fallback Case):
-/// ```text
-/// Time       Transport A               Transport B
-/// ─────────────────────────────────────────────────────────
-/// 0ms        🚀 START
-///            │
-/// 10ms       │ Processing...           (waiting...)
-///            │
-/// 50ms       ❌ Connection timeout
-///            │
-/// 51ms       (A failed, trying B...)  🚀 START
-///                                      │
-/// 61ms                                 │ Processing...
-///                                      │
-/// 101ms                                ✓ Receipt {status: 0x1}
-///                                      └──> Returns ✅ CORRECT!
-/// ```
-/// Sequential execution tries transports one at a time, in order of their score.
-/// Only moves to the next transport if the previous one fails. This ensures we
-/// always get the correct result while maintaining fallback capability.
-///
-/// # Default Methods:
-/// - `eth_sendRawTransactionSync` (EIP-7966): waits for receipt
-/// - `eth_sendTransactionSync`: same as above but for unsigned transactions
-fn default_sequential_methods() -> HashSet<String> {
-    ["eth_sendRawTransactionSync".to_string(), "eth_sendTransactionSync".to_string()]
-        .into_iter()
-        .collect()
 }
 
 impl<S> FallbackService<S>
@@ -187,14 +140,7 @@ where
         // Check if any method in the request requires sequential execution
         // For batch requests: if ANY method needs sequential execution, the entire batch must be
         // sequential
-        let needs_sequential = match &req {
-            RequestPacket::Single(r) => self.sequential_methods.contains(r.method()),
-            RequestPacket::Batch(reqs) => {
-                reqs.iter().any(|r| self.sequential_methods.contains(r.method()))
-            }
-        };
-
-        if needs_sequential {
+        if req.method_names().any(|name| self.sequential_methods.contains(name)) {
             return self.make_request_sequential(req).await;
         }
 
@@ -405,7 +351,7 @@ where
     type Service = FallbackService<S>;
 
     fn layer(&self, inner: Vec<S>) -> Self::Service {
-        FallbackService::with_sequential_methods(
+        FallbackService::new_with_sequential_methods(
             inner,
             self.active_transport_count,
             self.sequential_methods.clone(),
@@ -609,6 +555,30 @@ impl Default for TransportMetrics {
             successful_requests: 0,
         }
     }
+}
+
+/// Returns the default set of RPC methods that require sequential execution.
+///
+/// These methods return different valid results when the same request is sent to multiple
+/// nodes in parallel, requiring sequential execution to ensure correct results.
+///
+/// Methods in this list share a common pattern:
+/// - They wait for transaction confirmation before returning
+/// - First node: submits tx → waits → returns receipt
+/// - Other nodes: tx already in mempool → return "already known" error
+/// - Result: parallel execution returns error instead of receipt
+///
+/// Sequential execution tries transports one at a time, in order of their score.
+/// Only moves to the next transport if the previous one fails. This ensures we
+/// always get the correct result while maintaining fallback capability.
+///
+/// # Default Methods:
+/// - `eth_sendRawTransactionSync` (EIP-7966): waits for receipt
+/// - `eth_sendTransactionSync`: same as above but for unsigned transactions
+fn default_sequential_methods() -> HashSet<String> {
+    ["eth_sendRawTransactionSync".to_string(), "eth_sendTransactionSync".to_string()]
+        .into_iter()
+        .collect()
 }
 
 #[cfg(test)]
@@ -894,7 +864,7 @@ mod tests {
         // Create FallbackService with custom sequential method "my_custom_method"
         let custom_methods = ["my_custom_method".to_string()].into_iter().collect();
         let mut fallback_service =
-            FallbackService::with_sequential_methods(transports, 2, custom_methods);
+            FallbackService::new(transports, 2).with_sequential_methods(custom_methods);
 
         let request = Request::new("my_custom_method", Id::Number(1), ());
         let serialized = request.serialize().unwrap();
