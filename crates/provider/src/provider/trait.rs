@@ -30,7 +30,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -1082,6 +1082,21 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// The `"eth_signTransaction"` method is not supported by regular nodes.
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
         self.client().request("eth_signTransaction", (tx,)).await
+    }
+
+    /// Fills a transaction with missing fields using default values.
+    ///
+    /// This method prepares a transaction by populating missing fields such as gas limit,
+    /// gas price, or nonce with appropriate default values. The response includes both the
+    /// RLP-encoded signed transaction and the filled transaction.
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.client().request("eth_fillTransaction", (tx,)).await
     }
 
     /// Subscribe to a stream of new block headers.
@@ -2506,5 +2521,29 @@ mod tests {
         assert_eq!(receipt.transaction_hash, tx_hash);
         assert!(receipt.status());
         assert!(receipt.gas_used() > 0, "fillers should have estimated gas");
+    }
+
+    #[tokio::test]
+    async fn test_fill_transaction() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let filled = provider.fill_transaction(tx).await.unwrap();
+
+        // Verify the response contains RLP-encoded raw bytes
+        assert!(!filled.raw.is_empty(), "raw transaction bytes should not be empty");
+
+        // Verify the filled transaction has required fields populated
+        let filled_tx = &filled.tx;
+        assert!(filled_tx.to().is_some(), "filled transaction should have to address");
+        assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
+        assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
     }
 }
