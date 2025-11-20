@@ -34,7 +34,7 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
-use std::{borrow::Cow, fmt::Debug};
+use std::borrow::Cow;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -1092,10 +1092,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
-    where
-        N::TxEnvelope: RpcRecv + Debug,
-    {
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>> {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
@@ -2521,5 +2518,29 @@ mod tests {
         assert_eq!(receipt.transaction_hash, tx_hash);
         assert!(receipt.status());
         assert!(receipt.gas_used() > 0, "fillers should have estimated gas");
+    }
+
+    #[tokio::test]
+    async fn test_fill_transaction() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let filled = provider.fill_transaction(tx).await.unwrap();
+
+        // Verify the response contains RLP-encoded raw bytes
+        assert!(!filled.raw.is_empty(), "raw transaction bytes should not be empty");
+
+        // Verify the filled transaction has required fields populated
+        let filled_tx = &filled.tx;
+        assert!(filled_tx.to().is_some(), "filled transaction should have to address");
+        assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
+        assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
     }
 }

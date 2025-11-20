@@ -384,9 +384,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
-        where N::TxEnvelope: RpcRecv
-    {
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>> {
         self.0.fill_transaction(tx).await
     }
 
