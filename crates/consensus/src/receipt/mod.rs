@@ -12,7 +12,7 @@ pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 mod status;
 pub use status::Eip658Value;
 
-use alloy_eips::Typed2718;
+use alloy_eips::{eip2718::Eip2718Result, Typed2718};
 
 /// Bincode-compatible serde implementations for receipt types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -127,6 +127,18 @@ pub trait Eip2718EncodableReceipt: RlpEncodableReceipt + Typed2718 {
 
     /// EIP-2718 encodes the receipt with the provided bloom filter.
     fn eip2718_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut);
+}
+
+/// Receipt type that knows how to decode itself along with bloom from EIP-2718 format.
+///
+/// This is used to support [`alloy_eips::eip2718::Decodable2718`] implementation for
+/// [`ReceiptWithBloom`].
+pub trait Eip2718DecodableReceipt: Sized {
+    /// EIP-2718 decodes the receipt and bloom from the buffer.
+    fn typed_decode_with_bloom(ty: u8, buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>>;
+
+    /// EIP-2718 decodes the receipt and bloom from the buffer.
+    fn fallback_decode_with_bloom(buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>>;
 }
 
 #[cfg(test)]
