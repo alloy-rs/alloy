@@ -7,6 +7,7 @@ use crate::{
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, Provider,
     ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
+use alloy_json_rpc::RpcRecv;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
     Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128, U256, U64,
@@ -383,7 +384,10 @@ impl<N: Network> Provider<N> for DynProvider<N> {
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>> {
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
         self.0.fill_transaction(tx).await
     }
 

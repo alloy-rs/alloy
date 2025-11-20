@@ -1092,7 +1092,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn fill_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<FillTransaction<N::TxEnvelope>> {
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
         self.client().request("eth_fillTransaction", (tx,)).await
     }
 
