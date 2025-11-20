@@ -811,12 +811,11 @@ mod tests {
         let tx_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
         // Transport A: Fast, returns success for both methods
-        let transport_a = DelayedMockTransport::new(
-            Duration::from_millis(10),
-            success_response(tx_hash),
-        );
+        let transport_a =
+            DelayedMockTransport::new(Duration::from_millis(10), success_response(tx_hash));
 
-        // Transport B: Also fast, but would return error (but shouldn't be called in sequential mode)
+        // Transport B: Also fast, but would return error (but shouldn't be called in sequential
+        // mode)
         let transport_b = DelayedMockTransport::new(
             Duration::from_millis(10),
             success_response("should_not_be_called"),
@@ -862,7 +861,7 @@ mod tests {
                 // Both should be successful responses from transport A
                 for resp in responses {
                     match resp.payload {
-                        ResponsePayload::Success(_) => {}, // Expected
+                        ResponsePayload::Success(_) => {} // Expected
                         ResponsePayload::Failure(err) => panic!("Unexpected error: {:?}", err),
                     }
                 }
@@ -874,6 +873,55 @@ mod tests {
         assert!(
             elapsed < Duration::from_millis(50),
             "Sequential execution with fast first transport should be quick: {:?}",
+            elapsed
+        );
+    }
+
+    #[tokio::test]
+    async fn test_custom_sequential_method() {
+        // Test that users can add custom methods to the sequential execution list
+
+        // Transport A: Fast, always succeeds
+        let transport_a =
+            DelayedMockTransport::new(Duration::from_millis(10), success_response("result_a"));
+
+        // Transport B: Also fast, returns different result
+        let transport_b =
+            DelayedMockTransport::new(Duration::from_millis(10), success_response("result_b"));
+
+        let transports = vec![transport_a.clone(), transport_b.clone()];
+
+        // Create FallbackService with custom sequential method "my_custom_method"
+        let custom_methods = ["my_custom_method".to_string()].into_iter().collect();
+        let mut fallback_service =
+            FallbackService::with_sequential_methods(transports, 2, custom_methods);
+
+        let request = Request::new("my_custom_method", Id::Number(1), ());
+        let serialized = request.serialize().unwrap();
+        let request_packet = RequestPacket::Single(serialized);
+
+        let start = std::time::Instant::now();
+        let _response = fallback_service.call(request_packet).await.unwrap();
+        let elapsed = start.elapsed();
+
+        // Should use sequential execution:
+        // - Only transport_a called (first in list, succeeds)
+        // - transport_b NOT called (sequential mode stops after first success)
+        assert_eq!(
+            transport_a.call_count(),
+            1,
+            "Transport A should be called once (sequential, first transport)"
+        );
+        assert_eq!(
+            transport_b.call_count(),
+            0,
+            "Transport B should NOT be called (sequential mode, A succeeded)"
+        );
+
+        // Should complete in ~10ms (only transport A called)
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "Sequential execution with fast first transport: {:?}",
             elapsed
         );
     }
