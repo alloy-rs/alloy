@@ -1060,9 +1060,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         tx: SendableTx<N>,
     ) -> TransportResult<N::ReceiptResponse> {
         match tx {
-            SendableTx::Builder(_) => {
-               Err(RpcError::local_usage_str("unsigned tx not supported"))
-            }
+            SendableTx::Builder(_) => Err(RpcError::local_usage_str("unsigned tx not supported")),
             SendableTx::Envelope(tx) => {
                 let encoded_tx = tx.encoded_2718();
                 self.send_raw_transaction_sync(&encoded_tx).await
