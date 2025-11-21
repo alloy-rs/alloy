@@ -1462,20 +1462,28 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
-    use alloy_consensus::{Transaction, TxEnvelope};
+    use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
     use alloy_transport::layers::{RetryBackoffLayer, RetryPolicy};
     use std::{io::Read, str::FromStr, time::Duration};
+    
+    // Imports only used in cfg(not(windows)) tests
+    #[cfg(not(windows))]
+    use crate::ext::test::async_ci_only;
+    #[cfg(not(windows))]
+    use alloy_consensus::{transaction::SignerRecoverable, TxEnvelope};
+    #[cfg(not(windows))]
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    #[cfg(not(windows))]
+    use alloy_rlp::Decodable;
 
     // For layer transport tests
-    use alloy_consensus::transaction::SignerRecoverable;
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
         hyper,
