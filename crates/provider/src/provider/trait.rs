@@ -1476,13 +1476,19 @@ mod tests {
 
     // For layer transport tests
     use alloy_consensus::transaction::SignerRecoverable;
-    #[cfg(feature = "hyper")]
-    use alloy_transport_http::{
-        hyper,
-        hyper::body::Bytes as HyperBytes,
-        hyper_util::{
-            client::legacy::{Client, Error},
-            rt::TokioExecutor,
+
+    // Imports only used in cfg(not(windows)) tests
+    #[cfg(not(windows))]
+    use crate::ext::test::async_ci_only;
+    #[cfg(not(windows))]
+    use alloy_consensus::{transaction::SignerRecoverable, TxEnvelope};
+    #[cfg(not(windows))]
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    #[cfg(not(windows))]
+    use alloy_rlp::Decodable;
+
+    // For layer transport tests
+      rt::TokioExecutor,
         },
         HyperResponse, HyperResponseFut,
     };
