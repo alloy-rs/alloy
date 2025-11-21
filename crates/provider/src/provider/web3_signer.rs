@@ -69,7 +69,7 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
     use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
@@ -78,7 +78,6 @@ mod tests {
     use alloy_primitives::{Address, U256};
 
     #[tokio::test]
-    #[cfg(not(windows))]
     async fn eth_sign_transaction() {
         async_ci_only(|| async {
             run_with_tempdir("reth-sign-tx", |dir| async {
