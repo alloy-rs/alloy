@@ -27,7 +27,7 @@ workspace = true
 alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
-alloy-eip7928 = { workspace = true, features = ["rlp"] }
+alloy-eip7928 = { workspace = true, features = ["rlp", "borsh"] }
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
@@ -126,4 +126,10 @@ arbitrary = [
 	"alloy-eip7702/k256",
 	"c-kzg?/arbitrary",
 ]
-borsh = ["dep:borsh", "alloy-primitives/borsh"]
+borsh = [
+	"dep:borsh",
+	"alloy-primitives/borsh",
+	"alloy-eip2930/borsh",
+	"alloy-eip7702/borsh",
+	"alloy-eip7928/borsh",
+]

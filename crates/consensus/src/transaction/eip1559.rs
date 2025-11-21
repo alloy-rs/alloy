@@ -57,8 +57,6 @@ pub struct TxEip1559 {
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for TxKind in alloy_primitives
     pub to: TxKind,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
@@ -75,8 +73,6 @@ pub struct TxEip1559 {
     // sometimes returning `null` instead of an empty array `[]`.
     // More details in <https://github.com/alloy-rs/alloy/pull/2450>.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
     /// Input has two uses depending if `to` field is Create or Call.
     /// pub init: An unlimited size byte array specifying the
