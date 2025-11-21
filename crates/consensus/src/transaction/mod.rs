@@ -450,13 +450,6 @@ where
         }
     }
 
-    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
-        match self {
-            Self::Left(tx) => tx.effective_tip_per_gas(base_fee),
-            Self::Right(tx) => tx.effective_tip_per_gas(base_fee),
-        }
-    }
-
     fn is_dynamic_fee(&self) -> bool {
         match self {
             Self::Left(tx) => tx.is_dynamic_fee(),
