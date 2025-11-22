@@ -169,8 +169,8 @@ mod ssz_requests_conversions {
         #[error("unknown request_type prefix: {0}")]
         UnknownRequestType(u8),
         /// Remaining bytes could not be decoded as SSZ requests_data.
-        #[error("ssz error decoding requests_type: {0}")]
-        SszDecodeError(u8, DecodeError),
+        #[error("ssz error decoding request_type {0}: {1}")]
+        SszDecodeError(u8, #[source] DecodeError),
         /// Requests of request_type exceeds Electra size limits
         #[error("requests_data payload for request_type {0} exceeds Electra size limit {1}")]
         RequestPayloadSizeExceeded(u8, usize),
