@@ -95,7 +95,7 @@ mod ssz_requests_conversions {
                     request_type: u8,
                 ) -> Result<Vec<T>, TryFromRequestsError>
                 where
-                    Vec<T>: Decode + Encode,
+                    T: Decode,
                 {
                     let list: Vec<T> = Vec::from_ssz_bytes(payload)
                         .map_err(|e| SszDecodeError(request_type, e))?;
