@@ -7,7 +7,7 @@ use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::{
     state::{AccountOverride, StateOverride},
-    BlockId,
+    BlockId, BlockOverrides,
 };
 use alloy_sol_types::SolCall;
 
@@ -100,6 +100,12 @@ where
     /// Set the block to use for this call.
     pub fn block(mut self, block: BlockId) -> Self {
         self.inner = self.inner.block(block);
+        self
+    }
+
+    /// Sets the block overrides for this call.
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.inner = self.inner.with_block_overrides(overrides);
         self
     }
 }
