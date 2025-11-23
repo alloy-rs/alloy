@@ -1,16 +1,13 @@
 //! Geth tracing types.
 
-use crate::geth::{
-    call::FlatCallFrame,
-    mux::{MuxConfig, MuxFrame},
-};
+use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 // re-exports
 pub use self::{
-    call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
+    call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig, FlatCallFrame},
     four_byte::FourByteFrame,
     noop::NoopFrame,
     pre_state::{
@@ -781,6 +778,18 @@ impl From<GethDebugTracingOptions> for GethDebugTracingCallOptions {
     }
 }
 
+/// Encodes a B256 value as a hex string without the 0x prefix.
+fn encode_hex_trimmed(value: &B256) -> String {
+    const HEX_CHARS: &[u8] = b"0123456789abcdef";
+    let bytes: &[u8] = value.as_ref();
+    let mut result = String::with_capacity(64);
+    for &byte in bytes.iter() {
+        result.push(HEX_CHARS[(byte >> 4) as usize] as char);
+        result.push(HEX_CHARS[(byte & 0x0f) as usize] as char);
+    }
+    result
+}
+
 /// Serializes a storage map as a list of key-value pairs _without_ 0x-prefix
 fn serialize_string_storage_map_opt<S: Serializer>(
     storage: &Option<BTreeMap<B256, B256>>,
@@ -791,10 +800,9 @@ fn serialize_string_storage_map_opt<S: Serializer>(
         Some(storage) => {
             let mut m = s.serialize_map(Some(storage.len()))?;
             for (key, val) in storage {
-                let key = format!("{key:?}");
-                let val = format!("{val:?}");
-                // skip the 0x prefix
-                m.serialize_entry(&key.as_str()[2..], &val.as_str()[2..])?;
+                let key_hex = encode_hex_trimmed(key);
+                let val_hex = encode_hex_trimmed(val);
+                m.serialize_entry(&key_hex, &val_hex)?;
             }
             m.end()
         }
