@@ -106,9 +106,11 @@ impl MnemonicBuilder<English> {
 }
 
 impl<W: Wordlist> MnemonicBuilder<W> {
-    /// Sets the phrase in the mnemonic builder. The phrase can either be a string or a path to
-    /// the file that contains the phrase. Once a phrase is provided, the key will be generated
-    /// deterministically by calling the `build` method.
+    /// Sets the phrase in the mnemonic builder. The phrase must be provided as a string
+    /// containing the BIP-39 mnemonic. This builder does not read from file paths
+    /// automatically; if your phrase is stored in a file, read the file contents yourself
+    /// and pass the resulting string here. Once a phrase is provided, the key will be
+    /// generated deterministically by calling the `build` method.
     ///
     /// # Examples
     ///
@@ -252,10 +254,10 @@ impl<W: Wordlist + Clone> IntoIterator for MnemonicBuilder<W> {
 /// Error produced by the mnemonic signer module.
 #[derive(Debug, Error)]
 pub enum MnemonicBuilderError {
-    /// Error suggests that a phrase (path or words) was expected but not found.
+    /// Error suggests that a phrase was expected but not found.
     #[error("expected phrase not found")]
     ExpectedPhraseNotFound,
-    /// Error suggests that a phrase (path or words) was not expected but found.
+    /// Error suggests that a phrase was not expected but found.
     #[error("unexpected phrase found")]
     UnexpectedPhraseFound,
 }
