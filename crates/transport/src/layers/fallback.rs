@@ -221,7 +221,8 @@ where
         let top_transports = {
             let mut transports_clone = (*self.transports).clone();
             transports_clone.sort_by(|a, b| b.cmp(a));
-            transports_clone.into_iter().take(self.active_transport_count).collect::<Vec<_>>()
+            transports_clone.truncate(self.active_transport_count);
+            transports_clone
         };
 
         let mut last_error = None;
