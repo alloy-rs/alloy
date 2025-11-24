@@ -69,10 +69,10 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
     }
 }
 
-#[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
     use super::*;
-    use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
+    use crate::{ext::test::async_ci_only, ProviderBuilder};
     use alloy_consensus::{transaction::SignerRecoverable, TxEnvelope};
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{Address, U256};
