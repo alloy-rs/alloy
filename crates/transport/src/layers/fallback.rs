@@ -147,10 +147,11 @@ where
         // Default: parallel execution for methods with deterministic results
         // Get the top transports to use for this request
         let top_transports = {
-            // Clone the vec, sort it, and take the top `self.active_transport_count`
+            // Clone the vec, sort it, and keep only the top `self.active_transport_count`
             let mut transports_clone = (*self.transports).clone();
             transports_clone.sort_by(|a, b| b.cmp(a));
-            transports_clone.into_iter().take(self.active_transport_count).collect::<Vec<_>>()
+            transports_clone.truncate(self.active_transport_count);
+            transports_clone
         };
 
         // Create a collection of future requests
