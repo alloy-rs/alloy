@@ -204,7 +204,9 @@ where
     use serde_json::Value;
     match txs {
         BlockTransactions::Hashes(hashes) => hashes.serialize(serializer),
-        BlockTransactions::Uncle => serializer.serialize_seq(Some(0))?.end(),
+        BlockTransactions::Uncle => {
+            unreachable!("transactions field is skipped for uncle blocks via skip_serializing_if")
+        }
         BlockTransactions::Full(txs) => {
             let mut value = serde_json::to_value(txs).map_err(serde::ser::Error::custom)?;
             if let Value::Array(txs) = &mut value {
