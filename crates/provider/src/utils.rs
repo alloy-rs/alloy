@@ -56,7 +56,7 @@ impl Eip1559Estimator {
     }
 
     /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
-    pub fn estimate(self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
+    pub fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
         match self {
             Self::Default => eip1559_default_estimator(base_fee, rewards),
             Self::Custom(val) => val.estimate(base_fee, rewards),
