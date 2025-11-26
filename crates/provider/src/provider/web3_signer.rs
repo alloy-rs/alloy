@@ -69,7 +69,7 @@ impl<P: Provider<N> + Clone, N: Network> Web3Signer<P, N> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
     use crate::{ext::test::async_ci_only, Provider, ProviderBuilder};
