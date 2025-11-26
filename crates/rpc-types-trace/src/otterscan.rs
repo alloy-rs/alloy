@@ -10,7 +10,6 @@ use alloy_rpc_types_eth::{
 };
 use serde::{
     de::{self, Unexpected},
-    ser::SerializeSeq,
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
