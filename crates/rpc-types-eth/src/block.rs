@@ -1179,7 +1179,7 @@ mod tests {
     "size": "0xaeb6"
 }"#;
         let block = serde_json::from_str::<Block>(s).unwrap();
-        let header = block.clone().header.inner;
+        let header = block.header.inner.clone();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
         assert_eq!(recomputed_hash, block.header.hash);
 
@@ -1216,7 +1216,7 @@ mod tests {
             "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
          }"#;
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
-        let header = block2.clone().header.inner;
+        let header = block2.header.inner.clone();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
         assert_eq!(recomputed_hash, block2.header.hash);
     }
@@ -1254,7 +1254,7 @@ mod tests {
         };
 
         // Convert the RPC header to a primitive header
-        let primitive_header = rpc_header.clone().inner;
+        let primitive_header = rpc_header.inner.clone();
 
         // Seal the primitive header
         let sealed_header: Sealed<alloy_consensus::Header> =
@@ -1300,7 +1300,7 @@ mod tests {
         };
 
         // Convert the RPC header to a primitive header
-        let primitive_header = header.clone().inner;
+        let primitive_header = header.inner.clone();
 
         // Convert the primitive header to a RPC uncle block
         let block: Block<Transaction> = Block::uncle_from_header(primitive_header);
