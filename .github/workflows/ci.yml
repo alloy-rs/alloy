@@ -28,7 +28,7 @@ jobs:
         rust:
           - "stable"
           - "nightly"
-          - "1.86" # MSRV
+          - "1.88" # MSRV
         flags:
           # No features
           - "--no-default-features -F reqwest-rustls-tls"
@@ -38,10 +38,10 @@ jobs:
           - "--all-features"
         exclude:
           # All features on MSRV
-          - rust: "1.85" # MSRV
+          - rust: "1.88" # MSRV
             flags: "--all-features"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
@@ -59,16 +59,16 @@ jobs:
           cache-on-failure: true
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
-        if: ${{ matrix.rust != '1.86' }} # MSRV
-        uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
+        if: ${{ matrix.rust != '1.88' }} # MSRV
+        uses: taiki-e/install-action@763e3324d4fd026c9bd284c504378585777a87d5 # v2
         with:
           tool: nextest
       - name: build
-        if: ${{ matrix.rust == '1.86' }} # MSRV
+        if: ${{ matrix.rust == '1.88' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
         shell: bash
-        if: ${{ matrix.rust != '1.86' }} # MSRV
+        if: ${{ matrix.rust != '1.88' }} # MSRV
         run: cargo nextest run --workspace ${{ matrix.flags }}
 
   doctest:
@@ -77,7 +77,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
@@ -95,14 +95,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
-      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
+      - uses: taiki-e/install-action@763e3324d4fd026c9bd284c504378585777a87d5 # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -131,14 +131,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
           target: wasm32-wasip1
-      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
+      - uses: taiki-e/install-action@763e3324d4fd026c9bd284c504378585777a87d5 # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -162,13 +162,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
+      - uses: taiki-e/install-action@763e3324d4fd026c9bd284c504378585777a87d5 # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -184,14 +184,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
           targets: riscv32imac-unknown-none-elf
-      - uses: taiki-e/install-action@c5b1b6f479c32f356cc6f4ba672a47f63853b13b # v2
+      - uses: taiki-e/install-action@763e3324d4fd026c9bd284c504378585777a87d5 # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
@@ -205,10 +205,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: crate-ci/typos@80c8a4945eec0f6d464eaf9e65ed98ef085283d1 # v1
+      - uses: crate-ci/typos@626c4bedb751ce0b7f03262ca97ddda9a076ae1c # v1
 
   clippy:
     runs-on: ubuntu-latest
@@ -216,7 +216,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
@@ -236,7 +236,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
@@ -256,7 +256,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
@@ -272,7 +272,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: run zepter
@@ -302,7 +302,7 @@ jobs:
             build-mode: none
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Initialize CodeQL

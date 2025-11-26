@@ -15,6 +15,7 @@ use core::{fmt, mem};
 
 #[cfg(feature = "kzg")]
 use alloy_eips::eip4844::BlobTransactionValidationError;
+use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant};
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -26,6 +27,7 @@ use alloy_eips::eip4844::BlobTransactionValidationError;
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionVariant")]
 pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
     /// A standalone transaction with blob hashes and max blob fee.
@@ -70,6 +72,22 @@ impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip484
     fn from(value: Signed<TxEip4844WithSidecar<T>>) -> Self {
         let (tx, signature, hash) = value.into_parts();
         Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
+    }
+}
+
+impl From<TxEip4844Variant<BlobTransactionSidecar>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(value: TxEip4844Variant<BlobTransactionSidecar>) -> Self {
+        value.map_sidecar(Into::into)
+    }
+}
+
+impl From<TxEip4844Variant<BlobTransactionSidecarEip7594>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(value: TxEip4844Variant<BlobTransactionSidecarEip7594>) -> Self {
+        value.map_sidecar(Into::into)
     }
 }
 
@@ -146,6 +164,144 @@ impl<T> TxEip4844Variant<T> {
         }
     }
 
+    /// Strips the sidecar from this variant type leaving [`Self::TxEip4844`].
+    ///
+    /// Returns the sidecar if it was [`Self::TxEip4844WithSidecar`].
+    pub fn take_sidecar(&mut self) -> Option<T> {
+        // Use a placeholder to temporarily replace self
+        let placeholder = Self::TxEip4844(TxEip4844::default());
+        match mem::replace(self, placeholder) {
+            tx @ Self::TxEip4844(_) => {
+                // Put the original transaction back
+                *self = tx;
+                None
+            }
+            Self::TxEip4844WithSidecar(tx) => {
+                let (tx, sidecar) = tx.into_parts();
+                *self = Self::TxEip4844(tx);
+                Some(sidecar)
+            }
+        }
+    }
+
+    /// Strips the sidecar from the variant and returns both the transaction and the sidecar
+    /// separately, keeping the same sidecar type parameter.
+    ///
+    /// This method consumes the variant and returns:
+    /// - A [`TxEip4844Variant<T>`] containing only the transaction (always
+    ///   [`TxEip4844Variant::TxEip4844`])
+    /// - An [`Option<T>`] containing the sidecar if it existed
+    ///
+    /// This is a convenience wrapper around [`strip_sidecar_into`](Self::strip_sidecar_into)
+    /// that keeps the same type parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(variant: TxEip4844Variant<BlobTransactionSidecar>) {
+    /// // Strip and extract the sidecar (type parameter stays the same)
+    /// let (tx_variant, maybe_sidecar) = variant.strip_sidecar();
+    ///
+    /// if let Some(sidecar) = maybe_sidecar {
+    ///     // Process the sidecar separately
+    ///     println!("Sidecar has {} blobs", sidecar.blobs.len());
+    /// }
+    /// # }
+    /// ```
+    pub fn strip_sidecar(self) -> (Self, Option<T>) {
+        self.strip_sidecar_into()
+    }
+
+    /// Strips the sidecar from the variant and returns both the transaction and the sidecar
+    /// separately, converting to a different sidecar type parameter.
+    ///
+    /// This method consumes the variant and returns:
+    /// - A [`TxEip4844Variant<U>`] containing only the transaction (always
+    ///   [`TxEip4844Variant::TxEip4844`])
+    /// - An [`Option<T>`] containing the sidecar if it existed
+    ///
+    /// This is useful when you need to:
+    /// - Extract the sidecar for separate processing
+    /// - Convert to a variant with a different sidecar type parameter
+    /// - Separate the transaction data from blob data
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip7594::BlobTransactionSidecarVariant;
+    /// # fn example(variant: TxEip4844Variant<BlobTransactionSidecar>) {
+    /// // Strip and convert to a different type parameter
+    /// let (tx_variant, maybe_sidecar): (TxEip4844Variant<BlobTransactionSidecarVariant>, _) =
+    ///     variant.strip_sidecar_into();
+    ///
+    /// if let Some(sidecar) = maybe_sidecar {
+    ///     // Process the sidecar separately
+    ///     println!("Sidecar has {} blobs", sidecar.blobs.len());
+    /// }
+    /// # }
+    /// ```
+    pub fn strip_sidecar_into<U>(self) -> (TxEip4844Variant<U>, Option<T>) {
+        match self {
+            Self::TxEip4844(tx) => (TxEip4844Variant::TxEip4844(tx), None),
+            Self::TxEip4844WithSidecar(tx) => {
+                let (tx, sidecar) = tx.into_parts();
+                (TxEip4844Variant::TxEip4844(tx), Some(sidecar))
+            }
+        }
+    }
+
+    /// Drops the sidecar from the variant and returns only the transaction, keeping the same
+    /// sidecar type parameter.
+    ///
+    /// This is a convenience method that discards the sidecar, returning only the transaction
+    /// without a sidecar (always [`TxEip4844Variant::TxEip4844`]).
+    ///
+    /// This is equivalent to calling [`strip_sidecar`](Self::strip_sidecar) and taking only the
+    /// first element of the tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(variant: TxEip4844Variant<BlobTransactionSidecar>) {
+    /// // Drop the sidecar, keeping only the transaction
+    /// let tx_without_sidecar = variant.drop_sidecar();
+    /// # }
+    /// ```
+    pub fn drop_sidecar(self) -> Self {
+        self.strip_sidecar().0
+    }
+
+    /// Drops the sidecar from the variant and returns only the transaction, converting to a
+    /// different sidecar type parameter.
+    ///
+    /// This is a convenience method that discards the sidecar, returning only the transaction
+    /// without a sidecar (always [`TxEip4844Variant::TxEip4844`]).
+    ///
+    /// This is equivalent to calling [`strip_sidecar_into`](Self::strip_sidecar_into) and taking
+    /// only the first element of the tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip7594::BlobTransactionSidecarVariant;
+    /// # fn example(variant: TxEip4844Variant<BlobTransactionSidecar>) {
+    /// // Drop the sidecar and convert to a different type parameter
+    /// let tx_without_sidecar: TxEip4844Variant<BlobTransactionSidecarVariant> =
+    ///     variant.drop_sidecar_into();
+    /// # }
+    /// ```
+    pub fn drop_sidecar_into<U>(self) -> TxEip4844Variant<U> {
+        self.strip_sidecar_into().0
+    }
+
     /// Returns the [`TxEip4844WithSidecar`] if it has a sidecar
     pub const fn as_with_sidecar(&self) -> Option<&TxEip4844WithSidecar<T>> {
         match self {
@@ -168,6 +324,29 @@ impl<T> TxEip4844Variant<T> {
         match self {
             Self::TxEip4844WithSidecar(tx) => Some(tx.sidecar()),
             _ => None,
+        }
+    }
+
+    /// Maps the sidecar to a new type.
+    pub fn map_sidecar<U>(self, f: impl FnOnce(T) -> U) -> TxEip4844Variant<U> {
+        match self {
+            Self::TxEip4844(tx) => TxEip4844Variant::TxEip4844(tx),
+            Self::TxEip4844WithSidecar(tx) => {
+                TxEip4844Variant::TxEip4844WithSidecar(tx.map_sidecar(f))
+            }
+        }
+    }
+
+    /// Maps the sidecar to a new type, returning an error if the mapping fails.
+    pub fn try_map_sidecar<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<TxEip4844Variant<U>, E> {
+        match self {
+            Self::TxEip4844(tx) => Ok(TxEip4844Variant::TxEip4844(tx)),
+            Self::TxEip4844WithSidecar(tx) => {
+                tx.try_map_sidecar(f).map(TxEip4844Variant::TxEip4844WithSidecar)
+            }
         }
     }
 }
@@ -194,6 +373,78 @@ impl<T: TxEip4844Sidecar> TxEip4844Variant<T> {
             Self::TxEip4844(tx) => tx.size(),
             Self::TxEip4844WithSidecar(tx) => tx.size(),
         }
+    }
+}
+
+impl TxEip4844Variant<BlobTransactionSidecar> {
+    /// Converts this legacy EIP-4844 sidecar into an EIP-7594 sidecar with the default settings.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594(
+        self,
+    ) -> Result<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>, c_kzg::Error>
+    {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this legacy EIP-4844 sidecar into an EIP-7594 sidecar with the given settings.
+    ///
+    /// This requires computing cell KZG proofs from the blob data using the KZG trusted setup.
+    /// Each blob produces `CELLS_PER_EXT_BLOB` cell proofs.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>, c_kzg::Error>
+    {
+        self.try_map_sidecar(|sidecar| sidecar.try_into_7594(settings))
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarVariant> {
+    /// Attempts to convert this transaction's sidecar into the EIP-7594 format using default KZG
+    /// settings.
+    ///
+    /// For EIP-4844 sidecars, this computes cell KZG proofs from the blob data. If the sidecar is
+    /// already in EIP-7594 format, it returns itself unchanged.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarVariant>)` - The
+    ///   transaction with converted sidecar
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    pub fn try_convert_into_eip7594(self) -> Result<Self, c_kzg::Error> {
+        self.try_convert_into_eip7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Attempts to convert this transaction's sidecar into the EIP-7594 format using custom KZG
+    /// settings.
+    ///
+    /// For EIP-4844 sidecars, this computes cell KZG proofs from the blob data using the
+    /// provided KZG settings. If the sidecar is already in EIP-7594 format, it returns itself
+    /// unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `settings` - The KZG settings to use for computing cell proofs
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarVariant>)` - The
+    ///   transaction with converted sidecar
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    pub fn try_convert_into_eip7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        self.try_map_sidecar(|sidecar| sidecar.try_convert_into_eip7594_with_settings(settings))
     }
 }
 
@@ -474,6 +725,7 @@ where
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844Transaction", alias = "TransactionEip4844", alias = "Eip4844Tx")]
 pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
@@ -492,11 +744,9 @@ pub struct TxEip4844 {
         serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
     )]
     pub gas_limit: u64,
-    /// A scalar value equal to the maximum
-    /// amount of gas that should be used in executing
-    /// this transaction. This is paid up-front, before any
-    /// computation is done and may not be increased
-    /// later; formally Tg.
+    /// A scalar value equal to the maximum total fee per unit of gas
+    /// the sender is willing to pay. The actual fee paid per gas is
+    /// the minimum of this and `base_fee + max_priority_fee_per_gas`.
     ///
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
@@ -548,7 +798,7 @@ pub struct TxEip4844 {
 impl TxEip4844 {
     /// Returns the total gas for all blobs in this transaction.
     #[inline]
-    pub fn blob_gas(&self) -> u64 {
+    pub const fn blob_gas(&self) -> u64 {
         // SAFETY: we don't expect u64::MAX / DATA_GAS_PER_BLOB hashes in a single transaction
         self.blob_versioned_hashes.len() as u64 * DATA_GAS_PER_BLOB
     }
@@ -794,6 +1044,7 @@ impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
 pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
     /// The actual transaction.

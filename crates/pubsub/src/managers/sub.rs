@@ -89,9 +89,8 @@ impl SubscriptionManager {
     /// exists, the notification is dropped.
     pub(crate) fn notify(&mut self, notification: EthNotification) {
         if let Some(local_id) = self.local_id_for(&notification.subscription) {
-            if let Some((_, sub)) = self.local_to_sub.remove_by_left(&local_id) {
+            if let Some(sub) = self.local_to_sub.get_by_left(&local_id) {
                 sub.notify(notification.result);
-                self.local_to_sub.insert(local_id, sub);
             }
         }
     }

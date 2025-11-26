@@ -21,6 +21,7 @@ use core::mem;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Header {
     /// The Keccak 256-bit hash of the parent
     /// block’s header, in its entirety; formally Hp.
@@ -254,9 +255,9 @@ impl Header {
         mem::size_of::<u64>() + // timestamp
         mem::size_of::<B256>() + // mix hash
         mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u128>>() + // base fee per gas
-        mem::size_of::<Option<u128>>() + // blob gas used
-        mem::size_of::<Option<u128>>() + // excess blob gas
+        mem::size_of::<Option<u64>>() + // base fee per gas
+        mem::size_of::<Option<u64>>() + // blob gas used
+        mem::size_of::<Option<u64>>() + // excess blob gas
         mem::size_of::<Option<B256>>() + // parent beacon block root
         mem::size_of::<Option<B256>>() + // requests root
         self.extra_data.len() // extra data

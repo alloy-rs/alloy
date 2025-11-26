@@ -52,7 +52,7 @@ impl PartialSidecar {
     }
 
     /// Get the number of unused field elements that have been allocated
-    fn free_fe(&self) -> usize {
+    const fn free_fe(&self) -> usize {
         self.blobs.len() * FIELD_ELEMENTS_PER_BLOB as usize - self.fe
     }
 
