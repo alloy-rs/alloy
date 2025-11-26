@@ -35,7 +35,7 @@ impl BlockWithParent {
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(rename = "camelCase"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct RpcBlockHash {
     /// A block hash
     pub block_hash: BlockHash,
