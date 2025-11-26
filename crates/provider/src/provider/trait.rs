@@ -1462,12 +1462,13 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
-    use alloy_consensus::{Transaction, TxEnvelope};
+    use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
+    use alloy_node_bindings::Anvil;
+    #[cfg(not(windows))]
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     use alloy_signer_local::PrivateKeySigner;
@@ -1475,7 +1476,8 @@ mod tests {
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
-    use alloy_consensus::transaction::SignerRecoverable;
+    #[cfg(not(windows))]
+    use alloy_consensus::{transaction::SignerRecoverable, TxEnvelope};
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
         hyper,
@@ -2409,7 +2411,7 @@ mod tests {
     #[tokio::test]
     #[cfg(not(windows))]
     async fn eth_sign_transaction() {
-        async_ci_only(|| async {
+        crate::ext::test::async_ci_only(|| async {
             run_with_tempdir("reth-sign-tx", |dir| async {
                 let reth = Reth::new().dev().disable_discovery().data_dir(dir).spawn();
                 let provider = ProviderBuilder::new().connect_http(reth.endpoint_url());
