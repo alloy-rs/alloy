@@ -8,9 +8,9 @@ use serde_with::{serde_as, DisplayFromStr};
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LightClientFinalityData {
-    /// The attested header containing a `Beacon`.
+    /// The attested header containing a `BeaconBlockHeader`.
     pub attested_header: AttestedHeader,
-    /// The finalized header containing a `Beacon2`.
+    /// The finalized header containing a `BeaconBlockHeader`.
     pub finalized_header: FinalizedHeader,
     /// The Merkle branch proof for the finality.
     pub finality_branch: Vec<String>,
@@ -21,31 +21,21 @@ pub struct LightClientFinalityData {
     pub signature_slot: u64,
 }
 
-/// Contains the `Beacon` header that was attested.
+/// Contains the attested `BeaconBlockHeader`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestedHeader {
-    /// The `Beacon` object representing the block header.
+    /// The block header that was attested.
     pub beacon: BeaconBlockHeader,
 }
 
-#[deprecated(
-    note = "Use `BeaconBlockHeader` directly; this alias is redundant and will be removed in a future release."
-)]
-/// Backwards-compatible alias for the previously local `Beacon` header type.
-pub type Beacon = BeaconBlockHeader;
-
-/// Contains the `Beacon2` header that was finalized.
+/// Contains the finalized `BeaconBlockHeader`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedHeader {
-    /// The `Beacon2` object representing the block header.
+    /// The block header that was finalized.
     pub beacon: BeaconBlockHeader,
 }
 
-#[deprecated(
-    note = "Use `BeaconBlockHeader` directly; this alias is redundant and will be removed in a future release."
-)]
-/// Backwards-compatible alias for the previously local `Beacon2` header type.
-pub type Beacon2 = BeaconBlockHeader;
+
 
 /// Contains the sync committee bits and signature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
