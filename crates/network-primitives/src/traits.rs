@@ -1,6 +1,7 @@
 use crate::BlockTransactions;
 use alloy_consensus::{BlockHeader, Transaction};
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
+use alloy_eips::BlockNumHash;
 use alloy_serde::WithOtherFields;
 
 /// Receipt JSON-RPC response.
@@ -23,6 +24,13 @@ pub trait ReceiptResponse {
 
     /// Number of the block this transaction was included within.
     fn block_number(&self) -> Option<u64>;
+
+    /// Returns the [`BlockNumHash`] of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
+    fn block_hash_num(&self) -> Option<BlockNumHash> {
+        Some(BlockNumHash::new(self.block_number()?, self.block_hash()?))
+    }
 
     /// Transaction Hash.
     fn transaction_hash(&self) -> TxHash;
@@ -68,11 +76,22 @@ pub trait TransactionResponse: Transaction {
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
 
-    /// Block hash
+    /// Returns the hash of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
     fn block_hash(&self) -> Option<BlockHash>;
 
-    /// Block number
+    /// Returns the number of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
     fn block_number(&self) -> Option<u64>;
+
+    /// Returns the [`BlockNumHash`] of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
+    fn block_hash_num(&self) -> Option<BlockNumHash> {
+        Some(BlockNumHash::new(self.block_number()?, self.block_hash()?))
+    }
 
     /// Transaction Index
     fn transaction_index(&self) -> Option<u64>;
