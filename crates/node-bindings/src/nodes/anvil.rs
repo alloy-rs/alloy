@@ -277,7 +277,8 @@ impl Anvil {
 
     /// Select the [`EthereumHardfork`] to start anvil with.
     pub fn hardfork(mut self, hardfork: EthereumHardfork) -> Self {
-        self = self.args(["--hardfork", hardfork.to_string().as_str()]);
+        let hardfork_str = hardfork.to_string();
+        self = self.args(["--hardfork", &hardfork_str]);
         self
     }
 
