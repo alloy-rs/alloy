@@ -1,7 +1,7 @@
 use crate::BlockTransactions;
 use alloy_consensus::{BlockHeader, Transaction};
-use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_eips::BlockNumHash;
+use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
 
 /// Receipt JSON-RPC response.
