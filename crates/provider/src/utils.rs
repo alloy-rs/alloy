@@ -134,10 +134,7 @@ pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
     r: Option<BlockResp>,
 ) -> Option<BlockResp> {
     r.map(|mut block| {
-        if block.transactions().is_empty() {
-            block.transactions_mut().convert_to_hashes();
-        }
-
+        block.transactions_mut().convert_to_hashes();
         block
     })
 }
