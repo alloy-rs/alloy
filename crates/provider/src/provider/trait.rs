@@ -1463,10 +1463,15 @@ impl<N: Network> Provider<N> for RootProvider<N> {
 mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
-    use alloy_consensus::{Transaction, TxEnvelope};
+    use alloy_consensus::Transaction;
+    #[cfg(not(windows))]
+    use alloy_consensus::TxEnvelope;
     use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
-    use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
+    use alloy_node_bindings::Anvil;
+    #[cfg(not(windows))]
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
+    #[cfg(not(windows))]
     use alloy_rlp::Decodable;
     use alloy_rpc_client::{BuiltInConnectionString, RpcClient};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
@@ -1475,6 +1480,7 @@ mod tests {
     use std::{io::Read, str::FromStr, time::Duration};
 
     // For layer transport tests
+    #[cfg(not(windows))]
     use alloy_consensus::transaction::SignerRecoverable;
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
@@ -1617,7 +1623,7 @@ mod tests {
     #[tokio::test]
     #[cfg_attr(windows, ignore = "no reth on windows")]
     async fn test_auth_layer_transport() {
-        crate::ext::test::async_ci_only(|| async move {
+        async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
             use alloy_rpc_types_engine::JwtSecret;
             use alloy_transport_http::{AuthLayer, Http, HyperClient};
