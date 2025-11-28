@@ -119,7 +119,7 @@ fn create_mapping<const N: usize, T, F>(
     signature: F,
 ) -> FbHashMap<N, (String, usize)>
 where
-    F: Fn(&T) -> FixedBytes<N> + Copy,
+    F: Fn(&T) -> FixedBytes<N>,
 {
     elements
         .iter()
@@ -127,7 +127,7 @@ where
             sub_elements
                 .iter()
                 .enumerate()
-                .map(move |(index, element)| (signature(element), (name.to_owned(), index)))
+                .map(|(index, element)| (signature(element), (name.to_owned(), index)))
         })
         .collect()
 }
