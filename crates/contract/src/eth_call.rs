@@ -121,7 +121,7 @@ where
 
 impl<'coder, D, N> std::future::IntoFuture for EthCall<'coder, D, N>
 where
-    D: CallDecoder + Unpin,
+    D: CallDecoder,
     N: Network,
 {
     type Output = Result<D::CallOutput>;
@@ -149,7 +149,7 @@ where
 
 impl<D, N> std::future::Future for EthCallFut<'_, D, N>
 where
-    D: CallDecoder + Unpin,
+    D: CallDecoder,
     N: Network,
 {
     type Output = Result<D::CallOutput>;
