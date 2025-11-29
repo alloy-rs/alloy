@@ -59,7 +59,10 @@ pub use tenderly_admin::TenderlyAdminApi;
 mod mev;
 
 #[cfg(feature = "mev-api")]
-pub use mev::{sign_flashbots_payload, MevApi, MevBuilder, FLASHBOTS_SIGNATURE_HEADER};
+pub use mev::{
+    sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevApi,
+    MevBuilder, FLASHBOTS_SIGNATURE_HEADER,
+};
 
 #[cfg(test)]
 pub(crate) mod test {
