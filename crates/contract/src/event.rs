@@ -364,10 +364,10 @@ mod tests {
             .await
             .expect("no receipt");
 
-        // we sent the wrong event
-        // so no events should be returned when querying event.query() (MyEvent)
+        // The wrong event is not matched, but the previously emitted MyEvent remains
         let all = event.query().await.unwrap();
-        assert_eq!(all.len(), 0);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, expected_event);
 
         #[cfg(feature = "pubsub")]
         {
@@ -405,10 +405,10 @@ mod tests {
                 .await
                 .expect("no receipt");
 
-            // we sent the wrong event
-            // so no events should be returned when querying event.query() (MyEvent)
+            // The wrong event is not matched, but the previously emitted MyEvent remains
             let all = event.query().await.unwrap();
-            assert_eq!(all.len(), 0);
+            assert_eq!(all.len(), 1);
+            assert_eq!(all[0].0, expected_event);
         }
     }
 
@@ -470,10 +470,10 @@ mod tests {
             .await
             .expect("no receipt");
 
-        // we sent the wrong event
-        // so no events should be returned when querying event.query() (MyEvent)
+        // The wrong event is not matched, but the previously emitted MyEvent remains
         let all = event.query().await.unwrap();
-        assert_eq!(all.len(), 0);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, expected_event);
 
         #[cfg(feature = "pubsub")]
         {
@@ -513,10 +513,10 @@ mod tests {
                 .await
                 .expect("no receipt");
 
-            // we sent the wrong event
-            // so no events should be returned when querying event.query() (MyEvent)
+            // The wrong event is not matched, but the previously emitted MyEvent remains
             let all = event.query().await.unwrap();
-            assert_eq!(all.len(), 0);
+            assert_eq!(all.len(), 1);
+            assert_eq!(all[0].0, expected_event);
         }
     }
 }
