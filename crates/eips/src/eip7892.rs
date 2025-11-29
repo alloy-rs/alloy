@@ -42,6 +42,8 @@ pub struct BlobScheduleBlobParams {
     pub prague: BlobParams,
     /// Configuration for blob-related calculations for the Osaka hardfork.
     pub osaka: BlobParams,
+    /// Configuration for blob-related calculations for the Amsterdam hardfork.
+    pub amsterdam: BlobParams,
     /// Time-based scheduled updates to blob parameters.
     ///
     /// These are ordered by activation timestamps in natural order.
@@ -55,6 +57,7 @@ impl BlobScheduleBlobParams {
             cancun: BlobParams::cancun(),
             prague: BlobParams::prague(),
             osaka: BlobParams::osaka(),
+            amsterdam: BlobParams::amsterdam(),
             scheduled: Default::default(),
         }
     }
