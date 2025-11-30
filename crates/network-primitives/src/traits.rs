@@ -1,4 +1,4 @@
-use crate::BlockTransactions;
+use crate::{BlockTransactions, MinedTransactionInfo};
 use alloy_consensus::{BlockHeader, Transaction};
 use alloy_eips::BlockNumHash;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
@@ -122,6 +122,17 @@ pub trait TransactionResponse: Transaction {
             0 => None,
             ty => Some(ty),
         }
+    }
+    
+    /// Returns the [`MinedTransactionInfo`] if the transaction has been mined.
+    ///
+    /// Returns `None` if this transaction is still pending (missing block number, hash, or index).
+    fn mined_info(&self) -> Option<MinedTransactionInfo> {
+        Some(MinedTransactionInfo {
+            block_hash: self.block_hash()?,
+            block_number: self.block_number()?,
+            transaction_index: self.transaction_index()?,
+        })
     }
 }
 
