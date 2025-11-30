@@ -123,7 +123,7 @@ pub trait TransactionResponse: Transaction {
             ty => Some(ty),
         }
     }
-    
+
     /// Returns the [`MinedTransactionInfo`] if the transaction has been mined.
     ///
     /// Returns `None` if this transaction is still pending (missing block number, hash, or index).

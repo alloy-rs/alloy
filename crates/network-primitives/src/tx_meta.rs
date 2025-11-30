@@ -1,8 +1,5 @@
 use alloy_primitives::B256;
 
-
-
-
 /// Additional fields in the context of a block that contains this _mined_ transaction.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub struct MinedTransactionInfo {
