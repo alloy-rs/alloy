@@ -108,7 +108,7 @@ where
                 // Generate the Flashbots signature for the request body
                 let body = serde_json::to_string(&self.inner.request())
                     .map_err(TransportErrorKind::custom)?;
-                let signature = sign_flashbots_payload(body, &signer)
+                let signature = sign_flashbots_payload(body.as_bytes(), &signer)
                     .await
                     .map_err(TransportErrorKind::custom)?;
 
@@ -134,15 +134,31 @@ where
     }
 }
 
-/// Uses the provided signer to generate a signature for Flashbots authentication.
-/// Returns the value for the `X-Flashbots-Signature` header.
+/// Uses the provided signer to generate a Flashbots `X-Flashbots-Signature` header value in the
+/// format `{address}:{signature_hex}`.
 ///
-/// See [here](https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#authentication) for more information.
+/// See [Flashbots docs](https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#authentication) for more information.
+///
+/// # Example
+///
+/// ```
+/// use alloy_provider::ext::sign_flashbots_payload;
+/// use alloy_signer_local::PrivateKeySigner;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let signer: PrivateKeySigner =
+///     "0x0000000000000000000000000000000000000000000000000000000000123456".parse()?;
+/// let body = b"sign this message";
+/// let signature = sign_flashbots_payload(body, &signer).await?;
+/// assert!(signature.starts_with("0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x"));
+/// # Ok(())
+/// # }
+/// ```
 pub async fn sign_flashbots_payload<S: Signer + Send + Sync>(
-    body: impl AsRef<[u8]>,
+    body: &[u8],
     signer: &S,
 ) -> Result<String, alloy_signer::Error> {
-    let message_hash = keccak256(body.as_ref()).to_string();
+    let message_hash = keccak256(body).to_string();
     let signature = signer.sign_message(message_hash.as_bytes()).await?;
 
     // Normalized recovery byte (0/1) following the canonical signature encoding
@@ -160,9 +176,20 @@ pub async fn sign_flashbots_payload<S: Signer + Send + Sync>(
 /// recovery bytes are supported.
 ///
 /// See [Flashbots docs](https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#authentication) for more information.
+///
+/// # Example
+///
+/// ```
+/// use alloy_provider::ext::verify_flashbots_signature;
+///
+/// let signature_header = "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x983dc7c520db0d287faff3cd0aef81d5a7f4ffd3473440d3f705da16299724271f660b6fe367f455b205bc014eff3e20defd011f92000f94d39365ca0bc7867200";
+/// let body = b"sign this message";
+/// let address = verify_flashbots_signature(signature_header, body).unwrap();
+/// assert_eq!(address.to_string(), "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771");
+/// ```
 pub fn verify_flashbots_signature(
     signature_header: &str,
-    body: impl AsRef<[u8]>,
+    body: &[u8],
 ) -> Result<Address, FlashbotsSignatureError> {
     let (address_str, sig_str) =
         signature_header.split_once(':').ok_or(FlashbotsSignatureError::InvalidFormat)?;
@@ -170,7 +197,7 @@ pub fn verify_flashbots_signature(
     let expected = address_str.parse::<Address>()?;
     let signature = sig_str.parse::<Signature>()?;
 
-    let message_hash = keccak256(body.as_ref()).to_string();
+    let message_hash = keccak256(body).to_string();
     let actual = signature.recover_address_from_msg(message_hash.as_bytes())?;
 
     if actual != expected {
@@ -186,7 +213,7 @@ mod tests {
     use alloy_primitives::{address, b256};
     use alloy_signer_local::PrivateKeySigner;
 
-    const TEST_BODY: &str = "sign this message";
+    const TEST_BODY: &[u8] = b"sign this message";
     const TEST_SIGNATURE: &str = "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x983dc7c520db0d287faff3cd0aef81d5a7f4ffd3473440d3f705da16299724271f660b6fe367f455b205bc014eff3e20defd011f92000f94d39365ca0bc7867200";
 
     #[tokio::test]
@@ -195,7 +222,7 @@ mod tests {
             "0x0000000000000000000000000000000000000000000000000000000000123456"
         ))
         .unwrap();
-        let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
+        let signature = sign_flashbots_payload(TEST_BODY, &signer).await.unwrap();
         assert_eq!(signature, TEST_SIGNATURE);
     }
 
@@ -206,7 +233,7 @@ mod tests {
         ))
         .unwrap();
 
-        let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
+        let signature = sign_flashbots_payload(TEST_BODY, &signer).await.unwrap();
         let recovered = verify_flashbots_signature(&signature, TEST_BODY).unwrap();
         assert_eq!(recovered, signer.address());
     }
@@ -228,13 +255,13 @@ mod tests {
 
     #[test]
     fn test_verify_flashbots_signature_invalid_format() {
-        let result = verify_flashbots_signature("invalid", "body");
+        let result = verify_flashbots_signature("invalid", b"body");
         assert!(matches!(result, Err(FlashbotsSignatureError::InvalidFormat)));
     }
 
     #[test]
     fn test_verify_flashbots_signature_invalid_address() {
-        let result = verify_flashbots_signature("notanaddress:0x1234", "body");
+        let result = verify_flashbots_signature("notanaddress:0x1234", b"body");
         assert!(matches!(result, Err(FlashbotsSignatureError::InvalidAddress(_))));
     }
 
@@ -242,7 +269,7 @@ mod tests {
     fn test_verify_flashbots_signature_invalid_signature() {
         let result = verify_flashbots_signature(
             "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0xinvalid",
-            "body",
+            b"body",
         );
         assert!(matches!(result, Err(FlashbotsSignatureError::InvalidSignature(_))));
     }
@@ -258,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_verify_flashbots_signature_mismatch_wrong_body() {
-        let result = verify_flashbots_signature(TEST_SIGNATURE, "wrong body");
+        let result = verify_flashbots_signature(TEST_SIGNATURE, b"wrong body");
         assert!(matches!(result, Err(FlashbotsSignatureError::SignatureMismatch { .. })));
     }
 }
