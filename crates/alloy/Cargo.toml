@@ -143,7 +143,7 @@ wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
 # general
-consensus = ["dep:alloy-consensus"]
+consensus = ["dep:alloy-consensus", "rlp"]
 contract = [
     "dep:alloy-contract",
     "providers",
@@ -152,7 +152,7 @@ contract = [
     "json",
     "sol-types",
 ]
-eips = ["dep:alloy-eips"]
+eips = ["dep:alloy-eips", "rlp"]
 ens = ["dep:alloy-ens"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
