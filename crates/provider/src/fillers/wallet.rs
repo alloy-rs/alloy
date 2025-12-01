@@ -59,7 +59,7 @@ where
 {
     type Fillable = ();
 
-    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
         if tx.from().is_none() {
             return FillerControlFlow::Ready;
         }
@@ -81,7 +81,7 @@ where
     async fn prepare<P>(
         &self,
         _provider: &P,
-        _tx: &<N as Network>::TransactionRequest,
+        _tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
         P: Provider<N>,
@@ -109,10 +109,7 @@ where
         Ok(())
     }
 
-    fn prepare_call_sync(
-        &self,
-        tx: &mut <N as Network>::TransactionRequest,
-    ) -> TransportResult<()> {
+    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         if tx.from().is_none() {
             tx.set_from(self.wallet.default_signer_address());
         }

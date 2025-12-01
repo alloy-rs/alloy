@@ -107,8 +107,8 @@ where
 {
     fn trace_call<'a>(
         &self,
-        request: &'a <N as Network>::TransactionRequest,
-    ) -> TraceBuilder<&'a <N as Network>::TransactionRequest, TraceResults> {
+        request: &'a N::TransactionRequest,
+    ) -> TraceBuilder<&'a N::TransactionRequest, TraceResults> {
         TraceBuilder::new_rpc(self.client().request("trace_call", request)).pending()
     }
 

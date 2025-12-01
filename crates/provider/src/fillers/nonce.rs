@@ -153,7 +153,7 @@ impl<M: NonceManager> NonceFiller<M> {
 impl<M: NonceManager, N: Network> TxFiller<N> for NonceFiller<M> {
     type Fillable = u64;
 
-    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
         if tx.nonce().is_some() {
             return FillerControlFlow::Finished;
         }

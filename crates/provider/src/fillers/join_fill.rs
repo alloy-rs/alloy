@@ -123,19 +123,13 @@ where
         Ok(tx)
     }
 
-    async fn prepare_call(
-        &self,
-        tx: &mut <N as Network>::TransactionRequest,
-    ) -> TransportResult<()> {
+    async fn prepare_call(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         self.left.prepare_call(tx).await?;
         self.right.prepare_call(tx).await?;
         Ok(())
     }
 
-    fn prepare_call_sync(
-        &self,
-        tx: &mut <N as Network>::TransactionRequest,
-    ) -> TransportResult<()> {
+    fn prepare_call_sync(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         self.left.prepare_call_sync(tx)?;
         self.right.prepare_call_sync(tx)?;
         Ok(())

@@ -35,7 +35,7 @@ where
 {
     type Fillable = ();
 
-    fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+    fn status(&self, _tx: &N::TransactionRequest) -> FillerControlFlow {
         FillerControlFlow::Finished
     }
 

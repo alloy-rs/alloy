@@ -126,7 +126,7 @@ impl GasFiller {
 impl<N: Network> TxFiller<N> for GasFiller {
     type Fillable = GasFillable;
 
-    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
         // legacy and eip2930 tx
         if tx.gas_price().is_some() && tx.gas_limit().is_some() {
             return FillerControlFlow::Finished;
@@ -148,7 +148,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
     async fn prepare<P>(
         &self,
         provider: &P,
-        tx: &<N as Network>::TransactionRequest,
+        tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
         P: Provider<N>,
@@ -197,7 +197,7 @@ where
 {
     type Fillable = u128;
 
-    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
         // Nothing to fill if non-eip4844 tx or `max_fee_per_blob_gas` is already set to a valid
         // value.
         if tx.blob_sidecar().is_none()
@@ -214,7 +214,7 @@ where
     async fn prepare<P>(
         &self,
         provider: &P,
-        tx: &<N as Network>::TransactionRequest,
+        tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
         P: Provider<N>,

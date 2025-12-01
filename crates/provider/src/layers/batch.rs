@@ -424,7 +424,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         self.provider.root()
     }
 
-    fn call(&self, tx: <N as Network>::TransactionRequest) -> crate::EthCall<N, Bytes> {
+    fn call(&self, tx: N::TransactionRequest) -> crate::EthCall<N, Bytes> {
         crate::EthCall::call(CallBatchCaller::new(self), tx)
     }
 
