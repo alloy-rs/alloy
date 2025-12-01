@@ -30,15 +30,18 @@ impl<L, R> JoinFill<L, R> {
         &self.left
     }
 
+    /// Get a mutable reference to the left filler.
+    pub const fn left_mut(&mut self) -> &mut L {
+        &mut self.left
+    }
+
     /// Get a reference to the right filler.
     pub const fn right(&self) -> &R {
         &self.right
     }
 
     /// Get a mutable reference to the left filler.
-    ///
-    /// NB: this function exists to enable the [`crate::WalletProvider`] impl.
-    pub(crate) const fn right_mut(&mut self) -> &mut R {
+    pub const fn right_mut(&mut self) -> &mut R {
         &mut self.right
     }
 }

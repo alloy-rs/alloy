@@ -212,6 +212,11 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
+    /// Returns a mutable reference to the transaction filler.
+    pub const fn filler_mut(&mut self) -> &mut F {
+        &mut self.filler
+    }
+
     /// Change the network.
     ///
     /// By default, the network is `Ethereum`. This method must be called to configure a different
