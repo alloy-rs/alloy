@@ -54,7 +54,7 @@ jobs:
       - name: Install test binaries
         shell: bash
         run: ./.github/scripts/install_test_binaries.sh
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       # Only run tests on latest stable and above
@@ -83,7 +83,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - run: cargo test --workspace --doc
@@ -105,7 +105,7 @@ jobs:
       - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
         with:
           tool: cargo-hack
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - name: cargo hack
@@ -141,7 +141,7 @@ jobs:
       - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
         with:
           tool: cargo-hack
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - name: cargo hack
@@ -171,7 +171,7 @@ jobs:
       - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
         with:
           tool: cargo-hack
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - name: cargo hack
@@ -194,7 +194,7 @@ jobs:
       - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
         with:
           tool: cargo-hack
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - run: ./scripts/check_no_std.sh
@@ -223,7 +223,7 @@ jobs:
         with:
           toolchain: stable
           components: clippy
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - run: cargo +stable clippy --workspace --all-targets --all-features
@@ -242,7 +242,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: nightly
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
       - name: Build documentation
