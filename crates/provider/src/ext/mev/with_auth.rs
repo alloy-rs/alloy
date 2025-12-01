@@ -108,7 +108,7 @@ where
                 // Generate the Flashbots signature for the request body
                 let body = serde_json::to_string(&self.inner.request())
                     .map_err(TransportErrorKind::custom)?;
-                let signature = sign_flashbots_payload(body.as_bytes(), &signer)
+                let signature = sign_flashbots_payload(body, &signer)
                     .await
                     .map_err(TransportErrorKind::custom)?;
 
@@ -148,17 +148,17 @@ where
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let signer: PrivateKeySigner =
 ///     "0x0000000000000000000000000000000000000000000000000000000000123456".parse()?;
-/// let body = b"sign this message";
+/// let body = "sign this message".to_string();
 /// let signature = sign_flashbots_payload(body, &signer).await?;
 /// assert!(signature.starts_with("0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x"));
 /// # Ok(())
 /// # }
 /// ```
 pub async fn sign_flashbots_payload<S: Signer + Send + Sync>(
-    body: &[u8],
+    body: String,
     signer: &S,
 ) -> Result<String, alloy_signer::Error> {
-    let message_hash = keccak256(body).to_string();
+    let message_hash = keccak256(body.as_bytes()).to_string();
     let signature = signer.sign_message(message_hash.as_bytes()).await?;
 
     // Normalized recovery byte (0/1) following the canonical signature encoding
@@ -213,7 +213,7 @@ mod tests {
     use alloy_primitives::{address, b256};
     use alloy_signer_local::PrivateKeySigner;
 
-    const TEST_BODY: &[u8] = b"sign this message";
+    const TEST_BODY: &str = "sign this message";
     const TEST_SIGNATURE: &str = "0xd5F5175D014F28c85F7D67A111C2c9335D7CD771:0x983dc7c520db0d287faff3cd0aef81d5a7f4ffd3473440d3f705da16299724271f660b6fe367f455b205bc014eff3e20defd011f92000f94d39365ca0bc7867200";
 
     #[tokio::test]
@@ -222,7 +222,7 @@ mod tests {
             "0x0000000000000000000000000000000000000000000000000000000000123456"
         ))
         .unwrap();
-        let signature = sign_flashbots_payload(TEST_BODY, &signer).await.unwrap();
+        let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
         assert_eq!(signature, TEST_SIGNATURE);
     }
 
@@ -233,15 +233,15 @@ mod tests {
         ))
         .unwrap();
 
-        let signature = sign_flashbots_payload(TEST_BODY, &signer).await.unwrap();
-        let recovered = verify_flashbots_signature(&signature, TEST_BODY).unwrap();
+        let signature = sign_flashbots_payload(TEST_BODY.to_string(), &signer).await.unwrap();
+        let recovered = verify_flashbots_signature(&signature, TEST_BODY.as_bytes()).unwrap();
         assert_eq!(recovered, signer.address());
     }
 
     #[test]
     fn test_verify_flashbots_signature_v0() {
         // TEST_SIGNATURE uses v=0 (ends with "00")
-        let recovered = verify_flashbots_signature(TEST_SIGNATURE, TEST_BODY).unwrap();
+        let recovered = verify_flashbots_signature(TEST_SIGNATURE, TEST_BODY.as_bytes()).unwrap();
         assert_eq!(recovered, address!("0xd5F5175D014F28c85F7D67A111C2c9335D7CD771"));
     }
 
@@ -249,7 +249,7 @@ mod tests {
     fn test_verify_flashbots_signature_v27() {
         // Replace last byte: v=0 (00) -> v=27 (1b)
         let signature_v27 = format!("{}1b", &TEST_SIGNATURE[..TEST_SIGNATURE.len() - 2]);
-        let recovered = verify_flashbots_signature(&signature_v27, TEST_BODY).unwrap();
+        let recovered = verify_flashbots_signature(&signature_v27, TEST_BODY.as_bytes()).unwrap();
         assert_eq!(recovered, address!("0xd5F5175D014F28c85F7D67A111C2c9335D7CD771"));
     }
 
@@ -279,7 +279,7 @@ mod tests {
         let wrong_address = Address::repeat_byte(0x01);
         let sig_part = TEST_SIGNATURE.split_once(':').unwrap().1;
         let mismatched = format!("{wrong_address}:{sig_part}");
-        let result = verify_flashbots_signature(&mismatched, TEST_BODY);
+        let result = verify_flashbots_signature(&mismatched, TEST_BODY.as_bytes());
         assert!(matches!(result, Err(FlashbotsSignatureError::SignatureMismatch { .. })));
     }
 
