@@ -267,7 +267,7 @@ impl Geth {
         self
     }
 
-    /// Sets the port which will be used when the `geth-cli` instance is launched.
+    /// Sets the port which will be used when the `geth` instance is launched.
     ///
     /// If port is 0 then the OS will choose a random port.
     /// [GethInstance::port] will return the port that was chosen.
@@ -293,7 +293,7 @@ impl Geth {
         self
     }
 
-    /// Sets the block-time which will be used when the `geth-cli` instance is launched.
+    /// Sets the block-time which will be used when the `geth` instance is launched.
     ///
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
