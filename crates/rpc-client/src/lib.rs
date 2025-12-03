@@ -16,7 +16,7 @@ mod builder;
 pub use builder::ClientBuilder;
 
 mod builtin;
-pub use builtin::BuiltInConnectionString;
+pub use builtin::{BuiltInConnectionString, ConnectionConfig};
 
 mod call;
 pub use call::RpcCall;
