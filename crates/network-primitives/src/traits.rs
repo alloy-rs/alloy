@@ -4,6 +4,21 @@ use alloy_eips::BlockNumHash;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
 
+/// Error returned when a transaction failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransactionFailedError {
+    /// Hash of the failed transaction.
+    pub transaction_hash: TxHash,
+}
+
+impl core::fmt::Display for TransactionFailedError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Transaction {} failed", self.transaction_hash)
+    }
+}
+
+impl core::error::Error for TransactionFailedError {}
+
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
@@ -68,6 +83,15 @@ pub trait ReceiptResponse {
     ///
     /// EIP98 makes this field optional.
     fn state_root(&self) -> Option<B256>;
+
+    /// Ensures the transaction was successful, returning an error if it failed.
+    fn ensure_success(&self) -> Result<(), TransactionFailedError> {
+        if self.status() {
+            Ok(())
+        } else {
+            Err(TransactionFailedError { transaction_hash: self.transaction_hash() })
+        }
+    }
 }
 
 /// Transaction JSON-RPC response. Aggregates transaction data with its block and signer context.
