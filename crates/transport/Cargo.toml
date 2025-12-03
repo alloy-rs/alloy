@@ -51,7 +51,7 @@ tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
 
 # wasm32-unknown-unknown (Browser)
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-wasm-bindgen-futures = { version = "0.4", optional=true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 wasmtimer.workspace = true
 
 [features]
