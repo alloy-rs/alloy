@@ -22,13 +22,13 @@ use tokio::{
     sync::{mpsc, oneshot},
 };
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::{
     std::Instant,
     tokio::{interval, sleep_until},
 };
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
 use {
     std::time::Instant,
     tokio::time::{interval, sleep_until},

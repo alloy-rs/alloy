@@ -16,10 +16,10 @@ use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::Span;
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::{sleep, Sleep};
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
 use tokio::time::{sleep, Sleep};
 
 /// A poller task builder.
