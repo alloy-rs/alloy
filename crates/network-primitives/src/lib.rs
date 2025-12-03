@@ -21,4 +21,4 @@ mod tx_builders;
 pub use tx_builders::{TransactionBuilder4844, TransactionBuilder7702};
 
 mod tx_meta;
-pub use tx_meta::MinedTransactionInfo;
+pub use tx_meta::InclusionInfo;

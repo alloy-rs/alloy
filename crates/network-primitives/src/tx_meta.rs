@@ -2,7 +2,7 @@ use alloy_primitives::B256;
 
 /// Additional fields in the context of a block that contains this _mined_ transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub struct MinedTransactionInfo {
+pub struct InclusionInfo {
     /// The hash of the block.
     pub block_hash: B256,
     /// The block number.
