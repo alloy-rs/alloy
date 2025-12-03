@@ -50,6 +50,6 @@ mod time {
     #[cfg(all(target_family = "wasm", target_os = "unknown"))]
     pub(crate) use wasmtimer::std::Instant;
 
-    #[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
     pub(crate) use std::time::Instant;
 }

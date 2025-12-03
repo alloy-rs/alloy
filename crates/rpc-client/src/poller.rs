@@ -19,7 +19,7 @@ use tracing::Span;
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::{sleep, Sleep};
 
-#[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::{sleep, Sleep};
 
 /// A poller task builder.

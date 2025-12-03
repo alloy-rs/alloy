@@ -18,7 +18,7 @@ use tracing::trace;
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// The default average cost of a request in Compute Units (CU).

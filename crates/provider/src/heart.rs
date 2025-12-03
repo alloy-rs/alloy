@@ -28,7 +28,7 @@ use wasmtimer::{
     tokio::{interval, sleep_until},
 };
 
-#[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use {
     std::time::Instant,
     tokio::time::{interval, sleep_until},

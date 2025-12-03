@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, oneshot};
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(any(not(target_family = "wasm"), target_env = "p1"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// This is chosen somewhat arbitrarily. It should be short enough to not cause a noticeable
