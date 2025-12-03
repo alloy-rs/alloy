@@ -34,7 +34,7 @@ pub struct ConnectionConfig {
     /// Interval between connection retries.
     pub retry_interval: Option<Duration>,
     /// WebSocket-specific configuration.
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
 }
 
@@ -45,7 +45,7 @@ impl ConnectionConfig {
             auth: None,
             max_retries: None,
             retry_interval: None,
-            #[cfg(feature = "ws")]
+            #[cfg(all(feature = "ws", not(target_family = "wasm")))]
             ws_config: None,
         }
     }
@@ -69,7 +69,7 @@ impl ConnectionConfig {
     }
 
     /// Set the WebSocket configuration.
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
     pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
         self.ws_config = Some(config);
         self
@@ -201,14 +201,15 @@ impl BuiltInConnectionString {
 
                 // Apply authentication: prioritize config over existing URL auth
                 let auth = config.auth.as_ref().or(existing_auth.as_ref());
+                #[cfg(not(target_family = "wasm"))]
                 if let Some(auth) = auth {
-                    #[cfg(not(target_family = "wasm"))]
-                    {
-                        ws_connect = ws_connect.with_auth(auth.clone());
-                    }
+                    ws_connect = ws_connect.with_auth(auth.clone());
                 }
+                #[cfg(target_family = "wasm")]
+                let _ = auth; // Suppress unused warning on WASM
 
                 // Apply WebSocket-specific config
+                #[cfg(not(target_family = "wasm"))]
                 if let Some(ws_config) = config.ws_config {
                     ws_connect = ws_connect.with_config(ws_config);
                 }
