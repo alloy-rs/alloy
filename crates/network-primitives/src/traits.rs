@@ -148,10 +148,10 @@ pub trait TransactionResponse: Transaction {
         }
     }
 
-    /// Returns the [`InclusionInfo`] if the transaction has been mined.
+    /// Returns the [`InclusionInfo`] if the transaction has been included.
     ///
     /// Returns `None` if this transaction is still pending (missing block number, hash, or index).
-    fn mined_info(&self) -> Option<InclusionInfo> {
+    fn inclusion_info(&self) -> Option<InclusionInfo> {
         Some(InclusionInfo {
             block_hash: self.block_hash()?,
             block_number: self.block_number()?,
