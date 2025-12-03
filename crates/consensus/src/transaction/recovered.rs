@@ -116,7 +116,7 @@ impl<T> Recovered<T> {
     }
 
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
-    pub fn try_convert<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
+    pub fn try_convert<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
         Tx: TryFrom<T>,
     {
@@ -125,7 +125,7 @@ impl<T> Recovered<T> {
 
     /// Converts the transaction to the given alternative that is `TryFrom<T>`
     #[deprecated = "Use `try_convert` instead"]
-    pub fn try_convert_transaction<Tx, E>(self) -> Result<Recovered<Tx>, Tx::Error>
+    pub fn try_convert_transaction<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
         Tx: TryFrom<T>,
     {
