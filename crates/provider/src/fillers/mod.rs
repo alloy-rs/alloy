@@ -1,8 +1,20 @@
-//! Transaction Fillers
+//! Transaction fillers.
 //!
 //! Fillers decorate a [`Provider`], filling transaction details before they
-//! are sent to the network. Fillers are used to set the nonce, gas price, gas
-//! limit, and other transaction details, and are called before any other layer.
+//! are sent to the network, like nonces, gas limits, and gas prices.
+//!
+//! Fillers are called before any other layer in the provider.
+//!
+//! # Implementing a filler
+//!
+//! Fillers implement the [`TxFiller`] trait. Before a filler is called, [`TxFiller::status`] is
+//! called to determine whether the filler has any work to do. If this function returns
+//! [`FillerControlFlow::Ready`], the filler will be called.
+//!
+//! # Composing fillers
+//!
+//! To layer fillers, a utility filler is provided called [`JoinFill`], which is a composition of
+//! two fillers, left and right. The left filler is called before the right filler.
 //!
 //! [`Provider`]: crate::Provider
 
