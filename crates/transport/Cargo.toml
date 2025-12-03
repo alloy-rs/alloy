@@ -52,7 +52,7 @@ tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
 
 # wasm32-unknown-unknown (Browser)
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-wasm-bindgen-futures = { version = "0.4" }
+wasm-bindgen-futures = { version = "0.4", optional=true }
 wasmtimer.workspace = true
 
 # wasm32-wasip1 (WASI)
@@ -60,4 +60,5 @@ wasmtimer.workspace = true
 tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
 
 [features]
+wasm-bindgen = ["dep:wasm-bindgen-futures"]
 throttle = ["dep:governor"]
