@@ -42,7 +42,9 @@ impl PubSubFrontend {
             backend_tx
                 .send(PubSubInstruction::GetSub(id, tx))
                 .map_err(|_| TransportErrorKind::backend_gone())?;
-            rx.await.map_err(|_| TransportErrorKind::backend_gone())
+            rx.await
+                .map_err(|_| TransportErrorKind::backend_gone())?
+                .map_or_else(|| Err(TransportErrorKind::custom_str("subscription not found")), Ok)
         }
     }
 

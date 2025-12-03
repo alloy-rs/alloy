@@ -26,6 +26,7 @@ use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 /// The genesis block specification.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Genesis {
     /// The fork configuration for this network.
     #[serde(default)]
@@ -68,6 +69,9 @@ pub struct Genesis {
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
+    /// The parent hash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_hash: Option<B256>,
 }
 
 impl Genesis {
@@ -185,6 +189,12 @@ impl Genesis {
         self
     }
 
+    /// Set the parent hash.
+    pub const fn with_parent_hash(mut self, parent_hash: Option<B256>) -> Self {
+        self.parent_hash = parent_hash;
+        self
+    }
+
     /// Add accounts to the genesis block. If the address is already present,
     /// the account is updated.
     pub fn extend_accounts(
@@ -199,6 +209,7 @@ impl Genesis {
 /// An account in the state of the genesis block.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
@@ -300,6 +311,7 @@ impl From<GenesisAccount> for TrieAccount {
 /// for the source of each field.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct ChainConfig {
     /// The network's chain ID.
     pub chain_id: u64,
@@ -425,6 +437,7 @@ pub struct ChainConfig {
 
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
+    #[cfg_attr(feature = "borsh", borsh(skip))]
     pub extra_fields: OtherFields,
 
     /// The deposit contract address
@@ -657,7 +670,10 @@ pub mod serde_bincode_compat {
 
     #[cfg(test)]
     mod tests {
+        use std::collections::BTreeMap;
+
         use super::super::ChainConfig;
+        use alloy_eips::eip7840::BlobParams;
         use bincode::config;
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
@@ -670,6 +686,30 @@ pub mod serde_bincode_compat {
                 #[serde_as(as = "super::ChainConfig")]
                 config: ChainConfig,
             }
+
+            let mut blob_schedule = BTreeMap::new();
+            blob_schedule.insert(
+                "cancun".to_string(),
+                BlobParams {
+                    target_blob_count: 3,
+                    max_blob_count: 6,
+                    update_fraction: 3338477,
+                    min_blob_fee: 1,
+                    max_blobs_per_tx: 6,
+                    blob_base_cost: 0,
+                },
+            );
+            blob_schedule.insert(
+                "prague".to_string(),
+                BlobParams {
+                    target_blob_count: 6,
+                    max_blob_count: 9,
+                    update_fraction: 5007716,
+                    min_blob_fee: 1,
+                    max_blobs_per_tx: 9,
+                    blob_base_cost: 0,
+                },
+            );
 
             // Create a test config with mixed Some/None values to test serialization
             let config = ChainConfig {
@@ -706,7 +746,7 @@ pub mod serde_bincode_compat {
                 parlia: None,
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
-                blob_schedule: Default::default(),
+                blob_schedule,
             };
 
             let data = Data { config };
@@ -1045,10 +1085,12 @@ impl Default for ChainConfig {
 
 /// Empty consensus configuration for proof-of-work networks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct EthashConfig {}
 
 /// Consensus configuration for Clique.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct CliqueConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1065,6 +1107,7 @@ pub struct CliqueConfig {
 /// For the general introduction: <https://docs.bnbchain.org/docs/learn/consensus/>
 /// For the specification: <https://github.com/bnb-chain/bsc/blob/master/params/config.go#L558>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct ParliaConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1900,6 +1943,7 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
+                parent_hash: Some(B256::ZERO),
                 alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -2039,6 +2083,76 @@ mod tests {
         let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
         assert_eq!(gen1, gen2);
+    }
+
+    #[test]
+    fn test_parent_hash_serialization() {
+        // Test that parent_hash can be serialized and deserialized correctly
+        let parent_hash =
+            B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
+                .unwrap();
+
+        let genesis_with_parent_hash = Genesis::default().with_parent_hash(Some(parent_hash));
+        let json = serde_json::to_string(&genesis_with_parent_hash).unwrap();
+        let deserialized: Genesis = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.parent_hash, Some(parent_hash));
+
+        // Test that parent_hash is omitted when None (skip_serializing_if behavior)
+        let genesis_without_parent_hash = Genesis::default().with_parent_hash(None);
+        let json = serde_json::to_string(&genesis_without_parent_hash).unwrap();
+        assert!(!json.contains("parentHash"), "parentHash should be omitted when None");
+
+        // Test deserialization without parent_hash field (should default to None)
+        let genesis_json = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json).unwrap();
+        assert_eq!(genesis.parent_hash, None);
+
+        // Test deserialization with parent_hash field
+        let genesis_json_with_parent_hash = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000",
+            "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json_with_parent_hash).unwrap();
+        assert_eq!(genesis.parent_hash, Some(parent_hash));
+
+        // Test that zero hash is preserved as Some(B256::ZERO) when explicitly set
+        let genesis_json_with_zero_hash = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json_with_zero_hash).unwrap();
+        assert_eq!(
+            genesis.parent_hash,
+            Some(B256::ZERO),
+            "Zero hash should be preserved when explicitly set"
+        );
     }
 
     #[test]

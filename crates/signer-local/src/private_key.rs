@@ -278,7 +278,7 @@ mod tests {
         let (key, uuid) =
             LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
-        let path = Path::new(dir.path()).join(uuid.clone());
+        let path = Path::new(dir.path()).join(uuid.as_str());
         let file = File::open(path).unwrap();
         let keystore = serde_json::from_reader::<_, EthKeystore>(file).unwrap();
 

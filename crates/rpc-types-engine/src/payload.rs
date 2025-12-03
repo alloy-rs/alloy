@@ -653,7 +653,7 @@ impl ssz::Encode for ExecutionPayloadV2 {
 
 /// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
 ///
-/// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
+/// See also: <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#executionpayloadv3>
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -667,7 +667,7 @@ pub struct ExecutionPayloadV3 {
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub blob_gas_used: u64,
-    /// Array of hex[`u64`] representing excess blob gas, enabled with V3
+    /// Array of hex [`u64`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub excess_blob_gas: u64,
@@ -1277,7 +1277,7 @@ impl ExecutionPayload {
         Ok(base_block)
     }
 
-    /// Converts [`ExecutionPayloadV1`] to [`Block`].
+    /// Converts [`ExecutionPayload`] to [`Block`].
     ///
     /// Caution: This does not set fields that are not part of the payload and only part of the
     /// [`ExecutionPayloadSidecar`]:
@@ -1366,7 +1366,7 @@ impl ExecutionPayload {
         }
     }
 
-    /// Returns a reference to the V2 payload, if any.
+    /// Returns a reference to the V3 payload, if any.
     pub const fn as_v3(&self) -> Option<&ExecutionPayloadV3> {
         match self {
             Self::V1(_) | Self::V2(_) => None,
@@ -1374,7 +1374,7 @@ impl ExecutionPayload {
         }
     }
 
-    /// Returns a mutable reference to the V2 payload, if any.
+    /// Returns a mutable reference to the V3 payload, if any.
     pub const fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
         match self {
             Self::V1(_) | Self::V2(_) => None,

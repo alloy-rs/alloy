@@ -5,10 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
+
+### Miscellaneous Tasks
+
+- Release 1.1.1
+
+## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
+
+### Features
+
+- Re-export `keystore-geth-compat` feature ([#3131](https://github.com/alloy-rs/alloy/issues/3131))
+
+### Miscellaneous Tasks
+
+- Release 1.1.0
+- [ens] Bumped ens crate with appropriate features ([#3128](https://github.com/alloy-rs/alloy/issues/3128))
+
+## [1.0.42](https://github.com/alloy-rs/alloy/releases/tag/v1.0.42) - 2025-10-31
+
+### Features
+
+- Forward more-tuple-impls to alloy-core ([#3090](https://github.com/alloy-rs/alloy/issues/3090))
+- [ens] Add `alloy-ens` to `alloy` metacrate ([#3083](https://github.com/alloy-rs/alloy/issues/3083))
+- [signer-turnkey] Bump to 0.5 and add to main alloy package ([#3043](https://github.com/alloy-rs/alloy/issues/3043))
+
+### Miscellaneous Tasks
+
+- Release 1.0.42
+
+### Other
+
+- Add transport-throttle feature ([#3046](https://github.com/alloy-rs/alloy/issues/3046))
+
 ## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
 
 ### Miscellaneous Tasks
 
+- Release 1.0.41
 - Release 1.0.41
 
 ## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17

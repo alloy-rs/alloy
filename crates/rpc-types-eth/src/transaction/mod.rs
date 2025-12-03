@@ -26,7 +26,7 @@ mod receipt;
 pub use receipt::TransactionReceipt;
 
 pub mod request;
-pub use request::{TransactionInput, TransactionInputKind, TransactionRequest};
+pub use request::{FillTransaction, TransactionInput, TransactionInputKind, TransactionRequest};
 
 /// Serde-bincode-compat
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]

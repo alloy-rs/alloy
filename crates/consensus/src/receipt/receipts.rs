@@ -1,8 +1,12 @@
 use crate::receipt::{
-    Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
+    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, RlpDecodableReceipt,
+    RlpEncodableReceipt, TxReceipt,
 };
 use alloc::{vec, vec::Vec};
-use alloy_eips::{eip2718::Encodable2718, Typed2718};
+use alloy_eips::{
+    eip2718::{Eip2718Result, Encodable2718},
+    Decodable2718, Typed2718,
+};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::fmt;
@@ -12,6 +16,7 @@ use core::fmt;
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
 pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
@@ -196,12 +201,12 @@ pub struct Receipts<T> {
 
 impl<T> Receipts<T> {
     /// Returns the length of the [`Receipts`] vector.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.receipt_vec.len()
     }
 
     /// Returns `true` if the [`Receipts`] vector is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.receipt_vec.is_empty()
     }
 
@@ -254,6 +259,7 @@ impl<T> Default for Receipts<T> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceiptWithBloom", alias = "TxReceiptWithBloom")]
 pub struct ReceiptWithBloom<T = Receipt<Log>> {
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -383,6 +389,19 @@ where
 
     fn encode_2718(&self, out: &mut dyn BufMut) {
         self.receipt.eip2718_encode_with_bloom(&self.logs_bloom, out);
+    }
+}
+
+impl<R> Decodable2718 for ReceiptWithBloom<R>
+where
+    R: Eip2718DecodableReceipt,
+{
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
+        R::typed_decode_with_bloom(ty, buf)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        R::fallback_decode_with_bloom(buf)
     }
 }
 
