@@ -1,4 +1,4 @@
-use crate::BlockTransactions;
+use crate::{BlockTransactions, InclusionInfo};
 use alloy_consensus::{BlockHeader, Transaction};
 use alloy_eips::BlockNumHash;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
@@ -146,6 +146,17 @@ pub trait TransactionResponse: Transaction {
             0 => None,
             ty => Some(ty),
         }
+    }
+
+    /// Returns the [`InclusionInfo`] if the transaction has been included.
+    ///
+    /// Returns `None` if this transaction is still pending (missing block number, hash, or index).
+    fn inclusion_info(&self) -> Option<InclusionInfo> {
+        Some(InclusionInfo {
+            block_hash: self.block_hash()?,
+            block_number: self.block_number()?,
+            transaction_index: self.transaction_index()?,
+        })
     }
 }
 
