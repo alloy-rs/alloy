@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
+
+### Bug Fixes
+
+- Normalize recovery bytes in flashbots signature ([#3192](https://github.com/alloy-rs/alloy/issues/3192))
+
+### Features
+
+- Add helper `TypedTransaction::decode_unsigned()` ([#3198](https://github.com/alloy-rs/alloy/issues/3198))
+- Obtain the transaction hash if eth_sendrawSync ([#3202](https://github.com/alloy-rs/alloy/issues/3202))
+
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 
 ### Bug Fixes
@@ -20,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support send_transaction_sync ([#3177](https://github.com/alloy-rs/alloy/issues/3177))
 - Feature Arbsym Provider Builder ([#3156](https://github.com/alloy-rs/alloy/issues/3156))
 - [provider] Add sendawsync to Provider trait ([#3164](https://github.com/alloy-rs/alloy/issues/3164))
+
+### Miscellaneous Tasks
+
+- Release 1.1.1
 
 ## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
 

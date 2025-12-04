@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
+
+### Bug Fixes
+
+- [rpc-types] Correct BeaconExecutionPayloadV3 doc ([#3216](https://github.com/alloy-rs/alloy/issues/3216))
+
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 
 ### Features
 
 - Genesis endpoint JSON types ([#3167](https://github.com/alloy-rs/alloy/issues/3167))
+
+### Miscellaneous Tasks
+
+- Release 1.1.1
 
 ## [1.1.0](https://github.com/alloy-rs/alloy/releases/tag/v1.1.0) - 2025-11-04
 

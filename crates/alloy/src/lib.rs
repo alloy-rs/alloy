@@ -14,19 +14,26 @@
 #[doc(hidden)]
 pub use alloy_core as core;
 
+/// Low-level primitives for Ethereum.
 #[doc(inline)]
 pub use self::core::primitives;
 #[doc(no_inline)]
 pub use primitives::{hex, uint};
 
+/// Dynamic Solidity type encoder.
 #[cfg(feature = "dyn-abi")]
 #[doc(inline)]
 pub use self::core::dyn_abi;
 
+/// Full Ethereum [JSON-ABI](https://docs.soliditylang.org/en/latest/abi-spec.html) implementation.
 #[cfg(feature = "json-abi")]
 #[doc(inline)]
 pub use self::core::json_abi;
 
+/// Solidity type modeling and [ABI] and [EIP-712] codec implementation.
+///
+/// [ABI]: https://docs.soliditylang.org/en/latest/abi-spec.html
+/// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
 #[cfg(feature = "sol-types")]
 #[doc(inline)]
 pub use self::core::sol_types;
@@ -36,6 +43,9 @@ pub use self::core::sol_types;
 #[doc(no_inline)]
 pub use sol_types::sol;
 
+/// A fast and simple [Ethereum RLP][rlp] implementation in Rust.
+///
+/// [rlp]: https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp
 #[cfg(feature = "rlp")]
 #[doc(inline)]
 pub use self::core::rlp;
@@ -56,30 +66,38 @@ macro_rules! sol {
 
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
+/// Interact with on-chain contracts.
 #[cfg(feature = "contract")]
 #[doc(inline)]
 pub use alloy_contract as contract;
 
+/// Ethereum consensus interface.
 #[cfg(feature = "consensus")]
 #[doc(inline)]
 pub use alloy_consensus as consensus;
 
+/// Ethereum Improvement Proposal (EIP) implementations.
 #[cfg(feature = "eips")]
 #[doc(inline)]
 pub use alloy_eips as eips;
 
+/// Ethereum Name Service utilities like namehash, forward & reverse lookups. ENS Name
+/// resolving utilities.
 #[cfg(feature = "ens")]
 #[doc(inline)]
 pub use alloy_ens as ens;
 
+/// Ethereum blockchain RPC behavior abstraction.
 #[cfg(feature = "network")]
 #[doc(inline)]
 pub use alloy_network as network;
 
+/// Ethereum genesis file definitions.
 #[cfg(feature = "genesis")]
 #[doc(inline)]
 pub use alloy_genesis as genesis;
 
+/// Ethereum execution-layer client bindings.
 #[cfg(feature = "node-bindings")]
 #[doc(inline)]
 pub use alloy_node_bindings as node_bindings;
@@ -128,6 +146,7 @@ pub mod rpc {
     pub use alloy_rpc_types as types;
 }
 
+/// Serde related helpers for Alloy.
 #[cfg(feature = "serde")]
 #[doc(inline)]
 pub use alloy_serde as serde;

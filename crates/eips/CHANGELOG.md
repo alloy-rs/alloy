@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add EIP-7594 conversion and sidecar manipulation API ([#3144](https://github.com/alloy-rs/alloy/issues/3144))
 - [consensus,eips,genesis] Add Borsh support ([#2946](https://github.com/alloy-rs/alloy/issues/2946))
 
+### Miscellaneous Tasks
+
+- Release 1.1.1
+
 ### Refactor
 
 - [consensus] Remove Borsh skip attributes from tx structs ([#3155](https://github.com/alloy-rs/alloy/issues/3155))
