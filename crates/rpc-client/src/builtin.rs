@@ -20,62 +20,6 @@ pub enum BuiltInConnectionString {
     Ipc(std::path::PathBuf),
 }
 
-/// Configuration for connecting to built-in transports.
-///
-/// Provides a flexible way to configure various aspects of the connection,
-/// including authentication, retry behavior, and transport-specific settings.
-#[derive(Clone, Debug, Default)]
-#[non_exhaustive]
-pub struct ConnectionConfig {
-    /// Authorization header for authenticated connections.
-    pub auth: Option<alloy_transport::Authorization>,
-    /// Maximum number of connection retries.
-    pub max_retries: Option<u32>,
-    /// Interval between connection retries.
-    pub retry_interval: Option<Duration>,
-    /// WebSocket-specific configuration.
-    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
-    pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
-}
-
-impl ConnectionConfig {
-    /// Create a new empty configuration.
-    pub const fn new() -> Self {
-        Self {
-            auth: None,
-            max_retries: None,
-            retry_interval: None,
-            #[cfg(all(feature = "ws", not(target_family = "wasm")))]
-            ws_config: None,
-        }
-    }
-
-    /// Set the authorization header.
-    pub fn with_auth(mut self, auth: alloy_transport::Authorization) -> Self {
-        self.auth = Some(auth);
-        self
-    }
-
-    /// Set the maximum number of retries.
-    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
-        self.max_retries = Some(max_retries);
-        self
-    }
-
-    /// Set the retry interval.
-    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
-        self.retry_interval = Some(retry_interval);
-        self
-    }
-
-    /// Set the WebSocket configuration.
-    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
-    pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
-        self.ws_config = Some(config);
-        self
-    }
-}
-
 impl TransportConnect for BuiltInConnectionString {
     fn is_local(&self) -> bool {
         match self {
@@ -317,6 +261,62 @@ impl FromStr for BuiltInConnectionString {
         #[cfg(feature = "ipc")]
         let res = res.or_else(|_| Self::try_as_ipc(s));
         res
+    }
+}
+
+/// Configuration for connecting to built-in transports.
+///
+/// Provides a flexible way to configure various aspects of the connection,
+/// including authentication, retry behavior, and transport-specific settings.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct ConnectionConfig {
+    /// Authorization header for authenticated connections.
+    pub auth: Option<alloy_transport::Authorization>,
+    /// Maximum number of connection retries.
+    pub max_retries: Option<u32>,
+    /// Interval between connection retries.
+    pub retry_interval: Option<Duration>,
+    /// WebSocket-specific configuration.
+    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+    pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
+}
+
+impl ConnectionConfig {
+    /// Create a new empty configuration.
+    pub const fn new() -> Self {
+        Self {
+            auth: None,
+            max_retries: None,
+            retry_interval: None,
+            #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+            ws_config: None,
+        }
+    }
+
+    /// Set the authorization header.
+    pub fn with_auth(mut self, auth: alloy_transport::Authorization) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
+    /// Set the maximum number of retries.
+    pub const fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = Some(max_retries);
+        self
+    }
+
+    /// Set the retry interval.
+    pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
+        self.retry_interval = Some(retry_interval);
+        self
+    }
+
+    /// Set the WebSocket configuration.
+    #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+    pub const fn with_ws_config(mut self, config: alloy_transport_ws::WebSocketConfig) -> Self {
+        self.ws_config = Some(config);
+        self
     }
 }
 
