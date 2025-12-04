@@ -321,9 +321,10 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     ) -> TransportResult<Vec<Vec<PreStateFrame>>>;
 
     /// The `debug_executionWitness` method allows for re-execution of a block with the purpose of
-    /// generating an execution witness. The witness comprises of a map of all hashed trie nodes to
-    /// their preimages that were required during the execution of the block, including during
-    /// state root recomputation.
+    /// generating an execution witness. The witness contains lists of required preimages and
+    /// headers needed during execution and verification: state trie node preimages (`state`),
+    /// contract code preimages (`codes`), unhashed account/storage keys (`keys`), and
+    /// RLP-encoded block headers (`headers`) used to verify state reads and BLOCKHASH results.
     ///
     /// The first argument is the block number or block hash.
     ///
