@@ -1060,8 +1060,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         tx: SendableTx<N>,
     ) -> TransportResult<N::ReceiptResponse> {
         match tx {
-            SendableTx::Builder(_) => {
-               Err(RpcError::local_usage_str("unsigned tx not supported"))
+            SendableTx::Builder(mut tx) => {
+                // Make sure to initialize heartbeat before we submit transaction, so that
+                // we don't miss it if user will subscriber to it immediately after sending.
+                let _handle = self.root().get_heart();
+                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                self.client().request("eth_sendTransactionSync", (tx,)).await
             }
             SendableTx::Envelope(tx) => {
                 let encoded_tx = tx.encoded_2718();
