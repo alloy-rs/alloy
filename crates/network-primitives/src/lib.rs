@@ -10,10 +10,15 @@
 extern crate alloc;
 
 mod traits;
-pub use traits::{BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse};
+pub use traits::{
+    BlockResponse, HeaderResponse, ReceiptResponse, TransactionFailedError, TransactionResponse,
+};
 
 mod block;
 pub use block::{BlockTransactionHashes, BlockTransactions, BlockTransactionsKind};
 
 mod tx_builders;
 pub use tx_builders::{TransactionBuilder4844, TransactionBuilder7702};
+
+mod tx_meta;
+pub use tx_meta::InclusionInfo;

@@ -516,6 +516,25 @@ impl Filter {
             && self.block_option.get_to_block().is_some_and(BlockNumberOrTag::is_pending)
     }
 
+    /// Extracts the block number range from the filter, if applicable.
+    ///
+    /// Returns a tuple of `(from_block, to_block)` where each element is `Some(block_number)`
+    /// if the corresponding block in the filter is a specific number, or `None` otherwise.
+    ///
+    /// This method only works with `FilterBlockOption::Range` variants. For
+    /// `FilterBlockOption::AtBlockHash` variants, it returns `(None, None)`.
+    ///
+    /// Block numbers are extracted only from `BlockNumberOrTag::Number(_)` variants.
+    /// Other variants like `BlockNumberOrTag::Latest`, `BlockNumberOrTag::Pending`, etc.
+    /// are treated as `None`.
+    pub fn extract_block_range(&self) -> (Option<u64>, Option<u64>) {
+        let FilterBlockOption::Range { from_block, to_block } = &self.block_option else {
+            return (None, None);
+        };
+
+        (from_block.and_then(|b| b.as_number()), to_block.and_then(|b| b.as_number()))
+    }
+
     /// Pins the block hash for the filter
     #[must_use]
     pub fn at_block_hash<T: Into<B256>>(mut self, hash: T) -> Self {
@@ -2417,5 +2436,33 @@ mod tests {
         let filter = Filter::new();
         let logs: Vec<_> = filter.filter_receipts(all_receipts).collect();
         assert_eq!(logs.len(), 5); // Should match all 5 logs
+    }
+
+    #[test]
+    fn test_extract_block_range() {
+        // Test Range with numeric block numbers
+        let filter = Filter::new().from_block(10u64).to_block(20u64);
+        assert_eq!(filter.extract_block_range(), (Some(10), Some(20)));
+
+        // Test Range with only from_block
+        let filter = Filter::new().from_block(10u64);
+        assert_eq!(filter.extract_block_range(), (Some(10), None));
+
+        // Test Range with only to_block
+        let filter = Filter::new().to_block(20u64);
+        assert_eq!(filter.extract_block_range(), (None, Some(20)));
+
+        // Test Range with latest/pending tags (should return None)
+        let filter =
+            Filter::new().from_block(BlockNumberOrTag::Latest).to_block(BlockNumberOrTag::Pending);
+        assert_eq!(filter.extract_block_range(), (None, None));
+
+        // Test AtBlockHash (should return None, None)
+        let filter = Filter::new().at_block_hash(B256::ZERO);
+        assert_eq!(filter.extract_block_range(), (None, None));
+
+        // Test empty filter (default Range with None values)
+        let filter = Filter::new();
+        assert_eq!(filter.extract_block_range(), (None, None));
     }
 }

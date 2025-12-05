@@ -1,4 +1,4 @@
-use crate::{BuiltInConnectionString, RpcClient};
+use crate::{BuiltInConnectionString, ConnectionConfig, RpcClient};
 use alloy_transport::{BoxTransport, IntoBoxTransport, TransportConnect, TransportResult};
 use tower::{
     layer::util::{Identity, Stack},
@@ -137,6 +137,46 @@ impl<L> ClientBuilder<L> {
         L::Service: IntoBoxTransport,
     {
         self.connect_with(s.parse::<BuiltInConnectionString>()?).await
+    }
+
+    /// Connect a transport specified by the given string with custom configuration, producing an
+    /// [`RpcClient`].
+    ///
+    /// This method allows for fine-grained control over connection settings
+    /// such as authentication, retry behavior, and transport-specific options.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_rpc_client::{ClientBuilder, ConnectionConfig};
+    /// use alloy_transport::Authorization;
+    /// use std::time::Duration;
+    ///
+    /// let config = ConnectionConfig::new()
+    ///     .with_auth(Authorization::bearer("my-token"))
+    ///     .with_max_retries(3)
+    ///     .with_retry_interval(Duration::from_secs(2));
+    ///
+    /// let client =
+    ///     ClientBuilder::default().connect_with_config("ws://localhost:8545", config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See [`BuiltInConnectionString`] and [`ConnectionConfig`] for more information.
+    pub async fn connect_with_config(
+        self,
+        s: &str,
+        config: ConnectionConfig,
+    ) -> TransportResult<RpcClient>
+    where
+        L: Layer<BoxTransport>,
+        L::Service: IntoBoxTransport,
+    {
+        let transport = BuiltInConnectionString::connect_with(s, config).await?;
+        let transport = self.builder.service(transport);
+        Ok(RpcClient::new(transport.into_box_transport(), false))
     }
 
     /// Connect a transport, producing an [`RpcClient`].

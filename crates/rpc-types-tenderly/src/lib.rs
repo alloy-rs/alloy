@@ -253,6 +253,12 @@ impl DecodedValue {
         Some(ty)
     }
 
+    /// Returns the parsed type of the log input.
+    #[deprecated = "Use `Self::ty` instead"]
+    pub fn typ(&self) -> Option<DynSolType> {
+        self.ty()
+    }
+
     /// Returns the parsed value of the log input.
     pub fn value(&self) -> Option<DynSolValue> {
         let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.ty()?) else {
