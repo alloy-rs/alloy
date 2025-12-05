@@ -12,7 +12,6 @@ use alloy_rpc_types_tenderly::{
 use alloy_transport::TransportResult;
 
 /// Tenderly namespace rpc interface that gives access to several non-standard RPC methods.
-///
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait TenderlyApi<N: Network>: Send + Sync {
@@ -451,7 +450,7 @@ mod test {
         let url = env::var("TENDERLY_URL").unwrap().parse().unwrap();
         let provider = ProviderBuilder::new().connect_http(url);
 
-        let call_data = bytes!("a9059cbb00000000000000000000000011223344551122334455112233445511223344550000000000000000000000000000000000000000000000000000000000000999").into();
+        let call_data = bytes!("a9059cbb00000000000000000000000011223344551122334455112233445511223344550000000000000000000000000000000000000000000000000000000000000999");
 
         let res = provider.tenderly_decode_input(call_data).await.unwrap();
 

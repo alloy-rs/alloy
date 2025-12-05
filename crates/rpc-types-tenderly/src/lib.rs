@@ -85,17 +85,17 @@ pub struct TenderlyDecodedArgument {
 
 impl TenderlyDecodedArgument {
     /// Returns the parsed type of the decoded argument.
-    pub fn typ(&self) -> Option<DynSolType> {
+    pub fn ty(&self) -> Option<DynSolType> {
         let raw = self.raw_typ.as_str()?;
-        let Ok(typ) = raw.parse() else {
+        let Ok(ty) = raw.parse() else {
             return None;
         };
-        Some(typ)
+        Some(ty)
     }
 
     /// Returns the parsed value of the decoded argument.
     pub fn value(&self) -> Option<DynSolValue> {
-        let Ok(val) = DecodedValue::parse_dyn_value(&self.raw_value, &self.typ()?) else {
+        let Ok(val) = DecodedValue::parse_dyn_value(&self.raw_value, &self.ty()?) else {
             return None;
         };
         Some(val)
@@ -125,7 +125,7 @@ pub struct TenderlyFunctionInput {
 
 impl TenderlyFunctionInput {
     /// Returns the parsed type of the input parameter.
-    pub fn typ(&self) -> Option<DynSolType> {
+    pub fn ty(&self) -> Option<DynSolType> {
         let raw = self.raw_typ.as_str()?;
         raw.parse().ok()
     }
@@ -245,17 +245,17 @@ pub struct DecodedValue {
 
 impl DecodedValue {
     /// Returns the parsed type of the log input.
-    pub fn typ(&self) -> Option<DynSolType> {
+    pub fn ty(&self) -> Option<DynSolType> {
         let raw = self.raw_typ.as_str()?;
-        let Ok(typ) = raw.parse() else {
+        let Ok(ty) = raw.parse() else {
             return None;
         };
-        Some(typ)
+        Some(ty)
     }
 
     /// Returns the parsed value of the log input.
     pub fn value(&self) -> Option<DynSolValue> {
-        let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.typ()?) else {
+        let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.ty()?) else {
             return None;
         };
         Some(val)
@@ -686,16 +686,16 @@ mod tests {
         // Test first argument (address)
         let arg0 = &parsed.decoded_arguments[0];
         assert_eq!(arg0.name, "arg0");
-        let typ0 = arg0.typ().expect("should parse address type");
-        assert!(matches!(typ0, DynSolType::Address));
+        let ty0 = arg0.ty().expect("should parse address type");
+        assert!(matches!(ty0, DynSolType::Address));
         let value0 = arg0.value().expect("should parse address value");
         assert!(matches!(value0, DynSolValue::Address(_)));
 
         // Test second argument (uint256)
         let arg1 = &parsed.decoded_arguments[1];
         assert_eq!(arg1.name, "arg1");
-        let typ1 = arg1.typ().expect("should parse uint256 type");
-        assert!(matches!(typ1, DynSolType::Uint(_)));
+        let ty1 = arg1.ty().expect("should parse uint256 type");
+        assert!(matches!(ty1, DynSolType::Uint(_)));
         let value1 = arg1.value().expect("should parse uint256 value");
         assert!(matches!(value1, DynSolValue::Uint(_, _)));
 
@@ -717,24 +717,24 @@ mod tests {
         // Test first argument (address)
         let arg0 = &parsed.decoded_arguments[0];
         assert_eq!(arg0.name, "arg0");
-        let typ0 = arg0.typ().expect("should parse address type");
-        assert!(matches!(typ0, DynSolType::Address));
+        let ty0 = arg0.ty().expect("should parse address type");
+        assert!(matches!(ty0, DynSolType::Address));
         let value0 = arg0.value().expect("should parse address value");
         assert!(matches!(value0, DynSolValue::Address(_)));
 
         // Test second argument (uint256)
         let arg1 = &parsed.decoded_arguments[1];
         assert_eq!(arg1.name, "arg1");
-        let typ1 = arg1.typ().expect("should parse uint256 type");
-        assert!(matches!(typ1, DynSolType::Uint(_)));
+        let ty1 = arg1.ty().expect("should parse uint256 type");
+        assert!(matches!(ty1, DynSolType::Uint(_)));
         let value1 = arg1.value().expect("should parse uint256 value");
         assert!(matches!(value1, DynSolValue::Uint(_, _)));
 
         // Test third argument (uint256)
         let arg2 = &parsed.decoded_arguments[2];
         assert_eq!(arg2.name, "arg2");
-        let typ2 = arg2.typ().expect("should parse uint256 type");
-        assert!(matches!(typ2, DynSolType::Uint(_)));
+        let ty2 = arg2.ty().expect("should parse uint256 type");
+        assert!(matches!(ty2, DynSolType::Uint(_)));
         let value2 = arg2.value().expect("should parse uint256 value");
         assert!(matches!(value2, DynSolValue::Uint(_, _)));
 
