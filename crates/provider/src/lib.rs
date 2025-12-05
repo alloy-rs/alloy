@@ -53,6 +53,8 @@ pub use alloy_network::{self as network, Network};
 
 pub use alloy_transport as transport;
 
+pub use alloy_rpc_client::ConnectionConfig;
+
 #[cfg(feature = "ws")]
 pub use alloy_rpc_client::WsConnect;
 
