@@ -33,6 +33,49 @@ For a more fine-grained control over the features you wish to include, you can a
 
 A comprehensive list of available features can be found on [docs.rs](https://docs.rs/crate/alloy/latest/features) or in the [`alloy` crate's `Cargo.toml`](https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml).
 
+## Examples
+
+### Connecting to a Provider
+
+Here's a simple example of connecting to an Ethereum node and querying the latest block:
+
+```rust
+use alloy::providers::{Provider, ProviderBuilder};
+
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+// Create a provider with the HTTP transport using the `reqwest` crate.
+let rpc_url = "https://eth.llamarpc.com";
+let provider = ProviderBuilder::new().connect(rpc_url).await?;
+
+// Get the latest block number.
+let latest_block = provider.get_block_number().await?;
+println!("Latest block number: {latest_block}");
+
+// Get chain ID.
+let chain_id = provider.get_chain_id().await?;
+println!("Chain ID: {chain_id}");
+# Ok(())
+# }
+```
+
+### Network generic
+
+Alloy is network-generic, allowing you to work with any Ethereum-compatible chain. Here's an example using Optimism (see [`op-alloy`](https://docs.rs/op-alloy)) to demonstrate this capability:
+
+```rust,ignore
+use alloy::providers::{Provider, ProviderBuilder};
+use op_alloy::network::Optimism;
+
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+// Connect to Optimism mainnet.
+let rpc_url = "https://mainnet.optimism.io";
+let provider = ProviderBuilder::new_with_network::<Optimism>().connect(rpc_url).await?;
+# Ok(())
+# }
+```
+
+For more examples, check out the [Alloy examples repository](https://github.com/alloy-rs/examples).
+
 ## Overview
 
 This repository contains the following crates:

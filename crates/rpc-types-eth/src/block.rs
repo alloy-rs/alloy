@@ -132,6 +132,16 @@ impl<T, H> Block<T, H> {
         self.transactions.into_transactions_vec()
     }
 
+    /// Consumes the type and returns the transaction hashes as a vector.
+    ///
+    /// Note: if this is an uncle, this will return an empty vector.
+    pub fn into_hashes_vec(self) -> Vec<B256>
+    where
+        T: TransactionResponse,
+    {
+        self.transactions.into_hashes_vec()
+    }
+
     /// Converts this block into a [`BlockBody`].
     ///
     /// Returns an error if the transactions are not full or if the block has uncles.

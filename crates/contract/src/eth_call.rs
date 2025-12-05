@@ -7,7 +7,7 @@ use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::{
     state::{AccountOverride, StateOverride},
-    BlockId,
+    BlockId, BlockOverrides,
 };
 use alloy_sol_types::SolCall;
 
@@ -102,6 +102,12 @@ where
         self.inner = self.inner.block(block);
         self
     }
+
+    /// Sets the block overrides for this call.
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.inner = self.inner.with_block_overrides(overrides);
+        self
+    }
 }
 
 impl<N> From<alloy_provider::EthCall<N, Bytes>> for EthCall<'static, (), N>
@@ -115,7 +121,7 @@ where
 
 impl<'coder, D, N> std::future::IntoFuture for EthCall<'coder, D, N>
 where
-    D: CallDecoder + Unpin,
+    D: CallDecoder,
     N: Network,
 {
     type Output = Result<D::CallOutput>;
@@ -143,7 +149,7 @@ where
 
 impl<D, N> std::future::Future for EthCallFut<'_, D, N>
 where
-    D: CallDecoder + Unpin,
+    D: CallDecoder,
     N: Network,
 {
     type Output = Result<D::CallOutput>;
