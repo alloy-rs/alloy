@@ -532,14 +532,7 @@ impl Filter {
             return (None, None);
         };
 
-        let extract_number = |block: Option<BlockNumberOrTag>| {
-            block.and_then(|b| match b {
-                BlockNumberOrTag::Number(n) => Some(n),
-                _ => None,
-            })
-        };
-
-        (extract_number(*from_block), extract_number(*to_block))
+        (from_block.and_then(|b| b.as_number()), to_block.and_then(|b| b.as_number()))
     }
 
     /// Pins the block hash for the filter
