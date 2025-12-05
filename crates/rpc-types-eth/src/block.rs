@@ -3,7 +3,9 @@
 use crate::Transaction;
 use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::{error::ValueError, BlockBody, BlockHeader, Sealed, TxEnvelope};
-use alloy_eips::{eip4895::Withdrawals, eip7840::BlobParams, Encodable2718};
+use alloy_eips::{
+    eip4895::Withdrawals, eip7840::BlobParams, eip7928::BlockAccessList, Encodable2718,
+};
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
@@ -40,6 +42,9 @@ pub struct Block<T = Transaction<TxEnvelope>, H = Header> {
     /// Withdrawals in the block.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals: Option<Withdrawals>,
+    /// Block-Level Access Lists for Block.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_access_list: Option<BlockAccessList>,
 }
 
 // cannot derive, as the derive impl would constrain `where T: Default`
@@ -50,6 +55,7 @@ impl<T, H: Default> Default for Block<T, H> {
             uncles: Default::default(),
             transactions: Default::default(),
             withdrawals: Default::default(),
+            block_access_list: Default::default(),
         }
     }
 }
@@ -75,7 +81,7 @@ impl<T, H> Block<T, H> {
     /// .with_withdrawals(Some(Withdrawals::default()));
     /// ```
     pub const fn new(header: H, transactions: BlockTransactions<T>) -> Self {
-        Self { header, uncles: vec![], transactions, withdrawals: None }
+        Self { header, uncles: vec![], transactions, withdrawals: None, block_access_list: None }
     }
 
     /// Returns the block's number.
@@ -160,6 +166,7 @@ impl<T, H> Block<T, H> {
             transactions: self.transactions.into_transactions_vec(),
             ommers: Default::default(),
             withdrawals: self.withdrawals,
+            block_access_list: self.block_access_list,
         }
     }
 
@@ -178,6 +185,7 @@ impl<T, H> Block<T, H> {
             transactions: self.transactions.into_transactions_vec(),
             ommers: vec![],
             withdrawals: self.withdrawals,
+            block_access_list: self.block_access_list,
         }
         .into_block(self.header)
     }
@@ -189,6 +197,7 @@ impl<T, H> Block<T, H> {
             uncles: self.uncles,
             transactions: self.transactions,
             withdrawals: self.withdrawals,
+            block_access_list: self.block_access_list,
         }
     }
 
@@ -214,6 +223,7 @@ impl<T, H> Block<T, H> {
             uncles: self.uncles,
             transactions: self.transactions,
             withdrawals: self.withdrawals,
+            block_access_list: self.block_access_list,
         })
     }
 
@@ -244,6 +254,7 @@ impl<T, H> Block<T, H> {
             uncles: self.uncles,
             transactions: self.transactions.map(f),
             withdrawals: self.withdrawals,
+            block_access_list: self.block_access_list,
         }
     }
 
@@ -260,6 +271,7 @@ impl<T, H> Block<T, H> {
             uncles: self.uncles,
             transactions: self.transactions.try_map(f)?,
             withdrawals: self.withdrawals,
+            block_access_list: self.block_access_list,
         })
     }
 
@@ -294,6 +306,7 @@ impl<T, H: Sealable + Encodable> Block<T, Header<H>> {
             header: Header::from_consensus(block.header.seal_slow(), None, Some(size)),
             transactions: BlockTransactions::Uncle,
             withdrawals: None,
+            block_access_list: None,
         }
     }
 }
@@ -328,7 +341,8 @@ impl<T> Block<T> {
         let size = U256::from(block.length());
         let alloy_consensus::Block {
             header,
-            body: alloy_consensus::BlockBody { transactions, ommers, withdrawals },
+            body:
+                alloy_consensus::BlockBody { transactions, ommers, withdrawals, block_access_list },
         } = block;
 
         Self {
@@ -336,6 +350,7 @@ impl<T> Block<T> {
             uncles: ommers.into_iter().map(|h| h.hash_slow()).collect(),
             transactions: BlockTransactions::Full(transactions),
             withdrawals,
+            block_access_list,
         }
     }
 
@@ -347,11 +362,12 @@ impl<T> Block<T> {
     ///  - If the block's transaction is not [`BlockTransactions::Full`], the returned block will
     ///    have an empty transaction vec.
     pub fn into_consensus(self) -> alloy_consensus::Block<T> {
-        let Self { header, transactions, withdrawals, .. } = self;
+        let Self { header, transactions, withdrawals, block_access_list, .. } = self;
         alloy_consensus::BlockBody {
             transactions: transactions.into_transactions_vec(),
             ommers: vec![],
             withdrawals,
+            block_access_list,
         }
         .into_block(header.into_consensus())
     }
@@ -588,6 +604,10 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
 
     fn requests_hash(&self) -> Option<B256> {
         self.inner.requests_hash()
+    }
+
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.inner.block_access_list_hash()
     }
 
     fn extra_data(&self) -> &Bytes {
@@ -861,6 +881,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -868,11 +889,12 @@ mod tests {
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
             withdrawals: Some(Default::default()),
+            block_access_list: Some(Default::default()),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         similar_asserts::assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[]}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[],"blockAccessList":[]}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
         similar_asserts::assert_eq!(block, deserialized);
@@ -908,6 +930,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
                 },
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
@@ -915,6 +938,7 @@ mod tests {
             uncles: vec![],
             transactions: BlockTransactions::Uncle,
             withdrawals: None,
+            block_access_list: None,
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -953,6 +977,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -960,6 +985,7 @@ mod tests {
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
             withdrawals: None,
+            block_access_list: None,
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -1258,6 +1284,7 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                block_access_list_hash: None,
             },
             size: None,
             total_difficulty: None,
@@ -1304,6 +1331,7 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                block_access_list_hash: None,
             },
             total_difficulty: None,
             size: Some(U256::from(505)),
@@ -1328,6 +1356,7 @@ mod tests {
                 uncles: vec![],
                 transactions: BlockTransactions::Uncle,
                 withdrawals: None,
+                block_access_list: None,
             }
         );
     }
@@ -1362,6 +1391,7 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),
@@ -1369,6 +1399,7 @@ mod tests {
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
             withdrawals: Some(Default::default()),
+            block_access_list: Some(Default::default()),
         };
         let hash = block.header.hash;
         let rlp = Bytes::from("header");
@@ -1378,7 +1409,7 @@ mod tests {
         let serialized = serde_json::to_string(&bad_block).unwrap();
         assert_eq!(
             serialized,
-            r#"{"block":{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","size":"0x13","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[]},"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","rlp":"0x686561646572"}"#
+            r#"{"block":{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","size":"0x13","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"withdrawals":[],"blockAccessList":[]},"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","rlp":"0x686561646572"}"#
         );
 
         let deserialized: BadBlock = serde_json::from_str(&serialized).unwrap();
