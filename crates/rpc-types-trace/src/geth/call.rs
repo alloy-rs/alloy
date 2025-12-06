@@ -179,6 +179,75 @@ impl FlatCallConfig {
     }
 }
 
+/// A single item yielded by [`CallFrameIter`].
+///
+/// It gives access to the current frame, its parent, and
+/// allows skipping traversal into its children.
+#[derive(Debug, PartialEq)]
+pub struct CallFrameItem<'a> {
+    frame: &'a CallFrame,
+    parent: Option<&'a CallFrame>,
+}
+
+impl<'a> CallFrameItem<'a> {
+    /// The current frame.
+    pub const fn frame(&self) -> &CallFrame {
+        self.frame
+    }
+
+    /// The parent of this frame, if any.
+    pub const fn parent(&self) -> Option<&CallFrame> {
+        self.parent
+    }
+}
+
+/// An iterator for traversing `CallFrame` hierarchies.
+///
+/// Traversal is **depth-first** by default.
+/// Children of a frame can be skipped using [`CallFrameIter::skip_children`].
+#[derive(Debug)]
+pub struct CallFrameIter<'a> {
+    /// Stack of (frame-item reference, parent reference)
+    stack: Vec<(&'a CallFrame, Option<&'a CallFrame>)>,
+    /// The last frame that was yielded.
+    last_frame: Option<&'a CallFrame>,
+}
+
+impl<'a> CallFrameIter<'a> {
+    /// Creates a new iterator starting from `root`.
+    pub fn new(root: &'a CallFrame) -> Self {
+        Self { stack: vec![(root, None)], last_frame: None }
+    }
+
+    /// Skips children for the most recently yielded item.
+    /// Note: this would panic if there are no parent owning the children to
+    /// skip. `next` must be called before `skip_children`.
+    pub fn skip_children(&mut self) {
+        if let Some(parent) = self.last_frame {
+            let _ = self.stack.split_off(self.stack.len() - parent.calls.len());
+        }
+    }
+}
+
+impl<'a> Iterator for CallFrameIter<'a> {
+    type Item = CallFrameItem<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (frame, parent) = self.stack.pop()?;
+
+        // Add children in reverse order so they're processed in the correct order
+        for child in frame.calls.iter().rev() {
+            self.stack.push((child, Some(frame)));
+        }
+
+        // Create and return the item
+        let item = CallFrameItem { frame, parent };
+        self.last_frame = Some(frame);
+
+        Some(item)
+    }
+}
+
 /// A unified representation of a call.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -313,6 +382,9 @@ mod tests {
 
     // See <https://github.com/ethereum/go-ethereum/tree/master/eth/tracers/internal/tracetest/testdata>
     const DEFAULT: &str = include_str!("../../test_data/call_tracer/default.json");
+    const MULTI_DEFAULT: &str = include_str!("../../test_data/call_tracer/multi_call_default.json");
+    const DELEGATE_DEFAULT: &str =
+        include_str!("../../test_data/call_tracer/default_with_delegate_call.json");
     const LEGACY: &str = include_str!("../../test_data/call_tracer/legacy.json");
     const ONLY_TOP_CALL: &str = include_str!("../../test_data/call_tracer/only_top_call.json");
     const WITH_LOG: &str = include_str!("../../test_data/call_tracer/with_log.json");
@@ -340,6 +412,73 @@ mod tests {
         let _trace: CallFrame = serde_json::from_str(LEGACY).unwrap();
         let _trace: CallFrame = serde_json::from_str(ONLY_TOP_CALL).unwrap();
         let _trace: CallFrame = serde_json::from_str(WITH_LOG).unwrap();
+    }
+
+    #[test]
+    fn test_call_frame_iter() {
+        let mut init_frame: CallFrame = serde_json::from_str(DEFAULT).unwrap();
+        init_frame.calls.push(init_frame.clone());
+
+        let mut call_iter = CallFrameIter::new(&init_frame);
+
+        let call_1 = call_iter.next().unwrap();
+        assert_eq!(call_1.frame().calls.len(), 2);
+        assert_eq!(*call_1.frame(), init_frame);
+
+        let call_2 = call_iter.next().unwrap();
+        assert_eq!(call_2.frame().calls.len(), 0);
+        let init_frame_raw: CallFrame = serde_json::from_str(DEFAULT).unwrap();
+        assert_eq!(*call_2.frame(), init_frame_raw.calls[0]);
+
+        let call_3 = call_iter.next().unwrap();
+        assert_eq!(call_3.frame().calls.len(), 1);
+        assert_eq!(*call_3.frame(), init_frame_raw);
+
+        let call_4 = call_iter.next().unwrap();
+        assert_eq!(call_4.frame().calls.len(), 0);
+        assert_eq!(*call_4.frame(), init_frame_raw.calls[0]);
+    }
+
+    #[test]
+    fn test_call_frame_iter_with_delegate_call() {
+        let init_frame: CallFrame = serde_json::from_str(DELEGATE_DEFAULT).unwrap();
+
+        let mut call_iter = CallFrameIter::new(&init_frame);
+
+        let call_1 = call_iter.next().unwrap();
+        if call_1.frame().is_delegate_call() {
+            call_iter.skip_children();
+        }
+
+        let call_2 = call_iter.next();
+        assert_eq!(call_2, None);
+    }
+
+    #[test]
+    fn test_call_frame_iter_with_multiple_skip_children() {
+        let init_frame: CallFrame = serde_json::from_str(MULTI_DEFAULT).unwrap();
+
+        let mut call_iter = CallFrameIter::new(&init_frame);
+
+        let call_1 = call_iter.next().unwrap();
+        assert_eq!(call_1.frame().value, Some(U256::from(1)));
+
+        let call_2 = call_iter.next().unwrap();
+        assert_eq!(call_2.frame().value, Some(U256::from(3)));
+
+        let call_3 = call_iter.next().unwrap();
+        assert_eq!(call_3.frame().value, Some(U256::from(5)));
+
+        call_iter.skip_children();
+
+        let call_4 = call_iter.next().unwrap();
+        assert_eq!(call_4.frame().value, Some(U256::from(4)));
+
+        let call_5 = call_iter.next().unwrap();
+        assert_eq!(call_5.frame().value, Some(U256::from(2)));
+
+        let call_6 = call_iter.next();
+        assert_eq!(call_6, None);
     }
 
     #[test]
