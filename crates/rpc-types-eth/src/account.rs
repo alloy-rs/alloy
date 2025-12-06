@@ -104,7 +104,6 @@ impl EIP1186AccountProofResponse {
     pub fn is_empty(&self) -> bool {
         self.nonce == 0
             && self.balance.is_zero()
-            && self.storage_hash.is_zero()
             && self.code_hash == alloy_consensus::constants::KECCAK_EMPTY
     }
 }
