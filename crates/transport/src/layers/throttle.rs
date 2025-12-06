@@ -75,7 +75,8 @@ where
 
     fn call(&mut self, request: RequestPacket) -> Self::Future {
         let throttle = self.throttle.clone();
-        let mut inner = self.inner.clone();
+        let inner_clone = self.inner.clone();
+        let mut inner = std::mem::replace(&mut self.inner, inner_clone);
 
         Box::pin(async move {
             throttle.until_ready().await;
