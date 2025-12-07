@@ -46,12 +46,11 @@ auto_impl.workspace = true
 [dev-dependencies]
 alloy-primitives.workspace = true
 
-# non-WASM only
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-tokio = { workspace = true, features = ["rt", "time","sync","macros"] }
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
+tokio = { workspace = true, features = ["rt", "time", "sync", "macros"] }
 
-# WASM only
-[target.'cfg(target_family = "wasm")'.dependencies]
+# wasm32-unknown-unknown (Browser)
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
 wasmtimer.workspace = true
 

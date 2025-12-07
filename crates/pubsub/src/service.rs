@@ -13,10 +13,10 @@ use alloy_transport::{
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// The service contains the backend handle, a subscription manager, and the
