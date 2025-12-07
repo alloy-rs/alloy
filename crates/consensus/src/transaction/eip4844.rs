@@ -622,7 +622,7 @@ impl<T: Encodable7594> RlpEcdsaEncodableTx for TxEip4844Variant<T> {
     }
 }
 
-impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844Variant<T> {
+impl<T: Decodable7594> RlpEcdsaDecodableTx for TxEip4844Variant<T> {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
@@ -1303,7 +1303,7 @@ impl<T: Encodable7594> RlpEcdsaEncodableTx for TxEip4844WithSidecar<T> {
     }
 }
 
-impl<T: Encodable7594 + Decodable7594> RlpEcdsaDecodableTx for TxEip4844WithSidecar<T> {
+impl<T: Decodable7594> RlpEcdsaDecodableTx for TxEip4844WithSidecar<T> {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
