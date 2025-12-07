@@ -325,6 +325,7 @@ mod tests {
     use alloy_primitives::address;
     use alloy_provider::ProviderBuilder;
 
+    #[ignore = "requires external mainnet RPC; run manually when desired"]
     #[tokio::test]
     async fn test_reverse_registrar_fetching_mainnet() {
         let provider = ProviderBuilder::new()
@@ -334,6 +335,7 @@ mod tests {
         assert_eq!(*res.unwrap().address(), address!("0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb"));
     }
 
+    #[ignore = "requires external mainnet RPC; run manually when desired"]
     #[tokio::test]
     async fn test_pub_resolver_fetching_mainnet() {
         let provider = ProviderBuilder::new()
@@ -344,6 +346,7 @@ mod tests {
         let res = provider.get_resolver(node, name).await;
         assert_eq!(*res.unwrap().address(), address!("0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63"));
     }
+    #[ignore = "requires external mainnet RPC; run manually when desired"]
     #[tokio::test]
     async fn test_pub_resolver_text() {
         let provider = ProviderBuilder::new()
@@ -356,6 +359,7 @@ mod tests {
         assert_eq!(txt, "https://euc.li/vitalik.eth")
     }
 
+    #[ignore = "requires external mainnet RPC; run manually when desired"]
     #[tokio::test]
     async fn test_pub_resolver_fetching_txt() {
         let provider = ProviderBuilder::new()
