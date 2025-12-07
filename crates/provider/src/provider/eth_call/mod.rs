@@ -1,3 +1,5 @@
+#[cfg(feature = "reqwest")]
+use crate::Provider;
 use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcRecv;
@@ -335,6 +337,37 @@ impl<N> EthCall<N, Bytes>
 where
     N: Network,
 {
+    /// Enable CCIP resolution for this call.
+    ///
+    /// This transforms the `EthCall` into a `CcipCall` that will automatically
+    /// handle OffchainLookup errors and fetch data from gateways.
+    ///
+    /// Note: This requires passing a provider reference to handle callback execution.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "reqwest")]
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_network::TransactionBuilder;
+    /// use alloy_primitives::{address, bytes};
+    /// use alloy_provider::{Provider, ProviderBuilder};
+    ///
+    /// let provider = ProviderBuilder::new().connect_http("https://eth.llamarpc.com".parse()?);
+    /// let tx = provider
+    ///     .transaction_request()
+    ///     .to(address!("1234567890123456789012345678901234567890"))
+    ///     .input(bytes!("deadbeef").into());
+    ///
+    /// let result = provider.call(tx).ccip(provider.clone()).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "reqwest")]
+    pub fn ccip(self, provider: impl Provider<N> + 'static) -> super::ccip::CcipCall<N> {
+        super::ccip::CcipCall::new(self, Arc::new(provider))
+    }
+
     /// Decode the [`Bytes`] returned by an `"eth_call"` into a [`SolCall::Return`] type.
     ///
     /// ## Note
