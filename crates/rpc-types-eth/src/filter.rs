@@ -642,7 +642,7 @@ impl Filter {
         self.block_option.get_from_block().and_then(|b| b.as_number())
     }
 
-    /// Returns the numeric value of the `fromBlock` field
+    /// Returns the value of the `blockHash` field
     pub const fn get_block_hash(&self) -> Option<B256> {
         match self.block_option {
             FilterBlockOption::AtBlockHash(hash) => Some(hash),
