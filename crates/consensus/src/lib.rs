@@ -12,6 +12,7 @@ extern crate alloc;
 #[cfg(feature = "arbitrary")]
 use rand as _;
 
+#[cfg(not(feature = "std"))]
 use once_cell as _;
 
 pub use alloy_trie::TrieAccount;
