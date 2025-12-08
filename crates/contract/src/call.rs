@@ -13,7 +13,7 @@ use alloy_rpc_types_eth::{
     state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::marker::PhantomData;
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
