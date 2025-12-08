@@ -270,7 +270,7 @@ pub enum FilterBlockOption {
 }
 
 impl FilterBlockOption {
-    /// Returns the `from_block` value, if any
+    /// Returns the `to_block` value, if any
     pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { to_block, .. } => to_block.as_ref(),
@@ -278,7 +278,7 @@ impl FilterBlockOption {
         }
     }
 
-    /// Returns the `to_block` value, if any
+    /// Returns the `from_block` value, if any
     pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { from_block, .. } => from_block.as_ref(),
