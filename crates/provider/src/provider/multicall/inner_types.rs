@@ -193,7 +193,9 @@ impl<D: SolCall> CallTuple for Dynamic<D> {
 #[derive(Debug, Error)]
 pub enum MulticallError {
     /// Encountered when an `aggregate/aggregate3` batch contains a transaction with a value.
-    #[error("batch contains a tx with a value, try using .send() instead")]
+    #[error(
+        "batch contains a tx with a value, use aggregate3_value/send_aggregate3_value instead"
+    )]
     ValueTx,
     /// Error decoding return data.
     #[error("could not decode: {0}")]
