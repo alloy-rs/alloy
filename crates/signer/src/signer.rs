@@ -40,13 +40,11 @@ pub trait Signer<Sig = Signature> {
     #[cfg(feature = "eip712")]
     #[inline]
     #[auto_impl(keep_default_for(&mut, Box))]
-    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+    async fn sign_typed_data<T: SolStruct>(
         &self,
         payload: &T,
         domain: &Eip712Domain,
     ) -> Result<Sig>
-    where
-        Self: Sized,
     {
         self.sign_hash(&payload.eip712_signing_hash(domain)).await
     }
@@ -111,10 +109,11 @@ pub trait SignerSync<Sig = Signature> {
     #[cfg(feature = "eip712")]
     #[inline]
     #[auto_impl(keep_default_for(&, &mut, Box, Rc, Arc))]
-    fn sign_typed_data_sync<T: SolStruct>(&self, payload: &T, domain: &Eip712Domain) -> Result<Sig>
-    where
-        Self: Sized,
-    {
+    fn sign_typed_data_sync<T: SolStruct>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Sig> {
         self.sign_hash_sync(&payload.eip712_signing_hash(domain))
     }
 
