@@ -664,6 +664,10 @@ where
         call_type: M,
         value: Option<U256>,
     ) -> Result<M::Return> {
+        if value.is_none() && self.calls.iter().any(|c| c.value != U256::ZERO) {
+            return Err(MulticallError::ValueTx);
+        }
+
         let tx = self.build_request(call_type, value);
 
         let mut eth_call = self.provider.root().call(tx);
@@ -685,6 +689,10 @@ where
         call_type: M,
         value: Option<U256>,
     ) -> Result<PendingTransactionBuilder<N>> {
+        if value.is_none() && self.calls.iter().any(|c| c.value != U256::ZERO) {
+            return Err(MulticallError::ValueTx);
+        }
+
         let tx = self.build_request(call_type, value);
 
         let pending_tx =
@@ -853,5 +861,46 @@ where
     /// Get the input kind for this builder
     pub const fn input_kind(&self) -> TransactionInputKind {
         self.input_kind
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ProviderBuilder;
+    use alloy_primitives::U256;
+
+    use crate::provider::multicall::bindings::IMulticall3::getBasefeeCall;
+
+    #[tokio::test]
+    async fn aggregate_with_value_returns_valuetx() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let call = CallItem::<getBasefeeCall>::new(
+            MULTICALL3_ADDRESS,
+            getBasefeeCall {}.abi_encode().into(),
+        )
+        .value(U256::from(1));
+
+        let multicall = MulticallBuilder::new(&provider).add_call(call);
+        let err = multicall.aggregate().await.unwrap_err();
+
+        assert!(matches!(err, MulticallError::ValueTx));
+    }
+
+    #[tokio::test]
+    async fn aggregate3_with_value_returns_valuetx() {
+        let provider = ProviderBuilder::new().connect_anvil();
+
+        let call = CallItem::<getBasefeeCall>::new(
+            MULTICALL3_ADDRESS,
+            getBasefeeCall {}.abi_encode().into(),
+        )
+        .value(U256::from(1));
+
+        let multicall = MulticallBuilder::new(&provider).add_call(call);
+        let err = multicall.aggregate3().await.unwrap_err();
+
+        assert!(matches!(err, MulticallError::ValueTx));
     }
 }
