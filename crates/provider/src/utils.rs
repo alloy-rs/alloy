@@ -137,11 +137,11 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     full: bool,
 ) -> TransportResult<Vec<Option<BlockResp>>> {
     let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
-    let blocks = futures::future::try_join_all(hashes.into_iter().map(|hash| {
-        client
-            .request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
-    }))
-    .await?;
+    let blocks =
+        futures::future::try_join_all(hashes.into_iter().map(|hash| {
+            client.request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
+        }))
+        .await?;
     Ok(blocks)
 }
 
