@@ -8,7 +8,7 @@ pub enum PubSubInstruction {
     /// Send a request.
     Request(InFlight),
     /// Get the subscription ID for a local ID.
-    GetSub(B256, oneshot::Sender<RawSubscription>),
+    GetSub(B256, oneshot::Sender<Option<RawSubscription>>),
     /// Unsubscribe from a subscription.
     Unsubscribe(B256),
 }

@@ -147,6 +147,335 @@ impl<T> EthereumTxEnvelope<T> {
     }
 }
 
+impl<T> EthereumTypedTransaction<TxEip4844Variant<T>> {
+    /// Strips the sidecar from EIP-4844 transactions and returns both the transaction and the
+    /// sidecar separately, keeping the same sidecar type parameter.
+    ///
+    /// This method consumes the typed transaction and returns:
+    /// - An [`EthereumTypedTransaction<TxEip4844Variant<T>>`] with the sidecar stripped from
+    ///   EIP-4844 transactions
+    /// - An [`Option<T>`] containing the sidecar if this was an EIP-4844 transaction with a sidecar
+    ///
+    /// For non-EIP-4844 transactions, this returns the transaction unchanged with `None` for the
+    /// sidecar.
+    ///
+    /// This is a convenience wrapper around
+    /// [`strip_eip4844_sidecar_into`](Self::strip_eip4844_sidecar_into) that keeps the same type
+    /// parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Strip the sidecar from the transaction (type parameter stays the same)
+    /// let (tx_without_sidecar, maybe_sidecar) = tx.strip_eip4844_sidecar();
+    ///
+    /// if let Some(sidecar) = maybe_sidecar {
+    ///     // Process the blob sidecar separately
+    ///     println!("Transaction had {} blobs", sidecar.blobs.len());
+    /// }
+    /// # }
+    /// ```
+    pub fn strip_eip4844_sidecar(self) -> (Self, Option<T>) {
+        self.strip_eip4844_sidecar_into()
+    }
+
+    /// Strips the sidecar from EIP-4844 transactions and returns both the transaction and the
+    /// sidecar separately, converting to a different sidecar type parameter.
+    ///
+    /// This method consumes the typed transaction and returns:
+    /// - An [`EthereumTypedTransaction<TxEip4844Variant<U>>`] with the sidecar stripped from
+    ///   EIP-4844 transactions
+    /// - An [`Option<T>`] containing the sidecar if this was an EIP-4844 transaction with a sidecar
+    ///
+    /// For non-EIP-4844 transactions, this simply converts the type parameter and returns `None`
+    /// for the sidecar.
+    ///
+    /// This is useful when you need to:
+    /// - Extract blob data from pooled transactions for separate processing
+    /// - Convert between different sidecar type parameters
+    /// - Prepare transactions for storage (without sidecars)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip7594::BlobTransactionSidecarVariant;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Strip the sidecar and convert to a different type parameter
+    /// let (tx_without_sidecar, maybe_sidecar): (
+    ///     EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecarVariant>>,
+    ///     _,
+    /// ) = tx.strip_eip4844_sidecar_into();
+    ///
+    /// if let Some(sidecar) = maybe_sidecar {
+    ///     // Process the blob sidecar separately
+    ///     println!("Transaction had {} blobs", sidecar.blobs.len());
+    /// }
+    /// # }
+    /// ```
+    pub fn strip_eip4844_sidecar_into<U>(
+        self,
+    ) -> (EthereumTypedTransaction<TxEip4844Variant<U>>, Option<T>) {
+        match self {
+            Self::Legacy(tx) => (EthereumTypedTransaction::Legacy(tx), None),
+            Self::Eip2930(tx) => (EthereumTypedTransaction::Eip2930(tx), None),
+            Self::Eip1559(tx) => (EthereumTypedTransaction::Eip1559(tx), None),
+            Self::Eip4844(tx) => {
+                let (tx_variant, sidecar) = tx.strip_sidecar_into();
+                (EthereumTypedTransaction::Eip4844(tx_variant), sidecar)
+            }
+            Self::Eip7702(tx) => (EthereumTypedTransaction::Eip7702(tx), None),
+        }
+    }
+
+    /// Drops the sidecar from EIP-4844 transactions and returns only the transaction, keeping the
+    /// same sidecar type parameter.
+    ///
+    /// This is a convenience method that discards the sidecar from EIP-4844 transactions,
+    /// returning only the transaction without a sidecar.
+    ///
+    /// This is equivalent to calling [`strip_eip4844_sidecar`](Self::strip_eip4844_sidecar) and
+    /// taking only the first element of the tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Drop the sidecar, keeping only the transaction
+    /// let tx_without_sidecar = tx.drop_eip4844_sidecar();
+    /// # }
+    /// ```
+    pub fn drop_eip4844_sidecar(self) -> Self {
+        self.strip_eip4844_sidecar().0
+    }
+
+    /// Drops the sidecar from EIP-4844 transactions and returns only the transaction, converting
+    /// to a different sidecar type parameter.
+    ///
+    /// This is a convenience method that discards the sidecar from EIP-4844 transactions,
+    /// returning only the transaction without a sidecar.
+    ///
+    /// This is equivalent to calling
+    /// [`strip_eip4844_sidecar_into`](Self::strip_eip4844_sidecar_into) and taking only the first
+    /// element of the tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip7594::BlobTransactionSidecarVariant;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Drop the sidecar and convert to a different type parameter
+    /// let tx_without_sidecar: EthereumTypedTransaction<
+    ///     TxEip4844Variant<BlobTransactionSidecarVariant>,
+    /// > = tx.drop_eip4844_sidecar_into();
+    /// # }
+    /// ```
+    pub fn drop_eip4844_sidecar_into<U>(self) -> EthereumTypedTransaction<TxEip4844Variant<U>> {
+        self.strip_eip4844_sidecar_into().0
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip4844::BlobTransactionSidecar>> {
+    /// Converts the envelope to EIP-7594 format using default KZG settings.
+    ///
+    /// For EIP-4844 transactions, this computes cell KZG proofs and converts the sidecar to
+    /// EIP-7594 format. Non-EIP-4844 transactions are converted to the appropriate envelope type
+    /// without modification.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The
+    ///   envelope with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844WithSidecar;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Convert to EIP-7594 format
+    /// let eip7594_envelope = envelope.try_into_7594()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594(
+        self,
+    ) -> Result<
+        EthereumTxEnvelope<
+            TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        >,
+        c_kzg::Error,
+    > {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts the envelope to EIP-7594 format using custom KZG settings.
+    ///
+    /// For EIP-4844 transactions, this computes cell KZG proofs and converts the sidecar to
+    /// EIP-7594 format using the provided KZG settings. Non-EIP-4844 transactions are converted
+    /// to the appropriate envelope type without modification.
+    ///
+    /// # Arguments
+    ///
+    /// * `settings` - The KZG settings to use for computing cell proofs
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The
+    ///   envelope with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844WithSidecar;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip4844::env_settings::EnvKzgSettings;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Load custom KZG settings
+    /// let kzg_settings = EnvKzgSettings::Default.get();
+    ///
+    /// // Convert using custom settings
+    /// let eip7594_envelope = envelope.try_into_7594_with_settings(kzg_settings)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<
+        EthereumTxEnvelope<
+            TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        >,
+        c_kzg::Error,
+    > {
+        self.try_map_eip4844(|tx| tx.try_into_7594_with_settings(settings))
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransactionSidecar>> {
+    /// Converts the envelope to EIP-7594 format using default KZG settings.
+    ///
+    /// For EIP-4844 transactions with sidecars, this computes cell KZG proofs and converts the
+    /// sidecar to EIP-7594 format. Transactions without sidecars and non-EIP-4844 transactions
+    /// are converted to the appropriate envelope type without modification.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The envelope
+    ///   with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844Variant<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Convert to EIP-7594 format
+    /// let eip7594_envelope = envelope.try_into_7594()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594(
+        self,
+    ) -> Result<
+        EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>,
+        c_kzg::Error,
+    > {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts the envelope to EIP-7594 format using custom KZG settings.
+    ///
+    /// For EIP-4844 transactions with sidecars, this computes cell KZG proofs and converts the
+    /// sidecar to EIP-7594 format using the provided KZG settings. Transactions without sidecars
+    /// and non-EIP-4844 transactions are converted to the appropriate envelope type without
+    /// modification.
+    ///
+    /// # Arguments
+    ///
+    /// * `settings` - The KZG settings to use for computing cell proofs
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The envelope
+    ///   with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip4844::env_settings::EnvKzgSettings;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844Variant<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Load custom KZG settings
+    /// let kzg_settings = EnvKzgSettings::Default.get();
+    ///
+    /// // Convert using custom settings
+    /// let eip7594_envelope = envelope.try_into_7594_with_settings(kzg_settings)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<
+        EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>,
+        c_kzg::Error,
+    > {
+        self.try_map_eip4844(|tx| tx.try_into_7594_with_settings(settings))
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip4844::BlobTransactionSidecar>>>
+    for EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>
+{
+    type Error = c_kzg::Error;
+
+    fn try_from(
+        value: EthereumTxEnvelope<
+            TxEip4844WithSidecar<alloy_eips::eip4844::BlobTransactionSidecar>,
+        >,
+    ) -> Result<Self, Self::Error> {
+        value.try_into_7594()
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransactionSidecar>>>
+    for EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>
+{
+    type Error = c_kzg::Error;
+
+    fn try_from(
+        value: EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransactionSidecar>>,
+    ) -> Result<Self, Self::Error> {
+        value.try_into_7594()
+    }
+}
+
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
 /// # Note:

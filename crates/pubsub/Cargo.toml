@@ -38,5 +38,5 @@ tracing.workspace = true
 parking_lot.workspace = true
 auto_impl.workspace = true
 
-[target.'cfg(target_family = "wasm")'.dependencies]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasmtimer.workspace = true

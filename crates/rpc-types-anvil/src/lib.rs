@@ -6,7 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use alloy_primitives::{BlockHash, Bytes, ChainId, TxHash, B256, U256};
+use alloy_primitives::{BlockHash, Bytes, ChainId, B256, U256};
 use alloy_rpc_types_eth::TransactionRequest;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
@@ -141,7 +141,7 @@ pub struct ForkedNetwork {
     /// Block number of the forked chain
     pub fork_block_number: u64,
     /// Block hash of the forked chain
-    pub fork_block_hash: TxHash,
+    pub fork_block_hash: BlockHash,
 }
 
 /// Additional `evm_mine` options

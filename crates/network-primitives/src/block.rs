@@ -151,7 +151,7 @@ impl<T> BlockTransactions<T> {
 
     /// Returns the number of transactions.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         match self {
             Self::Hashes(h) => h.len(),
             Self::Full(f) => f.len(),
@@ -161,7 +161,7 @@ impl<T> BlockTransactions<T> {
 
     /// Whether the block has no transactions.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
@@ -216,6 +216,16 @@ impl<T: TransactionResponse> BlockTransactions<T> {
     #[inline]
     pub fn hashes(&self) -> BlockTransactionHashes<'_, T> {
         BlockTransactionHashes::new(self)
+    }
+
+    /// Consumes the type and returns the hashes as a vector.
+    ///
+    /// Note: if this is an uncle this will return an empty vector.
+    pub fn into_hashes_vec(self) -> Vec<B256> {
+        match self {
+            Self::Hashes(hashes) => hashes,
+            this => this.hashes().collect(),
+        }
     }
 }
 

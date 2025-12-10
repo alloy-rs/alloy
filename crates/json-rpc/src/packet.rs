@@ -57,7 +57,7 @@ impl RequestPacket {
     }
 
     /// Returns the batch of [`SerializedRequest`] if this packet is [`RequestPacket::Batch`]
-    pub fn as_batch(&self) -> Option<&[SerializedRequest]> {
+    pub const fn as_batch(&self) -> Option<&[SerializedRequest]> {
         match self {
             Self::Batch(req) => Some(req.as_slice()),
             Self::Single(_) => None,
@@ -86,7 +86,7 @@ impl RequestPacket {
     }
 
     /// Get the number of requests in the packet.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         match self {
             Self::Single(_) => 1,
             Self::Batch(batch) => batch.len(),
@@ -94,7 +94,7 @@ impl RequestPacket {
     }
 
     /// Check if the packet is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -113,7 +113,7 @@ impl RequestPacket {
     }
 
     /// Returns all [`SerializedRequest`].
-    pub fn requests(&self) -> &[SerializedRequest] {
+    pub const fn requests(&self) -> &[SerializedRequest] {
         match self {
             Self::Single(req) => std::slice::from_ref(req),
             Self::Batch(req) => req.as_slice(),
@@ -121,7 +121,7 @@ impl RequestPacket {
     }
 
     /// Returns a mutable reference to all [`SerializedRequest`].
-    pub fn requests_mut(&mut self) -> &mut [SerializedRequest] {
+    pub const fn requests_mut(&mut self) -> &mut [SerializedRequest] {
         match self {
             Self::Single(req) => std::slice::from_mut(req),
             Self::Batch(req) => req.as_mut_slice(),
@@ -272,7 +272,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     }
 
     /// Returns the batch of [`Response`] if this packet is [`ResponsePacket::Batch`].
-    pub fn as_batch(&self) -> Option<&[Response<Payload, ErrData>]> {
+    pub const fn as_batch(&self) -> Option<&[Response<Payload, ErrData>]> {
         match self {
             Self::Batch(resp) => Some(resp.as_slice()),
             Self::Single(_) => None,
@@ -335,7 +335,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     }
 
     /// Returns a all [`Response`].
-    pub fn responses(&self) -> &[Response<Payload, ErrData>] {
+    pub const fn responses(&self) -> &[Response<Payload, ErrData>] {
         match self {
             Self::Single(req) => std::slice::from_ref(req),
             Self::Batch(req) => req.as_slice(),

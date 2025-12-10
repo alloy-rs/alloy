@@ -577,7 +577,7 @@ impl TransactionRequest {
     pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let Some(sidecar) = self.sidecar.clone() else {
+        let Some(sidecar) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
         };
 
@@ -1753,6 +1753,16 @@ pub struct BuildTransactionErr<T = TransactionRequest> {
 #[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
+
+/// Response type for `eth_fillTransaction`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FillTransaction<T = TypedTransaction> {
+    /// RLP-encoded signed transaction bytes.
+    pub raw: Bytes,
+    /// Filled transaction request with populated default values.
+    pub tx: T,
+}
 
 #[cfg(test)]
 mod tests {

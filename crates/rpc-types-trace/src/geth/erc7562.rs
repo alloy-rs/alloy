@@ -61,6 +61,16 @@ pub struct Erc7562Frame {
     pub calls: Vec<Self>,
 }
 
+impl Erc7562Frame {
+    /// Returns true if this call reverted.
+    pub fn is_revert(&self) -> bool {
+        if self.revert_reason.is_some() {
+            return true;
+        }
+        matches!(self.error.as_deref(), Some("execution reverted"))
+    }
+}
+
 /// The accessed slots.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -10,7 +10,7 @@ use crate::{
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, IntoWallet, Network};
 use alloy_primitives::ChainId;
-use alloy_rpc_client::{ClientBuilder, RpcClient};
+use alloy_rpc_client::{ClientBuilder, ConnectionConfig, RpcClient};
 use alloy_transport::{TransportConnect, TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -309,6 +309,14 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         self.layer(CallBatchLayer::new())
     }
 
+    /// Aggregate multiple `eth_call` requests with block number queries done by calling Arbsym
+    /// precompile.
+    ///
+    /// See [`CallBatchLayer`] for more information.
+    pub fn with_arbitrum_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
+        self.layer(CallBatchLayer::new().arbitrum_compat())
+    }
+
     // --- Build to Provider ---
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
@@ -409,6 +417,45 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         N: Network,
     {
         let client = ClientBuilder::default().connect(s).await?;
+        Ok(self.connect_client(client))
+    }
+
+    /// Finish the layer stack by providing a connection string with custom configuration.
+    ///
+    /// This method allows for fine-grained control over connection settings
+    /// such as authentication, retry behavior, and transport-specific options.
+    /// The transport type is extracted from the connection string and configured
+    /// using the provided [`ConnectionConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_provider::{ConnectionConfig, ProviderBuilder};
+    /// use alloy_transport::Authorization;
+    /// use std::time::Duration;
+    ///
+    /// let config = ConnectionConfig::new()
+    ///     .with_auth(Authorization::bearer("my-token"))
+    ///     .with_max_retries(3)
+    ///     .with_retry_interval(Duration::from_secs(2));
+    ///
+    /// let provider =
+    ///     ProviderBuilder::new().connect_with_config("ws://localhost:8545", config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect_with_config(
+        self,
+        s: &str,
+        config: ConnectionConfig,
+    ) -> Result<F::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
+        N: Network,
+    {
+        let client = ClientBuilder::default().connect_with_config(s, config).await?;
         Ok(self.connect_client(client))
     }
 

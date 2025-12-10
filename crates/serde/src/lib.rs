@@ -14,6 +14,8 @@ use serde::Serializer;
 
 pub mod displayfromstr;
 
+pub mod checksum;
+
 mod optional;
 pub use self::optional::*;
 

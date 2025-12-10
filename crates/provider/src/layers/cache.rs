@@ -197,6 +197,21 @@ where
     }
 
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
+        if filter.block_option.as_block_hash().is_none() {
+            // if block options have dynamic range we can't cache them
+            let from_is_number = filter
+                .block_option
+                .get_from_block()
+                .as_ref()
+                .is_some_and(|block| block.is_number());
+            let to_is_number =
+                filter.block_option.get_to_block().as_ref().is_some_and(|block| block.is_number());
+
+            if !from_is_number || !to_is_number {
+                return self.inner.get_logs(filter).await;
+            }
+        }
+
         let req = RequestType::new("eth_getLogs", filter.clone());
 
         let params_hash = req.params_hash().ok();

@@ -146,7 +146,7 @@ mod contract {
 mod provider {
     use crate::{
         namehash, reverse_address, EnsError, EnsRegistry, EnsResolver::EnsResolverInstance,
-        ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS,
+        ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS, ENS_REVERSE_REGISTRAR_DOMAIN,
     };
     use alloy_primitives::{Address, B256};
     use alloy_provider::{Network, Provider};
@@ -218,7 +218,7 @@ mod provider {
         async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError> {
             let registry = EnsRegistry::new(ENS_ADDRESS, self);
             let address = registry
-                .owner(namehash("addr.reverse"))
+                .owner(namehash(ENS_REVERSE_REGISTRAR_DOMAIN))
                 .call()
                 .await
                 .map_err(EnsError::RevRegistrar)?;
