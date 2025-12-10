@@ -1094,12 +1094,10 @@ impl TransactionBuilder7702 for TransactionRequest {
 }
 
 impl TransactionBuilder7594 for TransactionRequest {
-    /// Get the max fee per blob gas for the transaction.
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.max_fee_per_blob_gas
     }
 
-    /// Set the max fee per blob gas  for the transaction.
     fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }

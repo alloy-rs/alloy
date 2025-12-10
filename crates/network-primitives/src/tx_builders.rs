@@ -55,7 +55,7 @@ pub trait TransactionBuilder7594: Default + Sized + Send + Sync + 'static {
     /// Get the max fee per blob gas for the transaction.
     fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
-    /// Set the max fee per blob gas  for the transaction.
+    /// Set the max fee per blob gas for the transaction.
     fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128);
 
     /// Gets the EIP-7594 blob sidecar of the transaction.
