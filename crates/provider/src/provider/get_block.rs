@@ -164,9 +164,7 @@ where
 
                 let fut = async move {
                     let resp = rpc_call.await?;
-                    let result =
-                        if self.kind.is_hashes() { utils::convert_to_hashes(resp) } else { resp };
-                    Ok(result)
+                    Ok(resp)
                 };
 
                 ProviderCall::BoxedFuture(Box::pin(fut))
@@ -202,13 +200,7 @@ where
                     let block = serde_json::from_value(block.clone())
                         .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
 
-                    let block = if self.kind.is_hashes() {
-                        utils::convert_to_hashes(Some(block))
-                    } else {
-                        Some(block)
-                    };
-
-                    Ok(block)
+                    Ok(Some(block))
                 };
 
                 ProviderCall::BoxedFuture(Box::pin(map_fut))
@@ -418,11 +410,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
                     let call = client.request("eth_getBlockByHash", (hash, kind.is_full()));
                     let resp = call.await?;
 
-                    if kind.is_hashes() {
-                        Ok(utils::convert_to_hashes(resp))
-                    } else {
-                        Ok(resp)
-                    }
+                    Ok(resp)
                 }
             })
             .filter_map(|result| futures::future::ready(result.transpose()));
