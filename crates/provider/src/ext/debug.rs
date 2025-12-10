@@ -57,7 +57,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// It will replay any prior transactions to achieve the same state the transaction was executed
     /// in.
     ///
-    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    /// [`GethDebugTracingOptions`] can be used to specify the trace options.
     ///
     /// # Note
     ///
@@ -73,7 +73,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// This method allows for the trace to be returned as a type that implements `RpcRecv` and
     /// `serde::de::DeserializeOwned`.
     ///
-    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    /// [`GethDebugTracingOptions`] can be used to specify the trace options.
     ///
     /// # Note
     ///
@@ -91,7 +91,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// This method provides the trace in a JSON format, which can be useful for further processing
     /// or inspection.
     ///
-    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    /// [`GethDebugTracingOptions`] can be used to specify the trace options.
     ///
     /// # Note
     ///
@@ -107,7 +107,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     /// This method provides the trace in the form of a `CallFrame`, which can be useful for
     /// analyzing the call stack and execution details.
     ///
-    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    /// [`GethDebugTracingOptions`] can be used to specify the trace options.
     ///
     /// # Note
     ///
@@ -193,7 +193,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
     ///
     /// The parent of the block must be present or it will fail.
     ///
-    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    /// [`GethDebugTracingOptions`] can be used to specify the trace options.
     ///
     /// # Note
     ///
@@ -206,7 +206,7 @@ pub trait DebugApi<N: Network = Ethereum>: Send + Sync {
 
     /// Same as `debug_trace_block_by_hash` but block is specified by number.
     ///
-    /// [GethDebugTracingOptions] can be used to specify the trace options.
+    /// [`GethDebugTracingOptions`] can be used to specify the trace options.
     ///
     /// # Note
     ///
