@@ -35,7 +35,7 @@ impl MaybePraguePayloadFields {
         Self { fields: None }
     }
 
-    /// Returns a new [`MaybePraguePayloadFields`] with the given prague fields.
+    /// Consumes `self` and returns the contained [`PraguePayloadFields`], if present.
     pub fn into_inner(self) -> Option<PraguePayloadFields> {
         self.fields
     }
