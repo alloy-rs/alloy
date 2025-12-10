@@ -304,7 +304,7 @@ mod tests {
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            sidecar: Some(sidecar),
+            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 
@@ -332,7 +332,7 @@ mod tests {
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             max_fee_per_blob_gas: Some(0),
-            sidecar: Some(sidecar),
+            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 
