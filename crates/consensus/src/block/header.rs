@@ -168,7 +168,7 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
-            block_access_list_hash: Some(EMPTY_BLOCK_ACCESS_LIST_HASH),
+            block_access_list_hash: None,
         }
     }
 }
