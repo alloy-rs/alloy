@@ -130,18 +130,6 @@ pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
 
-pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
-    r: Option<BlockResp>,
-) -> Option<BlockResp> {
-    r.map(|mut block| {
-        if block.transactions().is_empty() {
-            block.transactions_mut().convert_to_hashes();
-        }
-
-        block
-    })
-}
-
 /// Fetches full blocks for a list of block hashes
 pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     hashes: Vec<B256>,
@@ -152,7 +140,6 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     let blocks = futures::future::try_join_all(hashes.into_iter().map(|hash| {
         client
             .request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
-            .map_resp(|resp| if !full { convert_to_hashes(resp) } else { resp })
     }))
     .await?;
     Ok(blocks)
