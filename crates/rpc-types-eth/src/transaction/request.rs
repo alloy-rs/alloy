@@ -1396,7 +1396,7 @@ impl From<TxEnvelope> for TransactionRequest {
 pub(super) mod serde_bincode_compat {
     use crate::TransactionInput;
     use alloc::{borrow::Cow, vec::Vec};
-    use alloy_eips::{eip2930::AccessList, eip7594::BlobTransactionSidecarVariant};
+    use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
@@ -1449,7 +1449,8 @@ pub(super) mod serde_bincode_compat {
         /// Blob versioned hashes for EIP-4844 transactions.
         pub blob_versioned_hashes: Option<Cow<'a, Vec<B256>>>,
         /// Blob sidecar for EIP-4844 transactions.
-        pub sidecar: Option<Cow<'a, BlobTransactionSidecarVariant>>,
+        pub sidecar:
+            Option<alloy_eips::eip7594::serde_bincode_compat::BlobTransactionSidecarVariant<'a>>,
         /// Authorization list for EIP-7702 transactions.
         pub authorization_list:
             Option<Vec<alloy_eips::eip7702::serde_bincode_compat::SignedAuthorization<'a>>>,
@@ -1473,7 +1474,7 @@ pub(super) mod serde_bincode_compat {
                 access_list: value.access_list.as_ref().map(Cow::Borrowed),
                 transaction_type: value.transaction_type,
                 blob_versioned_hashes: value.blob_versioned_hashes.as_ref().map(Cow::Borrowed),
-                sidecar: value.sidecar.as_ref().map(Cow::Borrowed),
+                sidecar: value.sidecar.as_ref().map(Into::into),
                 authorization_list: value
                     .authorization_list
                     .as_ref()
@@ -1504,7 +1505,7 @@ pub(super) mod serde_bincode_compat {
                 blob_versioned_hashes: value
                     .blob_versioned_hashes
                     .map(|hashes| hashes.into_owned()),
-                sidecar: value.sidecar.map(|sidecar| sidecar.into_owned()),
+                sidecar: value.sidecar.map(Into::into),
                 authorization_list: value
                     .authorization_list
                     .map(|list| list.into_iter().map(Into::into).collect()),
