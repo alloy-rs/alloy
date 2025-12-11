@@ -35,7 +35,7 @@ pub use yubihsm;
 #[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 mod private_key_secp256k1;
 
 
@@ -44,7 +44,7 @@ mod private_key_secp256k1;
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
 /// A signer instantiated with a locally stored private key.
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 pub type PrivateKeySigner = LocalSigner<secp256k1::SecretKey>;
 
 #[doc(hidden)]
@@ -127,7 +127,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     }
 }
 
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl Signer for LocalSigner<secp256k1::SecretKey> {
@@ -165,7 +165,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigne
     }
 }
 
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 impl SignerSync for LocalSigner<secp256k1::SecretKey> {
     #[inline]
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
@@ -246,7 +246,7 @@ where
     }
 }
 
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl TxSigner<Signature> for LocalSigner<secp256k1::SecretKey>
@@ -280,7 +280,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> TxSignerSync<Signature> f
     }
 }
 
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 impl TxSignerSync<Signature> for LocalSigner<secp256k1::SecretKey>
 {
     fn address(&self) -> Address {
@@ -299,7 +299,7 @@ impl TxSignerSync<Signature> for LocalSigner<secp256k1::SecretKey>
 #[cfg(feature = "k256")]
 impl_into_wallet!(@[C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync + 'static] LocalSigner<C>);
 
-#[cfg(feature = "secp256k1")]
+#[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 impl_into_wallet!(LocalSigner<secp256k1::SecretKey>);
 
 #[cfg(test)]
