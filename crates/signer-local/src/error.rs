@@ -27,7 +27,12 @@ pub enum LocalSignerError {
     #[error(transparent)]
     #[cfg(feature = "mnemonic")]
     MnemonicBuilderError(#[from] super::mnemonic::MnemonicBuilderError),
-
+    
+    /// [`secp256k1`] error.
+    #[error(transparent)]
+    #[cfg(feature = "secp256k1")]
+    Secp256k1Error(#[from] secp256k1::Error),
+    
     /// [`eth_keystore`] error.
     #[cfg(feature = "keystore")]
     #[error(transparent)]

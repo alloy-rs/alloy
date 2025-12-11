@@ -35,11 +35,14 @@ pub use coins_bip39;
 
 #[cfg(feature = "secp256k1")]
 mod private_key_secp256k1;
-#[cfg(feature = "secp256k1")]
-pub use private_key_secp256k1::Secp256k1Signer;
+
 
 /// A signer instantiated with a locally stored private key.
+#[cfg(feature = "k256")]
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
+
+#[cfg(feature = "secp256k1")]
+pub type PrivateKeySigner = LocalSigner<secp256k1::SecretKey>;
 
 #[doc(hidden)]
 #[deprecated(note = "use `PrivateKeySigner` instead")]
@@ -167,6 +170,8 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
         self.chain_id
     }
 }
+
+
 
 // do not log the signer
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigner<C> {
