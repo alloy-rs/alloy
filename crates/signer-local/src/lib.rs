@@ -11,6 +11,7 @@ use alloy_network::{impl_into_wallet, TxSigner, TxSignerSync};
 use alloy_primitives::{Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
+#[cfg(feature = "k256")]
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
 
@@ -22,6 +23,7 @@ mod mnemonic;
 #[cfg(feature = "mnemonic")]
 pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError, MnemonicSignerIter};
 
+#[cfg(feature = "k256")]
 mod private_key;
 
 #[cfg(feature = "yubihsm")]
@@ -41,6 +43,7 @@ mod private_key_secp256k1;
 #[cfg(feature = "k256")]
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
+/// A signer instantiated with a locally stored private key.
 #[cfg(feature = "secp256k1")]
 pub type PrivateKeySigner = LocalSigner<secp256k1::SecretKey>;
 
@@ -99,6 +102,7 @@ pub struct LocalSigner<C> {
     pub(crate) chain_id: Option<ChainId>,
 }
 
+#[cfg(feature = "k256")]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for LocalSigner<C> {
@@ -123,6 +127,32 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     }
 }
 
+#[cfg(feature = "secp256k1")]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
+impl Signer for LocalSigner<secp256k1::SecretKey> {
+    #[inline]
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+        self.sign_hash_sync(hash)
+    }
+
+    #[inline]
+    fn address(&self) -> Address {
+        self.address
+    }
+
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
+    }
+
+    #[inline]
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
+        self.chain_id = chain_id;
+    }
+}
+
+#[cfg(feature = "k256")]
 impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigner<C> {
     #[inline]
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
@@ -135,7 +165,20 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigne
     }
 }
 
-impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
+#[cfg(feature = "secp256k1")]
+impl SignerSync for LocalSigner<secp256k1::SecretKey> {
+    #[inline]
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
+        private_key_secp256k1::sign_hash_sync(&self.credential, hash)
+    }
+
+    #[inline]
+    fn chain_id_sync(&self) -> Option<ChainId> {
+        self.chain_id
+    }
+}
+
+impl<C> LocalSigner<C> {
     /// Construct a new credential with an external [`PrehashSigner`].
     #[inline]
     pub const fn new_with_credential(
@@ -174,7 +217,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
 
 
 // do not log the signer
-impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigner<C> {
+impl<C> fmt::Debug for LocalSigner<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSigner")
             .field("address", &self.address)
@@ -183,6 +226,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigne
     }
 }
 
+#[cfg(feature = "k256")]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 impl<C> TxSigner<Signature> for LocalSigner<C>
@@ -202,9 +246,26 @@ where
     }
 }
 
-impl<C> TxSignerSync<Signature> for LocalSigner<C>
-where
-    C: PrehashSigner<(ecdsa::Signature, RecoveryId)>,
+#[cfg(feature = "secp256k1")]
+#[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait)]
+impl TxSigner<Signature> for LocalSigner<secp256k1::SecretKey>
+{
+    fn address(&self) -> Address {
+        self.address
+    }
+
+    #[doc(alias = "sign_tx")]
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> alloy_signer::Result<Signature> {
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
+    }
+}
+
+#[cfg(feature = "k256")]
+impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> TxSignerSync<Signature> for LocalSigner<C>
 {
     fn address(&self) -> Address {
         self.address
@@ -219,7 +280,27 @@ where
     }
 }
 
+#[cfg(feature = "secp256k1")]
+impl TxSignerSync<Signature> for LocalSigner<secp256k1::SecretKey>
+{
+    fn address(&self) -> Address {
+        self.address
+    }
+
+    #[doc(alias = "sign_tx_sync")]
+    fn sign_transaction_sync(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> alloy_signer::Result<Signature> {
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
+    }
+}
+
+#[cfg(feature = "k256")]
 impl_into_wallet!(@[C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync + 'static] LocalSigner<C>);
+
+#[cfg(feature = "secp256k1")]
+impl_into_wallet!(LocalSigner<secp256k1::SecretKey>);
 
 #[cfg(test)]
 mod test {

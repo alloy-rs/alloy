@@ -1,13 +1,13 @@
 use alloy_primitives::hex;
-use k256::ecdsa;
 use thiserror::Error;
 
 /// Error thrown by [`LocalSigner`](crate::LocalSigner).
 #[derive(Debug, Error)]
 pub enum LocalSignerError {
     /// [`ecdsa`] error.
+    #[cfg(feature = "k256")]
     #[error(transparent)]
-    EcdsaError(#[from] ecdsa::Error),
+    EcdsaError(#[from] k256::ecdsa::Error),
     /// [`hex`](mod@hex) error.
     #[error(transparent)]
     HexError(#[from] hex::FromHexError),
@@ -29,8 +29,8 @@ pub enum LocalSignerError {
     MnemonicBuilderError(#[from] super::mnemonic::MnemonicBuilderError),
     
     /// [`secp256k1`] error.
-    #[error(transparent)]
     #[cfg(feature = "secp256k1")]
+    #[error(transparent)]
     Secp256k1Error(#[from] secp256k1::Error),
     
     /// [`eth_keystore`] error.

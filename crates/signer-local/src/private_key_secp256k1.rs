@@ -1,9 +1,9 @@
 //! [`secp256k1`] signer implementation.
 
 use super::{LocalSigner, LocalSignerError};
-use alloy_primitives::{Address, B256, B512, hex};
-use alloy_signer::utils::raw_public_key_to_address;
-use secp256k1::{PublicKey, SecretKey, SECP256K1};
+use alloy_primitives::{Address, B256, B512, Signature, U256, hex};
+use alloy_signer::{utils::raw_public_key_to_address, Result};
+use secp256k1::{Message, PublicKey, SECP256K1, SecretKey, ecdsa::RecoveryId};
 use rand::{CryptoRng, Rng};
 use std::str::FromStr;
 
@@ -138,6 +138,12 @@ impl From<SecretKey> for LocalSigner<SecretKey> {
     }
 }
 
+impl From<&SecretKey> for LocalSigner<SecretKey> {
+    fn from(value: &SecretKey) -> Self {
+        Self::from_secp256k1_secret_key(value.clone())
+    }
+}
+
 impl FromStr for LocalSigner<SecretKey> {
     type Err = LocalSignerError;
 
@@ -149,10 +155,22 @@ impl FromStr for LocalSigner<SecretKey> {
 
 fn secret_key_to_address(secret_key: &SecretKey) -> Address {
     let public_key = PublicKey::from_secret_key(SECP256K1, secret_key);
-    let raw_public_key = public_key.serialize_uncompressed();
+    let raw_public_key = &public_key.serialize_uncompressed()[1..];
     raw_public_key_to_address(&raw_public_key)
 }
 
+
+pub(crate) fn sign_hash_sync(secret_key: &SecretKey, hash: &B256) -> Result<Signature> {
+    let msg = Message::from_digest(hash.0);
+    let sig = SECP256K1.sign_ecdsa_recoverable(&msg, secret_key);
+    let (rec_id, data) = sig.serialize_compact();
+    
+    Ok(Signature::new(
+        U256::try_from_be_slice(&data[..32]).unwrap(),
+        U256::try_from_be_slice(&data[32..64]).unwrap(),
+        rec_id == RecoveryId::Zero,
+    ))
+}
 
 #[cfg(test)]
 mod tests {
@@ -161,4 +179,10 @@ mod tests {
     
     #[cfg(feature = "keystore")]
     use tempfile::tempdir;
+    
+    #[test]
+    fn parse_pk() {
+        let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
+        let _pk: LocalSigner<SecretKey> = s.parse().unwrap();
+    }
 }
