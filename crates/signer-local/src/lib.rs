@@ -38,7 +38,6 @@ pub use coins_bip39;
 #[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 mod private_key_secp256k1;
 
-
 /// A signer instantiated with a locally stored private key.
 #[cfg(feature = "k256")]
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
@@ -214,8 +213,6 @@ impl<C> LocalSigner<C> {
     }
 }
 
-
-
 // do not log the signer
 impl<C> fmt::Debug for LocalSigner<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -249,8 +246,7 @@ where
 #[cfg(all(feature = "secp256k1", not(feature = "k256")))]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
-impl TxSigner<Signature> for LocalSigner<secp256k1::SecretKey>
-{
+impl TxSigner<Signature> for LocalSigner<secp256k1::SecretKey> {
     fn address(&self) -> Address {
         self.address
     }
@@ -265,8 +261,7 @@ impl TxSigner<Signature> for LocalSigner<secp256k1::SecretKey>
 }
 
 #[cfg(feature = "k256")]
-impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> TxSignerSync<Signature> for LocalSigner<C>
-{
+impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> TxSignerSync<Signature> for LocalSigner<C> {
     fn address(&self) -> Address {
         self.address
     }
@@ -281,8 +276,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> TxSignerSync<Signature> f
 }
 
 #[cfg(all(feature = "secp256k1", not(feature = "k256")))]
-impl TxSignerSync<Signature> for LocalSigner<secp256k1::SecretKey>
-{
+impl TxSignerSync<Signature> for LocalSigner<secp256k1::SecretKey> {
     fn address(&self) -> Address {
         self.address
     }

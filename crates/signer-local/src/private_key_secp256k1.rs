@@ -1,10 +1,10 @@
 //! [`secp256k1`] signer implementation.
 
 use super::{LocalSigner, LocalSignerError};
-use alloy_primitives::{Address, B256, B512, Signature, U256, hex};
+use alloy_primitives::{hex, Address, Signature, B256, B512, U256};
 use alloy_signer::{utils::raw_public_key_to_address, Result};
-use secp256k1::{Message, PublicKey, SECP256K1, SecretKey};
 use rand::{CryptoRng, Rng};
+use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
@@ -16,7 +16,7 @@ impl LocalSigner<SecretKey> {
         let address = secret_key_to_address(&credential);
         Self { credential, address, chain_id: None }
     }
-    
+
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a [`B256`] byte
     /// array.
     ///
@@ -25,7 +25,7 @@ impl LocalSigner<SecretKey> {
     pub fn from_bytes(bytes: &B256) -> Result<Self, secp256k1::Error> {
         SecretKey::from_slice(bytes.as_ref()).map(Self::from_secp256k1_secret_key)
     }
-    
+
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a byte slice.
     ///
     /// Byte slices shorter than the field size (32 bytes) are handled by zero padding the input.
@@ -33,13 +33,13 @@ impl LocalSigner<SecretKey> {
     pub fn from_slice(bytes: &[u8]) -> Result<Self, secp256k1::Error> {
         SecretKey::from_slice(bytes).map(Self::from_secp256k1_secret_key)
     }
-    
+
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
     #[inline]
     pub fn random() -> Self {
         Self::random_with(&mut rand::thread_rng())
     }
-    
+
     /// Creates a new random keypair with provided RNG
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let (secret_key, _) = SECP256K1.generate_keypair(rng);
@@ -65,7 +65,6 @@ impl LocalSigner<SecretKey> {
         B512::from_slice(&self.credential.public_key(SECP256K1).serialize_uncompressed()[1..])
     }
 }
-
 
 #[cfg(feature = "keystore")]
 impl LocalSigner<SecretKey> {
@@ -159,12 +158,11 @@ fn secret_key_to_address(secret_key: &SecretKey) -> Address {
     raw_public_key_to_address(&raw_public_key)
 }
 
-
 pub(crate) fn sign_hash_sync(secret_key: &SecretKey, hash: &B256) -> Result<Signature> {
     let msg = Message::from_digest(hash.0);
     let sig = SECP256K1.sign_ecdsa_recoverable(&msg, secret_key);
     let (rec_id, data) = sig.serialize_compact();
-    
+
     Ok(Signature::new(
         U256::try_from_be_slice(&data[..32]).unwrap(),
         U256::try_from_be_slice(&data[32..64]).unwrap(),
@@ -178,17 +176,16 @@ mod tests {
     use crate::{PrivateKeySigner, SignerSync};
     use alloy_primitives::address;
     use alloy_primitives::b256;
-    
-    
+
     #[cfg(feature = "keystore")]
     use tempfile::tempdir;
-    
+
     #[test]
     fn parse_pk() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
         let _pk: PrivateKeySigner = s.parse().unwrap();
     }
-    
+
     #[test]
     fn parse_short_key() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
@@ -199,7 +196,7 @@ mod tests {
             _ => panic!("Unexpected error"),
         }
     }
-    
+
     #[cfg(feature = "keystore")]
     fn test_encrypted_json_keystore(key: LocalSigner<SecretKey>, uuid: &str, dir: &Path) {
         // sign a message using the given key
@@ -216,7 +213,7 @@ mod tests {
 
         std::fs::remove_file(&path).unwrap();
     }
-    
+
     #[test]
     #[cfg(feature = "keystore")]
     fn encrypted_json_keystore_from_pk() {
@@ -239,7 +236,7 @@ mod tests {
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
-    
+
     #[test]
     #[cfg(feature = "keystore-geth-compat")]
     fn test_encrypted_json_keystore_with_address() {
@@ -261,7 +258,7 @@ mod tests {
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
-    
+
     #[test]
     fn signs_msg() {
         let message = "Some data";
@@ -280,7 +277,7 @@ mod tests {
         let recovered2 = signature.recover_address_from_prehash(&hash).unwrap();
         assert_eq!(recovered2, address);
     }
-    
+
     #[test]
     #[cfg(feature = "eip712")]
     fn typed_data() {
@@ -330,7 +327,7 @@ mod tests {
         );
         assert_eq!(signer.sign_hash_sync(&dynamic_hash).unwrap(), sig_dynamic);
     }
-    
+
     #[test]
     fn key_to_address() {
         let signer: LocalSigner<SecretKey> =
@@ -345,7 +342,7 @@ mod tests {
             "0000000000000000000000000000000000000000000000000000000000000003".parse().unwrap();
         assert_eq!(signer.address, address!("0x6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
     }
-    
+
     #[test]
     fn conversions() {
         let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
@@ -379,7 +376,7 @@ mod tests {
         assert_eq!(signer_field_bytes.to_bytes(), key);
         assert_eq!(signer_field_bytes.to_field_bytes().to_vec(), key.0.to_vec());
     }
-    
+
     #[test]
     fn key_from_str() {
         let signer: LocalSigner<SecretKey> =
@@ -397,7 +394,7 @@ mod tests {
             .parse::<LocalSigner<SecretKey>>()
             .unwrap_err();
     }
-    
+
     #[test]
     fn public_key() {
         let signer: LocalSigner<SecretKey> =
