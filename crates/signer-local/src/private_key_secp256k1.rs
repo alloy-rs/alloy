@@ -3,7 +3,7 @@
 use super::{LocalSigner, LocalSignerError};
 use alloy_primitives::{Address, B256, B512, Signature, U256, hex};
 use alloy_signer::{utils::raw_public_key_to_address, Result};
-use secp256k1::{Message, PublicKey, SECP256K1, SecretKey, ecdsa::RecoveryId};
+use secp256k1::{Message, PublicKey, SECP256K1, SecretKey};
 use rand::{CryptoRng, Rng};
 use std::str::FromStr;
 
@@ -168,13 +168,16 @@ pub(crate) fn sign_hash_sync(secret_key: &SecretKey, hash: &B256) -> Result<Sign
     Ok(Signature::new(
         U256::try_from_be_slice(&data[..32]).unwrap(),
         U256::try_from_be_slice(&data[32..64]).unwrap(),
-        rec_id == RecoveryId::Zero,
+        i32::from(rec_id) != 0,
     ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{PrivateKeySigner, SignerSync};
+    use alloy_primitives::address;
+    use alloy_primitives::b256;
     
     
     #[cfg(feature = "keystore")]
@@ -183,6 +186,222 @@ mod tests {
     #[test]
     fn parse_pk() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
-        let _pk: LocalSigner<SecretKey> = s.parse().unwrap();
+        let _pk: PrivateKeySigner = s.parse().unwrap();
+    }
+    
+    #[test]
+    fn parse_short_key() {
+        let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
+        assert!(s.len() < 64);
+        let pk = s.parse::<PrivateKeySigner>().unwrap_err();
+        match pk {
+            LocalSignerError::HexError(hex::FromHexError::InvalidStringLength) => {}
+            _ => panic!("Unexpected error"),
+        }
+    }
+    
+    #[cfg(feature = "keystore")]
+    fn test_encrypted_json_keystore(key: LocalSigner<SecretKey>, uuid: &str, dir: &Path) {
+        // sign a message using the given key
+        let message = "Some data";
+        let signature = key.sign_message_sync(message.as_bytes()).unwrap();
+
+        // read from the encrypted JSON keystore and decrypt it, while validating that the
+        // signatures produced by both the keys should match
+        let path = Path::new(dir).join(uuid);
+        let key2 = LocalSigner::<SecretKey>::decrypt_keystore(path.clone(), "randpsswd").unwrap();
+
+        let signature2 = key2.sign_message_sync(message.as_bytes()).unwrap();
+        assert_eq!(signature, signature2);
+
+        std::fs::remove_file(&path).unwrap();
+    }
+    
+    #[test]
+    #[cfg(feature = "keystore")]
+    fn encrypted_json_keystore_from_pk() {
+        // create and store an encrypted JSON keystore in this directory
+        let dir = tempdir().unwrap();
+        let mut rng = rand::thread_rng();
+
+        let private_key =
+            hex::decode("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b")
+                .unwrap();
+
+        let (key, uuid) = LocalSigner::<SecretKey>::encrypt_keystore(
+            &dir,
+            &mut rng,
+            private_key,
+            "randpsswd",
+            None,
+        )
+        .unwrap();
+
+        test_encrypted_json_keystore(key, &uuid, dir.path());
+    }
+    
+    #[test]
+    #[cfg(feature = "keystore-geth-compat")]
+    fn test_encrypted_json_keystore_with_address() {
+        // create and store an encrypted JSON keystore in this directory
+
+        use std::fs::File;
+
+        use eth_keystore::EthKeystore;
+        let dir = tempdir().unwrap();
+        let mut rng = rand::thread_rng();
+        let (key, uuid) =
+            LocalSigner::<SecretKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
+
+        let path = Path::new(dir.path()).join(uuid.as_str());
+        let file = File::open(path).unwrap();
+        let keystore = serde_json::from_reader::<_, EthKeystore>(file).unwrap();
+
+        assert!(!keystore.address.is_zero());
+
+        test_encrypted_json_keystore(key, &uuid, dir.path());
+    }
+    
+    #[test]
+    fn signs_msg() {
+        let message = "Some data";
+        let hash = alloy_primitives::utils::eip191_hash_message(message);
+        let key = LocalSigner::<SecretKey>::random_with(&mut rand::thread_rng());
+        let address = key.address;
+
+        // sign a message
+        let signature = key.sign_message_sync(message.as_bytes()).unwrap();
+
+        // ecrecover via the message will hash internally
+        let recovered = signature.recover_address_from_msg(message).unwrap();
+        assert_eq!(recovered, address);
+
+        // if provided with a hash, it will skip hashing
+        let recovered2 = signature.recover_address_from_prehash(&hash).unwrap();
+        assert_eq!(recovered2, address);
+    }
+    
+    #[test]
+    #[cfg(feature = "eip712")]
+    fn typed_data() {
+        use alloy_dyn_abi::eip712::TypedData;
+        use alloy_primitives::{keccak256, Address, I256, U256};
+        use alloy_sol_types::{eip712_domain, sol, SolStruct};
+        use serde::Serialize;
+
+        sol! {
+            #[derive(Debug, Serialize)]
+            struct FooBar {
+                int256 foo;
+                uint256 bar;
+                bytes fizz;
+                bytes32 buzz;
+                string far;
+                address out;
+            }
+        }
+
+        let domain = eip712_domain! {
+            name: "Eip712Test",
+            version: "1",
+            chain_id: 1,
+            verifying_contract: address!("0000000000000000000000000000000000000001"),
+            salt: keccak256("eip712-test-75F0CCte"),
+        };
+        let foo_bar = FooBar {
+            foo: I256::try_from(10u64).unwrap(),
+            bar: U256::from(20u64),
+            fizz: b"fizz".to_vec().into(),
+            buzz: keccak256("buzz"),
+            far: "space".into(),
+            out: Address::ZERO,
+        };
+        let signer = LocalSigner::random();
+        let hash = foo_bar.eip712_signing_hash(&domain);
+        let sig = signer.sign_typed_data_sync(&foo_bar, &domain).unwrap();
+        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), signer.address());
+        assert_eq!(signer.sign_hash_sync(&hash).unwrap(), sig);
+        let foo_bar_dynamic = TypedData::from_struct(&foo_bar, Some(domain));
+        let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
+        let sig_dynamic = signer.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
+        assert_eq!(
+            sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
+            signer.address()
+        );
+        assert_eq!(signer.sign_hash_sync(&dynamic_hash).unwrap(), sig_dynamic);
+    }
+    
+    #[test]
+    fn key_to_address() {
+        let signer: LocalSigner<SecretKey> =
+            "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
+        assert_eq!(signer.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+
+        let signer: LocalSigner<SecretKey> =
+            "0000000000000000000000000000000000000000000000000000000000000002".parse().unwrap();
+        assert_eq!(signer.address, address!("2B5AD5c4795c026514f8317c7a215E218DcCD6cF"));
+
+        let signer: LocalSigner<SecretKey> =
+            "0000000000000000000000000000000000000000000000000000000000000003".parse().unwrap();
+        assert_eq!(signer.address, address!("0x6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
+    }
+    
+    #[test]
+    fn conversions() {
+        let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
+
+        let signer_b256: LocalSigner<SecretKey> = LocalSigner::from_bytes(&key).unwrap();
+        assert_eq!(signer_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+        assert_eq!(signer_b256.chain_id, None);
+        assert_eq!(signer_b256.credential, SecretKey::from_byte_array(&key.0).unwrap());
+
+        let signer_str = LocalSigner::from_str(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
+        assert_eq!(signer_str.address, signer_b256.address);
+        assert_eq!(signer_str.chain_id, signer_b256.chain_id);
+        assert_eq!(signer_str.credential, signer_b256.credential);
+        assert_eq!(signer_str.to_bytes(), key);
+        assert_eq!(signer_str.to_field_bytes().to_vec(), key.0.to_vec());
+
+        let signer_slice = LocalSigner::from_slice(&key[..]).unwrap();
+        assert_eq!(signer_slice.address, signer_b256.address);
+        assert_eq!(signer_slice.chain_id, signer_b256.chain_id);
+        assert_eq!(signer_slice.credential, signer_b256.credential);
+        assert_eq!(signer_slice.to_bytes(), key);
+        assert_eq!(signer_slice.to_field_bytes().to_vec(), key.0.to_vec());
+
+        let signer_field_bytes = LocalSigner::from_bytes((&key.0).into()).unwrap();
+        assert_eq!(signer_field_bytes.address, signer_b256.address);
+        assert_eq!(signer_field_bytes.chain_id, signer_b256.chain_id);
+        assert_eq!(signer_field_bytes.credential, signer_b256.credential);
+        assert_eq!(signer_field_bytes.to_bytes(), key);
+        assert_eq!(signer_field_bytes.to_field_bytes().to_vec(), key.0.to_vec());
+    }
+    
+    #[test]
+    fn key_from_str() {
+        let signer: LocalSigner<SecretKey> =
+            "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
+
+        // Check FromStr and `0x`
+        let signer_0x: LocalSigner<SecretKey> =
+            "0x0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
+        assert_eq!(signer.address, signer_0x.address);
+        assert_eq!(signer.chain_id, signer_0x.chain_id);
+        assert_eq!(signer.credential, signer_0x.credential);
+
+        // Must fail because of `0z`
+        "0z0000000000000000000000000000000000000000000000000000000000000001"
+            .parse::<LocalSigner<SecretKey>>()
+            .unwrap_err();
+    }
+    
+    #[test]
+    fn public_key() {
+        let signer: LocalSigner<SecretKey> =
+            "0x51fde55a7d696da3b318b21e231dec5ff4b33e895f191b2988e122e969b20e90".parse().unwrap();
+        assert_eq!(signer.public_key(), B512::from_str("0x2bcb56445551cd344c9be67cfe27652932d7088c17b6c3c8dad622a5c8e8caf4574d68fa12355e7fefbe2377911016124b9284283527dd2ead05c7b6e5585fbd").unwrap());
     }
 }
