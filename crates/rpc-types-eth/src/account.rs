@@ -5,6 +5,7 @@ use alloy_primitives::{Address, Bytes, B256, B512, KECCAK256_EMPTY, U256};
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::Account;
+use alloy_consensus::EMPTY_ROOT_HASH;
 
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -104,7 +105,7 @@ impl EIP1186AccountProofResponse {
     pub fn is_empty(&self) -> bool {
         self.nonce == 0
             && self.balance.is_zero()
-            && self.storage_hash.is_zero()
+            && self.storage_hash == EMPTY_ROOT_HASH
             && self.code_hash == alloy_consensus::constants::KECCAK_EMPTY
     }
 }

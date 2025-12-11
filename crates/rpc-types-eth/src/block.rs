@@ -796,13 +796,13 @@ impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct BadBlock {
+pub struct BadBlock<B = Block> {
     /// Underlying block object.
-    block: Block,
+    pub block: B,
     /// Hash of the block.
-    hash: BlockHash,
+    pub hash: BlockHash,
     /// RLP encoded block header.
-    rlp: Bytes,
+    pub rlp: Bytes,
 }
 
 #[cfg(test)]

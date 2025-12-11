@@ -18,7 +18,7 @@ mod block;
 pub use block::{BlockTransactionHashes, BlockTransactions, BlockTransactionsKind};
 
 mod tx_builders;
-pub use tx_builders::{TransactionBuilder4844, TransactionBuilder7702};
+pub use tx_builders::{TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702};
 
 mod tx_meta;
 pub use tx_meta::InclusionInfo;
