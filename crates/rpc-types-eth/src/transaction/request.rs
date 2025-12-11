@@ -1250,7 +1250,11 @@ impl From<TxEip4844Variant> for TransactionRequest {
     fn from(tx: TxEip4844Variant) -> Self {
         match tx {
             TxEip4844Variant::TxEip4844(tx) => tx.into(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.into(),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+                let mut req: Self = tx.tx.into();
+                req.sidecar = Some(tx.sidecar);
+                req
+            }
         }
     }
 }
