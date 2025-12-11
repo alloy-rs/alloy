@@ -1166,6 +1166,211 @@ impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
     }
 }
 
+/// New payload structure for V4. This is required for EIP-7928
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadV4 {
+    /// Inner V3 payload
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub payload_inner: ExecutionPayloadV3,
+    /// RLP-encoded block access list as defined in EIP-7928
+    pub block_access_list: Bytes,
+}
+
+impl ExecutionPayloadV4 {
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`].
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    ///
+    /// Note: This re-calculates the block hash.
+    // pub fn from_block_slow<T, H>(block: &Block<T, H>) -> Self
+    // where
+    //     T: Encodable2718,
+    //     H: BlockHeader + Sealable,
+    // {
+    //     Self::from_block_unchecked(block.hash_slow(), block)
+    // }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    // pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    // where
+    //     T: Encodable2718,
+    //     H: BlockHeader,
+    // {
+    //     Self {
+    //         block_access_list: alloy_rlp::encode(block.body.block_access_list.clone().unwrap())
+    //             .into(),
+    //         payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
+    //     }
+    // }
+
+    /// Returns the withdrawals for the payload.
+    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
+        &self.payload_inner.payload_inner.withdrawals
+    }
+
+    /// Returns the timestamp for the payload.
+    pub const fn timestamp(&self) -> u64 {
+        self.payload_inner.payload_inner.payload_inner.timestamp
+    }
+
+    // Converts [`ExecutionPayloadV4`] to [`Block`].
+    //
+    // This performs the same conversion as the underlying V3 payload, but inserts the block access
+    // list.
+    //
+    // See also [`ExecutionPayloadV3::try_into_block`].
+    // pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+    //     self.try_into_block_with(|tx| {
+    //         T::decode_2718_exact(tx.as_ref())
+    //             .map_err(alloy_rlp::Error::from)
+    //             .map_err(PayloadError::from)
+    //     })
+    // }
+
+    // Converts [`ExecutionPayloadV4`] to [`Block`] with a custom transaction mapper.
+    //
+    // See also [`ExecutionPayloadV3::try_into_block_with`].
+    // pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    // where
+    //     F: FnMut(Bytes) -> Result<T, E>,
+    //     E: Into<PayloadError>,
+    // {
+    //     self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    // }
+
+    // Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions.
+    //
+    // This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    // without any conversion.
+    // pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+    //     let mut base_block = self.payload_inner.into_block_raw()?;
+
+    //     base_block.body.block_access_list =
+    //         Some(alloy_rlp::decode_exact(self.block_access_list.as_ref())?);
+
+    //     base_block.header.block_access_list_hash =
+    //         Some(alloy_primitives::keccak256(self.block_access_list.as_ref()));
+
+    //     Ok(base_block)
+    // }
+}
+
+// impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
+//     type Error = PayloadError;
+
+// fn try_from(value: ExecutionPayloadV4) -> Result<Self, Self::Error> {
+//     value.try_into_block()
+// }
+//}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for ExecutionPayloadV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Bloom>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<Bytes>>()?;
+        builder.register_type::<Vec<Withdrawal>>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+
+        let mut decoder = builder.build()?;
+
+        Ok(Self {
+            payload_inner: ExecutionPayloadV3 {
+                payload_inner: ExecutionPayloadV2 {
+                    payload_inner: ExecutionPayloadV1 {
+                        parent_hash: decoder.decode_next()?,
+                        fee_recipient: decoder.decode_next()?,
+                        state_root: decoder.decode_next()?,
+                        receipts_root: decoder.decode_next()?,
+                        logs_bloom: decoder.decode_next()?,
+                        prev_randao: decoder.decode_next()?,
+                        block_number: decoder.decode_next()?,
+                        gas_limit: decoder.decode_next()?,
+                        gas_used: decoder.decode_next()?,
+                        timestamp: decoder.decode_next()?,
+                        extra_data: decoder.decode_next()?,
+                        base_fee_per_gas: decoder.decode_next()?,
+                        block_hash: decoder.decode_next()?,
+                        transactions: decoder.decode_next()?,
+                    },
+                    withdrawals: decoder.decode_next()?,
+                },
+                blob_gas_used: decoder.decode_next()?,
+                excess_blob_gas: decoder.decode_next()?,
+            },
+            block_access_list: decoder.decode_next()?,
+        })
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for ExecutionPayloadV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 5
+            + <Address as ssz::Encode>::ssz_fixed_len()
+            + <Bloom as ssz::Encode>::ssz_fixed_len()
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 6
+            + <U256 as ssz::Encode>::ssz_fixed_len()
+            + ssz::BYTES_PER_LENGTH_OFFSET * 4;
+
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.parent_hash);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.fee_recipient);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.state_root);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.receipts_root);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.logs_bloom);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.prev_randao);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_number);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_limit);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_used);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.timestamp);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.extra_data);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.base_fee_per_gas);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_hash);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.transactions);
+        encoder.append(&self.payload_inner.payload_inner.withdrawals);
+        encoder.append(&self.payload_inner.blob_gas_used);
+        encoder.append(&self.payload_inner.excess_blob_gas);
+        encoder.append(&self.block_access_list);
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
+            + ssz::BYTES_PER_LENGTH_OFFSET
+            + self.block_access_list.ssz_bytes_len()
+    }
+}
+
 /// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2], or
 /// [ExecutionPayloadV3].
 #[derive(Clone, Debug, PartialEq, Eq)]
