@@ -29,7 +29,7 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarV
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionVariant")]
-pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
+pub enum TxEip4844Variant<T = BlobTransactionSidecarVariant> {
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
     /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
@@ -74,6 +74,15 @@ impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip484
         Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
     }
 }
+
+impl From<TxEip4844WithSidecar<BlobTransactionSidecar>> 
+    for TxEip4844Variant<BlobTransactionSidecarVariant> 
+{
+    fn from(tx: TxEip4844WithSidecar<BlobTransactionSidecar>) -> Self {
+        Self::TxEip4844WithSidecar(tx.map_sidecar(Into::into))
+    }
+}
+
 
 impl From<TxEip4844Variant<BlobTransactionSidecar>>
     for TxEip4844Variant<BlobTransactionSidecarVariant>
