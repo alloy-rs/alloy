@@ -89,7 +89,7 @@ alloy-chains = { version = "0.2", default-features = false }
 alloy-eip2124 = { version = "0.2.0", default-features = false }
 alloy-eip2930 = { version = "0.2.3", default-features = false }
 alloy-eip7702 = { version = "0.6.3", default-features = false }
-alloy-eip7928 = { version = "0.1.0", default-features = false, git = "https://github.com/alloy-rs/eips.git" }
+alloy-eip7928 = { version = "0.1.0", default-features = false }
 
 # hardforks
 alloy-hardforks = "0.3.1"
