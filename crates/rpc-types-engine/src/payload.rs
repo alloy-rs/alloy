@@ -261,6 +261,28 @@ pub struct ExecutionPayloadEnvelopeV5 {
     pub execution_requests: Requests,
 }
 
+/// For BAL.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadEnvelopeV6 {
+    /// Execution payload V4
+    pub execution_payload: ExecutionPayloadV4,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload. See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+}
+
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
