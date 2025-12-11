@@ -33,6 +33,11 @@ pub use yubihsm;
 #[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
+#[cfg(feature = "secp256k1")]
+mod private_key_secp256k1;
+#[cfg(feature = "secp256k1")]
+pub use private_key_secp256k1::Secp256k1Signer;
+
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 

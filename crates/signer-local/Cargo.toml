@@ -36,6 +36,7 @@ zeroize = { workspace = true, optional = true, features = [
     "zeroize_derive",
     "alloc",
 ] }
+secp256k1 = { workspace = true, optional = true, features = ["recovery", "global-context", "std"] }
 
 # keystore
 eth-keystore = { version = "0.5.0", default-features = false, optional = true }
@@ -75,5 +76,6 @@ keystore-geth-compat = ["keystore", "eth-keystore?/geth-compat"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39", "zeroize"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
+secp256k1 = ["dep:secp256k1"]
 
 eip712 = ["alloy-signer/eip712"]
