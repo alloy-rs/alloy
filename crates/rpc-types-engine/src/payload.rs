@@ -1240,55 +1240,53 @@ impl ExecutionPayloadV4 {
         self.payload_inner.payload_inner.payload_inner.timestamp
     }
 
-    // Converts [`ExecutionPayloadV4`] to [`Block`].
-    //
-    // This performs the same conversion as the underlying V3 payload, but inserts the block access
-    // list.
-    //
-    // See also [`ExecutionPayloadV3::try_into_block`].
-    // pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
-    //     self.try_into_block_with(|tx| {
-    //         T::decode_2718_exact(tx.as_ref())
-    //             .map_err(alloy_rlp::Error::from)
-    //             .map_err(PayloadError::from)
-    //     })
-    // }
+    /// Converts [`ExecutionPayloadV4`] to [`Block`].
+    ///
+    /// This performs the same conversion as the underlying V3 payload, but inserts the block access
+    /// list.
+    ///
+    /// See also [`ExecutionPayloadV3::try_into_block`].
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
 
-    // Converts [`ExecutionPayloadV4`] to [`Block`] with a custom transaction mapper.
-    //
-    // See also [`ExecutionPayloadV3::try_into_block_with`].
-    // pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
-    // where
-    //     F: FnMut(Bytes) -> Result<T, E>,
-    //     E: Into<PayloadError>,
-    // {
-    //     self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
-    // }
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// See also [`ExecutionPayloadV3::try_into_block_with`].
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
 
-    // Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions.
-    //
-    // This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
-    // without any conversion.
-    // pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
-    //     let mut base_block = self.payload_inner.into_block_raw()?;
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    /// NOTE: to be replaced with v4 specific fields
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.payload_inner.payload_inner.into_block_raw()?;
 
-    //     base_block.body.block_access_list =
-    //         Some(alloy_rlp::decode_exact(self.block_access_list.as_ref())?);
+        base_block.header.blob_gas_used = Some(self.payload_inner.blob_gas_used);
+        base_block.header.excess_blob_gas = Some(self.payload_inner.excess_blob_gas);
 
-    //     base_block.header.block_access_list_hash =
-    //         Some(alloy_primitives::keccak256(self.block_access_list.as_ref()));
-
-    //     Ok(base_block)
-    // }
+        Ok(base_block)
+    }
 }
 
-// impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
-//     type Error = PayloadError;
+impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
+    type Error = PayloadError;
 
-// fn try_from(value: ExecutionPayloadV4) -> Result<Self, Self::Error> {
-//     value.try_into_block()
-// }
-//}
+    fn try_from(value: ExecutionPayloadV4) -> Result<Self, Self::Error> {
+        value.try_into_block()
+    }
+}
 
 #[cfg(feature = "ssz")]
 impl ssz::Decode for ExecutionPayloadV4 {
