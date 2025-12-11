@@ -52,6 +52,15 @@ pub trait EngineApi<N>: Send + Sync {
         execution_requests: Vec<Bytes>,
     ) -> TransportResult<PayloadStatus>;
 
+    /// For BAL
+    async fn new_payload_v5(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus>;
+
     /// Updates the execution layer client with the given fork choice, as specified for the Paris
     /// fork.
     ///
@@ -132,6 +141,12 @@ pub trait EngineApi<N>: Send + Sync {
         &self,
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
+
+    /// For BAL.
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV6>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -223,6 +238,21 @@ where
             .await
     }
 
+    async fn new_payload_v5(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request(
+                "engine_newPayloadV5",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
+            .await
+    }
+
     async fn fork_choice_updated_v1(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -276,6 +306,13 @@ where
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
         self.client().request("engine_getPayloadV4", (payload_id,)).await
+    }
+
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV6> {
+        self.client().request("engine_getPayloadV6", (payload_id,)).await
     }
 
     async fn get_payload_bodies_by_hash_v1(
