@@ -329,6 +329,56 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "eip712")]
+    fn typed_data() {
+        use alloy_dyn_abi::eip712::TypedData;
+        use alloy_primitives::{keccak256, Address, I256, U256};
+        use alloy_sol_types::{eip712_domain, sol, SolStruct};
+        use serde::Serialize;
+
+        sol! {
+            #[derive(Debug, Serialize)]
+            struct FooBar {
+                int256 foo;
+                uint256 bar;
+                bytes fizz;
+                bytes32 buzz;
+                string far;
+                address out;
+            }
+        }
+
+        let domain = eip712_domain! {
+            name: "Eip712Test",
+            version: "1",
+            chain_id: 1,
+            verifying_contract: address!("0000000000000000000000000000000000000001"),
+            salt: keccak256("eip712-test-75F0CCte"),
+        };
+        let foo_bar = FooBar {
+            foo: I256::try_from(10u64).unwrap(),
+            bar: U256::from(20u64),
+            fizz: b"fizz".to_vec().into(),
+            buzz: keccak256("buzz"),
+            far: "space".into(),
+            out: Address::ZERO,
+        };
+        let signer = LocalSigner::<Secp256k1Credential>::random();
+        let hash = foo_bar.eip712_signing_hash(&domain);
+        let sig = signer.sign_typed_data_sync(&foo_bar, &domain).unwrap();
+        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), signer.address());
+        assert_eq!(signer.sign_hash_sync(&hash).unwrap(), sig);
+        let foo_bar_dynamic = TypedData::from_struct(&foo_bar, Some(domain));
+        let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
+        let sig_dynamic = signer.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
+        assert_eq!(
+            sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
+            signer.address()
+        );
+        assert_eq!(signer.sign_hash_sync(&dynamic_hash).unwrap(), sig_dynamic);
+    }
+
+    #[test]
     fn key_to_address() {
         let signer: Secp256k1Signer =
             "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
