@@ -78,7 +78,6 @@ impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
         // Convert secp256k1 signature to k256 signature
         let k256_sig = K256Signature::from_slice(&data).map_err(SignatureError::from_source)?;
 
-        // Convert recovery id
         let k256_rec_id = RecoveryId::from_byte(i32::from(rec_id) as u8)
             .ok_or_else(|| SignatureError::from_source("invalid recovery id"))?;
 
