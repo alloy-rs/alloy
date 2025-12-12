@@ -435,9 +435,71 @@ pub mod beacon_payload_v3 {
     }
 }
 
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg(feature = "amsterdam")]
+struct BeaconExecutionPayloadV4<'a> {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    payload_inner: BeaconExecutionPayloadV3<'a>,
+    /// RLP encoded `block_access_list`
+    block_access_list: Cow<'a, Bytes>,
+}
+
+#[cfg(feature = "amsterdam")]
+impl<'a> From<BeaconExecutionPayloadV4<'a>> for alloy_rpc_types_engine::ExecutionPayloadV4 {
+    fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
+        let BeaconExecutionPayloadV4 { payload_inner, block_access_list } = payload;
+        Self {
+            payload_inner: payload_inner.into(),
+            block_access_list: block_access_list.into_owned(),
+        }
+    }
+}
+
+#[cfg(feature = "amsterdam")]
+impl<'a> From<&'a alloy_rpc_types_engine::ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
+    fn from(value: &'a alloy_rpc_types_engine::ExecutionPayloadV4) -> Self {
+        let alloy_rpc_types_engine::ExecutionPayloadV4 { payload_inner, block_access_list } = value;
+        BeaconExecutionPayloadV4 {
+            payload_inner: payload_inner.into(),
+            block_access_list: Cow::Borrowed(block_access_list),
+        }
+    }
+}
+
+/// A helper serde module to convert from/to the Beacon API which uses quoted decimals rather than
+/// big-endian hex.
+#[cfg(feature = "amsterdam")]
+pub mod beacon_payload_v4 {
+    use super::*;
+
+    /// Serialize the payload attributes for the beacon API.
+    pub fn serialize<S>(
+        payload_attributes: &alloy_rpc_types_engine::ExecutionPayloadV4,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        BeaconExecutionPayloadV4::from(payload_attributes).serialize(serializer)
+    }
+
+    /// Deserialize the payload attributes for the beacon API.
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<alloy_rpc_types_engine::ExecutionPayloadV4, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        BeaconExecutionPayloadV4::deserialize(deserializer).map(Into::into)
+    }
+}
+
 /// Represents all possible payload versions.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
+#[cfg(not(feature = "amsterdam"))]
 enum BeaconExecutionPayload<'a> {
     /// V1 payload
     V1(BeaconExecutionPayloadV1<'a>),
@@ -448,6 +510,7 @@ enum BeaconExecutionPayload<'a> {
 }
 
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
+#[cfg(not(feature = "amsterdam"))]
 impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -468,6 +531,7 @@ impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
     }
 }
 
+#[cfg(not(feature = "amsterdam"))]
 impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
     fn from(payload: BeaconExecutionPayload<'a>) -> Self {
         match payload {
@@ -478,6 +542,7 @@ impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
     }
 }
 
+#[cfg(not(feature = "amsterdam"))]
 impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
     fn from(value: &'a ExecutionPayload) -> Self {
         match value {
@@ -489,6 +554,79 @@ impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
             }
             ExecutionPayload::V3(payload) => {
                 BeaconExecutionPayload::V3(BeaconExecutionPayloadV3::from(payload))
+            }
+        }
+    }
+}
+
+/// Represents all possible payload versions.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+#[cfg(feature = "amsterdam")]
+enum BeaconExecutionPayload<'a> {
+    /// V1 payload
+    V1(BeaconExecutionPayloadV1<'a>),
+    /// V2 payload
+    V2(BeaconExecutionPayloadV2<'a>),
+    /// V3 payload
+    V3(BeaconExecutionPayloadV3<'a>),
+    /// V4 payload
+    V4(BeaconExecutionPayloadV4<'a>),
+}
+
+// Deserializes untagged ExecutionPayload by trying each variant in falling order
+#[cfg(feature = "amsterdam")]
+impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum BeaconExecutionPayloadDesc<'a> {
+            V4(BeaconExecutionPayloadV4<'a>),
+            V3(BeaconExecutionPayloadV3<'a>),
+            V2(BeaconExecutionPayloadV2<'a>),
+            V1(BeaconExecutionPayloadV1<'a>),
+        }
+        match BeaconExecutionPayloadDesc::deserialize(deserializer)? {
+            BeaconExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
+            BeaconExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
+            BeaconExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
+            BeaconExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
+        }
+    }
+}
+
+#[cfg(feature = "amsterdam")]
+impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
+    fn from(payload: BeaconExecutionPayload<'a>) -> Self {
+        match payload {
+            BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
+            BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
+            BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
+            BeaconExecutionPayload::V4(payload) => {
+                Self::V4(alloy_rpc_types_engine::ExecutionPayloadV4::from(payload))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "amsterdam")]
+impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
+    fn from(value: &'a ExecutionPayload) -> Self {
+        match value {
+            ExecutionPayload::V1(payload) => {
+                BeaconExecutionPayload::V1(BeaconExecutionPayloadV1::from(payload))
+            }
+            ExecutionPayload::V2(payload) => {
+                BeaconExecutionPayload::V2(BeaconExecutionPayloadV2::from(payload))
+            }
+            ExecutionPayload::V3(payload) => {
+                BeaconExecutionPayload::V3(BeaconExecutionPayloadV3::from(payload))
+            }
+            ExecutionPayload::V4(payload) => {
+                BeaconExecutionPayload::V4(BeaconExecutionPayloadV4::from(payload))
             }
         }
     }

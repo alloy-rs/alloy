@@ -53,3 +53,4 @@ ssz = [
 	"alloy-rpc-types-engine/ssz",
 	"alloy-eips/ssz",
 ]
+amsterdam = ["alloy-rpc-types-engine/amsterdam"]

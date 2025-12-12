@@ -1416,6 +1416,7 @@ impl ssz::Encode for ExecutionPayloadV4 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg(not(feature = "amsterdam"))]
 pub enum ExecutionPayload {
     /// V1 payload
     V1(ExecutionPayloadV1),
@@ -1425,6 +1426,7 @@ pub enum ExecutionPayload {
     V3(ExecutionPayloadV3),
 }
 
+#[cfg(not(feature = "amsterdam"))]
 impl ExecutionPayload {
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
     /// [`ExecutionPayloadSidecar`] extracted from the block.
@@ -1826,6 +1828,461 @@ impl ExecutionPayload {
     }
 }
 
+/// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2], or
+/// [ExecutionPayloadV3].
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg(feature = "amsterdam")]
+pub enum ExecutionPayload {
+    /// V1 payload
+    V1(ExecutionPayloadV1),
+    /// V2 payload
+    V2(ExecutionPayloadV2),
+    /// V3 payload
+    V3(ExecutionPayloadV3),
+    /// V4 payload
+    V4(ExecutionPayloadV4),
+}
+
+#[cfg(feature = "amsterdam")]
+impl ExecutionPayload {
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked(block.hash_slow(), block)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    pub fn from_block_unchecked<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let sidecar = ExecutionPayloadSidecar::from_block(block);
+
+        let execution_payload = if block.header.block_access_list_hash().is_some() {
+            // block with block access list: V4
+            Self::V4(ExecutionPayloadV4::from_block_unchecked(block_hash, block))
+        } else if block.header.parent_beacon_block_root().is_some() {
+            // block with parent beacon block root: V3
+            Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
+        } else if block.body.withdrawals.is_some() {
+            // block with withdrawals: V2
+            Self::V2(ExecutionPayloadV2::from_block_unchecked(block_hash, block))
+        } else {
+            // otherwise V1
+            Self::V1(ExecutionPayloadV1::from_block_unchecked(block_hash, block))
+        };
+
+        (execution_payload, sidecar)
+    }
+
+    /// Tries to create a new unsealed block from the given payload and payload sidecar.
+    ///
+    /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
+    ///
+    /// # Note
+    ///
+    /// The log bloom is assumed to be validated during serialization.
+    ///
+    /// See <https://github.com/ethereum/go-ethereum/blob/79a478bb6176425c2400e949890e668a3d9a3d05/core/beacon/types.go#L145>
+    pub fn try_into_block_with_sidecar<T: Decodable2718>(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+    ) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with_sidecar_with(sidecar, |tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with sidecar and a custom transaction mapper.
+    ///
+    /// The log bloom is assumed to be validated during serialization.
+    ///
+    /// See <https://github.com/ethereum/go-ethereum/blob/79a478bb6176425c2400e949890e668a3d9a3d05/core/beacon/types.go#L145>
+    pub fn try_into_block_with_sidecar_with<T, F, E>(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+        f: F,
+    ) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        self.into_block_with_sidecar_raw(sidecar)?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions and sidecar.
+    ///
+    /// This is similar to [`Self::try_into_block_with_sidecar_with`] but returns the transactions
+    /// as raw bytes without any conversion.
+    pub fn into_block_with_sidecar_raw(
+        self,
+        sidecar: &ExecutionPayloadSidecar,
+    ) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.into_block_raw()?;
+        base_block.header.parent_beacon_block_root = sidecar.parent_beacon_block_root();
+        base_block.header.requests_hash = sidecar.requests_hash();
+        Ok(base_block)
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`].
+    ///
+    /// Caution: This does not set fields that are not part of the payload and only part of the
+    /// [`ExecutionPayloadSidecar`]:
+    /// - parent_beacon_block_root
+    /// - requests_hash
+    ///
+    /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// Caution: This does not set fields that are not part of the payload and only part of the
+    /// [`ExecutionPayloadSidecar`]:
+    /// - parent_beacon_block_root
+    /// - requests_hash
+    ///
+    /// See also: [`ExecutionPayload::try_into_block_with_sidecar`]
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayload`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        match self {
+            Self::V1(payload) => payload.into_block_raw(),
+            Self::V2(payload) => payload.into_block_raw(),
+            Self::V3(payload) => payload.into_block_raw(),
+            Self::V4(payload) => payload.into_block_raw(),
+        }
+    }
+
+    /// Returns a reference to the V1 payload.
+    pub const fn as_v1(&self) -> &ExecutionPayloadV1 {
+        match self {
+            Self::V1(payload) => payload,
+            Self::V2(payload) => &payload.payload_inner,
+            Self::V3(payload) => &payload.payload_inner.payload_inner,
+            Self::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
+        }
+    }
+
+    /// Returns a mutable reference to the V1 payload.
+    pub const fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
+        match self {
+            Self::V1(payload) => payload,
+            Self::V2(payload) => &mut payload.payload_inner,
+            Self::V3(payload) => &mut payload.payload_inner.payload_inner,
+            Self::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
+        }
+    }
+
+    /// Consumes the payload and returns the V1 payload.
+    pub fn into_v1(self) -> ExecutionPayloadV1 {
+        match self {
+            Self::V1(payload) => payload,
+            Self::V2(payload) => payload.payload_inner,
+            Self::V3(payload) => payload.payload_inner.payload_inner,
+            Self::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
+        }
+    }
+
+    /// Returns a reference to the V2 payload, if any.
+    pub const fn as_v2(&self) -> Option<&ExecutionPayloadV2> {
+        match self {
+            Self::V1(_) => None,
+            Self::V2(payload) => Some(payload),
+            Self::V3(payload) => Some(&payload.payload_inner),
+            Self::V4(payload) => Some(&payload.payload_inner.payload_inner),
+        }
+    }
+
+    /// Returns a mutable reference to the V2 payload, if any.
+    pub const fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
+        match self {
+            Self::V1(_) => None,
+            Self::V2(payload) => Some(payload),
+            Self::V3(payload) => Some(&mut payload.payload_inner),
+            Self::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V3 payload, if any.
+    pub const fn as_v3(&self) -> Option<&ExecutionPayloadV3> {
+        match self {
+            Self::V1(_) | Self::V2(_) => None,
+            Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&payload.payload_inner),
+        }
+    }
+
+    /// Returns a mutable reference to the V3 payload, if any.
+    pub const fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
+        match self {
+            Self::V1(_) | Self::V2(_) => None,
+            Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&mut payload.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V4 payload, if any.
+    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
+        match self {
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
+        }
+    }
+
+    /// Returns a mutable reference to the V4 payload, if any.
+    pub const fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
+        match self {
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
+        }
+    }
+
+    /// Returns the block access list if V4
+    pub const fn block_access_list(&self) -> Option<&Bytes> {
+        match self.as_v4() {
+            Some(payload) => Some(&payload.block_access_list),
+            None => None,
+        }
+    }
+
+    /// Returns the withdrawals for the payload.
+    pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
+        match self.as_v2() {
+            Some(payload) => Some(&payload.withdrawals),
+            None => None,
+        }
+    }
+
+    /// Returns the transactions for the payload.
+    pub const fn transactions(&self) -> &Vec<Bytes> {
+        &self.as_v1().transactions
+    }
+
+    /// Returns a mutable reference to the transactions for the payload.
+    pub const fn transactions_mut(&mut self) -> &mut Vec<Bytes> {
+        &mut self.as_v1_mut().transactions
+    }
+
+    /// Extracts essential information into one container type.
+    pub fn header_info(&self) -> HeaderInfo {
+        HeaderInfo {
+            number: self.block_number(),
+            beneficiary: self.fee_recipient(),
+            timestamp: self.timestamp(),
+            gas_limit: self.gas_limit(),
+            base_fee_per_gas: Some(self.saturated_base_fee_per_gas()),
+            excess_blob_gas: self.excess_blob_gas(),
+            blob_gas_used: self.blob_gas_used(),
+            difficulty: U256::ZERO,
+            mix_hash: Some(self.prev_randao()),
+        }
+    }
+
+    /// Returns the gas limit for the payload.
+    ///
+    /// Note: this returns the u64 saturated base fee, but it is specified as [`U256`].
+    pub fn saturated_base_fee_per_gas(&self) -> u64 {
+        self.as_v1().base_fee_per_gas.saturating_to()
+    }
+
+    /// Returns the blob gas used for the payload.
+    pub fn blob_gas_used(&self) -> Option<u64> {
+        self.as_v3().map(|payload| payload.blob_gas_used)
+    }
+
+    /// Returns the excess blob gas for the payload.
+    pub fn excess_blob_gas(&self) -> Option<u64> {
+        self.as_v3().map(|payload| payload.excess_blob_gas)
+    }
+
+    /// Returns the gas limit for the payload.
+    pub const fn gas_limit(&self) -> u64 {
+        self.as_v1().gas_limit
+    }
+
+    /// Returns the fee recipient.
+    pub const fn fee_recipient(&self) -> Address {
+        self.as_v1().fee_recipient
+    }
+
+    /// Returns the timestamp for the payload.
+    pub const fn timestamp(&self) -> u64 {
+        self.as_v1().timestamp
+    }
+
+    /// Returns the parent hash for the payload.
+    pub const fn parent_hash(&self) -> B256 {
+        self.as_v1().parent_hash
+    }
+
+    /// Returns the block hash for the payload.
+    pub const fn block_hash(&self) -> B256 {
+        self.as_v1().block_hash
+    }
+
+    /// Returns the block number for this payload.
+    pub const fn block_number(&self) -> u64 {
+        self.as_v1().block_number
+    }
+
+    /// Returns the block number for this payload.
+    pub const fn block_num_hash(&self) -> BlockNumHash {
+        self.as_v1().block_num_hash()
+    }
+
+    /// Returns the prev randao for this payload.
+    pub const fn prev_randao(&self) -> B256 {
+        self.as_v1().prev_randao
+    }
+
+    /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None
+    pub fn blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.excess_blob_gas()?))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// See also [Self::next_block_excess_blob_gas]
+    pub fn next_block_blob_fee(&self, blob_params: BlobParams) -> Option<u128> {
+        Some(blob_params.calc_blob_fee(self.next_block_excess_blob_gas(blob_params)?))
+    }
+
+    /// Calculate base fee for next block according to the EIP-1559 spec.
+    ///
+    /// Returns a `None` if no base fee is set, no EIP-1559 support
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+        self.as_v1().next_block_base_fee(base_fee_params)
+    }
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
+        Some(blob_params.next_block_excess_blob_gas_osaka(
+            self.excess_blob_gas()?,
+            self.blob_gas_used()?,
+            self.as_v1().base_fee_per_gas.to(),
+        ))
+    }
+
+    /// Convenience function for [`Self::next_block_excess_blob_gas`] with an optional
+    /// [`BlobParams`] argument.
+    ///
+    /// Returns `None` if the `blob_params` are `None`.
+    pub fn maybe_next_block_excess_blob_gas(&self, blob_params: Option<BlobParams>) -> Option<u64> {
+        self.next_block_excess_blob_gas(blob_params?)
+    }
+
+    /// Returns an iterator over the decoded transactions in this payload.
+    ///
+    /// This iterator will decode transactions on the fly.
+    pub fn decoded_transactions<T: Decodable2718>(
+        &self,
+    ) -> impl Iterator<Item = Eip2718Result<T>> + '_ {
+        self.transactions().iter().map(|tx_bytes| T::decode_2718_exact(tx_bytes.as_ref()))
+    }
+
+    /// Returns iterator over decoded transactions with their original encoded bytes.
+    ///
+    /// This iterator will decode transactions on the fly and return them with their bytes.
+    pub fn decoded_transactions_with_encoded<T: Decodable2718>(
+        &self,
+    ) -> impl Iterator<Item = Eip2718Result<WithEncoded<T>>> + '_ {
+        self.transactions().iter().map(|tx_bytes| {
+            T::decode_2718_exact(tx_bytes.as_ref()).map(|tx| WithEncoded::new(tx_bytes.clone(), tx))
+        })
+    }
+
+    /// Returns an iterator over the recovered transactions in this payload.
+    ///
+    /// This iterator will decode and recover signer addresses for transactions on the fly.
+    pub fn recovered_transactions<T>(
+        &self,
+    ) -> impl Iterator<
+        Item = Result<
+            alloy_consensus::transaction::Recovered<T>,
+            alloy_consensus::crypto::RecoveryError,
+        >,
+    > + '_
+    where
+        T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
+    {
+        self.decoded_transactions::<T>().map(|res| {
+            res.map_err(alloy_consensus::crypto::RecoveryError::from_source)
+                .and_then(|tx| tx.try_into_recovered())
+        })
+    }
+
+    /// Returns an iterator over the recovered transactions in this payload with their
+    /// original encoded bytes.
+    ///
+    /// This iterator will decode and recover signer addresses for transactions on the fly
+    /// and return them with their bytes.
+    pub fn recovered_transactions_with_encoded<T>(
+        &self,
+    ) -> impl Iterator<
+        Item = Result<
+            WithEncoded<alloy_consensus::transaction::Recovered<T>>,
+            alloy_consensus::crypto::RecoveryError,
+        >,
+    > + '_
+    where
+        T: Decodable2718 + alloy_consensus::transaction::SignerRecoverable,
+    {
+        self.transactions().iter().map(|tx_bytes| {
+            T::decode_2718_exact(tx_bytes.as_ref())
+                .map_err(alloy_consensus::crypto::RecoveryError::from_source)
+                .and_then(|tx| {
+                    tx.try_into_recovered()
+                        .map(|recovered| WithEncoded::new(tx_bytes.clone(), recovered))
+                })
+        })
+    }
+}
+
 impl From<ExecutionPayloadV1> for ExecutionPayload {
     fn from(payload: ExecutionPayloadV1) -> Self {
         Self::V1(payload)
@@ -1847,6 +2304,13 @@ impl From<ExecutionPayloadFieldV2> for ExecutionPayload {
 impl From<ExecutionPayloadV3> for ExecutionPayload {
     fn from(payload: ExecutionPayloadV3) -> Self {
         Self::V3(payload)
+    }
+}
+
+#[cfg(feature = "amsterdam")]
+impl From<ExecutionPayloadV4> for ExecutionPayload {
+    fn from(payload: ExecutionPayloadV4) -> Self {
+        Self::V4(payload)
     }
 }
 
@@ -1876,6 +2340,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 formatter.write_str("a valid ExecutionPayload object")
             }
 
+            #[cfg(not(feature = "amsterdam"))]
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::MapAccess<'de>,
@@ -2034,6 +2499,183 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
 
                 Ok(ExecutionPayload::V2(ExecutionPayloadV2 { payload_inner: v1, withdrawals }))
             }
+
+            #[cfg(feature = "amsterdam")]
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                // this currently rejects unknown fields
+                #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+                #[cfg_attr(feature = "serde", serde(field_identifier, rename_all = "camelCase"))]
+                enum Fields {
+                    ParentHash,
+                    FeeRecipient,
+                    StateRoot,
+                    ReceiptsRoot,
+                    LogsBloom,
+                    PrevRandao,
+                    BlockNumber,
+                    GasLimit,
+                    GasUsed,
+                    Timestamp,
+                    ExtraData,
+                    BaseFeePerGas,
+                    BlockHash,
+                    Transactions,
+                    // V2
+                    Withdrawals,
+                    // V3
+                    BlobGasUsed,
+                    ExcessBlobGas,
+                    // V4
+                    BlockAccessList,
+                }
+
+                let mut parent_hash = None;
+                let mut fee_recipient = None;
+                let mut state_root = None;
+                let mut receipts_root = None;
+                let mut logs_bloom = None;
+                let mut prev_randao = None;
+                let mut block_number = None;
+                let mut gas_limit = None;
+                let mut gas_used = None;
+                let mut timestamp = None;
+                let mut extra_data = None;
+                let mut base_fee_per_gas = None;
+                let mut block_hash = None;
+                let mut transactions = None;
+                let mut withdrawals = None;
+                let mut blob_gas_used = None;
+                let mut excess_blob_gas = None;
+                let mut block_access_list = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Fields::ParentHash => parent_hash = Some(map.next_value()?),
+                        Fields::FeeRecipient => fee_recipient = Some(map.next_value()?),
+                        Fields::StateRoot => state_root = Some(map.next_value()?),
+                        Fields::ReceiptsRoot => receipts_root = Some(map.next_value()?),
+                        Fields::LogsBloom => logs_bloom = Some(map.next_value()?),
+                        Fields::PrevRandao => prev_randao = Some(map.next_value()?),
+                        Fields::BlockNumber => {
+                            let raw = map.next_value::<U64>()?;
+                            block_number = Some(raw.to());
+                        }
+                        Fields::GasLimit => {
+                            let raw = map.next_value::<U64>()?;
+                            gas_limit = Some(raw.to());
+                        }
+                        Fields::GasUsed => {
+                            let raw = map.next_value::<U64>()?;
+                            gas_used = Some(raw.to());
+                        }
+                        Fields::Timestamp => {
+                            let raw = map.next_value::<U64>()?;
+                            timestamp = Some(raw.to());
+                        }
+                        Fields::ExtraData => extra_data = Some(map.next_value()?),
+                        Fields::BaseFeePerGas => base_fee_per_gas = Some(map.next_value()?),
+                        Fields::BlockHash => block_hash = Some(map.next_value()?),
+                        Fields::Transactions => transactions = Some(map.next_value()?),
+                        Fields::Withdrawals => withdrawals = Some(map.next_value()?),
+                        Fields::BlobGasUsed => {
+                            let raw = map.next_value::<U64>()?;
+                            blob_gas_used = Some(raw.to());
+                        }
+                        Fields::ExcessBlobGas => {
+                            let raw = map.next_value::<U64>()?;
+                            excess_blob_gas = Some(raw.to());
+                        }
+                        Fields::BlockAccessList => block_access_list = Some(map.next_value()?),
+                    }
+                }
+
+                let parent_hash =
+                    parent_hash.ok_or_else(|| serde::de::Error::missing_field("parentHash"))?;
+                let fee_recipient =
+                    fee_recipient.ok_or_else(|| serde::de::Error::missing_field("feeRecipient"))?;
+                let state_root =
+                    state_root.ok_or_else(|| serde::de::Error::missing_field("stateRoot"))?;
+                let receipts_root =
+                    receipts_root.ok_or_else(|| serde::de::Error::missing_field("receiptsRoot"))?;
+                let logs_bloom =
+                    logs_bloom.ok_or_else(|| serde::de::Error::missing_field("logsBloom"))?;
+                let prev_randao =
+                    prev_randao.ok_or_else(|| serde::de::Error::missing_field("prevRandao"))?;
+                let block_number =
+                    block_number.ok_or_else(|| serde::de::Error::missing_field("blockNumber"))?;
+                let gas_limit =
+                    gas_limit.ok_or_else(|| serde::de::Error::missing_field("gasLimit"))?;
+                let gas_used =
+                    gas_used.ok_or_else(|| serde::de::Error::missing_field("gasUsed"))?;
+                let timestamp =
+                    timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
+                let extra_data =
+                    extra_data.ok_or_else(|| serde::de::Error::missing_field("extraData"))?;
+                let base_fee_per_gas = base_fee_per_gas
+                    .ok_or_else(|| serde::de::Error::missing_field("baseFeePerGas"))?;
+                let block_hash =
+                    block_hash.ok_or_else(|| serde::de::Error::missing_field("blockHash"))?;
+                let transactions =
+                    transactions.ok_or_else(|| serde::de::Error::missing_field("transactions"))?;
+
+                let v1 = ExecutionPayloadV1 {
+                    parent_hash,
+                    fee_recipient,
+                    state_root,
+                    receipts_root,
+                    logs_bloom,
+                    prev_randao,
+                    block_number,
+                    gas_limit,
+                    gas_used,
+                    timestamp,
+                    extra_data,
+                    base_fee_per_gas,
+                    block_hash,
+                    transactions,
+                };
+
+                let Some(withdrawals) = withdrawals else {
+                    return if blob_gas_used.is_none() && excess_blob_gas.is_none() {
+                        Ok(ExecutionPayload::V1(v1))
+                    } else {
+                        Err(serde::de::Error::custom("invalid enum variant"))
+                    };
+                };
+
+                if let (Some(blob_gas_used), Some(excess_blob_gas), Some(block_access_list)) =
+                    (blob_gas_used, excess_blob_gas, block_access_list)
+                {
+                    return Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
+                        payload_inner: ExecutionPayloadV3 {
+                            payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
+                            blob_gas_used,
+                            excess_blob_gas,
+                        },
+                        block_access_list,
+                    }));
+                }
+
+                if let (Some(blob_gas_used), Some(excess_blob_gas)) =
+                    (blob_gas_used, excess_blob_gas)
+                {
+                    return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
+                        payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
+                        blob_gas_used,
+                        excess_blob_gas,
+                    }));
+                }
+
+                // reject incomplete V3 payloads even if they could construct a valid V2
+                if blob_gas_used.is_some() || excess_blob_gas.is_some() {
+                    return Err(serde::de::Error::custom("invalid enum variant"));
+                }
+
+                Ok(ExecutionPayload::V2(ExecutionPayloadV2 { payload_inner: v1, withdrawals }))
+            }
         }
 
         const FIELDS: &[&str] = &[
@@ -2054,6 +2696,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             "withdrawals",
             "blobGasUsed",
             "excessBlobGas",
+            #[cfg(feature = "amsterdam")]
+            "blockAccessList",
         ];
         deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
     }
