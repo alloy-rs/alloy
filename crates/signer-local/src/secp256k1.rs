@@ -1,54 +1,128 @@
-//! [`k256`] signer implementation.
+//! [`secp256k1`] signer implementation.
+//!
+//! This module provides a signer implementation using the [`secp256k1`] crate
+//! as an alternative to the default [`k256`] implementation.
 
-use super::{LocalSigner, LocalSignerError};
-use alloy_primitives::{hex, B256, B512};
-use alloy_signer::utils::secret_key_to_address;
-use k256::{
-    ecdsa::{self, SigningKey},
-    FieldBytes, NonZeroScalar, SecretKey as K256SecretKey,
+use crate::{LocalSigner, LocalSignerError};
+use alloy_primitives::{hex, keccak256, Address, B256, B512};
+use k256::ecdsa::{
+    signature::{hazmat::PrehashSigner, Error as SignatureError},
+    RecoveryId, Signature as K256Signature,
 };
 use rand::{CryptoRng, Rng};
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, SECP256K1};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
 use std::path::Path;
 
-impl LocalSigner<SigningKey> {
-    /// Creates a new [`LocalSigner`] instance from a [`SigningKey`].
-    ///
-    /// This can also be used to create a [`LocalSigner`] from a [`SecretKey`](K256SecretKey).
-    /// See also the `From` implementations.
+/// A wrapper around [`secp256k1::SecretKey`] that implements [`PrehashSigner`].
+///
+/// This allows using the `secp256k1` crate for ECDSA operations while maintaining
+/// compatibility with the [`LocalSigner`] infrastructure.
+#[derive(Clone)]
+pub struct Secp256k1Credential(SecretKey);
+
+impl Secp256k1Credential {
+    /// Creates a new [`Secp256k1Credential`] from a [`SecretKey`].
+    #[inline]
+    pub const fn new(secret_key: SecretKey) -> Self {
+        Self(secret_key)
+    }
+
+    /// Returns a reference to the inner [`SecretKey`].
+    #[inline]
+    pub const fn inner(&self) -> &SecretKey {
+        &self.0
+    }
+
+    /// Consumes this credential and returns the inner [`SecretKey`].
+    #[inline]
+    pub const fn into_inner(self) -> SecretKey {
+        self.0
+    }
+
+    /// Returns the public key for this credential.
+    #[inline]
+    pub fn public_key(&self) -> PublicKey {
+        self.0.public_key(SECP256K1)
+    }
+}
+
+impl std::fmt::Debug for Secp256k1Credential {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Secp256k1Credential").finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for Secp256k1Credential {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.secret_bytes() == other.0.secret_bytes()
+    }
+}
+
+impl From<SecretKey> for Secp256k1Credential {
+    fn from(secret_key: SecretKey) -> Self {
+        Self::new(secret_key)
+    }
+}
+
+impl PrehashSigner<(K256Signature, RecoveryId)> for Secp256k1Credential {
+    fn sign_prehash(&self, prehash: &[u8]) -> Result<(K256Signature, RecoveryId), SignatureError> {
+        let msg =
+            Message::from_digest_slice(prehash).map_err(|_| SignatureError::from_source(""))?;
+
+        let sig = SECP256K1.sign_ecdsa_recoverable(&msg, &self.0);
+        let (rec_id, data) = sig.serialize_compact();
+
+        // Convert secp256k1 signature to k256 signature
+        let k256_sig = K256Signature::from_slice(&data).map_err(SignatureError::from_source)?;
+
+        // Convert recovery id
+        let k256_rec_id = RecoveryId::from_byte(i32::from(rec_id) as u8)
+            .ok_or_else(|| SignatureError::from_source("invalid recovery id"))?;
+
+        Ok((k256_sig, k256_rec_id))
+    }
+}
+
+/// Converts a [`secp256k1::SecretKey`] to its corresponding Ethereum address.
+#[inline]
+fn secret_key_to_address(secret_key: &SecretKey) -> Address {
+    let public = secret_key.public_key(SECP256K1);
+    public_key_to_address(&public)
+}
+
+/// Converts a [`secp256k1::PublicKey`] to its corresponding Ethereum address.
+#[inline]
+fn public_key_to_address(public: &PublicKey) -> Address {
+    // Strip out the first byte (0x04 tag for uncompressed public key)
+    let hash = keccak256(&public.serialize_uncompressed()[1..]);
+    Address::from_slice(&hash[12..])
+}
+
+impl LocalSigner<Secp256k1Credential> {
+    /// Creates a new [`LocalSigner`] instance from a [`secp256k1::SecretKey`].
     #[doc(alias = "from_private_key")]
     #[doc(alias = "new_private_key")]
     #[doc(alias = "new_pk")]
     #[inline]
-    pub fn from_signing_key(credential: SigningKey) -> Self {
-        let address = secret_key_to_address(&credential);
-        Self::new_with_credential(credential, address, None)
+    pub fn from_secp256k1(secret_key: SecretKey) -> Self {
+        let address = secret_key_to_address(&secret_key);
+        Self::new_with_credential(Secp256k1Credential::new(secret_key), address, None)
     }
 
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a [`B256`] byte
     /// array.
-    ///
-    /// This is identical to [`from_field_bytes`](Self::from_field_bytes).
     #[inline]
-    pub fn from_bytes(bytes: &B256) -> Result<Self, ecdsa::Error> {
-        Self::from_field_bytes((&bytes.0).into())
-    }
-
-    /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a [`FieldBytes`] byte
-    /// array.
-    #[inline]
-    pub fn from_field_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_bytes(bytes).map(Self::from_signing_key)
+    pub fn from_bytes(bytes: &B256) -> Result<Self, secp256k1::Error> {
+        Self::from_slice(bytes.as_slice())
     }
 
     /// Creates a new [`LocalSigner`] instance from a raw scalar serialized as a byte slice.
-    ///
-    /// Byte slices shorter than the field size (32 bytes) are handled by zero padding the input.
     #[inline]
-    pub fn from_slice(bytes: &[u8]) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_slice(bytes).map(Self::from_signing_key)
+    pub fn from_slice(bytes: &[u8]) -> Result<Self, secp256k1::Error> {
+        SecretKey::from_slice(bytes).map(Self::from_secp256k1)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -60,43 +134,29 @@ impl LocalSigner<SigningKey> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        Self::from_signing_key(SigningKey::random(rng))
+        let secp = Secp256k1::new();
+        let (secret_key, _) = secp.generate_keypair(rng);
+        Self::from_secp256k1(secret_key)
     }
 
-    /// Borrow the secret [`NonZeroScalar`] value for this key.
-    ///
-    /// # ⚠️ Warning
-    ///
-    /// This value is key material.
-    ///
-    /// Please treat it with the care it deserves!
-    #[inline]
-    pub fn as_nonzero_scalar(&self) -> &NonZeroScalar {
-        self.credential.as_nonzero_scalar()
-    }
-
-    /// Serialize this [`LocalSigner`]'s [`SigningKey`] as a [`B256`] byte array.
+    /// Serialize this [`LocalSigner`]'s [`SecretKey`] as a [`B256`] byte array.
     #[inline]
     pub fn to_bytes(&self) -> B256 {
-        B256::new(<[u8; 32]>::from(self.to_field_bytes()))
-    }
-
-    /// Serialize this [`LocalSigner`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
-    #[inline]
-    pub fn to_field_bytes(&self) -> FieldBytes {
-        self.credential.to_bytes()
+        B256::from_slice(&self.credential.0.secret_bytes())
     }
 
     /// Convenience function that returns this signer's ethereum public key as a [`B512`] byte
     /// array.
     #[inline]
     pub fn public_key(&self) -> B512 {
-        B512::from_slice(&self.credential.verifying_key().to_encoded_point(false).as_bytes()[1..])
+        let public = self.credential.public_key();
+        // Remove the 0x04 prefix byte
+        B512::from_slice(&public.serialize_uncompressed()[1..])
     }
 }
 
 #[cfg(feature = "keystore")]
-impl LocalSigner<SigningKey> {
+impl LocalSigner<Secp256k1Credential> {
     /// Creates a new random encrypted JSON with the provided password and stores it in the
     /// provided directory. Returns a tuple (LocalSigner, String) of the signer instance for the
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
@@ -152,33 +212,21 @@ impl LocalSigner<SigningKey> {
     }
 }
 
-impl PartialEq for LocalSigner<SigningKey> {
+impl PartialEq for LocalSigner<Secp256k1Credential> {
     fn eq(&self, other: &Self) -> bool {
-        self.credential.to_bytes().eq(&other.credential.to_bytes())
+        self.credential == other.credential
             && self.address == other.address
             && self.chain_id == other.chain_id
     }
 }
 
-impl From<SigningKey> for LocalSigner<SigningKey> {
-    fn from(value: SigningKey) -> Self {
-        Self::from_signing_key(value)
+impl From<SecretKey> for LocalSigner<Secp256k1Credential> {
+    fn from(value: SecretKey) -> Self {
+        Self::from_secp256k1(value)
     }
 }
 
-impl From<K256SecretKey> for LocalSigner<SigningKey> {
-    fn from(value: K256SecretKey) -> Self {
-        Self::from_signing_key(value.into())
-    }
-}
-
-impl From<&K256SecretKey> for LocalSigner<SigningKey> {
-    fn from(value: &K256SecretKey) -> Self {
-        Self::from_signing_key(value.into())
-    }
-}
-
-impl FromStr for LocalSigner<SigningKey> {
+impl FromStr for LocalSigner<Secp256k1Credential> {
     type Err = LocalSignerError;
 
     fn from_str(src: &str) -> Result<Self, Self::Err> {
@@ -190,7 +238,7 @@ impl FromStr for LocalSigner<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{PrivateKeySigner, SignerSync};
+    use crate::{PrivateKeySigner, Secp256k1Signer, SignerSync};
     use alloy_primitives::{address, b256};
 
     #[cfg(feature = "keystore")]
@@ -199,14 +247,14 @@ mod tests {
     #[test]
     fn parse_pk() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
-        let _pk: PrivateKeySigner = s.parse().unwrap();
+        let _pk: Secp256k1Signer = s.parse().unwrap();
     }
 
     #[test]
     fn parse_short_key() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
         assert!(s.len() < 64);
-        let pk = s.parse::<PrivateKeySigner>().unwrap_err();
+        let pk = s.parse::<Secp256k1Signer>().unwrap_err();
         match pk {
             LocalSignerError::HexError(hex::FromHexError::InvalidStringLength) => {}
             _ => panic!("Unexpected error"),
@@ -214,7 +262,9 @@ mod tests {
     }
 
     #[cfg(feature = "keystore")]
-    fn test_encrypted_json_keystore(key: LocalSigner<SigningKey>, uuid: &str, dir: &Path) {
+    fn test_encrypted_json_keystore(key: Secp256k1Signer, uuid: &str, dir: &Path) {
+        use std::path::Path;
+
         // sign a message using the given key
         let message = "Some data";
         let signature = key.sign_message_sync(message.as_bytes()).unwrap();
@@ -222,7 +272,7 @@ mod tests {
         // read from the encrypted JSON keystore and decrypt it, while validating that the
         // signatures produced by both the keys should match
         let path = Path::new(dir).join(uuid);
-        let key2 = LocalSigner::<SigningKey>::decrypt_keystore(path.clone(), "randpsswd").unwrap();
+        let key2 = Secp256k1Signer::decrypt_keystore(path.clone(), "randpsswd").unwrap();
 
         let signature2 = key2.sign_message_sync(message.as_bytes()).unwrap();
         assert_eq!(signature, signature2);
@@ -236,8 +286,7 @@ mod tests {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
         let mut rng = rand::thread_rng();
-        let (key, uuid) =
-            LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
+        let (key, uuid) = Secp256k1Signer::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
@@ -253,36 +302,9 @@ mod tests {
             hex::decode("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b")
                 .unwrap();
 
-        let (key, uuid) = LocalSigner::<SigningKey>::encrypt_keystore(
-            &dir,
-            &mut rng,
-            private_key,
-            "randpsswd",
-            None,
-        )
-        .unwrap();
-
-        test_encrypted_json_keystore(key, &uuid, dir.path());
-    }
-
-    #[test]
-    #[cfg(feature = "keystore-geth-compat")]
-    fn test_encrypted_json_keystore_with_address() {
-        // create and store an encrypted JSON keystore in this directory
-
-        use std::fs::File;
-
-        use eth_keystore::EthKeystore;
-        let dir = tempdir().unwrap();
-        let mut rng = rand::thread_rng();
         let (key, uuid) =
-            LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
-
-        let path = Path::new(dir.path()).join(uuid.as_str());
-        let file = File::open(path).unwrap();
-        let keystore = serde_json::from_reader::<_, EthKeystore>(file).unwrap();
-
-        assert!(!keystore.address.is_zero());
+            Secp256k1Signer::encrypt_keystore(&dir, &mut rng, private_key, "randpsswd", None)
+                .unwrap();
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
@@ -291,7 +313,7 @@ mod tests {
     fn signs_msg() {
         let message = "Some data";
         let hash = alloy_primitives::utils::eip191_hash_message(message);
-        let key = LocalSigner::<SigningKey>::random_with(&mut rand::thread_rng());
+        let key = Secp256k1Signer::random_with(&mut rand::thread_rng());
         let address = key.address;
 
         // sign a message
@@ -307,66 +329,16 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "eip712")]
-    fn typed_data() {
-        use alloy_dyn_abi::eip712::TypedData;
-        use alloy_primitives::{keccak256, Address, I256, U256};
-        use alloy_sol_types::{eip712_domain, sol, SolStruct};
-        use serde::Serialize;
-
-        sol! {
-            #[derive(Debug, Serialize)]
-            struct FooBar {
-                int256 foo;
-                uint256 bar;
-                bytes fizz;
-                bytes32 buzz;
-                string far;
-                address out;
-            }
-        }
-
-        let domain = eip712_domain! {
-            name: "Eip712Test",
-            version: "1",
-            chain_id: 1,
-            verifying_contract: address!("0000000000000000000000000000000000000001"),
-            salt: keccak256("eip712-test-75F0CCte"),
-        };
-        let foo_bar = FooBar {
-            foo: I256::try_from(10u64).unwrap(),
-            bar: U256::from(20u64),
-            fizz: b"fizz".to_vec().into(),
-            buzz: keccak256("buzz"),
-            far: "space".into(),
-            out: Address::ZERO,
-        };
-        let signer = LocalSigner::<SigningKey>::random();
-        let hash = foo_bar.eip712_signing_hash(&domain);
-        let sig = signer.sign_typed_data_sync(&foo_bar, &domain).unwrap();
-        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), signer.address());
-        assert_eq!(signer.sign_hash_sync(&hash).unwrap(), sig);
-        let foo_bar_dynamic = TypedData::from_struct(&foo_bar, Some(domain));
-        let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
-        let sig_dynamic = signer.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
-        assert_eq!(
-            sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
-            signer.address()
-        );
-        assert_eq!(signer.sign_hash_sync(&dynamic_hash).unwrap(), sig_dynamic);
-    }
-
-    #[test]
     fn key_to_address() {
-        let signer: LocalSigner<SigningKey> =
+        let signer: Secp256k1Signer =
             "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
         assert_eq!(signer.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
 
-        let signer: LocalSigner<SigningKey> =
+        let signer: Secp256k1Signer =
             "0000000000000000000000000000000000000000000000000000000000000002".parse().unwrap();
         assert_eq!(signer.address, address!("2B5AD5c4795c026514f8317c7a215E218DcCD6cF"));
 
-        let signer: LocalSigner<SigningKey> =
+        let signer: Secp256k1Signer =
             "0000000000000000000000000000000000000000000000000000000000000003".parse().unwrap();
         assert_eq!(signer.address, address!("0x6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
     }
@@ -375,59 +347,80 @@ mod tests {
     fn conversions() {
         let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
 
-        let signer_b256: LocalSigner<SigningKey> =
-            LocalSigner::<SigningKey>::from_bytes(&key).unwrap();
+        let signer_b256: Secp256k1Signer = Secp256k1Signer::from_bytes(&key).unwrap();
         assert_eq!(signer_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
         assert_eq!(signer_b256.chain_id, None);
-        assert_eq!(signer_b256.credential, SigningKey::from_bytes((&key.0).into()).unwrap());
 
-        let signer_str = LocalSigner::<SigningKey>::from_str(
+        let signer_str = Secp256k1Signer::from_str(
             "0000000000000000000000000000000000000000000000000000000000000001",
         )
         .unwrap();
         assert_eq!(signer_str.address, signer_b256.address);
         assert_eq!(signer_str.chain_id, signer_b256.chain_id);
-        assert_eq!(signer_str.credential, signer_b256.credential);
         assert_eq!(signer_str.to_bytes(), key);
-        assert_eq!(signer_str.to_field_bytes(), key.0.into());
 
-        let signer_slice = LocalSigner::<SigningKey>::from_slice(&key[..]).unwrap();
+        let signer_slice = Secp256k1Signer::from_slice(&key[..]).unwrap();
         assert_eq!(signer_slice.address, signer_b256.address);
         assert_eq!(signer_slice.chain_id, signer_b256.chain_id);
-        assert_eq!(signer_slice.credential, signer_b256.credential);
         assert_eq!(signer_slice.to_bytes(), key);
-        assert_eq!(signer_slice.to_field_bytes(), key.0.into());
-
-        let signer_field_bytes = LocalSigner::from_field_bytes((&key.0).into()).unwrap();
-        assert_eq!(signer_field_bytes.address, signer_b256.address);
-        assert_eq!(signer_field_bytes.chain_id, signer_b256.chain_id);
-        assert_eq!(signer_field_bytes.credential, signer_b256.credential);
-        assert_eq!(signer_field_bytes.to_bytes(), key);
-        assert_eq!(signer_field_bytes.to_field_bytes(), key.0.into());
     }
 
     #[test]
     fn key_from_str() {
-        let signer: LocalSigner<SigningKey> =
+        let signer: Secp256k1Signer =
             "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
 
         // Check FromStr and `0x`
-        let signer_0x: LocalSigner<SigningKey> =
+        let signer_0x: Secp256k1Signer =
             "0x0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
         assert_eq!(signer.address, signer_0x.address);
         assert_eq!(signer.chain_id, signer_0x.chain_id);
-        assert_eq!(signer.credential, signer_0x.credential);
 
         // Must fail because of `0z`
         "0z0000000000000000000000000000000000000000000000000000000000000001"
-            .parse::<LocalSigner<SigningKey>>()
+            .parse::<Secp256k1Signer>()
             .unwrap_err();
     }
 
     #[test]
     fn public_key() {
-        let signer: LocalSigner<SigningKey> =
+        let signer: Secp256k1Signer =
             "0x51fde55a7d696da3b318b21e231dec5ff4b33e895f191b2988e122e969b20e90".parse().unwrap();
         assert_eq!(signer.public_key(), B512::from_str("0x2bcb56445551cd344c9be67cfe27652932d7088c17b6c3c8dad622a5c8e8caf4574d68fa12355e7fefbe2377911016124b9284283527dd2ead05c7b6e5585fbd").unwrap());
+    }
+
+    /// Test that the secp256k1 and k256 implementations produce the same results.
+    #[test]
+    fn k256_secp256k1_compatibility() {
+        let key_hex = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
+
+        let k256_signer: PrivateKeySigner = key_hex.parse().unwrap();
+        let secp256k1_signer: Secp256k1Signer = key_hex.parse().unwrap();
+
+        // Same address
+        assert_eq!(k256_signer.address(), secp256k1_signer.address());
+
+        // Same public key
+        assert_eq!(k256_signer.public_key(), secp256k1_signer.public_key());
+
+        // Signatures can be recovered to the same address
+        let message = b"test message";
+        let k256_sig = k256_signer.sign_message_sync(message).unwrap();
+        let secp256k1_sig = secp256k1_signer.sign_message_sync(message).unwrap();
+
+        assert_eq!(
+            k256_sig.recover_address_from_msg(message).unwrap(),
+            secp256k1_sig.recover_address_from_msg(message).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_parity() {
+        let signer = Secp256k1Signer::random();
+        let message = b"hello";
+        let signature = signer.sign_message_sync(message).unwrap();
+        let value = signature.as_bytes().to_vec();
+        let recovered_signature: alloy_primitives::Signature = value.as_slice().try_into().unwrap();
+        assert_eq!(signature, recovered_signature);
     }
 }
