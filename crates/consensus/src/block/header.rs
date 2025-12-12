@@ -752,7 +752,7 @@ pub trait BlockHeader {
         #[cfg(feature = "amsterdam")]
         let bal_empty = self
             .block_access_list_hash()
-            .map_or(true, |hash| hash == alloy_eips::eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH);
+            .is_none_or(|hash| hash == alloy_eips::eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH);
 
         #[cfg(not(feature = "amsterdam"))]
         let bal_empty = true;

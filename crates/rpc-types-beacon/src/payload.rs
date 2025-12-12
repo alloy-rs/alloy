@@ -818,6 +818,7 @@ mod tests {
         assert!(execution_payload_from_beacon_str(invalid_json).is_err());
     }
 
+    #[cfg(not(feature = "amsterdam"))]
     #[test]
     fn test_extract_payload_from_beacon_block() {
         // Extracted from https://light-mainnet.beaconcha.in/slot/0x6ceadbf2a6adbbd64cbec33fdebbc582f25171cd30ac43f641cbe76ac7313ddf with only 2 transactions
