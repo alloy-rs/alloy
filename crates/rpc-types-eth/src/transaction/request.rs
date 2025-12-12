@@ -593,10 +593,8 @@ impl TransactionRequest {
 
     /// Build an EIP-7702 transaction.
     ///
-    /// # Panics
-    ///
-    /// If required fields are missing. Use `complete_7702` to check if the
-    /// request can be built.
+    /// Returns an error if required fields are missing. Use `complete_7702` to
+    /// check if the request can be built.
     pub fn build_7702(self) -> Result<TxEip7702, ValueError<Self>> {
         let Some(to) = self.to else {
             return Err(ValueError::new(self, "Missing 'to' field for Eip7702 transaction."));

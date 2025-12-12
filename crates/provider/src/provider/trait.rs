@@ -1368,13 +1368,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// use alloy_rpc_client::NoParams;
     ///
     /// // No parameters: `()`
-    /// let block_number = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
+    /// let block_number: String = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
     ///
     /// // One parameter: `(param,)` or `[param]`
-    /// let block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
+    /// let block: serde_json::Value = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
     ///
     /// // Two or more parameters: `(param1, param2, ...)` or `[param1, param2, ...]`
-    /// let full_block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
+    /// let full_block: serde_json::Value = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
     /// # Ok(())
     /// # }
     /// ```
