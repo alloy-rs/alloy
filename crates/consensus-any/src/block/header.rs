@@ -96,7 +96,7 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
-    /// EIP-7685 requests hash.
+    /// EIP-7928 block access list hash.
     #[cfg(feature = "amsterdam")]
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_access_list_hash: Option<B256>,

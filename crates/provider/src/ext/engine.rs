@@ -52,7 +52,9 @@ pub trait EngineApi<N>: Send + Sync {
         execution_requests: Vec<Bytes>,
     ) -> TransportResult<PayloadStatus>;
 
-    /// For BAL
+    /// Sends the given payload to the execution layer client, as specified for the Amsterdam fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_newpayloadv5>
     #[cfg(feature = "amsterdam")]
     async fn new_payload_v5(
         &self,
@@ -143,7 +145,13 @@ pub trait EngineApi<N>: Send + Sync {
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
 
-    /// For BAL.
+    /// Returns the most recent version of the payload that is available in the corresponding
+    /// payload build process at the time of receiving this call.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_getpayloadv6>
+    ///
+    /// Note:
+    /// > Provider software MAY stop the corresponding build process after serving this call.
     #[cfg(feature = "amsterdam")]
     async fn get_payload_v6(
         &self,

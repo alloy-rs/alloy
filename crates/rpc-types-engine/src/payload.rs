@@ -18,7 +18,6 @@ use alloy_eips::{
     eip7594::{BlobTransactionSidecarEip7594, CELLS_PER_EXT_BLOB},
     eip7685::Requests,
     eip7840::BlobParams,
-    eip7928::BlockAccessList,
     BlockNumHash,
 };
 use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
@@ -1192,7 +1191,10 @@ impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
     }
 }
 
-/// New payload structure for V4. This is required for EIP-7928
+/// New payload structure for V4. This is required for EIP-7928.
+///
+/// See also: <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#executionpayloadv4>
+#[cfg(feature = "amsterdam")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -1205,6 +1207,7 @@ pub struct ExecutionPayloadV4 {
     pub block_access_list: Bytes,
 }
 
+#[cfg(feature = "amsterdam")]
 impl ExecutionPayloadV4 {
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`].
     ///
@@ -1228,7 +1231,8 @@ impl ExecutionPayloadV4 {
         H: BlockHeader,
     {
         Self {
-            block_access_list: alloy_rlp::encode(BlockAccessList::new()).into(),
+            block_access_list: alloy_rlp::encode(alloy_eips::eip7928::BlockAccessList::new())
+                .into(),
             payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
         }
     }
@@ -1241,6 +1245,21 @@ impl ExecutionPayloadV4 {
     /// Returns the timestamp for the payload.
     pub const fn timestamp(&self) -> u64 {
         self.payload_inner.payload_inner.payload_inner.timestamp
+    }
+
+    /// Returns the blob gas used for the payload.
+    pub const fn blob_gas_used(&self) -> u64 {
+        self.payload_inner.blob_gas_used
+    }
+
+    /// Returns the excess blob gas for the payload.
+    pub const fn excess_blob_gas(&self) -> u64 {
+        self.payload_inner.excess_blob_gas
+    }
+
+    /// Returns the block access list for the payload.
+    pub const fn block_access_list(&self) -> &Bytes {
+        &self.block_access_list
     }
 
     /// Converts [`ExecutionPayloadV4`] to [`Block`].
