@@ -56,30 +56,6 @@ impl<T> Recovered<T> {
         self.inner.clone()
     }
 
-    /// Returns a reference to the transaction.
-    #[doc(alias = "transaction")]
-    #[deprecated = "Use `inner` instead"]
-    pub const fn tx(&self) -> &T {
-        &self.inner
-    }
-
-    /// Transform back to the transaction.
-    #[doc(alias = "into_transaction")]
-    #[deprecated = "Use `into_inner` instead"]
-    pub fn into_tx(self) -> T {
-        self.inner
-    }
-
-    /// Clone the inner transaction.
-    #[doc(alias = "clone_transaction")]
-    #[deprecated = "Use `clone_inner` instead"]
-    pub fn clone_tx(&self) -> T
-    where
-        T: Clone,
-    {
-        self.inner.clone()
-    }
-
     /// Dissolve Self to its component
     #[doc(alias = "split")]
     pub fn into_parts(self) -> (T, Address) {
@@ -107,15 +83,6 @@ impl<T> Recovered<T> {
         self.map(Tx::from)
     }
 
-    /// Converts the transaction type to the given alternative that is `From<T>`
-    #[deprecated = "Use `convert` instead"]
-    pub fn convert_transaction<Tx>(self) -> Recovered<Tx>
-    where
-        Tx: From<T>,
-    {
-        self.map(Tx::from)
-    }
-
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
     pub fn try_convert<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
@@ -124,6 +91,7 @@ impl<T> Recovered<T> {
         self.try_map(Tx::try_from)
     }
 
+<<<<<<< HEAD
     /// Converts the transaction to the given alternative that is `TryFrom<T>`
     #[deprecated = "Use `try_convert` instead"]
     pub fn try_convert_transaction<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
@@ -133,28 +101,15 @@ impl<T> Recovered<T> {
         self.try_map(Tx::try_from)
     }
 
+=======
+>>>>>>> 50f527932 (chore: rm all deprecations)
     /// Applies the given closure to the inner signed object.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
         Recovered::new_unchecked(f(self.inner), self.signer)
     }
 
-    /// Applies the given closure to the inner transaction type.
-    #[deprecated = "Use `map` instead"]
-    pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
-        Recovered::new_unchecked(f(self.inner), self.signer)
-    }
-
     /// Applies the given fallible closure to the inner signed object.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Recovered<Tx>, E> {
-        Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
-    }
-
-    /// Applies the given fallible closure to the inner transaction type.
-    #[deprecated = "Use `try_map` instead"]
-    pub fn try_map_transaction<Tx, E>(
-        self,
-        f: impl FnOnce(T) -> Result<Tx, E>,
-    ) -> Result<Recovered<Tx>, E> {
         Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
     }
 

@@ -4,8 +4,7 @@ use alloc::vec::Vec;
 use alloy_primitives::{Address, Bytes, B256, B512, KECCAK256_EMPTY, U256};
 
 // re-export account type for `eth_getAccount`
-pub use alloy_consensus::Account;
-use alloy_consensus::EMPTY_ROOT_HASH;
+pub use alloy_consensus::TrieAccount as Account;
 
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
