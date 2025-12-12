@@ -1,4 +1,5 @@
 use crate::crypto::RecoveryError;
+use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
@@ -259,11 +260,21 @@ pub trait SignerRecoverable {
     /// Returns an error if the transaction's signature is invalid.
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError>;
 
+    /// Same as [`SignerRecoverable::recover_signer`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of transactions to avoid allocating a new
+    /// buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn recover_with_buf(&self, buf: &mut alloc::vec::Vec<u8>) -> Result<Address, RecoveryError> {
+        let _ = buf;
+        self.recover_signer()
+    }
+
     /// Same as [`SignerRecoverable::recover_signer_unchecked`] but receives a buffer to operate on
     /// for encoding. This is useful during batch recovery of historical transactions to avoid
     /// allocating a new buffer for each transaction.
     ///
-    /// Caution: it is expected that implementations clear this buffer.
+    /// Caution: it is expected that implementations always clear this buffer before using it.
     fn recover_unchecked_with_buf(
         &self,
         buf: &mut alloc::vec::Vec<u8>,
@@ -292,6 +303,37 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
 
+    /// Same as [`SignerRecoverable::try_into_recovered`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of transactions to avoid
+    /// allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_into_recovered_with_buf(
+        self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.recover_with_buf(buf)?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+    /// Same as [`SignerRecoverable::try_into_recovered_unchecked`] but receives a buffer to operate
+    /// on for encoding. This is useful during batch recovery of hsitorical transactions to
+    /// avoid allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_into_recovered_unchecked_with_buf(
+        self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.recover_unchecked_with_buf(buf)?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
     /// `Recovered<&Self>`
     fn try_to_recovered_ref(&self) -> Result<Recovered<&Self>, RecoveryError> {
@@ -299,10 +341,36 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
 
+    /// Same as [`SignerRecoverable::try_to_recovered_ref`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of transactions to avoid
+    /// allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_to_recovered_ref_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.recover_with_buf(buf)?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
     /// Recover the signer via [`SignerRecoverable::recover_signer_unchecked`] and returns a
     /// `Recovered<&Self>`
     fn try_to_recovered_ref_unchecked(&self) -> Result<Recovered<&Self>, RecoveryError> {
         let signer = self.recover_signer_unchecked()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    /// Same as [`SignerRecoverable::try_to_recovered_ref_unchecked`] but receives a buffer to
+    /// operate on for encoding. This is useful during batch recovery of historical transactions
+    /// to avoid allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_to_recovered_ref_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.recover_unchecked_with_buf(buf)?;
         Ok(Recovered::new_unchecked(self, signer))
     }
 }
@@ -317,6 +385,10 @@ where
 
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.1.recover_signer_unchecked()
+    }
+
+    fn recover_with_buf(&self, buf: &mut Vec<u8>) -> Result<Address, RecoveryError> {
+        self.1.recover_with_buf(buf)
     }
 
     fn recover_unchecked_with_buf(
@@ -337,6 +409,10 @@ where
 
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.inner().recover_signer_unchecked()
+    }
+
+    fn recover_with_buf(&self, buf: &mut alloc::vec::Vec<u8>) -> Result<Address, RecoveryError> {
+        self.inner().recover_with_buf(buf)
     }
 
     fn recover_unchecked_with_buf(
