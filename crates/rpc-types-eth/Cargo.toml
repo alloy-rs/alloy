@@ -106,4 +106,4 @@ serde-bincode-compat = [
 	"dep:serde_with",
 	"alloy-eips/serde-bincode-compat",
 ]
-amsterdam = ["alloy-consensus/amsterdam"]
+amsterdam = ["alloy-consensus/amsterdam", "alloy-consensus-any/amsterdam"]
