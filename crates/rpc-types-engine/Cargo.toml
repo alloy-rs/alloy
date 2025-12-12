@@ -14,9 +14,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -61,7 +61,7 @@ std = [
 	"alloy-serde?/std",
 	"alloy-primitives/std",
 	"alloy-rlp/std",
-	"serde?/std"
+	"serde?/std",
 ]
 serde = [
 	"dep:serde",
@@ -75,15 +75,22 @@ jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
-arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
-amsterdam = []
+arbitrary = [
+	"dep:arbitrary",
+	"std",
+	"alloy-primitives/arbitrary",
+	"alloy-serde/arbitrary",
+	"alloy-consensus/arbitrary",
+	"alloy-eips/arbitrary",
+]
+amsterdam = ["alloy-consensus/amsterdam"]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
-    "rand",
-    "rlp",
-    "serde",
-    "arbitrary",
+	"rand",
+	"rlp",
+	"serde",
+	"arbitrary",
 ] }
 alloy-consensus = { workspace = true, features = ["arbitrary"] }
 arbitrary = { workspace = true, features = ["derive"] }

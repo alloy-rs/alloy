@@ -3,9 +3,9 @@ use alloy_network::Network;
 use alloy_primitives::{BlockHash, Bytes, B256};
 use alloy_rpc_types_engine::{
     ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
-    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadEnvelopeV6,
-    ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4,
-    ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatus,
+    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadInputV2,
+    ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
+    PayloadId, PayloadStatus,
 };
 use alloy_transport::TransportResult;
 
@@ -58,7 +58,7 @@ pub trait EngineApi<N>: Send + Sync {
     #[cfg(feature = "amsterdam")]
     async fn new_payload_v5(
         &self,
-        payload: ExecutionPayloadV4,
+        payload: alloy_rpc_types_engine::ExecutionPayloadV4,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
         execution_requests: Vec<Bytes>,
@@ -156,7 +156,7 @@ pub trait EngineApi<N>: Send + Sync {
     async fn get_payload_v6(
         &self,
         payload_id: PayloadId,
-    ) -> TransportResult<ExecutionPayloadEnvelopeV6>;
+    ) -> TransportResult<alloy_rpc_types_engine::ExecutionPayloadEnvelopeV6>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -251,7 +251,7 @@ where
     #[cfg(feature = "amsterdam")]
     async fn new_payload_v5(
         &self,
-        payload: ExecutionPayloadV4,
+        payload: alloy_rpc_types_engine::ExecutionPayloadV4,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
         execution_requests: Vec<Bytes>,
@@ -323,7 +323,7 @@ where
     async fn get_payload_v6(
         &self,
         payload_id: PayloadId,
-    ) -> TransportResult<ExecutionPayloadEnvelopeV6> {
+    ) -> TransportResult<alloy_rpc_types_engine::ExecutionPayloadEnvelopeV6> {
         self.client().request("engine_getPayloadV6", (payload_id,)).await
     }
 
