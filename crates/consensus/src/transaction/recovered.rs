@@ -319,7 +319,7 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
     /// Same as [`SignerRecoverable::try_into_recovered_unchecked`] but receives a buffer to operate
-    /// on for encoding. This is useful during batch recovery of hsitorical transactions to
+    /// on for encoding. This is useful during batch recovery of historical transactions to
     /// avoid allocating a new buffer for each transaction.
     ///
     /// Caution: it is expected that implementations always clear this buffer before using it.
