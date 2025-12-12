@@ -53,6 +53,7 @@ pub trait EngineApi<N>: Send + Sync {
     ) -> TransportResult<PayloadStatus>;
 
     /// For BAL
+    #[cfg(feature = "amsterdam")]
     async fn new_payload_v5(
         &self,
         payload: ExecutionPayloadV4,
@@ -143,6 +144,7 @@ pub trait EngineApi<N>: Send + Sync {
     ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
 
     /// For BAL.
+    #[cfg(feature = "amsterdam")]
     async fn get_payload_v6(
         &self,
         payload_id: PayloadId,
@@ -238,6 +240,7 @@ where
             .await
     }
 
+    #[cfg(feature = "amsterdam")]
     async fn new_payload_v5(
         &self,
         payload: ExecutionPayloadV4,
@@ -308,6 +311,7 @@ where
         self.client().request("engine_getPayloadV4", (payload_id,)).await
     }
 
+    #[cfg(feature = "amsterdam")]
     async fn get_payload_v6(
         &self,
         payload_id: PayloadId,

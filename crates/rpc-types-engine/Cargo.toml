@@ -76,6 +76,7 @@ jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
 arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
+amsterdam = []
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [

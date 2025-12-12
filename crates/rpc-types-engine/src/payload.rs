@@ -267,6 +267,7 @@ pub struct ExecutionPayloadEnvelopeV5 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg(feature = "amsterdam")]
 pub struct ExecutionPayloadEnvelopeV6 {
     /// Execution payload V4
     pub execution_payload: ExecutionPayloadV4,
@@ -1271,15 +1272,12 @@ impl ExecutionPayloadV4 {
     /// without any conversion.
     /// NOTE: to be replaced with v4 specific fields
     pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block = self.payload_inner.payload_inner.into_block_raw()?;
-
-        base_block.header.blob_gas_used = Some(self.payload_inner.blob_gas_used);
-        base_block.header.excess_blob_gas = Some(self.payload_inner.excess_blob_gas);
-
+        let base_block = self.payload_inner.into_block_raw()?;
         Ok(base_block)
     }
 }
 
+#[cfg(feature = "amsterdam")]
 impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
     type Error = PayloadError;
 
