@@ -14,9 +14,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -29,7 +29,6 @@ alloy-consensus-any.workspace = true
 alloy-network-primitives.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "map"] }
-
 itertools.workspace = true
 thiserror.workspace = true
 
@@ -48,10 +47,10 @@ alloy-sol-types.workspace = true
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
-    "rand",
-    "rlp",
-    "serde",
-    "arbitrary",
+	"rand",
+	"rlp",
+	"serde",
+	"arbitrary",
 ] }
 alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
 alloy-eips = { workspace = true, features = ["arbitrary", "k256"] }
@@ -75,8 +74,8 @@ std = [
 	"alloy-sol-types/std",
 	"serde?/std",
 	"serde_json?/std",
+	"thiserror/std",
 	"serde_with?/std",
-	"thiserror/std"
 ]
 serde = [
 	"dep:serde",
@@ -87,7 +86,7 @@ serde = [
 	"alloy-eips/serde",
 	"alloy-consensus-any/serde",
 	"rand/serde",
-	"alloy-network-primitives/serde"
+	"alloy-network-primitives/serde",
 ]
 arbitrary = [
 	"std",
@@ -97,8 +96,13 @@ arbitrary = [
 	"alloy-serde?/arbitrary",
 	"alloy-eips/arbitrary",
 	"alloy-consensus-any/arbitrary",
-	"alloy-sol-types/arbitrary"
+	"alloy-sol-types/arbitrary",
+
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
-serde-bincode-compat = ["serde", "dep:serde_with", "alloy-eips/serde-bincode-compat"]
+serde-bincode-compat = [
+	"serde",
+	"dep:serde_with",
+	"alloy-eips/serde-bincode-compat",
+]
