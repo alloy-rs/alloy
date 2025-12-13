@@ -56,11 +56,7 @@ impl<N: Network> TransactionBuilderError<N> {
     }
 }
 
-/// Base Transaction builder.
-///
-/// Transaction builders are primarily used to construct typed transactions that can be signed with
-/// [`TransactionBuilder::build`], or unsigned typed transactions with
-/// [`TransactionBuilder::build_unsigned`].
+/// Transaction builder.
 #[doc(alias = "TxBuilder")]
 pub trait TransactionBuilder: Default + Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
@@ -315,10 +311,11 @@ pub trait TransactionBuilder: Default + Sized + Send + Sync + 'static {
     fn can_build(&self) -> bool;
 }
 
-/// Network-specific transaction builder operations.
+/// Network-specific transaction builder.
 ///
-/// Network Transaction builders should be able to construct all available transaction types on a
-/// given network.
+/// Extends [`TransactionBuilder`] with [`build_unsigned`](Self::build_unsigned)
+/// and [`build`](Self::build) methods.
+#[doc(alias = "NetworkTxBuilder")]
 pub trait NetworkTransactionBuilder<N: Network>: TransactionBuilder {
     /// Check if all necessary keys are present to build the specified type,
     /// returning a list of missing keys.

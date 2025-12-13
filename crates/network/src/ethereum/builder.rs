@@ -140,6 +140,7 @@ impl TransactionBuilder for TransactionRequest {
         common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
     }
 }
+
 impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
         match ty {
