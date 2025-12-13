@@ -354,7 +354,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Retrieves account information ([`Account`](alloy_consensus::Account)) for the given
     /// [`Address`] at the particular [`BlockId`].
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
         self.client().request("eth_getAccount", address).into()
     }
 
