@@ -441,16 +441,6 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
 
         Ok(BlobTransactionSidecarEip7594::new(self.inner.blobs, commitments, proofs))
     }
-
-    /// Build the sidecar for eip-7594 from the data with the provided settings.
-    #[cfg(feature = "kzg")]
-    #[deprecated = "Use `build_7594_with_settings` instead"]
-    pub fn builder_7594_sidecar(
-        self,
-        settings: &c_kzg::KzgSettings,
-    ) -> Result<BlobTransactionSidecarEip7594, c_kzg::Error> {
-        self.build_7594_with_settings(settings)
-    }
 }
 
 impl<T: SidecarCoder> From<T> for SidecarBuilder<T> {

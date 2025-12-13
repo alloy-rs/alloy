@@ -169,13 +169,6 @@ impl RpcClient {
         PollerBuilder::new(self.get_weak(), method, params)
     }
 
-    /// Boxes the transport.
-    #[deprecated(since = "0.9.0", note = "`RpcClient` is now always boxed")]
-    #[expect(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
-    }
-
     /// Create a new [`BatchRequest`] builder.
     #[inline]
     pub fn new_batch(&self) -> BatchRequest<'_> {
@@ -384,14 +377,6 @@ impl RpcClientInner {
         method: impl Into<Cow<'static, str>>,
     ) -> RpcCall<NoParams, Resp> {
         self.request(method, [])
-    }
-
-    /// Type erase the service in the transport, allowing it to be used in a
-    /// generic context.
-    #[deprecated(since = "0.9.0", note = "`RpcClientInner` is now always boxed")]
-    #[expect(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
     }
 }
 
