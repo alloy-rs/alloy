@@ -998,7 +998,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
         match tx {
             SendableTx::Builder(mut tx) => {
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                alloy_network::NetworkTransactionBuilder::prep_for_submission(&mut tx);
                 let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
                 Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
             }
@@ -1075,7 +1075,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
         match tx {
             SendableTx::Builder(mut tx) => {
-                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                alloy_network::NetworkTransactionBuilder::prep_for_submission(&mut tx);
                 let receipt = self.client().request("eth_sendTransactionSync", (tx,)).await?;
                 Ok(receipt)
             }
@@ -1474,7 +1474,9 @@ mod tests {
     use super::*;
     use crate::{builder, ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_consensus::{Transaction, TxEnvelope};
-    use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+    use alloy_network::{
+        AnyNetwork, EthereumWallet, NetworkTransactionBuilder, TransactionBuilder,
+    };
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil, Reth};
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rlp::Decodable;

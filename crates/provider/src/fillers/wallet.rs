@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, NetworkWallet, TransactionBuilder};
+use alloy_network::{Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder};
 use alloy_transport::TransportResult;
 
 use super::{FillerControlFlow, TxFiller};
