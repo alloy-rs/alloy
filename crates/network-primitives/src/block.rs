@@ -205,13 +205,6 @@ impl<T: TransactionResponse> BlockTransactions<T> {
         self.into_hashes()
     }
 
-    /// Returns an iterator over the transaction hashes.
-    #[deprecated = "use `hashes` instead"]
-    #[inline]
-    pub fn iter(&self) -> BlockTransactionHashes<'_, T> {
-        self.hashes()
-    }
-
     /// Returns an iterator over references to the transaction hashes.
     #[inline]
     pub fn hashes(&self) -> BlockTransactionHashes<'_, T> {

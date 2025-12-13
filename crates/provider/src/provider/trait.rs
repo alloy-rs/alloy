@@ -105,7 +105,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # async fn f() -> Result<(), Box<dyn std::error::Error>> {
     /// let provider: DynProvider =
-    ///     ProviderBuilder::new().on_builtin("http://localhost:8080").await?.erased();
+    ///     ProviderBuilder::new().connect("http://localhost:8080").await?.erased();
     /// let block = provider.get_block_number().await?;
     /// # Ok(())
     /// # }
@@ -352,9 +352,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getAccountInfo", address).into()
     }
 
-    /// Retrieves account information ([`Account`](alloy_consensus::Account)) for the given
+    /// Retrieves account information ([`TrieAccount`](alloy_consensus::TrieAccount)) for the given
     /// [`Address`] at the particular [`BlockId`].
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
         self.client().request("eth_getAccount", address).into()
     }
 
