@@ -16,9 +16,6 @@ mod native;
 #[cfg(not(target_family = "wasm"))]
 pub use native::{WebSocketConfig, WsConnect};
 
-#[cfg(not(target_family = "wasm"))]
-use rustls as _;
-
 #[cfg(target_family = "wasm")]
 mod wasm;
 #[cfg(target_family = "wasm")]
