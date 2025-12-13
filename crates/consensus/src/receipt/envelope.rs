@@ -111,17 +111,17 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Returns the success status of the receipt's transaction.
     pub const fn status(&self) -> bool {
-        self.as_receipt().unwrap().status.coerce_status()
+        self.as_receipt().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
     pub const fn cumulative_gas_used(&self) -> u64 {
-        self.as_receipt().unwrap().cumulative_gas_used
+        self.as_receipt().cumulative_gas_used
     }
 
     /// Return the receipt logs.
     pub fn logs(&self) -> &[T] {
-        &self.as_receipt().unwrap().logs
+        &self.as_receipt().logs
     }
 
     /// Consumes the type and returns the logs.
@@ -131,34 +131,32 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Return the receipt's bloom.
     pub const fn logs_bloom(&self) -> &Bloom {
-        &self.as_receipt_with_bloom().unwrap().logs_bloom
+        &self.as_receipt_with_bloom().logs_bloom
     }
 
-    /// Return the inner receipt with bloom. Currently this is infallible,
-    /// however, future receipt types may be added.
-    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<Receipt<T>>> {
+    /// Returns a reference to the bloom.
+    pub const fn as_receipt_with_bloom(&self) -> &ReceiptWithBloom<Receipt<T>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
             | Self::Eip4844(t)
-            | Self::Eip7702(t) => Some(t),
+            | Self::Eip7702(t) => t,
         }
     }
 
-    /// Return the mutable inner receipt with bloom. Currently this is
-    /// infallible, however, future receipt types may be added.
-    pub const fn as_receipt_with_bloom_mut(&mut self) -> Option<&mut ReceiptWithBloom<Receipt<T>>> {
+    /// Returns a mutable reference to the bloom.
+    pub const fn as_receipt_with_bloom_mut(&mut self) -> &mut ReceiptWithBloom<Receipt<T>> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
             | Self::Eip4844(t)
-            | Self::Eip7702(t) => Some(t),
+            | Self::Eip7702(t) => t,
         }
     }
 
-    /// Consumes the type and returns the underlying [`Receipt`].
+    /// Consumes the type and returns the underlying Receipt.
     pub fn into_receipt(self) -> Receipt<T> {
         match self {
             Self::Legacy(t)
@@ -169,15 +167,17 @@ impl<T> ReceiptEnvelope<T> {
         }
     }
 
-    /// Return the inner receipt. Currently this is infallible, however, future
-    /// receipt types may be added.
-    pub const fn as_receipt(&self) -> Option<&Receipt<T>> {
+    /// Returns a reference to the inner receipt.
+    ///
+    /// This method is infallible because all enum variants contain a
+    /// `ReceiptWithBloom<Receipt<T>>`.
+    pub const fn as_receipt(&self) -> &Receipt<T> {
         match self {
             Self::Legacy(t)
             | Self::Eip2930(t)
             | Self::Eip1559(t)
             | Self::Eip4844(t)
-            | Self::Eip7702(t) => Some(&t.receipt),
+            | Self::Eip7702(t) => &t.receipt,
         }
     }
 }
@@ -189,16 +189,16 @@ where
     type Log = T;
 
     fn status_or_post_state(&self) -> Eip658Value {
-        self.as_receipt().unwrap().status
+        self.as_receipt().status
     }
 
     fn status(&self) -> bool {
-        self.as_receipt().unwrap().status.coerce_status()
+        self.as_receipt().status.coerce_status()
     }
 
     /// Return the receipt's bloom.
     fn bloom(&self) -> Bloom {
-        self.as_receipt_with_bloom().unwrap().logs_bloom
+        self.as_receipt_with_bloom().logs_bloom
     }
 
     fn bloom_cheap(&self) -> Option<Bloom> {
@@ -207,12 +207,12 @@ where
 
     /// Returns the cumulative gas used at this receipt.
     fn cumulative_gas_used(&self) -> u64 {
-        self.as_receipt().unwrap().cumulative_gas_used
+        self.as_receipt().cumulative_gas_used
     }
 
     /// Return the receipt logs.
     fn logs(&self) -> &[T] {
-        &self.as_receipt().unwrap().logs
+        &self.as_receipt().logs
     }
 
     fn into_logs(self) -> Vec<Self::Log>
@@ -226,12 +226,12 @@ where
 impl ReceiptEnvelope {
     /// Get the length of the inner receipt in the 2718 encoding.
     pub fn inner_length(&self) -> usize {
-        self.as_receipt_with_bloom().unwrap().length()
+        self.as_receipt_with_bloom().length()
     }
 
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
-        let length = self.as_receipt_with_bloom().unwrap().length();
+        let length = self.as_receipt_with_bloom().length();
         match self {
             Self::Legacy(_) => length,
             _ => length + 1,
@@ -284,7 +284,7 @@ impl Encodable2718 for ReceiptEnvelope {
             None => {}
             Some(ty) => out.put_u8(ty),
         }
-        self.as_receipt_with_bloom().unwrap().encode(out);
+        self.as_receipt_with_bloom().encode(out);
     }
 }
 
@@ -450,7 +450,7 @@ pub(crate) mod serde_bincode_compat {
             };
 
             // ensure we have proper roundtrip data
-            data.transaction.as_receipt_with_bloom_mut().unwrap().receipt.status = true.into();
+            data.transaction.as_receipt_with_bloom_mut().receipt.status = true.into();
 
             let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
             let (decoded, _) =
