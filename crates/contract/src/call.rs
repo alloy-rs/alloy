@@ -3,8 +3,9 @@ use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{
-    eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    eip2718::Encodable2718, Ethereum, IntoWallet, Network, NetworkTransactionBuilder,
+    TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+    TxSigner,
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};

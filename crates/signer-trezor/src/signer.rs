@@ -283,7 +283,7 @@ fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signatur
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::{EthereumWallet, TransactionBuilder};
+    use alloy_network::{EthereumWallet, NetworkTransactionBuilder, TransactionBuilder};
     use alloy_primitives::{address, b256};
     use alloy_rpc_types_eth::{AccessList, AccessListItem, TransactionRequest};
 
