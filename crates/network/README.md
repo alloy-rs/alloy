@@ -38,12 +38,16 @@ For example, to add a new network called `Foo`:
 struct Foo;
 
 impl Network for Foo {
-    type Transaction = FooTransaction;
-    type Block = FooBlock;
+    type TxType = FooTxType;
+    type TxEnvelope = FooTxEnvelope;
+    type UnsignedTx = FooUnsignedTx;
+    type ReceiptEnvelope = FooReceiptEnvelope;
     type Header = FooHeader;
-    type Receipt = FooReceipt;
-
-    // etc.
+    type TransactionRequest = FooTransactionRequest;
+    type TransactionResponse = FooTransactionResponse;
+    type ReceiptResponse = FooReceiptResponse;
+    type HeaderResponse = FooHeaderResponse;
+    type BlockResponse = FooBlockResponse;
 }
 ```
 
@@ -64,3 +68,4 @@ trait FooProviderExt: Provider<Foo> {
 ```
 
 [alloy-provider]: ../provider
+
