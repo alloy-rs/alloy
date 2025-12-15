@@ -69,9 +69,6 @@ pub enum TurnkeySignerError {
     /// Invalid hex string in response.
     #[error("invalid hex string: {0}")]
     Hex(#[from] hex::FromHexError),
-    /// Signature not found in response.
-    #[error("signature not found in response")]
-    SignatureNotFound,
     /// Invalid signature format received from Turnkey.
     #[error("invalid signature format")]
     InvalidSignature,
