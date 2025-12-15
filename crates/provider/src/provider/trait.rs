@@ -1820,7 +1820,7 @@ mod tests {
         };
 
         let _receipt =
-            provider.send_transaction_sync(tx.clone()).await.expect("failed to send tx sync");
+            provider.send_transaction_sync(tx).await.expect("failed to send tx sync");
     }
 
     #[tokio::test]
