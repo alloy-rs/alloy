@@ -168,7 +168,8 @@ impl Default for Header {
 
 impl Sealable for Header {
     fn hash_slow(&self) -> B256 {
-        self.hash_slow()
+        // Avoid trait-method recursion: call the inherent implementation directly.
+        Header::hash_slow(self)
     }
 }
 
