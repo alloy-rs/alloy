@@ -48,7 +48,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - name: Install Anvil
-        uses: foundry-rs/foundry-toolchain@50d5a8956f2e319df19e6b57539d7e2acb9f8c1e # v1
+        uses: foundry-rs/foundry-toolchain@8b0419c685ef46cb79ec93fbdc131174afceb730 # v1
         with:
           version: nightly
       - name: Install test binaries
