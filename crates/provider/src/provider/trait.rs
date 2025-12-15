@@ -1867,7 +1867,7 @@ mod tests {
             ..Default::default()
         };
 
-        let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let builder = provider.send_transaction(tx).await.expect("failed to send tx");
         let hash1 = *builder.tx_hash();
 
         // Wait until tx is confirmed.
