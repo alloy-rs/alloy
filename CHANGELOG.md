@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
+
+### Bug Fixes
+
+- [network] Correct priority_fee_or_price field order in UnknownTypedTransaction ([#3301](https://github.com/alloy-rs/alloy/issues/3301))
+- [geth] Treat “execution reverted” as revert in CallFrame::is_revert ([#3295](https://github.com/alloy-rs/alloy/issues/3295))
+- [consensus] Silence unused generic param in Recovered::try_convert ([#3274](https://github.com/alloy-rs/alloy/issues/3274))
+- [ens] Use ENS_REVERSE_REGISTRAR_DOMAIN in get_reverse_registrar ([#3276](https://github.com/alloy-rs/alloy/issues/3276))
+- [eip1898] RpcBlockHash serde to use rename_all = \"camelCase\" ([#3255](https://github.com/alloy-rs/alloy/issues/3255))
+- Fix/fallback sequential for sync methods ([#3211](https://github.com/alloy-rs/alloy/issues/3211))
+- Correct SyncInfo.stages doc to list of  Stage  entries ([#3226](https://github.com/alloy-rs/alloy/issues/3226))
+
+### Dependencies
+
+- [deps] Bump Swatinem/rust-cache from 2.8.1 to 2.8.2 ([#3281](https://github.com/alloy-rs/alloy/issues/3281))
+- [deps] Bump taiki-e/install-action from 2.62.57 to 2.62.60 ([#3280](https://github.com/alloy-rs/alloy/issues/3280))
+- [deps] Bump crate-ci/typos from 1.39.2 to 1.40.0 ([#3282](https://github.com/alloy-rs/alloy/issues/3282))
+- [deps] Bump crate-ci/typos from 1.39.0 to 1.39.2 ([#3244](https://github.com/alloy-rs/alloy/issues/3244))
+- [deps] Bump taiki-e/install-action from 2.62.49 to 2.62.57 ([#3245](https://github.com/alloy-rs/alloy/issues/3245))
+- [deps] Bump actions/checkout from 5 to 6 ([#3246](https://github.com/alloy-rs/alloy/issues/3246))
+
+### Documentation
+
+- Align ExecutionWitness docs with list-based schema and RLP headers ([#3298](https://github.com/alloy-rs/alloy/issues/3298))
+- Add an example in alloy meta crate ([#3291](https://github.com/alloy-rs/alloy/issues/3291))
+- [provider] Properly format references ([#3292](https://github.com/alloy-rs/alloy/issues/3292))
+- Add more links, tests for README in transport and signer-local ([#3019](https://github.com/alloy-rs/alloy/issues/3019))
+- Add documentation for build_unsigned and build methods ([#3187](https://github.com/alloy-rs/alloy/issues/3187))
+- [provider] Expand on filler documentation ([#3283](https://github.com/alloy-rs/alloy/issues/3283))
+- [meta] Fix re-export docs ([#3284](https://github.com/alloy-rs/alloy/issues/3284))
+- Fix incorrect max_fee_per_gas field documentation ([#3250](https://github.com/alloy-rs/alloy/issues/3250))
+
+### Features
+
+- Make BuiltInConnectionString::connect configurable ([#3296](https://github.com/alloy-rs/alloy/issues/3296))
+- Add Erc7562Frame::is_revert method ([#3299](https://github.com/alloy-rs/alloy/issues/3299))
+- Add extract_block_range for Filter ([#3300](https://github.com/alloy-rs/alloy/issues/3300))
+- Add ensure_success method to ReceiptResponse ([#3287](https://github.com/alloy-rs/alloy/issues/3287))
+- [provider] Add `verify_flashbots_signature` function ([#3273](https://github.com/alloy-rs/alloy/issues/3273))
+- Add blocknumhash helper ([#3263](https://github.com/alloy-rs/alloy/issues/3263))
+- Add into-hashes-vec ([#3257](https://github.com/alloy-rs/alloy/issues/3257))
+- Include DecodeError in SszDecodeError display ([#3232](https://github.com/alloy-rs/alloy/issues/3232))
+- [provider] Add `fill_transaction` method to Provider trait ([#3221](https://github.com/alloy-rs/alloy/issues/3221))
+
+### Miscellaneous Tasks
+
+- Add contains helper ([#3302](https://github.com/alloy-rs/alloy/issues/3302))
+- Deprecate `DecodedValue::typ` in favor of `ty` ([#3293](https://github.com/alloy-rs/alloy/issues/3293))
+- Enable rlp when consensus/eips are active ([#3279](https://github.com/alloy-rs/alloy/issues/3279))
+- Prefix hash constants with 0x ([#3272](https://github.com/alloy-rs/alloy/issues/3272))
+- Remove unnecessary Unpin bound on decoder in EthCall futures ([#3267](https://github.com/alloy-rs/alloy/issues/3267))
+- [alloy] `consensus-secp256k1` feature ([#3270](https://github.com/alloy-rs/alloy/issues/3270))
+
+### Other
+
+- Wasm32 wasip support ([#3289](https://github.com/alloy-rs/alloy/issues/3289))
+- Align sequential fallback top-N selection with truncate ([#3242](https://github.com/alloy-rs/alloy/issues/3242))
+- Avoid redundant allocation when ranking fallback transports  ([#3241](https://github.com/alloy-rs/alloy/issues/3241))
+- Add contract eth_call block overrides ([#3233](https://github.com/alloy-rs/alloy/issues/3233))
+
+### Refactor
+
+- [contract] Remove redundant PhantomData from StorageSlotFinder ([#3277](https://github.com/alloy-rs/alloy/issues/3277))
+
+### Styling
+
+- [Feature] Introduce MinedTransactionInfo ([#3275](https://github.com/alloy-rs/alloy/issues/3275))
+
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
 
 ### Bug Fixes
@@ -35,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.1.2
 - [node-bindings/anvil] Unify startup timeout with shared NODE_STARTUP_TIMEOUT ([#3193](https://github.com/alloy-rs/alloy/issues/3193))
 
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
@@ -2088,6 +2157,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
+### Miscellaneous Tasks
+
+- Release 0.7.3
+
+## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
+
 ### Bug Fixes
 
 - Wrong func sig ([#1742](https://github.com/alloy-rs/alloy/issues/1742))
@@ -2124,7 +2199,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.7.3
 - Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
 - Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
 - Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))

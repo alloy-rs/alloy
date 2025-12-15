@@ -175,7 +175,7 @@ mod tests {
         let req_even = RequestPacket::Single(
             Request::new("test", Id::Number(2), None::<&'static RawValue>).try_into().unwrap(),
         );
-        let _ = dual_transport.call(req_even.clone()).await.unwrap();
+        let _ = dual_transport.call(req_even).await.unwrap();
 
         let received = rx.try_recv().unwrap();
 
@@ -189,7 +189,7 @@ mod tests {
                 .try_into()
                 .expect("Failed to serialize request"),
         );
-        let _ = dual_transport.call(req_odd.clone()).await.unwrap();
+        let _ = dual_transport.call(req_odd).await.unwrap();
 
         assert!(rx.try_recv().is_err(), "Received unexpected request for odd ID");
     }

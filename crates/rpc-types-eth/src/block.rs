@@ -126,6 +126,16 @@ impl<T, H> Block<T, H> {
         self.transactions.into_transactions_vec()
     }
 
+    /// Consumes the type and returns the transaction hashes as a vector.
+    ///
+    /// Note: if this is an uncle, this will return an empty vector.
+    pub fn into_hashes_vec(self) -> Vec<B256>
+    where
+        T: TransactionResponse,
+    {
+        self.transactions.into_hashes_vec()
+    }
+
     /// Converts this block into a [`BlockBody`].
     ///
     /// Returns an error if the transactions are not full or if the block has uncles.
@@ -786,13 +796,13 @@ impl<T: TransactionResponse, H> BlockResponse for Block<T, H> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct BadBlock {
+pub struct BadBlock<B = Block> {
     /// Underlying block object.
-    block: Block,
+    pub block: B,
     /// Hash of the block.
-    hash: BlockHash,
+    pub hash: BlockHash,
     /// RLP encoded block header.
-    rlp: Bytes,
+    pub rlp: Bytes,
 }
 
 #[cfg(test)]
