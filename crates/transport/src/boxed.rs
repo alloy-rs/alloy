@@ -132,7 +132,7 @@ mod test {
     const fn _compile_check() {
         const fn inner<T>()
         where
-            T: Transport + CloneTransport + Send + Sync + Clone + IntoBoxTransport + 'static,
+            T: CloneTransport + Send + Sync + IntoBoxTransport + 'static,
         {
         }
         inner::<BoxTransport>();
