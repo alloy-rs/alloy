@@ -30,7 +30,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -55,17 +55,18 @@ pub type FilterPollerBuilder<R> = PollerBuilder<(U256,), Vec<R>>;
 /// ## Special treatment of EIP-1559
 ///
 /// While many RPC features are encapsulated by extension traits,
-/// EIP-1559 fee estimation is generally assumed to be on by default. We
-/// generally assume that EIP-1559 is supported by the client and will
+/// [EIP-1559] fee estimation is generally assumed to be on by default. We
+/// generally assume that [EIP-1559] is supported by the client and will
 /// proactively use it by default.
 ///
-/// As a result, the provider supports EIP-1559 fee estimation the ethereum
+/// As a result, the provider supports [EIP-1559] fee estimation the ethereum
 /// [`TransactionBuilder`] will use it by default. We acknowledge that this
-/// means EIP-1559 has a privileged status in comparison to other transaction
-/// types. Networks that DO NOT support EIP-1559 should create their own
+/// means [EIP-1559] has a privileged status in comparison to other transaction
+/// types. Networks that DO NOT support [EIP-1559] should create their own
 /// [`TransactionBuilder`] and Fillers to change this behavior.
 ///
 /// [`TransactionBuilder`]: alloy_network::TransactionBuilder
+/// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -104,7 +105,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # async fn f() -> Result<(), Box<dyn std::error::Error>> {
     /// let provider: DynProvider =
-    ///     ProviderBuilder::new().on_builtin("http://localhost:8080").await?.erased();
+    ///     ProviderBuilder::new().connect("http://localhost:8080").await?.erased();
     /// let block = provider.get_block_number().await?;
     /// # Ok(())
     /// # }
@@ -162,7 +163,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// overrides, without publishing a transaction.
     ///
     /// This function returns [`EthCall`] which can be used to execute the
-    /// call, or to add [`StateOverride`] or a [`BlockId`]. If no overrides
+    /// call, or to add a [`StateOverride`] or a [`BlockId`]. If no overrides
     /// or block ID is provided, the call will be executed on the pending block
     /// with the current state.
     ///
@@ -191,10 +192,10 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         EthCall::call(self.weak_client(), tx).block(BlockNumberOrTag::Pending.into())
     }
 
-    /// Execute a list of [`Bundle`] against the provided [`StateContext`] and [`StateOverride`],
+    /// Execute a list of [`Bundle`]s against the provided [`StateContext`] and [`StateOverride`],
     /// without publishing a transaction.
     ///
-    /// This function returns [`EthCallMany`] builder which is used to execute the call, and also
+    /// This function returns an [`EthCallMany`] builder which is used to execute the call, and also
     /// set the [`StateContext`] and [`StateOverride`].
     ///
     /// [`StateContext`]: alloy_rpc_types_eth::StateContext
@@ -261,17 +262,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # Note
     ///
-    /// Not all client implementations support state overrides for eth_estimateGas.
+    /// Not all client implementations support state overrides for `eth_estimateGas`.
     fn estimate_gas(&self, tx: N::TransactionRequest) -> EthCall<N, U64, u64> {
         EthCall::gas_estimate(self.weak_client(), tx)
             .block(BlockNumberOrTag::Pending.into())
             .map_resp(utils::convert_u64)
     }
 
-    /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    /// Estimates the [EIP-1559] `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     ///
-    /// Receives an [Eip1559Estimator] that can be used to modify
+    /// Receives an [`Eip1559Estimator`] that can be used to modify
     /// how to estimate these fees.
+    ///
+    /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     async fn estimate_eip1559_fees_with(
         &self,
         estimator: Eip1559Estimator,
@@ -304,16 +307,20 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(estimator.estimate(base_fee_per_gas, &fee_history.reward.unwrap_or_default()))
     }
 
-    /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    /// Estimates the [EIP-1559] `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     ///
     /// Uses the builtin estimator [`utils::eip1559_default_estimator`] function.
+    ///
+    /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     async fn estimate_eip1559_fees(&self) -> TransportResult<Eip1559Estimation> {
         self.estimate_eip1559_fees_with(Eip1559Estimator::default()).await
     }
 
-    /// Returns a collection of historical gas information [FeeHistory] which
-    /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
+    /// Returns a collection of historical gas information [`FeeHistory`] which
+    /// can be used to calculate the [EIP-1559] fields `maxFeePerGas` and `maxPriorityFeePerGas`.
     /// `block_count` can range from 1 to 1024 blocks in a single request.
+    ///
+    /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     async fn get_fee_history(
         &self,
         block_count: u64,
@@ -333,8 +340,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
-    /// Retrieves account information ([Account](alloy_rpc_types_eth::Account)) for the given
-    /// [Address] at the particular [BlockId].
+    /// Retrieves account information ([`Account`](alloy_rpc_types_eth::Account)) for the given
+    /// [`Address`] at the particular [`BlockId`].
     ///
     /// Note: This is slightly different than `eth_getAccount` and not all clients support this
     /// endpoint.
@@ -345,9 +352,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getAccountInfo", address).into()
     }
 
-    /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
-    /// at the particular [BlockId].
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    /// Retrieves account information ([`TrieAccount`](alloy_consensus::TrieAccount)) for the given
+    /// [`Address`] at the particular [`BlockId`].
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
         self.client().request("eth_getAccount", address).into()
     }
 
@@ -375,7 +382,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
-    /// Gets a block by its [BlockHash]
+    /// Gets a block by its [`BlockHash`]
     ///
     /// By default this fetches the block with only the transaction hashes populated in the block,
     /// and not the full transactions.
@@ -403,7 +410,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         EthGetBlock::by_hash(hash, self.client())
     }
 
-    /// Gets a block by its [BlockNumberOrTag]
+    /// Gets a block by its [`BlockNumberOrTag`]
     ///
     /// By default this fetches the block with only the transaction hashes populated in the block,
     /// and not the full transactions.
@@ -453,7 +460,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .map(|opt_count: Option<U64>| opt_count.map(|count| count.to::<u64>()))
     }
 
-    /// Gets the selected block [BlockId] receipts.
+    /// Gets the selected block [`BlockId`] receipts.
     fn get_block_receipts(
         &self,
         block: BlockId,
@@ -461,7 +468,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockReceipts", (block,)).into()
     }
 
-    /// Gets the bytecode located at the corresponding [Address].
+    /// Gets the bytecode located at the corresponding [`Address`].
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.client().request("eth_getCode", address).into()
     }
@@ -498,7 +505,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// hashes into full blocks bodies.
     ///
     /// Returns the [`WatchBlocks`] type which consumes the stream of block hashes from
-    /// [`PollerBuilder`] and returns a stream of [`BlockResponse`]'s.
+    /// [`PollerBuilder`] and returns a stream of [`BlockResponse`]s.
     ///
     /// # Examples
     ///
@@ -658,7 +665,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.root().watch_pending_transaction(config).await
     }
 
-    /// Retrieves a [`Vec<Log>`] with the given [Filter].
+    /// Retrieves a [`Vec<Log>`] with the given [`Filter`].
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.client().request("eth_getLogs", (filter,)).await
     }
@@ -674,7 +681,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getProof", (address, keys)).into()
     }
 
-    /// Gets the specified storage value from [Address].
+    /// Gets the specified storage value from [`Address`].
     fn get_storage_at(
         &self,
         address: Address,
@@ -696,7 +703,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
-    /// Gets a transaction by its [TxHash].
+    /// Gets a transaction by its [`TxHash`].
     fn get_transaction_by_hash(
         &self,
         hash: TxHash,
@@ -748,14 +755,17 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
-    /// Returns the EIP-2718 encoded transaction if it exists, see also
-    /// [Decodable2718](alloy_eips::eip2718::Decodable2718).
+    /// Returns the [EIP-2718] encoded transaction if it exists, see also
+    /// [`Decodable2718`](alloy_eips::eip2718::Decodable2718).
     ///
-    /// If the transaction is an EIP-4844 transaction that is still in the pool (pending) it will
+    /// If the transaction is an [EIP-4844] transaction that is still in the pool (pending) it will
     /// include the sidecar, otherwise it will the consensus variant without the sidecar:
-    /// [TxEip4844](alloy_consensus::transaction::eip4844::TxEip4844).
+    /// [`TxEip4844`](alloy_consensus::transaction::eip4844::TxEip4844).
     ///
-    /// This can be decoded into [TxEnvelope](alloy_consensus::transaction::TxEnvelope).
+    /// This can be decoded into [`TxEnvelope`](alloy_consensus::transaction::TxEnvelope).
+    ///
+    /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+    /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
     fn get_raw_transaction_by_hash(&self, hash: TxHash) -> ProviderCall<(TxHash,), Option<Bytes>> {
         self.client().request("eth_getRawTransactionByHash", (hash,)).into()
     }
@@ -773,7 +783,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             .into()
     }
 
-    /// Gets a transaction receipt if it exists, by its [TxHash].
+    /// Gets a transaction receipt if it exists, by its [`TxHash`].
     fn get_transaction_receipt(
         &self,
         hash: TxHash,
@@ -781,7 +791,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getTransactionReceipt", (hash,)).into()
     }
 
-    /// Gets an uncle block through the tag [BlockId] and index [u64].
+    /// Gets an uncle block through the tag [`BlockId`] and index `u64`.
     async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<N::BlockResponse>> {
         let idx = U64::from(idx);
         match tag {
@@ -796,7 +806,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
-    /// Gets the number of uncles for the block specified by the tag [BlockId].
+    /// Gets the number of uncles for the block specified by the tag [`BlockId`].
     async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
         match tag {
             BlockId::Hash(hash) => self
@@ -829,7 +839,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request_noparams("eth_newBlockFilter").await
     }
 
-    /// Notify the provider that we are interested in logs that match the given filter.
+    /// Notify the provider that we are interested in logs that match the given [`Filter`].
     ///
     /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
     ///
@@ -865,10 +875,55 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
+    /// Broadcasts a raw transaction RLP bytes to the network and returns the transaction receipt
+    /// after it has been mined.
+    ///
+    /// Unlike send_raw_transaction which returns immediately with
+    /// a transaction hash, this method waits on the server side until the transaction is included
+    /// in a block and returns the receipt directly. This is an optimization that reduces the number
+    /// of RPC calls needed to confirm a transaction.
+    ///
+    /// This method implements the `eth_sendRawTransactionSync` RPC method as defined in
+    /// [EIP-7966].
+    ///
+    /// [EIP-7966]: https://github.com/ethereum/EIPs/pull/9151
+    ///
+    /// # Error Handling
+    ///
+    /// If the transaction fails, you can extract the transaction hash from the error using
+    /// [`RpcError::tx_hash_data`]:
+    ///
+    /// ```no_run
+    /// # use alloy_json_rpc::RpcError;
+    /// # use alloy_network_primitives::ReceiptResponse;
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, encoded_tx: &[u8]) {
+    /// match provider.send_raw_transaction_sync(encoded_tx).await {
+    ///     Ok(receipt) => {
+    ///         println!("Transaction successful: {}", receipt.transaction_hash());
+    ///     }
+    ///     Err(rpc_err) => {
+    ///         if let Some(tx_hash) = rpc_err.tx_hash_data() {
+    ///             println!("Transaction failed but hash available: {}", tx_hash);
+    ///         }
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    ///
+    /// Note: This is only available on certain clients that support the
+    /// `eth_sendRawTransactionSync` RPC method, such as Anvil.
+    async fn send_raw_transaction_sync(
+        &self,
+        encoded_tx: &[u8],
+    ) -> TransportResult<N::ReceiptResponse> {
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
+        self.client().request("eth_sendRawTransactionSync", (rlp_hex,)).await
+    }
+
     /// Broadcasts a raw transaction RLP bytes with a conditional [`TransactionConditional`] to the
     /// network.
     ///
-    /// TransactionConditional represents the preconditions that determine the inclusion of the
+    /// [`TransactionConditional`] represents the preconditions that determine the inclusion of the
     /// transaction, enforced out-of-protocol by the sequencer.
     ///
     /// Note: This endpoint is only available on certain networks, e.g. opstack chains, polygon,
@@ -930,7 +985,6 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementers should NOT override this method.
     ///
-    /// [`send_transaction`]: Self::send_transaction
     /// [`ProviderLayer`]: crate::ProviderLayer
     /// [`TxFiller`]: crate::fillers::TxFiller
     #[doc(hidden)]
@@ -955,12 +1009,104 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         }
     }
 
-    /// Signs a transaction that can be submitted to the network later using
-    /// [`Provider::send_raw_transaction`].
+    /// Sends a transaction and waits for its receipt in a single call.
     ///
-    /// The `"eth_signTransaction"` method is not supported by regular nodes.
+    /// This method combines transaction submission and receipt retrieval into a single
+    /// async operation, providing a simpler API compared to the two-step process of
+    /// [`send_transaction`](Self::send_transaction) followed by waiting for confirmation.
+    ///
+    /// Returns the transaction receipt directly after submission and confirmation.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use alloy_network_primitives::ReceiptResponse;
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let receipt = provider.send_transaction_sync(tx).await?;
+    /// println!("Transaction hash: {}", receipt.transaction_hash());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Error Handling
+    ///
+    /// If the transaction fails, you can extract the transaction hash from the error using
+    /// [`RpcError::tx_hash_data`]:
+    ///
+    /// ```no_run
+    /// # use alloy_json_rpc::RpcError;
+    /// # use alloy_network_primitives::ReceiptResponse;
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) {
+    /// match provider.send_transaction_sync(tx).await {
+    ///     Ok(receipt) => {
+    ///         println!("Transaction successful: {}", receipt.transaction_hash());
+    ///     }
+    ///     Err(rpc_err) => {
+    ///         if let Some(tx_hash) = rpc_err.tx_hash_data() {
+    ///             println!("Transaction failed but hash available: {}", tx_hash);
+    ///         }
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    async fn send_transaction_sync(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
+        self.send_transaction_sync_internal(SendableTx::Builder(tx)).await
+    }
+
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
+    /// transaction and send it to the network without changing user-facing
+    /// APIs. Generally implementers should NOT override this method.
+    ///
+    /// If the input is a [`SendableTx::Builder`] then this utilizes `eth_sendTransactionSync` by
+    /// default.
+    ///
+    /// [`ProviderLayer`]: crate::ProviderLayer
+    /// [`TxFiller`]: crate::fillers::TxFiller
+    #[doc(hidden)]
+    async fn send_transaction_sync_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<N::ReceiptResponse> {
+        // Make sure to initialize heartbeat before we submit transaction, so that
+        // we don't miss it if user will subscriber to it immediately after sending.
+        let _handle = self.root().get_heart();
+
+        match tx {
+            SendableTx::Builder(mut tx) => {
+                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
+                let receipt = self.client().request("eth_sendTransactionSync", (tx,)).await?;
+                Ok(receipt)
+            }
+            SendableTx::Envelope(tx) => {
+                let encoded_tx = tx.encoded_2718();
+                self.send_raw_transaction_sync(&encoded_tx).await
+            }
+        }
+    }
+
+    /// Signs a transaction that can be submitted to the network later using
+    /// [`send_raw_transaction`](Self::send_raw_transaction).
+    ///
+    /// The `eth_signTransaction` method is not supported by regular nodes.
     async fn sign_transaction(&self, tx: N::TransactionRequest) -> TransportResult<Bytes> {
         self.client().request("eth_signTransaction", (tx,)).await
+    }
+
+    /// Fills a transaction with missing fields using default values.
+    ///
+    /// This method prepares a transaction by populating missing fields such as gas limit,
+    /// gas price, or nonce with appropriate default values. The response includes both the
+    /// RLP-encoded signed transaction and the filled transaction.
+    async fn fill_transaction(
+        &self,
+        tx: N::TransactionRequest,
+    ) -> TransportResult<FillTransaction<N::TxEnvelope>>
+    where
+        N::TxEnvelope: RpcRecv,
+    {
+        self.client().request("eth_fillTransaction", (tx,)).await
     }
 
     /// Subscribe to a stream of new block headers.
@@ -1222,13 +1368,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// use alloy_rpc_client::NoParams;
     ///
     /// // No parameters: `()`
-    /// let block_number = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
+    /// let block_number: String = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
     ///
     /// // One parameter: `(param,)` or `[param]`
-    /// let block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
+    /// let block: serde_json::Value = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
     ///
     /// // Two or more parameters: `(param1, param2, ...)` or `[param1, param2, ...]`
-    /// let full_block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
+    /// let full_block: serde_json::Value = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -1484,28 +1630,14 @@ mod tests {
         crate::ext::test::async_ci_only(|| async move {
             use alloy_node_bindings::Reth;
             use alloy_rpc_types_engine::JwtSecret;
-            use alloy_transport_http::{AuthLayer, AuthService, Http, HyperClient};
+            use alloy_transport_http::{AuthLayer, Http, HyperClient};
 
             let secret = JwtSecret::random();
 
             let reth =
                 Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
 
-            let hyper_client =
-                Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-
-            let service =
-                tower::ServiceBuilder::new().layer(AuthLayer::new(secret)).service(hyper_client);
-
-            let layer_transport: HyperClient<
-                Full<HyperBytes>,
-                AuthService<
-                    Client<
-                        alloy_transport_http::hyper_util::client::legacy::connect::HttpConnector,
-                        Full<HyperBytes>,
-                    >,
-                >,
-            > = HyperClient::with_service(service);
+            let layer_transport = HyperClient::new().layer(AuthLayer::new(secret));
 
             let http_hyper = Http::with_client(layer_transport, reth.endpoint_url());
 
@@ -1677,6 +1809,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_send_tx_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let _receipt =
+            provider.send_transaction_sync(tx.clone()).await.expect("failed to send tx sync");
+    }
+
+    #[tokio::test]
+    async fn test_send_raw_transaction_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create a transaction
+        let tx = TransactionRequest {
+            nonce: Some(0),
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        // Build and sign the transaction to get the envelope
+        let tx_envelope = tx.build(&provider.wallet()).await.expect("failed to build tx");
+
+        // Encode the transaction
+        let encoded = tx_envelope.encoded_2718();
+
+        // Send using the sync method - this directly returns the receipt
+        let receipt =
+            provider.send_raw_transaction_sync(&encoded).await.expect("failed to send raw tx sync");
+
+        // Verify receipt
+        assert_eq!(receipt.to(), Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")));
+        // The main idea that returned receipt should be already mined
+        assert!(receipt.block_number().is_some(), "transaction should be mined");
+        assert!(receipt.transaction_hash() != B256::ZERO, "should have valid tx hash");
+    }
+
+    #[tokio::test]
     async fn test_watch_confirmed_tx() {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
         let tx = TransactionRequest {
@@ -1687,7 +1865,7 @@ mod tests {
             ..Default::default()
         };
 
-        let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let builder = provider.send_transaction(tx).await.expect("failed to send tx");
         let hash1 = *builder.tx_hash();
 
         // Wait until tx is confirmed.
@@ -2303,5 +2481,79 @@ mod tests {
         let p = ProviderBuilder::new().connect(&anvil.endpoint()).await.unwrap();
 
         let _num = p.get_block_number().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_send_transaction_sync() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let anvil = Anvil::new().spawn();
+        let provider = ProviderBuilder::new().connect_http(anvil.endpoint_url());
+
+        let tx = TransactionRequest::default()
+            .with_from(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266"))
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        // Test the sync transaction sending
+        let receipt = provider.send_transaction_sync(tx).await.unwrap();
+
+        // Verify we can access transaction metadata from the receipt
+        let tx_hash = receipt.transaction_hash;
+        assert!(!tx_hash.is_zero());
+        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert!(receipt.status());
+    }
+
+    #[tokio::test]
+    async fn test_send_transaction_sync_with_fillers() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        // Create transaction without specifying gas or nonce - fillers should handle this
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+        // Note: No gas limit, gas price, or nonce specified - fillers will provide these
+
+        // Test that sync transactions work with filler pipeline
+        let receipt = provider.send_transaction_sync(tx).await.unwrap();
+
+        // Verify immediate access works
+        let tx_hash = receipt.transaction_hash;
+        assert!(!tx_hash.is_zero());
+
+        // Verify receipt shows fillers worked (gas was estimated and used)
+        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert!(receipt.status());
+        assert!(receipt.gas_used() > 0, "fillers should have estimated gas");
+    }
+
+    #[tokio::test]
+    async fn test_fill_transaction() {
+        use alloy_network::TransactionBuilder;
+        use alloy_primitives::{address, U256};
+
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+
+        let tx = TransactionRequest::default()
+            .with_from(provider.default_signer_address())
+            .with_to(address!("70997970C51812dc3A010C7d01b50e0d17dc79C8"))
+            .with_value(U256::from(100));
+
+        let filled = provider.fill_transaction(tx).await.unwrap();
+
+        // Verify the response contains RLP-encoded raw bytes
+        assert!(!filled.raw.is_empty(), "raw transaction bytes should not be empty");
+
+        // Verify the filled transaction has required fields populated
+        let filled_tx = &filled.tx;
+        assert!(filled_tx.to().is_some(), "filled transaction should have to address");
+        assert!(filled_tx.gas_limit() > 0, "filled transaction should have gas limit");
+        assert!(filled_tx.max_fee_per_gas() > 0, "filled transaction should have max fee per gas");
     }
 }

@@ -13,7 +13,7 @@ use alloy_rpc_types_eth::{
     state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::marker::PhantomData;
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -577,12 +577,56 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
 
+    /// Broadcasts the underlying transaction to the network as a deployment transaction and waits
+    /// for the receipt, returning the address of the deployed contract.
+    ///
+    /// This uses `eth_sendRawTransactionSync` ([EIP-7966](https://eips.ethereum.org/EIPS/eip-7966)),
+    /// which returns the transaction receipt in the same request rather than just the transaction
+    /// hash.
+    ///
+    /// Returns an error if the transaction is not a deployment transaction, or if the contract
+    /// address is not found in the deployment transaction's receipt.
+    ///
+    /// For more fine-grained control over the deployment process, use
+    /// [`deploy`](Self::deploy) instead.
+    ///
+    /// Note that the deployment address can be pre-calculated if the `from` address and `nonce` are
+    /// known using [`calculate_create_address`](Self::calculate_create_address).
+    ///
+    /// # Note
+    ///
+    /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
+    pub async fn deploy_sync(&self) -> Result<Address> {
+        if !self.request.kind().is_some_and(|to| to.is_create()) {
+            return Err(Error::NotADeploymentTransaction);
+        }
+        let receipt = self.send_sync().await?;
+        receipt.contract_address().ok_or(Error::ContractNotDeployed)
+    }
+
     /// Broadcasts the underlying transaction to the network.
     ///
     /// Returns a builder for configuring the pending transaction watcher.
     /// See [`Provider::send_transaction`] for more information.
     pub async fn send(&self) -> Result<PendingTransactionBuilder<N>> {
         Ok(self.provider.send_transaction(self.request.clone()).await?)
+    }
+
+    /// Broadcasts the underlying transaction to the network and waits for the receipt.
+    ///
+    /// This uses `eth_sendRawTransactionSync` ([EIP-7966](https://eips.ethereum.org/EIPS/eip-7966)),
+    /// which returns the transaction receipt in the same request rather than just the transaction
+    /// hash.
+    ///
+    /// Returns the transaction receipt if the transaction was confirmed.
+    ///
+    /// See [`Provider::send_transaction_sync`] for more information.
+    ///
+    /// # Note
+    ///
+    /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
+    pub async fn send_sync(&self) -> Result<N::ReceiptResponse> {
+        Ok(self.provider.send_transaction_sync(self.request.clone()).await?)
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -841,6 +885,41 @@ mod tests {
             .get_receipt()
             .await
             .expect("Could not get the receipt");
+        let transaction_hash = receipt.transaction_hash;
+        let transaction = provider
+            .get_transaction_by_hash(transaction_hash)
+            .await
+            .expect("failed to fetch tx")
+            .expect("tx not included");
+        assert_eq!(
+            transaction.max_fee_per_gas(),
+            max_fee_per_gas.to::<u128>(),
+            "max_fee_per_gas of the transaction should be set to the right value"
+        );
+        assert_eq!(
+            transaction
+                .max_priority_fee_per_gas()
+                .expect("max_priority_fee_per_gas of the transaction should be set"),
+            max_priority_fee_per_gas.to::<u128>(),
+            "max_priority_fee_per_gas of the transaction should be set to the right value"
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deploy_and_call_with_priority_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let counter_address =
+            Counter::deploy_builder(provider.clone()).deploy_sync().await.unwrap();
+        let counter_contract = Counter::new(counter_address, provider.clone());
+        let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
+        let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
+        let receipt = counter_contract
+            .increment()
+            .max_fee_per_gas(max_fee_per_gas.to())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
+            .send_sync()
+            .await
+            .expect("Could not send transaction");
         let transaction_hash = receipt.transaction_hash;
         let transaction = provider
             .get_transaction_by_hash(transaction_hash)

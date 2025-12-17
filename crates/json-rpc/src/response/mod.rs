@@ -44,7 +44,7 @@ impl BorrowedResponse<'_> {
     /// Convert this borrowed response to an owned response by copying the data
     /// from the deserializer (if necessary).
     pub fn into_owned(self) -> Response {
-        Response { id: self.id.clone(), payload: self.payload.into_owned() }
+        Response { id: self.id, payload: self.payload.into_owned() }
     }
 }
 
@@ -356,6 +356,24 @@ mod test {
                 "message": "Invalid Request"
             },
             "id": null
+        }"#;
+        let response: super::Response = serde_json::from_str(response).unwrap();
+        assert_eq!(response.id, super::Id::None);
+        assert!(matches!(response.payload, super::ResponsePayload::Failure(_)));
+    }
+
+    #[test]
+    fn serde_unknown() {
+        let response = r#"{
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32600,
+                "message": "Invalid Request"
+            },
+            "id": null,
+            "dummy": null,
+            "abc": 5,
+            "value": "hello"
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);

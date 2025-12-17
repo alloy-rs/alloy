@@ -36,6 +36,9 @@ pub mod sidecar;
 /// Types and functions related to withdrawals.
 pub mod withdrawals;
 
+/// Types for the beacon genesis endpoint.
+pub mod genesis;
+
 /// BLS signature type
 pub type BlsSignature = FixedBytes<BLS_SIGNATURE_BYTES_LEN>;
 

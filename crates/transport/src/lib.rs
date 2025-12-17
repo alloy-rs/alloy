@@ -6,8 +6,6 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use alloy_primitives as _;
-
 mod boxed;
 pub use boxed::{BoxTransport, IntoBoxTransport};
 
@@ -49,9 +47,9 @@ pub type RpcFut<'a, T> = futures_utils_wasm::BoxFuture<'a, TransportResult<T>>;
 
 /// Cross platform time types.
 mod time {
-    #[cfg(target_family = "wasm")]
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
     pub(crate) use wasmtimer::std::Instant;
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
     pub(crate) use std::time::Instant;
 }

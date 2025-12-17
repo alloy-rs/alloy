@@ -157,7 +157,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn priority_fee_or_price(&self) -> u128 {
-        self.gas_price().or(self.max_priority_fee_per_gas()).unwrap_or_default()
+        self.max_priority_fee_per_gas().or(self.gas_price()).unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {

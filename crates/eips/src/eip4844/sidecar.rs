@@ -34,6 +34,7 @@ pub struct IndexedBlobHash {
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
@@ -344,7 +345,7 @@ impl BlobTransactionSidecar {
 
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.blobs.len() * BYTES_PER_BLOB + // blobs
             self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
             self.proofs.len() * BYTES_PER_PROOF // proofs

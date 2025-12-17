@@ -18,6 +18,7 @@ pub const BLOB_BASE_COST: u64 = 2_u64.pow(13);
     feature = "serde",
     serde(from = "serde_impl::SerdeHelper", into = "serde_impl::SerdeHelper")
 )]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct BlobParams {
     /// Target blob count for the block.
     pub target_blob_count: u64,
@@ -124,18 +125,6 @@ impl BlobParams {
     }
 
     /// Calculates the `excess_blob_gas` value for the next block based on the current block
-    /// `excess_blob_gas` and `blob_gas_used`.
-    #[inline]
-    #[deprecated(note = "Use `next_block_excess_blob_gas_osaka` instead")]
-    pub const fn next_block_excess_blob_gas(
-        &self,
-        excess_blob_gas: u64,
-        blob_gas_used: u64,
-    ) -> u64 {
-        self.next_block_excess_blob_gas_osaka(excess_blob_gas, blob_gas_used, 0)
-    }
-
-    /// Calculates the `excess_blob_gas` value for the next block based on the current block
     /// `excess_blob_gas`, `blob_gas_used` and `base_fee_per_gas`.
     #[inline]
     pub const fn next_block_excess_blob_gas_osaka(
@@ -181,7 +170,7 @@ mod serde_impl {
         max_blob_count: u64,
         #[serde(rename = "target")]
         target_blob_count: u64,
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         min_blob_fee: Option<u128>,
     }
 

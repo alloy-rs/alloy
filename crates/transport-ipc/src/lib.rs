@@ -80,7 +80,8 @@ impl IpcBackend {
                                 }
                             }
                             None => {
-                                error!("Read stream has failed.");
+                                // Stream ended; upstream already logged the cause (EOF or JSON error).
+                                debug!("IPC read stream ended");
                                 break true;
                             }
                         }

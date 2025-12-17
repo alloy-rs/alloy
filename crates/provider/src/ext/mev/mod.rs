@@ -1,6 +1,8 @@
 mod with_auth;
 
-pub use self::with_auth::{sign_flashbots_payload, MevBuilder};
+pub use self::with_auth::{
+    sign_flashbots_payload, verify_flashbots_signature, FlashbotsSignatureError, MevBuilder,
+};
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, TxHash};
@@ -14,6 +16,20 @@ use alloy_rpc_types_mev::{
 pub const FLASHBOTS_SIGNATURE_HEADER: &str = "x-flashbots-signature";
 
 /// This module provides support for interacting with non-standard MEV-related RPC endpoints.
+///
+/// # Important Notes
+///
+/// MEV operations are extremely time-sensitive and should be executed as quickly as possible.
+/// Bundle submissions have strict timing requirements and may fail if submitted too late.
+///
+/// ## Common Limitations
+///
+/// - Bundle size limits vary by relay (typically 1-10 transactions)
+/// - Timeout constraints apply to simulation and execution
+/// - Rate limiting may be enforced by MEV relays
+/// - Authentication is required for most operations
+///
+/// See [Flashbots documentation](https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint) for detailed limitations.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait MevApi<N>: Send + Sync {
@@ -25,6 +41,11 @@ pub trait MevApi<N>: Send + Sync {
 
     /// Sends a MEV bundle using the `eth_sendBundle` RPC method.
     /// Returns the resulting bundle hash on success.
+    ///
+    /// # Timing Critical
+    ///
+    /// Bundle submission is extremely time-sensitive. Submit as early as possible
+    /// in the block interval to maximize inclusion probability.
     fn send_bundle(
         &self,
         bundle: EthSendBundle,
@@ -65,6 +86,11 @@ pub trait MevApi<N>: Send + Sync {
 
     /// Sends a MEV bundle using the `mev_sendBundle` RPC method.
     /// Returns the resulting bundle hash on success.
+    ///
+    /// # Timing Critical
+    ///
+    /// Bundle submission is extremely time-sensitive. Submit as early as possible
+    /// in the block interval to maximize inclusion probability.
     fn send_mev_bundle(
         &self,
         bundle: MevSendBundle,

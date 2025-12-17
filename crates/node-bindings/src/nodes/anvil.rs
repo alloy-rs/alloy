@@ -1,6 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
-use crate::NodeError;
+use crate::{NodeError, NODE_STARTUP_TIMEOUT};
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
@@ -21,9 +21,6 @@ use url::Url;
 /// anvil's default ipc path
 pub const DEFAULT_IPC_ENDPOINT: &str =
     if cfg!(unix) { "/tmp/anvil.ipc" } else { r"\\.\pipe\anvil.ipc" };
-
-/// How long we will wait for anvil to indicate that it is ready.
-const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
 
 /// An anvil CLI instance. Will close the instance when dropped.
 ///
@@ -378,6 +375,7 @@ impl Anvil {
     }
 
     /// Sets the timeout which will be used when the `anvil` instance is launched.
+    /// Units: milliseconds.
     pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
         self
@@ -449,6 +447,7 @@ impl Anvil {
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
+        let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
 
         let mut private_keys = Vec::new();
         let mut addresses = Vec::new();
@@ -456,9 +455,7 @@ impl Anvil {
         let mut chain_id = None;
         let mut wallet = None;
         loop {
-            if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
-                <= Instant::now()
-            {
+            if start + timeout <= Instant::now() {
                 return Err(NodeError::Timeout);
             }
 
