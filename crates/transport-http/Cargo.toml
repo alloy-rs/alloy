@@ -76,6 +76,9 @@ jwt-auth = [
     "dep:jsonwebtoken",
 ]
 traceparent = [
+    "dep:tower",
+    "dep:tracing",
+    "dep:alloy-json-rpc",
     "dep:opentelemetry-http",
     "dep:opentelemetry",
     "dep:tracing-opentelemetry",
