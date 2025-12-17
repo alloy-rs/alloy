@@ -1,4 +1,5 @@
-//! tower http like layer implementations that work over the http::Request type.
+//! Additional layers that may be useful for HTTP transport users. Typically
+//! these inject headers into the HTTP requests.
 #![cfg(not(target_family = "wasm"))]
 
 #[cfg(feature = "jwt-auth")]

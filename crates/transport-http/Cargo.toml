@@ -44,9 +44,9 @@ alloy-rpc-types-engine = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
 # trace propagation
+opentelemetry = { version = "0.31.0", optional = true }
 opentelemetry-http = { version = "0.31.0", optional = true}
 tracing-opentelemetry = { version = "0.32.0", optional = true}
-opentelemetry = { version = "0.31.0", optional = true }
 
 [features]
 default = ["reqwest", "reqwest-default-tls", "traceparent"]
@@ -77,6 +77,7 @@ jwt-auth = [
 ]
 traceparent = [
     "dep:opentelemetry-http",
+    "dep:opentelemetry",
     "dep:tracing-opentelemetry",
 ]
 reqwest-default-tls = ["reqwest?/default-tls"]
