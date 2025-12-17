@@ -380,8 +380,8 @@ struct TxWatcher {
 impl TxWatcher {
     /// Notify the waiter.
     fn notify(self, result: Result<(), WatchTxError>) {
-        debug!(tx=%self.config.tx_hash, "notifying");
-        let _ = self.tx.send(result);
+        let sent = self.tx.send(result).is_ok();
+        debug!(tx=%self.config.tx_hash, sent, "notifying watcher");
     }
 }
 
