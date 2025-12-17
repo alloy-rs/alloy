@@ -1,13 +1,28 @@
 use alloy_json_rpc::RequestPacket;
-use tower::Service;
+use tower::{Layer, Service};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-/// A layer to propagate trace context using W3C `traceparent` header standard
+/// A layer to propagate trace context using W3C `traceparent` header standard.
+///
+/// This layer injects the `traceparent` header into outgoing requests, enabling
+/// distributed tracing across services that support the W3C Trace Context
+/// specification.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TraceParentLayer;
 
+impl<S> Layer<S> for TraceParentLayer {
+    type Service = TraceParentService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        TraceParentService { inner }
+    }
+}
+
 /// A service that injects trace context into requests using W3C `traceparent`
-/// header standard
+/// header standard.
+///
+/// This service wraps another service and adds the `traceparent` header to each
+/// outgoing request, allowing for trace context propagation.
 #[derive(Debug)]
 pub struct TraceParentService<S> {
     inner: S,
