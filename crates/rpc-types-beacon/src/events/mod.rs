@@ -184,7 +184,7 @@ pub struct BlsToExecutionChangeMessage {
     pub to_execution_address: Address,
 }
 
-/// Event for the `Deposit` topic of the beacon API node event stream.
+/// Event for the `finalized_checkpoint` topic of the beacon API node event stream.
 ///
 /// Finalized checkpoint has been updated
 #[serde_as]
