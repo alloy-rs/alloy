@@ -2031,7 +2031,7 @@ mod tests {
 
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
                 eip4844_request.build_consensus_tx();
-            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 { max_fee_per_blob_gas, .. }))) if max_fee_per_blob_gas == max_fee_per_blob_gas);
+            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 { max_fee_per_blob_gas: blob_gas_fee, .. }))) if blob_gas_fee == max_fee_per_blob_gas);
 
             // Negative case
             let eip4844_request_incorrect_to = TransactionRequest {
