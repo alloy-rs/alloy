@@ -181,7 +181,7 @@ impl<N: Network> NewBlocks<N> {
                 // offset to the initial fetch so that we fetch tip - 1
                 self.next_yield = block_number.saturating_sub(1);
             } else if block_number < self.next_yield {
-                debug!(block_number, self.next_yield, "not advanced yet");
+                debug!(block_number, expected = self.next_yield, "block height regressed");
                 continue 'task;
             }
 
