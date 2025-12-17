@@ -120,8 +120,7 @@ where
                 )]);
 
                 // Patch the existing RPC call with the new headers
-                let rpc_call = self.inner.map_meta(|meta| {
-                    let mut meta = meta;
+                let rpc_call = self.inner.map_meta(|mut meta| {
                     meta.extensions_mut().get_or_insert_default::<HeaderMap>().extend(headers);
                     meta
                 });
