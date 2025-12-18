@@ -13,7 +13,7 @@
 //! For non-human-readable formats, the default `serde` behavior for `Option<U256>` is used.
 
 use alloy_primitives::U256;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serializer};
 use serde_json::Value;
 
 /// Serializes an optional TTD as a JSON number.
