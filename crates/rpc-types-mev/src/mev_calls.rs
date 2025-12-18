@@ -107,7 +107,7 @@ pub(super) mod serde_bincode_compat {
                     block: value.inclusion_block,
                     max_block: value.inclusion_max_block,
                 },
-                bundle_body: value.bundle_body.into_iter().map(|item| item.into_owned()).collect(),
+                bundle_body: value.bundle_body.into_iter().map(Cow::into_owned).collect(),
                 validity: value.validity.map(Cow::into_owned),
                 privacy: value.privacy.map(Cow::into_owned),
             }
@@ -184,7 +184,7 @@ impl Inclusion {
     /// Returns the block number of the last block the bundle is valid for.
     #[inline]
     pub fn max_block_number(&self) -> Option<u64> {
-        self.max_block.as_ref().map(|b| *b)
+        self.max_block.copied()
     }
 }
 
