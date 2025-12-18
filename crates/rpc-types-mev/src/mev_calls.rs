@@ -184,7 +184,7 @@ impl Inclusion {
     /// Returns the block number of the last block the bundle is valid for.
     #[inline]
     pub fn max_block_number(&self) -> Option<u64> {
-        self.max_block.as_ref().map(|b| *b)
+        self.max_block.copied()
     }
 }
 
