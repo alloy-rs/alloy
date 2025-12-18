@@ -836,7 +836,7 @@ impl TxEip4844 {
         TxEip4844WithSidecar::from_tx_and_sidecar(self, sidecar)
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip4844Variant] transaction.
+    /// Calculates a heuristic for the in-memory size of the [TxEip4844] transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
@@ -849,7 +849,7 @@ impl TxEip4844 {
         self.access_list.size() + // access_list
         self.input.len() +  // input
         self.blob_versioned_hashes.capacity() * mem::size_of::<B256>() + // blob hashes size
-        mem::size_of::<u128>() // max_fee_per_data_gas
+        mem::size_of::<u128>() // max_fee_per_blob_gas
     }
 }
 
