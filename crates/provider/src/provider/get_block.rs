@@ -54,10 +54,14 @@ impl EthGetBlockParams {
     }
 }
 
-/// A builder for an `"eth_getBlockByHash"` request. This type is returned by the
-/// [`Provider::call`] method.
+/// A builder for `"eth_getBlockByHash"` and `"eth_getBlockByNumber"` requests.
 ///
-/// [`Provider::call`]: crate::Provider::call
+/// This type is returned by the [`Provider::get_block`],
+/// [`Provider::get_block_by_hash`] and [`Provider::get_block_by_number`] methods.
+///
+/// [`Provider::get_block`]: crate::Provider::get_block
+/// [`Provider::get_block_by_hash`]: crate::Provider::get_block_by_hash
+/// [`Provider::get_block_by_number`]: crate::Provider::get_block_by_number
 #[must_use = "EthGetBlockBy must be awaited to execute the request"]
 //#[derive(Clone, Debug)]
 pub struct EthGetBlock<BlockResp>
