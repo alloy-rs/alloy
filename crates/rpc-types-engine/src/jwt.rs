@@ -302,7 +302,7 @@ mod tests {
         let secret_2: Result<JwtSecret, _> = JwtSecret::from_hex(key);
         assert!(secret_2.is_ok());
 
-        assert_eq!(secret_0.as_ref().unwrap().clone(), secret_1.unwrap());
+        assert_eq!(*secret_0.as_ref().unwrap(), secret_1.unwrap());
         assert_eq!(secret_0.unwrap(), secret_2.unwrap());
     }
 
