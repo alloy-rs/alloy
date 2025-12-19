@@ -54,12 +54,7 @@ where
 
 /// Supports parsing the TTD as an `Option<u64>`, or `Option<f64>` specifically for the mainnet TTD
 /// (5.875e22).
-pub fn deserialize_json_ttd_opt<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserialize(deserializer)
-}
+pub use deserialize as deserialize_json_ttd_opt;
 
 /// Converts the given [serde_json::Value] into a `U256` value for TTD deserialization.
 fn ttd_from_value<'de, D>(val: Value) -> Result<U256, D::Error>
