@@ -250,7 +250,7 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
-pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
+pub fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
     eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
         parent_excess_blob_gas,
         parent_blob_gas_used,
@@ -264,7 +264,7 @@ pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_u
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
     eip7840::BlobParams::cancun().calc_blob_fee(excess_blob_gas)
 }
 
@@ -279,25 +279,33 @@ pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-pub const fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
+pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
-    let mut i = 1;
-    let mut output = 0;
-    let mut numerator_accum = factor * denominator;
-    while numerator_accum > 0 {
-        output += numerator_accum;
+    use num_bigint::BigUint;
+    use num_traits::{ToPrimitive, Zero};
 
-        // Use checked multiplication to prevent overflow
-        let Some(val) = numerator_accum.checked_mul(numerator) else {
-            break;
-        };
+    let denominator_bi = BigUint::from(denominator);
+    let numerator_bi = BigUint::from(numerator);
 
-        // Denominator is asserted as not zero at the start of the function.
-        numerator_accum = val / (denominator * i);
+    let mut i: u128 = 1;
+    let mut output = BigUint::default();
+    let mut numerator_accum = BigUint::from(factor) * &denominator_bi;
+
+    while !numerator_accum.is_zero() {
+        output += &numerator_accum;
+
+        // Equivalent to: accum = (accum * numerator) / (denominator * i)
+        numerator_accum *= &numerator_bi;
+        numerator_accum /= &denominator_bi;
+        numerator_accum /= BigUint::from(i);
+
         i += 1;
     }
-    output / denominator
+
+    (output / denominator_bi)
+        .to_u128()
+        .expect("fake_exponential overflow (result does not fit in u128)")
 }
 
 #[cfg(test)]
@@ -391,6 +399,7 @@ mod tests {
             (2, 5, 2, 23),   // approximate 24.36
             (1, 50000000, 2225652, 5709098764),
             (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1),
+            (1, 299453931, 5007716, 93359993185840258978230108), // diverged from geth due to internal overflow before using num_bigint.
         ] {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
