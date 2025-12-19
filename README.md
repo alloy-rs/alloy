@@ -105,6 +105,7 @@ This repository contains the following crates:
   - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace
+  - [`alloy-rpc-types-tenderly`] - Types for the Tenderly node's Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-trace`] - Types for the `trace` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-txpool`] - Types for the `txpool` Ethereum JSON-RPC namespace
 - [`alloy-serde`] - [Serde]-related utilities
@@ -114,10 +115,12 @@ This repository contains the following crates:
   - [`alloy-signer-ledger`] - [Ledger] signer implementation
   - [`alloy-signer-local`] - Local (private key, keystore, mnemonic, YubiHSM) signer implementations
   - [`alloy-signer-trezor`] - [Trezor] signer implementation
+  - [`alloy-signer-turnkey`] - [Turnkey] signer implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
   - [`alloy-transport-http`] - HTTP transport implementation
   - [`alloy-transport-ipc`] - IPC transport implementation
   - [`alloy-transport-ws`] - WS transport implementation
+- [`alloy-tx-macros`] - Derive macro for transaction envelopes
 
 [`alloy`]: https://github.com/alloy-rs/alloy/tree/main/crates/alloy
 [`alloy-core`]: https://docs.rs/alloy-core
@@ -144,6 +147,7 @@ This repository contains the following crates:
 [`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
 [`alloy-rpc-types-eth`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth
 [`alloy-rpc-types-mev`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-mev
+[`alloy-rpc-types-tenderly`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-tenderly
 [`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
 [`alloy-rpc-types-txpool`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-txpool
 [`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde
@@ -153,16 +157,19 @@ This repository contains the following crates:
 [`alloy-signer-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger
 [`alloy-signer-local`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-local
 [`alloy-signer-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor
+[`alloy-signer-turnkey`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-turnkey
 [`alloy-transport`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport
 [`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
 [`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
 [`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
+[`alloy-tx-macros`]: https://github.com/alloy-rs/alloy/tree/main/crates/tx-macros
 [`alloy-ens`]: https://github.com/alloy-rs/alloy/tree/main/crates/ens
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms
 [Ledger]: https://www.ledger.com
 [Trezor]: https://trezor.io
+[Turnkey]: https://www.turnkey.com
 [Serde]: https://serde.rs
 [beacon-apis]: https://ethereum.github.io/beacon-APIs
 [Anvil]: https://github.com/foundry-rs/foundry
