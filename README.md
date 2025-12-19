@@ -84,6 +84,8 @@ This repository contains the following crates:
 - [`alloy-consensus`] - Ethereum consensus interface
   - [`alloy-consensus-any`] - Catch-all consensus interface for multiple networks
 - [`alloy-contract`] - Interact with on-chain contracts
+- [`alloy-eip5792`] - Types for the `wallet_` Ethereum JSON-RPC namespace
+- [`alloy-eip7547`] - EIP-7547: Inclusion Lists types
 - [`alloy-eips`] - Ethereum Improvement Proposal (EIP) implementations
 - [`alloy-genesis`] - Ethereum genesis file definitions
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
@@ -122,6 +124,8 @@ This repository contains the following crates:
 [`alloy-consensus`]: https://github.com/alloy-rs/alloy/tree/main/crates/consensus
 [`alloy-consensus-any`]: https://github.com/alloy-rs/alloy/tree/main/crates/consensus-any
 [`alloy-contract`]: https://github.com/alloy-rs/alloy/tree/main/crates/contract
+[`alloy-eip5792`]: https://github.com/alloy-rs/alloy/tree/main/crates/eip5792
+[`alloy-eip7547`]: https://github.com/alloy-rs/alloy/tree/main/crates/eip7547
 [`alloy-eips`]: https://github.com/alloy-rs/alloy/tree/main/crates/eips
 [`alloy-genesis`]: https://github.com/alloy-rs/alloy/tree/main/crates/genesis
 [`alloy-json-rpc`]: https://github.com/alloy-rs/alloy/tree/main/crates/json-rpc
