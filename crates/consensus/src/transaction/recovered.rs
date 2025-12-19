@@ -111,7 +111,8 @@ impl<T> Recovered<T> {
     where
         T: Encodable2718,
     {
-        let mut out = alloc::vec![];
+        // Preallocate the exact encoded length to avoid repeated growth during writes.
+        let mut out = Vec::with_capacity(self.inner.encode_2718_len());
         self.inner.encode_2718(&mut out);
 
         self.into_encoded_with(out)
