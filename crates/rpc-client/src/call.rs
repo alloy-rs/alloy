@@ -78,9 +78,9 @@ where
 
                     let request = request.take().expect("no request");
                     if tracing::enabled!(tracing::Level::TRACE) {
-                        trace!(?request, "sending request");
+                        trace!(?request, "preparing request");
                     } else {
-                        debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+                        debug!(method=%request.meta.method, id=%request.meta.id, "serializing request");
                     }
                     let request = request.serialize();
                     let fut = match request {
