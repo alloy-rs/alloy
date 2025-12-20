@@ -16,6 +16,23 @@ use futures_utils_wasm::impl_future;
 #[auto_impl::auto_impl(&, &mut, Box, Arc)]
 pub trait TransportConnect: Sized + Send + Sync + 'static {
     /// Returns `true` if the transport connects to a local resource.
+    ///
+    /// This is a best-effort heuristic used to optimize behavior for local vs remote
+    /// endpoints (e.g., setting different poll intervals).
+    ///
+    /// # Examples
+    ///
+    /// Local resources typically include:
+    /// - `localhost` or `127.0.0.1` (IPv4 loopback)
+    /// - `::1` (IPv6 loopback)
+    /// - IPC paths (Unix sockets, Windows named pipes)
+    /// - URLs without a hostname
+    ///
+    /// # Implementation
+    ///
+    /// For HTTP/WebSocket transports, consider using
+    /// [`guess_local_url`](crate::utils::guess_local_url) to implement this method. IPC
+    /// transports should always return `true`.
     fn is_local(&self) -> bool;
 
     /// Connect to the transport, returning a `Transport` instance.
