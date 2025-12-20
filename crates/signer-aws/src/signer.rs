@@ -182,7 +182,11 @@ impl AwsSigner {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
-    /// Sign a digest with this signer's key and applies EIP-155.
+    /// Sign a digest with this signer's key and recover a `Signature` with the
+    /// correct y-parity for the given public key.
+    ///
+    /// The digest is expected to already include any EIP-155 chain ID encoding
+    /// via the transaction's signature hash.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
