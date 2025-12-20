@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-debug"
-description = "Ethereum RPC debug types"
+description = "Types for the `debug` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true

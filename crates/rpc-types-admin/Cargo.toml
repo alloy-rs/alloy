@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-admin"
-description = "Ethereum RPC admin types"
+description = "Types for the `admin` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true

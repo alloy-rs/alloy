@@ -1,6 +1,6 @@
 [package]
 name = "alloy-eip5792"
-description = "Types for the 'wallet' Ethereum JSON-RPC namespace"
+description = "Types for the `wallet_` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true

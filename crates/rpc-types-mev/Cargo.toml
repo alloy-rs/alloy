@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-mev"
-description = "Types for the MEV JSON-RPC namespace"
+description = "Types for the MEV bundle JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true
