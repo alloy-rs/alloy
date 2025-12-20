@@ -529,7 +529,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 
     /// Reap transactions overridden by a chain gap (true reorg or resync after a pause).
     /// Accepts new chain height as an argument, and drops any subscriptions
-    /// that were received in blocks affected by the reorg (e.g. >= new_height).
+    /// that were received in blocks affected by the chain gap (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
         for waiters in self.waiting_confs.values_mut() {
             *waiters = std::mem::take(waiters).into_iter().filter_map(|watcher| {
@@ -598,7 +598,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     to_watch.notify(Ok(()));
                 } else {
                     debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-                    // Ensure reorg handling can move this watcher back if needed.
+                    // Ensure chain gap handling can move this watcher back if needed.
                     let mut to_watch = to_watch;
                     if to_watch.received_at_block.is_none() {
                         to_watch.received_at_block = Some(*block_height);
@@ -638,9 +638,9 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         if let Some((last_height, _)) = self.past_blocks.back().as_ref() {
             // Check that the chain is continuous.
             if *last_height + 1 != block_height {
-                // Move all the transactions that were reset by the reorg to the unconfirmed list.
+                // Move all the transactions that were reset by the chain gap to the unconfirmed list.
                 // This can also happen if we unpaused the heartbeat after some time.
-                debug!(block_height, last_height, "reorg/unpause detected");
+                debug!(block_height, last_height, "chain gap detected");
                 self.move_reorg_to_unconfirmed(block_height);
                 // Remove past blocks that are now invalid.
                 self.past_blocks.retain(|(h, _)| *h < block_height);
