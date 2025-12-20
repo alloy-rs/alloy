@@ -1,5 +1,5 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, B256, U256};
+use alloy_primitives::{hex, normalize_v, Address, ChainId, Signature, SignatureError, B256, U256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer};
 use async_trait::async_trait;
 use std::fmt;
@@ -75,6 +75,19 @@ pub enum TurnkeySignerError {
     /// Invalid signature format received from Turnkey.
     #[error("invalid signature format")]
     InvalidSignature,
+    /// Invalid signature component lengths.
+    #[error("invalid signature component lengths: r={r_len} bytes (expected 32), s={s_len} bytes (expected 32), v={v_len} bytes (expected 1)")]
+    InvalidSignatureLength {
+        /// Length of r component in bytes.
+        r_len: usize,
+        /// Length of s component in bytes.
+        s_len: usize,
+        /// Length of v component in bytes.
+        v_len: usize,
+    },
+    /// Signature error from primitives.
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
 }
 
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
@@ -123,7 +136,11 @@ impl Signer for TurnkeySigner {
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::Hex(e)))?;
 
         if r_bytes.len() != 32 || s_bytes.len() != 32 || v_bytes.len() != 1 {
-            return Err(alloy_signer::Error::other(TurnkeySignerError::InvalidSignature));
+            return Err(alloy_signer::Error::other(TurnkeySignerError::InvalidSignatureLength {
+                r_len: r_bytes.len(),
+                s_len: s_bytes.len(),
+                v_len: v_bytes.len(),
+            }));
         }
 
         let mut r_arr = [0u8; 32];
@@ -134,8 +151,11 @@ impl Signer for TurnkeySigner {
         s_arr.copy_from_slice(&s_bytes);
         let s = U256::from_be_bytes(s_arr);
 
-        let parity = normalize_v(v_bytes[0] as u64)
-            .ok_or_else(|| alloy_signer::Error::other(TurnkeySignerError::InvalidSignature))?;
+        let parity = normalize_v(v_bytes[0] as u64).ok_or_else(|| {
+            alloy_signer::Error::other(TurnkeySignerError::SignatureError(
+                SignatureError::InvalidParity(v_bytes[0] as u64),
+            ))
+        })?;
 
         Ok(Signature::new(r, s, parity))
     }
