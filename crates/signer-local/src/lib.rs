@@ -45,19 +45,9 @@ pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 /// A signer instantiated with a locally stored private key, using the `secp256k1` crate.
 #[cfg(feature = "secp256k1")]
 pub type Secp256k1Signer = LocalSigner<Secp256k1Credential>;
-
-#[doc(hidden)]
-#[deprecated(note = "use `PrivateKeySigner` instead")]
-pub type LocalWallet = PrivateKeySigner;
-
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
 pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
-
-#[cfg(feature = "yubihsm")]
-#[doc(hidden)]
-#[deprecated(note = "use `YubiSigner` instead")]
-pub type YubiWallet = YubiSigner;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
 ///
