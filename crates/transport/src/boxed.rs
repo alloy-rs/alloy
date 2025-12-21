@@ -73,15 +73,15 @@ impl Clone for BoxTransport {
 
 /// Helper trait for constructing [`BoxTransport`].
 trait CloneTransport: Transport + std::any::Any {
-    fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync>;
+    fn clone_box(&self) -> Box<dyn CloneTransport>;
 }
 
 impl<T> CloneTransport for T
 where
-    T: Transport + Clone + Send + Sync,
+    T: Transport + Clone,
 {
     #[inline]
-    fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync> {
+    fn clone_box(&self) -> Box<dyn CloneTransport> {
         Box::new(self.clone())
     }
 }
