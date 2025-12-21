@@ -132,11 +132,11 @@ where
             Ok(token) => {
                 req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
 
-                let mut this = self.clone();
+                let mut inner = self.inner.clone();
 
-                Box::pin(
-                    async move { this.inner.call(req).await.map_err(TransportErrorKind::custom) },
-                )
+                Box::pin(async move {
+                    inner.call(req).await.map_err(TransportErrorKind::custom)
+                })
             }
             Err(e) => {
                 let e = TransportErrorKind::custom(e);
