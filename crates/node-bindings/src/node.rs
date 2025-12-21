@@ -25,8 +25,8 @@ pub enum NodeError {
     /// Encountered a fatal error.
     #[error("fatal error: {0}")]
     Fatal(String),
-    /// A line could not be read from the node stderr.
-    #[error("could not read line from node stderr: {0}")]
+    /// A line could not be read from the node output stream.
+    #[error("could not read line from node output: {0}")]
     ReadLineError(std::io::Error),
 
     /// The chain id was not set.
