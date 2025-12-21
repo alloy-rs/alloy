@@ -43,8 +43,13 @@ hyper-tls = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
+# trace propagation
+opentelemetry = { version = "0.31.0", optional = true }
+opentelemetry-http = { version = "0.31.0", optional = true}
+tracing-opentelemetry = { version = "0.32.0", optional = true}
+
 [features]
-default = ["reqwest", "reqwest-default-tls"]
+default = ["reqwest", "reqwest-default-tls", "traceparent"]
 reqwest = [
     "dep:reqwest",
     "dep:alloy-json-rpc",
@@ -69,6 +74,14 @@ jwt-auth = [
     "alloy-rpc-types-engine/jwt",
     "alloy-rpc-types-engine/serde",
     "dep:jsonwebtoken",
+]
+traceparent = [
+    "dep:tower",
+    "dep:tracing",
+    "dep:alloy-json-rpc",
+    "dep:opentelemetry-http",
+    "dep:opentelemetry",
+    "dep:tracing-opentelemetry",
 ]
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]

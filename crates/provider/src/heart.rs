@@ -527,7 +527,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
     }
 
-    /// Reap transactions overridden by the reorg.
+    /// Reap transactions overridden by a chain gap (true reorg or resync after a pause).
     /// Accepts new chain height as an argument, and drops any subscriptions
     /// that were received in blocks affected by the reorg (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
@@ -537,7 +537,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
                     // All blocks after and _including_ the new height are reaped.
                     if received_at_block >= new_height {
                         let hash = watcher.config.tx_hash;
-                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed due to reorg");
+                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
                         self.unconfirmed.insert(hash, watcher);
                         return None;
                     }

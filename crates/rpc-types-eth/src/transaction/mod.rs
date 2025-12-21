@@ -447,20 +447,25 @@ mod tx_serde {
     //!
     //! This is needed because we might need to deserialize the `gasPrice` field into both
     //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    //!
+    //! Additionally, during deserialization this module handles the case where the `gasPrice` field
+    //! is larger than `u128::MAX` by saturating it to `u128::MAX`. This is known to happen on
+    //! some networks.
+    //!
+    //! See <https://github.com/alloy-rs/alloy/issues/2842> for example.
+
     use super::*;
+
     use serde::{Deserialize, Serialize};
+
+    use alloy_primitives::U256;
 
     /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
     /// field if inner [`TxEnvelope`] did not consume it.
     #[derive(Serialize, Deserialize)]
     struct MaybeGasPrice {
-        #[serde(
-            default,
-            rename = "gasPrice",
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )]
-        pub effective_gas_price: Option<u128>,
+        #[serde(default, rename = "gasPrice", skip_serializing_if = "Option::is_none")]
+        pub effective_gas_price: Option<U256>,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -493,8 +498,12 @@ mod tx_serde {
 
             let (inner, from) = inner.into_parts();
 
-            // if inner transaction has its own `gasPrice` don't serialize it in this struct.
-            let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
+            let effective_gas_price = if inner.gas_price().is_none() {
+                effective_gas_price.map(U256::from)
+            } else {
+                // If inner transaction has its own `gasPrice` don't serialize it in this struct.
+                None
+            };
 
             Self {
                 inner,
@@ -520,9 +529,11 @@ mod tx_serde {
                 gas_price,
             } = value;
 
-            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice`, otherwise
-            // return error
-            let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
+            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice` (making
+            // sure to saturate when converting to u128), otherwise return error.
+            let effective_gas_price = inner
+                .gas_price()
+                .or_else(|| gas_price.effective_gas_price.map(|g| g.saturating_to()));
 
             Ok(Self {
                 inner: Recovered::new_unchecked(inner, from),
@@ -612,5 +623,47 @@ mod tests {
         let raw = r#"{"blockHash":"0xb14eac260f0cb7c3bbf4c9ff56034defa4f566780ed3e44b7a79b6365d02887c","blockNumber":"0xb022","from":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","gas":"0xf8ac","gasPrice":"0xe07899f","maxFeePerGas":"0xe0789a0","maxPriorityFeePerGas":"0xe078998","hash":"0xadc3f24d05f05f1065debccb1c4b033eaa35917b69b343d88d9062cdf8ecad83","input":"0x","nonce":"0x1a","to":"0x6d2d4e1c2326a069f36f5d6337470dc26adb7156","transactionIndex":"0x0","value":"0x0","type":"0x4","accessList":[],"chainId":"0x1a5ee289c","authorizationList":[{"chainId":"0x1a5ee289c","address":"0x529f773125642b12a44bd543005650989eceaa2a","nonce":"0x1a","v":"0x0","r":"0x9b3de20cf8bd07f3c5c55c38c920c146f081bc5ab4580d0c87786b256cdab3c2","s":"0x74841956f4832bace3c02aed34b8f0a2812450da3728752edbb5b5e1da04497"}],"v":"0x1","r":"0xb3bf7d6877864913bba04d6f93d98009a5af16ee9c12295cd634962a2346b67c","s":"0x31ca4a874afa964ec7643e58c6b56b35b1bcc7698eb1b5e15e61e78b353bd42d","yParity":"0x1"}"#;
         let tx = serde_json::from_str::<Transaction>(raw).unwrap();
         assert!(tx.inner.is_eip7702());
+    }
+
+    /// <https://github.com/alloy-rs/alloy/issues/2842>
+    #[test]
+    #[cfg(feature = "serde")]
+    fn gas_price_saturation() {
+        use super::tx_serde::*;
+        use alloy_network::UnknownTypedTransaction;
+
+        let tx_json_with_saturate = serde_json::json!({
+            "type": "0x78",
+            "nonce": "0x1",
+            // A gas price larger than u128::MAX.
+            "gasPrice": "0x30783134626639633464372e3333333333333333333333333333333333333333",
+            "gas": "0x5208",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x0",
+            "input": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
+        });
+        let tx_helper: TransactionSerdeHelper<UnknownTypedTransaction> =
+            serde_json::from_value(tx_json_with_saturate).unwrap();
+        let tx: Transaction<UnknownTypedTransaction> = tx_helper.try_into().unwrap();
+        assert!(tx.inner.gas_price().is_none());
+        assert_eq!(tx.effective_gas_price, Some(u128::MAX));
+
+        let tx_json_no_saturate = serde_json::json!({
+            "type": "0x78",
+            "nonce": "0x1",
+            // A normal gas price.
+            "gasPrice": "0x3b9aca00",
+            "gas": "0x5208",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x0",
+            "input": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
+        });
+        let tx_helper: TransactionSerdeHelper<UnknownTypedTransaction> =
+            serde_json::from_value(tx_json_no_saturate).unwrap();
+        let tx: Transaction<UnknownTypedTransaction> = tx_helper.try_into().unwrap();
+        assert!(tx.inner.gas_price().is_some_and(|g| g == 1_000_000_000));
+        assert!(tx.effective_gas_price.is_some_and(|g| g == 1_000_000_000));
     }
 }
