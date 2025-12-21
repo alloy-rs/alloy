@@ -21,6 +21,11 @@ impl RpcModules {
     pub fn into_modules(self) -> HashMap<String, String> {
         self.module_map
     }
+
+    /// Parse `RpcModules` from a JSON string.
+    pub fn from_json(s: &str) -> Result<Self, serde_json::Error> {
+    serde_json::from_str(s)
+    }
 }
 
 #[cfg(test)]
@@ -38,7 +43,7 @@ mod tests {
             ("net".to_owned(), "1.0".to_owned()),
         ]);
         let m = RpcModules::new(module_map);
-        let de_serialized: RpcModules = serde_json::from_str(s).unwrap();
+        let de_serialized = RpcModules::from_json(s).unwrap();
         assert_eq!(de_serialized, m);
     }
 }

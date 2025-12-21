@@ -25,6 +25,7 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["map"] }
 alloy-serde.workspace = true
+serde_json = { workspace = true }
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-any = { workspace = true, optional = true }
