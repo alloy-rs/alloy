@@ -76,7 +76,7 @@ impl Withdrawals {
     /// Calculate a heuristic for the in-memory size of the [Withdrawals].
     #[inline]
     pub const fn size(&self) -> usize {
-        self.0.len() * core::mem::size_of::<Withdrawal>()
+        size_of::<Self>() + self.0.capacity() * size_of::<Withdrawal>()
     }
 
     /// Get an iterator over the Withdrawals.
