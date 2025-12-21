@@ -39,7 +39,7 @@ pub use alloy_network_primitives::{
 /// Captures type info for network-specific RPC requests/responses.
 ///
 /// Networks are only containers for types, so it is recommended to use ZSTs for their definition.
-pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
+pub trait Network: Debug + Copy + Sized + Send + Sync + 'static {
     // -- Consensus types --
 
     /// The network transaction type enum.
@@ -54,7 +54,6 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + TryFrom<u8, Error = Eip2718Error>
         + Debug
         + Display
-        + Clone
         + Copy
         + Send
         + Sync
