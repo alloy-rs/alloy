@@ -15,11 +15,6 @@ pub enum LocalSignerError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
-    /// [`secp256k1`] error.
-    #[error(transparent)]
-    #[cfg(feature = "secp256k1")]
-    Secp256k1Error(#[from] secp256k1::Error),
-
     /// [`coins_bip32`] error.
     #[error(transparent)]
     #[cfg(feature = "mnemonic")]

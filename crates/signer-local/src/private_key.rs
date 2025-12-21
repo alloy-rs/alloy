@@ -341,7 +341,7 @@ mod tests {
             far: "space".into(),
             out: Address::ZERO,
         };
-        let signer = LocalSigner::<SigningKey>::random();
+        let signer = LocalSigner::random();
         let hash = foo_bar.eip712_signing_hash(&domain);
         let sig = signer.sign_typed_data_sync(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), signer.address());
@@ -375,13 +375,12 @@ mod tests {
     fn conversions() {
         let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
 
-        let signer_b256: LocalSigner<SigningKey> =
-            LocalSigner::<SigningKey>::from_bytes(&key).unwrap();
+        let signer_b256: LocalSigner<SigningKey> = LocalSigner::from_bytes(&key).unwrap();
         assert_eq!(signer_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
         assert_eq!(signer_b256.chain_id, None);
         assert_eq!(signer_b256.credential, SigningKey::from_bytes((&key.0).into()).unwrap());
 
-        let signer_str = LocalSigner::<SigningKey>::from_str(
+        let signer_str = LocalSigner::from_str(
             "0000000000000000000000000000000000000000000000000000000000000001",
         )
         .unwrap();
@@ -391,7 +390,7 @@ mod tests {
         assert_eq!(signer_str.to_bytes(), key);
         assert_eq!(signer_str.to_field_bytes(), key.0.into());
 
-        let signer_slice = LocalSigner::<SigningKey>::from_slice(&key[..]).unwrap();
+        let signer_slice = LocalSigner::from_slice(&key[..]).unwrap();
         assert_eq!(signer_slice.address, signer_b256.address);
         assert_eq!(signer_slice.chain_id, signer_b256.chain_id);
         assert_eq!(signer_slice.credential, signer_b256.credential);
