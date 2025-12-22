@@ -37,6 +37,7 @@ alloy-consensus-any = { version = "1.1.3", path = "crates/consensus-any", defaul
 alloy-contract = { version = "1.1.3", path = "crates/contract", default-features = false }
 alloy-eips = { version = "1.1.3", path = "crates/eips", default-features = false }
 alloy-ens = { version = "1.1.3", path = "crates/ens", default-features = false }
+alloy-siwe = { version = "1.1.3", path = "crates/siwe", default-features = false }
 alloy-eip7547 = { version = "1.1.3", path = "crates/eip7547", default-features = false }
 alloy-genesis = { version = "1.1.3", path = "crates/genesis", default-features = false }
 alloy-json-rpc = { version = "1.1.3", path = "crates/json-rpc", default-features = false }
