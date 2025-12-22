@@ -156,8 +156,8 @@ impl Message {
     /// - `expiration_time` is `None` OR `t < expiration_time`
     #[must_use]
     pub fn valid_at(&self, t: &OffsetDateTime) -> bool {
-        let not_before_ok = self.not_before.as_ref().map(|nbf| nbf < t).unwrap_or(true);
-        let not_expired = self.expiration_time.as_ref().map(|exp| exp >= t).unwrap_or(true);
+        let not_before_ok = self.not_before.as_ref().is_none_or(|nbf| nbf < t);
+        let not_expired = self.expiration_time.as_ref().is_none_or(|exp| exp >= t);
         not_before_ok && not_expired
     }
 
