@@ -1,4 +1,6 @@
-//! EIP-4361 Message implementation.
+//! [EIP-4361] message implementation.
+//!
+//! [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
 
 use crate::{TimeStamp, VerificationOpts};
 use alloc::{string::String, string::ToString, vec::Vec};
@@ -11,7 +13,9 @@ use http::uri::Authority;
 use iri_string::types::UriString;
 use time::OffsetDateTime;
 
-/// EIP-4361 version.
+/// [EIP-4361] message version.
+///
+/// [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display, strum::EnumString)]
 pub enum Version {
     /// Version 1.
@@ -19,53 +23,34 @@ pub enum Version {
     V1 = 1,
 }
 
-/// EIP-4361 message.
+/// [EIP-4361] message.
 ///
-/// # Example
-///
-/// ```
-/// use alloy_siwe::Message;
-///
-/// let msg = r#"localhost:4361 wants you to sign in with your Ethereum account:
-/// 0x6Da01670d8fc844e736095918bbE11fE8D564163
-///
-/// SIWE Notepad Example
-///
-/// URI: http://localhost:4361
-/// Version: 1
-/// Chain ID: 1
-/// Nonce: kEWepMt9knR6lWJ6A
-/// Issued At: 2021-12-07T18:28:18.807Z"#;
-///
-/// let message: Message = msg.parse().unwrap();
-/// assert_eq!(message.chain_id, 1);
-/// assert_eq!(message.nonce, "kEWepMt9knR6lWJ6A");
-/// ```
+/// [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
-    /// RFC 3986 authority requesting the signing.
+    /// Domain requesting the signing.
     pub domain: Authority,
-    /// Ethereum address performing the signing (EIP-55 checksum format).
+    /// Ethereum address performing the signing.
     pub address: Address,
-    /// Human-readable ASCII assertion that the user will sign.
+    /// Human-readable statement.
     pub statement: Option<String>,
-    /// RFC 3986 URI referring to the resource that is the subject of signing.
+    /// URI of the resource.
     pub uri: UriString,
-    /// Current version of the message (must be 1).
+    /// Message version.
     pub version: Version,
-    /// EIP-155 Chain ID to which the session is bound.
+    /// Chain ID.
     pub chain_id: u64,
-    /// Randomized token used to prevent replay attacks (min 8 alphanumeric chars).
+    /// Randomized nonce for replay protection.
     pub nonce: String,
-    /// ISO 8601 datetime when the message was created.
+    /// When the message was created.
     pub issued_at: TimeStamp,
-    /// ISO 8601 datetime when the message expires.
+    /// When the message expires.
     pub expiration_time: Option<TimeStamp>,
-    /// ISO 8601 datetime when the message becomes valid.
+    /// When the message becomes valid.
     pub not_before: Option<TimeStamp>,
-    /// System-specific identifier for the sign-in request.
+    /// Request identifier.
     pub request_id: Option<String>,
-    /// List of URIs the user wishes to have resolved.
+    /// Resources the user wishes to access.
     pub resources: Vec<UriString>,
 }
 
@@ -111,33 +96,9 @@ impl FromStr for Message {
 }
 
 impl Message {
-    /// Verify the message signature using EIP-191 personal sign.
+    /// Verifies the signature using [EIP-191] personal sign.
     ///
-    /// Returns the recovered address on success.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use alloy_primitives::{hex, Signature};
-    /// use alloy_siwe::Message;
-    ///
-    /// let msg: Message = r#"localhost:4361 wants you to sign in with your Ethereum account:
-    /// 0x6Da01670d8fc844e736095918bbE11fE8D564163
-    ///
-    /// SIWE Notepad Example
-    ///
-    /// URI: http://localhost:4361
-    /// Version: 1
-    /// Chain ID: 1
-    /// Nonce: kEWepMt9knR6lWJ6A
-    /// Issued At: 2021-12-07T18:28:18.807Z"#.parse().unwrap();
-    ///
-    /// let sig_bytes = hex!("6228b3ecd7bf2df018183aeab6b6f1db1e9f4e3cbe24560404112e25363540eb679934908143224d746bbb5e1aa65ab435684081f4dbb74a0fec57f98f40f5051c");
-    /// let signature = Signature::try_from(&sig_bytes[..]).unwrap();
-    ///
-    /// let recovered = msg.verify_eip191(&signature).unwrap();
-    /// assert_eq!(recovered, msg.address);
-    /// ```
+    /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     pub fn verify_eip191(&self, signature: &Signature) -> Result<Address, VerificationError> {
         let message_str = self.to_string();
         let recovered = signature.recover_address_from_msg(message_str.as_bytes())?;
@@ -149,11 +110,7 @@ impl Message {
         Ok(recovered)
     }
 
-    /// Validates time constraints at a specific point in time.
-    ///
-    /// Returns `true` if:
-    /// - `not_before` is `None` OR `t >= not_before`
-    /// - `expiration_time` is `None` OR `t < expiration_time`
+    /// Returns `true` if the message is valid at time `t`.
     #[must_use]
     pub fn valid_at(&self, t: &OffsetDateTime) -> bool {
         let not_before_ok = self.not_before.as_ref().is_none_or(|nbf| nbf < t);
@@ -161,12 +118,7 @@ impl Message {
         not_before_ok && not_expired
     }
 
-    /// Validate message against verification options (without signature check).
-    ///
-    /// This validates:
-    /// - Time constraints if `opts.timestamp` is provided
-    /// - Domain matching if `opts.domain` is provided
-    /// - Nonce matching if `opts.nonce` is provided
+    /// Validates time, domain, and nonce against the provided options.
     pub fn validate(&self, opts: &VerificationOpts) -> Result<(), VerificationError> {
         if let Some(t) = &opts.timestamp {
             if !self.valid_at(t) {
@@ -189,15 +141,9 @@ impl Message {
         Ok(())
     }
 
-    /// Verify the message with additional validation options.
+    /// Validates options and verifies the [EIP-191] signature.
     ///
-    /// This validates:
-    /// - Time constraints if `opts.timestamp` is provided
-    /// - Domain matching if `opts.domain` is provided
-    /// - Nonce matching if `opts.nonce` is provided
-    /// - Signature (EIP-191)
-    ///
-    /// For time-sensitive validation, always provide `opts.timestamp`.
+    /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     pub fn verify(
         &self,
         signature: &Signature,
