@@ -27,7 +27,6 @@ all = "warn"
 all = { level = "warn", priority = -1 }
 missing-const-for-fn = "warn"
 use-self = "warn"
-option-if-let-else = "warn"
 redundant-clone = "warn"
 large-enum-variant = "allow"
 result-large-err = "allow"
@@ -118,7 +117,7 @@ futures-executor = "0.3"
 futures-utils-wasm = "0.1"
 wasmtimer = "0.4.0"
 
-gcloud-sdk = "0.27"
+gcloud-sdk = "0.27.4"
 hyper = { version = "1.2", default-features = false }
 hyper-util = "0.1"
 hyper-tls = "0.6.0"

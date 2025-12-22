@@ -545,9 +545,9 @@ impl BlobTransactionSidecarEip7594 {
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip7594].
     #[inline]
     pub const fn size(&self) -> usize {
-        self.blobs.len() * BYTES_PER_BLOB + // blobs
-               self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
-               self.cell_proofs.len() * BYTES_PER_PROOF // proofs
+        self.blobs.capacity() * BYTES_PER_BLOB
+            + self.commitments.capacity() * BYTES_PER_COMMITMENT
+            + self.cell_proofs.capacity() * BYTES_PER_PROOF
     }
 
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and

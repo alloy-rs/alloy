@@ -1,4 +1,5 @@
 use crate::crypto::RecoveryError;
+use alloc::vec::Vec;
 use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
@@ -55,30 +56,6 @@ impl<T> Recovered<T> {
         self.inner.clone()
     }
 
-    /// Returns a reference to the transaction.
-    #[doc(alias = "transaction")]
-    #[deprecated = "Use `inner` instead"]
-    pub const fn tx(&self) -> &T {
-        &self.inner
-    }
-
-    /// Transform back to the transaction.
-    #[doc(alias = "into_transaction")]
-    #[deprecated = "Use `into_inner` instead"]
-    pub fn into_tx(self) -> T {
-        self.inner
-    }
-
-    /// Clone the inner transaction.
-    #[doc(alias = "clone_transaction")]
-    #[deprecated = "Use `clone_inner` instead"]
-    pub fn clone_tx(&self) -> T
-    where
-        T: Clone,
-    {
-        self.inner.clone()
-    }
-
     /// Dissolve Self to its component
     #[doc(alias = "split")]
     pub fn into_parts(self) -> (T, Address) {
@@ -106,26 +83,8 @@ impl<T> Recovered<T> {
         self.map(Tx::from)
     }
 
-    /// Converts the transaction type to the given alternative that is `From<T>`
-    #[deprecated = "Use `convert` instead"]
-    pub fn convert_transaction<Tx>(self) -> Recovered<Tx>
-    where
-        Tx: From<T>,
-    {
-        self.map(Tx::from)
-    }
-
     /// Converts the inner signed object to the given alternative that is `TryFrom<T>`
     pub fn try_convert<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
-    where
-        Tx: TryFrom<T>,
-    {
-        self.try_map(Tx::try_from)
-    }
-
-    /// Converts the transaction to the given alternative that is `TryFrom<T>`
-    #[deprecated = "Use `try_convert` instead"]
-    pub fn try_convert_transaction<Tx>(self) -> Result<Recovered<Tx>, Tx::Error>
     where
         Tx: TryFrom<T>,
     {
@@ -137,23 +96,8 @@ impl<T> Recovered<T> {
         Recovered::new_unchecked(f(self.inner), self.signer)
     }
 
-    /// Applies the given closure to the inner transaction type.
-    #[deprecated = "Use `map` instead"]
-    pub fn map_transaction<Tx>(self, f: impl FnOnce(T) -> Tx) -> Recovered<Tx> {
-        Recovered::new_unchecked(f(self.inner), self.signer)
-    }
-
     /// Applies the given fallible closure to the inner signed object.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Recovered<Tx>, E> {
-        Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
-    }
-
-    /// Applies the given fallible closure to the inner transaction type.
-    #[deprecated = "Use `try_map` instead"]
-    pub fn try_map_transaction<Tx, E>(
-        self,
-        f: impl FnOnce(T) -> Result<Tx, E>,
-    ) -> Result<Recovered<Tx>, E> {
         Ok(Recovered::new_unchecked(f(self.inner)?, self.signer))
     }
 
@@ -259,11 +203,21 @@ pub trait SignerRecoverable {
     /// Returns an error if the transaction's signature is invalid.
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError>;
 
+    /// Same as [`SignerRecoverable::recover_signer`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of transactions to avoid allocating a new
+    /// buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn recover_with_buf(&self, buf: &mut alloc::vec::Vec<u8>) -> Result<Address, RecoveryError> {
+        let _ = buf;
+        self.recover_signer()
+    }
+
     /// Same as [`SignerRecoverable::recover_signer_unchecked`] but receives a buffer to operate on
     /// for encoding. This is useful during batch recovery of historical transactions to avoid
     /// allocating a new buffer for each transaction.
     ///
-    /// Caution: it is expected that implementations clear this buffer.
+    /// Caution: it is expected that implementations always clear this buffer before using it.
     fn recover_unchecked_with_buf(
         &self,
         buf: &mut alloc::vec::Vec<u8>,
@@ -292,6 +246,37 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
 
+    /// Same as [`SignerRecoverable::try_into_recovered`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of transactions to avoid
+    /// allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_into_recovered_with_buf(
+        self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.recover_with_buf(buf)?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+    /// Same as [`SignerRecoverable::try_into_recovered_unchecked`] but receives a buffer to operate
+    /// on for encoding. This is useful during batch recovery of historical transactions to
+    /// avoid allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_into_recovered_unchecked_with_buf(
+        self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<Self>, RecoveryError>
+    where
+        Self: Sized,
+    {
+        let signer = self.recover_unchecked_with_buf(buf)?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
     /// `Recovered<&Self>`
     fn try_to_recovered_ref(&self) -> Result<Recovered<&Self>, RecoveryError> {
@@ -299,10 +284,36 @@ pub trait SignerRecoverable {
         Ok(Recovered::new_unchecked(self, signer))
     }
 
+    /// Same as [`SignerRecoverable::try_to_recovered_ref`] but receives a buffer to operate on
+    /// for encoding. This is useful during batch recovery of transactions to avoid
+    /// allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_to_recovered_ref_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.recover_with_buf(buf)?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
     /// Recover the signer via [`SignerRecoverable::recover_signer_unchecked`] and returns a
     /// `Recovered<&Self>`
     fn try_to_recovered_ref_unchecked(&self) -> Result<Recovered<&Self>, RecoveryError> {
         let signer = self.recover_signer_unchecked()?;
+        Ok(Recovered::new_unchecked(self, signer))
+    }
+
+    /// Same as [`SignerRecoverable::try_to_recovered_ref_unchecked`] but receives a buffer to
+    /// operate on for encoding. This is useful during batch recovery of historical transactions
+    /// to avoid allocating a new buffer for each transaction.
+    ///
+    /// Caution: it is expected that implementations always clear this buffer before using it.
+    fn try_to_recovered_ref_unchecked_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<Recovered<&Self>, RecoveryError> {
+        let signer = self.recover_unchecked_with_buf(buf)?;
         Ok(Recovered::new_unchecked(self, signer))
     }
 }
@@ -317,6 +328,10 @@ where
 
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.1.recover_signer_unchecked()
+    }
+
+    fn recover_with_buf(&self, buf: &mut Vec<u8>) -> Result<Address, RecoveryError> {
+        self.1.recover_with_buf(buf)
     }
 
     fn recover_unchecked_with_buf(
@@ -337,6 +352,10 @@ where
 
     fn recover_signer_unchecked(&self) -> Result<Address, RecoveryError> {
         self.inner().recover_signer_unchecked()
+    }
+
+    fn recover_with_buf(&self, buf: &mut alloc::vec::Vec<u8>) -> Result<Address, RecoveryError> {
+        self.inner().recover_with_buf(buf)
     }
 
     fn recover_unchecked_with_buf(
