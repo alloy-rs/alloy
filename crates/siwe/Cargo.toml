@@ -43,9 +43,8 @@ strum = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true, features = ["as_ref", "display"] }
 
 # Optional dependencies
-alloy-contract = { workspace = true, optional = true }
+alloy-eip1271 = { workspace = true, optional = true }
 alloy-provider = { workspace = true, optional = true }
-alloy-sol-types = { workspace = true, optional = true }
 async-trait = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -61,5 +60,5 @@ default = ["std"]
 std = []
 rand = ["dep:rand"]
 serde = ["dep:serde", "alloy-primitives/serde", "time/serde"]
-contract = ["dep:alloy-contract", "dep:alloy-sol-types"]
-provider = ["contract", "dep:alloy-provider", "dep:async-trait"]
+eip1271 = ["dep:alloy-eip1271"]
+provider = ["eip1271", "dep:alloy-provider", "dep:async-trait"]
