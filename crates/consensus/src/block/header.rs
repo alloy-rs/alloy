@@ -246,6 +246,33 @@ impl Header {
     }
 
     /// Calculate a heuristic for the in-memory size of the [Header].
+    #[cfg(not(feature = "amsterdam"))]
+    #[inline]
+    pub fn size(&self) -> usize {
+        mem::size_of::<B256>() + // parent hash
+        mem::size_of::<B256>() + // ommers hash
+        mem::size_of::<Address>() + // beneficiary
+        mem::size_of::<B256>() + // state root
+        mem::size_of::<B256>() + // transactions root
+        mem::size_of::<B256>() + // receipts root
+        mem::size_of::<Option<B256>>() + // withdrawals root
+        mem::size_of::<Bloom>() + // logs bloom
+        mem::size_of::<U256>() + // difficulty
+        mem::size_of::<BlockNumber>() + // number
+        mem::size_of::<u64>() + // gas limit
+        mem::size_of::<u64>() + // gas used
+        mem::size_of::<u64>() + // timestamp
+        mem::size_of::<B256>() + // mix hash
+        mem::size_of::<u64>() + // nonce
+        mem::size_of::<Option<u64>>() + // base fee per gas
+        mem::size_of::<Option<u64>>() + // blob gas used
+        mem::size_of::<Option<u64>>() + // excess blob gas
+        mem::size_of::<Option<B256>>() + // parent beacon block root
+        mem::size_of::<Option<B256>>() + // requests root
+        self.extra_data.len() // extra data
+    }
+
+    #[cfg(feature = "amsterdam")]
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<B256>() + // parent hash
@@ -548,8 +575,8 @@ pub(crate) const fn generate_valid_header(
     // Placeholder for future EIP adjustments
     header.requests_hash = None;
 
-    // #[cfg(feature = "amsterdam")]
-    // header.block_access_list_hash = None;
+    #[cfg(feature = "amsterdam")]
+    header.block_access_list_hash = None;
 
     header
 }
