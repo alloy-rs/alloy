@@ -12,7 +12,7 @@ use winnow::{
     ModalResult, Parser,
 };
 
-use crate::{Message, ParseError, TimeStamp, Version};
+use crate::{message::PREAMBLE, Message, ParseError, TimeStamp, Version};
 use alloy_primitives::Address;
 use http::uri::Authority;
 use iri_string::types::UriString;
@@ -65,8 +65,6 @@ fn message(input: &mut &str) -> PResult<Message> {
         resources,
     })
 }
-
-const PREAMBLE: &str = " wants you to sign in with your Ethereum account:";
 
 /// Parse: `[ scheme "://" ] domain " wants you to sign in with your Ethereum account:" LF`
 fn scheme_and_domain_line(input: &mut &str) -> PResult<(Option<String>, Authority)> {
