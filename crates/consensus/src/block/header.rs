@@ -499,6 +499,7 @@ impl Decodable for Header {
 ///
 /// This __does not, and should not guarantee__ that the header is valid with respect to __anything
 /// else__.
+#[cfg(not(feature = "amsterdam"))]
 #[cfg(any(test, feature = "arbitrary"))]
 pub(crate) const fn generate_valid_header(
     mut header: Header,
@@ -526,7 +527,37 @@ pub(crate) const fn generate_valid_header(
     // Placeholder for future EIP adjustments
     header.requests_hash = None;
 
-    #[cfg(feature = "amsterdam")]
+    header
+}
+
+#[cfg(feature = "amsterdam")]
+#[cfg(any(test, feature = "arbitrary"))]
+pub(crate) const fn generate_valid_header(
+    mut header: Header,
+    eip_4844_active: bool,
+    blob_gas_used: u64,
+    excess_blob_gas: u64,
+    parent_beacon_block_root: B256,
+) -> Header {
+    // Clear all related fields if EIP-1559 is inactive
+    if header.base_fee_per_gas.is_none() {
+        header.withdrawals_root = None;
+    }
+
+    // Set fields based on EIP-4844 being active
+    if eip_4844_active {
+        header.blob_gas_used = Some(blob_gas_used);
+        header.excess_blob_gas = Some(excess_blob_gas);
+        header.parent_beacon_block_root = Some(parent_beacon_block_root);
+    } else {
+        header.blob_gas_used = None;
+        header.excess_blob_gas = None;
+        header.parent_beacon_block_root = None;
+    }
+
+    // Placeholder for future EIP adjustments
+    header.requests_hash = None;
+
     header.block_access_list_hash = None;
 
     header
