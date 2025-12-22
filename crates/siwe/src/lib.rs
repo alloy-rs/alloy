@@ -7,8 +7,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-//! Sign-In with Ethereum (EIP-4361) utilities.
-
 extern crate alloc;
 
 use alloc::string::String;
@@ -31,15 +29,16 @@ pub use nonce::generate_nonce;
 #[cfg_attr(docsrs, doc(cfg(feature = "provider")))]
 pub use provider::*;
 
-/// Verification options for SIWE message validation.
+/// Verification options for [EIP-4361] message validation.
+///
+/// [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
 #[derive(Clone, Debug, Default)]
 pub struct VerificationOpts {
-    /// Expected domain field. If provided, verification fails if message domain doesn't match.
+    /// Expected domain. Fails verification if message domain doesn't match.
     pub domain: Option<http::uri::Authority>,
-    /// Expected nonce field. If provided, verification fails if message nonce doesn't match.
+    /// Expected nonce. Fails verification if message nonce doesn't match.
     pub nonce: Option<String>,
-    /// Timestamp to validate against. If provided, time constraints are checked.
-    /// For security-sensitive applications, always provide this.
+    /// Timestamp for time constraint validation.
     pub timestamp: Option<time::OffsetDateTime>,
 }
 
@@ -50,25 +49,16 @@ mod provider {
     use alloy_primitives::{eip191_hash_message, Address, Signature};
     use alloy_provider::{Network, Provider};
 
-    /// Extension trait for SIWE verification on providers.
+    /// Extension trait for SIWE verification with [EIP-1271] support.
+    ///
+    /// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
     #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     pub trait SiweExt<N: Network>: Provider<N> {
-        /// Verify a SIWE message signature, with EIP-1271 contract wallet support.
+        /// Verifies a SIWE message, trying [EIP-191] first then [EIP-1271].
         ///
-        /// This method first attempts EIP-191 personal signature verification.
-        /// If that fails (e.g., for contract wallets), it falls back to EIP-1271
-        /// on-chain verification using the provider.
-        ///
-        /// # Arguments
-        ///
-        /// * `message` - The SIWE message to verify
-        /// * `signature` - The signature bytes
-        /// * `opts` - Verification options (domain, nonce, timestamp checks)
-        ///
-        /// # Returns
-        ///
-        /// Returns the verified address on success, or an error if verification fails.
+        /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
+        /// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
         async fn verify_siwe(
             &self,
             message: &Message,
