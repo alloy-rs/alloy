@@ -5,12 +5,18 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 //! Sign-In with Ethereum (EIP-4361) utilities.
+
+extern crate alloc;
+
+use alloc::string::String;
 
 #[cfg(feature = "contract")]
 mod eip1271;
 mod message;
+mod parser;
 mod timestamp;
 
 #[cfg(feature = "rand")]
