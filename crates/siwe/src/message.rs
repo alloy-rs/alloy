@@ -16,9 +16,10 @@ use time::OffsetDateTime;
 /// [EIP-4361] message version.
 ///
 /// [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
-#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display, strum::EnumString)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, strum::Display, strum::EnumString)]
 pub enum Version {
-    /// Version 1.
+    /// Version 1 (the only version defined in EIP-4361).
+    #[default]
     #[strum(serialize = "1")]
     V1 = 1,
 }
@@ -28,6 +29,8 @@ pub enum Version {
 /// [EIP-4361]: https://eips.ethereum.org/EIPS/eip-4361
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
+    /// URI scheme (e.g., "https"). Optional per EIP-4361.
+    pub scheme: Option<String>,
     /// Domain requesting the signing.
     pub domain: Authority,
     /// Ethereum address performing the signing.
@@ -56,6 +59,9 @@ pub struct Message {
 
 impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(scheme) = &self.scheme {
+            write!(f, "{scheme}://")?;
+        }
         writeln!(f, "{}{}", &self.domain, PREAMBLE)?;
         writeln!(f, "{}", self.address.to_checksum(None))?;
         writeln!(f)?;
@@ -111,10 +117,14 @@ impl Message {
     }
 
     /// Returns `true` if the message is valid at time `t`.
+    ///
+    /// Time boundary conditions (following viem convention):
+    /// - `not_before`: inclusive (message is valid at exactly `not_before`)
+    /// - `expiration_time`: exclusive (message is invalid at exactly `expiration_time`)
     #[must_use]
     pub fn valid_at(&self, t: &OffsetDateTime) -> bool {
-        let not_before_ok = self.not_before.as_ref().is_none_or(|nbf| nbf < t);
-        let not_expired = self.expiration_time.as_ref().is_none_or(|exp| exp >= t);
+        let not_before_ok = self.not_before.as_ref().is_none_or(|nbf| nbf <= t);
+        let not_expired = self.expiration_time.as_ref().is_none_or(|exp| exp > t);
         not_before_ok && not_expired
     }
 
@@ -151,6 +161,32 @@ impl Message {
     ) -> Result<Address, VerificationError> {
         self.validate(opts)?;
         self.verify_eip191(signature)
+    }
+
+    /// Creates a new [`MessageBuilder`] for constructing a SIWE message.
+    ///
+    /// The builder uses a typestate pattern to ensure all required fields are set
+    /// at compile time. The builder defaults to [`Version::V1`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use alloy_siwe::Message;
+    /// use alloy_primitives::address;
+    /// use time::OffsetDateTime;
+    ///
+    /// let message = Message::builder()
+    ///     .domain("example.com".parse().unwrap())
+    ///     .address(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+    ///     .uri("https://example.com/login".parse().unwrap())
+    ///     .chain_id(1)
+    ///     .nonce("32891756".to_string())
+    ///     .issued_at(OffsetDateTime::now_utc().into())
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> crate::builder::MessageBuilder<(), (), (), (), (), ()> {
+        crate::builder::MessageBuilder::new()
     }
 }
 
@@ -206,10 +242,16 @@ pub enum VerificationError {
     /// Nonce does not match expected value.
     #[error("nonce mismatch")]
     NonceMismatch,
-    /// EIP-1271 contract verification failed.
+    /// EIP-1271 contract call failed.
     #[cfg(feature = "eip1271")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "eip1271")))]
     #[error("EIP-1271 verification failed: {0}")]
     Eip1271(#[from] alloy_eip1271::Eip1271Error),
+    /// EIP-1271 contract returned invalid signature.
+    #[cfg(feature = "eip1271")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "eip1271")))]
+    #[error("contract signature verification failed for address {0}")]
+    ContractSignatureInvalid(Address),
 }
 
 // Display format constants
@@ -374,5 +416,114 @@ Issued At: 2021-09-30T16:25:24Z"#;
 
         let result = msg.parse::<Message>();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_with_scheme() {
+        let msg = r#"https://service.org wants you to sign in with your Ethereum account:
+0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+
+
+URI: https://service.org/login
+Version: 1
+Chain ID: 1
+Nonce: 32891756
+Issued At: 2021-09-30T16:25:24Z"#;
+
+        let message: Message = msg.parse().unwrap();
+        assert_eq!(message.scheme, Some("https".to_string()));
+        assert_eq!(message.domain.to_string(), "service.org");
+    }
+
+    #[test]
+    fn test_roundtrip_with_scheme() {
+        let msg = r#"https://example.com wants you to sign in with your Ethereum account:
+0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+
+Sign in to Example
+
+URI: https://example.com/login
+Version: 1
+Chain ID: 1
+Nonce: 32891756
+Issued At: 2021-09-30T16:25:24Z"#;
+
+        let message: Message = msg.parse().unwrap();
+        assert_eq!(message.scheme, Some("https".to_string()));
+
+        let serialized = message.to_string();
+        let reparsed: Message = serialized.parse().unwrap();
+        assert_eq!(message, reparsed);
+    }
+
+    #[test]
+    fn test_builder() {
+        use alloy_primitives::address;
+        use time::OffsetDateTime;
+
+        let message = Message::builder()
+            .statement("Sign in to Example")
+            .domain("example.com".parse().unwrap())
+            .address(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+            .uri("https://example.com/login".parse().unwrap())
+            .chain_id(1)
+            .nonce("32891756".to_string())
+            .issued_at(OffsetDateTime::now_utc().into())
+            .build();
+
+        assert_eq!(message.domain.to_string(), "example.com");
+        assert_eq!(message.version, Version::V1);
+        assert_eq!(message.chain_id, 1);
+        assert_eq!(message.statement, Some("Sign in to Example".to_string()));
+    }
+
+    #[test]
+    fn test_builder_with_scheme() {
+        use alloy_primitives::address;
+        use time::OffsetDateTime;
+
+        let message = Message::builder()
+            .scheme("https")
+            .domain("example.com".parse().unwrap())
+            .address(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+            .uri("https://example.com/login".parse().unwrap())
+            .chain_id(1)
+            .nonce("32891756".to_string())
+            .issued_at(OffsetDateTime::now_utc().into())
+            .build();
+
+        assert_eq!(message.scheme, Some("https".to_string()));
+
+        // Verify it serializes with the scheme
+        let serialized = message.to_string();
+        assert!(serialized.starts_with("https://example.com wants you to sign in"));
+    }
+
+    #[test]
+    fn test_valid_at_boundaries() {
+        use time::{Duration, OffsetDateTime};
+
+        let now = OffsetDateTime::now_utc();
+        let message = Message::builder()
+            .not_before(now.into())
+            .expiration_time((now + Duration::hours(1)).into())
+            .domain("example.com".parse().unwrap())
+            .address("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap())
+            .uri("https://example.com".parse().unwrap())
+            .chain_id(1)
+            .nonce("12345678".to_string())
+            .issued_at(now.into())
+            .build();
+
+        // At exactly not_before time, message should be valid (inclusive)
+        assert!(message.valid_at(&now));
+
+        // At exactly expiration time, message should be invalid (exclusive)
+        let expiration = now + Duration::hours(1);
+        assert!(!message.valid_at(&expiration));
+
+        // Just before expiration, should be valid
+        let before_expiration = now + Duration::hours(1) - Duration::seconds(1);
+        assert!(message.valid_at(&before_expiration));
     }
 }
