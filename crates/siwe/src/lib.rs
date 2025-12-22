@@ -90,26 +90,7 @@ mod provider {
             signature: &[u8],
             opts: &VerificationOpts,
         ) -> Result<Address, VerificationError> {
-            // Validate time constraints
-            if let Some(t) = &opts.timestamp {
-                if !message.valid_at(t) {
-                    return Err(VerificationError::Time);
-                }
-            }
-
-            // Validate domain
-            if let Some(expected_domain) = &opts.domain {
-                if *expected_domain != message.domain {
-                    return Err(VerificationError::DomainMismatch);
-                }
-            }
-
-            // Validate nonce
-            if let Some(expected_nonce) = &opts.nonce {
-                if *expected_nonce != message.nonce {
-                    return Err(VerificationError::NonceMismatch);
-                }
-            }
+            message.validate(opts)?;
 
             // Try EIP-191 verification first (for EOA wallets)
             if signature.len() == 65 {

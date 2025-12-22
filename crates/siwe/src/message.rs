@@ -161,6 +161,34 @@ impl Message {
         not_before_ok && not_expired
     }
 
+    /// Validate message against verification options (without signature check).
+    ///
+    /// This validates:
+    /// - Time constraints if `opts.timestamp` is provided
+    /// - Domain matching if `opts.domain` is provided
+    /// - Nonce matching if `opts.nonce` is provided
+    pub fn validate(&self, opts: &VerificationOpts) -> Result<(), VerificationError> {
+        if let Some(t) = &opts.timestamp {
+            if !self.valid_at(t) {
+                return Err(VerificationError::Time);
+            }
+        }
+
+        if let Some(expected_domain) = &opts.domain {
+            if *expected_domain != self.domain {
+                return Err(VerificationError::DomainMismatch);
+            }
+        }
+
+        if let Some(expected_nonce) = &opts.nonce {
+            if *expected_nonce != self.nonce {
+                return Err(VerificationError::NonceMismatch);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Verify the message with additional validation options.
     ///
     /// This validates:
@@ -175,28 +203,7 @@ impl Message {
         signature: &Signature,
         opts: &VerificationOpts,
     ) -> Result<Address, VerificationError> {
-        // Validate time (only if timestamp provided)
-        if let Some(t) = &opts.timestamp {
-            if !self.valid_at(t) {
-                return Err(VerificationError::Time);
-            }
-        }
-
-        // Validate domain
-        if let Some(expected_domain) = &opts.domain {
-            if *expected_domain != self.domain {
-                return Err(VerificationError::DomainMismatch);
-            }
-        }
-
-        // Validate nonce
-        if let Some(expected_nonce) = &opts.nonce {
-            if *expected_nonce != self.nonce {
-                return Err(VerificationError::NonceMismatch);
-            }
-        }
-
-        // Verify signature
+        self.validate(opts)?;
         self.verify_eip191(signature)
     }
 }
