@@ -6,38 +6,21 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-//! EIP-1271 smart contract signature verification.
-//!
-//! This crate provides utilities for verifying signatures using the EIP-1271 standard,
-//! which allows smart contracts to validate signatures on behalf of contract accounts.
-//!
-//! # Example
-//!
-//! ```ignore
-//! use alloy_eip1271::Eip1271;
-//! use alloy_primitives::{b256, address, bytes};
-//!
-//! let hash = b256!("...");
-//! let address = address!("...");
-//! let signature = bytes!("...");
-//!
-//! let valid = hash.verify(address, signature, &provider).await?;
-//! ```
-
 use alloy_primitives::{Address, Bytes, FixedBytes, B256};
 use alloy_provider::{Network, Provider};
 use alloy_sol_types::sol;
 
-/// EIP-1271 magic value returned when a signature is valid.
+/// [EIP-1271] magic value: `bytes4(keccak256("isValidSignature(bytes32,bytes)"))`.
 ///
-/// This is `bytes4(keccak256("isValidSignature(bytes32,bytes)"))`.
+/// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
 pub const MAGIC_VALUE: FixedBytes<4> = FixedBytes::new([0x16, 0x26, 0xba, 0x7e]);
 
 sol! {
-    /// EIP-1271 interface for smart contract signature verification.
+    /// [EIP-1271] interface.
+    ///
+    /// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
     #[sol(rpc)]
     contract ERC1271 {
-        /// Returns the magic value `0x1626ba7e` if the signature is valid.
         function isValidSignature(
             bytes32 hash,
             bytes memory signature
@@ -45,40 +28,26 @@ sol! {
     }
 }
 
-/// Error type for EIP-1271 verification.
+/// [EIP-1271] verification error.
+///
+/// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
 #[derive(Debug, thiserror::Error)]
 pub enum Eip1271Error {
     /// Contract call failed.
     #[error("contract call failed: {0}")]
     ContractCall(#[from] alloy_contract::Error),
-    /// Contract returned unexpected data (not EIP-1271 compliant).
+    /// Contract is not EIP-1271 compliant.
     #[error("contract is not EIP-1271 compliant")]
     NonCompliant,
 }
 
-/// Extension trait for verifying hashes via EIP-1271.
+/// Extension trait for [EIP-1271] hash verification.
 ///
-/// This trait extends `B256` to allow verifying that a hash was signed by a
-/// smart contract account using the EIP-1271 `isValidSignature` interface.
-///
-/// # Example
-///
-/// ```ignore
-/// use alloy_eip1271::Eip1271;
-///
-/// let hash = eip191_hash_message(&message);
-/// let valid = hash.verify(contract_address, &signature, &provider).await?;
-/// ```
+/// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait Eip1271 {
-    /// Verify this hash was signed by the address using EIP-1271.
-    ///
-    /// Calls `isValidSignature(hash, signature)` on the contract at `address`.
-    ///
-    /// Returns `Ok(true)` if the contract returns the magic value `0x1626ba7e`.
-    /// Returns `Ok(false)` if the contract returns a different value.
-    /// Returns `Err` if the contract call fails or returns unexpected data.
+    /// Verifies the hash was signed by the contract at `address`.
     async fn verify<N, P>(
         &self,
         address: Address,
