@@ -35,6 +35,7 @@ result-large-err = "allow"
 alloy-consensus = { version = "1.5.2", path = "crates/consensus", default-features = false }
 alloy-consensus-any = { version = "1.5.2", path = "crates/consensus-any", default-features = false }
 alloy-contract = { version = "1.5.2", path = "crates/contract", default-features = false }
+alloy-eip1271 = { version = "1.5.2", path = "crates/eip1271", default-features = false }
 alloy-eip4361 = { version = "1.5.2", path = "crates/eip4361", default-features = false }
 alloy-eips = { version = "1.5.2", path = "crates/eips", default-features = false }
 alloy-ens = { version = "1.5.2", path = "crates/ens", default-features = false }

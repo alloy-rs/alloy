@@ -13,8 +13,6 @@ extern crate alloc;
 
 use alloc::string::String;
 
-#[cfg(feature = "contract")]
-mod eip1271;
 mod message;
 mod parser;
 mod timestamp;
@@ -24,10 +22,6 @@ mod nonce;
 
 pub use message::{Message, ParseError, VerificationError, Version};
 pub use timestamp::TimeStamp;
-
-#[cfg(feature = "contract")]
-#[cfg_attr(docsrs, doc(cfg(feature = "contract")))]
-pub use eip1271::*;
 
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
@@ -52,7 +46,8 @@ pub struct VerificationOpts {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{Message, VerificationError, VerificationOpts};
-    use alloy_primitives::{eip191_hash_message, Address, Bytes, Signature};
+    use alloy_eip1271::Eip1271;
+    use alloy_primitives::{eip191_hash_message, Address, Signature};
     use alloy_provider::{Network, Provider};
 
     /// Extension trait for SIWE verification on providers.
@@ -129,9 +124,9 @@ mod provider {
             let message_str = message.to_string();
             let hash = eip191_hash_message(message_str.as_bytes());
 
-            let is_valid =
-                crate::verify_eip1271(message.address, hash, Bytes::copy_from_slice(signature), self)
-                    .await?;
+            let is_valid = hash
+                .verify(message.address, alloy_primitives::Bytes::copy_from_slice(signature), self)
+                .await?;
 
             if is_valid {
                 Ok(message.address)
