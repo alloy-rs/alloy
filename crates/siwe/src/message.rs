@@ -1,6 +1,7 @@
 //! EIP-4361 Message implementation.
 
 use crate::{TimeStamp, VerificationOpts};
+use alloc::{string::String, string::ToString, vec::Vec};
 use alloy_primitives::{Address, Signature};
 use core::{
     fmt::{self, Display, Formatter},
@@ -11,28 +12,11 @@ use iri_string::types::UriString;
 use time::OffsetDateTime;
 
 /// EIP-4361 version.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display, strum::EnumString)]
 pub enum Version {
     /// Version 1.
+    #[strum(serialize = "1")]
     V1 = 1,
-}
-
-impl FromStr for Version {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "1" {
-            Ok(Self::V1)
-        } else {
-            Err(ParseError::Format("invalid version"))
-        }
-    }
-}
-
-impl Display for Version {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", *self as u64)
-    }
 }
 
 /// EIP-4361 message.
@@ -122,92 +106,7 @@ impl FromStr for Message {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut lines = s.split('\n');
-
-        // Parse domain from preamble
-        let domain = lines
-            .next()
-            .and_then(|preamble| preamble.strip_suffix(PREAMBLE))
-            .map(Authority::from_str)
-            .ok_or(ParseError::Format("missing preamble"))??;
-
-        // Parse address (must be EIP-55 checksummed)
-        let address_str = tagged(ADDR_TAG, lines.next())?;
-        if !is_checksummed(address_str) {
-            return Err(ParseError::Format("address not in EIP-55 format"));
-        }
-        let address: Address = address_str.parse()?;
-
-        // Skip blank line
-        lines.next();
-
-        // Parse optional statement
-        let statement = match lines.next() {
-            None => return Err(ParseError::Format("unexpected end after address")),
-            Some("") => None,
-            Some(s) => {
-                lines.next(); // Skip blank line after statement
-                Some(s.to_string())
-            }
-        };
-
-        // Parse required fields
-        let uri = parse_line(URI_TAG, lines.next())?;
-        let version = parse_line(VERSION_TAG, lines.next())?;
-        let chain_id = parse_line(CHAIN_TAG, lines.next())?;
-        let nonce: String = parse_line(NONCE_TAG, lines.next())?;
-        if nonce.len() < 8 {
-            return Err(ParseError::Format("nonce must be at least 8 characters"));
-        }
-        let issued_at: TimeStamp = tagged(IAT_TAG, lines.next())?.parse()?;
-
-        // Parse optional fields
-        let mut line = lines.next();
-
-        let expiration_time = match tag_optional(EXP_TAG, line)? {
-            Some(exp) => {
-                line = lines.next();
-                Some(exp.parse()?)
-            }
-            None => None,
-        };
-
-        let not_before = match tag_optional(NBF_TAG, line)? {
-            Some(nbf) => {
-                line = lines.next();
-                Some(nbf.parse()?)
-            }
-            None => None,
-        };
-
-        let request_id = match tag_optional(RID_TAG, line)? {
-            Some(rid) => {
-                line = lines.next();
-                Some(rid.into())
-            }
-            None => None,
-        };
-
-        let resources = match line {
-            Some(RES_TAG) => lines.map(|s| parse_line("- ", Some(s))).collect(),
-            Some(_) => Err(ParseError::Format("unexpected content")),
-            None => Ok(vec![]),
-        }?;
-
-        Ok(Self {
-            domain,
-            address,
-            statement,
-            uri,
-            version,
-            chain_id,
-            nonce,
-            issued_at,
-            expiration_time,
-            not_before,
-            request_id,
-            resources,
-        })
+        crate::parser::parse_message(s)
     }
 }
 
@@ -319,10 +218,10 @@ pub enum ParseError {
     TimeStamp(#[from] time::error::Parse),
     /// Invalid chain ID.
     #[error("invalid chain ID: {0}")]
-    ChainId(#[from] std::num::ParseIntError),
+    ChainId(#[from] core::num::ParseIntError),
     /// Format error.
-    #[error("format error: {0}")]
-    Format(&'static str),
+    #[error("parse error: {0}")]
+    Format(String),
 }
 
 impl From<core::convert::Infallible> for ParseError {
@@ -364,10 +263,9 @@ pub enum VerificationError {
     Eip1271NonCompliant,
 }
 
-// Parsing helpers
+// Display format constants
 
 const PREAMBLE: &str = " wants you to sign in with your Ethereum account:";
-const ADDR_TAG: &str = "0x";
 const URI_TAG: &str = "URI: ";
 const VERSION_TAG: &str = "Version: ";
 const CHAIN_TAG: &str = "Chain ID: ";
@@ -377,37 +275,6 @@ const EXP_TAG: &str = "Expiration Time: ";
 const NBF_TAG: &str = "Not Before: ";
 const RID_TAG: &str = "Request ID: ";
 const RES_TAG: &str = "Resources:";
-
-fn tagged<'a>(tag: &'static str, line: Option<&'a str>) -> Result<&'a str, ParseError> {
-    line.and_then(|l| l.strip_prefix(tag))
-        .ok_or(ParseError::Format(tag))
-}
-
-fn parse_line<S: FromStr<Err = E>, E: Into<ParseError>>(
-    tag: &'static str,
-    line: Option<&str>,
-) -> Result<S, ParseError> {
-    tagged(tag, line).and_then(|s| S::from_str(s).map_err(Into::into))
-}
-
-fn tag_optional<'a>(
-    tag: &'static str,
-    line: Option<&'a str>,
-) -> Result<Option<&'a str>, ParseError> {
-    match tagged(tag, line).map(Some) {
-        Err(ParseError::Format(t)) if t == tag => Ok(None),
-        r => r,
-    }
-}
-
-/// Check if an address string is EIP-55 checksummed.
-fn is_checksummed(addr: &str) -> bool {
-    // Parse and re-checksum, then compare
-    match addr.parse::<Address>() {
-        Ok(parsed) => parsed.to_checksum(None) == format!("0x{addr}"),
-        Err(_) => false,
-    }
-}
 
 #[cfg(feature = "serde")]
 mod serde_impl {
