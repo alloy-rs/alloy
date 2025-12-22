@@ -256,7 +256,7 @@ pub enum VerificationError {
 
 // Display format constants
 
-const PREAMBLE: &str = " wants you to sign in with your Ethereum account:";
+pub(crate) const PREAMBLE: &str = " wants you to sign in with your Ethereum account:";
 const URI_TAG: &str = "URI: ";
 const VERSION_TAG: &str = "Version: ";
 const CHAIN_TAG: &str = "Chain ID: ";
