@@ -254,13 +254,9 @@ pub enum VerificationError {
     #[error("nonce mismatch")]
     NonceMismatch,
     /// EIP-1271 contract verification failed.
-    #[cfg(feature = "contract")]
-    #[error("contract verification failed: {0}")]
-    Contract(#[from] alloy_contract::Error),
-    /// Contract is not EIP-1271 compliant.
-    #[cfg(feature = "contract")]
-    #[error("contract is not EIP-1271 compliant")]
-    Eip1271NonCompliant,
+    #[cfg(feature = "eip1271")]
+    #[error("EIP-1271 verification failed: {0}")]
+    Eip1271(#[from] alloy_eip1271::Eip1271Error),
 }
 
 // Display format constants
