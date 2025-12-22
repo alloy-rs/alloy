@@ -1295,7 +1295,7 @@ impl ExecutionPayloadV4 {
     pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
         let mut base_block = self.payload_inner.into_block_raw()?;
         base_block.header.block_access_list_hash =
-            alloy_primitives::keccak256(self.block_access_list);
+            Some(alloy_primitives::keccak256(self.block_access_list));
         Ok(base_block)
     }
 }
