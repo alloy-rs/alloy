@@ -27,7 +27,7 @@ pub(crate) fn parse_message(input: &str) -> Result<Message, ParseError> {
 
 /// Root parser for EIP-4361 message.
 fn message(input: &mut &str) -> PResult<Message> {
-    let domain = domain_line.parse_next(input)?;
+    let (scheme, domain) = scheme_and_domain_line.parse_next(input)?;
     let address = address_line.parse_next(input)?;
 
     // Empty line after address
@@ -50,6 +50,7 @@ fn message(input: &mut &str) -> PResult<Message> {
     let resources = resources_section.parse_next(input)?;
 
     Ok(Message {
+        scheme,
         domain,
         address,
         statement,
@@ -65,27 +66,30 @@ fn message(input: &mut &str) -> PResult<Message> {
     })
 }
 
-// ============================================================================
-// Domain and Preamble
-// ============================================================================
-
 const PREAMBLE: &str = " wants you to sign in with your Ethereum account:";
 
-/// Parse: `domain " wants you to sign in with your Ethereum account:" LF`
-fn domain_line(input: &mut &str) -> PResult<Authority> {
+/// Parse: `[ scheme "://" ] domain " wants you to sign in with your Ethereum account:" LF`
+fn scheme_and_domain_line(input: &mut &str) -> PResult<(Option<String>, Authority)> {
+    // Try to parse optional scheme (e.g., "https://")
+    let scheme = opt(terminated(
+        take_till(1.., |c| c == ':'),
+        "://",
+    ))
+    .parse_next(input)?
+    .map(|s: &str| s.to_string());
+
+    // Parse domain until the preamble
     let domain_str = terminated(take_till(1.., |c| c == ' '), PREAMBLE)
         .context(StrContext::Label("domain"))
         .parse_next(input)?;
     line_ending.parse_next(input)?;
 
-    domain_str
+    let domain = domain_str
         .parse::<Authority>()
-        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
-}
+        .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))?;
 
-// ============================================================================
-// Address
-// ============================================================================
+    Ok((scheme, domain))
+}
 
 /// Parse: `"0x" 40HEXDIG LF`
 fn address_line(input: &mut &str) -> PResult<Address> {
@@ -108,10 +112,6 @@ fn address_line(input: &mut &str) -> PResult<Address> {
     Ok(addr)
 }
 
-// ============================================================================
-// Statement (optional)
-// ============================================================================
-
 /// Parse optional statement section: `[ statement LF ] LF`
 fn statement_section(input: &mut &str) -> PResult<Option<String>> {
     // Check if we have an empty line (no statement)
@@ -131,10 +131,6 @@ fn statement_section(input: &mut &str) -> PResult<Option<String>> {
 
     Ok(Some(stmt.to_string()))
 }
-
-// ============================================================================
-// Required Fields
-// ============================================================================
 
 /// Parse: `"URI: " uri LF`
 fn uri_field(input: &mut &str) -> PResult<UriString> {
@@ -193,10 +189,6 @@ fn issued_at_field(input: &mut &str) -> PResult<TimeStamp> {
         .map_err(|_| winnow::error::ErrMode::Cut(ContextError::new()))
 }
 
-// ============================================================================
-// Optional Fields
-// ============================================================================
-
 /// Parse: `LF "Expiration Time: " date-time`
 fn expiration_time_field(input: &mut &str) -> PResult<TimeStamp> {
     line_ending.parse_next(input)?;
@@ -234,10 +226,6 @@ fn request_id_field(input: &mut &str) -> PResult<String> {
     Ok(rid_str.to_string())
 }
 
-// ============================================================================
-// Resources
-// ============================================================================
-
 /// Parse: `[ LF "Resources:" *( LF "- " URI ) ]`
 fn resources_section(input: &mut &str) -> PResult<Vec<UriString>> {
     // Check if resources section exists
@@ -271,10 +259,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_domain_line() {
+    fn test_parse_scheme_and_domain_line() {
         let mut input = "localhost:4361 wants you to sign in with your Ethereum account:\n";
-        let domain = domain_line(&mut input).unwrap();
+        let (scheme, domain) = scheme_and_domain_line(&mut input).unwrap();
+        assert!(scheme.is_none());
         assert_eq!(domain.to_string(), "localhost:4361");
+        assert!(input.is_empty());
+    }
+
+    #[test]
+    fn test_parse_scheme_and_domain_line_with_scheme() {
+        let mut input = "https://example.com wants you to sign in with your Ethereum account:\n";
+        let (scheme, domain) = scheme_and_domain_line(&mut input).unwrap();
+        assert_eq!(scheme, Some("https".to_string()));
+        assert_eq!(domain.to_string(), "example.com");
         assert!(input.is_empty());
     }
 

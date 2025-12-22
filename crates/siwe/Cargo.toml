@@ -50,8 +50,10 @@ rand = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-provider = { workspace = true, features = ["reqwest"] }
+alloy-contract.workspace = true
+alloy-provider = { workspace = true, features = ["reqwest", "anvil-node"] }
 alloy-signer-local = { workspace = true, features = ["mnemonic"] }
+alloy-sol-types.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
