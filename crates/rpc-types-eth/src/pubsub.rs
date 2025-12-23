@@ -9,7 +9,7 @@ use alloy_serde::WithOtherFields;
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
-pub enum SubscriptionResult<T = Transaction, R = TransactionReceipt> {
+pub enum SubscriptionResult<T = Transaction> {
     /// New block header.
     Header(Box<WithOtherFields<Header>>),
     /// Log
@@ -21,7 +21,7 @@ pub enum SubscriptionResult<T = Transaction, R = TransactionReceipt> {
     /// SyncStatus
     SyncState(PubSubSyncStatus),
     /// Transaction Receipts
-    TransactionReceipts(Vec<R>),
+    TransactionReceipts(Vec<TransactionReceipt>),
 }
 
 /// Response type for a SyncStatus subscription.
@@ -52,10 +52,9 @@ pub struct SyncStatusMetadata {
 }
 
 #[cfg(feature = "serde")]
-impl<T, R> serde::Serialize for SubscriptionResult<T, R>
+impl<T> serde::Serialize for SubscriptionResult<T>
 where
     T: serde::Serialize,
-    R: serde::Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
