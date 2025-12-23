@@ -36,44 +36,45 @@ pub enum Eip1271Error {
     /// Contract call failed.
     #[error("contract call failed: {0}")]
     ContractCall(#[from] alloy_contract::Error),
-    /// Contract is not EIP-1271 compliant.
-    #[error("contract is not EIP-1271 compliant")]
-    NonCompliant,
 }
 
-/// Extension trait for [EIP-1271] hash verification.
+/// Extension trait for [EIP-1271] smart contract signature verification.
 ///
 /// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-pub trait Eip1271 {
-    /// Verifies the hash was signed by the contract at `address`.
-    async fn verify<N, P>(
+pub trait ProviderEip1271Ext<N: Network, P: Provider<N>> {
+    /// Verifies a signature against a smart contract wallet using [EIP-1271].
+    ///
+    /// Returns `true` if the contract returns the magic value `0x1626ba7e`.
+    ///
+    /// [EIP-1271]: https://eips.ethereum.org/EIPS/eip-1271
+    async fn verify_eip1271(
         &self,
         address: Address,
-        signature: impl Into<Bytes> + Send,
-        provider: &P,
-    ) -> Result<bool, Eip1271Error>
-    where
-        N: Network,
-        P: Provider<N>;
+        hash: B256,
+        signature: impl AsRef<[u8]> + Send,
+    ) -> Result<bool, Eip1271Error>;
 }
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-impl Eip1271 for B256 {
-    async fn verify<N, P>(
+impl<N, P> ProviderEip1271Ext<N, P> for P
+where
+    N: Network,
+    P: Provider<N>,
+{
+    async fn verify_eip1271(
         &self,
         address: Address,
-        signature: impl Into<Bytes> + Send,
-        provider: &P,
-    ) -> Result<bool, Eip1271Error>
-    where
-        N: Network,
-        P: Provider<N>,
-    {
-        let contract = ERC1271::new(address, provider);
-        let result = contract.isValidSignature(*self, signature.into()).call().await;
+        hash: B256,
+        signature: impl AsRef<[u8]> + Send,
+    ) -> Result<bool, Eip1271Error> {
+        let contract = ERC1271::new(address, self);
+        let result = contract
+            .isValidSignature(hash, Bytes::copy_from_slice(signature.as_ref()))
+            .call()
+            .await;
 
         match result {
             Ok(magic_value) => Ok(magic_value == MAGIC_VALUE),
@@ -129,7 +130,8 @@ mod tests {
         let hash = B256::ZERO;
         let signature = Bytes::from(vec![0u8; 65]);
 
-        let is_valid = hash.verify(*contract.address(), signature, &provider).await.unwrap();
+        let is_valid =
+            provider.verify_eip1271(*contract.address(), hash, signature).await.unwrap();
         assert!(is_valid, "Expected valid signature");
     }
 
@@ -146,7 +148,8 @@ mod tests {
         let hash = B256::ZERO;
         let signature = Bytes::from(vec![0u8; 65]);
 
-        let is_valid = hash.verify(*contract.address(), signature, &provider).await.unwrap();
+        let is_valid =
+            provider.verify_eip1271(*contract.address(), hash, signature).await.unwrap();
         assert!(!is_valid, "Expected invalid signature");
     }
 
@@ -162,7 +165,7 @@ mod tests {
         let hash = B256::ZERO;
         let signature = Bytes::from(vec![0u8; 65]);
 
-        let result = hash.verify(non_contract, signature, &provider).await;
+        let result = provider.verify_eip1271(non_contract, hash, signature).await;
         // Should return false (not an error) when contract call fails
         assert!(!result.unwrap(), "Expected false for non-contract address");
     }

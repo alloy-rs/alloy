@@ -47,7 +47,7 @@ pub struct VerificationOpts {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{Message, VerificationError, VerificationOpts};
-    use alloy_eip1271::Eip1271;
+    use alloy_eip1271::ProviderEip1271Ext;
     use alloy_primitives::{eip191_hash_message, Address, Signature};
     use alloy_provider::{Network, Provider};
 
@@ -97,9 +97,7 @@ mod provider {
             let message_str = message.to_string();
             let hash = eip191_hash_message(message_str.as_bytes());
 
-            let is_valid = hash
-                .verify(message.address, alloy_primitives::Bytes::copy_from_slice(signature), self)
-                .await?;
+            let is_valid = self.verify_eip1271(message.address, hash, signature).await?;
 
             if is_valid {
                 Ok(message.address)
