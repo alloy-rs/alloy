@@ -26,7 +26,7 @@ pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
 /// A trait responsible for estimating EIP-1559 values
-pub trait Eip1559EstimatorFn: Send + Unpin {
+pub trait Eip1559EstimatorFn: Send {
     /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
     fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation;
 }
@@ -45,7 +45,7 @@ impl Eip1559Estimator {
     /// Creates a new estimator from a closure
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin + 'static,
+        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + 'static,
     {
         Self::new_estimator(f)
     }
@@ -66,7 +66,7 @@ impl Eip1559Estimator {
 
 impl<F> Eip1559EstimatorFn for F
 where
-    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin,
+    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send,
 {
     fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
         (self)(base_fee, rewards)
