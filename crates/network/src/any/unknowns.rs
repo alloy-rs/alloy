@@ -442,10 +442,8 @@ mod tests {
             "input": "0x",
             "from": "0x0000000000000000000000000000000000000000"
         });
-        let tx_helper: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
-            serde_json::from_value(tx_json_with_saturate).unwrap();
         let tx: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
-            tx_helper.try_into().unwrap();
+            serde_json::from_value(tx_json_with_saturate).unwrap();
         assert!(tx.inner.gas_price().is_none());
         assert_eq!(tx.effective_gas_price, Some(u128::MAX));
 
@@ -460,10 +458,8 @@ mod tests {
             "input": "0x",
             "from": "0x0000000000000000000000000000000000000000"
         });
-        let tx_helper: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
-            serde_json::from_value(tx_json_no_saturate).unwrap();
         let tx: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
-            tx_helper.try_into().unwrap();
+            serde_json::from_value(tx_json_no_saturate).unwrap();
         assert!(tx.inner.gas_price().is_some_and(|g| g == 1_000_000_000));
         assert!(tx.effective_gas_price.is_some_and(|g| g == 1_000_000_000));
     }
