@@ -80,7 +80,6 @@ bincode = { workspace = true, features = ["serde"] }
 k256.workspace = true
 rand.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["macros"] }
 assert_matches.workspace = true
 
 [features]

@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Bug Fixes
+
+- Simplify size functions ([#3403](https://github.com/alloy-rs/alloy/issues/3403))
+- Remove ring spec and bump gcloud version ([#2768](https://github.com/alloy-rs/alloy/issues/2768))
+- Saturate gas price in deser for unknown networks ([#3095](https://github.com/alloy-rs/alloy/issues/3095))
+- Clarify KMS signer EIP-155 documentation ([#3335](https://github.com/alloy-rs/alloy/issues/3335))
+- [node-bindings] Generalize ReadLineError output description ([#3359](https://github.com/alloy-rs/alloy/issues/3359))
+- Incorrect debug log message in heartbeat transaction watcher ([#3362](https://github.com/alloy-rs/alloy/issues/3362))
+- Don't blow up header maps when using auth ([#3360](https://github.com/alloy-rs/alloy/issues/3360))
+- [transport-ipc] Avoid false error on normal EOF ([#3358](https://github.com/alloy-rs/alloy/issues/3358))
+- Misleading Ledger signer debug log and align error handling ([#3356](https://github.com/alloy-rs/alloy/issues/3356))
+- [eip7547] Correct InclusionListSummaryEntryV1 Display name ([#3354](https://github.com/alloy-rs/alloy/issues/3354))
+- Resolve clippy and doctest warnings ([#3333](https://github.com/alloy-rs/alloy/issues/3333))
+- [rpc-types-eth] Correct build_7702 panic documentation ([#3332](https://github.com/alloy-rs/alloy/issues/3332))
+- Align EIP1186AccountProofResponse::is_empty with EIP-161 ([#3303](https://github.com/alloy-rs/alloy/issues/3303))
+- More flexible `BadBlock` type ([#3322](https://github.com/alloy-rs/alloy/issues/3322))
+
+### Dependencies
+
+- [deps] Bump taiki-e/install-action from 2.63.3 to 2.65.1 ([#3406](https://github.com/alloy-rs/alloy/issues/3406))
+- [deps] Run cargo shear ([#3405](https://github.com/alloy-rs/alloy/issues/3405))
+- [deps] Bump taiki-e/install-action from 2.62.64 to 2.63.3 ([#3352](https://github.com/alloy-rs/alloy/issues/3352))
+- [deps] Bump foundry-rs/foundry-toolchain from 1.5.0 to 1.6.0 ([#3353](https://github.com/alloy-rs/alloy/issues/3353))
+- [deps] Bump taiki-e/install-action from 2.62.60 to 2.62.64 ([#3310](https://github.com/alloy-rs/alloy/issues/3310))
+
+### Documentation
+
+- Add tenderly, turnkey, and tx-macros crates to README ([#3385](https://github.com/alloy-rs/alloy/issues/3385))
+- Add EIP-5792 and EIP-7547 crates to README ([#3382](https://github.com/alloy-rs/alloy/issues/3382))
+- [signer] Add Turnkey to signer implementations list ([#3334](https://github.com/alloy-rs/alloy/issues/3334))
+- Correct BlockOpcodeGas comment to block-level usage ([#3349](https://github.com/alloy-rs/alloy/issues/3349))
+- [network] Fix outdated Network trait example in README ([#3346](https://github.com/alloy-rs/alloy/issues/3346))
+- Fix Maybe*PayloadFields into_inner doc comments ([#3324](https://github.com/alloy-rs/alloy/issues/3324))
+- [provider] Fix debug trace call option type ([#3318](https://github.com/alloy-rs/alloy/issues/3318))
+- Fix try_into_eip7702 documentation ([#3317](https://github.com/alloy-rs/alloy/issues/3317))
+- Fix SendableTx::try_into_request documentation ([#3311](https://github.com/alloy-rs/alloy/issues/3311))
+- Fix swapped filter doc comments ([#3308](https://github.com/alloy-rs/alloy/issues/3308))
+- [rpc-types-eth] Fix swapped docs for get_to_block/get_from_block ([#3307](https://github.com/alloy-rs/alloy/issues/3307))
+
+### Features
+
+- Add Signer implementation for secp256 key ([#3337](https://github.com/alloy-rs/alloy/issues/3337))
+- Add `transactionReceipts` into SubscriptionKind ([#2974](https://github.com/alloy-rs/alloy/issues/2974))
+- [consensus] Add buffer-based signer recovery methods ([#3340](https://github.com/alloy-rs/alloy/issues/3340))
+- Add bincode compat support for BlobTransactionSidecarVariant ([#3325](https://github.com/alloy-rs/alloy/issues/3325))
+- Allow fusaka sidecars in the tx request ([#3321](https://github.com/alloy-rs/alloy/issues/3321))
+
+### Miscellaneous Tasks
+
+- Remove cyclic dev dep ([#3411](https://github.com/alloy-rs/alloy/issues/3411))
+- Aggregate PRs ([#3404](https://github.com/alloy-rs/alloy/issues/3404))
+- [rpc-types-mev] Remove unused `#![allow(deprecated)]` directive ([#3376](https://github.com/alloy-rs/alloy/issues/3376))
+- Make receipt generic ([#3357](https://github.com/alloy-rs/alloy/issues/3357))
+- Remove redundant clone in provider test ([#3342](https://github.com/alloy-rs/alloy/issues/3342))
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+- [eip5792] Drop redundant Vec import ([#3323](https://github.com/alloy-rs/alloy/issues/3323))
+
+### Other
+
+- Remove transactionReceipts subscription kind ([#3409](https://github.com/alloy-rs/alloy/issues/3409))
+- Add a layer to alloy-transport-http that allows propagating trace information ([#3367](https://github.com/alloy-rs/alloy/issues/3367))
+- Reapply "chore: adds erc7562 tracer variant" ([#3038](https://github.com/alloy-rs/alloy/issues/3038))
+- Remove redundant std::self import from CallBuilder ([#3313](https://github.com/alloy-rs/alloy/issues/3313))
+
+### Refactor
+
+- [json-rpc] Remove unnecessary copying ([#3348](https://github.com/alloy-rs/alloy/issues/3348))
+- [transport] Remove redundant clones in dual transport test ([#3336](https://github.com/alloy-rs/alloy/issues/3336))
+- Remove unnecessary Encode bound in parse_request_payload ([#3184](https://github.com/alloy-rs/alloy/issues/3184))
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Bug Fixes
@@ -51,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.1.3
 - Add contains helper ([#3302](https://github.com/alloy-rs/alloy/issues/3302))
 - Deprecate `DecodedValue::typ` in favor of `ty` ([#3293](https://github.com/alloy-rs/alloy/issues/3293))
 - Enable rlp when consensus/eips are active ([#3279](https://github.com/alloy-rs/alloy/issues/3279))
@@ -2157,12 +2230,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Wrong func sig ([#1742](https://github.com/alloy-rs/alloy/issues/1742))
@@ -2199,6 +2266,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
 - Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
 - Display instead of Debug the response JSON ([#1748](https://github.com/alloy-rs/alloy/issues/1748))
