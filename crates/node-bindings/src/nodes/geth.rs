@@ -470,35 +470,27 @@ impl Geth {
 
         // use geth init to initialize the datadir if the genesis exists
         if is_clique {
-            let clique_addr = self.clique_address();
-            if let Some(genesis) = &mut self.genesis {
-                // set up a clique config with an instant sealing period and short (8 block) epoch
-                let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
-                genesis.config.clique = Some(clique_config);
-
-                let clique_addr = clique_addr.ok_or_else(|| {
-                    NodeError::CliqueAddressError(
-                        "could not calculates the address of the Clique consensus address."
-                            .to_string(),
-                    )
-                })?;
-
-                // set the extraData field
-                let extra_data_bytes =
-                    [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
-                genesis.extra_data = extra_data_bytes.into();
-            }
-
             let clique_addr = self.clique_address().ok_or_else(|| {
                 NodeError::CliqueAddressError(
                     "could not calculates the address of the Clique consensus address.".to_string(),
                 )
             })?;
 
-            self.genesis = Some(Genesis::clique_genesis(
-                self.chain_id.ok_or(NodeError::ChainIdNotSet)?,
-                clique_addr,
-            ));
+            if let Some(genesis) = &mut self.genesis {
+                // set up a clique config with an instant sealing period and short (8 block) epoch
+                let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
+                genesis.config.clique = Some(clique_config);
+
+                // set the extraData field
+                let extra_data_bytes =
+                    [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
+                genesis.extra_data = extra_data_bytes.into();
+            } else {
+                self.genesis = Some(Genesis::clique_genesis(
+                    self.chain_id.ok_or(NodeError::ChainIdNotSet)?,
+                    clique_addr,
+                ));
+            }
 
             // we must set the etherbase if using clique
             // need to use format! / Debug here because the Address Display impl doesn't show the
