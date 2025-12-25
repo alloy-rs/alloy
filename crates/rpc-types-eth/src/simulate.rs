@@ -125,7 +125,10 @@ pub struct SimulatePayload<TxReq = TransactionRequest> {
     /// Array of block state calls to be executed at specific, optional block/state.
     #[cfg_attr(feature = "serde", serde(default))]
     pub block_state_calls: Vec<SimBlock<TxReq>>,
-    /// Flag to determine whether to trace ERC20/ERC721 token transfers within transactions.
+    /// Flags to adds ETH transfers as ERC20 transfer events to the logs
+    /// These transfers have emitter contract parameter
+    /// set as address(0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee)
+    /// This allows you to track movements of ETH in your calls
     #[cfg_attr(feature = "serde", serde(default))]
     pub trace_transfers: bool,
     /// Flag to enable or disable validation of the transaction sequence in the blocks.
