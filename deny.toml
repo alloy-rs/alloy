@@ -6,6 +6,8 @@ ignore = [
     "RUSTSEC-2024-0437",
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
+    # https://github.com/rustsec/advisory-db/pull/2538#issuecomment-3684201405
+    "RUSTSEC-2025-0137",
 ]
 
 [bans]
