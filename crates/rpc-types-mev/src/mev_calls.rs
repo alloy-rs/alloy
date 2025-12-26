@@ -1,16 +1,9 @@
-// Allow to keep the deprecated items for compatibility
-#![allow(deprecated)]
-
 use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
 use alloy_primitives::{Bytes, TxHash, U256};
 use alloy_rpc_types_eth::{BlockOverrides, Log};
 use serde::{Deserialize, Serialize};
-
-/// A bundle of transactions to send to the matchmaker.
-#[deprecated = "Use `MevSendBundle` instead"]
-pub type SendBundleRequest = MevSendBundle;
 
 /// A bundle of transactions to send to the matchmaker.
 ///
@@ -61,10 +54,6 @@ pub(super) mod serde_bincode_compat {
     use crate::{BundleItem, Inclusion, Privacy, ProtocolVersion, Validity};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
-
-    /// A bundle of transactions to send to the matchmaker.
-    #[deprecated = "Use `MevSendBundle` instead"]
-    pub type SendBundleRequest<'a> = MevSendBundle<'a>;
 
     /// Bincode-compatible [super::MevSendBundle] serde implementation.
     ///

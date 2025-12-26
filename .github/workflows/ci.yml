@@ -48,7 +48,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - name: Install Anvil
-        uses: foundry-rs/foundry-toolchain@50d5a8956f2e319df19e6b57539d7e2acb9f8c1e # v1
+        uses: foundry-rs/foundry-toolchain@8b0419c685ef46cb79ec93fbdc131174afceb730 # v1
         with:
           version: nightly
       - name: Install test binaries
@@ -60,7 +60,7 @@ jobs:
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
         if: ${{ matrix.rust != '1.88' }} # MSRV
-        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
+        uses: taiki-e/install-action@b9c5db3aef04caffaf95a1d03931de10fb2a140f # v2
         with:
           tool: nextest
       - name: build
@@ -102,7 +102,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
-      - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
+      - uses: taiki-e/install-action@b9c5db3aef04caffaf95a1d03931de10fb2a140f # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
@@ -138,7 +138,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-wasip1
-      - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
+      - uses: taiki-e/install-action@b9c5db3aef04caffaf95a1d03931de10fb2a140f # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
@@ -168,7 +168,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
+      - uses: taiki-e/install-action@b9c5db3aef04caffaf95a1d03931de10fb2a140f # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
@@ -191,7 +191,7 @@ jobs:
         with:
           toolchain: stable
           targets: riscv32imac-unknown-none-elf
-      - uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2
+      - uses: taiki-e/install-action@b9c5db3aef04caffaf95a1d03931de10fb2a140f # v2
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2

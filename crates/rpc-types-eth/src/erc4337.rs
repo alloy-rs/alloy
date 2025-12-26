@@ -6,10 +6,6 @@ use alloy_primitives::{
     Address, BlockNumber, Bytes, B256, U256,
 };
 
-/// Alias for backwards compat
-#[deprecated(since = "0.8.4", note = "use `TransactionConditional` instead")]
-pub type ConditionalOptions = TransactionConditional;
-
 /// Options for conditional raw transaction submissions.
 ///
 /// TransactionConditional represents the preconditions that determine the inclusion of the

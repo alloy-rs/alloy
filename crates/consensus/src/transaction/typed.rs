@@ -220,7 +220,7 @@ impl<Eip4844: RlpEcdsaEncodableTx> EthereumTypedTransaction<Eip4844> {
         }
     }
 
-    /// Consumes the type and returns the EIP-4844 if this transaction is of that type.
+    /// Consumes the type and returns the EIP-7702 if this transaction is of that type.
     pub fn try_into_eip7702(self) -> Result<TxEip7702, ValueError<Self>> {
         match self {
             Self::Eip7702(tx) => Ok(tx),

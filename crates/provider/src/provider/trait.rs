@@ -105,7 +105,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// # async fn f() -> Result<(), Box<dyn std::error::Error>> {
     /// let provider: DynProvider =
-    ///     ProviderBuilder::new().on_builtin("http://localhost:8080").await?.erased();
+    ///     ProviderBuilder::new().connect("http://localhost:8080").await?.erased();
     /// let block = provider.get_block_number().await?;
     /// # Ok(())
     /// # }
@@ -352,9 +352,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getAccountInfo", address).into()
     }
 
-    /// Retrieves account information ([`Account`](alloy_consensus::Account)) for the given
+    /// Retrieves account information ([`TrieAccount`](alloy_consensus::TrieAccount)) for the given
     /// [`Address`] at the particular [`BlockId`].
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
         self.client().request("eth_getAccount", address).into()
     }
 
@@ -1368,13 +1368,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// use alloy_rpc_client::NoParams;
     ///
     /// // No parameters: `()`
-    /// let block_number = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
+    /// let block_number: String = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
     ///
     /// // One parameter: `(param,)` or `[param]`
-    /// let block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
+    /// let block: serde_json::Value = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
     ///
     /// // Two or more parameters: `(param1, param2, ...)` or `[param1, param2, ...]`
-    /// let full_block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
+    /// let full_block: serde_json::Value = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -1865,7 +1865,7 @@ mod tests {
             ..Default::default()
         };
 
-        let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let builder = provider.send_transaction(tx).await.expect("failed to send tx");
         let hash1 = *builder.tx_hash();
 
         // Wait until tx is confirmed.

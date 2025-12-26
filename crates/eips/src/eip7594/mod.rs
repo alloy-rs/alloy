@@ -32,3 +32,6 @@ pub use rlp::*;
 mod sidecar;
 #[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
+
+#[cfg(all(feature = "kzg-sidecar", feature = "serde", feature = "serde-bincode-compat"))]
+pub use sidecar::serde_bincode_compat;
