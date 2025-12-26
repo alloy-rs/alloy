@@ -462,7 +462,6 @@ pub struct AnyHeader {
     pub block_access_list_hash: Option<B256>,
 }
 
-#[cfg(feature = "amsterdam")]
 impl AnyHeader {
     /// Seal the header with a known hash.
     ///
@@ -479,6 +478,7 @@ impl AnyHeader {
     /// - mix_hash
     ///
     /// If the conversion fails, the original [`AnyHeader`] is returned.
+    #[cfg(feature = "amsterdam")]
     pub fn try_into_header(self) -> Result<Header, ValueError<Self>> {
         if self.nonce.is_none() {
             return Err(ValueError::new(self, "missing nonce field"));
@@ -541,6 +541,7 @@ impl AnyHeader {
     /// Converts this header into a [`Header`] with default values for missing mandatory fields:
     /// - mix_hash
     /// - nonce
+    #[cfg(feature = "amsterdam")]
     pub fn into_header_with_defaults(self) -> Header {
         let Self {
             parent_hash,
