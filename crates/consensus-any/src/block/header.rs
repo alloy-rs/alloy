@@ -1,8 +1,9 @@
 use alloy_consensus::{error::ValueError, BlockHeader, Header};
-use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256};
+use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
+#[cfg(not(feature = "amsterdam"))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -96,10 +97,6 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
-    /// EIP-7928 block access list hash.
-    #[cfg(feature = "amsterdam")]
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub block_access_list_hash: Option<B256>,
 }
 
 #[cfg(not(feature = "amsterdam"))]
@@ -364,13 +361,115 @@ impl From<Header> for AnyHeader {
     }
 }
 
+/// Block header representation with certain fields made optional to account for possible
+/// differences in network implementations.
+#[cfg(feature = "amsterdam")]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct AnyHeader {
+    /// Hash of the parent
+    pub parent_hash: B256,
+    /// Hash of the uncles
+    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
+    pub ommers_hash: B256,
+    /// Alias of `author`
+    #[cfg_attr(feature = "serde", serde(rename = "miner"))]
+    pub beneficiary: Address,
+    /// State root hash
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "lenient_state_root"))]
+    pub state_root: B256,
+    /// Transactions root hash
+    pub transactions_root: B256,
+    /// Transactions receipts root hash
+    pub receipts_root: B256,
+    /// Logs bloom
+    pub logs_bloom: Bloom,
+    /// Difficulty
+    pub difficulty: U256,
+    /// Block number
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub number: u64,
+    /// Gas Limit
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
+    pub gas_limit: u64,
+    /// Gas Used
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
+    pub gas_used: u64,
+    /// Timestamp
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
+    pub timestamp: u64,
+    /// Extra data
+    pub extra_data: Bytes,
+    /// Mix Hash
+    ///
+    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
+    /// computation has been carried out on this block: the Proof-of-Work (PoW).
+    ///
+    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
+    ///
+    /// This is an Option because it is not always set by non-ethereum networks.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
+    /// And <https://github.com/ethereum/execution-apis/issues/328>
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub mix_hash: Option<B256>,
+    /// Nonce
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub nonce: Option<B64>,
+    /// Base fee per unit of gas (if past London)
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub base_fee_per_gas: Option<u64>,
+    /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub withdrawals_root: Option<B256>,
+    /// Blob gas used
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub blob_gas_used: Option<u64>,
+    /// Excess blob gas
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub excess_blob_gas: Option<u64>,
+    /// EIP-4788 parent beacon block root
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub parent_beacon_block_root: Option<B256>,
+    /// EIP-7685 requests hash.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub requests_hash: Option<B256>,
+    /// EIP-7928 block access list hash.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_access_list_hash: Option<B256>,
+}
+
+#[cfg(feature = "amsterdam")]
 impl AnyHeader {
     /// Seal the header with a known hash.
     ///
     /// WARNING: This method does not perform validation whether the hash is correct.
     #[inline]
-    pub const fn seal(self, hash: B256) -> Sealed<Self> {
-        Sealed::new_unchecked(self, hash)
+    pub const fn seal(self, hash: B256) -> alloy_consensus::Sealed<Self> {
+        alloy_consensus::Sealed::new_unchecked(self, hash)
     }
 
     /// Attempts to convert this header into a `Header`.
@@ -380,7 +479,6 @@ impl AnyHeader {
     /// - mix_hash
     ///
     /// If the conversion fails, the original [`AnyHeader`] is returned.
-    #[cfg(feature = "amsterdam")]
     pub fn try_into_header(self) -> Result<Header, ValueError<Self>> {
         if self.nonce.is_none() {
             return Err(ValueError::new(self, "missing nonce field"));
@@ -443,7 +541,6 @@ impl AnyHeader {
     /// Converts this header into a [`Header`] with default values for missing mandatory fields:
     /// - mix_hash
     /// - nonce
-    #[cfg(feature = "amsterdam")]
     pub fn into_header_with_defaults(self) -> Header {
         let Self {
             parent_hash,
