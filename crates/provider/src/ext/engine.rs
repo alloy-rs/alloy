@@ -3,9 +3,9 @@ use alloy_network::Network;
 use alloy_primitives::{BlockHash, Bytes, B256};
 use alloy_rpc_types_engine::{
     ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
-    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadInputV2,
-    ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
-    PayloadId, PayloadStatus,
+    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadEnvelopeV6,
+    ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4,
+    ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatus,
 };
 use alloy_transport::TransportResult;
 
@@ -47,6 +47,15 @@ pub trait EngineApi<N>: Send + Sync {
     async fn new_payload_v4(
         &self,
         payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus>;
+
+    /// For BAL
+    async fn new_payload_v5(
+        &self,
+        payload: ExecutionPayloadV4,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
         execution_requests: Vec<Bytes>,
@@ -132,6 +141,12 @@ pub trait EngineApi<N>: Send + Sync {
         &self,
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
+
+    /// For BAL.
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV6>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -223,6 +238,21 @@ where
             .await
     }
 
+    async fn new_payload_v5(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request(
+                "engine_newPayloadV5",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
+            .await
+    }
+
     async fn fork_choice_updated_v1(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -276,6 +306,13 @@ where
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
         self.client().request("engine_getPayloadV4", (payload_id,)).await
+    }
+
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV6> {
+        self.client().request("engine_getPayloadV6", (payload_id,)).await
     }
 
     async fn get_payload_bodies_by_hash_v1(

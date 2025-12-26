@@ -14,9 +14,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -50,21 +50,30 @@ serde_json = { workspace = true, optional = true }
 
 # misc
 derive_more = { workspace = true, features = [
-    "from",
-    "deref",
-    "deref_mut",
-    "into_iterator",
+	"from",
+	"deref",
+	"deref_mut",
+	"into_iterator",
 ], default-features = false }
 auto_impl.workspace = true
 thiserror.workspace = true
 either.workspace = true
 once_cell = { workspace = true, features = ["race", "alloc"] }
-secp256k1 = { workspace = true, optional = true, features = ["recovery", "global-context", "std"] }
+secp256k1 = { workspace = true, optional = true, features = [
+	"recovery",
+	"global-context",
+	"std",
+] }
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary", "kzg", "serde"] }
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
-secp256k1 = { workspace = true, features = ["recovery", "global-context", "std", "rand"] }
+secp256k1 = { workspace = true, features = [
+	"recovery",
+	"global-context",
+	"std",
+	"rand",
+] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 bincode = { workspace = true, features = ["serde"] }
@@ -93,6 +102,7 @@ std = [
 	"secp256k1?/std",
 	"borsh?/std"
 ]
+
 k256 = ["dep:k256", "alloy-primitives/k256", "alloy-eips/k256"]
 secp256k1 = ["dep:secp256k1"]
 crypto-backend = []
@@ -106,8 +116,9 @@ arbitrary = [
 	"alloy-serde?/arbitrary",
 	"alloy-trie/arbitrary",
 	"c-kzg?/arbitrary",
-	"alloy-tx-macros/arbitrary"
+	"alloy-tx-macros/arbitrary",
 ]
+
 serde = [
 	"dep:serde",
 	"alloy-primitives/serde",
@@ -120,7 +131,7 @@ serde = [
 	"k256?/serde",
 	"rand?/serde",
 	"secp256k1?/serde",
-	"alloy-tx-macros/serde"
+	"alloy-tx-macros/serde",
 ]
 serde-bincode-compat = ["alloy-eips/serde-bincode-compat", "serde_with"]
 borsh = [

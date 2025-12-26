@@ -17,6 +17,12 @@ pub enum PayloadError {
     /// Invalid payload excess blob gas.
     #[display("invalid payload excess blob gas: {_0}")]
     ExcessBlobGas(U256),
+    /// block access list present in pre-amsterdam payload.
+    #[display("block access list present in pre-amsterdam payload")]
+    PreAmsterdamBlockWithBlockAccessList,
+    /// block access list missing in post-amsterdam payload.
+    #[display("block access list missing in post-amsterdam payload")]
+    PostAmsterdamBlockWithoutBlockAccessList,
     /// withdrawals present in pre-shanghai payload.
     #[display("withdrawals present in pre-shanghai payload")]
     PreShanghaiBlockWithWithdrawals,

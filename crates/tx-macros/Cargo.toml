@@ -17,9 +17,9 @@ proc-macro = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-    "-Zunstable-options",
-    "--generate-link-to-definition",
-    "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -29,7 +29,7 @@ workspace = true
 syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"
-darling = "0.21"
+darling = "0.21.3"
 
 [features]
 arbitrary = []
