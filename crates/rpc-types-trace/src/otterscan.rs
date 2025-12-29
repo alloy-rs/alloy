@@ -395,6 +395,7 @@ mod tests {
         assert_eq!(serde_json::to_string(&OperationType::OpSelfDestruct).unwrap(), "1");
         assert_eq!(serde_json::to_string(&OperationType::OpCreate).unwrap(), "2");
         assert_eq!(serde_json::to_string(&OperationType::OpCreate2).unwrap(), "3");
+        assert_eq!(serde_json::to_string(&OperationType::OpEofCreate).unwrap(), "4");
     }
 
     #[test]
@@ -406,6 +407,37 @@ mod tests {
         );
         assert_eq!(serde_json::from_str::<OperationType>("2").unwrap(), OperationType::OpCreate);
         assert_eq!(serde_json::from_str::<OperationType>("3").unwrap(), OperationType::OpCreate2);
+        assert_eq!(serde_json::from_str::<OperationType>("4").unwrap(), OperationType::OpEofCreate);
+        assert!(serde_json::from_str::<OperationType>("5").is_err());
+    }
+
+    #[test]
+    fn test_serialize_txs_with_truncated_input() {
+        #[derive(Serialize)]
+        struct SimpleTx {
+            input: String,
+        }
+
+        let long_input = "0x0123456789abcdef";
+        let txs = BlockTransactions::Full(vec![SimpleTx { input: long_input.to_string() }]);
+
+        let mut buf = Vec::new();
+        {
+            let mut serializer = serde_json::Serializer::new(&mut buf);
+            serialize_txs_with_truncated_input(&txs, &mut serializer).unwrap();
+        }
+
+        let value: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        let arr = value.as_array().expect("transactions should serialize to array");
+        assert_eq!(arr.len(), 1);
+
+        let obj = arr[0].as_object().expect("serialized transaction should be an object");
+        let truncated = obj
+            .get("input")
+            .and_then(|v| v.as_str())
+            .expect("input field should be present and a string");
+
+        assert_eq!(truncated, "0x01234567");
     }
 
     #[test]
