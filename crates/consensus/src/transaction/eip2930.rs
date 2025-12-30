@@ -1,12 +1,10 @@
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 use crate::{SignableTransaction, Transaction, TxType};
 use alloy_eips::{
     eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
-
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -44,8 +42,6 @@ pub struct TxEip2930 {
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for TxKind in alloy_primitives
     pub to: TxKind,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
@@ -59,8 +55,6 @@ pub struct TxEip2930 {
     /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
     /// Input has two uses depending if `to` field is Create or Call.
     /// pub init: An unlimited size byte array specifying the
@@ -80,14 +74,7 @@ impl TxEip2930 {
     /// Calculates a heuristic for the in-memory size of the [TxEip2930] transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u128>() + // gas_price
-        mem::size_of::<u64>() + // gas_limit
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() // input
+        size_of::<Self>() + self.access_list.size() + self.input.len()
     }
 }
 

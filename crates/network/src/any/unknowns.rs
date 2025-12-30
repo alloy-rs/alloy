@@ -157,7 +157,7 @@ impl alloy_consensus::Transaction for UnknownTypedTransaction {
 
     #[inline]
     fn priority_fee_or_price(&self) -> u128 {
-        self.gas_price().or(self.max_priority_fee_per_gas()).unwrap_or_default()
+        self.max_priority_fee_per_gas().or(self.gas_price()).unwrap_or_default()
     }
 
     fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
@@ -426,5 +426,41 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&tx).unwrap()).unwrap();
 
         assert_eq!(tx, roundrip_tx);
+    }
+
+    /// <https://github.com/alloy-rs/alloy/issues/2842>
+    #[test]
+    fn gas_price_saturation() {
+        let tx_json_with_saturate = serde_json::json!({
+            "type": "0x78",
+            "nonce": "0x1",
+            // A gas price larger than u128::MAX.
+            "gasPrice": "0x30783134626639633464372e3333333333333333333333333333333333333333",
+            "gas": "0x5208",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x0",
+            "input": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
+        });
+        let tx: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
+            serde_json::from_value(tx_json_with_saturate).unwrap();
+        assert!(tx.inner.gas_price().is_none());
+        assert_eq!(tx.effective_gas_price, Some(u128::MAX));
+
+        let tx_json_no_saturate = serde_json::json!({
+            "type": "0x78",
+            "nonce": "0x1",
+            // A normal gas price.
+            "gasPrice": "0x3b9aca00",
+            "gas": "0x5208",
+            "to": "0x0000000000000000000000000000000000000000",
+            "value": "0x0",
+            "input": "0x",
+            "from": "0x0000000000000000000000000000000000000000"
+        });
+        let tx: alloy_rpc_types_eth::Transaction<UnknownTypedTransaction> =
+            serde_json::from_value(tx_json_no_saturate).unwrap();
+        assert!(tx.inner.gas_price().is_some_and(|g| g == 1_000_000_000));
+        assert!(tx.effective_gas_price.is_some_and(|g| g == 1_000_000_000));
     }
 }

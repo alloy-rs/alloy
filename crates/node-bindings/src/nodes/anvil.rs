@@ -1,6 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
-use crate::NodeError;
+use crate::{NodeError, NODE_STARTUP_TIMEOUT};
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::EthereumWallet;
 use alloy_primitives::{hex, Address, ChainId};
@@ -22,9 +22,6 @@ use url::Url;
 pub const DEFAULT_IPC_ENDPOINT: &str =
     if cfg!(unix) { "/tmp/anvil.ipc" } else { r"\\.\pipe\anvil.ipc" };
 
-/// How long we will wait for anvil to indicate that it is ready.
-const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
-
 /// An anvil CLI instance. Will close the instance when dropped.
 ///
 /// Construct this using [`Anvil`].
@@ -35,6 +32,7 @@ pub struct AnvilInstance {
     addresses: Vec<Address>,
     wallet: Option<EthereumWallet>,
     ipc_path: Option<String>,
+    host: String,
     port: u16,
     chain_id: Option<ChainId>,
 }
@@ -75,6 +73,11 @@ impl AnvilInstance {
         &self.addresses
     }
 
+    /// Returns the host of this instance
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
     /// Returns the port of this instance
     pub const fn port(&self) -> u16 {
         self.port
@@ -89,12 +92,12 @@ impl AnvilInstance {
     /// Returns the HTTP endpoint of this instance
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.port)
+        format!("http://{}:{}", self.host, self.port)
     }
 
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.port)
+        format!("ws://{}:{}", self.host, self.port)
     }
 
     /// Returns the IPC path
@@ -164,6 +167,7 @@ impl Drop for AnvilInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Anvil {
     program: Option<PathBuf>,
+    host: Option<String>,
     port: Option<u16>,
     // If the block_time is an integer, f64::to_string() will output without a decimal point
     // which allows this to be backwards compatible.
@@ -219,6 +223,12 @@ impl Anvil {
     /// [`std::process::Command::new()`]
     pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.program = Some(path.into());
+        self
+    }
+
+    /// Sets the host which will be used when the `anvil` instance is launched.
+    pub fn host<T: Into<String>>(mut self, host: T) -> Self {
+        self.host = Some(host.into());
         self
     }
 
@@ -378,6 +388,7 @@ impl Anvil {
     }
 
     /// Sets the timeout which will be used when the `anvil` instance is launched.
+    /// Units: milliseconds.
     pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
         self
@@ -414,6 +425,10 @@ impl Anvil {
         // set additional environment variables
         cmd.envs(self.envs);
 
+        if let Some(ref host) = self.host {
+            cmd.arg("--host").arg(host);
+        }
+
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
 
@@ -449,6 +464,7 @@ impl Anvil {
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
+        let timeout = self.timeout.map(Duration::from_millis).unwrap_or(NODE_STARTUP_TIMEOUT);
 
         let mut private_keys = Vec::new();
         let mut addresses = Vec::new();
@@ -456,9 +472,7 @@ impl Anvil {
         let mut chain_id = None;
         let mut wallet = None;
         loop {
-            if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
-                <= Instant::now()
-            {
+            if start + timeout <= Instant::now() {
                 return Err(NodeError::Timeout);
             }
 
@@ -520,6 +534,7 @@ impl Anvil {
             addresses,
             wallet,
             ipc_path: self.ipc_path,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
             port,
             chain_id: self.chain_id.or(chain_id),
         })
@@ -541,5 +556,25 @@ mod test {
     #[test]
     fn spawn_and_drop() {
         let _ = Anvil::new().block_time(12).try_spawn().map(drop);
+    }
+
+    #[test]
+    fn can_set_host() {
+        let anvil = Anvil::new().host("0.0.0.0").block_time(12).try_spawn();
+        if let Ok(anvil) = anvil {
+            assert_eq!(anvil.host(), "0.0.0.0");
+            assert!(anvil.endpoint().starts_with("http://0.0.0.0:"));
+            assert!(anvil.ws_endpoint().starts_with("ws://0.0.0.0:"));
+        }
+    }
+
+    #[test]
+    fn default_host_is_localhost() {
+        let anvil = Anvil::new().block_time(12).try_spawn();
+        if let Ok(anvil) = anvil {
+            assert_eq!(anvil.host(), "localhost");
+            assert!(anvil.endpoint().starts_with("http://localhost:"));
+            assert!(anvil.ws_endpoint().starts_with("ws://localhost:"));
+        }
     }
 }

@@ -146,14 +146,14 @@ mod contract {
 mod provider {
     use crate::{
         namehash, reverse_address, EnsError, EnsRegistry, EnsResolver::EnsResolverInstance,
-        ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS,
+        ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS, ENS_REVERSE_REGISTRAR_DOMAIN,
     };
     use alloy_primitives::{Address, B256};
     use alloy_provider::{Network, Provider};
-    use async_trait::async_trait;
 
     /// Extension trait for ENS contract calls.
-    #[async_trait]
+    #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+    #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     pub trait ProviderEnsExt<N: alloy_provider::Network, P: Provider<N>> {
         /// Returns the resolver for the specified node. The `&str` is only used for error messages.
         async fn get_resolver(
@@ -196,7 +196,8 @@ mod provider {
         }
     }
 
-    #[async_trait]
+    #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+    #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     impl<N, P> ProviderEnsExt<N, P> for P
     where
         P: Provider<N>,
@@ -218,7 +219,7 @@ mod provider {
         async fn get_reverse_registrar(&self) -> Result<ReverseRegistrarInstance<&P, N>, EnsError> {
             let registry = EnsRegistry::new(ENS_ADDRESS, self);
             let address = registry
-                .owner(namehash("addr.reverse"))
+                .owner(namehash(ENS_REVERSE_REGISTRAR_DOMAIN))
                 .call()
                 .await
                 .map_err(EnsError::RevRegistrar)?;

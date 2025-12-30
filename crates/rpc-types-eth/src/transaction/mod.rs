@@ -26,7 +26,7 @@ mod receipt;
 pub use receipt::TransactionReceipt;
 
 pub mod request;
-pub use request::{TransactionInput, TransactionInputKind, TransactionRequest};
+pub use request::{FillTransaction, TransactionInput, TransactionInputKind, TransactionRequest};
 
 /// Serde-bincode-compat
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
@@ -447,20 +447,23 @@ mod tx_serde {
     //!
     //! This is needed because we might need to deserialize the `gasPrice` field into both
     //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    //!
+    //! Additionally, during deserialization this module handles the case where the `gasPrice` field
+    //! is larger than `u128::MAX` by saturating it to `u128::MAX`. This is known to happen on
+    //! some networks.
+    //!
+    //! See <https://github.com/alloy-rs/alloy/issues/2842> for example.
+
     use super::*;
+    use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};
 
     /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
     /// field if inner [`TxEnvelope`] did not consume it.
     #[derive(Serialize, Deserialize)]
     struct MaybeGasPrice {
-        #[serde(
-            default,
-            rename = "gasPrice",
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )]
-        pub effective_gas_price: Option<u128>,
+        #[serde(default, rename = "gasPrice", skip_serializing_if = "Option::is_none")]
+        pub effective_gas_price: Option<U256>,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -493,8 +496,12 @@ mod tx_serde {
 
             let (inner, from) = inner.into_parts();
 
-            // if inner transaction has its own `gasPrice` don't serialize it in this struct.
-            let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
+            let effective_gas_price = if inner.gas_price().is_none() {
+                effective_gas_price.map(U256::from)
+            } else {
+                // If inner transaction has its own `gasPrice` don't serialize it in this struct.
+                None
+            };
 
             Self {
                 inner,
@@ -520,9 +527,11 @@ mod tx_serde {
                 gas_price,
             } = value;
 
-            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice`, otherwise
-            // return error
-            let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
+            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice` (making
+            // sure to saturate when converting to u128), otherwise return error.
+            let effective_gas_price = inner
+                .gas_price()
+                .or_else(|| gas_price.effective_gas_price.map(|g| g.saturating_to()));
 
             Ok(Self {
                 inner: Recovered::new_unchecked(inner, from),

@@ -69,6 +69,9 @@ pub struct Genesis {
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
+    /// The parent hash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_hash: Option<B256>,
 }
 
 impl Genesis {
@@ -183,6 +186,12 @@ impl Genesis {
     /// Set the blob gas used.
     pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
+        self
+    }
+
+    /// Set the parent hash.
+    pub const fn with_parent_hash(mut self, parent_hash: Option<B256>) -> Self {
+        self.parent_hash = parent_hash;
         self
     }
 
@@ -1952,6 +1961,7 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
+                parent_hash: Some(B256::ZERO),
                 alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -2091,6 +2101,76 @@ mod tests {
         let s = serde_json::to_string_pretty(&gen1).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
         assert_eq!(gen1, gen2);
+    }
+
+    #[test]
+    fn test_parent_hash_serialization() {
+        // Test that parent_hash can be serialized and deserialized correctly
+        let parent_hash =
+            B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234")
+                .unwrap();
+
+        let genesis_with_parent_hash = Genesis::default().with_parent_hash(Some(parent_hash));
+        let json = serde_json::to_string(&genesis_with_parent_hash).unwrap();
+        let deserialized: Genesis = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.parent_hash, Some(parent_hash));
+
+        // Test that parent_hash is omitted when None (skip_serializing_if behavior)
+        let genesis_without_parent_hash = Genesis::default().with_parent_hash(None);
+        let json = serde_json::to_string(&genesis_without_parent_hash).unwrap();
+        assert!(!json.contains("parentHash"), "parentHash should be omitted when None");
+
+        // Test deserialization without parent_hash field (should default to None)
+        let genesis_json = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json).unwrap();
+        assert_eq!(genesis.parent_hash, None);
+
+        // Test deserialization with parent_hash field
+        let genesis_json_with_parent_hash = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000",
+            "parentHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json_with_parent_hash).unwrap();
+        assert_eq!(genesis.parent_hash, Some(parent_hash));
+
+        // Test that zero hash is preserved as Some(B256::ZERO) when explicitly set
+        let genesis_json_with_zero_hash = r#"
+        {
+            "nonce": "0x0",
+            "timestamp": "0x0",
+            "extraData": "0x",
+            "gasLimit": "0x4c4b40",
+            "difficulty": "0x1",
+            "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "coinbase": "0x0000000000000000000000000000000000000000",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        }
+        "#;
+        let genesis: Genesis = serde_json::from_str(genesis_json_with_zero_hash).unwrap();
+        assert_eq!(
+            genesis.parent_hash,
+            Some(B256::ZERO),
+            "Zero hash should be preserved when explicitly set"
+        );
     }
 
     #[test]

@@ -94,17 +94,6 @@ impl<T> EthereumTxEnvelope<T> {
         Signed::new_unchecked(transaction, signature, hash).into()
     }
 
-    /// Creates a new signed transaction from the given transaction, signature and hash.
-    ///
-    /// Caution: This assumes the given hash is the correct transaction hash.
-    #[deprecated(note = "Use new_unchecked() instead")]
-    pub fn new(transaction: EthereumTypedTransaction<T>, signature: Signature, hash: B256) -> Self
-    where
-        T: RlpEcdsaEncodableTx,
-    {
-        Self::new_unchecked(transaction, signature, hash)
-    }
-
     /// Creates a new signed transaction from the given typed transaction and signature without the
     /// hash.
     ///
@@ -144,6 +133,335 @@ impl<T> EthereumTxEnvelope<T> {
             Self::Eip7702(tx) => &mut tx.tx_mut().input,
             Self::Eip4844(tx) => &mut tx.tx_mut().as_mut().input,
         }
+    }
+}
+
+impl<T> EthereumTypedTransaction<TxEip4844Variant<T>> {
+    /// Strips the sidecar from EIP-4844 transactions and returns both the transaction and the
+    /// sidecar separately, keeping the same sidecar type parameter.
+    ///
+    /// This method consumes the typed transaction and returns:
+    /// - An [`EthereumTypedTransaction<TxEip4844Variant<T>>`] with the sidecar stripped from
+    ///   EIP-4844 transactions
+    /// - An [`Option<T>`] containing the sidecar if this was an EIP-4844 transaction with a sidecar
+    ///
+    /// For non-EIP-4844 transactions, this returns the transaction unchanged with `None` for the
+    /// sidecar.
+    ///
+    /// This is a convenience wrapper around
+    /// [`strip_eip4844_sidecar_into`](Self::strip_eip4844_sidecar_into) that keeps the same type
+    /// parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Strip the sidecar from the transaction (type parameter stays the same)
+    /// let (tx_without_sidecar, maybe_sidecar) = tx.strip_eip4844_sidecar();
+    ///
+    /// if let Some(sidecar) = maybe_sidecar {
+    ///     // Process the blob sidecar separately
+    ///     println!("Transaction had {} blobs", sidecar.blobs.len());
+    /// }
+    /// # }
+    /// ```
+    pub fn strip_eip4844_sidecar(self) -> (Self, Option<T>) {
+        self.strip_eip4844_sidecar_into()
+    }
+
+    /// Strips the sidecar from EIP-4844 transactions and returns both the transaction and the
+    /// sidecar separately, converting to a different sidecar type parameter.
+    ///
+    /// This method consumes the typed transaction and returns:
+    /// - An [`EthereumTypedTransaction<TxEip4844Variant<U>>`] with the sidecar stripped from
+    ///   EIP-4844 transactions
+    /// - An [`Option<T>`] containing the sidecar if this was an EIP-4844 transaction with a sidecar
+    ///
+    /// For non-EIP-4844 transactions, this simply converts the type parameter and returns `None`
+    /// for the sidecar.
+    ///
+    /// This is useful when you need to:
+    /// - Extract blob data from pooled transactions for separate processing
+    /// - Convert between different sidecar type parameters
+    /// - Prepare transactions for storage (without sidecars)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip7594::BlobTransactionSidecarVariant;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Strip the sidecar and convert to a different type parameter
+    /// let (tx_without_sidecar, maybe_sidecar): (
+    ///     EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecarVariant>>,
+    ///     _,
+    /// ) = tx.strip_eip4844_sidecar_into();
+    ///
+    /// if let Some(sidecar) = maybe_sidecar {
+    ///     // Process the blob sidecar separately
+    ///     println!("Transaction had {} blobs", sidecar.blobs.len());
+    /// }
+    /// # }
+    /// ```
+    pub fn strip_eip4844_sidecar_into<U>(
+        self,
+    ) -> (EthereumTypedTransaction<TxEip4844Variant<U>>, Option<T>) {
+        match self {
+            Self::Legacy(tx) => (EthereumTypedTransaction::Legacy(tx), None),
+            Self::Eip2930(tx) => (EthereumTypedTransaction::Eip2930(tx), None),
+            Self::Eip1559(tx) => (EthereumTypedTransaction::Eip1559(tx), None),
+            Self::Eip4844(tx) => {
+                let (tx_variant, sidecar) = tx.strip_sidecar_into();
+                (EthereumTypedTransaction::Eip4844(tx_variant), sidecar)
+            }
+            Self::Eip7702(tx) => (EthereumTypedTransaction::Eip7702(tx), None),
+        }
+    }
+
+    /// Drops the sidecar from EIP-4844 transactions and returns only the transaction, keeping the
+    /// same sidecar type parameter.
+    ///
+    /// This is a convenience method that discards the sidecar from EIP-4844 transactions,
+    /// returning only the transaction without a sidecar.
+    ///
+    /// This is equivalent to calling [`strip_eip4844_sidecar`](Self::strip_eip4844_sidecar) and
+    /// taking only the first element of the tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Drop the sidecar, keeping only the transaction
+    /// let tx_without_sidecar = tx.drop_eip4844_sidecar();
+    /// # }
+    /// ```
+    pub fn drop_eip4844_sidecar(self) -> Self {
+        self.strip_eip4844_sidecar().0
+    }
+
+    /// Drops the sidecar from EIP-4844 transactions and returns only the transaction, converting
+    /// to a different sidecar type parameter.
+    ///
+    /// This is a convenience method that discards the sidecar from EIP-4844 transactions,
+    /// returning only the transaction without a sidecar.
+    ///
+    /// This is equivalent to calling
+    /// [`strip_eip4844_sidecar_into`](Self::strip_eip4844_sidecar_into) and taking only the first
+    /// element of the tuple.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use alloy_consensus::{EthereumTypedTransaction, TxEip4844Variant};
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip7594::BlobTransactionSidecarVariant;
+    /// # fn example(tx: EthereumTypedTransaction<TxEip4844Variant<BlobTransactionSidecar>>) {
+    /// // Drop the sidecar and convert to a different type parameter
+    /// let tx_without_sidecar: EthereumTypedTransaction<
+    ///     TxEip4844Variant<BlobTransactionSidecarVariant>,
+    /// > = tx.drop_eip4844_sidecar_into();
+    /// # }
+    /// ```
+    pub fn drop_eip4844_sidecar_into<U>(self) -> EthereumTypedTransaction<TxEip4844Variant<U>> {
+        self.strip_eip4844_sidecar_into().0
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip4844::BlobTransactionSidecar>> {
+    /// Converts the envelope to EIP-7594 format using default KZG settings.
+    ///
+    /// For EIP-4844 transactions, this computes cell KZG proofs and converts the sidecar to
+    /// EIP-7594 format. Non-EIP-4844 transactions are converted to the appropriate envelope type
+    /// without modification.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The
+    ///   envelope with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844WithSidecar;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Convert to EIP-7594 format
+    /// let eip7594_envelope = envelope.try_into_7594()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594(
+        self,
+    ) -> Result<
+        EthereumTxEnvelope<
+            TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        >,
+        c_kzg::Error,
+    > {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts the envelope to EIP-7594 format using custom KZG settings.
+    ///
+    /// For EIP-4844 transactions, this computes cell KZG proofs and converts the sidecar to
+    /// EIP-7594 format using the provided KZG settings. Non-EIP-4844 transactions are converted
+    /// to the appropriate envelope type without modification.
+    ///
+    /// # Arguments
+    ///
+    /// * `settings` - The KZG settings to use for computing cell proofs
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The
+    ///   envelope with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844WithSidecar;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip4844::env_settings::EnvKzgSettings;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Load custom KZG settings
+    /// let kzg_settings = EnvKzgSettings::Default.get();
+    ///
+    /// // Convert using custom settings
+    /// let eip7594_envelope = envelope.try_into_7594_with_settings(kzg_settings)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<
+        EthereumTxEnvelope<
+            TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>,
+        >,
+        c_kzg::Error,
+    > {
+        self.try_map_eip4844(|tx| tx.try_into_7594_with_settings(settings))
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransactionSidecar>> {
+    /// Converts the envelope to EIP-7594 format using default KZG settings.
+    ///
+    /// For EIP-4844 transactions with sidecars, this computes cell KZG proofs and converts the
+    /// sidecar to EIP-7594 format. Transactions without sidecars and non-EIP-4844 transactions
+    /// are converted to the appropriate envelope type without modification.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The envelope
+    ///   with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844Variant<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Convert to EIP-7594 format
+    /// let eip7594_envelope = envelope.try_into_7594()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594(
+        self,
+    ) -> Result<
+        EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>,
+        c_kzg::Error,
+    > {
+        self.try_into_7594_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts the envelope to EIP-7594 format using custom KZG settings.
+    ///
+    /// For EIP-4844 transactions with sidecars, this computes cell KZG proofs and converts the
+    /// sidecar to EIP-7594 format using the provided KZG settings. Transactions without sidecars
+    /// and non-EIP-4844 transactions are converted to the appropriate envelope type without
+    /// modification.
+    ///
+    /// # Arguments
+    ///
+    /// * `settings` - The KZG settings to use for computing cell proofs
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>)` - The envelope
+    ///   with EIP-7594 sidecars
+    /// - `Err(c_kzg::Error)` - If KZG proof computation fails
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_consensus::EthereumTxEnvelope;
+    /// # use alloy_consensus::TxEip4844Variant;
+    /// # use alloy_eips::eip4844::BlobTransactionSidecar;
+    /// # use alloy_eips::eip4844::env_settings::EnvKzgSettings;
+    /// # fn example(envelope: EthereumTxEnvelope<TxEip4844Variant<BlobTransactionSidecar>>) -> Result<(), c_kzg::Error> {
+    /// // Load custom KZG settings
+    /// let kzg_settings = EnvKzgSettings::Default.get();
+    ///
+    /// // Convert using custom settings
+    /// let eip7594_envelope = envelope.try_into_7594_with_settings(kzg_settings)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_into_7594_with_settings(
+        self,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<
+        EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>,
+        c_kzg::Error,
+    > {
+        self.try_map_eip4844(|tx| tx.try_into_7594_with_settings(settings))
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip4844::BlobTransactionSidecar>>>
+    for EthereumTxEnvelope<TxEip4844WithSidecar<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>
+{
+    type Error = c_kzg::Error;
+
+    fn try_from(
+        value: EthereumTxEnvelope<
+            TxEip4844WithSidecar<alloy_eips::eip4844::BlobTransactionSidecar>,
+        >,
+    ) -> Result<Self, Self::Error> {
+        value.try_into_7594()
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransactionSidecar>>>
+    for EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip7594::BlobTransactionSidecarEip7594>>
+{
+    type Error = c_kzg::Error;
+
+    fn try_from(
+        value: EthereumTxEnvelope<TxEip4844Variant<alloy_eips::eip4844::BlobTransactionSidecar>>,
+    ) -> Result<Self, Self::Error> {
+        value.try_into_7594()
     }
 }
 
@@ -550,6 +868,19 @@ where
         }
     }
 
+    fn recover_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        match self {
+            Self::Legacy(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
+            Self::Eip2930(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
+            Self::Eip1559(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
+            Self::Eip4844(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
+            Self::Eip7702(tx) => crate::transaction::SignerRecoverable::recover_with_buf(tx, buf),
+        }
+    }
+
     fn recover_unchecked_with_buf(
         &self,
         buf: &mut alloc::vec::Vec<u8>,
@@ -729,7 +1060,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction},
+        transaction::{Recovered, SignableTransaction, SignerRecoverable},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1721,5 +2052,89 @@ mod tests {
     }"#;
 
         let _ = serde_json::from_str::<TxEnvelope>(rpc_tx).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn test_recover_with_buf_eip1559() {
+        use alloy_primitives::address;
+
+        // Test vector from https://etherscan.io/tx/0xce4dc6d7a7549a98ee3b071b67e970879ff51b5b95d1c340bacd80fa1e1aab31
+        let raw_tx = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
+        let tx = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+
+        // Recover using the standard method
+        let from_standard = tx.recover_signer().unwrap();
+        assert_eq!(from_standard, address!("001e2b7dE757bA469a57bF6b23d982458a07eFcE"));
+
+        // Recover using the buffer method
+        let mut buf = alloc::vec::Vec::new();
+        let from_with_buf = tx.recover_with_buf(&mut buf).unwrap();
+        assert_eq!(from_with_buf, from_standard);
+
+        // Verify buffer was used (should contain encoded data after recovery)
+        assert!(!buf.is_empty());
+
+        // Test that reusing the buffer works correctly
+        buf.clear();
+        buf.extend_from_slice(b"some garbage data that should be cleared");
+        let from_with_buf_reuse = tx.recover_with_buf(&mut buf).unwrap();
+        assert_eq!(from_with_buf_reuse, from_standard);
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn test_recover_unchecked_with_buf_legacy() {
+        use alloy_primitives::address;
+
+        // Test vector from https://etherscan.io/tx/0x280cde7cdefe4b188750e76c888f13bd05ce9a4d7767730feefe8a0e50ca6fc4
+        let raw_tx = alloy_primitives::bytes!("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8");
+        let tx = TxEnvelope::decode_2718(&mut raw_tx.as_ref()).unwrap();
+
+        // Recover using the standard unchecked method
+        let from_standard = tx.recover_signer_unchecked().unwrap();
+        assert_eq!(from_standard, address!("a12e1462d0ceD572f396F58B6E2D03894cD7C8a4"));
+
+        // Recover using the buffer unchecked method
+        let mut buf = alloc::vec::Vec::new();
+        let from_with_buf = tx.recover_unchecked_with_buf(&mut buf).unwrap();
+        assert_eq!(from_with_buf, from_standard);
+
+        // Verify buffer was used
+        assert!(!buf.is_empty());
+
+        // Test that buffer is properly cleared and reused
+        let original_len = buf.len();
+        buf.extend_from_slice(&[0xFF; 100]); // Add garbage
+        let from_with_buf_reuse = tx.recover_unchecked_with_buf(&mut buf).unwrap();
+        assert_eq!(from_with_buf_reuse, from_standard);
+        // Buffer should be cleared and refilled with encoded data
+        assert_eq!(buf.len(), original_len);
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    fn test_recover_with_buf_multiple_tx_types() {
+        use alloy_primitives::address;
+
+        // Legacy tx
+        let raw_legacy = alloy_primitives::bytes!("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8");
+        let tx_legacy = TxEnvelope::decode_2718(&mut raw_legacy.as_ref()).unwrap();
+
+        // EIP-1559 tx
+        let raw_eip1559 = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
+        let tx_eip1559 = TxEnvelope::decode(&mut raw_eip1559.as_slice()).unwrap();
+
+        // Use a single buffer for both recoveries
+        let mut buf = alloc::vec::Vec::new();
+
+        let from_legacy = tx_legacy.recover_with_buf(&mut buf).unwrap();
+        assert_eq!(from_legacy, address!("a12e1462d0ceD572f396F58B6E2D03894cD7C8a4"));
+
+        let from_eip1559 = tx_eip1559.recover_with_buf(&mut buf).unwrap();
+        assert_eq!(from_eip1559, address!("001e2b7dE757bA469a57bF6b23d982458a07eFcE"));
+
+        // Verify that the buffer was properly reused (no allocation needed between calls)
+        assert!(!buf.is_empty());
     }
 }

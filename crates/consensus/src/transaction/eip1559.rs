@@ -1,12 +1,10 @@
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 use crate::{SignableTransaction, Transaction, TxType};
 use alloy_eips::{
     eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
-
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -32,11 +30,9 @@ pub struct TxEip1559 {
         serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
     )]
     pub gas_limit: u64,
-    /// A scalar value equal to the maximum
-    /// amount of gas that should be used in executing
-    /// this transaction. This is paid up-front, before any
-    /// computation is done and may not be increased
-    /// later; formally Tg.
+    /// A scalar value equal to the maximum total fee per unit of gas
+    /// the sender is willing to pay. The actual fee paid per gas is
+    /// the minimum of this and `base_fee + max_priority_fee_per_gas`.
     ///
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
@@ -57,8 +53,6 @@ pub struct TxEip1559 {
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for TxKind in alloy_primitives
     pub to: TxKind,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
@@ -75,8 +69,6 @@ pub struct TxEip1559 {
     // sometimes returning `null` instead of an empty array `[]`.
     // More details in <https://github.com/alloy-rs/alloy/pull/2450>.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
-    #[cfg_attr(feature = "borsh", borsh(skip))]
-    // TODO: Implement Borsh for AccessList in alloy_eip2930
     pub access_list: AccessList,
     /// Input has two uses depending if `to` field is Create or Call.
     /// pub init: An unlimited size byte array specifying the
@@ -97,15 +89,7 @@ impl TxEip1559 {
     /// transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u64>() + // gas_limit
-        mem::size_of::<u128>() + // max_fee_per_gas
-        mem::size_of::<u128>() + // max_priority_fee_per_gas
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() // input
+        size_of::<Self>() + self.access_list.size() + self.input.len()
     }
 }
 

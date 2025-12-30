@@ -82,7 +82,7 @@ pub struct DecodedValue {
 
 impl DecodedValue {
     /// Returns the parsed type of the log input.
-    pub fn typ(&self) -> Option<DynSolType> {
+    pub fn ty(&self) -> Option<DynSolType> {
         let raw = self.raw_typ.as_str()?;
         let Ok(typ) = raw.parse() else {
             return None;
@@ -90,9 +90,15 @@ impl DecodedValue {
         Some(typ)
     }
 
+    /// Returns the parsed type of the log input.
+    #[deprecated = "Use `Self::ty` instead"]
+    pub fn typ(&self) -> Option<DynSolType> {
+        self.ty()
+    }
+
     /// Returns the parsed value of the log input.
     pub fn value(&self) -> Option<DynSolValue> {
-        let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.typ()?) else {
+        let Ok(val) = Self::parse_dyn_value(&self.raw_value, &self.ty()?) else {
             return None;
         };
         Some(val)

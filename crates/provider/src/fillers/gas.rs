@@ -35,10 +35,11 @@ pub enum GasFillable {
 /// ## Note:
 ///
 /// The layer will populate gas fields based on the following logic:
-/// - if `gas_price` is set, it will process as a legacy tx and populate the `gas_limit` field if
-///   unset.
-/// - if `access_list` is set, it will process as a 2930 tx and populate the `gas_limit` and
-///   `gas_price` field if unset.
+/// - if `gas_price` is set, it will process as a legacy tx (or EIP-2930 if `access_list` is also
+///   set) and populate the `gas_limit` field if unset, and `gas_price` if unset for EIP-2930.
+/// - if `access_list` is set but `gas_price` is not set, it will process as an EIP-1559 tx (which
+///   can also have an access_list) and populate the `gas_limit`, `max_fee_per_gas` and
+///   `max_priority_fee_per_gas` fields if unset.
 /// - if `blob_sidecar` is set, it will process as an EIP-4844 tx and populate the `gas_limit`,
 ///   `max_fee_per_gas`, and `max_priority_fee_per_gas` fields if unset. The `max_fee_per_blob_gas`
 ///   is populated by [`BlobGasFiller`].
@@ -303,7 +304,7 @@ mod tests {
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            sidecar: Some(sidecar),
+            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 
@@ -331,7 +332,7 @@ mod tests {
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             max_fee_per_blob_gas: Some(0),
-            sidecar: Some(sidecar),
+            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 

@@ -61,9 +61,9 @@ impl<N: Network> SendableTx<N> {
         }
     }
 
-    /// Returns the envelope if this variant is an [`SendableTx::Builder`].
+    /// Returns the request if this variant is an [`SendableTx::Builder`].
     ///
-    /// Returns a [`SendableTxErr`] with the request object otherwise.
+    /// Returns a [`SendableTxErr`] with the envelope object otherwise.
     pub fn try_into_request(self) -> Result<N::TransactionRequest, SendableTxErr<N::TxEnvelope>> {
         match self {
             Self::Builder(req) => Ok(req),

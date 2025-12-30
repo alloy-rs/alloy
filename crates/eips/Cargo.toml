@@ -125,4 +125,6 @@ arbitrary = [
 borsh = [
 	"dep:borsh",
 	"alloy-primitives/borsh",
+	"alloy-eip2930/borsh",
+	"alloy-eip7702/borsh",
 ]

@@ -72,7 +72,7 @@ http = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 parking_lot.workspace = true
-[target.'cfg(target_family = "wasm")'.dependencies]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasmtimer.workspace = true
 
 [dev-dependencies]
@@ -85,13 +85,10 @@ alloy-signer.workspace = true
 alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest", "jwt-auth"] }
 alloy-serde.workspace = true
-alloy-dyn-abi.workspace = true
 
 itertools.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tracing-subscriber = { workspace = true, features = ["fmt"] }
-tempfile.workspace = true
 tower.workspace = true
 tower-http = { workspace = true, features = [
     "set-header",

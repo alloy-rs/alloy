@@ -15,7 +15,6 @@ use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
-use core::mem;
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -240,27 +239,7 @@ impl Header {
     /// Calculate a heuristic for the in-memory size of the [Header].
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<B256>() + // parent hash
-        mem::size_of::<B256>() + // ommers hash
-        mem::size_of::<Address>() + // beneficiary
-        mem::size_of::<B256>() + // state root
-        mem::size_of::<B256>() + // transactions root
-        mem::size_of::<B256>() + // receipts root
-        mem::size_of::<Option<B256>>() + // withdrawals root
-        mem::size_of::<Bloom>() + // logs bloom
-        mem::size_of::<U256>() + // difficulty
-        mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u64>() + // gas limit
-        mem::size_of::<u64>() + // gas used
-        mem::size_of::<u64>() + // timestamp
-        mem::size_of::<B256>() + // mix hash
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u64>>() + // base fee per gas
-        mem::size_of::<Option<u64>>() + // blob gas used
-        mem::size_of::<Option<u64>>() + // excess blob gas
-        mem::size_of::<Option<B256>>() + // parent beacon block root
-        mem::size_of::<Option<B256>>() + // requests root
-        self.extra_data.len() // extra data
+        size_of::<Self>() + self.extra_data.len()
     }
 
     fn header_payload_length(&self) -> usize {

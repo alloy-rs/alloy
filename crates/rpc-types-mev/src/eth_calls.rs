@@ -1,6 +1,3 @@
-// Allow to keep the deprecated items for compatibility
-#![allow(deprecated)]
-
 use crate::{u256_numeric_string, Privacy, Validity};
 
 use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};
@@ -218,19 +215,6 @@ pub struct EthCancelBundle {
     pub replacement_uuid: String,
 }
 
-/// Request for `eth_cancelBundle`
-#[deprecated = "Use `EthCancelBundle` instead"]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CancelBundleRequest {
-    /// Bundle hash of the bundle to be canceled
-    pub bundle_hash: String,
-}
-
-/// Request for `eth_cancelPrivateTransaction`
-#[deprecated = "Use `EthCancelPrivateTransaction` instead"]
-pub type CancelPrivateTransactionRequest = EthCancelPrivateTransaction;
-
 /// Request for `eth_cancelPrivateTransaction`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -328,20 +312,12 @@ impl EthSendBundle {
 }
 
 /// Response from the matchmaker after sending a bundle.
-#[deprecated = "Use `EthBundleHash` instead"]
-pub type SendBundleResponse = EthBundleHash;
-
-/// Response from the matchmaker after sending a bundle.
 #[derive(Deserialize, Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EthBundleHash {
     /// Hash of the bundle bodies.
     pub bundle_hash: B256,
 }
-
-/// Request for `eth_sendPrivateTransaction`
-#[deprecated = "Use `EthSendPrivateTransaction` instead"]
-pub type PrivateTransactionRequest = EthSendPrivateTransaction;
 
 /// Request for `eth_sendPrivateTransaction`
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
