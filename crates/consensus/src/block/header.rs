@@ -1,5 +1,5 @@
 use crate::{
-    block::HeaderInfo,
+    block::{HeaderInfo, HeaderRoots},
     constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
     Block, BlockBody,
 };
@@ -558,6 +558,18 @@ pub trait BlockHeader {
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
             mix_hash: self.mix_hash(),
+        }
+    }
+
+    /// Extracts info computed on external data
+    fn header_roots(&self) -> HeaderRoots {
+        HeaderRoots {
+            state_root: self.state_root(),
+            transactions_root: self.transactions_root(),
+            receipts_root: self.receipts_root(),
+            withdrawals_root: self.withdrawals_root(),
+            parent_beacon_block_root: self.parent_beacon_block_root(),
+            logs_bloom: self.logs_bloom(),
         }
     }
 
