@@ -56,16 +56,9 @@ impl<N: Network> TransactionBuilderError<N> {
     }
 }
 
-/// A Transaction builder for a network.
-///
-/// Transaction builders are primarily used to construct typed transactions that can be signed with
-/// [`TransactionBuilder::build`], or unsigned typed transactions with
-/// [`TransactionBuilder::build_unsigned`].
-///
-/// Transaction builders should be able to construct all available transaction types on a given
-/// network.
+/// Transaction builder.
 #[doc(alias = "TxBuilder")]
-pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'static {
+pub trait TransactionBuilder: Default + Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -293,6 +286,37 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Apply a function to the builder, returning the modified builder.
+    fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
+    /// Apply a fallible function to the builder, returning the modified builder or an error.
+    fn try_apply<F, E>(self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self) -> Result<Self, E>,
+    {
+        f(self)
+    }
+
+    /// True if the builder contains all necessary information to be submitted
+    /// to the `eth_sendTransaction` endpoint.
+    fn can_submit(&self) -> bool;
+
+    /// True if the builder contains all necessary information to be built into
+    /// a valid transaction.
+    fn can_build(&self) -> bool;
+}
+
+/// Network-specific transaction builder.
+///
+/// Extends [`TransactionBuilder`] with [`build_unsigned`](Self::build_unsigned)
+/// and [`build`](Self::build) methods.
+#[doc(alias = "NetworkTxBuilder")]
+pub trait NetworkTransactionBuilder<N: Network>: TransactionBuilder {
     /// Check if all necessary keys are present to build the specified type,
     /// returning a list of missing keys.
     fn complete_type(&self, ty: N::TxType) -> Result<(), Vec<&'static str>>;
@@ -319,30 +343,6 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self.assert_preferred(ty);
         self
     }
-
-    /// Apply a function to the builder, returning the modified builder.
-    fn apply<F>(self, f: F) -> Self
-    where
-        F: FnOnce(Self) -> Self,
-    {
-        f(self)
-    }
-
-    /// Apply a fallible function to the builder, returning the modified builder or an error.
-    fn try_apply<F, E>(self, f: F) -> Result<Self, E>
-    where
-        F: FnOnce(Self) -> Result<Self, E>,
-    {
-        f(self)
-    }
-
-    /// True if the builder contains all necessary information to be submitted
-    /// to the `eth_sendTransaction` endpoint.
-    fn can_submit(&self) -> bool;
-
-    /// True if the builder contains all necessary information to be built into
-    /// a valid transaction.
-    fn can_build(&self) -> bool;
 
     /// Returns the transaction type that this builder will attempt to build.
     /// This does not imply that the builder is ready to build.
