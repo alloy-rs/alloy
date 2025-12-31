@@ -992,6 +992,25 @@ mod tests {
         assert_eq!(gas, 56555);
     }
 
+    
+    #[test]
+    fn change_sidecar_7594() {
+        use alloy_consensus::Blob;
+
+        let sidecar =
+            BlobTransactionSidecarEip7594::new(vec![Blob::repeat_byte(0xAB)], vec![], vec![]);
+        let call_builder = build_call_builder().sidecar_7594(sidecar.clone());
+
+        let set_sidecar = call_builder
+            .request
+            .sidecar
+            .expect("sidecar should be set")
+            .into_eip7594()
+            .expect("sidecar should be EIP-7594 variant");
+
+        assert_eq!(set_sidecar, sidecar, "EIP-7594 sidecar should match the one we set");
+    }
+
     #[tokio::test]
     async fn decode_eth_call_ret_bytes() {
         sol! {
