@@ -45,6 +45,7 @@ pub use alloy_eips::{
         builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
         utils, Blob, BlobTransactionSidecar, Bytes48,
     },
+    eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant},
     Typed2718,
 };
 
