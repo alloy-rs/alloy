@@ -992,7 +992,6 @@ mod tests {
         assert_eq!(gas, 56555);
     }
 
-    
     #[test]
     fn change_sidecar_7594() {
         use alloy_consensus::Blob;
