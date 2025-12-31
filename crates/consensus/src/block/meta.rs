@@ -52,7 +52,6 @@ pub struct HeaderRoots {
     pub transactions_root: B256,
     /// The Keccak 256-bit hash of the root node of the trie structure populated with the receipts
     /// of each transaction in the transactions list portion of the block; formally He.
-    ///
     pub receipts_root: B256,
     /// The Keccak 256-bit hash of the withdrawals list portion of this block.
     pub withdrawals_root: Option<B256>,
@@ -61,6 +60,5 @@ pub struct HeaderRoots {
     pub parent_beacon_block_root: Option<B256>,
     /// The Bloom filter composed from indexable information (logger address and log topics)
     /// contained in each log entry from the receipt of each transaction in the transactions list.
-    ///
     pub logs_bloom: Bloom,
 }
