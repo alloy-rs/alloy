@@ -16,6 +16,7 @@ use core::cmp;
 /// This trait primarily exists to allow inference of the output type of
 /// [`SidecarBuilder::build`], and should generally not be implemented outside
 /// of this crate.
+#[cfg(feature = "kzg")]
 pub trait BuildableSidecar {
     /// Build the sidecar from the blobs and KZG settings.
     fn build(blobs: Vec<Blob>, settings: &c_kzg::KzgSettings) -> Result<Self, c_kzg::Error>
@@ -23,6 +24,7 @@ pub trait BuildableSidecar {
         Self: Sized;
 }
 
+#[cfg(feature = "kzg")]
 impl BuildableSidecar for BlobTransactionSidecar {
     fn build(blobs: Vec<Blob>, settings: &c_kzg::KzgSettings) -> Result<Self, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(blobs.len());
@@ -45,6 +47,7 @@ impl BuildableSidecar for BlobTransactionSidecar {
     }
 }
 
+#[cfg(feature = "kzg")]
 impl BuildableSidecar for BlobTransactionSidecarEip7594 {
     fn build(blobs: Vec<Blob>, settings: &c_kzg::KzgSettings) -> Result<Self, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(blobs.len());
