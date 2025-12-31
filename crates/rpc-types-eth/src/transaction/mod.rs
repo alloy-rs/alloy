@@ -10,8 +10,8 @@ use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
 use alloy_consensus::transaction::Recovered;
 pub use alloy_consensus::{
-    transaction::TransactionInfo, BlobTransactionSidecar, Receipt, ReceiptEnvelope,
-    ReceiptWithBloom, Transaction as TransactionTrait,
+    transaction::TransactionInfo, BlobTransactionSidecar, BlobTransactionSidecarEip7594, Receipt,
+    ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
 };
 pub use alloy_consensus_any::AnyReceiptEnvelope;
 pub use alloy_eips::{

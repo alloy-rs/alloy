@@ -4,13 +4,15 @@ use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{
     eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
+    TransactionBuilderError, TxSigner,
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{
-    state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
+    state::StateOverride, AccessList, BlobTransactionSidecar, BlobTransactionSidecarEip7594,
+    BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
 use std::marker::PhantomData;
@@ -421,6 +423,15 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         N::TransactionRequest: TransactionBuilder4844,
     {
         self.request.set_blob_sidecar(blob_sidecar);
+        self
+    }
+
+    /// Sets the EIP-7594 `sidecar` field in the transaction to the provided value.
+    pub fn sidecar_7594(mut self, sidecar: BlobTransactionSidecarEip7594) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder7594,
+    {
+        self.request.set_blob_sidecar_7594(sidecar);
         self
     }
 
