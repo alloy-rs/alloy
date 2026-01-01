@@ -550,6 +550,50 @@ impl BlobTransactionSidecarEip7594 {
             + self.cell_proofs.capacity() * BYTES_PER_PROOF
     }
 
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given blobs.
+    ///
+    /// This uses the global/default KZG settings, see also
+    /// [`EnvKzgSettings::Default`](crate::eip4844::env_settings::EnvKzgSettings).
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        let kzg_settings = EnvKzgSettings::Default;
+        Self::try_from_blobs_with_settings(blobs, kzg_settings.get())
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given blobs with custom
+    /// KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(blobs.len());
+        let mut cell_proofs = Vec::with_capacity(blobs.len() * CELLS_PER_EXT_BLOB);
+
+        for blob in &blobs {
+            // SAFETY: Blob and c_kzg::Blob have the same memory layout
+            let blob_kzg = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+
+            let commitment = settings.blob_to_kzg_commitment(blob_kzg)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                for kzg_proof in kzg_proofs.iter() {
+                    cell_proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(Self::new(blobs, commitments, cell_proofs))
+    }
+
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
     ///
