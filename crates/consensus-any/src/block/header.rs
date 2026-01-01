@@ -102,6 +102,7 @@ pub struct AnyHeader {
     pub block_access_list_hash: Option<B256>,
 }
 
+#[cfg(not(feature = "amsterdam"))]
 impl AnyHeader {
     /// Seal the header with a known hash.
     ///
@@ -148,7 +149,134 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            #[cfg(feature = "amsterdam")]
+        } = self;
+
+        Ok(Header {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash: mix_hash.unwrap(),
+            nonce: nonce.unwrap(),
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+        })
+    }
+
+    /// Converts this header into a [`Header`] with default values for missing mandatory fields:
+    /// - mix_hash
+    /// - nonce
+    pub fn into_header_with_defaults(self) -> Header {
+        let Self {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+        } = self;
+
+        Header {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash: mix_hash.unwrap_or_default(),
+            nonce: nonce.unwrap_or_default(),
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
+        }
+    }
+}
+
+#[cfg(feature = "amsterdam")]
+impl AnyHeader {
+    /// Seal the header with a known hash.
+    ///
+    /// WARNING: This method does not perform validation whether the hash is correct.
+    #[inline]
+    pub const fn seal(self, hash: B256) -> alloy_consensus::Sealed<Self> {
+        alloy_consensus::Sealed::new_unchecked(self, hash)
+    }
+
+    /// Attempts to convert this header into a `Header`.
+    ///
+    /// This can fail if the header is missing required fields:
+    /// - nonce
+    /// - mix_hash
+    ///
+    /// If the conversion fails, the original [`AnyHeader`] is returned.
+    pub fn try_into_header(self) -> Result<Header, ValueError<Self>> {
+        if self.nonce.is_none() {
+            return Err(ValueError::new(self, "missing nonce field"));
+        }
+        if self.mix_hash.is_none() {
+            return Err(ValueError::new(self, "missing mix hash field"));
+        }
+
+        let Self {
+            parent_hash,
+            ommers_hash,
+            beneficiary,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_hash,
             block_access_list_hash,
         } = self;
 
@@ -174,7 +302,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            #[cfg(feature = "amsterdam")]
             block_access_list_hash,
         })
     }
@@ -205,7 +332,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            #[cfg(feature = "amsterdam")]
             block_access_list_hash,
         } = self;
 
@@ -231,7 +357,6 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
-            #[cfg(feature = "amsterdam")]
             block_access_list_hash,
         }
     }
