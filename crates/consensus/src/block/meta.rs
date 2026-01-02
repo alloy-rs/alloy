@@ -41,7 +41,7 @@ pub struct HeaderInfo {
     pub mix_hash: Option<B256>,
 }
 
-/// Header info computed on external data
+/// Roots contained in a block header.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub struct HeaderRoots {
     /// The Keccak 256-bit hash of the root node of the state trie, after all transactions are
