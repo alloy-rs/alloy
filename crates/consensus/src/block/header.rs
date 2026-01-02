@@ -561,7 +561,7 @@ pub trait BlockHeader {
         }
     }
 
-    /// Extracts info computed on external data
+    /// Returns all roots contained in the header.
     fn header_roots(&self) -> HeaderRoots {
         HeaderRoots {
             state_root: self.state_root(),
