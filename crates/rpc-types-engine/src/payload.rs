@@ -1310,6 +1310,7 @@ impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
 }
 
 #[cfg(feature = "ssz")]
+#[cfg(feature = "amsterdam")]
 impl ssz::Decode for ExecutionPayloadV4 {
     fn is_ssz_fixed_len() -> bool {
         false
