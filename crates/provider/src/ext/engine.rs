@@ -52,6 +52,18 @@ pub trait EngineApi<N>: Send + Sync {
         execution_requests: Vec<Bytes>,
     ) -> TransportResult<PayloadStatus>;
 
+    /// Sends the given payload to the execution layer client, as specified for the Amsterdam fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_newpayloadv5>
+    #[cfg(feature = "amsterdam")]
+    async fn new_payload_v5(
+        &self,
+        payload: alloy_rpc_types_engine::ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus>;
+
     /// Updates the execution layer client with the given fork choice, as specified for the Paris
     /// fork.
     ///
@@ -132,6 +144,19 @@ pub trait EngineApi<N>: Send + Sync {
         &self,
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
+
+    /// Returns the most recent version of the payload that is available in the corresponding
+    /// payload build process at the time of receiving this call.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_getpayloadv6>
+    ///
+    /// Note:
+    /// > Provider software MAY stop the corresponding build process after serving this call.
+    #[cfg(feature = "amsterdam")]
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<alloy_rpc_types_engine::ExecutionPayloadEnvelopeV6>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -223,6 +248,22 @@ where
             .await
     }
 
+    #[cfg(feature = "amsterdam")]
+    async fn new_payload_v5(
+        &self,
+        payload: alloy_rpc_types_engine::ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request(
+                "engine_newPayloadV5",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
+            .await
+    }
+
     async fn fork_choice_updated_v1(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -276,6 +317,14 @@ where
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
         self.client().request("engine_getPayloadV4", (payload_id,)).await
+    }
+
+    #[cfg(feature = "amsterdam")]
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<alloy_rpc_types_engine::ExecutionPayloadEnvelopeV6> {
+        self.client().request("engine_getPayloadV6", (payload_id,)).await
     }
 
     async fn get_payload_bodies_by_hash_v1(
