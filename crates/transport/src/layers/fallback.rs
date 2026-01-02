@@ -7,8 +7,12 @@ use parking_lot::RwLock;
 use std::{
     collections::{HashSet, VecDeque},
     num::NonZeroUsize,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
+    time::SystemTime,
 };
 use tower::{Layer, Service};
 use tracing::trace;
@@ -391,7 +395,7 @@ struct ScoredTransport<S> {
     /// Unique identifier for the transport
     id: usize,
     /// Metrics for the transport
-    metrics: Arc<RwLock<TransportMetrics>>,
+    metrics: Arc<TransportMetrics>,
 }
 
 impl<S> ScoredTransport<S> {
@@ -402,26 +406,22 @@ impl<S> ScoredTransport<S> {
 
     /// Returns the current score of the transport based on the weighted algorithm.
     fn score(&self) -> f64 {
-        let metrics = self.metrics.read();
-        metrics.calculate_score()
+        self.metrics.calculate_score()
     }
 
     /// Get metrics summary for debugging
     fn metrics_summary(&self) -> String {
-        let metrics = self.metrics.read();
-        metrics.get_summary()
+        self.metrics.get_summary()
     }
 
     /// Track a successful request and its latency.
     fn track_success(&self, duration: Duration) {
-        let mut metrics = self.metrics.write();
-        metrics.track_success(duration);
+        self.metrics.track_success(duration);
     }
 
     /// Track a failed request.
     fn track_failure(&self) {
-        let mut metrics = self.metrics.write();
-        metrics.track_failure();
+        self.metrics.track_failure();
     }
 }
 
@@ -449,67 +449,82 @@ impl<S> Ord for ScoredTransport<S> {
 /// Represents performance metrics for a transport.
 #[derive(Debug)]
 struct TransportMetrics {
+    // Sample windows protected by RwLock
+    samples: RwLock<MetricSamples>,
+    // Atomic counters that can be updated without holding the lock
+    total_requests: AtomicU64,
+    successful_requests: AtomicU64,
+    last_update_nanos: AtomicU64,
+}
+
+/// Sample windows for latency and success tracking
+#[derive(Debug, Default)]
+struct MetricSamples {
     // Latency history - tracks last N responses
     latencies: VecDeque<Duration>,
     // Success history - tracks last N successes (true) or failures (false)
     successes: VecDeque<bool>,
-    // Last time this transport was checked/used
-    last_update: Instant,
-    // Total number of requests made to this transport
-    total_requests: u64,
-    // Total number of successful requests
-    successful_requests: u64,
 }
 
 impl TransportMetrics {
     /// Track a successful request and its latency.
-    fn track_success(&mut self, duration: Duration) {
-        self.total_requests += 1;
-        self.successful_requests += 1;
-        self.last_update = Instant::now();
+    fn track_success(&self, duration: Duration) {
+        // Update atomic counters without holding any lock
+        self.total_requests.fetch_add(1, Ordering::Relaxed);
+        self.successful_requests.fetch_add(1, Ordering::Relaxed);
+        if let Ok(since_epoch) = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            self.last_update_nanos.store(since_epoch.as_nanos() as u64, Ordering::Relaxed);
+        }
 
-        // Add to sample windows
-        self.latencies.push_back(duration);
-        self.successes.push_back(true);
+        // Only acquire lock for VecDeque operations
+        let mut samples = self.samples.write();
+        samples.latencies.push_back(duration);
+        samples.successes.push_back(true);
 
         // Limit to sample count
-        while self.latencies.len() > DEFAULT_SAMPLE_COUNT {
-            self.latencies.pop_front();
+        while samples.latencies.len() > DEFAULT_SAMPLE_COUNT {
+            samples.latencies.pop_front();
         }
-        while self.successes.len() > DEFAULT_SAMPLE_COUNT {
-            self.successes.pop_front();
+        while samples.successes.len() > DEFAULT_SAMPLE_COUNT {
+            samples.successes.pop_front();
         }
     }
 
     /// Track a failed request.
-    fn track_failure(&mut self) {
-        self.total_requests += 1;
-        self.last_update = Instant::now();
+    fn track_failure(&self) {
+        // Update atomic counters without holding any lock
+        self.total_requests.fetch_add(1, Ordering::Relaxed);
+        if let Ok(since_epoch) = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            self.last_update_nanos.store(since_epoch.as_nanos() as u64, Ordering::Relaxed);
+        }
 
-        // Add to sample windows (no latency for failures)
-        self.successes.push_back(false);
+        // Only acquire lock for VecDeque operations (no latency for failures)
+        let mut samples = self.samples.write();
+        samples.successes.push_back(false);
 
         // Limit to sample count
-        while self.successes.len() > DEFAULT_SAMPLE_COUNT {
-            self.successes.pop_front();
+        while samples.successes.len() > DEFAULT_SAMPLE_COUNT {
+            samples.successes.pop_front();
         }
     }
 
     /// Calculate weighted score based on stability and latency
     fn calculate_score(&self) -> f64 {
+        let samples = self.samples.read();
+        
         // If no data yet, return initial neutral score
-        if self.successes.is_empty() {
+        if samples.successes.is_empty() {
             return 0.0;
         }
 
         // Calculate stability score (percentage of successful requests)
-        let success_count = self.successes.iter().filter(|&&s| s).count();
-        let stability_score = success_count as f64 / self.successes.len() as f64;
+        let success_count = samples.successes.iter().filter(|&&s| s).count();
+        let stability_score = success_count as f64 / samples.successes.len() as f64;
 
         // Calculate latency score (lower is better)
-        let latency_score = if !self.latencies.is_empty() {
-            let avg_latency = self.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
-                / self.latencies.len() as f64;
+        let latency_score = if !samples.latencies.is_empty() {
+            let avg_latency = samples.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
+                / samples.latencies.len() as f64;
 
             // Normalize latency score (1.0 for 0ms, approaches 0.0 as latency increases)
             1.0 / (1.0 + avg_latency)
@@ -523,16 +538,18 @@ impl TransportMetrics {
 
     /// Get a summary of metrics for debugging
     fn get_summary(&self) -> String {
-        let success_rate = if !self.successes.is_empty() {
-            let success_count = self.successes.iter().filter(|&&s| s).count();
-            success_count as f64 / self.successes.len() as f64
+        let samples = self.samples.read();
+        
+        let success_rate = if !samples.successes.is_empty() {
+            let success_count = samples.successes.iter().filter(|&&s| s).count();
+            success_count as f64 / samples.successes.len() as f64
         } else {
             0.0
         };
 
-        let avg_latency = if !self.latencies.is_empty() {
-            self.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
-                / self.latencies.len() as f64
+        let avg_latency = if !samples.latencies.is_empty() {
+            samples.latencies.iter().map(|d| d.as_secs_f64()).sum::<f64>()
+                / samples.latencies.len() as f64
         } else {
             0.0
         };
@@ -541,7 +558,7 @@ impl TransportMetrics {
             "success_rate: {:.2}%, avg_latency: {:.2}ms, samples: {}, score: {:.4}",
             success_rate * 100.0,
             avg_latency * 1000.0,
-            self.successes.len(),
+            samples.successes.len(),
             self.calculate_score()
         )
     }
@@ -550,11 +567,10 @@ impl TransportMetrics {
 impl Default for TransportMetrics {
     fn default() -> Self {
         Self {
-            latencies: VecDeque::new(),
-            successes: VecDeque::new(),
-            last_update: Instant::now(),
-            total_requests: 0,
-            successful_requests: 0,
+            samples: RwLock::new(MetricSamples::default()),
+            total_requests: AtomicU64::new(0),
+            successful_requests: AtomicU64::new(0),
+            last_update_nanos: AtomicU64::new(0),
         }
     }
 }
