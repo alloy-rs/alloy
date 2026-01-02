@@ -1370,6 +1370,7 @@ impl ssz::Decode for ExecutionPayloadV4 {
 }
 
 #[cfg(feature = "ssz")]
+#[cfg(feature = "amsterdam")]
 impl ssz::Encode for ExecutionPayloadV4 {
     fn is_ssz_fixed_len() -> bool {
         false
