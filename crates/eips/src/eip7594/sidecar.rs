@@ -29,6 +29,12 @@ pub enum BlobTransactionSidecarVariant {
     Eip7594(BlobTransactionSidecarEip7594),
 }
 
+impl Default for BlobTransactionSidecarVariant {
+    fn default() -> Self {
+        Self::Eip4844(BlobTransactionSidecar::default())
+    }
+}
+
 impl BlobTransactionSidecarVariant {
     /// Returns true if this is a [`BlobTransactionSidecarVariant::Eip4844`].
     pub const fn is_eip4844(&self) -> bool {
