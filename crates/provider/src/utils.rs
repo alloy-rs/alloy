@@ -22,9 +22,6 @@ pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
 /// The minimum priority fee to provide.
 pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 
-/// An estimator function for EIP1559 fees.
-pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
-
 /// A trait responsible for estimating EIP-1559 values
 pub trait Eip1559EstimatorFn: Send + Unpin {
     /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
