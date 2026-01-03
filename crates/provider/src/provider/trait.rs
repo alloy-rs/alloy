@@ -129,7 +129,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_blob_base_fee(&self) -> ProviderCall<NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_blobBaseFee")
-            .map_resp(utils::convert_u128 as fn(U128) -> u128)
+            .map_resp(utils::CONVERT_U128)
             .into()
     }
 
@@ -137,7 +137,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_block_number(&self) -> ProviderCall<NoParams, U64, BlockNumber> {
         self.client()
             .request_noparams("eth_blockNumber")
-            .map_resp(utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::CONVERT_U64)
             .into()
     }
 
@@ -236,7 +236,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_chain_id(&self) -> ProviderCall<NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
-            .map_resp(utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::CONVERT_U64)
             .into()
     }
 
@@ -336,7 +336,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_gas_price(&self) -> ProviderCall<NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_gasPrice")
-            .map_resp(utils::convert_u128 as fn(U128) -> u128)
+            .map_resp(utils::CONVERT_U128)
             .into()
     }
 
@@ -779,7 +779,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
         self.client()
             .request("eth_getTransactionCount", address)
-            .map_resp(utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::CONVERT_U64)
             .into()
     }
 
@@ -826,7 +826,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_max_priority_fee_per_gas(&self) -> ProviderCall<NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_maxPriorityFeePerGas")
-            .map_resp(utils::convert_u128 as fn(U128) -> u128)
+            .map_resp(utils::CONVERT_U128)
             .into()
     }
 
@@ -1352,7 +1352,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     fn get_net_version(&self) -> ProviderCall<NoParams, U64, u64> {
         self.client()
             .request_noparams("net_version")
-            .map_resp(utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::CONVERT_U64)
             .into()
     }
 

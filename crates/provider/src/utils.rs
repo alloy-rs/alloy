@@ -126,9 +126,16 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
     r.to::<u128>()
 }
 
+/// Convert `U64` to `u64`.
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
+
+/// Function pointer constant for `convert_u128`.
+pub(crate) const CONVERT_U128: fn(U128) -> u128 = convert_u128;
+
+/// Function pointer constant for `convert_u64`.
+pub(crate) const CONVERT_U64: fn(U64) -> u64 = convert_u64;
 
 pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
     r: Option<BlockResp>,
