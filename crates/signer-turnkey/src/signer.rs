@@ -115,6 +115,17 @@ impl Signer for TurnkeySigner {
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::TurnkeyClient(e)))?;
 
         // Parse r, s, v from response
+        // Check for empty signature fields before decoding
+        if response.r.is_empty() {
+            return Err(alloy_signer::Error::other(TurnkeySignerError::SignatureNotFound));
+        }
+        if response.s.is_empty() {
+            return Err(alloy_signer::Error::other(TurnkeySignerError::SignatureNotFound));
+        }
+        if response.v.is_empty() {
+            return Err(alloy_signer::Error::other(TurnkeySignerError::SignatureNotFound));
+        }
+
         let r_bytes = hex::decode(&response.r)
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::Hex(e)))?;
         let s_bytes = hex::decode(&response.s)
