@@ -13,7 +13,7 @@ use std::{
 ///
 /// See [geth's `NodeInfo` struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/p2p/server.go#L1078)
 /// for the source of each field.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NodeInfo {
     /// Unique node identifier (also the encryption key).
     pub id: String,
@@ -269,6 +269,7 @@ mod handshake {
 mod tests {
     use super::*;
     use similar_asserts::assert_eq;
+    use std::str::FromStr;
 
     #[test]
     fn deserialize_peer_info() {
@@ -459,5 +460,194 @@ mod tests {
         }"#;
 
         let _: NodeInfo = serde_json::from_str(actual_response).unwrap();
+    }
+
+    #[test]
+    fn serialize_deserialize_node_info_roundtrip() {
+        let node_info = NodeInfo {
+            id: "6e2fe698f3064cd99410926ce16734e35e3cc947d4354461d2594f2d2dd9f7b6".to_string(),
+            name: "Geth/v1.10.19-stable/darwin-arm64/go1.18.3".to_string(),
+            enode: "enode://d7dfaea49c7ef37701e668652bcf1bc63d3abb2ae97593374a949e175e4ff128730a2f35199f3462a56298b981dfc395a5abebd2d6f0284ffe5bdc3d8e258b86@127.0.0.1:30304?discport=0".to_string(),
+            enr: "enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA".to_string(),
+            ip: "127.0.0.1".parse().unwrap(),
+            ports: Ports {
+                discovery: 0,
+                listener: 30304,
+            },
+            listen_addr: "[::]:30304".parse().unwrap(),
+            protocols: ProtocolInfo {
+                eth: Some(EthProtocolInfo {
+                    network: 1337,
+                    #[allow(deprecated)]
+                    difficulty: Some(U256::from(0)),
+                    genesis: B256::from_str("0xb04009ddf4b0763f42778e7d5937e49bebf1e11b2d26c9dac6cefb5f84b6f8ea").unwrap(),
+                    config: ChainConfig::default(),
+                    head: B256::from_str("0xb04009ddf4b0763f42778e7d5937e49bebf1e11b2d26c9dac6cefb5f84b6f8ea").unwrap(),
+                }),
+                snap: Some(SnapProtocolInfo {}),
+            },
+        };
+
+        let serialized = serde_json::to_string(&node_info).expect("Serialization failed");
+        let deserialized: NodeInfo =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        assert_eq!(node_info, deserialized);
+    }
+
+    #[test]
+    fn serialize_deserialize_peer_info_roundtrip() {
+        let peer_info = PeerInfo {
+            enr: Some("enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA".to_string()),
+            enode: "enode://bb37b7302f79e47c1226d6e3ccf0ef6d51146019efdcc1f6e861fd1c1a78d5e84e486225a6a8a503b93d5c50125ee980835c92bde7f7d12f074c16f4e439a578@127.0.0.1:60872".to_string(),
+            id: "ca23c04b7e796da5d6a5f04a62b81c88d41b1341537db85a2b6443e838d8339b".to_string(),
+            name: "Geth/v1.10.19-stable/darwin-arm64/go1.18.3".to_string(),
+            caps: vec!["eth/66".to_string(), "eth/67".to_string(), "snap/1".to_string()],
+            network: PeerNetworkInfo {
+                local_address: "127.0.0.1:30304".parse().unwrap(),
+                remote_address: "127.0.0.1:60872".parse().unwrap(),
+                inbound: true,
+                trusted: false,
+                static_node: false,
+            },
+            protocols: PeerProtocolInfo {
+                eth: Some(EthPeerInfo::Info(EthInfo { version: 67 })),
+                snap: Some(SnapPeerInfo::Info(SnapInfo { version: 1 })),
+                other: BTreeMap::new(),
+            },
+        };
+
+        let serialized = serde_json::to_string(&peer_info).expect("Serialization failed");
+        let deserialized: PeerInfo =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        assert_eq!(peer_info, deserialized);
+    }
+
+    #[test]
+    fn serialize_deserialize_peer_info_handshake_roundtrip() {
+        let peer_info = PeerInfo {
+            enr: None,
+            enode: "enode://a997fde0023537ad01e536ebf2eeeb4b4b3d5286707586727b704f32e8e2b4959e08b6db5b27eb6b7e9f6efcbb53657f4e2bd16900aa77a89426dc3382c29ce0@[::1]:60948".to_string(),
+            id: "df6f8bc331005962c2ef1f5236486a753bc6b2ddb5ef04370757999d1ca832d4".to_string(),
+            name: "Geth/v1.10.26-stable-e5eb32ac/linux-amd64/go1.18.5".to_string(),
+            caps: vec!["eth/66".to_string(), "eth/67".to_string(), "snap/1".to_string()],
+            network: PeerNetworkInfo {
+                local_address: "[::1]:30304".parse().unwrap(),
+                remote_address: "[::1]:60948".parse().unwrap(),
+                inbound: true,
+                trusted: false,
+                static_node: false,
+            },
+            protocols: PeerProtocolInfo {
+                eth: Some(EthPeerInfo::Handshake),
+                snap: Some(SnapPeerInfo::Handshake),
+                other: BTreeMap::new(),
+            },
+        };
+
+        let serialized = serde_json::to_string(&peer_info).expect("Serialization failed");
+        let deserialized: PeerInfo =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        assert_eq!(peer_info, deserialized);
+    }
+
+    #[test]
+    fn serialize_deserialize_peer_info_with_optional_fields_roundtrip() {
+        let peer_info = PeerInfo {
+            enr: None,
+            enode: "enode://f769f8cf850dd9f88a13c81ff3e70c3400cf93511c676c6d50f0e359beb43c28388931f64f56ab4110ccced37fb08163b6966fe42b6e15ec647fa8087914463d@127.0.0.1:45591?discport=0".to_string(),
+            id: "daa738efebf7e349b9f5b1a91d782e7355060bb15af8570e23463729d0632deb".to_string(),
+            name: "Geth/v1.13.14-stable-2bd6bd01/linux-amd64/go1.21.6".to_string(),
+            caps: vec!["eth/68".to_string(), "snap/1".to_string()],
+            network: PeerNetworkInfo {
+                local_address: "127.0.0.1:33236".parse().unwrap(),
+                remote_address: "127.0.0.1:45591".parse().unwrap(),
+                inbound: false,
+                trusted: false,
+                static_node: true,
+            },
+            protocols: PeerProtocolInfo {
+                eth: Some(EthPeerInfo::Info(EthInfo { version: 68 })),
+                snap: Some(SnapPeerInfo::Info(SnapInfo { version: 1 })),
+                other: BTreeMap::new(),
+            },
+        };
+
+        let serialized = serde_json::to_string(&peer_info).expect("Serialization failed");
+        let deserialized: PeerInfo =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        assert_eq!(peer_info, deserialized);
+    }
+
+    #[test]
+    fn serialize_deserialize_peer_event_roundtrip() {
+        let peer_event = PeerEvent {
+            kind: PeerEventType::Add,
+            peer: "ca23c04b7e796da5d6a5f04a62b81c88d41b1341537db85a2b6443e838d8339b".to_string(),
+            error: None,
+            protocol: None,
+            msg_code: None,
+            msg_size: None,
+            local_address: Some("127.0.0.1:30304".parse().unwrap()),
+            remote_address: Some("127.0.0.1:60872".parse().unwrap()),
+        };
+
+        let serialized = serde_json::to_string(&peer_event).expect("Serialization failed");
+        let deserialized: PeerEvent =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        assert_eq!(peer_event, deserialized);
+    }
+
+    #[test]
+    fn serialize_deserialize_peer_event_with_all_fields_roundtrip() {
+        let peer_event = PeerEvent {
+            kind: PeerEventType::MsgRecv,
+            peer: "df6f8bc331005962c2ef1f5236486a753bc6b2ddb5ef04370757999d1ca832d4".to_string(),
+            error: Some("connection error".to_string()),
+            protocol: Some("eth".to_string()),
+            msg_code: Some(0x10),
+            msg_size: Some(1024),
+            local_address: Some("[::1]:30304".parse().unwrap()),
+            remote_address: Some("[::1]:60948".parse().unwrap()),
+        };
+
+        let serialized = serde_json::to_string(&peer_event).expect("Serialization failed");
+        let deserialized: PeerEvent =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        assert_eq!(peer_event, deserialized);
+    }
+
+    #[test]
+    fn serialize_deserialize_peer_event_all_types_roundtrip() {
+        let event_types = vec![
+            PeerEventType::Add,
+            PeerEventType::Drop,
+            PeerEventType::MsgSend,
+            PeerEventType::MsgRecv,
+        ];
+
+        for event_type in event_types {
+            let peer_event = PeerEvent {
+                kind: event_type,
+                peer: "test_peer_id".to_string(),
+                error: None,
+                protocol: None,
+                msg_code: None,
+                msg_size: None,
+                local_address: None,
+                remote_address: None,
+            };
+
+            let serialized = serde_json::to_string(&peer_event).expect("Serialization failed");
+            let deserialized: PeerEvent =
+                serde_json::from_str(&serialized).expect("Deserialization failed");
+
+            assert_eq!(peer_event, deserialized);
+        }
     }
 }
