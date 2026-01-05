@@ -12,6 +12,7 @@ Signer implementations in Alloy:
 - [Trezor](https://docs.rs/alloy-signer-trezor)
 - [AWS KMS](https://docs.rs/alloy-signer-aws)
 - [GCP KMS](https://docs.rs/alloy-signer-gcp)
+- [Turnkey](https://docs.rs/alloy-signer-turnkey)
 
 [Signer]: https://docs.rs/alloy-signer/latest/alloy_signer/trait.Signer.html
 

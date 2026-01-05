@@ -150,10 +150,10 @@ mod provider {
     };
     use alloy_primitives::{Address, B256};
     use alloy_provider::{Network, Provider};
-    use async_trait::async_trait;
 
     /// Extension trait for ENS contract calls.
-    #[async_trait]
+    #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+    #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     pub trait ProviderEnsExt<N: alloy_provider::Network, P: Provider<N>> {
         /// Returns the resolver for the specified node. The `&str` is only used for error messages.
         async fn get_resolver(
@@ -196,7 +196,8 @@ mod provider {
         }
     }
 
-    #[async_trait]
+    #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+    #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
     impl<N, P> ProviderEnsExt<N, P> for P
     where
         P: Provider<N>,
