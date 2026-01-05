@@ -9,7 +9,7 @@ use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_client::WeakClient;
 use alloy_sol_types::{SolCall, SolType, SolValue};
 use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
-use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
+use std::{fmt, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
@@ -30,12 +30,12 @@ const DEFAULT_WAIT: Duration = Duration::from_millis(1);
 /// [Multicall3] contract itself and then aggregated with other `eth_call`s.
 ///
 /// Only calls that:
-/// - target the latest block ID,
 /// - have no state overrides,
 /// - have a target address and calldata,
 /// - have no other properties (nonce, gas, etc.)
 ///
-/// can be sent with a multicall. This of course requires that the [Multicall3] contract is
+/// can be sent with a multicall. Calls are batched together if they target the same
+/// [`BlockId`] (including `latest`). This of course requires that the [Multicall3] contract is
 /// deployed on the network, by default at [`MULTICALL3_ADDRESS`].
 ///
 /// This layer is useful for reducing the number of network requests made.
@@ -141,6 +141,7 @@ type CallBatchMsgTx = TransportResult<IMulticall3::Result>;
 
 struct CallBatchMsg<N: Network> {
     kind: CallBatchMsgKind<N>,
+    block_id: BlockId,
     tx: oneshot::Sender<CallBatchMsgTx>,
 }
 
@@ -175,9 +176,9 @@ enum CallBatchMsgKind<N: Network = Ethereum> {
 }
 
 impl<N: Network> CallBatchMsg<N> {
-    fn new(kind: CallBatchMsgKind<N>) -> (Self, oneshot::Receiver<CallBatchMsgTx>) {
+    fn new(kind: CallBatchMsgKind<N>, block_id: BlockId) -> (Self, oneshot::Receiver<CallBatchMsgTx>) {
         let (tx, rx) = oneshot::channel();
-        (Self { kind, tx }, rx)
+        (Self { kind, block_id, tx }, rx)
     }
 }
 
@@ -248,16 +249,13 @@ struct CallBatchProviderInner<N: Network> {
 
 impl<N: Network> CallBatchProviderInner<N> {
     /// We only want to perform a scheduled multicall if:
-    /// - The request has no block ID or state overrides,
+    /// - The request has no state overrides,
     /// - The request has a target address,
     /// - The request has no other properties (`nonce`, `gas`, etc cannot be sent with a multicall).
     ///
     /// Ref: <https://github.com/wevm/viem/blob/ba8319f71503af8033fd3c77cfb64c7eb235c6a9/src/actions/public/call.ts#L295>
     fn should_batch_call(&self, params: &crate::EthCallParams<N>) -> bool {
-        // TODO: block ID is not yet implemented
-        if params.block().is_some_and(|block| block != BlockId::latest()) {
-            return false;
-        }
+        // Block ID is now supported - calls with the same block ID can be batched together
         if params.overrides.as_ref().is_some_and(|overrides| !overrides.is_empty()) {
             return false;
         }
@@ -273,8 +271,8 @@ impl<N: Network> CallBatchProviderInner<N> {
         true
     }
 
-    async fn schedule(self, msg: CallBatchMsgKind<N>) -> TransportResult<Bytes> {
-        let (msg, rx) = CallBatchMsg::new(msg);
+    async fn schedule(self, msg: CallBatchMsgKind<N>, block_id: BlockId) -> TransportResult<Bytes> {
+        let (msg, rx) = CallBatchMsg::new(msg, block_id);
         self.tx.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
 
         let IMulticall3::Result { success, returnData } =
@@ -294,11 +292,11 @@ impl<N: Network> CallBatchProviderInner<N> {
         }
     }
 
-    async fn schedule_and_decode<T>(self, msg: CallBatchMsgKind<N>) -> TransportResult<T>
+    async fn schedule_and_decode<T>(self, msg: CallBatchMsgKind<N>, block_id: BlockId) -> TransportResult<T>
     where
         T: SolValue + From<<T::SolType as SolType>::RustType>,
     {
-        let data = self.schedule(msg).await?;
+        let data = self.schedule(msg, block_id).await?;
         T::abi_decode(&data).map_err(TransportErrorKind::custom)
     }
 }
@@ -347,49 +345,86 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     }
 
     fn process_msg(&mut self, msg: CallBatchMsg<N>) {
+        // Simply add the message to pending - we'll check block ID compatibility when sending
         self.pending.push(msg);
     }
 
     async fn send_batch(&mut self) {
         let pending = std::mem::take(&mut self.pending);
-
-        // If there's only a single call, avoid batching and perform the request directly.
-        if pending.len() == 1 {
-            let msg = pending.into_iter().next().unwrap();
-            let result = self.call_one(msg.kind).await;
-            let _ = msg.tx.send(result);
+        
+        if pending.is_empty() {
             return;
         }
+        
+        // Check if all messages have the same block ID
+        let first_block_id = pending[0].block_id;
+        let all_same_block = pending.iter().all(|msg| msg.block_id == first_block_id);
+        
+        if all_same_block {
+            // All messages have the same block ID - can batch them together
+            if pending.len() == 1 {
+                let msg = pending.into_iter().next().unwrap();
+                let result = self.call_one(msg.kind, first_block_id).await;
+                let _ = msg.tx.send(result);
+                return;
+            }
 
-        let result = self.send_batch_inner(&pending).await;
-        match result {
-            Ok(results) => {
-                debug_assert_eq!(results.len(), pending.len());
-                for (result, msg) in results.into_iter().zip(pending) {
-                    let _ = msg.tx.send(Ok(result));
+            let result = self.send_batch_inner(&pending, first_block_id).await;
+            match result {
+                Ok(results) => {
+                    debug_assert_eq!(results.len(), pending.len());
+                    for (result, msg) in results.into_iter().zip(pending) {
+                        let _ = msg.tx.send(Ok(result));
+                    }
+                }
+                Err(e) => {
+                    for msg in pending {
+                        let _ = msg.tx.send(Err(TransportErrorKind::custom_str(&e.to_string())));
+                    }
                 }
             }
-            Err(e) => {
-                for msg in pending {
-                    let _ = msg.tx.send(Err(TransportErrorKind::custom_str(&e.to_string())));
-                }
+        } else {
+            // Different block IDs - process each message individually
+            for msg in pending {
+                let result = self.call_one(msg.kind, msg.block_id).await;
+                let _ = msg.tx.send(result);
             }
         }
     }
 
-    async fn call_one(&mut self, msg: CallBatchMsgKind<N>) -> TransportResult<IMulticall3::Result> {
+    async fn call_one(&mut self, msg: CallBatchMsgKind<N>, block_id: BlockId) -> TransportResult<IMulticall3::Result> {
         let m3_res =
             |success, return_data| IMulticall3::Result { success, returnData: return_data };
         match msg {
-            CallBatchMsgKind::Call(tx) => self.inner.call(tx).await.map(|res| m3_res(true, res)),
+            CallBatchMsgKind::Call(tx) => {
+                let mut call = self.inner.call(tx);
+                if block_id != BlockId::latest() {
+                    call = call.block(block_id);
+                }
+                call.await.map(|res| m3_res(true, res))
+            }
             CallBatchMsgKind::BlockNumber => {
-                self.inner.get_block_number().await.map(|res| m3_res(true, res.abi_encode().into()))
+                if block_id != BlockId::latest() {
+                    // For non-latest blocks, we need to get the specific block number
+                    match self.inner.get_block_number_by_id(block_id).await {
+                        Ok(Some(number)) => Ok(m3_res(true, number.abi_encode().into())),
+                        Ok(None) => Ok(m3_res(false, Bytes::new())),
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    self.inner.get_block_number().await.map(|res| m3_res(true, res.abi_encode().into()))
+                }
             }
             CallBatchMsgKind::ChainId => {
+                // Chain ID is network metadata, independent of block ID
                 self.inner.get_chain_id().await.map(|res| m3_res(true, res.abi_encode().into()))
             }
             CallBatchMsgKind::Balance(addr) => {
-                self.inner.get_balance(addr).await.map(|res| m3_res(true, res.abi_encode().into()))
+                let mut balance_call = self.inner.get_balance(addr);
+                if block_id != BlockId::latest() {
+                    balance_call = balance_call.block_id(block_id);
+                }
+                balance_call.await.map(|res| m3_res(true, res.abi_encode().into()))
             }
         }
     }
@@ -397,6 +432,7 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     async fn send_batch_inner(
         &self,
         pending: &[CallBatchMsg<N>],
+        block_id: BlockId,
     ) -> TransportResult<Vec<IMulticall3::Result>> {
         let calls: Vec<_> =
             pending.iter().map(|msg| msg.kind.to_call3(self.m3a, self.arbsys)).collect();
@@ -405,7 +441,12 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
             .with_to(self.m3a)
             .with_input(IMulticall3::aggregate3Call { calls }.abi_encode());
 
-        let bytes = self.inner.call(tx).await?;
+        let mut call = self.inner.call(tx);
+        if block_id != BlockId::latest() {
+            call = call.block(block_id);
+        }
+        
+        let bytes = call.await?;
         if bytes.is_empty() {
             return Err(TransportErrorKind::custom_str(&format!(
                 "Multicall3 not deployed at {}",
@@ -436,7 +477,7 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::BlockNumber,
     > {
         crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::BlockNumber),
+            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::BlockNumber, BlockId::latest()),
         ))
     }
 
@@ -447,23 +488,21 @@ impl<P: Provider<N> + 'static, N: Network> Provider<N> for CallBatchProvider<P, 
         alloy_primitives::U64,
         alloy_primitives::ChainId,
     > {
+        // Chain ID is network metadata, use latest but the block ID is effectively ignored
         crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::ChainId),
+            self.inner.clone().schedule_and_decode::<u64>(CallBatchMsgKind::ChainId, BlockId::latest()),
         ))
     }
 
     fn get_balance(&self, address: Address) -> crate::RpcWithBlock<Address, U256, U256> {
         let this = self.clone();
         crate::RpcWithBlock::new_provider(move |block| {
-            if block != BlockId::latest() {
-                this.provider.get_balance(address).block_id(block).into_future()
-            } else {
-                ProviderCall::BoxedFuture(Box::pin(
-                    this.inner
-                        .clone()
-                        .schedule_and_decode::<U256>(CallBatchMsgKind::Balance(address)),
-                ))
-            }
+            // Now we can batch balance requests for any block ID
+            ProviderCall::BoxedFuture(Box::pin(
+                this.inner
+                    .clone()
+                    .schedule_and_decode::<U256>(CallBatchMsgKind::Balance(address), block),
+            ))
         })
     }
 }
@@ -488,8 +527,9 @@ impl<N: Network> Caller<N, Bytes> for CallBatchCaller<N> {
             return Caller::<N, Bytes>::call(&self.weak, params);
         }
 
+        let block_id = params.block().unwrap_or(BlockId::latest());
         Ok(crate::ProviderCall::BoxedFuture(Box::pin(
-            self.inner.clone().schedule(CallBatchMsgKind::Call(params.into_data())),
+            self.inner.clone().schedule(CallBatchMsgKind::Call(params.into_data()), block_id),
         )))
     }
 
@@ -513,7 +553,6 @@ mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_primitives::{address, hex};
-    use alloy_rpc_types_eth::TransactionRequest;
     use alloy_transport::mock::Asserter;
 
     // https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11#code
@@ -559,6 +598,50 @@ mod tests {
         assert!(block_number_err.unwrap_err().to_string().contains("reverted"));
         assert!(chain_id_err.unwrap_err().to_string().contains("reverted"));
         assert!(asserter.read_q().is_empty(), "only 1 request should've been made");
+    }
+
+    #[tokio::test]
+    async fn block_id_batching() {
+        use alloy_primitives::address;
+        use alloy_rpc_types_eth::TransactionRequest;
+
+        let asserter = Asserter::new();
+        let provider =
+            ProviderBuilder::new().with_call_batching().connect_mocked_client(asserter.clone());
+        
+        let addr = address!("0x1234567890123456789012345678901234567890");
+        
+        // Test 1: Same block ID - should batch together
+        push_m3_success(
+            &asserter,
+            &[
+                (true, 42u64.abi_encode()),  // balance call
+                (true, 100u64.abi_encode()), // call result
+            ],
+        );
+
+        let (balance, call_result) = tokio::join!(
+            provider.get_balance(addr).block_id(BlockId::number(100)),
+            provider.call(TransactionRequest::default().with_to(addr)).block(BlockId::number(100))
+        );
+
+        assert_eq!(balance.unwrap(), U256::from(42));
+        assert_eq!(call_result.unwrap(), 100u64.abi_encode());
+        
+        // Test 2: Different block IDs - should NOT batch, process individually
+        // When not batched, call_one directly calls the inner provider
+        asserter.push_success(&U256::from(42)); // balance at latest
+        asserter.push_success(&U256::from(24)); // balance at block 200
+        
+        let (balance_latest, balance_200) = tokio::join!(
+            provider.get_balance(addr), // Uses latest by default
+            provider.get_balance(addr).block_id(BlockId::number(200))
+        );
+
+        assert_eq!(balance_latest.unwrap(), U256::from(42));
+        assert_eq!(balance_200.unwrap(), U256::from(24));
+        
+        assert!(asserter.read_q().is_empty(), "all requests should've been processed");
     }
 
     #[tokio::test]
