@@ -56,7 +56,7 @@ pub use transaction::*;
 mod work;
 pub use work::Work;
 
-/// This module provides implementations for EIP-4337.
+/// This module provides implementations for ERC-4337.
 pub mod erc4337;
 pub use erc4337::{
     PackedUserOperation, SendUserOperation, SendUserOperationResponse, UserOperation,
