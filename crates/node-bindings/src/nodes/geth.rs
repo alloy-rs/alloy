@@ -13,10 +13,13 @@ use std::{
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tempfile::tempdir;
 use url::Url;
+
+#[cfg(unix)]
+use libc;
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
@@ -175,8 +178,29 @@ impl GethInstance {
 
 impl Drop for GethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill geth");
+        graceful_shutdown(&mut self.pid, "geth");
     }
+}
+
+/// Attempts graceful shutdown with SIGTERM, then SIGKILL after timeout.
+fn graceful_shutdown(child: &mut Child, _name: &str) {
+    #[cfg(unix)]
+    {
+        unsafe { libc::kill(child.id() as i32, libc::SIGTERM); }
+        
+        let timeout = Duration::from_secs(10);
+        let start = Instant::now();
+        
+        while start.elapsed() < timeout {
+            match child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+                Err(_) => break,
+            }
+        }
+    }
+    
+    let _ = child.kill();
 }
 
 /// Builder for launching `geth`.
