@@ -251,18 +251,6 @@ impl<P: Provider<N>, N: Network> DynCallBuilder<P, N> {
         )
         .to(*address))
     }
-
-    /// Clears the decoder, returning a raw call builder.
-    #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
-        RawCallBuilder {
-            request: self.request,
-            block: self.block,
-            state: self.state,
-            provider: self.provider,
-            decoder: (),
-        }
-    }
 }
 
 #[doc(hidden)]
@@ -274,7 +262,7 @@ impl<'a, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<&'a P, C, N> {
     }
 }
 
-impl<P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<P, C, N> {
+impl<P: Provider<N>, D, N: Network> CallBuilder<P, D, N> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
     pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
