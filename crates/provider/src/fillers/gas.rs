@@ -1,4 +1,7 @@
-use std::future::IntoFuture;
+use std::{
+    fmt::{self, Formatter},
+    future::IntoFuture,
+};
 
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
@@ -187,9 +190,74 @@ impl<N: Network> TxFiller<N> for GasFiller {
     }
 }
 
+/// Blob Gas estimator variants
+#[derive(Default, Clone, Copy)]
+pub enum BlobGasEstimator {
+    /// Uses the builtin estimator
+    #[default]
+    Default,
+    /// Uses a custom estimator
+    Scaled(u128),
+}
+
+impl BlobGasEstimator {
+    /// Creates a new estimator from a closure
+    pub fn new(scale: u128) -> Self {
+        Self::Scaled(scale)
+    }
+
+    /// Creates a new estimate fn
+    pub fn new_estimator(scale: u128) -> Self {
+        Self::Scaled(scale)
+    }
+
+    /// Estimates the base fee per blob gas given the latest max_fee_per_blob_gas.
+    pub async fn estimate<P: Provider<N>, N: Network>(
+        self,
+        provider: &P,
+        tx: &<N as Network>::TransactionRequest,
+    ) -> TransportResult<u128>
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
+        let base_fee = match tx.max_fee_per_blob_gas() {
+            Some(max_fee) if max_fee >= BLOB_TX_MIN_BLOB_GASPRICE => max_fee,
+            _ => provider
+                .get_fee_history(2, BlockNumberOrTag::Latest, &[])
+                .await?
+                .base_fee_per_blob_gas
+                .last()
+                .ok_or(RpcError::NullResp)
+                .copied()?,
+        };
+
+        match self {
+            Self::Default => Ok(base_fee),
+            Self::Scaled(scale) => Ok(base_fee.saturating_mul(scale)),
+        }
+    }
+}
+
+impl fmt::Debug for BlobGasEstimator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlobGasEstimator")
+            .field(
+                "estimator",
+                &match self {
+                    Self::Default => "default",
+                    Self::Scaled(_) => "scaled",
+                },
+            )
+            .finish()
+    }
+}
+
 /// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct BlobGasFiller;
+pub struct BlobGasFiller {
+    /// The blob gas estimator to use.
+    pub estimator: BlobGasEstimator,
+}
 
 impl<N: Network> TxFiller<N> for BlobGasFiller
 where
@@ -219,19 +287,7 @@ where
     where
         P: Provider<N>,
     {
-        if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas() {
-            if max_fee_per_blob_gas >= BLOB_TX_MIN_BLOB_GASPRICE {
-                return Ok(max_fee_per_blob_gas);
-            }
-        }
-
-        provider
-            .get_fee_history(2, BlockNumberOrTag::Latest, &[])
-            .await?
-            .base_fee_per_blob_gas
-            .last()
-            .ok_or(RpcError::NullResp)
-            .copied()
+        self.estimator.estimate(provider, tx).await
     }
 
     async fn fill(
