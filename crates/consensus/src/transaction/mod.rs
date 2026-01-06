@@ -220,7 +220,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 
-    /// Returns the number of blobs of [`SignedAuthorization`] in this transactions
+    /// Returns the number of [`SignedAuthorization`]s in this transactions
     ///
     /// This is convenience function for `len(authorization_list)`.
     ///
