@@ -139,11 +139,13 @@ impl Drop for RethInstance {
 fn graceful_shutdown(child: &mut Child, _name: &str) {
     #[cfg(unix)]
     {
-        unsafe { libc::kill(child.id() as i32, libc::SIGTERM); }
-        
+        unsafe {
+            libc::kill(child.id() as i32, libc::SIGTERM);
+        }
+
         let timeout = Duration::from_secs(10);
         let start = Instant::now();
-        
+
         while start.elapsed() < timeout {
             match child.try_wait() {
                 Ok(Some(_)) => return,
@@ -152,7 +154,7 @@ fn graceful_shutdown(child: &mut Child, _name: &str) {
             }
         }
     }
-    
+
     let _ = child.kill();
 }
 
