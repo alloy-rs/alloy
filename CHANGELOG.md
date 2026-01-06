@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Bug Fixes
+
+- [rpc-types-engine] Correct doc comment for PrePragueBlockWithEip7702Transactions ([#3437](https://github.com/alloy-rs/alloy/issues/3437))
+- Update `SidecarBuilder::build` to allow 7594 ([#3428](https://github.com/alloy-rs/alloy/issues/3428))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.40.1 to 1.41.0 ([#3438](https://github.com/alloy-rs/alloy/issues/3438))
+- [deps] Bump taiki-e/install-action from 2.65.7 to 2.65.13 ([#3439](https://github.com/alloy-rs/alloy/issues/3439))
+- [deps] Bump taiki-e/install-action from 2.65.1 to 2.65.7 ([#3419](https://github.com/alloy-rs/alloy/issues/3419))
+- [deps] Bump crate-ci/typos from 1.40.0 to 1.40.1 ([#3418](https://github.com/alloy-rs/alloy/issues/3418))
+
+### Documentation
+
+- [consensus] Correct doc comment for authorization_list ([#3442](https://github.com/alloy-rs/alloy/issues/3442))
+- Add host setter to Reth builder ([#3435](https://github.com/alloy-rs/alloy/issues/3435))
+- `s/EIP-4337/ERC-4337/g;` ([#3431](https://github.com/alloy-rs/alloy/issues/3431))
+- Add host setter to Geth builder ([#3420](https://github.com/alloy-rs/alloy/issues/3420))
+
+### Features
+
+- [consensus] Add HeaderRoots type ([#3427](https://github.com/alloy-rs/alloy/issues/3427))
+- Add try_from_blobs for BlobTransactionSidecarEip7594 ([#3425](https://github.com/alloy-rs/alloy/issues/3425))
+- [`contract`] Add sidecar_7594 to CallBuilder ([#3424](https://github.com/alloy-rs/alloy/issues/3424))
+- Add host setter to the anvil builder ([#3415](https://github.com/alloy-rs/alloy/issues/3415))
+
+### Miscellaneous Tasks
+
+- Update trezor dep ([#3441](https://github.com/alloy-rs/alloy/issues/3441))
+- Add deprecated type alias back ([#3422](https://github.com/alloy-rs/alloy/issues/3422))
+- Ignore RUSTSEC-2025-0137 ([#3416](https://github.com/alloy-rs/alloy/issues/3416))
+
+### Performance
+
+- [provider] Skip batch calls when client disconnects ([#3440](https://github.com/alloy-rs/alloy/issues/3440))
+
+### Testing
+
+- [rpc-types-admin] Add serialization round-trip tests ([#3432](https://github.com/alloy-rs/alloy/issues/3432))
+
 ## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
 
 ### Bug Fixes
@@ -56,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.2.1
 - Remove cyclic dev dep ([#3411](https://github.com/alloy-rs/alloy/issues/3411))
 - Aggregate PRs ([#3404](https://github.com/alloy-rs/alloy/issues/3404))
 - [rpc-types-mev] Remove unused `#![allow(deprecated)]` directive ([#3376](https://github.com/alloy-rs/alloy/issues/3376))

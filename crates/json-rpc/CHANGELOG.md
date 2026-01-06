@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
 
+### Miscellaneous Tasks
+
+- Release 1.2.1
+
 ### Other
 
 - Add a layer to alloy-transport-http that allows propagating trace information ([#3367](https://github.com/alloy-rs/alloy/issues/3367))

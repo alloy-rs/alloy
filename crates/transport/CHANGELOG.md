@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
 
+### Miscellaneous Tasks
+
+- Release 1.2.1
+
 ### Refactor
 
 - [transport] Remove redundant clones in dual transport test ([#3336](https://github.com/alloy-rs/alloy/issues/3336))
