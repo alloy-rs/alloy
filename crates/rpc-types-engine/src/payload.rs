@@ -20,7 +20,7 @@ use alloy_eips::{
     eip7840::BlobParams,
     BlockNumHash,
 };
-use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -338,10 +338,8 @@ impl ExecutionPayloadV1 {
         }
 
         // Calculate the transactions root using encoded bytes
-        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
-            &self.transactions,
-            |item, buf| buf.put_slice(item),
-        );
+        let transactions_root =
+            alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions);
 
         let header = Header {
             parent_hash: self.parent_hash,
