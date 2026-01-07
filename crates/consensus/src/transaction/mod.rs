@@ -578,7 +578,6 @@ impl<T: TxHashRef> TxHashRef for alloy_eips::eip2718::WithEncoded<T> {
 mod tests {
     use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
     use alloy_primitives::Signature;
-    use rand::Rng;
 
     #[test]
     fn test_custom_envelope() {
@@ -613,8 +612,6 @@ mod tests {
         assert_eq!(MyTxType::try_from(2u8).unwrap(), MyTxType::Ethereum(TxType::Eip1559));
         assert_eq!(MyTxType::try_from(10u8).unwrap(), MyTxType::MyTx);
 
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
         let tx = Signed::new_unhashed(
             TxEip1559 {
                 chain_id: 1,
