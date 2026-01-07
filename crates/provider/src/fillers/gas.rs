@@ -312,17 +312,13 @@ where
             }
         }
 
-        // Fetch the latest base_fee_per_blob_gas
-        let base_fee_per_blob_gas = provider
-            .get_fee_history(2, BlockNumberOrTag::Latest, &[])
-            .await?
-            .base_fee_per_blob_gas
-            .last()
-            .ok_or(RpcError::NullResp)
-            .copied()?;
+        // Fetch the latest fee_history
+        let fee_history = provider.get_fee_history(2, BlockNumberOrTag::Latest, &[]).await?;
 
-        let blob_gas_used_ratio =
-            provider.get_fee_history(2, BlockNumberOrTag::Latest, &[]).await?.blob_gas_used_ratio;
+        let base_fee_per_blob_gas =
+            fee_history.base_fee_per_blob_gas.last().ok_or(RpcError::NullResp).copied()?;
+
+        let blob_gas_used_ratio = fee_history.blob_gas_used_ratio;
 
         Ok(self.estimator.estimate(base_fee_per_blob_gas, &blob_gas_used_ratio))
     }
