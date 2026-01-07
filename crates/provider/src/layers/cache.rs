@@ -200,6 +200,14 @@ where
         })
     }
 
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getAccount", address).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, client, req)
+        })
+    }
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
@@ -871,6 +879,130 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(count, count2);
+
+            shared_cache.save_cache(path).unwrap();
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_get_balance() {
+        run_with_tempdir("get-balance", |dir| async move {
+            let cache_layer = CacheLayer::new(100);
+            let cache_layer2 = cache_layer.clone();
+            let shared_cache = cache_layer.cache();
+            let anvil = Anvil::new().spawn();
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer)
+                .connect_http(anvil.endpoint_url());
+
+            let path = dir.join("rpc-cache-balance.txt");
+            shared_cache.load_cache(path.clone()).unwrap();
+
+            let address = anvil.addresses()[0];
+
+            // Send a transaction to change balance
+            let req = TransactionRequest::default()
+                .from(address)
+                .to(Address::repeat_byte(5))
+                .value(U256::from(1000))
+                .input(bytes!("deadbeef").into());
+
+            let receipt = provider
+                .send_transaction(req)
+                .await
+                .expect("failed to send tx")
+                .get_receipt()
+                .await
+                .unwrap();
+            let block_number = receipt.block_number.unwrap();
+
+            // Get balance from RPC (populates cache)
+            let balance = provider
+                .get_balance(address)
+                .block_id(block_number.into())
+                .await
+                .unwrap();
+
+            // Drop anvil to ensure second call can't hit RPC
+            drop(anvil);
+
+            // Create new provider with same cache but dead endpoint
+            let provider2 = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer2)
+                .connect_http("http://localhost:1".parse().unwrap());
+
+            // This only succeeds if cache is hit
+            let balance2 = provider2
+                .get_balance(address)
+                .block_id(block_number.into())
+                .await
+                .unwrap();
+            assert_eq!(balance, balance2);
+
+            shared_cache.save_cache(path).unwrap();
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_get_account() {
+        run_with_tempdir("get-account", |dir| async move {
+            let cache_layer = CacheLayer::new(100);
+            let cache_layer2 = cache_layer.clone();
+            let shared_cache = cache_layer.cache();
+            let anvil = Anvil::new().spawn();
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer)
+                .connect_http(anvil.endpoint_url());
+
+            let path = dir.join("rpc-cache-account.txt");
+            shared_cache.load_cache(path.clone()).unwrap();
+
+            let address = anvil.addresses()[0];
+
+            // Send a transaction to change account nonce
+            let req = TransactionRequest::default()
+                .from(address)
+                .to(Address::repeat_byte(5))
+                .value(U256::ZERO)
+                .input(bytes!("deadbeef").into());
+
+            let receipt = provider
+                .send_transaction(req)
+                .await
+                .expect("failed to send tx")
+                .get_receipt()
+                .await
+                .unwrap();
+            let block_number = receipt.block_number.unwrap();
+
+            // Get account from RPC (populates cache)
+            let account = provider
+                .get_account(address)
+                .block_id(block_number.into())
+                .await
+                .unwrap();
+
+            // Drop anvil to ensure second call can't hit RPC
+            drop(anvil);
+
+            // Create new provider with same cache but dead endpoint
+            let provider2 = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer2)
+                .connect_http("http://localhost:1".parse().unwrap());
+
+            // This only succeeds if cache is hit
+            let account2 = provider2
+                .get_account(address)
+                .block_id(block_number.into())
+                .await
+                .unwrap();
+            assert_eq!(account, account2);
 
             shared_cache.save_cache(path).unwrap();
         })
