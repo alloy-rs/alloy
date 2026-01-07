@@ -20,7 +20,7 @@ use alloy_eips::{
     eip7840::BlobParams,
     BlockNumHash,
 };
-use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -328,20 +328,20 @@ impl ExecutionPayloadV1 {
         self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
     }
 
-    /// Converts [`ExecutionPayloadV1`] to [`Block`] with raw [`Bytes`] transactions.
-    ///
-    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
-    /// without any conversion.
-    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+    /// Helper fn that accepts the separately canculated hash to convert [`ExecutionPayloadV1`] to
+    /// [`Block`]
+    pub fn try_into_block_with_tx_root(
+        self,
+        transactions_root: Option<B256>,
+    ) -> Result<Block<Bytes>, PayloadError> {
         if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
             return Err(PayloadError::ExtraData(self.extra_data));
         }
 
-        // Calculate the transactions root using encoded bytes
-        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
-            &self.transactions,
-            |item, buf| buf.put_slice(item),
-        );
+        let transactions_root = match transactions_root {
+            Some(root) => root,
+            None => alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions),
+        };
 
         let header = Header {
             parent_hash: self.parent_hash,
@@ -380,6 +380,18 @@ impl ExecutionPayloadV1 {
             header,
             body: BlockBody { transactions: self.transactions, ommers: vec![], withdrawals: None },
         })
+    }
+
+    /// Converts [`ExecutionPayloadV1`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        // Calculate the transactions root using encoded bytes
+        let transactions_root =
+            alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions);
+
+        self.try_into_block_with_tx_root(Some(transactions_root))
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].
