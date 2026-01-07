@@ -152,7 +152,7 @@ either = { version = "1.15", default-features = false }
 http = "1.1.0"
 itertools = { version = ">=0.13, <=0.14", default-features = false }
 jsonwebtoken = "9.3.0"
-lru = "0.13"
+lru = "0.16"
 once_cell = { version = "1.21", default-features = false }
 parking_lot = "0.12.3"
 pin-project = "1.1"
