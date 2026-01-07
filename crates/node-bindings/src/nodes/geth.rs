@@ -1,7 +1,7 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    utils::{extract_endpoint, extract_value, unused_port},
+    utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown},
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
@@ -175,7 +175,7 @@ impl GethInstance {
 
 impl Drop for GethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill geth");
+        GracefulShutdown::shutdown(&mut self.pid, 10, "geth");
     }
 }
 
