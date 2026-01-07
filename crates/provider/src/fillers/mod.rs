@@ -37,7 +37,10 @@ mod nonce;
 pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
 
 mod gas;
-pub use gas::{BlobGasEstimator, BlobGasFiller, GasFillable, GasFiller};
+pub use gas::{
+    BlobGasEstimator, BlobGasEstimatorFn, BlobGasEstimatorFunction, BlobGasFiller, GasFillable,
+    GasFiller,
+};
 
 mod join_fill;
 pub use join_fill::JoinFill;
