@@ -103,6 +103,31 @@ pub enum SubscriptionKind {
     Syncing,
 }
 
+impl core::fmt::Display for SubscriptionKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NewHeads => write!(f, "newHeads"),
+            Self::Logs => write!(f, "logs"),
+            Self::NewPendingTransactions => write!(f, "newPendingTransactions"),
+            Self::Syncing => write!(f, "syncing"),
+        }
+    }
+}
+
+impl core::str::FromStr for SubscriptionKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "newHeads" => Ok(Self::NewHeads),
+            "logs" => Ok(Self::Logs),
+            "newPendingTransactions" => Ok(Self::NewPendingTransactions),
+            "syncing" => Ok(Self::Syncing),
+            _ => Err("invalid subscription kind"),
+        }
+    }
+}
+
 /// Any additional parameters for a subscription.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Params {
@@ -241,6 +266,29 @@ mod tests {
 
         let param: Params = false.into();
         assert_eq!(param, Params::Bool(false));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn subscription_kind_str_roundtrip() {
+        use core::str::FromStr;
+
+        for kind in [
+            SubscriptionKind::NewHeads,
+            SubscriptionKind::Logs,
+            SubscriptionKind::NewPendingTransactions,
+            SubscriptionKind::Syncing,
+        ] {
+            let s = kind.to_string();
+            let parsed: SubscriptionKind = s.parse().unwrap();
+            assert_eq!(kind, parsed);
+
+            // Verify FromStr matches serde
+            let serde_str = serde_json::to_string(&kind).unwrap();
+            let serde_str = serde_str.trim_matches('"');
+            assert_eq!(s, serde_str);
+            assert_eq!(SubscriptionKind::from_str(serde_str).unwrap(), kind);
+        }
     }
 
     #[test]
