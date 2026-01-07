@@ -37,7 +37,7 @@ impl GracefulShutdown {
             }
         }
 
-        child.kill().expect(&format!("could not kill {}", process_name));
+        child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
     }
 }
 
