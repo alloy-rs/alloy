@@ -192,13 +192,13 @@ impl<N: Network> TxFiller<N> for GasFiller {
 }
 
 /// An estimator function for blob gas fees.
-pub type BlobGasEstimatorFunction = fn(u128, f64) -> u128;
+pub type BlobGasEstimatorFunction = fn(u128, &[f64]) -> u128;
 
 /// A trait responsible for estimating blob gas values
 pub trait BlobGasEstimatorFn: Send + Sync + Unpin {
     /// Estimates the blob gas fee given the base fee per blob gas
     /// and the blob gas usage ratio.
-    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: f64) -> u128;
+    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128;
 }
 
 /// Blob Gas estimator variants
@@ -208,38 +208,51 @@ pub enum BlobGasEstimator {
     #[default]
     Default,
     /// Uses a custom estimator
-    Scaled(Arc<dyn BlobGasEstimatorFn>),
+    Custom(Arc<dyn BlobGasEstimatorFn>),
 }
 
 impl BlobGasEstimator {
     /// Creates a new estimator from a closure
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(u128, f64) -> u128 + Send + Sync + Unpin + 'static,
+        F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin + 'static,
     {
         Self::new_estimator(f)
     }
 
     /// Creates a new estimate fn
     pub fn new_estimator<F: BlobGasEstimatorFn + 'static>(f: F) -> Self {
-        Self::Scaled(Arc::new(f))
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Create a custom estimator
+    pub fn custom<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin + 'static,
+    {
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Create a scaled estimator
+    pub fn scaled(scale: u128) -> Self {
+        Self::custom(move |base_fee, _| base_fee.saturating_mul(scale))
     }
 
     /// Estimates the blob gas fee given the base fee per blob gas
     /// and the blob gas usage ratio.
-    pub fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: f64) -> u128 {
+    pub fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128 {
         match self {
             Self::Default => base_fee_per_blob_gas,
-            Self::Scaled(val) => val.estimate(base_fee_per_blob_gas, blob_gas_used_ratio),
+            Self::Custom(val) => val.estimate(base_fee_per_blob_gas, blob_gas_used_ratio),
         }
     }
 }
 
 impl<F> BlobGasEstimatorFn for F
 where
-    F: Fn(u128, f64) -> u128 + Send + Sync + Unpin,
+    F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin,
 {
-    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: f64) -> u128 {
+    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128 {
         (self)(base_fee_per_blob_gas, blob_gas_used_ratio)
     }
 }
@@ -251,7 +264,7 @@ impl fmt::Debug for BlobGasEstimator {
                 "estimator",
                 &match self {
                     Self::Default => "default",
-                    Self::Scaled(_) => "scaled",
+                    Self::Custom(_) => "custom",
                 },
             )
             .finish()
@@ -308,9 +321,10 @@ where
             .ok_or(RpcError::NullResp)
             .copied()?;
 
-        let blob_gas_used_ratio = 1.0;
+        let blob_gas_used_ratio =
+            provider.get_fee_history(2, BlockNumberOrTag::Latest, &[]).await?.blob_gas_used_ratio;
 
-        Ok(self.estimator.estimate(base_fee_per_blob_gas, blob_gas_used_ratio))
+        Ok(self.estimator.estimate(base_fee_per_blob_gas, &blob_gas_used_ratio))
     }
 
     async fn fill(
