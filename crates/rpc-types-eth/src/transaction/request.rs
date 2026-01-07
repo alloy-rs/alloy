@@ -582,9 +582,7 @@ impl TransactionRequest {
     pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let Some(sidecar) =
-            self.sidecar.take().and_then(BlobTransactionSidecarVariant::into_eip4844)
-        else {
+        let Some(sidecar) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
         };
 
@@ -1239,7 +1237,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
     fn from(tx: TxEip4844WithSidecar) -> Self {
         let TxEip4844WithSidecar { tx, sidecar } = tx;
         let mut tx: Self = tx.into();
-        tx.sidecar = Some(sidecar.into());
+        tx.sidecar = Some(sidecar);
         tx
     }
 }
@@ -2110,6 +2108,32 @@ mod tests {
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
                 eip4844_request_incorrect_to.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
+        }
+
+        // EIP-4844 with EIP-7594 sidecar
+        {
+            use alloy_eips::eip4844::Blob;
+
+            // Positive case
+            let sidecar = BlobTransactionSidecarEip7594::new(
+                vec![Blob::repeat_byte(0xFA)],
+                Vec::new(),
+                Vec::new(),
+            );
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.into()),
+                ..Default::default()
+            };
+
+            // this panics because EIP-7594 sidecar is ignored
+            eip4844_request.build_consensus_tx().unwrap();
         }
 
         // EIP-7702

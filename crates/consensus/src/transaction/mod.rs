@@ -220,7 +220,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 
-    /// Returns the number of blobs of [`SignedAuthorization`] in this transactions
+    /// Returns the number of [`SignedAuthorization`]s in this transactions
     ///
     /// This is convenience function for `len(authorization_list)`.
     ///
@@ -269,7 +269,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// RLP-encodes the transaction for signing.
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
 
-    /// Outputs the length of the signature RLP encoding for the transaction.
+    /// Returns the length of the RLP-encoded transaction for signing.
     fn payload_len_for_signature(&self) -> usize;
 
     /// RLP-encodes the transaction for signing it. Used to calculate `signature_hash`.

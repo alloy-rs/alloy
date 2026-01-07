@@ -550,6 +550,81 @@ impl BlobTransactionSidecarEip7594 {
             + self.cell_proofs.capacity() * BYTES_PER_PROOF
     }
 
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the hex encoded blob str.
+    ///
+    /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_hex<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        blobs
+            .into_iter()
+            .map(crate::eip4844::utils::hex_to_blob)
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(Self::try_from_blobs)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given blob
+    /// bytes.
+    ///
+    /// See also [`Blob::from_bytes`](c_kzg::Blob::from_bytes)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_bytes<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        blobs
+            .into_iter()
+            .map(crate::eip4844::utils::bytes_to_blob)
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(Self::try_from_blobs)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given
+    /// blobs and KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len());
+        for blob in &blobs {
+            // SAFETY: same size
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
+
+            // SAFETY: same size
+            unsafe {
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                for kzg_proof in kzg_proofs.iter() {
+                    proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(Self::new(blobs, commitments, proofs))
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given
+    /// blobs.
+    ///
+    /// This uses the global/default KZG settings, see also
+    /// [`EnvKzgSettings::Default`](crate::eip4844::env_settings::EnvKzgSettings).
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_from_blobs_with_settings(blobs, EnvKzgSettings::Default.get())
+    }
+
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
     ///

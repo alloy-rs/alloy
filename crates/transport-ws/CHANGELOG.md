@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove ring spec and bump gcloud version ([#2768](https://github.com/alloy-rs/alloy/issues/2768))
 
+### Miscellaneous Tasks
+
+- Release 1.2.1
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Miscellaneous Tasks

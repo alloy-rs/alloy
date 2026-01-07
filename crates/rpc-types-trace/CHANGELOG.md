@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct BlockOpcodeGas comment to block-level usage ([#3349](https://github.com/alloy-rs/alloy/issues/3349))
 - Fix swapped filter doc comments ([#3308](https://github.com/alloy-rs/alloy/issues/3308))
 
+### Miscellaneous Tasks
+
+- Release 1.2.1
+
 ### Other
 
 - Reapply "chore: adds erc7562 tracer variant" ([#3038](https://github.com/alloy-rs/alloy/issues/3038))
