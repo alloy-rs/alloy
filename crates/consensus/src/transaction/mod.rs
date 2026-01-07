@@ -269,7 +269,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// RLP-encodes the transaction for signing.
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
 
-    /// Outputs the length of the signature RLP encoding for the transaction.
+    /// Returns the length of the RLP-encoded transaction for signing.
     fn payload_len_for_signature(&self) -> usize;
 
     /// RLP-encodes the transaction for signing it. Used to calculate `signature_hash`.

@@ -5,11 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Documentation
+
+- Add host setter to Reth builder ([#3435](https://github.com/alloy-rs/alloy/issues/3435))
+- Add host setter to Geth builder ([#3420](https://github.com/alloy-rs/alloy/issues/3420))
+
+### Features
+
+- Add host setter to the anvil builder ([#3415](https://github.com/alloy-rs/alloy/issues/3415))
+
 ## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
 
 ### Bug Fixes
 
 - [node-bindings] Generalize ReadLineError output description ([#3359](https://github.com/alloy-rs/alloy/issues/3359))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
 
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
