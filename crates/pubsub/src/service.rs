@@ -8,7 +8,7 @@ use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportErrorKind, TransportResult,
+    TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
@@ -258,8 +258,20 @@ impl<T: PubSubConnect> PubSubService<T> {
 
             if let Err(err) = result {
                 error!(%err, "pubsub service reconnection error");
+                self.cleanup_on_shutdown(err);
             }
         };
         fut.spawn_task();
+    }
+
+    /// Notify pending requests when service shuts down after reconnect failures.
+    fn cleanup_on_shutdown(&mut self, _err: TransportError) {
+        debug!(count = self.in_flights.len(), "Cleaning up pending requests");
+        for (_, in_flight) in self.in_flights.drain() {
+            let _ = in_flight.tx.send(Err(TransportErrorKind::backend_gone()));
+        }
+
+        // Subscriptions will be notified via broadcast channel drop
+        debug!(count = self.subs.len(), "Dropping subscriptions");
     }
 }
