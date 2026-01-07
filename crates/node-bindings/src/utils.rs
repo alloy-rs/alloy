@@ -18,14 +18,16 @@ pub(crate) struct GracefulShutdown;
 
 impl GracefulShutdown {
     /// Attempts graceful shutdown with SIGTERM, then SIGKILL after timeout.
-    pub(crate) fn shutdown(child: &mut Child, timeout_secs: u64) {
+    pub(crate) fn shutdown(child: &mut Child, timeout_secs: u64, process_name: &str) {
         #[cfg(unix)]
         {
-            unsafe { libc::kill(child.id() as i32, libc::SIGTERM); }
-            
+            unsafe {
+                libc::kill(child.id() as i32, libc::SIGTERM);
+            }
+
             let timeout = Duration::from_secs(timeout_secs);
             let start = Instant::now();
-            
+
             while start.elapsed() < timeout {
                 match child.try_wait() {
                     Ok(Some(_)) => return,
@@ -34,8 +36,8 @@ impl GracefulShutdown {
                 }
             }
         }
-        
-        let _ = child.kill();
+
+        child.kill().expect(&format!("could not kill {}", process_name));
     }
 }
 

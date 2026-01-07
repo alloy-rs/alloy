@@ -175,7 +175,7 @@ impl GethInstance {
 
 impl Drop for GethInstance {
     fn drop(&mut self) {
-        GracefulShutdown::shutdown(&mut self.pid, 10);
+        GracefulShutdown::shutdown(&mut self.pid, 10, "geth");
     }
 }
 
