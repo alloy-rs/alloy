@@ -1,7 +1,7 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Header, Log, Transaction};
-use alloc::{boxed::Box, format};
+use alloc::boxed::Box;
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 
@@ -127,6 +127,20 @@ impl Params {
     pub const fn is_logs(&self) -> bool {
         matches!(self, Self::Logs(_))
     }
+
+    /// Creates a new [`Params`] from a [`serde_json::Value`].
+    #[cfg(feature = "serde")]
+    pub fn from_json_value(v: serde_json::Value) -> Result<Self, serde_json::Error> {
+        if v.is_null() {
+            return Ok(Self::None);
+        }
+
+        if let Some(val) = v.as_bool() {
+            return Ok(val.into());
+        }
+
+        serde_json::from_value::<Filter>(v).map(Into::into)
+    }
 }
 
 impl From<Filter> for Params {
@@ -161,21 +175,8 @@ impl<'a> serde::Deserialize<'a> for Params {
     where
         D: serde::Deserializer<'a>,
     {
-        use serde::de::Error;
-
         let v = serde_json::Value::deserialize(deserializer)?;
-
-        if v.is_null() {
-            return Ok(Self::None);
-        }
-
-        if let Some(val) = v.as_bool() {
-            return Ok(val.into());
-        }
-
-        serde_json::from_value::<Filter>(v)
-            .map(Into::into)
-            .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
+        Self::from_json_value(v).map_err(serde::de::Error::custom)
     }
 }
 
