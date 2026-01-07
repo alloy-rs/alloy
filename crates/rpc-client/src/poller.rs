@@ -25,8 +25,8 @@ use tokio::time::{sleep, Sleep};
 /// A poller task builder.
 ///
 /// This builder is used to create a poller task that repeatedly polls a method on a client and
-/// sends the responses to a channel. By default, this is done every 10 seconds, with a channel size
-/// of 16, and no limit on the number of successful polls. This is all configurable.
+/// sends the responses to a channel. By default, it uses the client's configured poll interval, a
+/// channel size of 16, and no limit on the number of successful polls. This is all configurable.
 ///
 /// The builder is consumed using the [`spawn`](Self::spawn) method, which returns a channel to
 /// receive the responses. The task will continue to poll until either the client or the channel is
@@ -258,7 +258,8 @@ impl<Resp> PollerStream<Resp> {
         // Serialize params once
         let params = serde_json::value::to_raw_value(&builder.params).unwrap_or_else(|err| {
             error!(%err, "failed to serialize params during initialization");
-            // Return empty params, stream will terminate on first poll
+            // Fall back to empty params; subsequent polls may fail at the server according to
+            // the configured poll interval.
             Box::<RawValue>::default()
         });
 
