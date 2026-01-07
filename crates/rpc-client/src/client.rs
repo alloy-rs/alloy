@@ -262,7 +262,10 @@ impl RpcClientInner {
     /// Set the poll interval for the client in milliseconds. Default:
     /// 7s for remote and 250ms for local transports.
     pub fn set_poll_interval(&self, poll_interval: Duration) {
-        self.poll_interval.store(poll_interval.as_millis() as u64, Ordering::Relaxed);
+        // `Duration::as_millis` truncates sub-millisecond values to 0, which is an invalid poll
+        // interval for some consumers (e.g. `tokio::time::interval`).
+        let millis = poll_interval.as_millis().clamp(1, u64::MAX as u128) as u64;
+        self.poll_interval.store(millis, Ordering::Relaxed);
     }
 
     /// Returns a reference to the underlying transport.
