@@ -29,7 +29,7 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarV
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionVariant")]
-pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
+pub enum TxEip4844Variant<T = BlobTransactionSidecarVariant> {
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
     /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
@@ -106,6 +106,16 @@ impl<T> From<TxEip4844> for TxEip4844Variant<T> {
 impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant<BlobTransactionSidecar> {
     fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
         TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar).into()
+    }
+}
+
+impl From<TxEip4844WithSidecar<BlobTransactionSidecar>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(tx: TxEip4844WithSidecar<BlobTransactionSidecar>) -> Self {
+        let (tx, sidecar) = tx.into_parts();
+        let sidecar_variant = BlobTransactionSidecarVariant::Eip4844(sidecar);
+        TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar_variant).into()
     }
 }
 
@@ -1039,7 +1049,7 @@ impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
-pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
+pub struct TxEip4844WithSidecar<T = BlobTransactionSidecarVariant> {
     /// The actual transaction.
     #[cfg_attr(feature = "serde", serde(flatten))]
     #[doc(alias = "transaction")]
