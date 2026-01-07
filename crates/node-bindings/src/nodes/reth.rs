@@ -1,6 +1,9 @@
 //! Utilities for launching a Reth dev-mode instance.
 
-use crate::{utils::extract_endpoint, NodeError, NODE_STARTUP_TIMEOUT};
+use crate::{
+    utils::{extract_endpoint, GracefulShutdown},
+    NodeError, NODE_STARTUP_TIMEOUT,
+};
 use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
@@ -128,7 +131,7 @@ impl RethInstance {
 
 impl Drop for RethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill reth");
+        GracefulShutdown::shutdown(&mut self.pid, 10, "reth");
     }
 }
 
