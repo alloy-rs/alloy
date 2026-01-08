@@ -100,15 +100,28 @@ pub(crate) fn extract_endpoint(key: &str, line: &str) -> Option<SocketAddr> {
         .and_then(|val| val.parse().ok())
 }
 
-/// Runs the given closure with a temporary directory.
-pub fn run_with_tempdir_sync(prefix: &str, f: impl FnOnce(PathBuf)) {
+fn make_tempdir(prefix: &str) -> (TempDir, PathBuf) {
     let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
-    f(temp_dir_path);
+    (temp_dir, temp_dir_path)
+}
+
+fn close_tempdir(temp_dir: TempDir) {
     #[cfg(not(windows))]
     {
         let _ = temp_dir.close();
     }
+    #[cfg(windows)]
+    {
+        drop(temp_dir);
+    }
+}
+
+/// Runs the given closure with a temporary directory.
+pub fn run_with_tempdir_sync(prefix: &str, f: impl FnOnce(PathBuf)) {
+    let (temp_dir, temp_dir_path) = make_tempdir(prefix);
+    f(temp_dir_path);
+    close_tempdir(temp_dir);
 }
 
 /// Runs the given async closure with a temporary directory.
@@ -117,13 +130,9 @@ where
     F: FnOnce(PathBuf) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let temp_dir = TempDir::with_prefix(prefix).unwrap();
-    let temp_dir_path = temp_dir.path().to_path_buf();
+    let (temp_dir, temp_dir_path) = make_tempdir(prefix);
     f(temp_dir_path).await;
-    #[cfg(not(windows))]
-    {
-        let _ = temp_dir.close();
-    }
+    close_tempdir(temp_dir);
 }
 
 #[cfg(test)]
