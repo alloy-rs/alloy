@@ -3,7 +3,7 @@
 
 use super::EthereumTxEnvelope;
 use crate::{error::ValueError, Signed, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
-use alloy_eips::eip7594::Encodable7594;
+use alloy_eips::eip7594::{BlobTransactionSidecarVariant, Encodable7594};
 
 /// All possible transactions that can be included in a response to `GetPooledTransactions`.
 /// A response to `GetPooledTransactions`. This can include either a blob transaction, or a
@@ -12,7 +12,11 @@ use alloy_eips::eip7594::Encodable7594;
 /// The difference between this and the [`EthereumTxEnvelope<TxEip4844Variant<T>>`] is that this
 /// type always requires the [`TxEip4844WithSidecar`] variant, because EIP-4844 transaction can only
 /// be propagated with the sidecar over p2p.
-pub type PooledTransaction = EthereumTxEnvelope<TxEip4844WithSidecar>;
+///
+/// After the Osaka upgrade (EIP-7594), this type supports both legacy EIP-4844 and new EIP-7594
+/// blob sidecar formats via the [`BlobTransactionSidecarVariant`] enum.
+pub type PooledTransaction =
+    EthereumTxEnvelope<TxEip4844WithSidecar<BlobTransactionSidecarVariant>>;
 
 impl<T: Encodable7594> EthereumTxEnvelope<TxEip4844WithSidecar<T>> {
     /// Converts the transaction into [`EthereumTxEnvelope<TxEip4844Variant<T>>`].
