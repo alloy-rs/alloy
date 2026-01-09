@@ -12,13 +12,7 @@ extern crate alloc;
 #[cfg(feature = "arbitrary")]
 use rand as _;
 
-use once_cell as _;
-
 pub use alloy_trie::TrieAccount;
-
-/// Represents an TrieAccount in the account trie
-#[deprecated(since = "0.7.3", note = "use TrieAccount instead")]
-pub type Account = TrieAccount;
 
 mod block;
 pub use block::{Block, BlockBody, BlockHeader, EthBlock, Header, HeaderInfo, HeaderRoots};
