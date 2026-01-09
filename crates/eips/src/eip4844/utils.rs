@@ -3,9 +3,10 @@
 //!
 //! [`SidecarCoder`]: crate::eip4844::builder::SidecarCoder
 
+use crate::eip4844::{FIELD_ELEMENT_BYTES_USIZE, USABLE_BITS_PER_FIELD_ELEMENT};
+
 #[cfg(feature = "kzg")]
 use crate::eip4844::Blob;
-use crate::eip4844::{FIELD_ELEMENT_BYTES_USIZE, USABLE_BITS_PER_FIELD_ELEMENT};
 
 /// Determine whether a slice of bytes can be contained in a field element.
 pub const fn fits_in_fe(data: &[u8]) -> bool {
