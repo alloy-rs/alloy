@@ -317,6 +317,16 @@ where
         Self { inner, filler, _pd: PhantomData }
     }
 
+    /// Returns a reference to the filler.
+    pub const fn filler(&self) -> &F {
+        &self.filler
+    }
+
+    /// Returns a mutable reference to the filler.
+    pub const fn filler_mut(&mut self) -> &mut F {
+        &mut self.filler
+    }
+
     /// Joins a filler to this provider
     pub fn join_with<Other: TxFiller<N>>(
         self,
