@@ -78,7 +78,7 @@ trait CloneTransport: Transport + std::any::Any {
 
 impl<T> CloneTransport for T
 where
-    T: Transport + Clone + Send + Sync,
+    T: Transport + Clone,
 {
     #[inline]
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync> {
