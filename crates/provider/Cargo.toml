@@ -58,6 +58,7 @@ auto_impl.workspace = true
 dashmap = "6.0"
 futures-utils-wasm.workspace = true
 futures.workspace = true
+jsonrpsee = { workspace = true, features = ["server"] }
 lru.workspace = true
 pin-project.workspace = true
 reqwest = { workspace = true, optional = true }

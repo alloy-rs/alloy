@@ -20,8 +20,8 @@ use alloy_json_rpc::{RpcError, RpcRecv, RpcSend};
 use alloy_network::{Ethereum, Network};
 use alloy_network_primitives::{BlockResponse, ReceiptResponse};
 use alloy_primitives::{
-    hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
-    U256, U64,
+    hex, map::HashMap, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash,
+    B256, U128, U256, U64,
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 #[cfg(feature = "pubsub")]
@@ -33,6 +33,7 @@ use alloy_rpc_types_eth::{
     EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::TransportResult;
+use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
@@ -1467,6 +1468,25 @@ impl<N: Network> Provider<N> for RootProvider<N> {
             .await
             .map_err(|_| PendingTransactionError::FailedToRegister)
     }
+}
+
+/// Reth API namespace for reth-specific methods
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
+pub trait RethProviderExt {
+    /// Returns all ETH balance changes in a block
+    async fn reth_get_balance_changes_in_block(
+        &self,
+        block_id: BlockId,
+    ) -> RpcResult<HashMap<Address, U256>>;
+
+    /// Subscribe to json `ChainNotifications`
+    async fn reth_subscribe_chain_notifications(&self) -> SubscriptionResult;
+
+    /// Subscribe to persisted block notifications.
+    ///
+    /// Emits a notification with the block number and hash when a new block is persisted to disk.
+    async fn reth_subscribe_persisted_block(&self) -> SubscriptionResult;
 }
 
 #[cfg(test)]
