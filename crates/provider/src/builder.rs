@@ -584,27 +584,8 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         self.layer(anvil_layer).connect_client(rpc_client)
     }
 
-    /// Build this provider with anvil, using the BoxTransport. The
-    /// given function is used to configure the anvil instance.
-    #[deprecated(since = "0.12.6", note = "use `connect_anvil_with_config` instead")]
-    pub fn on_anvil_with_config(
-        self,
-        f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> F::Provider
-    where
-        L: ProviderLayer<crate::layers::AnvilProvider<RootProvider<N>, N>, N>,
-        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
-    {
-        let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
-        let url = anvil_layer.endpoint_url();
-
-        let rpc_client = ClientBuilder::default().http(url);
-
-        self.layer(anvil_layer).connect_client(rpc_client)
-    }
-
     /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    /// This calls `connect_anvil_with_wallet_and_config` and panics on error.
     pub fn connect_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
@@ -632,35 +613,6 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
         Ok(self.wallet(wallet).layer(anvil_layer).connect_client(rpc_client))
     }
 
-    /// Build this provider with anvil, using the BoxTransport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
-    #[deprecated(since = "0.12.6", note = "use `connect_anvil_with_wallet_and_config` instead")]
-    pub fn on_anvil_with_wallet_and_config(
-        self,
-        f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> AnvilProviderResult<
-        <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider, N>>::Provider,
-    >
-    where
-        F: TxFiller<N> + ProviderLayer<L::Provider, N>,
-        L: crate::builder::ProviderLayer<
-            crate::layers::AnvilProvider<crate::provider::RootProvider<N>, N>,
-            N,
-        >,
-        alloy_network::EthereumWallet: alloy_network::NetworkWallet<N>,
-    {
-        let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
-        let url = anvil_layer.endpoint_url();
-
-        let wallet = anvil_layer
-            .instance()
-            .wallet()
-            .ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
-
-        let rpc_client = ClientBuilder::default().http(url);
-
-        Ok(self.wallet(wallet).layer(anvil_layer).connect_client(rpc_client))
-    }
 }
 
 #[cfg(test)]
