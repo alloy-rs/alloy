@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
+### Bug Fixes
+
+- Graceful shutdown for reth and geth instances ([#3450](https://github.com/alloy-rs/alloy/issues/3450))
+- Support Eip7594 blob format for tx build ([#3446](https://github.com/alloy-rs/alloy/issues/3446))
+- [contract] Deduplicate clear_decoder method ([#3449](https://github.com/alloy-rs/alloy/issues/3449))
+
+### Dependencies
+
+- Bump lru ([#3460](https://github.com/alloy-rs/alloy/issues/3460))
+
+### Documentation
+
+- [rpc-client] Align poller docs with actual behavior ([#3464](https://github.com/alloy-rs/alloy/issues/3464))
+
+### Features
+
+- [provider] Add filler getters to FillProvider ([#3485](https://github.com/alloy-rs/alloy/issues/3485))
+- [rpc-types-eth] Add Params::from_json_value ([#3466](https://github.com/alloy-rs/alloy/issues/3466))
+- Add secp256k1 feature ([#3455](https://github.com/alloy-rs/alloy/issues/3455))
+- [rpc-types-eth] Implement FromStr for SubscriptionKind ([#3465](https://github.com/alloy-rs/alloy/issues/3465))
+- Added custom estimator to blobgasfilter ([#3447](https://github.com/alloy-rs/alloy/issues/3447))
+- [provider] Add balance caching to CacheProvider ([#3453](https://github.com/alloy-rs/alloy/issues/3453))
+- [provider] Add transaction count caching to CacheProvider ([#3448](https://github.com/alloy-rs/alloy/issues/3448))
+
+### Miscellaneous Tasks
+
+- Remove `#[allow(unused_assignments)]` ([#3475](https://github.com/alloy-rs/alloy/issues/3475))
+- Remove dead random buffer from custom envelope test ([#3456](https://github.com/alloy-rs/alloy/issues/3456))
+- Ignore RUSTSEC-2025-0141 bincode advisory ([#3459](https://github.com/alloy-rs/alloy/issues/3459))
+- Update alloy-trie ([#3454](https://github.com/alloy-rs/alloy/issues/3454))
+- Fix misleading comments ([#3445](https://github.com/alloy-rs/alloy/issues/3445))
+
+### Other
+
+- [eips] Make Blob import conditional ([#3472](https://github.com/alloy-rs/alloy/issues/3472))
+
+### Performance
+
+- [contract] Remove redundant allocation in TransportErrorExt ([#3477](https://github.com/alloy-rs/alloy/issues/3477))
+
+### Refactor
+
+- [rpc-types-mev] Remove duplicate formatting logic in FunctionSelector ([#3469](https://github.com/alloy-rs/alloy/issues/3469))
+
 ## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
 
 ### Bug Fixes
@@ -35,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.3.0
 - Update trezor dep ([#3441](https://github.com/alloy-rs/alloy/issues/3441))
 - Add deprecated type alias back ([#3422](https://github.com/alloy-rs/alloy/issues/3422))
 - Ignore RUSTSEC-2025-0137 ([#3416](https://github.com/alloy-rs/alloy/issues/3416))
