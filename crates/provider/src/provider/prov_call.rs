@@ -45,12 +45,6 @@ where
     Ready(Option<TransportResult<Output>>),
 }
 
-impl<Params, Resp, Output, Map> ProviderCall<Params, Resp, Output, Map>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
-{
     /// Instantiate a new [`ProviderCall`] from the output.
     pub const fn ready(output: TransportResult<Output>) -> Self {
         Self::Ready(Some(output))
@@ -163,8 +157,7 @@ impl<Params, Resp, Output, Map> ProviderCall<&Params, Resp, Output, Map>
 where
     Params: RpcSend + ToOwned,
     Params::Owned: RpcSend,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
+
 {
     /// Convert this call into one with owned params, by cloning the params.
     ///
@@ -179,11 +172,7 @@ where
     }
 }
 
-impl<Params, Resp> std::fmt::Debug for ProviderCall<Params, Resp>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-{
+impl<Params, Resp> std::fmt::Debug for ProviderCall<Params, Resp> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
@@ -196,44 +185,25 @@ where
 
 impl<Params, Resp, Output, Map> From<RpcCall<Params, Resp, Output, Map>>
     for ProviderCall<Params, Resp, Output, Map>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
 {
     fn from(call: RpcCall<Params, Resp, Output, Map>) -> Self {
         Self::RpcCall(call)
     }
 }
 
-impl<Params, Resp> From<Waiter<Resp>> for ProviderCall<Params, Resp, Resp, fn(Resp) -> Resp>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-{
+impl<Params, Resp> From<Waiter<Resp>> for ProviderCall<Params, Resp, Resp, fn(Resp) -> Resp> {
     fn from(waiter: Waiter<Resp>) -> Self {
         Self::Waiter(waiter)
     }
 }
 
-impl<Params, Resp, Output, Map> From<Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>>
-    for ProviderCall<Params, Resp, Output, Map>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-    Map: Fn(Resp) -> Output,
-{
-    fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
+impl<Params, Resp, Output, Map> From<BoxedFut<Output>> for ProviderCall<Params, Resp, Output, Map> {
+    fn from(fut: BoxedFut<Output>) -> Self {
         Self::BoxedFuture(fut)
     }
 }
 
-impl<Params, Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>>
-    for ProviderCall<Params, Resp>
-where
-    Params: RpcSend,
-    Resp: RpcRecv,
-{
+impl<Params, Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>> for ProviderCall<Params, Resp> {
     fn from(rx: oneshot::Receiver<TransportResult<Box<RawValue>>>) -> Self {
         Waiter::from(rx).into()
     }
@@ -241,10 +211,7 @@ where
 
 impl<Params, Resp, Output, Map> Future for ProviderCall<Params, Resp, Output, Map>
 where
-    Params: RpcSend,
-    Resp: RpcRecv,
     Output: 'static,
-    Map: Fn(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
