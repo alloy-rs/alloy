@@ -121,9 +121,7 @@ where
         Self::logs(self)
     }
 
-    fn into_logs(self) -> Vec<Self::Log>
-
-    {
+    fn into_logs(self) -> Vec<Self::Log> {
         self.inner.receipt.logs
     }
 }
