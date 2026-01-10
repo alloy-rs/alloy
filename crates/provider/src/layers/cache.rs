@@ -919,11 +919,8 @@ mod tests {
             let block_number = receipt.block_number.unwrap();
 
             // Get balance from RPC (populates cache)
-            let balance = provider
-                .get_balance(address)
-                .block_id(block_number.into())
-                .await
-                .unwrap();
+            let balance =
+                provider.get_balance(address).block_id(block_number.into()).await.unwrap();
 
             // Drop anvil to ensure second call can't hit RPC
             drop(anvil);
@@ -935,11 +932,8 @@ mod tests {
                 .connect_http("http://localhost:1".parse().unwrap());
 
             // This only succeeds if cache is hit
-            let balance2 = provider2
-                .get_balance(address)
-                .block_id(block_number.into())
-                .await
-                .unwrap();
+            let balance2 =
+                provider2.get_balance(address).block_id(block_number.into()).await.unwrap();
             assert_eq!(balance, balance2);
 
             shared_cache.save_cache(path).unwrap();
@@ -981,11 +975,8 @@ mod tests {
             let block_number = receipt.block_number.unwrap();
 
             // Get account from RPC (populates cache)
-            let account = provider
-                .get_account(address)
-                .block_id(block_number.into())
-                .await
-                .unwrap();
+            let account =
+                provider.get_account(address).block_id(block_number.into()).await.unwrap();
 
             // Drop anvil to ensure second call can't hit RPC
             drop(anvil);
@@ -997,11 +988,8 @@ mod tests {
                 .connect_http("http://localhost:1".parse().unwrap());
 
             // This only succeeds if cache is hit
-            let account2 = provider2
-                .get_account(address)
-                .block_id(block_number.into())
-                .await
-                .unwrap();
+            let account2 =
+                provider2.get_account(address).block_id(block_number.into()).await.unwrap();
             assert_eq!(account, account2);
 
             shared_cache.save_cache(path).unwrap();
