@@ -1,5 +1,5 @@
 use alloy_consensus::{error::ValueError, BlockHeader, Header};
-use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256};
+use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
@@ -96,6 +96,10 @@ pub struct AnyHeader {
     /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+    /// EIP-7928 block access list hash.
+    #[cfg(feature = "amsterdam")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_access_list_hash: Option<B256>,
 }
 
 impl AnyHeader {
@@ -103,8 +107,8 @@ impl AnyHeader {
     ///
     /// WARNING: This method does not perform validation whether the hash is correct.
     #[inline]
-    pub const fn seal(self, hash: B256) -> Sealed<Self> {
-        Sealed::new_unchecked(self, hash)
+    pub const fn seal(self, hash: B256) -> alloy_consensus::Sealed<Self> {
+        alloy_consensus::Sealed::new_unchecked(self, hash)
     }
 
     /// Attempts to convert this header into a `Header`.
@@ -144,6 +148,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            #[cfg(feature = "amsterdam")]
+            block_access_list_hash,
         } = self;
 
         Ok(Header {
@@ -168,6 +174,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            #[cfg(feature = "amsterdam")]
+            block_access_list_hash,
         })
     }
 
@@ -197,6 +205,8 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            #[cfg(feature = "amsterdam")]
+            block_access_list_hash,
         } = self;
 
         Header {
@@ -221,9 +231,12 @@ impl AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            #[cfg(feature = "amsterdam")]
+            block_access_list_hash,
         }
     }
 }
+
 
 impl BlockHeader for AnyHeader {
     fn parent_hash(&self) -> B256 {
@@ -309,6 +322,11 @@ impl BlockHeader for AnyHeader {
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
+
+    #[cfg(feature = "amsterdam")]
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.block_access_list_hash
+    }
 }
 
 impl From<Header> for AnyHeader {
@@ -335,6 +353,8 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            #[cfg(feature = "amsterdam")]
+            block_access_list_hash,
         } = value;
 
         Self {
@@ -359,6 +379,8 @@ impl From<Header> for AnyHeader {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_hash,
+            #[cfg(feature = "amsterdam")]
+            block_access_list_hash,
         }
     }
 }

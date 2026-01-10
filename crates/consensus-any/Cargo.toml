@@ -14,9 +14,9 @@ exclude.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
-  "-Zunstable-options",
-  "--generate-link-to-definition",
-  "--show-type-layout",
+	"-Zunstable-options",
+	"--generate-link-to-definition",
+	"--show-type-layout",
 ]
 
 [lints]
@@ -48,7 +48,7 @@ std = [
 	"alloy-serde?/std",
 	"alloy-primitives/std",
 	"alloy-rlp/std",
-	"serde?/std"
+	"serde?/std",
 ]
 arbitrary = [
 	"std",
@@ -56,12 +56,13 @@ arbitrary = [
 	"alloy-eips/arbitrary",
 	"alloy-consensus/arbitrary",
 	"alloy-primitives/arbitrary",
-	"alloy-serde?/arbitrary"
+	"alloy-serde?/arbitrary",
 ]
 serde = [
 	"dep:serde",
 	"alloy-primitives/serde",
 	"dep:alloy-serde",
 	"alloy-eips/serde",
-	"alloy-consensus/serde"
+	"alloy-consensus/serde",
 ]
+amsterdam = ["alloy-consensus/amsterdam"]
