@@ -4,7 +4,7 @@ use crate::{
         GasFiller, JoinFill, NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager,
         TxFiller, WalletFiller,
     },
-    layers::{CallBatchLayer, ChainLayer},
+    layers::{CacheLayer, CallBatchLayer, ChainLayer},
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -333,6 +333,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// See [`CallBatchLayer`] for more information.
     pub fn with_arbitrum_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
         self.layer(CallBatchLayer::new().arbitrum_compat())
+    }
+
+    /// Add response caching to the stack being built with the specified maximum cache size.
+    ///
+    /// See [`CacheLayer`] for more information.
+    pub fn with_caching(self, max_items: u32) -> ProviderBuilder<Stack<CacheLayer, L>, F, N> {
+        self.layer(CacheLayer::new(max_items))
+    }
+
+    /// Add response caching to the stack being built with a default cache size of 100 items.
+    ///
+    /// See [`CacheLayer`] for more information.
+    pub fn with_default_caching(self) -> ProviderBuilder<Stack<CacheLayer, L>, F, N> {
+        self.with_caching(100)
     }
 
     // --- Build to Provider ---
