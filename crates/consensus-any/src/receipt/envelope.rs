@@ -121,10 +121,7 @@ where
         Self::logs(self)
     }
 
-    fn into_logs(self) -> Vec<Self::Log>
-    where
-        Self::Log: Clone,
-    {
+    fn into_logs(self) -> Vec<Self::Log> {
         self.inner.receipt.logs
     }
 }
