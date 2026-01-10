@@ -1,7 +1,8 @@
 use crate::{
     fillers::{
-        CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
-        NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
+        BlobGasEstimator, BlobGasFiller, CachedNonceManager, ChainIdFiller, FillerControlFlow,
+        GasFiller, JoinFill, NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager,
+        TxFiller, WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
@@ -233,6 +234,23 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 
     // --- Fillers ---
+
+    /// Add blob gas estimation to the stack being built.
+    ///
+    /// See [`BlobGasFiller`] for more information.
+    pub fn with_blob_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, BlobGasFiller>, N> {
+        self.filler(BlobGasFiller::default())
+    }
+
+    /// Add blob gas estimation to the stack being built, using the provided estimator.
+    ///
+    /// See [`BlobGasFiller`] and [`BlobGasEstimator`] for more information.
+    pub fn with_blob_gas_estimator(
+        self,
+        estimator: BlobGasEstimator,
+    ) -> ProviderBuilder<L, JoinFill<F, BlobGasFiller>, N> {
+        self.filler(BlobGasFiller { estimator })
+    }
 
     /// Add gas estimation to the stack being built.
     ///
