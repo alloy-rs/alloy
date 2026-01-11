@@ -216,14 +216,13 @@ where
     }
 }
 
-impl<Params, Resp, Output, Map> From<Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>>
-    for ProviderCall<Params, Resp, Output, Map>
+impl<Params, Resp, Output, Map> From<BoxedFut<Output>> for ProviderCall<Params, Resp, Output, Map>
 where
     Params: RpcSend,
     Resp: RpcRecv,
     Map: Fn(Resp) -> Output,
 {
-    fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
+    fn from(fut: BoxedFut<Output>) -> Self {
         Self::BoxedFuture(fut)
     }
 }
