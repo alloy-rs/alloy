@@ -109,7 +109,7 @@ impl Error {
     /// }
     /// ```
     pub fn as_decoded_interface_error<E: SolInterface>(&self) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
+        self.decode_revert_with(|data| E::abi_decode(data).ok())
     }
 
     /// Try to decode a contract error into a specific Solidity error interface.
@@ -138,6 +138,11 @@ impl Error {
     /// See also [`Self::as_decoded_interface_error`] for more details.
     pub fn try_decode_into_interface_error<I: SolInterface>(self) -> Result<I, Self> {
         self.as_decoded_interface_error::<I>().ok_or(self)
+    }
+
+    #[inline]
+    fn decode_revert_with<T>(&self, decode: impl FnOnce(&[u8]) -> Option<T>) -> Option<T> {
+        self.as_revert_data().and_then(|data| decode(data.as_ref()))
     }
 
     /// Decode the revert data into a custom [`SolError`] type.
@@ -177,7 +182,7 @@ impl Error {
     /// }
     /// ```
     pub fn as_decoded_error<E: SolError>(&self) -> Option<E> {
-        self.as_revert_data().and_then(|data| E::abi_decode(&data).ok())
+        self.decode_revert_with(|data| E::abi_decode(data).ok())
     }
 }
 
