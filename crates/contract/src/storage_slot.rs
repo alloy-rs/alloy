@@ -135,6 +135,8 @@ where
         // first collect all the slots that are used by the function call
         let access_list_result = provider.create_access_list(&tx).await?;
         let access_list = access_list_result.access_list;
+        let mut last_rpc_err: Option<TransportError> = None;
+        let mut had_successful_call = false;
         // iterate over all the accessed slots and try to find the one that contains the
         // target value by overriding the slot and checking the function call result
         for item in access_list.0 {
@@ -149,9 +151,15 @@ where
                 let state_override =
                     StateOverridesBuilder::default().append(contract, account_override).build();
 
-                let Ok(result) = provider.call(tx.clone()).overrides(state_override).await else {
-                    // overriding this slot failed
-                    continue;
+                let result = match provider.call(tx.clone()).overrides(state_override).await {
+                    Ok(res) => {
+                        had_successful_call = true;
+                        res
+                    }
+                    Err(e) => {
+                        last_rpc_err = Some(e);
+                        continue; // overriding this slot failed
+                    }
                 };
 
                 let Ok(result_value) = U256::abi_decode(&result) else {
@@ -162,6 +170,11 @@ where
                 if result_value == expected_value {
                     return Ok(Some(*slot));
                 }
+            }
+        }
+        if !had_successful_call {
+            if let Some(err) = last_rpc_err {
+                return Err(err);
             }
         }
         Ok(None)
