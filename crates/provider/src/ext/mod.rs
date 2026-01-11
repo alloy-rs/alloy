@@ -64,6 +64,10 @@ pub use mev::{
     MevBuilder, FLASHBOTS_SIGNATURE_HEADER,
 };
 
+/// Reth related apis.
+#[cfg(feature = "reth-api")]
+pub mod reth;
+
 #[cfg(test)]
 pub(crate) mod test {
     #[allow(dead_code)] // dead only when all features off

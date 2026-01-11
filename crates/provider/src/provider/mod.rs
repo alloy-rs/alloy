@@ -16,7 +16,7 @@ mod sendable;
 pub use sendable::{SendableTx, SendableTxErr};
 
 mod r#trait;
-pub use r#trait::{FilterPollerBuilder, Provider, RethProviderExt};
+pub use r#trait::{FilterPollerBuilder, Provider};
 
 mod wallet;
 pub use wallet::WalletProvider;

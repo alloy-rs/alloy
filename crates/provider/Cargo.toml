@@ -58,7 +58,6 @@ auto_impl.workspace = true
 dashmap = "6.0"
 futures-utils-wasm.workspace = true
 futures.workspace = true
-jsonrpsee = { workspace = true, features = ["server"] }
 lru.workspace = true
 pin-project.workspace = true
 reqwest = { workspace = true, optional = true }
@@ -132,3 +131,4 @@ rpc-api = ["dep:alloy-rpc-types"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]
 throttle = ["alloy-transport/throttle"]
 mev-api = ["dep:alloy-rpc-types-mev", "dep:http"]
+reth-api = []
