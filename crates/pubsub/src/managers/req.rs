@@ -35,4 +35,9 @@ impl RequestManager {
         }
         None
     }
+
+    /// Drain all in-flight requests for cleanup on shutdown.
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (Id, InFlight)> {
+        std::mem::take(&mut self.reqs).into_iter()
+    }
 }
