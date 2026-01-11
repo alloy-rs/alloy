@@ -1,10 +1,7 @@
 //! Payload types.
 
 use crate::{ExecutionPayloadSidecar, PayloadError};
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{string::{String, ToString}, vec::Vec};
 use alloy_consensus::{
     constants::MAXIMUM_EXTRA_DATA_SIZE, Blob, Block, BlockBody, BlockHeader, Bytes48, Header,
     HeaderInfo, Transaction, EMPTY_OMMER_ROOT_HASH,
@@ -21,7 +18,17 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{Address, Bloom, Bytes, Sealable, B256, B64, U256};
-use core::iter::{FromIterator, IntoIterator};
+use core::{fmt, iter::{FromIterator, IntoIterator}};
+
+#[cfg(feature = "serde")]
+struct DisplayExpected<T>(T);
+
+#[cfg(feature = "serde")]
+impl<T: fmt::Display> serde::de::Expected for DisplayExpected<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -888,7 +895,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV1 {
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
-                &format!("{}", raw.commitments.len()).as_str(),
+                &DisplayExpected(raw.commitments.len()),
             ))
         }
     }
@@ -1018,7 +1025,7 @@ impl<'de> serde::Deserialize<'de> for BlobsBundleV2 {
         } else {
             Err(serde::de::Error::invalid_length(
                 raw.proofs.len(),
-                &format!("{}", raw.commitments.len() * CELLS_PER_EXT_BLOB).as_str(),
+                &DisplayExpected(raw.commitments.len() * CELLS_PER_EXT_BLOB),
             ))
         }
     }
