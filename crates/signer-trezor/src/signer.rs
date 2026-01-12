@@ -253,19 +253,23 @@ impl TrezorSigner {
     }
 }
 
+fn trim_leading_zero_bytes(bytes: &[u8], leading_zero_bits: u32) -> Vec<u8> {
+    bytes[(leading_zero_bits as usize) / 8..].to_vec()
+}
+
 fn u64_to_trezor(x: u64) -> Vec<u8> {
     let bytes = x.to_be_bytes();
-    bytes[x.leading_zeros() as usize / 8..].to_vec()
+    trim_leading_zero_bytes(&bytes, x.leading_zeros())
 }
 
 fn u128_to_trezor(x: u128) -> Vec<u8> {
     let bytes = x.to_be_bytes();
-    bytes[x.leading_zeros() as usize / 8..].to_vec()
+    trim_leading_zero_bytes(&bytes, x.leading_zeros())
 }
 
 fn u256_to_trezor(x: U256) -> Vec<u8> {
     let bytes = x.to_be_bytes::<32>();
-    bytes[x.leading_zeros() / 8..].to_vec()
+    trim_leading_zero_bytes(&bytes, x.leading_zeros())
 }
 
 fn address_to_trezor(x: &Address) -> String {
