@@ -65,7 +65,6 @@ pub use mev::{
 };
 
 /// Reth related apis.
-#[cfg(feature = "reth-api")]
 pub mod reth;
 
 #[cfg(test)]
