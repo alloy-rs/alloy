@@ -145,20 +145,18 @@ where
         }
 
         // Default: parallel execution for methods with deterministic results
-        // Get the top transports to use for this request
-        let top_transports = {
-            // Clone the vec, sort it, and keep only the top `self.active_transport_count`
-            let mut transports_clone = (*self.transports).clone();
-            transports_clone.sort_by(|a, b| b.cmp(a));
-            transports_clone.truncate(self.active_transport_count);
-            transports_clone
-        };
+        // Get the top transports to use for this request without cloning all of them
+        let mut transports_sorted: Vec<&ScoredTransport<S>> = self.transports.iter().collect();
+        transports_sorted.sort_by(|a, b| b.cmp(a));
+        transports_sorted.truncate(self.active_transport_count);
 
         // Create a collection of future requests
         let mut futures = FuturesUnordered::new();
 
         // Launch requests to all active transports in parallel
-        for mut transport in top_transports {
+        for transport_ref in transports_sorted {
+            // Clone only the transports we actually use for this request
+            let mut transport = transport_ref.clone();
             let req_clone = req.clone();
 
             let future = async move {
@@ -217,18 +215,17 @@ where
     ) -> Result<ResponsePacket, TransportError> {
         trace!("Using sequential fallback for method with non-deterministic results");
 
-        // Get transports sorted by score (best first)
-        let top_transports = {
-            let mut transports_clone = (*self.transports).clone();
-            transports_clone.sort_by(|a, b| b.cmp(a));
-            transports_clone.truncate(self.active_transport_count);
-            transports_clone
-        };
+        // Get transports sorted by score (best first) without cloning all of them
+        let mut transports_sorted: Vec<&ScoredTransport<S>> = self.transports.iter().collect();
+        transports_sorted.sort_by(|a, b| b.cmp(a));
+        transports_sorted.truncate(self.active_transport_count);
 
         let mut last_error = None;
 
         // Try each transport sequentially
-        for mut transport in top_transports {
+        for transport_ref in transports_sorted {
+            // Clone only the transport we actually use in this iteration
+            let mut transport = transport_ref.clone();
             let req_clone = req.clone();
             let start = Instant::now();
 
