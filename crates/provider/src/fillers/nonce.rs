@@ -148,6 +148,16 @@ impl<M: NonceManager> NonceFiller<M> {
     pub fn cached() -> NonceFiller<CachedNonceManager> {
         NonceFiller { nonce_manager: CachedNonceManager::default() }
     }
+
+    /// Get a reference to the nonce manager.
+    pub const fn nonce_manager(&self) -> &M {
+        &self.nonce_manager
+    }
+
+    /// Get a mutable reference to the nonce manager.
+    pub const fn nonce_manager_mut(&mut self) -> &mut M {
+        &mut self.nonce_manager
+    }
 }
 
 impl<M: NonceManager, N: Network> TxFiller<N> for NonceFiller<M> {

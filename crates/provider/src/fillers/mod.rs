@@ -327,6 +327,16 @@ where
         &mut self.filler
     }
 
+    /// Returns a reference to the inner provider.
+    pub const fn inner(&self) -> &P {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner provider.
+    pub const fn inner_mut(&mut self) -> &mut P {
+        &mut self.inner
+    }
+
     /// Joins a filler to this provider
     pub fn join_with<Other: TxFiller<N>>(
         self,
