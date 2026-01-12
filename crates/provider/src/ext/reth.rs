@@ -50,13 +50,13 @@ where
     async fn reth_subscribe_chain_notifications(
         &self,
     ) -> GetSubscription<alloy_rpc_client::NoParams, serde_json::Value> {
-        self.client().subscribe_to("reth_subscribeChainNotifications")
+        self.subscribe_to("reth_subscribeChainNotifications")
     }
 
     #[cfg(feature = "pubsub")]
     async fn reth_subscribe_persisted_block(
         &self,
     ) -> GetSubscription<alloy_rpc_client::NoParams, serde_json::Value> {
-        self.client().subscribe_to("reth_subscribePersistedBlock")
+        self.subscribe_to("reth_subscribePersistedBlock")
     }
 }
