@@ -360,11 +360,11 @@ impl BlobTransactionSidecar {
         I: IntoIterator<Item = B>,
         B: AsRef<str>,
     {
-        blobs
-            .into_iter()
-            .map(crate::eip4844::utils::hex_to_blob)
-            .collect::<Result<Vec<_>, _>>()
-            .and_then(Self::try_from_blobs)
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::hex_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
     }
 
     /// Tries to create a new [`BlobTransactionSidecar`] from the given blob
@@ -377,11 +377,11 @@ impl BlobTransactionSidecar {
         I: IntoIterator<Item = B>,
         B: AsRef<[u8]>,
     {
-        blobs
-            .into_iter()
-            .map(crate::eip4844::utils::bytes_to_blob)
-            .collect::<Result<Vec<_>, _>>()
-            .and_then(Self::try_from_blobs)
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::bytes_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
     }
 
     /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs
