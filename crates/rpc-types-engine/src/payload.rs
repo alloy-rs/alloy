@@ -53,6 +53,28 @@ impl From<B64> for PayloadId {
     }
 }
 
+/// Transaction list input for the `engine_getPayloadVxHacked` endpoints.
+///
+/// The JSON-RPC wire format is a single array of hex-encoded signed transactions:
+/// `params: [["0x...", "0x..."]]`.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct HackedPayloadTxs(pub Vec<Bytes>);
+
+impl From<Vec<Bytes>> for HackedPayloadTxs {
+    fn from(value: Vec<Bytes>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<HackedPayloadTxs> for Vec<Bytes> {
+    fn from(value: HackedPayloadTxs) -> Self {
+        value.0
+    }
+}
+
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
@@ -2376,6 +2398,21 @@ mod tests {
             },
         };
         assert_eq!(q, serde_json::from_str(s).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_hacked_payload_txs() {
+        let txs = HackedPayloadTxs(vec![Bytes::from(hex!("deadbeef"))]);
+        let json = serde_json::to_string(&txs).unwrap();
+        assert_eq!(json, r#"["0xdeadbeef"]"#);
+
+        let decoded: HackedPayloadTxs = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, txs);
+
+        let params = (txs,);
+        let params_json = serde_json::to_string(&params).unwrap();
+        assert_eq!(params_json, r#"[["0xdeadbeef"]]"#);
     }
 
     #[test]

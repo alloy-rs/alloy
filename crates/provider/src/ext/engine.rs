@@ -4,8 +4,8 @@ use alloy_primitives::{BlockHash, Bytes, B256};
 use alloy_rpc_types_engine::{
     ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
     ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadInputV2,
-    ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
-    PayloadId, PayloadStatus,
+    ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, HackedPayloadTxs,
+    PayloadAttributes, PayloadId, PayloadStatus,
 };
 use alloy_transport::TransportResult;
 
@@ -131,6 +131,38 @@ pub trait EngineApi<N>: Send + Sync {
     async fn get_payload_v4(
         &self,
         payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
+
+    /// Retrieves an execution payload from a list of signed transactions for the Paris fork.
+    ///
+    /// Params are encoded as `params: [["0x<signed tx>", ...]]`.
+    async fn get_payload_v1_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadV1>;
+
+    /// Retrieves an execution payload from a list of signed transactions for the Shanghai fork.
+    ///
+    /// Params are encoded as `params: [["0x<signed tx>", ...]]`.
+    async fn get_payload_v2_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV2>;
+
+    /// Retrieves an execution payload from a list of signed transactions for the Cancun fork.
+    ///
+    /// Params are encoded as `params: [["0x<signed tx>", ...]]`.
+    async fn get_payload_v3_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV3>;
+
+    /// Retrieves an execution payload from a list of signed transactions for the Prague fork.
+    ///
+    /// Params are encoded as `params: [["0x<signed tx>", ...]]`.
+    async fn get_payload_v4_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
 
     /// Returns the execution payload bodies by the given hash.
@@ -276,6 +308,34 @@ where
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
         self.client().request("engine_getPayloadV4", (payload_id,)).await
+    }
+
+    async fn get_payload_v1_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadV1> {
+        self.client().request("engine_getPayloadV1Hacked", (signed_transactions,)).await
+    }
+
+    async fn get_payload_v2_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV2> {
+        self.client().request("engine_getPayloadV2Hacked", (signed_transactions,)).await
+    }
+
+    async fn get_payload_v3_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV3> {
+        self.client().request("engine_getPayloadV3Hacked", (signed_transactions,)).await
+    }
+
+    async fn get_payload_v4_hacked(
+        &self,
+        signed_transactions: HackedPayloadTxs,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
+        self.client().request("engine_getPayloadV4Hacked", (signed_transactions,)).await
     }
 
     async fn get_payload_bodies_by_hash_v1(
