@@ -27,7 +27,7 @@ jobs:
         os: ["ubuntu-latest", "windows-latest"]
         rust:
           - "stable"
-          - "nightly"
+          - "nightly-2026-01-10"
           - "1.88" # MSRV
         flags:
           # No features
@@ -241,7 +241,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-01-10
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           cache-on-failure: true
@@ -261,7 +261,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-01-10
           components: rustfmt
       - run: cargo fmt --all --check
 
