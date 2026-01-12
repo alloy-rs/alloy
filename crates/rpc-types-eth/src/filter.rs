@@ -1745,12 +1745,12 @@ mod tests {
         }
 
         let item = Item { value: ValueOrArray::Value(U256::from(1u64)) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
 
         let item = Item { value: ValueOrArray::Array(vec![U256::from(1u64), U256::ZERO]) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
     }
