@@ -5,6 +5,7 @@
 
 use crate::{LocalSigner, LocalSignerError};
 use alloy_primitives::{hex, keccak256, Address, B256, B512};
+use alloy_signer::Signer;
 use k256::ecdsa::{
     signature::{hazmat::PrehashSigner, Error as SignatureError},
     RecoveryId, Signature as K256Signature,
@@ -152,6 +153,25 @@ impl LocalSigner<Secp256k1Credential> {
         // Remove the 0x04 prefix byte
         B512::from_slice(&public.serialize_uncompressed()[1..])
     }
+
+    /// Converts this [`Secp256k1Signer`] to a [`PrivateKeySigner`] (k256-based).
+    ///
+    /// The resulting signer will have the same address, private key, and chain ID.
+    #[inline]
+    pub fn to_k256(&self) -> crate::PrivateKeySigner {
+        let mut signer = crate::PrivateKeySigner::from_slice(&self.credential.0.secret_bytes())
+            .expect("valid secp256k1 key bytes should be valid k256 key bytes");
+        signer.set_chain_id(self.chain_id);
+        signer
+    }
+
+    /// Converts this [`Secp256k1Signer`] into a [`PrivateKeySigner`] (k256-based).
+    ///
+    /// This is the consuming version of [`to_k256`](Self::to_k256).
+    #[inline]
+    pub fn into_k256(self) -> crate::PrivateKeySigner {
+        self.to_k256()
+    }
 }
 
 #[cfg(feature = "keystore")]
@@ -231,6 +251,18 @@ impl FromStr for LocalSigner<Secp256k1Credential> {
     fn from_str(src: &str) -> Result<Self, Self::Err> {
         let array = hex::decode_to_array::<_, 32>(src)?;
         Ok(Self::from_slice(&array)?)
+    }
+}
+
+impl From<crate::PrivateKeySigner> for LocalSigner<Secp256k1Credential> {
+    fn from(signer: crate::PrivateKeySigner) -> Self {
+        signer.into_secp256k1()
+    }
+}
+
+impl From<&crate::PrivateKeySigner> for LocalSigner<Secp256k1Credential> {
+    fn from(signer: &crate::PrivateKeySigner) -> Self {
+        signer.to_secp256k1()
     }
 }
 
@@ -471,5 +503,86 @@ mod tests {
         let value = signature.as_bytes().to_vec();
         let recovered_signature: alloy_primitives::Signature = value.as_slice().try_into().unwrap();
         assert_eq!(signature, recovered_signature);
+    }
+
+    #[test]
+    fn test_k256_to_secp256k1_conversion() {
+        let k256_signer: PrivateKeySigner =
+            "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b".parse().unwrap();
+
+        // Test to_secp256k1
+        let secp_signer = k256_signer.to_secp256k1();
+        assert_eq!(k256_signer.address(), secp_signer.address());
+        assert_eq!(k256_signer.public_key(), secp_signer.public_key());
+
+        // Test into_secp256k1
+        let secp_signer2: Secp256k1Signer = k256_signer.clone().into_secp256k1();
+        assert_eq!(secp_signer.address(), secp_signer2.address());
+
+        // Test From trait
+        let secp_signer3: Secp256k1Signer = k256_signer.clone().into();
+        assert_eq!(secp_signer.address(), secp_signer3.address());
+
+        // Test From<&PrivateKeySigner>
+        let secp_signer4: Secp256k1Signer = (&k256_signer).into();
+        assert_eq!(secp_signer.address(), secp_signer4.address());
+    }
+
+    #[test]
+    fn test_secp256k1_to_k256_conversion() {
+        let secp_signer: Secp256k1Signer =
+            "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b".parse().unwrap();
+
+        // Test to_k256
+        let k256_signer = secp_signer.to_k256();
+        assert_eq!(secp_signer.address(), k256_signer.address());
+        assert_eq!(secp_signer.public_key(), k256_signer.public_key());
+
+        // Test into_k256
+        let k256_signer2: PrivateKeySigner = secp_signer.clone().into_k256();
+        assert_eq!(k256_signer.address(), k256_signer2.address());
+
+        // Test From trait
+        let k256_signer3: PrivateKeySigner = secp_signer.clone().into();
+        assert_eq!(k256_signer.address(), k256_signer3.address());
+
+        // Test From<&Secp256k1Signer>
+        let k256_signer4: PrivateKeySigner = (&secp_signer).into();
+        assert_eq!(k256_signer.address(), k256_signer4.address());
+    }
+
+    #[test]
+    fn test_roundtrip_conversion() {
+        let original: PrivateKeySigner =
+            "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b".parse().unwrap();
+
+        // k256 -> secp256k1 -> k256
+        let secp = original.to_secp256k1();
+        let roundtrip = secp.to_k256();
+
+        assert_eq!(original.address(), roundtrip.address());
+        assert_eq!(original.to_bytes(), roundtrip.to_bytes());
+
+        // Verify signatures match
+        let message = b"roundtrip test";
+        let sig1 = original.sign_message_sync(message).unwrap();
+        let sig2 = roundtrip.sign_message_sync(message).unwrap();
+        assert_eq!(
+            sig1.recover_address_from_msg(message).unwrap(),
+            sig2.recover_address_from_msg(message).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_chain_id_preserved_in_conversion() {
+        let mut k256_signer: PrivateKeySigner =
+            "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b".parse().unwrap();
+        k256_signer.set_chain_id(Some(1337));
+
+        let secp_signer = k256_signer.to_secp256k1();
+        assert_eq!(secp_signer.chain_id(), Some(1337));
+
+        let back_to_k256 = secp_signer.to_k256();
+        assert_eq!(back_to_k256.chain_id(), Some(1337));
     }
 }

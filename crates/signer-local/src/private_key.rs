@@ -3,6 +3,8 @@
 use super::{LocalSigner, LocalSignerError};
 use alloy_primitives::{hex, B256, B512};
 use alloy_signer::utils::secret_key_to_address;
+#[cfg(feature = "secp256k1")]
+use alloy_signer::Signer;
 use k256::{
     ecdsa::{self, SigningKey},
     FieldBytes, NonZeroScalar, SecretKey as K256SecretKey,
@@ -93,6 +95,31 @@ impl LocalSigner<SigningKey> {
     pub fn public_key(&self) -> B512 {
         B512::from_slice(&self.credential.verifying_key().to_encoded_point(false).as_bytes()[1..])
     }
+
+    /// Converts this [`PrivateKeySigner`] (k256-based) to a [`Secp256k1Signer`].
+    ///
+    /// This allows switching to the `secp256k1` crate implementation which may offer
+    /// better performance in some scenarios.
+    ///
+    /// The resulting signer will have the same address, private key, and chain ID.
+    #[cfg(feature = "secp256k1")]
+    #[inline]
+    pub fn to_secp256k1(&self) -> crate::Secp256k1Signer {
+        // This unwrap is safe because we're converting valid k256 key bytes
+        let mut signer = crate::Secp256k1Signer::from_slice(&self.credential.to_bytes())
+            .expect("valid k256 key bytes should be valid secp256k1 key bytes");
+        signer.set_chain_id(self.chain_id);
+        signer
+    }
+
+    /// Converts this [`PrivateKeySigner`] (k256-based) into a [`Secp256k1Signer`].
+    ///
+    /// This is the consuming version of [`to_secp256k1`](Self::to_secp256k1).
+    #[cfg(feature = "secp256k1")]
+    #[inline]
+    pub fn into_secp256k1(self) -> crate::Secp256k1Signer {
+        self.to_secp256k1()
+    }
 }
 
 #[cfg(feature = "keystore")]
@@ -175,6 +202,20 @@ impl From<K256SecretKey> for LocalSigner<SigningKey> {
 impl From<&K256SecretKey> for LocalSigner<SigningKey> {
     fn from(value: &K256SecretKey) -> Self {
         Self::from_signing_key(value.into())
+    }
+}
+
+#[cfg(feature = "secp256k1")]
+impl From<crate::Secp256k1Signer> for LocalSigner<SigningKey> {
+    fn from(signer: crate::Secp256k1Signer) -> Self {
+        signer.into_k256()
+    }
+}
+
+#[cfg(feature = "secp256k1")]
+impl From<&crate::Secp256k1Signer> for LocalSigner<SigningKey> {
+    fn from(signer: &crate::Secp256k1Signer) -> Self {
+        signer.to_k256()
     }
 }
 
