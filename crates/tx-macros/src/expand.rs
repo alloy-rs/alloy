@@ -594,7 +594,7 @@ impl Expander {
             where
                 #(#variant_types: #alloy_eips::Decodable2718),*
             {
-                fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+                fn decode(buf: &mut &[u8]) -> #alloy_rlp::Result<Self> {
                     Ok(<Self as #alloy_eips::Decodable2718>::network_decode(buf)?)
                 }
             }
