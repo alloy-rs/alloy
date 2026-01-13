@@ -27,8 +27,6 @@ pub trait TestingApi<N>: Send + Sync {
     ) -> TransportResult<R>;
 
     /// Builds a block using the provided parent, payload attributes, and transactions.
-    ///
-    /// See also <https://github.com/marcindsobczak/execution-apis/blob/main/src/testing/testing_buildBlockV1.md>
     async fn build_block_v1(
         &self,
         request: TestingBuildBlockRequestV1,
