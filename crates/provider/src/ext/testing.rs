@@ -1,10 +1,6 @@
 //! Testing namespace for building a block in a single call.
 //!
 //! This follows the `testing_buildBlockV1` specification.
-//!
-//! **Highly sensitive:** testing-only, powerful enough to include arbitrary transactions;
-//! must stay disabled by default and never be exposed on public-facing RPC without an
-//! explicit operator flag.
 
 use crate::Provider;
 use alloy_json_rpc::RpcRecv;
