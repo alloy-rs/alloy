@@ -199,6 +199,17 @@ pub mod secp256k1 {
     #[cfg(feature = "secp256k1")]
     use super::impl_secp256k1 as imp;
 
+    /// Returns the 65-byte signature encoding expected by the recovery backends in this module.
+    ///
+    /// Note: the recovery id byte is encoded as `0/1` (not `27/28`).
+    pub(super) fn signature_to_recoverable_bytes(signature: &Signature) -> [u8; 65] {
+        let mut sig = [0u8; 65];
+        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
+        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
+        sig[64] = signature.v() as u8;
+        sig
+    }
+
     /// Recover signer from message hash, _without ensuring that the signature has a low `s`
     /// value_.
     ///
@@ -209,11 +220,7 @@ pub mod secp256k1 {
         signature: &Signature,
         hash: B256,
     ) -> Result<Address, RecoveryError> {
-        let mut sig: [u8; 65] = [0; 65];
-
-        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
-        sig[64] = signature.v() as u8;
+        let sig = signature_to_recoverable_bytes(signature);
 
         // Try dynamic backend first when crypto-backend feature is enabled
         #[cfg(feature = "crypto-backend")]
@@ -357,10 +364,7 @@ mod tests {
         let signature =
             sign_message(B256::from_slice(&secret.secret_bytes()[..]), hash).expect("sign message");
 
-        let mut sig: [u8; 65] = [0; 65];
-        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
-        sig[64] = signature.v() as u8;
+        let sig = crate::crypto::secp256k1::signature_to_recoverable_bytes(&signature);
 
         assert_eq!(recover_signer_unchecked(&sig, &hash), Ok(signer));
     }
@@ -380,10 +384,7 @@ mod tests {
         let signature =
             sign_message(B256::from_slice(&secret.to_bytes()[..]), hash).expect("sign message");
 
-        let mut sig: [u8; 65] = [0; 65];
-        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
-        sig[64] = signature.v() as u8;
+        let sig = crate::crypto::secp256k1::signature_to_recoverable_bytes(&signature);
 
         assert_eq!(recover_signer_unchecked(&sig, &hash).ok(), Some(signer));
     }
@@ -417,20 +418,15 @@ mod tests {
                 .expect("k256 sign");
         assert_eq!(secp256k1_signature, k256_signature);
 
-        let mut sig: [u8; 65] = [0; 65];
-
-        sig[0..32].copy_from_slice(&secp256k1_signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&secp256k1_signature.s().to_be_bytes::<32>());
-        sig[64] = secp256k1_signature.v() as u8;
-        let secp256k1_recovered =
-            impl_secp256k1::recover_signer_unchecked(&sig, &hash).expect("secp256k1 recover");
+        let secp256k1_sig =
+            crate::crypto::secp256k1::signature_to_recoverable_bytes(&secp256k1_signature);
+        let secp256k1_recovered = impl_secp256k1::recover_signer_unchecked(&secp256k1_sig, &hash)
+            .expect("secp256k1 recover");
         assert_eq!(secp256k1_recovered, secp256k1_signer);
 
-        sig[0..32].copy_from_slice(&k256_signature.r().to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&k256_signature.s().to_be_bytes::<32>());
-        sig[64] = k256_signature.v() as u8;
+        let k256_sig = crate::crypto::secp256k1::signature_to_recoverable_bytes(&k256_signature);
         let k256_recovered =
-            impl_k256::recover_signer_unchecked(&sig, &hash).expect("k256 recover");
+            impl_k256::recover_signer_unchecked(&k256_sig, &hash).expect("k256 recover");
         assert_eq!(k256_recovered, k256_signer);
 
         assert_eq!(secp256k1_recovered, k256_recovered);
