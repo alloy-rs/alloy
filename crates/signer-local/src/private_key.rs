@@ -96,7 +96,8 @@ impl LocalSigner<SigningKey> {
         B512::from_slice(&self.credential.verifying_key().to_encoded_point(false).as_bytes()[1..])
     }
 
-    /// Converts this `PrivateKeySigner` (k256-based) to a [`Secp256k1Signer`](crate::Secp256k1Signer).
+    /// Converts this `PrivateKeySigner` (k256-based) to a
+    /// [`Secp256k1Signer`](crate::Secp256k1Signer).
     ///
     /// This allows switching to the `secp256k1` crate implementation which may offer
     /// better performance in some scenarios.
@@ -112,7 +113,8 @@ impl LocalSigner<SigningKey> {
         signer
     }
 
-    /// Converts this `PrivateKeySigner` (k256-based) into a [`Secp256k1Signer`](crate::Secp256k1Signer).
+    /// Converts this `PrivateKeySigner` (k256-based) into a
+    /// [`Secp256k1Signer`](crate::Secp256k1Signer).
     ///
     /// This is the consuming version of [`to_secp256k1`](Self::to_secp256k1).
     #[cfg(feature = "secp256k1")]
