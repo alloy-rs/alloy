@@ -154,7 +154,7 @@ impl LocalSigner<Secp256k1Credential> {
         B512::from_slice(&public.serialize_uncompressed()[1..])
     }
 
-    /// Converts this [`Secp256k1Signer`] to a [`PrivateKeySigner`] (k256-based).
+    /// Converts this `Secp256k1Signer` to a [`PrivateKeySigner`](crate::PrivateKeySigner) (k256-based).
     ///
     /// The resulting signer will have the same address, private key, and chain ID.
     #[inline]
@@ -165,7 +165,7 @@ impl LocalSigner<Secp256k1Credential> {
         signer
     }
 
-    /// Converts this [`Secp256k1Signer`] into a [`PrivateKeySigner`] (k256-based).
+    /// Converts this `Secp256k1Signer` into a [`PrivateKeySigner`](crate::PrivateKeySigner) (k256-based).
     ///
     /// This is the consuming version of [`to_k256`](Self::to_k256).
     #[inline]
