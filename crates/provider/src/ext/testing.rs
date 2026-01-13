@@ -9,9 +9,6 @@ use alloy_rpc_types_engine::{ExecutionPayloadEnvelopeV5, TestingBuildBlockReques
 use alloy_transport::TransportResult;
 
 /// Extension trait that gives access to Testing API RPC methods.
-///
-/// Note:
-/// > The provider should use a JWT authentication layer.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait TestingApi<N>: Send + Sync {
