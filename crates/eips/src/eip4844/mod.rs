@@ -2,6 +2,10 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+/// Re-export the `c_kzg` crate for downstream consumers.
+#[cfg(feature = "kzg")]
+pub use c_kzg;
+
 /// Module houses the KZG settings, enabling Custom and Default
 #[cfg(feature = "kzg")]
 pub mod env_settings;

@@ -40,6 +40,9 @@ pub use error::*;
 mod transition;
 pub use transition::*;
 
+mod testing;
+pub use testing::*;
+
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobAndProofV1;
 
