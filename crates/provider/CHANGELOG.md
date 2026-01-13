@@ -5,14 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
 
 ### Features
 
+- [provider] Add CacheLayer builder methods ([#3490](https://github.com/alloy-rs/alloy/issues/3490))
+- [provider] Add accessors to FillProvider and NonceFiller ([#3501](https://github.com/alloy-rs/alloy/issues/3501))
+- [engine] Add TestingApi with testing_buildBlockV1 support ([#3511](https://github.com/alloy-rs/alloy/issues/3511))
+- Added  reth provider trait ext ([#3480](https://github.com/alloy-rs/alloy/issues/3480))
+- [provider] Add mapping and mutable accessors to JoinFill ([#3488](https://github.com/alloy-rs/alloy/issues/3488))
+- [alloy-provider] Add methods for creating custom gas estimator for `BlobGasFiller` ([#3489](https://github.com/alloy-rs/alloy/issues/3489))
 - [provider] Add filler getters to FillProvider ([#3485](https://github.com/alloy-rs/alloy/issues/3485))
 - Added custom estimator to blobgasfilter ([#3447](https://github.com/alloy-rs/alloy/issues/3447))
 - [provider] Add balance caching to CacheProvider ([#3453](https://github.com/alloy-rs/alloy/issues/3453))
 - [provider] Add transaction count caching to CacheProvider ([#3448](https://github.com/alloy-rs/alloy/issues/3448))
+
+### Miscellaneous Tasks
+
+- Release 1.4.0
+
+### Refactor
+
+- [provider] Use BoxedFut alias in From impl for ProviderCall ([#3492](https://github.com/alloy-rs/alloy/issues/3492))
 
 ## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
 

@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Bug Fixes
+
+- [eips] Use for loop in blob conversion to avoid stack overflow ([#3499](https://github.com/alloy-rs/alloy/issues/3499))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.41.0 to 1.42.0 ([#3507](https://github.com/alloy-rs/alloy/issues/3507))
+- [deps] Bump taiki-e/install-action from 2.65.13 to 2.66.1 ([#3508](https://github.com/alloy-rs/alloy/issues/3508))
+
+### Features
+
+- [provider] Add CacheLayer builder methods ([#3490](https://github.com/alloy-rs/alloy/issues/3490))
+- [provider] Add accessors to FillProvider and NonceFiller ([#3501](https://github.com/alloy-rs/alloy/issues/3501))
+- [engine] Add TestingApi with testing_buildBlockV1 support ([#3511](https://github.com/alloy-rs/alloy/issues/3511))
+- [rpc-types-engine] Add ExecutionPayloadEnvelope V4/V5 conversions ([#3510](https://github.com/alloy-rs/alloy/issues/3510))
+- Added  reth provider trait ext ([#3480](https://github.com/alloy-rs/alloy/issues/3480))
+- [provider] Add mapping and mutable accessors to JoinFill ([#3488](https://github.com/alloy-rs/alloy/issues/3488))
+- [alloy-provider] Add methods for creating custom gas estimator for `BlobGasFiller` ([#3489](https://github.com/alloy-rs/alloy/issues/3489))
+
+### Miscellaneous Tasks
+
+- Avoid cloning extra_fields in genesis ChainConfig ([#3494](https://github.com/alloy-rs/alloy/issues/3494))
+
+### Other
+
+- Pin nightly to 2026-01-10 ([#3500](https://github.com/alloy-rs/alloy/issues/3500))
+
+### Refactor
+
+- [rpc-types-eth] Remove redundant clones in serde tests ([#3491](https://github.com/alloy-rs/alloy/issues/3491))
+- [provider] Use BoxedFut alias in From impl for ProviderCall ([#3492](https://github.com/alloy-rs/alloy/issues/3492))
+
+### Styling
+
+- [consensus-any] Remove redundant Clone bound from TxReceipt impl ([#3482](https://github.com/alloy-rs/alloy/issues/3482))
+
 ## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
 
 ### Bug Fixes
@@ -33,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.4.0
 - Release 1.4.0
 - Remove `#[allow(unused_assignments)]` ([#3475](https://github.com/alloy-rs/alloy/issues/3475))
 - Remove dead random buffer from custom envelope test ([#3456](https://github.com/alloy-rs/alloy/issues/3456))
