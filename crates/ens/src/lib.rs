@@ -149,12 +149,12 @@ mod provider {
         ReverseRegistrar::ReverseRegistrarInstance, ENS_ADDRESS, ENS_REVERSE_REGISTRAR_DOMAIN,
     };
     use alloy_primitives::{Address, B256};
-    use alloy_provider::{Network, Provider};
+    use alloy_provider::Provider;
 
     /// Extension trait for ENS contract calls.
     #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
     #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-    pub trait ProviderEnsExt<N: alloy_provider::Network, P: Provider<N>> {
+    pub trait ProviderEnsExt<N, P: Provider<N>> {
         /// Returns the resolver for the specified node. The `&str` is only used for error messages.
         async fn get_resolver(
             &self,
@@ -201,7 +201,6 @@ mod provider {
     impl<N, P> ProviderEnsExt<N, P> for P
     where
         P: Provider<N>,
-        N: Network,
     {
         async fn get_resolver(
             &self,
