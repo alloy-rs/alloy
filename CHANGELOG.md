@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [signer-local] Add conversions between PrivateKeySigner and Secp256k1Signer ([#3516](https://github.com/alloy-rs/alloy/issues/3516))
 - Add engine_getPayloadV5 ([#3515](https://github.com/alloy-rs/alloy/issues/3515))
 
+### Miscellaneous Tasks
+
+- Release 1.4.2
+
 ### Refactor
 
 - [rpc-types-eth] Remove redundant clones in block tests ([#3514](https://github.com/alloy-rs/alloy/issues/3514))
