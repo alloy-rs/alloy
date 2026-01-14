@@ -15,7 +15,7 @@ pub(crate) use header::serde_bincode_compat;
 use crate::Transaction;
 use alloc::vec::Vec;
 use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
-use alloy_primitives::{Sealable, Sealed, B256};
+use alloy_primitives::{keccak256, Sealable, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -374,7 +374,7 @@ mod block_rlp {
         }
     }
 
-    impl<T: Decodable> Block<T, Header> {
+    impl<T: Decodable, H: Decodable> Block<T, H> {
         /// Decodes the block from RLP, computing the header hash directly from the RLP bytes.
         ///
         /// This is more efficient than decoding the block and then sealing it, as the header
@@ -386,18 +386,19 @@ mod block_rlp {
                 return Err(alloy_rlp::Error::UnexpectedString);
             }
 
-            // Decode header with hash computed from raw RLP
-            let sealed_header = Header::decode_sealed(buf)?;
+            // Decode header and compute hash from raw RLP bytes
+            let header_start = *buf;
+            let header = H::decode(buf)?;
+            let header_hash = keccak256(&header_start[..header_start.len() - buf.len()]);
 
             // Decode remaining body fields
             let transactions = Vec::<T>::decode(buf)?;
-            let ommers = Vec::<Header>::decode(buf)?;
+            let ommers = Vec::<H>::decode(buf)?;
             let withdrawals = if buf.is_empty() { None } else { Some(Decodable::decode(buf)?) };
 
-            let (header, hash) = sealed_header.into_parts();
             let block = Self { header, body: BlockBody { transactions, ommers, withdrawals } };
 
-            Ok(Sealed::new_unchecked(block, hash))
+            Ok(Sealed::new_unchecked(block, header_hash))
         }
     }
 }
