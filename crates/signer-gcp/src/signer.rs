@@ -213,7 +213,7 @@ impl GcpSigner {
 
     /// Fetch the pubkey associated with this signer's key.
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpSignerError> {
-        request_get_pubkey(&self.client, &self.key_name).await.and_then(decode_pubkey)
+        Ok(self.pubkey)
     }
 
     /// Sign a digest with this signer's key
