@@ -159,18 +159,13 @@ pub struct FunctionSelector(pub [u8; 4]);
 
 // === impl FunctionSelector ===
 
-impl FunctionSelector {
-    fn hex_encode(&self) -> String {
-        hex::encode(self.0.as_ref())
-    }
-}
-
 impl Serialize for FunctionSelector {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.to_string().as_str())
+        // Reuse Display to avoid building an extra String allocation here.
+        serializer.collect_str(self)
     }
 }
 
@@ -201,13 +196,13 @@ impl AsRef<[u8]> for FunctionSelector {
 
 impl std::fmt::Debug for FunctionSelector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("FunctionSelector").field(&self.hex_encode()).finish()
+        f.debug_tuple("FunctionSelector").field(&hex::encode(self.0)).finish()
     }
 }
 
 impl std::fmt::Display for FunctionSelector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0x{}", self.hex_encode())
+        write!(f, "0x{}", hex::encode(self.0))
     }
 }
 
