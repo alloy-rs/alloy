@@ -1021,6 +1021,14 @@ impl BlobsBundleV1 {
         Self::default()
     }
 
+    /// Computes the versioned hashes from the KZG commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        self.commitments
+            .iter()
+            .map(|c| alloy_eips::eip4844::kzg_to_versioned_hash(c.as_slice()))
+            .collect()
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// # Panics
@@ -1245,6 +1253,14 @@ impl BlobsBundleV2 {
     /// payload for API compatibility reasons.
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Computes the versioned hashes from the KZG commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        self.commitments
+            .iter()
+            .map(|c| alloy_eips::eip4844::kzg_to_versioned_hash(c.as_slice()))
+            .collect()
     }
 
     /// Take `len` blob data from the bundle.
