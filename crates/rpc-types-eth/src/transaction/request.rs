@@ -1104,6 +1104,7 @@ impl TransactionBuilder7594 for TransactionRequest {
 
     fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594) {
         self.sidecar = Some(BlobTransactionSidecarVariant::Eip7594(sidecar));
+        self.populate_blob_hashes();
     }
 }
 
@@ -2213,5 +2214,33 @@ mod tests {
         let auths = req.authorization_list.unwrap();
         assert_eq!(auths.len(), 1);
         assert_eq!(auths[0].y_parity(), 0);
+    }
+
+    #[test]
+    fn set_blob_sidecar_7594_populates_versioned_hashes() {
+        use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, Bytes48};
+
+        // Create a sidecar with a known commitment
+        let commitment = Bytes48::repeat_byte(0x42);
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0xFA)],
+            vec![commitment],
+            vec![Bytes48::repeat_byte(0x11)], // cell proof
+        );
+
+        // Calculate expected versioned hash from the commitment
+        let expected_hash = kzg_to_versioned_hash(commitment.as_slice());
+
+        // Create a transaction request and set the sidecar
+        let mut tx_request = TransactionRequest::default();
+        assert!(tx_request.blob_versioned_hashes.is_none());
+
+        tx_request.set_blob_sidecar_7594(sidecar);
+
+        // Verify that blob_versioned_hashes was populated
+        assert!(tx_request.blob_versioned_hashes.is_some());
+        let hashes = tx_request.blob_versioned_hashes.unwrap();
+        assert_eq!(hashes.len(), 1);
+        assert_eq!(hashes[0], expected_hash);
     }
 }
