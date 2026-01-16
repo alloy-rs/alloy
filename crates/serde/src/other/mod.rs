@@ -94,7 +94,7 @@ impl OtherFields {
         &mut self,
         key: impl AsRef<str>,
     ) -> Option<serde_json::Result<V>> {
-        self.inner.remove(key.as_ref()).map(serde_json::from_value)
+        self.remove_with(key, serde_json::from_value)
     }
 
     /// Removes the deserialized value of the field, if it exists.
