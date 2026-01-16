@@ -1104,6 +1104,7 @@ impl TransactionBuilder7594 for TransactionRequest {
 
     fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594) {
         self.sidecar = Some(BlobTransactionSidecarVariant::Eip7594(sidecar));
+        self.populate_blob_hashes();
     }
 }
 
