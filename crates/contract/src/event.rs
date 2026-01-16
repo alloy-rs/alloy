@@ -314,7 +314,7 @@ mod tests {
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
         let wallet = EthereumWallet::from(pk);
         let provider = alloy_provider::ProviderBuilder::new()
-            .wallet(wallet.clone())
+            .wallet(wallet)
             .connect_http(anvil.endpoint_url());
 
         // let from = address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
@@ -422,7 +422,7 @@ mod tests {
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
         let wallet = EthereumWallet::from(pk);
         let provider = alloy_provider::ProviderBuilder::new()
-            .wallet(wallet.clone())
+            .wallet(wallet)
             .connect_http(anvil.endpoint_url());
 
         let contract = MyContract::deploy(&provider).await.unwrap();
