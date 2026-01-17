@@ -1,8 +1,12 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    utils, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcSend};
 use alloy_network::Network;
-use alloy_primitives::{keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256};
+use alloy_primitives::{
+    keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
+};
 use alloy_rpc_types_eth::{BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
@@ -187,6 +191,15 @@ where
         }))
     }
 
+    fn get_balance(&self, address: Address) -> RpcWithBlock<Address, U256> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getBalance", address).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, client, req)
+        })
+    }
+
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
@@ -346,6 +359,54 @@ where
             Ok(result)
         }))
     }
+
+    fn get_transaction_count(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<Address, U64, u64, fn(U64) -> u64> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getTransactionCount", address).with_block_id(block_id);
+
+            let redirect = req.has_block_tag();
+
+            if !redirect {
+                let params_hash = req.params_hash().ok();
+
+                if let Some(hash) = params_hash {
+                    if let Ok(Some(cached)) = cache.get_deserialized::<U64>(&hash) {
+                        return ProviderCall::BoxedFuture(Box::pin(async move {
+                            Ok(utils::convert_u64(cached))
+                        }));
+                    }
+                }
+            }
+
+            let client = client.clone();
+            let cache = cache.clone();
+
+            ProviderCall::BoxedFuture(Box::pin(async move {
+                let client = client
+                    .upgrade()
+                    .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
+
+                let result: U64 = client
+                    .request(req.method(), req.params())
+                    .map_params(|params| ParamsWithBlock::new(params, block_id))
+                    .await?;
+
+                if !redirect {
+                    let json_str =
+                        serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
+                    let hash = req.params_hash()?;
+                    let _ = cache.put(hash, json_str);
+                }
+
+                Ok(utils::convert_u64(result))
+            }))
+        })
+    }
 }
 
 /// Internal type to handle different types of requests and generating their param hashes.
@@ -502,7 +563,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
-    use alloy_primitives::{bytes, hex, Bytes, FixedBytes};
+    use alloy_primitives::{bytes, hex, utils::Unit, Bytes, FixedBytes};
     use alloy_rpc_types_eth::{BlockId, TransactionRequest};
 
     #[tokio::test]
@@ -623,6 +684,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_balance() {
+        run_with_tempdir("get-balance", |dir| async move {
+            let cache_layer = CacheLayer::new(100);
+            let cache_layer2 = cache_layer.clone();
+            let shared_cache = cache_layer.cache();
+            let anvil = Anvil::new().spawn();
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer)
+                .connect_http(anvil.endpoint_url());
+
+            let path = dir.join("rpc-cache-balance.txt");
+            shared_cache.load_cache(path.clone()).unwrap();
+
+            let to = Address::repeat_byte(5);
+
+            // Send a transaction to change balance
+            let req = TransactionRequest::default()
+                .from(anvil.addresses()[0])
+                .to(to)
+                .value(Unit::ETHER.wei());
+
+            let receipt = provider
+                .send_transaction(req)
+                .await
+                .expect("failed to send tx")
+                .get_receipt()
+                .await
+                .unwrap();
+            let block_number = receipt.block_number.unwrap();
+
+            // Get balance from RPC (populates cache)
+            let balance = provider.get_balance(to).block_id(block_number.into()).await.unwrap();
+            assert_eq!(balance, Unit::ETHER.wei());
+
+            // Drop anvil to ensure second call can't hit RPC
+            drop(anvil);
+
+            // Create new provider with same cache but dead endpoint
+            let provider2 = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer2)
+                .connect_http("http://localhost:1".parse().unwrap());
+
+            // This only succeeds if cache is hit
+            let balance2 = provider2.get_balance(to).block_id(block_number.into()).await.unwrap();
+            assert_eq!(balance, balance2);
+
+            shared_cache.save_cache(path).unwrap();
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn test_get_code() {
         run_with_tempdir("get-code", |dir| async move {
             let cache_layer = CacheLayer::new(100);
@@ -692,6 +807,70 @@ mod tests {
             assert_eq!(counter2, U256::from(1));
             let counter2_cached = provider.get_storage_at(counter_addr, U256::ZERO).block_id(block_id2).await.unwrap(); // Received from cache.
             assert_eq!(counter2, counter2_cached);
+
+            shared_cache.save_cache(path).unwrap();
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_count() {
+        run_with_tempdir("get-tx-count", |dir| async move {
+            let cache_layer = CacheLayer::new(100);
+            // CacheLayer uses Arc internally, so cloning shares the same cache.
+            let cache_layer2 = cache_layer.clone();
+            let shared_cache = cache_layer.cache();
+            let anvil = Anvil::new().spawn();
+            let provider = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer)
+                .connect_http(anvil.endpoint_url());
+
+            let path = dir.join("rpc-cache-tx-count.txt");
+            shared_cache.load_cache(path.clone()).unwrap();
+
+            let address = anvil.addresses()[0];
+
+            // Send a transaction to increase the nonce
+            let req = TransactionRequest::default()
+                .from(address)
+                .to(Address::repeat_byte(5))
+                .value(U256::ZERO)
+                .input(bytes!("deadbeef").into());
+
+            let receipt = provider
+                .send_transaction(req)
+                .await
+                .expect("failed to send tx")
+                .get_receipt()
+                .await
+                .unwrap();
+            let block_number = receipt.block_number.unwrap();
+
+            // Get transaction count from RPC (populates cache)
+            let count = provider
+                .get_transaction_count(address)
+                .block_id(block_number.into())
+                .await
+                .unwrap();
+            assert_eq!(count, 1);
+
+            // Drop anvil to ensure second call can't hit RPC
+            drop(anvil);
+
+            // Create new provider with same cache but dead endpoint
+            let provider2 = ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .layer(cache_layer2)
+                .connect_http("http://localhost:1".parse().unwrap());
+
+            // This only succeeds if cache is hit
+            let count2 = provider2
+                .get_transaction_count(address)
+                .block_id(block_number.into())
+                .await
+                .unwrap();
+            assert_eq!(count, count2);
 
             shared_cache.save_cache(path).unwrap();
         })

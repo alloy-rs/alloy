@@ -1,7 +1,8 @@
 use crate::{
     fillers::{
-        CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
-        NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
+        BlobGasEstimator, BlobGasFiller, CachedNonceManager, ChainIdFiller, FillerControlFlow,
+        GasFiller, JoinFill, NonceFiller, NonceManager, RecommendedFillers, SimpleNonceManager,
+        TxFiller, WalletFiller,
     },
     layers::{CallBatchLayer, ChainLayer},
     provider::SendableTx,
@@ -234,6 +235,23 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     // --- Fillers ---
 
+    /// Add blob gas estimation to the stack being built.
+    ///
+    /// See [`BlobGasFiller`] for more information.
+    pub fn with_blob_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, BlobGasFiller>, N> {
+        self.filler(BlobGasFiller::default())
+    }
+
+    /// Add blob gas estimation to the stack being built, using the provided estimator.
+    ///
+    /// See [`BlobGasFiller`] and [`BlobGasEstimator`] for more information.
+    pub fn with_blob_gas_estimator(
+        self,
+        estimator: BlobGasEstimator,
+    ) -> ProviderBuilder<L, JoinFill<F, BlobGasFiller>, N> {
+        self.filler(BlobGasFiller { estimator })
+    }
+
     /// Add gas estimation to the stack being built.
     ///
     /// See [`GasFiller`] for more information.
@@ -315,6 +333,27 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// See [`CallBatchLayer`] for more information.
     pub fn with_arbitrum_call_batching(self) -> ProviderBuilder<Stack<CallBatchLayer, L>, F, N> {
         self.layer(CallBatchLayer::new().arbitrum_compat())
+    }
+
+    /// Add response caching to the stack being built with the specified maximum cache size.
+    ///
+    /// See [`CacheLayer`](crate::layers::CacheLayer) for more information.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn with_caching(
+        self,
+        max_items: u32,
+    ) -> ProviderBuilder<Stack<crate::layers::CacheLayer, L>, F, N> {
+        self.layer(crate::layers::CacheLayer::new(max_items))
+    }
+
+    /// Add response caching to the stack being built with a default cache size of 100 items.
+    ///
+    /// See [`CacheLayer`](crate::layers::CacheLayer) for more information.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn with_default_caching(
+        self,
+    ) -> ProviderBuilder<Stack<crate::layers::CacheLayer, L>, F, N> {
+        self.with_caching(100)
     }
 
     // --- Build to Provider ---

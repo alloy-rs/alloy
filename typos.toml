@@ -17,3 +17,4 @@ extend-exclude = [
 [default.extend-words]
 ser = "ser"
 typ = "typ"
+bimap = "bimap"

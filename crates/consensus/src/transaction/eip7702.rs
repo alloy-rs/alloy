@@ -1,3 +1,4 @@
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 use crate::{SignableTransaction, Transaction, TxType};
 use alloc::vec::Vec;
 use alloy_eips::{
@@ -8,9 +9,6 @@ use alloy_eips::{
 };
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
-
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -88,17 +86,10 @@ impl TxEip7702 {
     /// Calculates a heuristic for the in-memory size of the [TxEip7702] transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u64>() + // gas_limit
-        mem::size_of::<u128>() + // max_fee_per_gas
-        mem::size_of::<u128>() + // max_priority_fee_per_gas
-        mem::size_of::<Address>() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() + // input
-        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>()
-        // authorization_list
+        size_of::<Self>()
+            + self.access_list.size()
+            + self.input.len()
+            + self.authorization_list.capacity() * size_of::<SignedAuthorization>()
     }
 }
 

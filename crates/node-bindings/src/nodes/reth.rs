@@ -1,6 +1,9 @@
 //! Utilities for launching a Reth dev-mode instance.
 
-use crate::{utils::extract_endpoint, NodeError, NODE_STARTUP_TIMEOUT};
+use crate::{
+    utils::{extract_endpoint, GracefulShutdown},
+    NodeError, NODE_STARTUP_TIMEOUT,
+};
 use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
@@ -37,6 +40,7 @@ const DEFAULT_P2P_PORT: u16 = 30303;
 #[derive(Debug)]
 pub struct RethInstance {
     pid: Child,
+    host: String,
     instance: u16,
     http_port: u16,
     ws_port: u16,
@@ -48,6 +52,11 @@ pub struct RethInstance {
 }
 
 impl RethInstance {
+    /// Returns the host of this instance.
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
     /// Returns the instance number of this instance.
     pub const fn instance(&self) -> u16 {
         self.instance
@@ -77,17 +86,17 @@ impl RethInstance {
     /// Returns the HTTP endpoint of this instance.
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.http_port)
+        format!("http://{}:{}", self.host, self.http_port)
     }
 
     /// Returns the Websocket endpoint of this instance.
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.ws_port)
+        format!("ws://{}:{}", self.host, self.ws_port)
     }
 
     /// Returns the IPC endpoint of this instance.
     pub fn ipc_endpoint(&self) -> String {
-        self.ipc.clone().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
+        self.ipc.as_ref().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
     /// Returns the HTTP endpoint url of this instance.
@@ -122,7 +131,7 @@ impl RethInstance {
 
 impl Drop for RethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill reth");
+        GracefulShutdown::shutdown(&mut self.pid, 10, "reth");
     }
 }
 
@@ -148,6 +157,7 @@ impl Drop for RethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     dev: bool,
+    host: Option<String>,
     http_port: u16,
     ws_port: u16,
     auth_port: u16,
@@ -174,6 +184,7 @@ impl Reth {
     pub fn new() -> Self {
         Self {
             dev: false,
+            host: None,
             http_port: DEFAULT_HTTP_PORT,
             ws_port: DEFAULT_WS_PORT,
             auth_port: DEFAULT_AUTH_PORT,
@@ -220,6 +231,14 @@ impl Reth {
     /// Enable `dev` mode for the Reth instance.
     pub const fn dev(mut self) -> Self {
         self.dev = true;
+        self
+    }
+
+    /// Sets the host which will be used when the `reth` instance is launched.
+    ///
+    /// Defaults to `localhost`.
+    pub fn host<T: Into<String>>(mut self, host: T) -> Self {
+        self.host = Some(host.into());
         self
     }
 
@@ -408,9 +427,17 @@ impl Reth {
         cmd.arg("--http");
         cmd.arg("--http.api").arg(API);
 
+        if let Some(ref host) = self.host {
+            cmd.arg("--http.addr").arg(host);
+        }
+
         // Open the WS API.
         cmd.arg("--ws");
         cmd.arg("--ws.api").arg(API);
+
+        if let Some(ref host) = self.host {
+            cmd.arg("--ws.addr").arg(host);
+        }
 
         // Configure the IPC path if it is set.
         if let Some(ipc) = &self.ipc_path {
@@ -528,6 +555,7 @@ impl Reth {
 
         Ok(RethInstance {
             pid: child,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
             instance: self.instance,
             http_port,
             ws_port,
@@ -537,5 +565,30 @@ impl Reth {
             auth_port: Some(auth_port),
             genesis: self.genesis,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_set_host() {
+        let reth = Reth::new().host("0.0.0.0").dev().try_spawn();
+        if let Ok(reth) = reth {
+            assert_eq!(reth.host(), "0.0.0.0");
+            assert!(reth.endpoint().starts_with("http://0.0.0.0:"));
+            assert!(reth.ws_endpoint().starts_with("ws://0.0.0.0:"));
+        }
+    }
+
+    #[test]
+    fn default_host_is_localhost() {
+        let reth = Reth::new().dev().try_spawn();
+        if let Ok(reth) = reth {
+            assert_eq!(reth.host(), "localhost");
+            assert!(reth.endpoint().starts_with("http://localhost:"));
+            assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
+        }
     }
 }

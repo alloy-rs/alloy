@@ -43,13 +43,10 @@ serde_json = { workspace = true, features = ["raw_value"] }
 alloy-pubsub = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-rpc-client = { workspace = true, features = ["pubsub", "ws"] }
-alloy-transport-http = { workspace = true, features = ["reqwest-rustls-tls"] }
 alloy-node-bindings.workspace = true
 alloy-provider = { workspace = true, features = ["anvil-node"] }
 alloy-signer-local.workspace = true
 
-reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber.workspace = true
 serde_json.workspace = true

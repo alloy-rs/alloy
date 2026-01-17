@@ -152,7 +152,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Reorg the chain
     async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()>;
 
-    /// Rollback the chain  
+    /// Rollback the chain
     async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()>;
 
     /// Retrieves a blob by its versioned hash.
@@ -1235,7 +1235,7 @@ mod tests {
                     let bob = accounts[1];
                     let sidecar: SidecarBuilder<SimpleCoder> =
                         SidecarBuilder::from_slice(b"Blobs are fun!");
-                    let sidecar = sidecar.build().unwrap();
+                    let sidecar = sidecar.build_4844().unwrap();
 
                     let tx = TransactionRequest::default()
                         .with_from(alice)
@@ -1275,7 +1275,7 @@ mod tests {
                     let bob = accounts[1];
                     let sidecar: SidecarBuilder<SimpleCoder> =
                         SidecarBuilder::from_slice(b"Blobs are fun!");
-                    let sidecar = sidecar.build().unwrap();
+                    let sidecar = sidecar.build_4844().unwrap();
 
                     let tx = TransactionRequest::default()
                         .with_from(alice)

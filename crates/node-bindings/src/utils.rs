@@ -5,8 +5,41 @@ use std::{
     future::Future,
     net::{SocketAddr, TcpListener},
     path::PathBuf,
+    process::Child,
+    time::{Duration, Instant},
 };
 use tempfile::TempDir;
+
+#[cfg(unix)]
+use libc;
+
+/// Helper for graceful process shutdown.
+pub(crate) struct GracefulShutdown;
+
+impl GracefulShutdown {
+    /// Attempts graceful shutdown with SIGTERM, then SIGKILL after timeout.
+    pub(crate) fn shutdown(child: &mut Child, timeout_secs: u64, process_name: &str) {
+        #[cfg(unix)]
+        {
+            unsafe {
+                libc::kill(child.id() as i32, libc::SIGTERM);
+            }
+
+            let timeout = Duration::from_secs(timeout_secs);
+            let start = Instant::now();
+
+            while start.elapsed() < timeout {
+                match child.try_wait() {
+                    Ok(Some(_)) => return,
+                    Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+                    Err(_) => break,
+                }
+            }
+        }
+
+        child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
+    }
+}
 
 /// A bit of hack to find an unused TCP port.
 ///

@@ -44,7 +44,7 @@ impl BorrowedResponse<'_> {
     /// Convert this borrowed response to an owned response by copying the data
     /// from the deserializer (if necessary).
     pub fn into_owned(self) -> Response {
-        Response { id: self.id.clone(), payload: self.payload.into_owned() }
+        Response { id: self.id, payload: self.payload.into_owned() }
     }
 }
 

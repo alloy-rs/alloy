@@ -1,7 +1,7 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    utils::{extract_endpoint, extract_value, unused_port},
+    utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown},
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
@@ -68,6 +68,7 @@ impl Default for PrivateNetOptions {
 #[derive(Debug)]
 pub struct GethInstance {
     pid: Child,
+    host: String,
     port: u16,
     p2p_port: Option<u16>,
     auth_port: Option<u16>,
@@ -78,6 +79,11 @@ pub struct GethInstance {
 }
 
 impl GethInstance {
+    /// Returns the host of this instance
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
     /// Returns the port of this instance
     pub const fn port(&self) -> u16 {
         self.port
@@ -96,12 +102,12 @@ impl GethInstance {
     /// Returns the HTTP endpoint of this instance
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.port)
+        format!("http://{}:{}", self.host, self.port)
     }
 
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.port)
+        format!("ws://{}:{}", self.host, self.port)
     }
 
     /// Returns the IPC endpoint of this instance
@@ -169,7 +175,7 @@ impl GethInstance {
 
 impl Drop for GethInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill geth");
+        GracefulShutdown::shutdown(&mut self.pid, 10, "geth");
     }
 }
 
@@ -195,6 +201,7 @@ impl Drop for GethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Geth {
     program: Option<PathBuf>,
+    host: Option<String>,
     port: Option<u16>,
     authrpc_port: Option<u16>,
     ipc_path: Option<PathBuf>,
@@ -273,6 +280,14 @@ impl Geth {
     /// [GethInstance::port] will return the port that was chosen.
     pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
         self.port = Some(port.into());
+        self
+    }
+
+    /// Sets the host which will be used when the `geth` instance is launched.
+    ///
+    /// Defaults to `localhost`.
+    pub fn host<T: Into<String>>(mut self, host: T) -> Self {
+        self.host = Some(host.into());
         self
     }
 
@@ -449,10 +464,18 @@ impl Geth {
         cmd.arg("--http.port").arg(&port_s);
         cmd.arg("--http.api").arg(API);
 
+        if let Some(ref host) = self.host {
+            cmd.arg("--http.addr").arg(host);
+        }
+
         // Open the WS API
         cmd.arg("--ws");
         cmd.arg("--ws.port").arg(port_s);
         cmd.arg("--ws.api").arg(API);
+
+        if let Some(ref host) = self.host {
+            cmd.arg("--ws.addr").arg(host);
+        }
 
         // pass insecure unlock flag if set
         let is_clique = self.is_clique();
@@ -670,6 +693,7 @@ impl Geth {
 
         Ok(GethInstance {
             pid: child,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
             port,
             ipc: self.ipc_path,
             data_dir: self.data_dir,
@@ -678,5 +702,30 @@ impl Geth {
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_set_host() {
+        let geth = Geth::new().host("0.0.0.0").dev().try_spawn();
+        if let Ok(geth) = geth {
+            assert_eq!(geth.host(), "0.0.0.0");
+            assert!(geth.endpoint().starts_with("http://0.0.0.0:"));
+            assert!(geth.ws_endpoint().starts_with("ws://0.0.0.0:"));
+        }
+    }
+
+    #[test]
+    fn default_host_is_localhost() {
+        let geth = Geth::new().dev().try_spawn();
+        if let Ok(geth) = geth {
+            assert_eq!(geth.host(), "localhost");
+            assert!(geth.endpoint().starts_with("http://localhost:"));
+            assert!(geth.ws_endpoint().starts_with("ws://localhost:"));
+        }
     }
 }

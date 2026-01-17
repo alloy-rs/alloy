@@ -1,11 +1,12 @@
 use super::signer::NetworkWallet;
 use crate::Network;
+pub use alloy_network_primitives::{
+    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
+};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionInputKind};
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
-
-pub use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 
 /// Result type for transaction builders
 pub type BuildResult<T, N> = Result<T, UnbuiltTransactionError<N>>;

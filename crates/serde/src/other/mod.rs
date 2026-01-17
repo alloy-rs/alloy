@@ -50,7 +50,7 @@ impl OtherFields {
 
     /// Deserialized this type into another container type.
     pub fn deserialize_as<T: DeserializeOwned>(&self) -> serde_json::Result<T> {
-        serde_json::from_value(Value::Object(self.inner.clone().into_iter().collect()))
+        self.clone().deserialize_into()
     }
 
     /// Deserialized this type into another container type.
