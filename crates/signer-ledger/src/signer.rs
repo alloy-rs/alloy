@@ -340,7 +340,7 @@ impl LedgerSigner {
         // workaround for https://github.com/LedgerHQ/app-ethereum/issues/409
         // TODO: remove in future version
         let chunk_size =
-            (0..=255).rev().find(|i| payload.len() % i != 3).expect("true for any length");
+            (1..=255).rev().find(|i| payload.len() % i != 3).expect("true for any length");
 
         // Iterate in 255 byte chunks
         for chunk in payload.chunks(chunk_size) {
@@ -385,8 +385,34 @@ impl LedgerSigner {
 
         let mut bytes = vec![depth as u8];
         for derivation_index in elements {
-            let hardened = derivation_index.contains('\'');
-            let mut index = derivation_index.replace('\'', "").parse::<u32>().unwrap();
+            // Fast path: avoid allocating via `replace` for the common "digits + optional '\''"
+            // derivation format (e.g. `44'`).
+            //
+            // Fallback to the previous implementation for any other string to preserve behavior.
+            let hardened = derivation_index.as_bytes().contains(&b'\'');
+            let mut index = if derivation_index
+                .bytes()
+                .all(|b| b.is_ascii_digit() || b == b'\'')
+            {
+                let mut saw_digit = false;
+                let mut acc: Option<u32> = Some(0);
+                for b in derivation_index.bytes() {
+                    if b.is_ascii_digit() {
+                        saw_digit = true;
+                        let digit = (b - b'0') as u32;
+                        acc = match acc {
+                            Some(v) => v.checked_mul(10).and_then(|v| v.checked_add(digit)),
+                            None => None,
+                        };
+                    }
+                }
+                match (saw_digit, acc) {
+                    (true, Some(v)) => v,
+                    _ => derivation_index.replace('\'', "").parse::<u32>().unwrap(),
+                }
+            } else {
+                derivation_index.replace('\'', "").parse::<u32>().unwrap()
+            };
             if hardened {
                 index |= 0x80000000;
             }
@@ -408,6 +434,44 @@ mod tests {
     use std::sync::OnceLock;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
+
+    #[test]
+    fn test_path_to_bytes_ledger_live_0() {
+        let bytes = LedgerSigner::path_to_bytes(&DerivationType::LedgerLive(0));
+        assert_eq!(
+            bytes,
+            vec![
+                5, // depth
+                0x80, 0x00, 0x00, 0x2c, // 44'
+                0x80, 0x00, 0x00, 0x3c, // 60'
+                0x80, 0x00, 0x00, 0x00, // 0'
+                0x00, 0x00, 0x00, 0x00, // 0
+                0x00, 0x00, 0x00, 0x00, // 0
+            ]
+        );
+    }
+
+    #[test]
+    fn test_path_to_bytes_legacy_0() {
+        let bytes = LedgerSigner::path_to_bytes(&DerivationType::Legacy(0));
+        assert_eq!(
+            bytes,
+            vec![
+                4, // depth
+                0x80, 0x00, 0x00, 0x2c, // 44'
+                0x80, 0x00, 0x00, 0x3c, // 60'
+                0x80, 0x00, 0x00, 0x00, // 0'
+                0x00, 0x00, 0x00, 0x00, // 0
+            ]
+        );
+    }
+
+    #[test]
+    fn test_path_to_bytes_other_matches_ledger_live_string() {
+        // Ensure `DerivationType::Other` continues to be interpreted consistently.
+        let bytes = LedgerSigner::path_to_bytes(&DerivationType::Other("m/44'/60'/0'/0/0".into()));
+        assert_eq!(bytes, LedgerSigner::path_to_bytes(&DerivationType::LedgerLive(0)));
+    }
 
     fn my_address() -> Address {
         static ADDRESS: OnceLock<Address> = OnceLock::new();
