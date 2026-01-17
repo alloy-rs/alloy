@@ -187,7 +187,11 @@ impl GroupedVariants {
 
             // Check that variant has exactly one unnamed field
             let ty = match &fields.style {
-                darling::ast::Style::Tuple if fields.len() == 1 => fields.fields[0].clone(),
+                darling::ast::Style::Tuple if fields.len() == 1 => fields
+                    .fields
+                    .into_iter()
+                    .next()
+                    .expect("len checked"),
                 darling::ast::Style::Tuple => {
                     return Err(darling::Error::custom(format!(
                         "expected exactly one field, found {}",
