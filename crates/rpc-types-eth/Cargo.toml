@@ -55,7 +55,6 @@ alloy-primitives = { workspace = true, features = [
 ] }
 alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
 alloy-eips = { workspace = true, features = ["arbitrary", "k256"] }
-alloy-network = { workspace = true }
 
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true

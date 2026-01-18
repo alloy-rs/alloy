@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Features
+
+- [consensus] Relax Block::decode_sealed to accept any H: Decodable ([#3523](https://github.com/alloy-rs/alloy/issues/3523))
+- [consensus] Add decode_sealed for efficient sealed block/header decoding ([#3519](https://github.com/alloy-rs/alloy/issues/3519))
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Bug Fixes
+
+- Support Eip7594 blob format for tx build ([#3446](https://github.com/alloy-rs/alloy/issues/3446))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+- Release 1.4.0
+- Remove dead random buffer from custom envelope test ([#3456](https://github.com/alloy-rs/alloy/issues/3456))
+- Update alloy-trie ([#3454](https://github.com/alloy-rs/alloy/issues/3454))
+- Fix misleading comments ([#3445](https://github.com/alloy-rs/alloy/issues/3445))
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Documentation
+
+- [consensus] Correct doc comment for authorization_list ([#3442](https://github.com/alloy-rs/alloy/issues/3442))
+- `s/EIP-4337/ERC-4337/g;` ([#3431](https://github.com/alloy-rs/alloy/issues/3431))
+
+### Features
+
+- [consensus] Add HeaderRoots type ([#3427](https://github.com/alloy-rs/alloy/issues/3427))
+- [`contract`] Add sidecar_7594 to CallBuilder ([#3424](https://github.com/alloy-rs/alloy/issues/3424))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+- Add deprecated type alias back ([#3422](https://github.com/alloy-rs/alloy/issues/3422))
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Bug Fixes
+
+- Simplify size functions ([#3403](https://github.com/alloy-rs/alloy/issues/3403))
+
+### Dependencies
+
+- [deps] Run cargo shear ([#3405](https://github.com/alloy-rs/alloy/issues/3405))
+
+### Documentation
+
+- Fix try_into_eip7702 documentation ([#3317](https://github.com/alloy-rs/alloy/issues/3317))
+
+### Features
+
+- [consensus] Add buffer-based signer recovery methods ([#3340](https://github.com/alloy-rs/alloy/issues/3340))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Bug Fixes
@@ -17,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.1.3
 - Prefix hash constants with 0x ([#3272](https://github.com/alloy-rs/alloy/issues/3272))
 
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
@@ -83,17 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Release 1.0.42
 - Fix clippy ([#3044](https://github.com/alloy-rs/alloy/issues/3044))
-
-## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
-
-### Miscellaneous Tasks
-
 - Release 1.0.41
-
-## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
-
-### Miscellaneous Tasks
-
 - Release 1.0.40
 
 ## [1.0.39](https://github.com/alloy-rs/alloy/releases/tag/v1.0.39) - 2025-10-16
@@ -238,30 +294,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
-
-### Miscellaneous Tasks
-
-- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
-
-## [1.0.26](https://github.com/alloy-rs/alloy/releases/tag/v1.0.26) - 2025-08-26
-
-### Features
-
 - Add TxHashRef trait and implementations ([#2751](https://github.com/alloy-rs/alloy/issues/2751))
 - Add helpers for encoding block from parts ([#2809](https://github.com/alloy-rs/alloy/issues/2809))
-
-### Miscellaneous Tasks
-
-- Release 1.0.26
-
-## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
-
-### Features
-
 - Expose alloy trie ([#2773](https://github.com/alloy-rs/alloy/issues/2773))
 
 ### Miscellaneous Tasks
 
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+- Release 1.0.26
 - Release 1.0.25
 - Fix warnings ([#2799](https://github.com/alloy-rs/alloy/issues/2799))
 - Add typos ([#2787](https://github.com/alloy-rs/alloy/issues/2787))
@@ -380,11 +420,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.0.12
-
-## [1.0.11](https://github.com/alloy-rs/alloy/releases/tag/v1.0.11) - 2025-06-17
-
-### Miscellaneous Tasks
-
 - Release 1.0.11
 
 ## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
@@ -867,23 +902,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
-### Features
-
-- Add deref for block ([#1868](https://github.com/alloy-rs/alloy/issues/1868))
-
-### Miscellaneous Tasks
-
-- Release 0.9.1
-- Add arbitrary for blockbody ([#1867](https://github.com/alloy-rs/alloy/issues/1867))
-
-## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
-
 ### Bug Fixes
 
 - Use u64 for all gas values ([#1848](https://github.com/alloy-rs/alloy/issues/1848))
 
 ### Features
 
+- Add deref for block ([#1868](https://github.com/alloy-rs/alloy/issues/1868))
 - Add tryfrom payloadv1 for block ([#1851](https://github.com/alloy-rs/alloy/issues/1851))
 - Add match functions ([#1847](https://github.com/alloy-rs/alloy/issues/1847))
 - Add BlockConditional ([#1846](https://github.com/alloy-rs/alloy/issues/1846))
@@ -896,6 +921,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.9.1
+- Add arbitrary for blockbody ([#1867](https://github.com/alloy-rs/alloy/issues/1867))
 - Rm unused alloy-signer dep ([#1862](https://github.com/alloy-rs/alloy/issues/1862))
 - Rm non exhaustive from ReceiptEnvelope ([#1843](https://github.com/alloy-rs/alloy/issues/1843))
 - Rm non exhaustive for envelope ([#1842](https://github.com/alloy-rs/alloy/issues/1842))
@@ -968,15 +995,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Bug Fixes
 
 - Adjust EIP-7742 to latest spec ([#1713](https://github.com/alloy-rs/alloy/issues/1713))
+- Pass slice to RlpReceipt::rlp_decode_fields ([#1696](https://github.com/alloy-rs/alloy/issues/1696))
+- [`consensus`] Serde aliases to avoid breaking changes ([#1654](https://github.com/alloy-rs/alloy/issues/1654))
 
 ### Documentation
 
@@ -992,25 +1015,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Receipt root fn ([#1708](https://github.com/alloy-rs/alloy/issues/1708))
 - Impl `Encodable2718` for `ReceiptWithBloom` ([#1719](https://github.com/alloy-rs/alloy/issues/1719))
 - Add blob_gas_used ([#1704](https://github.com/alloy-rs/alloy/issues/1704))
-
-### Miscellaneous Tasks
-
-- Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
-- Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
-- Rm redundant generic ([#1737](https://github.com/alloy-rs/alloy/issues/1737))
-- Relax ommers root fn ([#1736](https://github.com/alloy-rs/alloy/issues/1736))
-- Add missing from impl ([#1732](https://github.com/alloy-rs/alloy/issues/1732))
-- Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
-
-## [0.7.0](https://github.com/alloy-rs/alloy/releases/tag/v0.7.0) - 2024-11-28
-
-### Bug Fixes
-
-- Pass slice to RlpReceipt::rlp_decode_fields ([#1696](https://github.com/alloy-rs/alloy/issues/1696))
-- [`consensus`] Serde aliases to avoid breaking changes ([#1654](https://github.com/alloy-rs/alloy/issues/1654))
-
-### Features
-
 - EIP-7742 ([#1600](https://github.com/alloy-rs/alloy/issues/1600))
 - Add parent_num_hash to BlockHeader ([#1687](https://github.com/alloy-rs/alloy/issues/1687))
 - Modifiy ReceiptWithBloom and associated impls to use with Reth ([#1672](https://github.com/alloy-rs/alloy/issues/1672))
@@ -1024,6 +1028,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
+- Export storage root fns ([#1756](https://github.com/alloy-rs/alloy/issues/1756))
+- Re-export stateroot fns ([#1753](https://github.com/alloy-rs/alloy/issues/1753))
+- Rm redundant generic ([#1737](https://github.com/alloy-rs/alloy/issues/1737))
+- Relax ommers root fn ([#1736](https://github.com/alloy-rs/alloy/issues/1736))
+- Add missing from impl ([#1732](https://github.com/alloy-rs/alloy/issues/1732))
+- Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 - Release 0.7.0
 - Relax from impl ([#1698](https://github.com/alloy-rs/alloy/issues/1698))
 - Make clippy happy ([#1677](https://github.com/alloy-rs/alloy/issues/1677))
@@ -1260,11 +1271,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
-
-## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
-
-### Miscellaneous Tasks
-
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
@@ -1363,50 +1369,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
-### Features
-
-- Impl Transaction for TxEnvelope ([#1006](https://github.com/alloy-rs/alloy/issues/1006))
-
-### Miscellaneous Tasks
-
-- Release 0.1.4
-
-### Other
-
-- Remove signature.v parity before calculating tx hash ([#893](https://github.com/alloy-rs/alloy/issues/893))
-
-## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
-
 ### Documentation
 
 - Copy/paste error of eip-7251 link ([#961](https://github.com/alloy-rs/alloy/issues/961))
 
 ### Features
 
+- Impl Transaction for TxEnvelope ([#1006](https://github.com/alloy-rs/alloy/issues/1006))
 - Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
 
 ### Miscellaneous Tasks
 
+- Release 0.1.4
 - Release 0.1.3
 - [eips] Make `sha2` optional, add `kzg-sidecar` feature ([#949](https://github.com/alloy-rs/alloy/issues/949))
 
+### Other
+
+- Remove signature.v parity before calculating tx hash ([#893](https://github.com/alloy-rs/alloy/issues/893))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
-
-### Documentation
-
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
-
-### Features
-
-- Add eip-7251 consolidation request ([#919](https://github.com/alloy-rs/alloy/issues/919))
-
-### Miscellaneous Tasks
-
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
-
-## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Bug Fixes
 
@@ -1435,10 +1417,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
 - Update descriptions and top level summary ([#128](https://github.com/alloy-rs/alloy/issues/128))
 
 ### Features
 
+- Add eip-7251 consolidation request ([#919](https://github.com/alloy-rs/alloy/issues/919))
 - Derive serde for header ([#902](https://github.com/alloy-rs/alloy/issues/902))
 - Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
 - Add as_ is_ functions to envelope ([#872](https://github.com/alloy-rs/alloy/issues/872))
@@ -1475,6 +1459,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 - [clippy] Apply lint suggestions ([#903](https://github.com/alloy-rs/alloy/issues/903))
 - Rm unused txtype mod ([#879](https://github.com/alloy-rs/alloy/issues/879))
 - [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
