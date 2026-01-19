@@ -2343,6 +2343,11 @@ impl ExecutionData {
         self.payload.withdrawals()
     }
 
+    /// Returns the number of transactions in the payload.
+    pub const fn transaction_count(&self) -> usize {
+        self.payload.transactions().len()
+    }
+
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
     ///
     /// Performs additional validation of `extra_data` and `base_fee_per_gas` fields.
