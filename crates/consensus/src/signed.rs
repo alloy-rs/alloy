@@ -473,6 +473,19 @@ impl<T: Transaction> Transaction for Sealed<T> {
 }
 
 #[cfg(any(feature = "secp256k1", feature = "k256"))]
+fn signature_hash_with_buf<T>(
+    tx: &T,
+    buf: &mut alloc::vec::Vec<u8>,
+) -> B256
+where
+    T: SignableTransaction<Signature>,
+{
+    buf.clear();
+    tx.encode_for_signing(buf);
+    alloy_primitives::keccak256(buf)
+}
+
+#[cfg(any(feature = "secp256k1", feature = "k256"))]
 impl<T> crate::transaction::SignerRecoverable for Signed<T>
 where
     T: SignableTransaction<Signature>,
@@ -493,9 +506,7 @@ where
         &self,
         buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
-        buf.clear();
-        self.tx.encode_for_signing(buf);
-        let signature_hash = alloy_primitives::keccak256(buf);
+        let signature_hash = signature_hash_with_buf(&self.tx, buf);
         crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
     }
 
@@ -503,9 +514,7 @@ where
         &self,
         buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
-        buf.clear();
-        self.tx.encode_for_signing(buf);
-        let signature_hash = alloy_primitives::keccak256(buf);
+        let signature_hash = signature_hash_with_buf(&self.tx, buf);
         crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
     }
 }
