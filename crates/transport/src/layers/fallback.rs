@@ -111,7 +111,8 @@ impl<S: Clone> FallbackService<S> {
         }
     }
 
-    /// Returns the top transports sorted by score (best first), limited by `active_transport_count`.
+    /// Returns the top transports sorted by score (best first), limited by
+    /// `active_transport_count`.
     fn top_transports(&self) -> Vec<ScoredTransport<S>> {
         // Clone the vec, sort it, and keep only the top `self.active_transport_count`.
         let mut transports_clone = (*self.transports).clone();
