@@ -53,7 +53,7 @@ pub trait Signer<Sig = Signature> {
 
     /// Encodes and signs the typed data according to [EIP-712] using dynamically-typed data.
     ///
-    /// Unlike [`sign_typed_data`], this method works with unsized Signers (trait objects like
+    /// Unlike [`Signer::sign_typed_data`], this method works with unsized Signers (trait objects like
     /// `Box<dyn Signer>`).
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
@@ -124,7 +124,7 @@ pub trait SignerSync<Sig = Signature> {
 
     /// Encodes and signs the typed data according to [EIP-712] using dynamically-typed data.
     ///
-    /// Unlike [`sign_typed_data_sync`], this method works with unsized Signers (trait objects like
+    /// Unlike [`SignerSync::sign_typed_data_sync`], this method works with unsized Signers (trait objects like
     /// `Box<dyn SignerSync>`).
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
