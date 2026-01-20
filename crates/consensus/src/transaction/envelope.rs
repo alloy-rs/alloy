@@ -1059,7 +1059,7 @@ pub mod serde_bincode_compat {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{Recovered, SignableTransaction, SignerRecoverable},
+        transaction::{Recovered, SignableTransaction},
         Transaction, TxEip4844, TxEip4844WithSidecar,
     };
     use alloc::vec::Vec;
@@ -1069,8 +1069,9 @@ mod tests {
         eip7594::BlobTransactionSidecarVariant,
         eip7702::Authorization,
     };
-    #[allow(unused_imports)]
-    use alloy_primitives::{b256, Bytes, TxKind};
+    use alloy_primitives::{b256, Bytes};
+    #[cfg(feature = "k256")]
+    use alloy_primitives::TxKind;
     use alloy_primitives::{hex, Address, Signature, U256};
     use alloy_rlp::Decodable;
     use std::{fs, path::PathBuf, str::FromStr, vec};
