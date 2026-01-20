@@ -312,6 +312,7 @@ impl From<GenesisAccount> for TrieAccount {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
+#[non_exhaustive]
 pub struct ChainConfig {
     /// The network's chain ID.
     pub chain_id: u64,
