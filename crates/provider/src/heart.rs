@@ -535,19 +535,45 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
     /// Accepts new chain height as an argument, and drops any subscriptions
     /// that were received in blocks affected by the reorg (e.g. >= new_height).
     fn move_reorg_to_unconfirmed(&mut self, new_height: u64) {
+        let last_height = self.past_blocks.back().map(|(h, _)| *h).unwrap_or(new_height);
+
         for waiters in self.waiting_confs.values_mut() {
             *waiters = std::mem::take(waiters).into_iter().filter_map(|watcher| {
                 if let Some(received_at_block) = watcher.received_at_block {
                     // All blocks after and _including_ the new height are reaped.
-                    if received_at_block >= new_height {
+                    if received_at_block >= new_height || received_at_block > last_height {
                         let hash = watcher.config.tx_hash;
-                        debug!(tx=%hash, %received_at_block, %new_height, "return to unconfirmed after chain gap");
+                        debug!(tx=%hash, %received_at_block, %new_height, %last_height, "return to unconfirmed after chain gap");
                         self.unconfirmed.insert(hash, watcher);
                         return None;
                     }
                 }
                 Some(watcher)
             }).collect();
+        }
+
+        let gap_size = new_height.saturating_sub(last_height + 1);
+        const MAX_RECOVERABLE_GAP: u64 = 10;
+
+        if gap_size >= MAX_RECOVERABLE_GAP {
+            debug! {
+                gap_size,
+                last_height,
+                new_height,
+                "large gap detected, timing out unconfirmed transactions"
+            };
+
+            let to_timeout: Vec<_> = self.unconfirmed.keys().copied().collect();
+            for tx_hash in to_timeout {
+                if let Some(watcher) = self.unconfirmed.remove(&tx_hash) {
+                    warn!(
+                        tx=%tx_hash,
+                        gap_size,
+                        "transaction lost in large reorg gap, timing out"
+                    );
+                    watcher.notify(Err(WatchTxError::Timeout));
+                }
+            }
         }
     }
 
@@ -740,5 +766,91 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
             // Always reap timeouts
             self.reap_timeouts();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_network::Ethereum;
+    use alloy_primitives::b256;
+    use std::collections::VecDeque;
+    use tokio::sync::oneshot;
+
+    fn create_test_heartbeat(
+    ) -> Heartbeat<Ethereum, futures::stream::Empty<alloy_rpc_types_eth::Block>> {
+        let stream = futures::stream::empty();
+        let paused = Arc::new(Paused::default());
+
+        Heartbeat {
+            stream: stream.fuse(),
+            past_blocks: VecDeque::new(),
+            unconfirmed: B256HashMap::default(),
+            waiting_confs: BTreeMap::new(),
+            reap_at: BTreeMap::new(),
+            paused,
+            _network: std::marker::PhantomData,
+        }
+    }
+
+    fn create_test_watcher(
+        tx_hash: B256,
+    ) -> (TxWatcher, oneshot::Receiver<Result<(), WatchTxError>>) {
+        let (tx, rx) = oneshot::channel();
+        let config = PendingTransactionConfig::new(tx_hash);
+        let watcher = TxWatcher { config, received_at_block: None, tx };
+        (watcher, rx)
+    }
+
+    #[test]
+    fn test_large_gap_clear_unconfirmed() {
+        let mut heartbeat = create_test_heartbeat();
+        heartbeat.past_blocks.push_back((100, B256HashSet::default()));
+
+        let tx_hash = b256!("1111111111111111111111111111111111111111111111111111111111111111");
+        let (watcher, mut rx) = create_test_watcher(tx_hash);
+        heartbeat.unconfirmed.insert(tx_hash, watcher);
+
+        assert_eq!(heartbeat.unconfirmed.len(), 1);
+
+        heartbeat.move_reorg_to_unconfirmed(115);
+
+        assert_eq!(heartbeat.unconfirmed.len(), 0, "unconfirmed should be empty");
+        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))));
+    }
+
+    #[test]
+    fn test_small_gap_keeps_unconfirmed() {
+        let mut heartbeat = create_test_heartbeat();
+        heartbeat.past_blocks.push_back((100, B256HashSet::default()));
+
+        let tx_hash = b256!("2222222222222222222222222222222222222222222222222222222222222222");
+        let (watcher, mut rx) = create_test_watcher(tx_hash);
+        heartbeat.unconfirmed.insert(tx_hash, watcher);
+
+        heartbeat.move_reorg_to_unconfirmed(105);
+
+        assert_eq!(heartbeat.unconfirmed.len(), 1, "unconfirmed should still have tx");
+        assert!(matches!(rx.try_recv(), Err(oneshot::error::TryRecvError::Empty)));
+    }
+
+    #[test]
+    fn test_waiting_confs_in_gap_gets_timed_out() {
+        let mut heartbeat = create_test_heartbeat();
+        heartbeat.past_blocks.push_back((100, B256HashSet::default()));
+
+        let tx_hash = b256!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let (mut watcher, mut rx) = create_test_watcher(tx_hash);
+
+        watcher.received_at_block = Some(105);
+        heartbeat.waiting_confs.entry(110).or_default().push(watcher);
+
+        assert_eq!(heartbeat.waiting_confs.len(), 1);
+        assert_eq!(heartbeat.unconfirmed.len(), 0);
+
+        heartbeat.move_reorg_to_unconfirmed(115);
+
+        assert_eq!(heartbeat.unconfirmed.len(), 0, "should be timed out");
+        assert!(matches!(rx.try_recv(), Ok(Err(WatchTxError::Timeout))));
     }
 }
