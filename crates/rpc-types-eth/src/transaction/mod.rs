@@ -548,22 +548,6 @@ mod tx_serde {
 mod tests {
     use super::*;
 
-    #[allow(unused)]
-    fn assert_convert_into_envelope(tx: Transaction) -> TxEnvelope {
-        tx.into()
-    }
-    #[allow(unused)]
-    fn assert_convert_into_consensus(tx: Transaction) -> EthereumTxEnvelope<TxEip4844> {
-        tx.into()
-    }
-
-    #[allow(unused)]
-    fn assert_convert_into_typed(
-        tx: Transaction<EthereumTypedTransaction<TxEip4844>>,
-    ) -> EthereumTypedTransaction<TxEip4844> {
-        tx.into()
-    }
-
     #[test]
     #[cfg(feature = "serde")]
     fn into_request_legacy() {
