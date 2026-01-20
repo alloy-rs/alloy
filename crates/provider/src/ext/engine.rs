@@ -51,6 +51,20 @@ pub trait EngineApi<N>: Send + Sync {
         execution_requests: Vec<Bytes>,
     ) -> TransportResult<PayloadStatus>;
 
+    /// Sends the given payload to the execution layer client, as specified for the Prague fork.
+    ///
+    /// This is a variant of [`Self::new_payload_v4`] that accepts [`RequestsOrHash`] for the
+    /// execution requests, allowing either the full requests or just a precomputed hash.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/03911ffc053b8b806123f1fc237184b0092a485a/src/engine/prague.md#engine_newpayloadv4>
+    async fn new_payload_v4_requests(
+        &self,
+        payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
+    ) -> TransportResult<PayloadStatus>;
+
     /// Sends the given payload to the execution layer client, as specified for the Amsterdam fork.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_newpayloadv5>
@@ -261,6 +275,21 @@ where
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
         execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request(
+                "engine_newPayloadV4",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
+            .await
+    }
+
+    async fn new_payload_v4_requests(
+        &self,
+        payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
     ) -> TransportResult<PayloadStatus> {
         self.client()
             .request(
