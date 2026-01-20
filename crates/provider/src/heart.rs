@@ -553,6 +553,13 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
         }
 
         let gap_size = new_height.saturating_sub(last_height + 1);
+
+        // Timeout threshold for large block gaps. Transactions confirmed in the gap
+        // cannot be detected, causing indefinite polling.
+        //
+        // Set to 10 blocks to balance:
+        // - Tolerating deep reorgs (mainnet typically < 7 blocks)
+        // - Responsiveness on fast chains (e.g., Arbitrum: 10 blocks ~ 2.5s)
         const MAX_RECOVERABLE_GAP: u64 = 10;
 
         if gap_size >= MAX_RECOVERABLE_GAP {
