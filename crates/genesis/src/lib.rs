@@ -597,9 +597,9 @@ pub mod serde_bincode_compat {
                 blob_schedule: Cow::Borrowed(&value.blob_schedule),
                 extra_fields: {
                     let mut extra_fields = BTreeMap::new();
-                    for (k, v) in value.extra_fields.clone().into_iter() {
+                    for (k, v) in &value.extra_fields {
                         // Convert all serde_json::Value types to string for bincode compatibility
-                        extra_fields.insert(k, v.to_string());
+                        extra_fields.insert(k.clone(), v.to_string());
                     }
                     extra_fields
                 },

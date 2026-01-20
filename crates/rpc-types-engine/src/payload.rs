@@ -20,7 +20,7 @@ use alloy_eips::{
     eip7840::BlobParams,
     BlockNumHash,
 };
-use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -261,6 +261,108 @@ pub struct ExecutionPayloadEnvelopeV5 {
     pub execution_requests: Requests,
 }
 
+impl ExecutionPayloadEnvelopeV4 {
+    /// Converts this V4 envelope into a [`ExecutionPayloadEnvelopeV5`] by computing EIP-7594
+    /// cell proofs for the blobs bundle.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v5_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v5(
+        self,
+    ) -> Result<ExecutionPayloadEnvelopeV5, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v5_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V4 envelope into a [`ExecutionPayloadEnvelopeV5`] by computing EIP-7594
+    /// cell proofs for the blobs bundle using the provided KZG settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v5_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<ExecutionPayloadEnvelopeV5, alloy_eips::eip4844::c_kzg::Error> {
+        let blobs_bundle = self.envelope_inner.blobs_bundle.try_into_v2_with_settings(settings)?;
+        Ok(ExecutionPayloadEnvelopeV5 {
+            execution_payload: self.envelope_inner.execution_payload,
+            block_value: self.envelope_inner.block_value,
+            blobs_bundle,
+            should_override_builder: self.envelope_inner.should_override_builder,
+            execution_requests: self.execution_requests,
+        })
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<ExecutionPayloadEnvelopeV4> for ExecutionPayloadEnvelopeV5 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: ExecutionPayloadEnvelopeV4) -> Result<Self, Self::Error> {
+        value.try_into_v5()
+    }
+}
+
+impl ExecutionPayloadEnvelopeV5 {
+    /// Converts this V5 envelope into a [`ExecutionPayloadEnvelopeV4`] by computing EIP-4844
+    /// blob proofs for the blobs bundle.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v4_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v4(
+        self,
+    ) -> Result<ExecutionPayloadEnvelopeV4, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v4_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V5 envelope into a [`ExecutionPayloadEnvelopeV4`] by computing EIP-4844
+    /// blob proofs for the blobs bundle using the provided KZG settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v4_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<ExecutionPayloadEnvelopeV4, alloy_eips::eip4844::c_kzg::Error> {
+        let blobs_bundle = self.blobs_bundle.try_into_v1_with_settings(settings)?;
+        Ok(ExecutionPayloadEnvelopeV4 {
+            envelope_inner: ExecutionPayloadEnvelopeV3 {
+                execution_payload: self.execution_payload,
+                block_value: self.block_value,
+                blobs_bundle,
+                should_override_builder: self.should_override_builder,
+            },
+            execution_requests: self.execution_requests,
+        })
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<ExecutionPayloadEnvelopeV5> for ExecutionPayloadEnvelopeV4 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: ExecutionPayloadEnvelopeV5) -> Result<Self, Self::Error> {
+        value.try_into_v4()
+    }
+}
+
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
@@ -338,10 +440,8 @@ impl ExecutionPayloadV1 {
         }
 
         // Calculate the transactions root using encoded bytes
-        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
-            &self.transactions,
-            |item, buf| buf.put_slice(item),
-        );
+        let transactions_root =
+            alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions);
 
         let header = Header {
             parent_hash: self.parent_hash,
@@ -921,6 +1021,14 @@ impl BlobsBundleV1 {
         Self::default()
     }
 
+    /// Computes the versioned hashes from the KZG commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        self.commitments
+            .iter()
+            .map(|c| alloy_eips::eip4844::kzg_to_versioned_hash(c.as_slice()))
+            .collect()
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// # Panics
@@ -962,6 +1070,58 @@ impl BlobsBundleV1 {
         let Self { commitments, proofs, blobs } = self;
         Ok(BlobTransactionSidecar { blobs, commitments, proofs })
     }
+
+    /// Converts this V1 bundle into a [`BlobsBundleV2`] by computing EIP-7594 cell proofs.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v2_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundle has mismatched lengths or if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v2(self) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v2_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V1 bundle into a [`BlobsBundleV2`] by computing EIP-7594 cell proofs
+    /// using the provided KZG settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundle has mismatched lengths or if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v2_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
+        use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
+
+        let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
+
+        for blob in self.blobs.iter() {
+            // SAFETY: Blob and alloy_eips::eip4844::c_kzg::Blob have the same memory layout
+            let blob_kzg =
+                unsafe { core::mem::transmute::<&Blob, &alloy_eips::eip4844::c_kzg::Blob>(blob) };
+
+            // Compute cells and their KZG proofs for this blob
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                for kzg_proof in kzg_proofs.iter() {
+                    cell_proofs.push(core::mem::transmute::<
+                        alloy_eips::eip4844::c_kzg::Bytes48,
+                        Bytes48,
+                    >(kzg_proof.to_bytes()));
+                }
+            }
+        }
+
+        Ok(BlobsBundleV2 { commitments: self.commitments, proofs: cell_proofs, blobs: self.blobs })
+    }
 }
 
 impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
@@ -982,6 +1142,15 @@ impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
 
     fn try_from(value: BlobsBundleV1) -> Result<Self, Self::Error> {
         value.try_into_sidecar()
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<BlobsBundleV1> for BlobsBundleV2 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: BlobsBundleV1) -> Result<Self, Self::Error> {
+        value.try_into_v2()
     }
 }
 
@@ -1086,6 +1255,14 @@ impl BlobsBundleV2 {
         Self::default()
     }
 
+    /// Computes the versioned hashes from the KZG commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        self.commitments
+            .iter()
+            .map(|c| alloy_eips::eip4844::kzg_to_versioned_hash(c.as_slice()))
+            .collect()
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// Note this will take `len * CELLS_PER_EXT_BLOB` proofs.
@@ -1143,6 +1320,59 @@ impl BlobsBundleV2 {
         let Self { commitments, proofs, blobs } = self;
         Ok(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs: proofs })
     }
+
+    /// Converts this V2 bundle into a [`BlobsBundleV1`] by computing EIP-4844 blob proofs.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v1_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v1(self) -> Result<BlobsBundleV1, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v1_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V2 bundle into a [`BlobsBundleV1`] by computing EIP-4844 blob proofs
+    /// using the provided KZG settings.
+    ///
+    /// This recomputes the blob proofs from the blobs and commitments. The cell proofs from
+    /// V2 are discarded as they are not used in V1.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v1_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<BlobsBundleV1, alloy_eips::eip4844::c_kzg::Error> {
+        let mut proofs = Vec::with_capacity(self.blobs.len());
+
+        for (blob, commitment) in self.blobs.iter().zip(self.commitments.iter()) {
+            // SAFETY: Blob and alloy_eips::eip4844::c_kzg::Blob have the same memory layout
+            let blob_kzg =
+                unsafe { core::mem::transmute::<&Blob, &alloy_eips::eip4844::c_kzg::Blob>(blob) };
+            let commitment_kzg = unsafe {
+                core::mem::transmute::<&Bytes48, &alloy_eips::eip4844::c_kzg::Bytes48>(commitment)
+            };
+
+            // Compute the blob proof
+            let proof = settings.compute_blob_kzg_proof(blob_kzg, commitment_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                proofs.push(core::mem::transmute::<alloy_eips::eip4844::c_kzg::Bytes48, Bytes48>(
+                    proof.to_bytes(),
+                ));
+            }
+        }
+
+        Ok(BlobsBundleV1 { commitments: self.commitments, proofs, blobs: self.blobs })
+    }
 }
 
 impl From<Vec<BlobTransactionSidecarEip7594>> for BlobsBundleV2 {
@@ -1163,6 +1393,15 @@ impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
 
     fn try_from(value: BlobsBundleV2) -> Result<Self, Self::Error> {
         value.try_into_sidecar()
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: BlobsBundleV2) -> Result<Self, Self::Error> {
+        value.try_into_v1()
     }
 }
 
@@ -1847,7 +2086,8 @@ impl ExecutionPayloadBodyV1 {
 
     /// Converts a [`alloy_consensus::Block`] into an execution payload body.
     pub fn from_block<T: Encodable2718, H>(block: Block<T, H>) -> Self {
-        Self::new(block.body.withdrawals.clone(), block.body.transactions())
+        let BlockBody { withdrawals, transactions, .. } = block.into_body();
+        Self::new(withdrawals, transactions.iter())
     }
 }
 
@@ -2101,6 +2341,11 @@ impl ExecutionData {
     /// Return the withdrawals for the payload or attributes.
     pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
         self.payload.withdrawals()
+    }
+
+    /// Returns the number of transactions in the payload.
+    pub const fn transaction_count(&self) -> usize {
+        self.payload.transactions().len()
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
