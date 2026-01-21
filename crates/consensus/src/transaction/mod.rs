@@ -234,6 +234,9 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
 pub trait TransactionEnvelope: Transaction {
     /// The enum of transaction types.
     type TxType: Typed2718;
+
+    /// Returns the transaction type.
+    fn tx_type(&self) -> Self::TxType;
 }
 
 /// A signable transaction.
