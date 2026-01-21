@@ -387,6 +387,10 @@ pub struct ValueChange {
 mod tests {
     use crate::TenderlySimulationResult;
 
+    fn normalize_whitespace(input: &str) -> String {
+        input.split_whitespace().collect::<String>()
+    }
+
     #[test]
     fn test_success_response() {
         let input = include_str!("../test_data/success.json");
@@ -394,8 +398,8 @@ mod tests {
 
         // strip whitespace to force equal formatting
         assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
+            normalize_whitespace(&serde_json::to_string(&parsed).unwrap()),
+            normalize_whitespace(input)
         );
     }
 
@@ -405,8 +409,8 @@ mod tests {
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
+            normalize_whitespace(&serde_json::to_string(&parsed).unwrap()),
+            normalize_whitespace(input)
         );
     }
 
@@ -416,8 +420,8 @@ mod tests {
         let parsed: Vec<TenderlySimulationResult> = serde_json::from_str(input).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
+            normalize_whitespace(&serde_json::to_string(&parsed).unwrap()),
+            normalize_whitespace(input)
         );
     }
 
@@ -427,8 +431,8 @@ mod tests {
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
+            normalize_whitespace(&serde_json::to_string(&parsed).unwrap()),
+            normalize_whitespace(input)
         );
     }
 
@@ -438,8 +442,8 @@ mod tests {
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
+            normalize_whitespace(&serde_json::to_string(&parsed).unwrap()),
+            normalize_whitespace(input)
         );
     }
 
@@ -449,8 +453,8 @@ mod tests {
         let parsed: TenderlySimulationResult = serde_json::from_str(input).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&parsed).unwrap().split_whitespace().collect::<String>(),
-            input.split_whitespace().collect::<String>()
+            normalize_whitespace(&serde_json::to_string(&parsed).unwrap()),
+            normalize_whitespace(input)
         );
     }
 }
