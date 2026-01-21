@@ -1,5 +1,6 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcRecv, RpcSend};
+use alloy_primitives::map::HashSet;
 use alloy_transport::utils::Spawnable;
 use futures::{ready, stream::FusedStream, Future, FutureExt, Stream, StreamExt};
 use serde::Serialize;
@@ -72,6 +73,7 @@ pub struct PollerBuilder<Params, Resp> {
     channel_size: usize,
     poll_interval: Duration,
     limit: usize,
+    terminal_error_codes: HashSet<i64>,
 
     _pd: PhantomData<fn() -> Resp>,
 }
@@ -92,6 +94,7 @@ where
             channel_size: 16,
             poll_interval,
             limit: usize::MAX,
+            terminal_error_codes: HashSet::default(),
             _pd: PhantomData,
         }
     }
@@ -126,6 +129,16 @@ where
     pub fn with_limit(mut self, limit: Option<usize>) -> Self {
         self.set_limit(limit);
         self
+    }
+
+    /// Sets rpc error codes used for printing poller's error conditionally.
+    pub fn with_error_code(&mut self, codes: HashSet<i64>) {
+        self.terminal_error_codes = codes;
+    }
+
+    /// Return set of error codes.
+    pub fn error_codes(&self) -> &HashSet<i64> {
+        &self.terminal_error_codes
     }
 
     /// Returns the duration between polls.
@@ -237,6 +250,7 @@ pub struct PollerStream<Resp, Output = Resp, Map = fn(Resp) -> Output> {
     state: PollState<Resp>,
     span: Span,
     map: Map,
+    terminal_error_codes: HashSet<i64>,
     _pd: PhantomData<fn() -> Output>,
 }
 
@@ -273,6 +287,7 @@ impl<Resp> PollerStream<Resp> {
             state: PollState::Waiting,
             span,
             map: std::convert::identity,
+            terminal_error_codes: HashSet::default(),
             _pd: PhantomData,
         }
     }
@@ -317,6 +332,7 @@ where
             poll_count: self.poll_count,
             state: self.state,
             span: self.span,
+            terminal_error_codes: HashSet::default(),
             map,
             _pd: PhantomData,
         }
@@ -377,8 +393,13 @@ where
                             // across reth/geth/nethermind, so we check
                             // just the message.
                             if let Some(resp) = err.as_error_resp() {
-                                if resp.message.contains("filter not found") {
-                                    warn!("server has dropped the filter, stopping poller");
+                                if resp.message.contains("filter not found")
+                                    && this.terminal_error_codes.contains(&resp.code)
+                                {
+                                    let err_code = resp.code;
+                                    let err_msg = resp.message.clone();
+                                    let log_msg = format!("Server has dropped the filter, stopping poller. Error code; {}, error message: {}", err_code, err_msg);
+                                    warn!(log_msg);
                                     this.state = PollState::Finished;
                                     continue;
                                 }
