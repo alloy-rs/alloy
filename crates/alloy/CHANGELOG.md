@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
 
 ### Bug Fixes
 
 - Propagate eip712 feature to signer-local ([#3559](https://github.com/alloy-rs/alloy/issues/3559))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
 
 ## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
 
@@ -26,13 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
 
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
 ### Features
 
 - Add secp256k1 feature ([#3455](https://github.com/alloy-rs/alloy/issues/3455))
 
 ### Miscellaneous Tasks
 
-- Release 1.4.1
 - Release 1.4.0
 
 ## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
@@ -720,16 +729,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Add net rpc namespace ([#989](https://github.com/alloy-rs/alloy/issues/989))
-- [alloy] Forward `rustls` & `native` reqwest TLS configuration to Alloy's metacrate ([#969](https://github.com/alloy-rs/alloy/issues/969))
-- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
 
 ### Miscellaneous Tasks
 
 - Release 0.1.4
 - Release 0.1.3 (-p alloy)
+
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Features
+
+- [alloy] Forward `rustls` & `native` reqwest TLS configuration to Alloy's metacrate ([#969](https://github.com/alloy-rs/alloy/issues/969))
+- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
+
+### Miscellaneous Tasks
+
 - Add more features to meta crate ([#953](https://github.com/alloy-rs/alloy/issues/953))
 
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
+
+### Documentation
+
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
+
+### Miscellaneous Tasks
+
+- Release 0.1.2
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Bug Fixes
 
@@ -738,7 +767,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
 - Unhide `sol!` wrapper in meta crate ([#654](https://github.com/alloy-rs/alloy/issues/654))
 
 ### Features
@@ -759,9 +787,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 - [eips] Compile tests with default features ([#860](https://github.com/alloy-rs/alloy/issues/860))
 - Remove stale todos ([#354](https://github.com/alloy-rs/alloy/issues/354))
 - [alloy] Re-export `alloy-core` items individually ([#230](https://github.com/alloy-rs/alloy/issues/230))
