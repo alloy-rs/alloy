@@ -16,8 +16,9 @@ pub struct IpcConnect<T> {
 }
 
 impl<T> IpcConnect<T> {
-    /// Create a new IPC connection object for any type T that can be converted into
-    /// `IpcConnect<T>`.
+    /// Create a new IPC connection object.
+    ///
+    /// This method is only available for types where `IpcConnect<T>` implements `PubSubConnect`.
     pub const fn new(inner: T) -> Self
     where
         Self: alloy_pubsub::PubSubConnect,
