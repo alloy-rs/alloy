@@ -3184,4 +3184,18 @@ mod tests {
             assert_eq!(with_encoded.encoded_bytes(), &transaction);
         }
     }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_attributes_without_slot_number() {
+        let json = r#"{
+            "timestamp": "0x1234",
+            "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "suggestedFeeRecipient": "0x0000000000000000000000000000000000000000"
+        }"#;
+
+        let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
+        assert_eq!(attrs.timestamp, 0x1234);
+        assert!(attrs.slot_number.is_none());
+    }
 }
