@@ -5,10 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Bug Fixes
+
+- Missing populate_blob_hashes in TransactionBuilder7594::set_blob_sidecar_7594 ([#3534](https://github.com/alloy-rs/alloy/issues/3534))
+
+### Performance
+
+- [rpc-types-eth] Optimize FilterSet::to_value_or_array to avoid unnecessary allocations ([#3532](https://github.com/alloy-rs/alloy/issues/3532))
+
 ## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
 
 ### Miscellaneous Tasks
 
+- Release 1.4.3
 - Release 1.4.2
 
 ### Refactor
