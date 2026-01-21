@@ -193,29 +193,37 @@ impl<N: Network> NewBlocks<N> {
 
             // Then try to fill as many blocks as possible.
             // TODO: Maybe use `join_all`
-            let mut retries = MAX_RETRIES;
             for number in self.next_yield..=block_number {
                 debug!(number, "fetching block");
-                let block = match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
-                    Ok(Some(block)) => block,
-                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                        debug!(number, %err, "failed to fetch block, retrying");
-                        retries -= 1;
-                        continue;
+                // Each block gets its own retry counter to prevent a single failing block
+                // from exhausting retries and blocking all subsequent blocks.
+                let mut retries = MAX_RETRIES;
+                let block = loop {
+                    match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
+                        Ok(Some(block)) => break Some(block),
+                        Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
+                            debug!(number, %err, "failed to fetch block, retrying");
+                            retries -= 1;
+                        }
+                        Ok(None) if retries > 0 => {
+                            debug!(number, "failed to fetch block (doesn't exist), retrying");
+                            retries -= 1;
+                        }
+                        Err(err) => {
+                            error!(number, %err, "failed to fetch block");
+                            break 'task;
+                        }
+                        Ok(None) => {
+                            error!(number, "failed to fetch block (doesn't exist)");
+                            // Block doesn't exist after retries, stop filling and wait for next tip update
+                            break None;
+                        }
                     }
-                    Ok(None) if retries > 0 => {
-                        debug!(number, "failed to fetch block (doesn't exist), retrying");
-                        retries -= 1;
-                        continue;
-                    }
-                    Err(err) => {
-                        error!(number, %err, "failed to fetch block");
-                        break;
-                    }
-                    Ok(None) => {
-                        error!(number, "failed to fetch block (doesn't exist)");
-                        break;
-                    }
+                };
+                let Some(block) = block else {
+                    // Failed to fetch block after retries, stop current fill batch
+                    // The outer loop will retry from this block number on next iteration
+                    break;
                 };
                 self.known_blocks.put(number, block);
                 if self.known_blocks.len() == BLOCK_CACHE_SIZE.get() {
