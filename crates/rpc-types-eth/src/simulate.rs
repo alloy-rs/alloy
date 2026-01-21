@@ -190,6 +190,9 @@ pub struct SimulateError {
     pub code: i32,
     /// Message error
     pub message: String,
+    /// Data for the error e.g revert reason
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub data: String,
 }
 
 #[cfg(test)]
@@ -199,6 +202,29 @@ mod tests {
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_simulate_error_no_data() {
+        let error_json = json!({
+            "code": -32000,
+            "message": "Execution reverted"
+        });
+        let err: SimulateError = serde_json::from_value(error_json).unwrap();
+        assert_eq!(err.data, "");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_simulate_error_with_data() {
+        let error_json = json!({
+            "code": -32000,
+            "message": "Execution reverted",
+            "data": "0xcabedea8"
+        });
+        let err: SimulateError = serde_json::from_value(error_json).unwrap();
+        assert_eq!(err.data, "0xcabedea8");
+    }
 
     #[test]
     #[cfg(feature = "serde")]
