@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
 
 ### Bug Fixes
 
 - Missing populate_blob_hashes in TransactionBuilder7594::set_blob_sidecar_7594 ([#3534](https://github.com/alloy-rs/alloy/issues/3534))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
 
 ### Performance
 
@@ -20,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Miscellaneous Tasks
+
 - Release 1.4.2
 
 ### Refactor
@@ -27,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc-types-eth] Remove redundant clones in block tests ([#3514](https://github.com/alloy-rs/alloy/issues/3514))
 
 ## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+### Refactor
+
+- [rpc-types-eth] Remove redundant clones in serde tests ([#3491](https://github.com/alloy-rs/alloy/issues/3491))
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
 
 ### Bug Fixes
 
@@ -39,12 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 1.4.1
 - Release 1.4.0
-
-### Refactor
-
-- [rpc-types-eth] Remove redundant clones in serde tests ([#3491](https://github.com/alloy-rs/alloy/issues/3491))
 
 ## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
 
@@ -137,11 +151,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.0.42
-- Release 1.0.41
 
 ### Refactor
 
 - [rpc-types-eth] Remove duplicate block range filtering logic ([#3077](https://github.com/alloy-rs/alloy/issues/3077))
+
+## [1.0.41](https://github.com/alloy-rs/alloy/releases/tag/v1.0.41) - 2025-10-17
+
+### Miscellaneous Tasks
+
+- Release 1.0.41
 
 ## [1.0.40](https://github.com/alloy-rs/alloy/releases/tag/v1.0.40) - 2025-10-17
 
@@ -239,13 +258,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - Fusaka changes ([#2821](https://github.com/alloy-rs/alloy/issues/2821))
+
+### Miscellaneous Tasks
+
+- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
+
+## [1.0.26](https://github.com/alloy-rs/alloy/releases/tag/v1.0.26) - 2025-08-26
+
+### Features
+
 - Add helper methods to decode logs in TransactionReceipt ([#2811](https://github.com/alloy-rs/alloy/issues/2811))
 - Add fromstr for TransactionInputKind ([#2805](https://github.com/alloy-rs/alloy/issues/2805))
 - Add convenience fn for setting 7702 delegation designator ([#2802](https://github.com/alloy-rs/alloy/issues/2802))
 
 ### Miscellaneous Tasks
 
-- Release 1.0.27 ([#2822](https://github.com/alloy-rs/alloy/issues/2822))
 - Release 1.0.26
 
 ## [1.0.25](https://github.com/alloy-rs/alloy/releases/tag/v1.0.25) - 2025-08-19
@@ -372,13 +399,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.12](https://github.com/alloy-rs/alloy/releases/tag/v1.0.12) - 2025-06-18
 
+### Miscellaneous Tasks
+
+- Release 1.0.12
+
+## [1.0.11](https://github.com/alloy-rs/alloy/releases/tag/v1.0.11) - 2025-06-17
+
 ### Bug Fixes
 
 - Move `Transaction::from_transaction` ([#2590](https://github.com/alloy-rs/alloy/issues/2590))
 
 ### Miscellaneous Tasks
 
-- Release 1.0.12
 - Release 1.0.11
 
 ## [1.0.10](https://github.com/alloy-rs/alloy/releases/tag/v1.0.10) - 2025-06-17
@@ -754,6 +786,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1](https://github.com/alloy-rs/alloy/releases/tag/v0.9.1) - 2024-12-30
 
+### Miscellaneous Tasks
+
+- Release 0.9.1
+
+## [0.9.0](https://github.com/alloy-rs/alloy/releases/tag/v0.9.0) - 2024-12-30
+
 ### Bug Fixes
 
 - Use u64 for all gas values ([#1848](https://github.com/alloy-rs/alloy/issues/1848))
@@ -770,7 +808,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.9.1
 - Make clippy happy ([#1849](https://github.com/alloy-rs/alloy/issues/1849))
 - Rm non exhaustive from ReceiptEnvelope ([#1843](https://github.com/alloy-rs/alloy/issues/1843))
 - Rm non exhaustive for envelope ([#1842](https://github.com/alloy-rs/alloy/issues/1842))
@@ -1063,6 +1100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Miscellaneous Tasks
+
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
@@ -1191,26 +1233,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add helper to set both input and data fields ([#1019](https://github.com/alloy-rs/alloy/issues/1019))
 - [rpc-types-eth] Add more utils to `TransactionIndex` ([#1007](https://github.com/alloy-rs/alloy/issues/1007))
 - Add into transactions iterator ([#984](https://github.com/alloy-rs/alloy/issues/984))
-- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
-- [contract] Implement Filter's builder methods on Event ([#960](https://github.com/alloy-rs/alloy/issues/960))
 
 ### Miscellaneous Tasks
 
 - Release 0.1.4
 - Convert rcp-types-eth block Header to consensus Header ([#1014](https://github.com/alloy-rs/alloy/issues/1014))
 - Make wrapped index value pub ([#988](https://github.com/alloy-rs/alloy/issues/988))
-- Release 0.1.3
-- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
 
 ### Other
 
 - Add range test in `FilterBlockOption` ([#939](https://github.com/alloy-rs/alloy/issues/939))
 
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Features
+
+- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
+- [contract] Implement Filter's builder methods on Event ([#960](https://github.com/alloy-rs/alloy/issues/960))
+
+### Miscellaneous Tasks
+
+- Release 0.1.3
+- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
-
-### Dependencies
-
-- [deps] Bump all ([#864](https://github.com/alloy-rs/alloy/issues/864))
 
 ### Documentation
 
@@ -1222,10 +1268,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `is_` and `as_` utils for `FilterBlockOption` ([#927](https://github.com/alloy-rs/alloy/issues/927))
 - Add utils to `ValueOrArray` ([#924](https://github.com/alloy-rs/alloy/issues/924))
 - Add `is_` utils to `FilterChanges` ([#923](https://github.com/alloy-rs/alloy/issues/923))
-- Integrate `EvmOverrides` to rpc types ([#906](https://github.com/alloy-rs/alloy/issues/906))
-- Add getter methods for `FilterChanges` ([#899](https://github.com/alloy-rs/alloy/issues/899))
-- Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
-- [rpc] Split off `eth` namespace in `alloy-rpc-types` to `alloy-rpc-types-eth` ([#847](https://github.com/alloy-rs/alloy/issues/847))
 
 ### Miscellaneous Tasks
 
@@ -1233,6 +1275,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc-types] Remove duplicate `Index` definition in `rpc-types-anvil` in favor of the one in `rpc-types-eth` ([#943](https://github.com/alloy-rs/alloy/issues/943))
 - Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
 - Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
+
+### Dependencies
+
+- [deps] Bump all ([#864](https://github.com/alloy-rs/alloy/issues/864))
+
+### Features
+
+- Integrate `EvmOverrides` to rpc types ([#906](https://github.com/alloy-rs/alloy/issues/906))
+- Add getter methods for `FilterChanges` ([#899](https://github.com/alloy-rs/alloy/issues/899))
+- Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
+- [rpc] Split off `eth` namespace in `alloy-rpc-types` to `alloy-rpc-types-eth` ([#847](https://github.com/alloy-rs/alloy/issues/847))
+
+### Miscellaneous Tasks
+
 - Rm unused txtype mod ([#879](https://github.com/alloy-rs/alloy/issues/879))
 - [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
 - [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))
