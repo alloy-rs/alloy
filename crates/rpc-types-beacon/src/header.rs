@@ -57,6 +57,7 @@ pub struct Header {
 /// The header of a beacon block.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BeaconBlockHeader {
     /// The slot to which this block corresponds.
     #[serde_as(as = "DisplayFromStr")]
@@ -122,5 +123,25 @@ mod tests {
             }
         }"#;
         let _header_response: HeaderResponse = serde_json::from_str(s).unwrap();
+    }
+
+    #[cfg(feature = "ssz")]
+    mod ssz_tests {
+        use super::*;
+        use ssz::{Decode, Encode};
+
+        #[test]
+        fn ssz_roundtrip_beacon_block_header() {
+            let header = BeaconBlockHeader {
+                slot: 12345,
+                proposer_index: 678,
+                parent_root: B256::repeat_byte(0x11),
+                state_root: B256::repeat_byte(0x22),
+                body_root: B256::repeat_byte(0x33),
+            };
+            let encoded = header.as_ssz_bytes();
+            let decoded = BeaconBlockHeader::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(header, decoded);
+        }
     }
 }
