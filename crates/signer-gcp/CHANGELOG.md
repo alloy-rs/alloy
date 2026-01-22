@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
 
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
 ### Bug Fixes
 
 - Return cached pubkey in GcpSigner::get_pubkey ([#3521](https://github.com/alloy-rs/alloy/issues/3521))
@@ -33,11 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 1.4.1
-
-## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
-
-### Miscellaneous Tasks
-
 - Release 1.4.0
 
 ## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
@@ -639,11 +640,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.3.6
-
-## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
-
-### Miscellaneous Tasks
-
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
@@ -699,21 +695,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
-### Documentation
-
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
-
-### Miscellaneous Tasks
-
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
-
-## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
-
 ### Bug Fixes
 
 - Add "google-longrunning" ([#839](https://github.com/alloy-rs/alloy/issues/839))
+
+### Documentation
+
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
 
 ### Features
 
@@ -723,6 +711,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 - [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
 - [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))
 - [docs] Add doc aliases ([#843](https://github.com/alloy-rs/alloy/issues/843))
