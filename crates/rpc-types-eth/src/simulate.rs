@@ -4,7 +4,7 @@ use crate::{
     alloc::string::ToString, state::StateOverride, Block, BlockOverrides, Log, TransactionRequest,
 };
 use alloc::{string::String, vec::Vec};
-use alloy_primitives::{bytes, Bytes, U256};
+use alloy_primitives::{Bytes, U256};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -207,7 +207,7 @@ impl SimulateError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Address, TxKind};
+    use alloy_primitives::{bytes, Address, TxKind};
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
