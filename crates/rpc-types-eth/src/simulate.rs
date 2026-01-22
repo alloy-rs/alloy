@@ -195,9 +195,9 @@ pub struct SimulateError {
     pub code: i32,
     /// Message error
     pub message: String,
-    /// Data for the error e.g revert reason
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub data: String,
+    /// Data for the error, e.g. revert reason.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub data: Option<Bytes>,
 }
 
 impl SimulateError {
@@ -230,7 +230,7 @@ mod tests {
             "message": "Execution reverted"
         });
         let err: SimulateError = serde_json::from_value(error_json).unwrap();
-        assert_eq!(err.data, "");
+        assert_eq!(err.data, None);
     }
 
     #[test]
@@ -242,7 +242,7 @@ mod tests {
             "data": "0xcabedea8"
         });
         let err: SimulateError = serde_json::from_value(error_json).unwrap();
-        assert_eq!(err.data, "0xcabedea8");
+        assert_eq!(err.data, Some("0xcabedea8".into()));
     }
 
     #[test]
