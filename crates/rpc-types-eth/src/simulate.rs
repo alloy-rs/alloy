@@ -5,7 +5,7 @@ use crate::{
     Log, TransactionRequest,
 };
 use alloc::{string::String, vec::Vec};
-use alloy_primitives::{Bytes, U256};
+use alloy_primitives::{bytes, Bytes, U256};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -183,7 +183,7 @@ impl<TxReq> SimulatePayload<TxReq> {
 }
 
 /// The error response returned by the `eth_simulateV1` method.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulateError {
@@ -242,7 +242,7 @@ mod tests {
             "data": "0xcabedea8"
         });
         let err: SimulateError = serde_json::from_value(error_json).unwrap();
-        assert_eq!(err.data, Some("0xcabedea8".into()));
+        assert_eq!(err.data, Some(bytes!("cabedea8")));
     }
 
     #[test]
