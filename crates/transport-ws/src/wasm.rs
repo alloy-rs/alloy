@@ -8,6 +8,7 @@ use futures::{
 use serde_json::value::RawValue;
 use std::time::Duration;
 use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
+use tracing::error;
 
 /// Simple connection info for the websocket.
 #[derive(Clone, Debug)]
