@@ -590,6 +590,14 @@ impl<H: BlockHeader> BlockHeader for Header<H> {
         self.inner.requests_hash()
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.inner.block_access_list_hash()
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.inner.slot_number()
+    }
+
     fn extra_data(&self) -> &Bytes {
         self.inner.extra_data()
     }
@@ -861,6 +869,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -908,6 +918,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 size: None,
                 total_difficulty: Some(U256::from(100000)),
@@ -953,6 +965,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: None,
@@ -1256,6 +1270,8 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                block_access_list_hash: None,
+                slot_number: None,
             },
             size: None,
             total_difficulty: None,
@@ -1302,6 +1318,8 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
                 requests_hash: None,
+                block_access_list_hash: None,
+                slot_number: None,
             },
             total_difficulty: None,
             size: Some(U256::from(505)),
@@ -1360,6 +1378,8 @@ mod tests {
                     excess_blob_gas: None,
                     parent_beacon_block_root: None,
                     requests_hash: None,
+                    block_access_list_hash: None,
+                    slot_number: None,
                 },
                 total_difficulty: Some(U256::from(100000)),
                 size: Some(U256::from(19)),
