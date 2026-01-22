@@ -192,6 +192,13 @@ pub struct SimulateError {
     pub message: String,
 }
 
+impl SimulateError {
+    /// Creates a new invalid params error.
+    pub fn invalid_params() -> Self {
+        Self { code: -32602, message: "invalid params".to_string() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
