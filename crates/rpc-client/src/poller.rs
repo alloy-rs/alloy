@@ -6,6 +6,7 @@ use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
+    fmt::Debug,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -21,6 +22,18 @@ use wasmtimer::tokio::{sleep, Sleep};
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::{sleep, Sleep};
+
+/// A function that creates new parameters when reconnection is needed
+type ReconnectFn = Box<
+    dyn Fn(
+            WeakClient,
+        ) -> alloy_transport::Pbf<
+            'static,
+            Box<RawValue>,
+            alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
+        > + Send
+        + Sync,
+>;
 
 /// A poller task builder.
 ///
@@ -58,7 +71,6 @@ use tokio::time::{sleep, Sleep};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
 pub struct PollerBuilder<Params, Resp> {
     /// The client to poll with.
@@ -67,6 +79,7 @@ pub struct PollerBuilder<Params, Resp> {
     /// Request Method
     method: Cow<'static, str>,
     params: Params,
+    reconnect_fn: Option<ReconnectFn>,
 
     // config options
     channel_size: usize,
@@ -74,6 +87,14 @@ pub struct PollerBuilder<Params, Resp> {
     limit: usize,
 
     _pd: PhantomData<fn() -> Resp>,
+}
+
+impl<Params, Resp> std::fmt::Debug for PollerBuilder<Params, Resp> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PollerBuilder")
+            .field("reconnect_factory", &self.reconnect_fn.as_ref().map(|_| "<function>"))
+            .finish_non_exhaustive()
+    }
 }
 
 impl<Params, Resp> PollerBuilder<Params, Resp>
@@ -87,6 +108,7 @@ where
             client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.poll_interval());
         Self {
             client,
+            reconnect_fn: None,
             method: method.into(),
             params,
             channel_size: 16,
@@ -109,6 +131,30 @@ where
     /// Sets the channel size for the poller task.
     pub const fn with_channel_size(mut self, channel_size: usize) -> Self {
         self.set_channel_size(channel_size);
+        self
+    }
+
+    /// Sets the reconnect function which updates the poller params and runs when filter drops.
+    pub fn with_reconnect<F, Fut>(mut self, reconnect_fn: F) -> Self
+    where
+        F: Fn(WeakClient) -> Fut + Send + Sync + 'static,
+        Fut: Future<
+                Output = Result<
+                    Box<RawValue>,
+                    alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
+                >,
+            > + Send
+            + 'static,
+    {
+        let boxed_reconnect_fn: ReconnectFn = Box::new(move |client| {
+            Box::pin(reconnect_fn(client))
+                as alloy_transport::Pbf<
+                    'static,
+                    Box<RawValue>,
+                    alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
+                >
+        });
+        self.reconnect_fn = Some(boxed_reconnect_fn);
         self
     }
 
@@ -172,6 +218,7 @@ where
     /// Note that this does not spawn the poller on a separate task, thus all responses will be
     /// polled on the current thread once this stream is polled.
     pub fn into_stream(self) -> PollerStream<Resp> {
+        println!("STtrEAMINg STARting");
         PollerStream::new(self)
     }
 
@@ -192,6 +239,14 @@ enum PollState<Resp> {
         alloy_transport::Pbf<
             'static,
             Resp,
+            alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
+        >,
+    ),
+    /// Attempting to reconnect (re-establish filter)
+    Reconnecting(
+        alloy_transport::Pbf<
+            'static,
+            Box<RawValue>,
             alloy_transport::RpcError<alloy_transport::TransportErrorKind>,
         >,
     ),
@@ -232,6 +287,7 @@ pub struct PollerStream<Resp, Output = Resp, Map = fn(Resp) -> Output> {
     method: Cow<'static, str>,
     params: Box<RawValue>,
     poll_interval: Duration,
+    reconnect_fn: Option<ReconnectFn>,
     limit: usize,
     poll_count: usize,
     state: PollState<Resp>,
@@ -247,12 +303,13 @@ impl<Resp, Output, Map> std::fmt::Debug for PollerStream<Resp, Output, Map> {
             .field("poll_interval", &self.poll_interval)
             .field("limit", &self.limit)
             .field("poll_count", &self.poll_count)
+            .field("reconnect_factory", &self.reconnect_fn.as_ref().map(|_| "<function>"))
             .finish_non_exhaustive()
     }
 }
 
 impl<Resp> PollerStream<Resp> {
-    fn new<Params: Serialize>(builder: PollerBuilder<Params, Resp>) -> Self {
+    fn new<Params: Serialize + RpcSend + 'static>(builder: PollerBuilder<Params, Resp>) -> Self {
         let span = debug_span!("poller", method = %builder.method);
 
         // Serialize params once
@@ -268,6 +325,7 @@ impl<Resp> PollerStream<Resp> {
             method: builder.method,
             params,
             poll_interval: builder.poll_interval,
+            reconnect_fn: builder.reconnect_fn,
             limit: builder.limit,
             poll_count: 0,
             state: PollState::Waiting,
@@ -317,6 +375,7 @@ where
             poll_count: self.poll_count,
             state: self.state,
             span: self.span,
+            reconnect_fn: self.reconnect_fn,
             map,
             _pd: PhantomData,
         }
@@ -336,6 +395,16 @@ where
 
         loop {
             match &mut this.state {
+                PollState::Reconnecting(fut) => match ready!(fut.poll_unpin(cx)) {
+                    Ok(resp) => {
+                        this.params = resp;
+                        this.state = PollState::Waiting;
+                    }
+                    Err(err) => {
+                        error!("reconnect failed: {}", err);
+                        this.state = PollState::Finished;
+                    }
+                },
                 PollState::Paused => return Poll::Pending,
                 PollState::Waiting => {
                     // Check if we've reached the limit
@@ -376,9 +445,17 @@ where
                             // the poller. Error codes are not consistent
                             // across reth/geth/nethermind, so we check
                             // just the message.
+                            // The rpc call that returns this is eth_getFilterChanges
                             if let Some(resp) = err.as_error_resp() {
                                 if resp.message.contains("filter not found") {
                                     warn!("server has dropped the filter, stopping poller");
+                                    if let Some(ref reconnect_fn) = this.reconnect_fn {
+                                        warn!("server has dropped the filter, attempting to reconnect");
+
+                                        let reconnect_fut = reconnect_fn(this.client.clone());
+                                        this.state = PollState::Reconnecting(reconnect_fut);
+                                        continue;
+                                    }
                                     this.state = PollState::Finished;
                                     continue;
                                 }
