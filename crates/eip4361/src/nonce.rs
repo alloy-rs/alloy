@@ -9,7 +9,7 @@ use rand::{distributions::Alphanumeric, Rng};
 /// # Example
 ///
 /// ```
-/// use alloy_siwe::generate_nonce;
+/// use alloy_eip4361::generate_nonce;
 ///
 /// let nonce = generate_nonce();
 /// assert!(nonce.len() >= 8);
