@@ -1,5 +1,5 @@
 [package]
-name = "alloy-siwe"
+name = "alloy-eip4361"
 description = "Sign-In with Ethereum (EIP-4361) utilities"
 
 version.workspace = true

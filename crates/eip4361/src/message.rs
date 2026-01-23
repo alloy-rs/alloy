@@ -171,7 +171,7 @@ impl Message {
     /// # Example
     ///
     /// ```
-    /// use alloy_siwe::Message;
+    /// use alloy_eip4361::Message;
     /// use alloy_primitives::address;
     /// use time::OffsetDateTime;
     ///
