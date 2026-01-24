@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkWallet, TransactionBuilder};
