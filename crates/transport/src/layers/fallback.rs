@@ -110,6 +110,16 @@ impl<S: Clone> FallbackService<S> {
             trace!("  #{}: Transport[{}] - {}", idx + 1, id, summary);
         }
     }
+
+    /// Returns the top transports sorted by score (best first), limited by
+    /// `active_transport_count`.
+    fn top_transports(&self) -> Vec<ScoredTransport<S>> {
+        // Clone the vec, sort it, and keep only the top `self.active_transport_count`.
+        let mut transports_clone = (*self.transports).clone();
+        transports_clone.sort_by(|a, b| b.cmp(a));
+        transports_clone.truncate(self.active_transport_count);
+        transports_clone
+    }
 }
 
 impl<S> FallbackService<S>
@@ -146,13 +156,7 @@ where
 
         // Default: parallel execution for methods with deterministic results
         // Get the top transports to use for this request
-        let top_transports = {
-            // Clone the vec, sort it, and keep only the top `self.active_transport_count`
-            let mut transports_clone = (*self.transports).clone();
-            transports_clone.sort_by(|a, b| b.cmp(a));
-            transports_clone.truncate(self.active_transport_count);
-            transports_clone
-        };
+        let top_transports = self.top_transports();
 
         // Create a collection of future requests
         let mut futures = FuturesUnordered::new();
@@ -218,12 +222,7 @@ where
         trace!("Using sequential fallback for method with non-deterministic results");
 
         // Get transports sorted by score (best first)
-        let top_transports = {
-            let mut transports_clone = (*self.transports).clone();
-            transports_clone.sort_by(|a, b| b.cmp(a));
-            transports_clone.truncate(self.active_transport_count);
-            transports_clone
-        };
+        let top_transports = self.top_transports();
 
         let mut last_error = None;
 

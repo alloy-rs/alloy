@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+### Other
+
+- Revert "chore: "reapply "chore: added slot num in payload attr"" ([#3567](https://github.com/alloy-rs/alloy/issues/3567))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Bug Fixes
+
+- Avoid cloning withdrawals in payload body ([#3542](https://github.com/alloy-rs/alloy/issues/3542))
+
+### Features
+
+- [engine] Add ExecutionPayloadV4 and ExecutionPayloadEnvelopeV6 types ([#3552](https://github.com/alloy-rs/alloy/issues/3552))
+- [rpc-types-engine] Add transaction_count helper to ExecutionData ([#3543](https://github.com/alloy-rs/alloy/issues/3543))
+- Add versioned_hashes helper to BlobsBundle and try_into_sealed to AnyRpcBlock ([#3527](https://github.com/alloy-rs/alloy/issues/3527))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- "reapply "chore: added slot num in payload attr" ([#3530](https://github.com/alloy-rs/alloy/issues/3530))
+- Added slot num in payload attr ([#3524](https://github.com/alloy-rs/alloy/issues/3524))
+
+### Other
+
+- Revert "chore: added slot num in payload attr" ([#3528](https://github.com/alloy-rs/alloy/issues/3528))
+
 ## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
 
 ### Features
@@ -13,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.4.3
 - Release 1.4.2
 
 ## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
