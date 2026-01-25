@@ -576,9 +576,10 @@ impl BlobTransactionSidecarEip7594 {
         I: IntoIterator<Item = B>,
         B: AsRef<[u8]>,
     {
-        let mut converted = Vec::new();
-        for blob in blobs {
-            converted.push(crate::eip4844::utils::bytes_to_blob(blob)?);
+        let blobs_iter = blobs.into_iter();
+        let mut converted = Vec::with_capacity(iter.size_hint().0);
+        for blob in blobs_iter {
+            converted.push(hex_to_blob(blob)?);
         }
         Self::try_from_blobs(converted)
     }
