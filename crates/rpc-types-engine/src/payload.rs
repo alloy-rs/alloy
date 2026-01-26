@@ -2148,6 +2148,12 @@ impl From<ExecutionPayloadV3> for ExecutionPayload {
     }
 }
 
+impl From<ExecutionPayloadV4> for ExecutionPayload {
+    fn from(payload: ExecutionPayloadV4) -> Self {
+        Self::V4(payload)
+    }
+}
+
 impl<T: Decodable2718> TryFrom<ExecutionPayload> for Block<T> {
     type Error = PayloadError;
 
