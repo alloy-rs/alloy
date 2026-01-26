@@ -165,7 +165,11 @@ where
                 let fut = async move {
                     let resp = rpc_call.await?;
                     let result =
-                        if self.kind.is_hashes() { utils::convert_to_hashes(resp) } else { resp };
+                        if self.kind.is_hashes() {
+                            utils::normalize_empty_transactions_to_hashes(resp)
+                        } else {
+                            resp
+                        };
                     Ok(result)
                 };
 
@@ -203,7 +207,7 @@ where
                         .map_err(|e| TransportError::deser_err(e, block.to_string()))?;
 
                     let block = if self.kind.is_hashes() {
-                        utils::convert_to_hashes(Some(block))
+                        utils::normalize_empty_transactions_to_hashes(Some(block))
                     } else {
                         Some(block)
                     };
@@ -419,7 +423,7 @@ impl<N: alloy_network::Network> SubFullBlocks<N> {
                     let resp = call.await?;
 
                     if kind.is_hashes() {
-                        Ok(utils::convert_to_hashes(resp))
+                        Ok(utils::normalize_empty_transactions_to_hashes(resp))
                     } else {
                         Ok(resp)
                     }
