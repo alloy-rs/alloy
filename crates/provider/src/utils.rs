@@ -130,7 +130,12 @@ pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
 }
 
-pub(crate) fn convert_to_hashes<BlockResp: alloy_network::BlockResponse>(
+/// Normalizes the empty `transactions: []` response to the `Hashes` variant.
+///
+/// With `serde(untagged)`, an empty array can deserialize into the first matching enum variant,
+/// which for `BlockTransactions` is `Full(Vec::new())`. When callers request hashes-only blocks,
+/// this helper ensures the intended `Hashes(Vec::new())` representation for the empty case.
+pub(crate) fn normalize_empty_transactions_to_hashes<BlockResp: alloy_network::BlockResponse>(
     r: Option<BlockResp>,
 ) -> Option<BlockResp> {
     r.map(|mut block| {
@@ -152,7 +157,7 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     let blocks = futures::future::try_join_all(hashes.into_iter().map(|hash| {
         client
             .request::<_, Option<BlockResp>>("eth_getBlockByHash", (hash, full))
-            .map_resp(|resp| if !full { convert_to_hashes(resp) } else { resp })
+            .map_resp(|resp| if !full { normalize_empty_transactions_to_hashes(resp) } else { resp })
     }))
     .await?;
     Ok(blocks)
