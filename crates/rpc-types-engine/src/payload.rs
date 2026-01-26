@@ -1947,6 +1947,13 @@ impl ExecutionPayload {
         self.as_v3().map(|payload| payload.excess_blob_gas)
     }
 
+    /// Returns the block access list for the payload (EIP-7928).
+    ///
+    /// Returns `None` for pre-Amsterdam payloads (V1, V2, V3).
+    pub fn block_access_list(&self) -> Option<&Bytes> {
+        self.as_v4().map(|payload| &payload.block_access_list)
+    }
+
     /// Returns the gas limit for the payload.
     pub const fn gas_limit(&self) -> u64 {
         self.as_v1().gas_limit
