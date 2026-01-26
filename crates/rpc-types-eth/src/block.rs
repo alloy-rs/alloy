@@ -649,7 +649,7 @@ impl From<Header> for alloy_serde::WithOtherFields<Header> {
 /// BlockOverrides is a set of header fields to override.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase"))]
 pub struct BlockOverrides {
     /// Overrides the block number.
     ///
@@ -704,6 +704,9 @@ pub struct BlockOverrides {
         serde(default, skip_serializing_if = "Option::is_none", alias = "baseFeePerGas")
     )]
     pub base_fee: Option<U256>,
+    /// Overrides the blob base fee of the block.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub blob_base_fee: Option<U256>,
     /// A dictionary that maps blockNumber to a user-defined hash. It can be queried from the
     /// EVM opcode BLOCKHASH.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -720,6 +723,7 @@ impl BlockOverrides {
             && self.coinbase.is_none()
             && self.random.is_none()
             && self.base_fee.is_none()
+            && self.blob_base_fee.is_none()
             && self.block_hash.is_none()
     }
 
@@ -762,6 +766,12 @@ impl BlockOverrides {
     /// Sets the base fee override
     pub const fn with_base_fee(mut self, base_fee: U256) -> Self {
         self.base_fee = Some(base_fee);
+        self
+    }
+
+    /// Sets the blob base fee override
+    pub const fn with_blob_base_fee(mut self, blob_base_fee: U256) -> Self {
+        self.blob_base_fee = Some(blob_base_fee);
         self
     }
 

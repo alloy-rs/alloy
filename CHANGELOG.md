@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Features
+
+- [rpc-types-eth] Add SimulateError::invalid_params constructor ([#3578](https://github.com/alloy-rs/alloy/issues/3578))
+- [rpc-types-beacon] Add SSZ support for beacon block types ([#3575](https://github.com/alloy-rs/alloy/issues/3575))
+
+### Miscellaneous Tasks
+
+- Revert "chore: add amsterdam support" ([#3573](https://github.com/alloy-rs/alloy/issues/3573))
+
 ## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+### Other
+
+- Revert "chore: "reapply "chore: added slot num in payload attr"" ([#3567](https://github.com/alloy-rs/alloy/issues/3567))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
 
 ### Bug Fixes
 
@@ -47,7 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
-- Revert "chore: "reapply "chore: added slot num in payload attr"" ([#3567](https://github.com/alloy-rs/alloy/issues/3567))
 - [fallback] Deduplicate top transport selection ([#3540](https://github.com/alloy-rs/alloy/issues/3540))
 - Update to tempoxyz ([#3541](https://github.com/alloy-rs/alloy/issues/3541))
 - Remove unused debug import from envelope module ([#3531](https://github.com/alloy-rs/alloy/issues/3531))

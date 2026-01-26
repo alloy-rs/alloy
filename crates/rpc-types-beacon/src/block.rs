@@ -66,6 +66,7 @@ pub struct BeaconBlock<T = serde_json::Value> {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#eth1data>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Eth1Data {
     /// Root of the deposit tree.
     pub deposit_root: B256,
@@ -81,6 +82,7 @@ pub struct Eth1Data {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#checkpoint>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Checkpoint {
     /// The epoch number.
     #[serde_as(as = "DisplayFromStr")]
@@ -94,6 +96,7 @@ pub struct Checkpoint {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#attestationdata>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct AttestationData {
     /// The slot number.
     #[serde_as(as = "DisplayFromStr")]
@@ -113,6 +116,7 @@ pub struct AttestationData {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#attestation>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Attestation {
     /// Attester aggregation bits.
     pub aggregation_bits: Bytes,
@@ -127,6 +131,7 @@ pub struct Attestation {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#indexedattestation>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct IndexedAttestation {
     /// Attesting validator indices.
     #[serde_as(as = "Vec<DisplayFromStr>")]
@@ -141,6 +146,7 @@ pub struct IndexedAttestation {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#proposerslashing>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct ProposerSlashing {
     /// First signed block header.
     pub signed_header_1: SignedBeaconBlockHeader,
@@ -152,6 +158,7 @@ pub struct ProposerSlashing {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#signedbeaconblockheader>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct SignedBeaconBlockHeader {
     /// The beacon block header.
     pub message: BeaconBlockHeader,
@@ -163,6 +170,7 @@ pub struct SignedBeaconBlockHeader {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#attesterslashing>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct AttesterSlashing {
     /// First attestation.
     pub attestation_1: IndexedAttestation,
@@ -175,6 +183,7 @@ pub struct AttesterSlashing {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#depositdata>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct DepositData {
     /// The validator's BLS public key.
     pub pubkey: BlsPublicKey,
@@ -191,6 +200,7 @@ pub struct DepositData {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#deposit>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Deposit {
     /// Branch in the deposit tree (proof).
     pub proof: Vec<B256>,
@@ -203,6 +213,7 @@ pub struct Deposit {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#voluntaryexit>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct VoluntaryExit {
     /// Minimum epoch for processing exit.
     #[serde_as(as = "DisplayFromStr")]
@@ -216,6 +227,7 @@ pub struct VoluntaryExit {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#signedvoluntaryexit>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct SignedVoluntaryExit {
     /// The voluntary exit message.
     pub message: VoluntaryExit,
@@ -227,6 +239,7 @@ pub struct SignedVoluntaryExit {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/altair/beacon-chain.md#syncaggregate>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct SyncAggregate {
     /// Aggregation bits of sync committee participation.
     pub sync_committee_bits: Bytes,
@@ -239,6 +252,7 @@ pub struct SyncAggregate {
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/capella/beacon-chain.md#blstoexecutionchange>
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BlsToExecutionChange {
     /// Validator index.
     #[serde_as(as = "DisplayFromStr")]
@@ -253,6 +267,7 @@ pub struct BlsToExecutionChange {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/capella/beacon-chain.md#signedblstoexecutionchange>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct SignedBlsToExecutionChange {
     /// The BLS to execution change message.
     pub message: BlsToExecutionChange,
@@ -264,6 +279,7 @@ pub struct SignedBlsToExecutionChange {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#beaconblockbody>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BeaconBlockBodyPhase0 {
     /// The RANDAO reveal value provided by the validator.
     pub randao_reveal: BlsSignature,
@@ -287,6 +303,7 @@ pub struct BeaconBlockBodyPhase0 {
 ///
 /// See <https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/altair/beacon-chain.md#beaconblockbody>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BeaconBlockBodyAltair {
     /// The RANDAO reveal value provided by the validator.
     pub randao_reveal: BlsSignature,
@@ -654,5 +671,165 @@ mod tests {
         }"#;
         let slashing: ProposerSlashing = serde_json::from_str(s).unwrap();
         assert_eq!(slashing.signed_header_1.message.slot, 1);
+    }
+
+    #[cfg(feature = "ssz")]
+    mod ssz_tests {
+        use super::*;
+        use ssz::{Decode, Encode};
+
+        #[test]
+        fn ssz_roundtrip_eth1_data() {
+            let eth1_data = Eth1Data {
+                deposit_root: B256::repeat_byte(0x11),
+                deposit_count: 42,
+                block_hash: B256::repeat_byte(0x22),
+            };
+            let encoded = eth1_data.as_ssz_bytes();
+            let decoded = Eth1Data::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(eth1_data, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_checkpoint() {
+            let checkpoint = Checkpoint { epoch: 100, root: B256::repeat_byte(0x33) };
+            let encoded = checkpoint.as_ssz_bytes();
+            let decoded = Checkpoint::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(checkpoint, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_attestation_data() {
+            let data = AttestationData {
+                slot: 1000,
+                index: 5,
+                beacon_block_root: B256::repeat_byte(0x44),
+                source: Checkpoint { epoch: 10, root: B256::repeat_byte(0x55) },
+                target: Checkpoint { epoch: 11, root: B256::repeat_byte(0x66) },
+            };
+            let encoded = data.as_ssz_bytes();
+            let decoded = AttestationData::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(data, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_voluntary_exit() {
+            let exit = VoluntaryExit { epoch: 50, validator_index: 123 };
+            let encoded = exit.as_ssz_bytes();
+            let decoded = VoluntaryExit::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(exit, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_signed_voluntary_exit() {
+            use crate::BlsSignature;
+            let exit = SignedVoluntaryExit {
+                message: VoluntaryExit { epoch: 50, validator_index: 123 },
+                signature: BlsSignature::repeat_byte(0x77),
+            };
+            let encoded = exit.as_ssz_bytes();
+            let decoded = SignedVoluntaryExit::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(exit, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_deposit_data() {
+            use crate::BlsPublicKey;
+            let data = DepositData {
+                pubkey: BlsPublicKey::repeat_byte(0x88),
+                withdrawal_credentials: B256::repeat_byte(0x99),
+                amount: 32_000_000_000,
+                signature: crate::BlsSignature::repeat_byte(0xaa),
+            };
+            let encoded = data.as_ssz_bytes();
+            let decoded = DepositData::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(data, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_bls_to_execution_change() {
+            use crate::BlsPublicKey;
+            let change = BlsToExecutionChange {
+                validator_index: 456,
+                from_bls_pubkey: BlsPublicKey::repeat_byte(0xbb),
+                to_execution_address: alloy_primitives::Address::repeat_byte(0xcc),
+            };
+            let encoded = change.as_ssz_bytes();
+            let decoded = BlsToExecutionChange::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(change, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_signed_bls_to_execution_change() {
+            use crate::{BlsPublicKey, BlsSignature};
+            let change = SignedBlsToExecutionChange {
+                message: BlsToExecutionChange {
+                    validator_index: 789,
+                    from_bls_pubkey: BlsPublicKey::repeat_byte(0xdd),
+                    to_execution_address: alloy_primitives::Address::repeat_byte(0xee),
+                },
+                signature: BlsSignature::repeat_byte(0xff),
+            };
+            let encoded = change.as_ssz_bytes();
+            let decoded = SignedBlsToExecutionChange::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(change, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_sync_aggregate() {
+            let aggregate = SyncAggregate {
+                sync_committee_bits: Bytes::from_static(&[0x01, 0x02, 0x03]),
+                sync_committee_signature: crate::BlsSignature::repeat_byte(0x11),
+            };
+            let encoded = aggregate.as_ssz_bytes();
+            let decoded = SyncAggregate::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(aggregate, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_beacon_block_body_phase0() {
+            let body = BeaconBlockBodyPhase0 {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x22),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x33),
+                    deposit_count: 100,
+                    block_hash: B256::repeat_byte(0x44),
+                },
+                graffiti: B256::repeat_byte(0x55),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![],
+                deposits: vec![],
+                voluntary_exits: vec![],
+            };
+            let encoded = body.as_ssz_bytes();
+            let decoded = BeaconBlockBodyPhase0::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(body, decoded);
+        }
+
+        #[test]
+        fn ssz_roundtrip_beacon_block_body_altair() {
+            let body = BeaconBlockBodyAltair {
+                randao_reveal: crate::BlsSignature::repeat_byte(0x66),
+                eth1_data: Eth1Data {
+                    deposit_root: B256::repeat_byte(0x77),
+                    deposit_count: 200,
+                    block_hash: B256::repeat_byte(0x88),
+                },
+                graffiti: B256::repeat_byte(0x99),
+                proposer_slashings: vec![],
+                attester_slashings: vec![],
+                attestations: vec![],
+                deposits: vec![],
+                voluntary_exits: vec![],
+                sync_aggregate: SyncAggregate {
+                    sync_committee_bits: Bytes::from_static(&[0xaa]),
+                    sync_committee_signature: crate::BlsSignature::repeat_byte(0xbb),
+                },
+            };
+            let encoded = body.as_ssz_bytes();
+            let decoded = BeaconBlockBodyAltair::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(body, decoded);
+        }
     }
 }

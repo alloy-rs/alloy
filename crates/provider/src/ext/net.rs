@@ -7,11 +7,11 @@ use alloy_transport::TransportResult;
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 pub trait NetApi<N>: Send + Sync {
-    /// Returns a `bool` indicating whether or not the node is listening for network connections.
+    /// Returns `true` if the node is listening for network connections.
     async fn net_listening(&self) -> TransportResult<bool>;
     /// Returns the number of peers connected to the node.
     async fn net_peer_count(&self) -> TransportResult<u64>;
-    /// Returns the network ID (e.g. 1 for mainnet).
+    /// Returns the network ID (for example, `1` for mainnet).
     async fn net_version(&self) -> TransportResult<u64>;
 }
 
