@@ -172,6 +172,10 @@ mod serde_impl {
         target_blob_count: u64,
         #[serde(skip)]
         min_blob_fee: Option<u128>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        max_blobs_per_tx: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        blob_base_cost: Option<u64>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -181,8 +185,8 @@ mod serde_impl {
                 max_blob_count,
                 update_fraction,
                 min_blob_fee,
-                max_blobs_per_tx: _,
-                blob_base_cost: _,
+                max_blobs_per_tx,
+                blob_base_cost,
             } = params;
 
             Self {
@@ -191,23 +195,64 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
                     .then_some(min_blob_fee),
+                max_blobs_per_tx: (max_blobs_per_tx != max_blob_count).then_some(max_blobs_per_tx),
+                blob_base_cost: (blob_base_cost != 0).then_some(blob_base_cost),
             }
         }
     }
 
     impl From<SerdeHelper> for BlobParams {
         fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
-                helper;
+            let SerdeHelper {
+                target_blob_count,
+                max_blob_count,
+                update_fraction,
+                min_blob_fee,
+                max_blobs_per_tx,
+                blob_base_cost,
+            } = helper;
 
             Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
                 min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
-                max_blobs_per_tx: max_blob_count,
-                blob_base_cost: 0,
+                max_blobs_per_tx: max_blobs_per_tx.unwrap_or(max_blob_count),
+                blob_base_cost: blob_base_cost.unwrap_or(0),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_blob_params_serde_roundtrip() {
+        // Test with osaka config (has non-default max_blobs_per_tx and blob_base_cost)
+        let osaka = BlobParams::osaka();
+        let serialized = serde_json::to_string(&osaka).unwrap();
+        let deserialized: BlobParams = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(osaka.target_blob_count, deserialized.target_blob_count);
+        assert_eq!(osaka.max_blob_count, deserialized.max_blob_count);
+        assert_eq!(osaka.update_fraction, deserialized.update_fraction);
+        assert_eq!(osaka.min_blob_fee, deserialized.min_blob_fee);
+        assert_eq!(osaka.max_blobs_per_tx, deserialized.max_blobs_per_tx);
+        assert_eq!(osaka.blob_base_cost, deserialized.blob_base_cost);
+
+        // Test with cancun config (has default values)
+        let cancun = BlobParams::cancun();
+        let serialized = serde_json::to_string(&cancun).unwrap();
+        let deserialized: BlobParams = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(cancun.target_blob_count, deserialized.target_blob_count);
+        assert_eq!(cancun.max_blob_count, deserialized.max_blob_count);
+        assert_eq!(cancun.update_fraction, deserialized.update_fraction);
+        assert_eq!(cancun.min_blob_fee, deserialized.min_blob_fee);
+        assert_eq!(cancun.max_blobs_per_tx, deserialized.max_blobs_per_tx);
+        assert_eq!(cancun.blob_base_cost, deserialized.blob_base_cost);
     }
 }
