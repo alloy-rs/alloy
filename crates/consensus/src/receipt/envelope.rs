@@ -387,6 +387,7 @@ pub(crate) mod serde_bincode_compat {
                     status: success.into(),
                     cumulative_gas_used,
                     logs: logs.into_owned(),
+                    gas_spent: None,
                 },
                 logs_bloom: logs_bloom.into_owned(),
             };
@@ -478,6 +479,7 @@ mod test {
                 )),
                 cumulative_gas_used: 0,
                 logs: Default::default(),
+                gas_spent: None,
             },
             logs_bloom: Default::default(),
         };

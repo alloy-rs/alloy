@@ -2235,6 +2235,7 @@ mod tests {
                     data: LogData::new(vec![topic2], Bytes::from(vec![0x03, 0x04])).unwrap(),
                 },
             ],
+            gas_spent: None,
         };
 
         let receipt2 = Receipt {
@@ -2244,6 +2245,7 @@ mod tests {
                 address: addr1,
                 data: LogData::new(vec![topic2], Bytes::from(vec![0x05])).unwrap(),
             }],
+            gas_spent: None,
         };
 
         let receipts = [receipt1, receipt2];
@@ -2387,6 +2389,7 @@ mod tests {
                         data: LogData::new(vec![topic2], Bytes::from(vec![0x03, 0x04])).unwrap(),
                     },
                 ],
+                gas_spent: None,
             },
             Receipt {
                 status: alloy_consensus::Eip658Value::Eip658(true),
@@ -2395,6 +2398,7 @@ mod tests {
                     address: addr1,
                     data: LogData::new(vec![topic2], Bytes::from(vec![0x05])).unwrap(),
                 }],
+                gas_spent: None,
             },
         ];
 
@@ -2412,6 +2416,7 @@ mod tests {
                     data: LogData::new(vec![topic1], Bytes::from(vec![0x07])).unwrap(),
                 },
             ],
+            gas_spent: None,
         }];
 
         let all_receipts = vec![block1_receipts, block2_receipts];
