@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkWallet, TransactionBuilder};
@@ -169,7 +167,8 @@ mod tests {
 
         let anvil = Anvil::new().spawn();
 
-        let provider = ProviderBuilder::new().wallet(pk.clone()).connect_http(anvil.endpoint_url());
+        let expected_address = pk.address();
+        let provider = ProviderBuilder::new().wallet(pk).connect_http(anvil.endpoint_url());
 
         let tx = TransactionRequest {
             nonce: Some(0),
@@ -187,7 +186,7 @@ mod tests {
 
         let default_address = wallet.default_signer().address();
 
-        assert_eq!(pk.address(), default_address);
+        assert_eq!(expected_address, default_address);
         assert_eq!(receipt.from, default_address);
     }
 }
