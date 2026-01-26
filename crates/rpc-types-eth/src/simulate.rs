@@ -180,7 +180,7 @@ impl<TxReq> SimulatePayload<TxReq> {
 }
 
 /// The error response returned by the `eth_simulateV1` method.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulateError {
