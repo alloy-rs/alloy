@@ -153,7 +153,6 @@ mod tests {
                     status: Eip658Value::success(),
                     cumulative_gas_used: 102068,
                     logs,
-                    gas_spent: None,
                 },
                 ty: TxType::Eip2930,
             },

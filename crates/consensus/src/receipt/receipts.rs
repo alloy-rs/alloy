@@ -29,16 +29,6 @@ pub struct Receipt<T = Log> {
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<T>,
-    /// EIP-7778: Per-transaction gas after refunds.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )
-    )]
-    pub gas_spent: Option<u64>,
 }
 
 impl<T> Receipt<T> {
@@ -46,8 +36,8 @@ impl<T> Receipt<T> {
     ///
     /// Returns the receipt with the new log type
     pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> Receipt<U> {
-        let Self { status, cumulative_gas_used, logs, gas_spent } = self;
-        Receipt { status, cumulative_gas_used, logs: logs.into_iter().map(f).collect(), gas_spent }
+        let Self { status, cumulative_gas_used, logs } = self;
+        Receipt { status, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
     }
 }
 
@@ -119,14 +109,10 @@ where
 impl<T: Encodable> Receipt<T> {
     /// Returns length of RLP-encoded receipt fields with the given [`Bloom`] without an RLP header.
     pub fn rlp_encoded_fields_length_with_bloom(&self, bloom: &Bloom) -> usize {
-        let mut length = self.status.length()
+        self.status.length()
             + self.cumulative_gas_used.length()
             + bloom.length()
-            + self.logs.length();
-        if let Some(gas_spent) = self.gas_spent {
-            length += gas_spent.length();
-        }
-        length
+            + self.logs.length()
     }
 
     /// RLP-encodes receipt fields with the given [`Bloom`] without an RLP header.
@@ -135,9 +121,6 @@ impl<T: Encodable> Receipt<T> {
         self.cumulative_gas_used.encode(out);
         bloom.encode(out);
         self.logs.encode(out);
-        if let Some(gas_spent) = self.gas_spent {
-            gas_spent.encode(out);
-        }
     }
 
     /// Returns RLP header for this receipt encoding with the given [`Bloom`].
@@ -168,12 +151,8 @@ impl<T: Decodable> Receipt<T> {
         let cumulative_gas_used = Decodable::decode(buf)?;
         let logs_bloom = Decodable::decode(buf)?;
         let logs = Decodable::decode(buf)?;
-        let gas_spent = if buf.is_empty() { None } else { Some(Decodable::decode(buf)?) };
 
-        Ok(ReceiptWithBloom {
-            receipt: Self { status, cumulative_gas_used, logs, gas_spent },
-            logs_bloom,
-        })
+        Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
     }
 }
 
@@ -481,7 +460,6 @@ pub(crate) mod serde_bincode_compat {
                 status: value.status.into(),
                 cumulative_gas_used: value.cumulative_gas_used,
                 logs: value.logs.into_owned(),
-                gas_spent: None,
             }
         }
     }

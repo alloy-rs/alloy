@@ -169,7 +169,6 @@ mod tests {
                         ),
                     }],
                     status: false.into(),
-                    gas_spent: None,
                 },
                 logs_bloom: [0; 256].into(),
             });
@@ -202,7 +201,6 @@ mod tests {
                         ),
                     }],
                     status: false.into(),
-                    gas_spent: None,
                 },
                 logs_bloom: [0; 256].into(),
             };
@@ -236,7 +234,6 @@ mod tests {
                     ),
                 },
             ],
-            gas_spent: None,
         }
         .with_bloom();
 
@@ -255,7 +252,7 @@ mod tests {
     #[test]
     fn can_encode_by_reference() {
         let receipt: Receipt =
-            Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![], gas_spent: None };
+            Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![] };
 
         let encoded_ref = alloy_rlp::encode(&ReceiptWithBloom {
             receipt: &receipt,
