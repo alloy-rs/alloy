@@ -79,6 +79,11 @@ pub trait ReceiptResponse {
     /// Returns the cumulative gas used at this receipt.
     fn cumulative_gas_used(&self) -> u64;
 
+    /// EIP-7778: Per-transaction gas after refunds.
+    fn gas_spent(&self) -> Option<u64> {
+        None
+    }
+
     /// The post-transaction state root (pre Byzantium)
     ///
     /// EIP98 makes this field optional.
@@ -261,6 +266,10 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
 
     fn cumulative_gas_used(&self) -> u64 {
         self.inner.cumulative_gas_used()
+    }
+
+    fn gas_spent(&self) -> Option<u64> {
+        self.inner.gas_spent()
     }
 
     fn state_root(&self) -> Option<B256> {
