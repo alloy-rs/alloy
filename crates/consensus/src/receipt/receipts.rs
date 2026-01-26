@@ -481,6 +481,7 @@ pub(crate) mod serde_bincode_compat {
                 status: value.status.into(),
                 cumulative_gas_used: value.cumulative_gas_used,
                 logs: value.logs.into_owned(),
+                gas_spent: None,
             }
         }
     }
