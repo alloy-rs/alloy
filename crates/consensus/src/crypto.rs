@@ -53,8 +53,7 @@ pub const SECP256K1N_HALF: U256 = U256::from_be_bytes([
 ]);
 
 /// Serialized uncompressed public key
-#[derive(Debug, Clone)]
-pub struct UncompressedPublicKey(pub [u8; 65]);
+pub type UncompressedPublicKey = [u8; 65];
 
 /// Crypto backend module for pluggable cryptographic implementations.
 #[cfg(feature = "crypto-backend")]
@@ -266,11 +265,11 @@ pub mod secp256k1 {
         // Try dynamic backend first when crypto-backend feature is enabled
         #[cfg(feature = "crypto-backend")]
         if let Some(provider) = super::backend::try_get_provider() {
-            return provider.verify_and_compute_signer_unchecked(&pubkey.0, &sig, &hash.0);
+            return provider.verify_and_compute_signer_unchecked(pubkey, &sig, &hash.0);
         }
 
         // Fallback to compile-time selected implementation
-        imp::verify_and_compute_signer_unchecked(&pubkey.0, &sig, &hash.0)
+        imp::verify_and_compute_signer_unchecked(pubkey, &sig, &hash.0)
             .map_err(|_| RecoveryError::new())
     }
 
