@@ -2207,6 +2207,9 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                     // V3
                     BlobGasUsed,
                     ExcessBlobGas,
+                    // V4
+                    BlockAccessList,
+                    SlotNumber,
                 }
 
                 let mut parent_hash = None;
@@ -2226,6 +2229,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 let mut withdrawals = None;
                 let mut blob_gas_used = None;
                 let mut excess_blob_gas = None;
+                let mut block_access_list = None;
+                let mut slot_number = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -2263,6 +2268,13 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         Fields::ExcessBlobGas => {
                             let raw = map.next_value::<U64>()?;
                             excess_blob_gas = Some(raw.to());
+                        }
+                        Fields::BlockAccessList => {
+                            block_access_list = Some(map.next_value()?);
+                        }
+                        Fields::SlotNumber => {
+                            let raw = map.next_value::<U64>()?;
+                            slot_number = Some(raw.to());
                         }
                     }
                 }
@@ -2324,15 +2336,34 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 if let (Some(blob_gas_used), Some(excess_blob_gas)) =
                     (blob_gas_used, excess_blob_gas)
                 {
-                    return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
+                    let v3 = ExecutionPayloadV3 {
                         payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
                         blob_gas_used,
                         excess_blob_gas,
-                    }));
+                    };
+
+                    // Check for V4 fields (block_access_list and slot_number)
+                    return match (block_access_list, slot_number) {
+                        (Some(block_access_list), Some(slot_number)) => {
+                            Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
+                                payload_inner: v3,
+                                block_access_list,
+                                slot_number,
+                            }))
+                        }
+                        // reject incomplete V4 payloads
+                        (None, None) => Ok(ExecutionPayload::V3(v3)),
+                        _ => Err(serde::de::Error::custom("invalid enum variant")),
+                    };
                 }
 
                 // reject incomplete V3 payloads even if they could construct a valid V2
                 if blob_gas_used.is_some() || excess_blob_gas.is_some() {
+                    return Err(serde::de::Error::custom("invalid enum variant"));
+                }
+
+                // reject V4 fields without V3 fields
+                if block_access_list.is_some() || slot_number.is_some() {
                     return Err(serde::de::Error::custom("invalid enum variant"));
                 }
 
@@ -2358,6 +2389,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             "withdrawals",
             "blobGasUsed",
             "excessBlobGas",
+            "blockAccessList",
+            "slotNumber",
         ];
         deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
     }
