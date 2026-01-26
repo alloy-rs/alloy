@@ -7,11 +7,11 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{
-    error::ValueError, transaction::Recovered, SignableTransaction, TxEip1559, TxEip2930,
-    TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType,
-    Typed2718, TypedTransaction,
+    error::ValueError, transaction::Recovered, BlobTransactionSidecarVariant, SignableTransaction,
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
+    TxLegacy, TxType, Typed2718, TypedTransaction,
 };
-use alloy_eips::{eip7594::BlobTransactionSidecarVariant, eip7702::SignedAuthorization};
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
