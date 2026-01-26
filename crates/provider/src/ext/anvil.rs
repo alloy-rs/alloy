@@ -23,7 +23,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Stops impersonating an account if previously set with `anvil_impersonateAccount`.
     async fn anvil_stop_impersonating_account(&self, address: Address) -> TransportResult<()>;
 
-    /// If set to true will make every account impersonated.
+    /// If set to `true`, impersonates all accounts.
     async fn anvil_auto_impersonate_account(&self, enabled: bool) -> TransportResult<()>;
 
     /// Impersonates the `from` address in the given transaction request, optionally funds the
