@@ -216,7 +216,7 @@ mod tests {
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO)
-            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .with_blob_sidecar_4844(BlobTransactionSidecar::default())
             .with_max_fee_per_blob_gas(0);
 
         let tx = request.clone().build_unsigned().unwrap();
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn test_fail_when_sidecar_and_access_list() {
         let request = TransactionRequest::default()
-            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .with_blob_sidecar_4844(BlobTransactionSidecar::default())
             .with_access_list(AccessList::default());
 
         let error = request.build_unsigned().unwrap_err();
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_invalid_4844_fields() {
         let request =
-            TransactionRequest::default().with_blob_sidecar(BlobTransactionSidecar::default());
+            TransactionRequest::default().with_blob_sidecar_4844(BlobTransactionSidecar::default());
 
         let error = request.build_unsigned().unwrap_err();
 
