@@ -66,16 +66,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub to: Option<Address>,
     /// Contract address created, or None if not a deployment.
     pub contract_address: Option<Address>,
-    /// EIP-7778: Per-transaction gas after refunds.
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt",
-            default
-        )
-    )]
-    pub gas_spent: Option<u64>,
 }
 
 #[cfg(feature = "serde")]
@@ -122,12 +112,6 @@ where
             from: Address,
             to: Option<Address>,
             contract_address: Option<Address>,
-            #[serde(
-                default,
-                skip_serializing_if = "Option::is_none",
-                with = "alloy_serde::quantity::opt"
-            )]
-            gas_spent: Option<u64>,
         }
 
         let helper = ReceiptDeserHelper::deserialize(deserializer)?;
@@ -144,7 +128,6 @@ where
             from: helper.from,
             to: helper.to,
             contract_address: helper.contract_address,
-            gas_spent: helper.gas_spent,
         })
     }
 }
@@ -193,7 +176,6 @@ impl<T> TransactionReceipt<T> {
             from: self.from,
             to: self.to,
             contract_address: self.contract_address,
-            gas_spent: self.gas_spent,
         }
     }
 
@@ -322,10 +304,6 @@ impl<T: TxReceipt<Log = Log>> ReceiptResponse for TransactionReceipt<T> {
 
     fn state_root(&self) -> Option<B256> {
         self.inner.status_or_post_state().as_post_state()
-    }
-
-    fn gas_spent(&self) -> Option<u64> {
-        self.gas_spent
     }
 }
 
