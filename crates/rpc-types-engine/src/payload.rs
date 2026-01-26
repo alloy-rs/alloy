@@ -1150,6 +1150,26 @@ impl ExecutionPayloadV4 {
         }
     }
 
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash
+    /// and block access list.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    pub fn from_block_unchecked_with_bal<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+        block_access_list: Bytes,
+    ) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
+        Self {
+            payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
+            block_access_list,
+            slot_number: block.header.slot_number().unwrap_or_default(),
+        }
+    }
+
     /// Returns the timestamp for the execution payload.
     pub const fn timestamp(&self) -> u64 {
         self.payload_inner.timestamp()
