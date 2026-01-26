@@ -1,7 +1,7 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Header, Log, Transaction};
-use alloc::{boxed::Box, format};
+use alloc::boxed::Box;
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 
@@ -103,6 +103,31 @@ pub enum SubscriptionKind {
     Syncing,
 }
 
+impl core::fmt::Display for SubscriptionKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NewHeads => write!(f, "newHeads"),
+            Self::Logs => write!(f, "logs"),
+            Self::NewPendingTransactions => write!(f, "newPendingTransactions"),
+            Self::Syncing => write!(f, "syncing"),
+        }
+    }
+}
+
+impl core::str::FromStr for SubscriptionKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "newHeads" => Ok(Self::NewHeads),
+            "logs" => Ok(Self::Logs),
+            "newPendingTransactions" => Ok(Self::NewPendingTransactions),
+            "syncing" => Ok(Self::Syncing),
+            _ => Err("invalid subscription kind"),
+        }
+    }
+}
+
 /// Any additional parameters for a subscription.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Params {
@@ -126,6 +151,20 @@ impl Params {
     #[inline]
     pub const fn is_logs(&self) -> bool {
         matches!(self, Self::Logs(_))
+    }
+
+    /// Creates a new [`Params`] from a [`serde_json::Value`].
+    #[cfg(feature = "serde")]
+    pub fn from_json_value(v: serde_json::Value) -> Result<Self, serde_json::Error> {
+        if v.is_null() {
+            return Ok(Self::None);
+        }
+
+        if let Some(val) = v.as_bool() {
+            return Ok(val.into());
+        }
+
+        serde_json::from_value::<Filter>(v).map(Into::into)
     }
 }
 
@@ -161,21 +200,8 @@ impl<'a> serde::Deserialize<'a> for Params {
     where
         D: serde::Deserializer<'a>,
     {
-        use serde::de::Error;
-
         let v = serde_json::Value::deserialize(deserializer)?;
-
-        if v.is_null() {
-            return Ok(Self::None);
-        }
-
-        if let Some(val) = v.as_bool() {
-            return Ok(val.into());
-        }
-
-        serde_json::from_value::<Filter>(v)
-            .map(Into::into)
-            .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
+        Self::from_json_value(v).map_err(serde::de::Error::custom)
     }
 }
 
@@ -241,6 +267,29 @@ mod tests {
 
         let param: Params = false.into();
         assert_eq!(param, Params::Bool(false));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn subscription_kind_str_roundtrip() {
+        use core::str::FromStr;
+
+        for kind in [
+            SubscriptionKind::NewHeads,
+            SubscriptionKind::Logs,
+            SubscriptionKind::NewPendingTransactions,
+            SubscriptionKind::Syncing,
+        ] {
+            let s = kind.to_string();
+            let parsed: SubscriptionKind = s.parse().unwrap();
+            assert_eq!(kind, parsed);
+
+            // Verify FromStr matches serde
+            let serde_str = serde_json::to_string(&kind).unwrap();
+            let serde_str = serde_str.trim_matches('"');
+            assert_eq!(s, serde_str);
+            assert_eq!(SubscriptionKind::from_str(serde_str).unwrap(), kind);
+        }
     }
 
     #[test]

@@ -582,9 +582,7 @@ impl TransactionRequest {
     pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let Some(sidecar) =
-            self.sidecar.take().and_then(BlobTransactionSidecarVariant::into_eip4844)
-        else {
+        let Some(sidecar) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
         };
 
@@ -1106,6 +1104,7 @@ impl TransactionBuilder7594 for TransactionRequest {
 
     fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594) {
         self.sidecar = Some(BlobTransactionSidecarVariant::Eip7594(sidecar));
+        self.populate_blob_hashes();
     }
 }
 
@@ -1239,7 +1238,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
     fn from(tx: TxEip4844WithSidecar) -> Self {
         let TxEip4844WithSidecar { tx, sidecar } = tx;
         let mut tx: Self = tx.into();
-        tx.sidecar = Some(sidecar.into());
+        tx.sidecar = Some(sidecar);
         tx
     }
 }
@@ -2112,6 +2111,32 @@ mod tests {
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
 
+        // EIP-4844 with EIP-7594 sidecar
+        {
+            use alloy_eips::eip4844::Blob;
+
+            // Positive case
+            let sidecar = BlobTransactionSidecarEip7594::new(
+                vec![Blob::repeat_byte(0xFA)],
+                Vec::new(),
+                Vec::new(),
+            );
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.into()),
+                ..Default::default()
+            };
+
+            // this panics because EIP-7594 sidecar is ignored
+            eip4844_request.build_consensus_tx().unwrap();
+        }
+
         // EIP-7702
         {
             let eip4844_request = TransactionRequest {
@@ -2189,5 +2214,33 @@ mod tests {
         let auths = req.authorization_list.unwrap();
         assert_eq!(auths.len(), 1);
         assert_eq!(auths[0].y_parity(), 0);
+    }
+
+    #[test]
+    fn set_blob_sidecar_7594_populates_versioned_hashes() {
+        use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, Bytes48};
+
+        // Create a sidecar with a known commitment
+        let commitment = Bytes48::repeat_byte(0x42);
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0xFA)],
+            vec![commitment],
+            vec![Bytes48::repeat_byte(0x11)], // cell proof
+        );
+
+        // Calculate expected versioned hash from the commitment
+        let expected_hash = kzg_to_versioned_hash(commitment.as_slice());
+
+        // Create a transaction request and set the sidecar
+        let mut tx_request = TransactionRequest::default();
+        assert!(tx_request.blob_versioned_hashes.is_none());
+
+        tx_request.set_blob_sidecar_7594(sidecar);
+
+        // Verify that blob_versioned_hashes was populated
+        assert!(tx_request.blob_versioned_hashes.is_some());
+        let hashes = tx_request.blob_versioned_hashes.unwrap();
+        assert_eq!(hashes.len(), 1);
+        assert_eq!(hashes[0], expected_hash);
     }
 }

@@ -191,11 +191,10 @@ impl<T: Clone + Eq + Hash> FilterSet<T> {
     /// - If the filter has only 1 value, it returns the single value
     /// - Otherwise it returns an array of values
     pub fn to_value_or_array(&self) -> Option<ValueOrArray<T>> {
-        let mut values = self.set.iter().cloned().collect::<Vec<T>>();
-        match values.len() {
+        match self.set.len() {
             0 => None,
-            1 => Some(ValueOrArray::Value(values.pop().expect("values length is one"))),
-            _ => Some(ValueOrArray::Array(values)),
+            1 => self.set.iter().next().cloned().map(ValueOrArray::Value),
+            _ => Some(ValueOrArray::Array(self.set.iter().cloned().collect())),
         }
     }
 }
@@ -1631,6 +1630,28 @@ mod tests {
         serde_json::to_value(t).expect("Failed to serialize value")
     }
 
+    #[test]
+    fn test_filterset_to_value_or_array_semantics() {
+        let empty = FilterSet::<u8>::default();
+        assert_eq!(empty.to_value_or_array(), None);
+
+        let mut single = FilterSet::<u8>::default();
+        assert!(single.insert(7));
+        assert_eq!(single.to_value_or_array(), Some(ValueOrArray::Value(7)));
+
+        let mut multi = FilterSet::<u8>::default();
+        assert!(multi.insert(1));
+        assert!(multi.insert(2));
+        match multi.to_value_or_array() {
+            Some(ValueOrArray::Array(values)) => {
+                assert_eq!(values.len(), 2);
+                assert!(values.contains(&1));
+                assert!(values.contains(&2));
+            }
+            other => panic!("expected Some(ValueOrArray::Array(_)), got {other:?}"),
+        }
+    }
+
     // <https://hoodi.etherscan.io/block/400001>
     #[test]
     #[cfg(feature = "serde")]
@@ -1745,12 +1766,12 @@ mod tests {
         }
 
         let item = Item { value: ValueOrArray::Value(U256::from(1u64)) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
 
         let item = Item { value: ValueOrArray::Array(vec![U256::from(1u64), U256::ZERO]) };
-        let json = serde_json::to_value(item.clone()).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
     }

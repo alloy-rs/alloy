@@ -15,6 +15,9 @@ pub mod constants;
 /// Beacon API events support.
 pub mod events;
 
+/// Types and functions related to the signed beacon block.
+pub mod block;
+
 /// Types and functions related to the beacon block header.
 pub mod header;
 

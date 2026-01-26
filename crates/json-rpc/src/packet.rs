@@ -133,19 +133,15 @@ impl RequestPacket {
         self.requests().iter().map(|req| req.method())
     }
 
-    /// Retrieves the [`HeaderMap`] from the request metadata if available;
-    /// otherwise, returns an empty map. This functionality is only supported for single requests.
+    /// Retrieves the combined headers from all requests in the packet. If
+    /// multiple requests contain the same header, the last one wins.
     pub fn headers(&self) -> HeaderMap {
-        // If this is a batch request, we cannot return headers.
-        let Some(single_req) = self.as_single() else {
-            return HeaderMap::new();
-        };
-        // If the request provides a `HeaderMap` return it.
-        if let Some(http_header_extension) = single_req.meta().extensions().get::<HeaderMap>() {
-            return http_header_extension.clone();
-        };
-
-        HeaderMap::new()
+        self.requests().iter().fold(HeaderMap::new(), |mut acc, req| {
+            if let Some(http_header_extension) = req.meta().extensions().get::<HeaderMap>() {
+                acc.extend(http_header_extension.iter().map(|(k, v)| (k.clone(), v.clone())));
+            };
+            acc
+        })
     }
 }
 

@@ -36,8 +36,6 @@ tracing.workspace = true
 http = "1.1"
 tokio = { workspace = true, features = ["sync", "rt", "time"] }
 tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
-# choose ring as the default TLS backend
-rustls = { workspace = true, features = ["ring"] }
 
 # WASM only
 [target.'cfg(target_family = "wasm")'.dependencies]
