@@ -157,6 +157,8 @@ struct BeaconPayloadAttributes {
     withdrawals: Option<Vec<Withdrawal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parent_beacon_block_root: Option<B256>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot_number: Option<u64>,
 }
 
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
@@ -183,6 +185,7 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: payload_attributes.suggested_fee_recipient,
             withdrawals: payload_attributes.withdrawals.clone(),
             parent_beacon_block_root: payload_attributes.parent_beacon_block_root,
+            slot_number: payload_attributes.slot_number,
         };
         beacon_api_payload_attributes.serialize(serializer)
     }
@@ -199,6 +202,7 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: beacon_api_payload_attributes.suggested_fee_recipient,
             withdrawals: beacon_api_payload_attributes.withdrawals,
             parent_beacon_block_root: beacon_api_payload_attributes.parent_beacon_block_root,
+            slot_number: beacon_api_payload_attributes.slot_number,
         })
     }
 }
@@ -821,5 +825,30 @@ mod tests {
             ExecutionPayload::V2(_) => panic!("Expected V1 payload, got V2"),
             ExecutionPayload::V3(_) => panic!("Expected V1 payload, got V3"),
         }
+    }
+
+    #[test]
+    fn serde_beacon_payload_attributes_without_slot_number() {
+        use alloy_rpc_types_engine::PayloadAttributes;
+
+        let json = r#"{
+            "timestamp": "1234",
+            "prev_randao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "suggested_fee_recipient": "0x0000000000000000000000000000000000000000"
+        }"#;
+
+        let attrs: BeaconPayloadAttributes = serde_json::from_str(json).unwrap();
+        assert_eq!(attrs.timestamp, 1234);
+        assert!(attrs.slot_number.is_none());
+
+        let engine_attrs = PayloadAttributes {
+            timestamp: attrs.timestamp,
+            prev_randao: attrs.prev_randao,
+            suggested_fee_recipient: attrs.suggested_fee_recipient,
+            withdrawals: attrs.withdrawals,
+            parent_beacon_block_root: attrs.parent_beacon_block_root,
+            slot_number: attrs.slot_number,
+        };
+        assert!(engine_attrs.slot_number.is_none());
     }
 }
