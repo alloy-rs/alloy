@@ -343,6 +343,7 @@ eip712 = [
     "alloy-signer-aws?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
+    "alloy-signer-local?/eip712",
     "alloy-signer-turnkey?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",

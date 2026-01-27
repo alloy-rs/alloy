@@ -363,6 +363,33 @@ impl TryFrom<ExecutionPayloadEnvelopeV5> for ExecutionPayloadEnvelopeV4 {
     }
 }
 
+/// This structure maps for the return value of `engine_getPayloadV6` of the beacon chain spec.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_getpayloadv6>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadEnvelopeV6 {
+    /// Execution payload V4
+    pub execution_payload: ExecutionPayloadV4,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload.
+    ///
+    /// See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+}
+
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
@@ -954,6 +981,132 @@ impl ssz::Encode for ExecutionPayloadV3 {
     fn ssz_bytes_len(&self) -> usize {
         <ExecutionPayloadV2 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
             + <u64 as ssz::Encode>::ssz_fixed_len() * 2
+    }
+}
+
+/// Execution payload V4 as defined in the Amsterdam fork.
+///
+/// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928].
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#executionpayloadv4>
+///
+/// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadV4 {
+    /// Inner V3 payload
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub payload_inner: ExecutionPayloadV3,
+    /// RLP-encoded block access list as defined in [EIP-7928].
+    ///
+    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+    pub block_access_list: Bytes,
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for ExecutionPayloadV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Bloom>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<Bytes>>()?;
+        builder.register_type::<Vec<Withdrawal>>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+
+        let mut decoder = builder.build()?;
+
+        Ok(Self {
+            payload_inner: ExecutionPayloadV3 {
+                payload_inner: ExecutionPayloadV2 {
+                    payload_inner: ExecutionPayloadV1 {
+                        parent_hash: decoder.decode_next()?,
+                        fee_recipient: decoder.decode_next()?,
+                        state_root: decoder.decode_next()?,
+                        receipts_root: decoder.decode_next()?,
+                        logs_bloom: decoder.decode_next()?,
+                        prev_randao: decoder.decode_next()?,
+                        block_number: decoder.decode_next()?,
+                        gas_limit: decoder.decode_next()?,
+                        gas_used: decoder.decode_next()?,
+                        timestamp: decoder.decode_next()?,
+                        extra_data: decoder.decode_next()?,
+                        base_fee_per_gas: decoder.decode_next()?,
+                        block_hash: decoder.decode_next()?,
+                        transactions: decoder.decode_next()?,
+                    },
+                    withdrawals: decoder.decode_next()?,
+                },
+                blob_gas_used: decoder.decode_next()?,
+                excess_blob_gas: decoder.decode_next()?,
+            },
+            block_access_list: decoder.decode_next()?,
+        })
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for ExecutionPayloadV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 5
+            + <Address as ssz::Encode>::ssz_fixed_len()
+            + <Bloom as ssz::Encode>::ssz_fixed_len()
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 6
+            + <U256 as ssz::Encode>::ssz_fixed_len()
+            + ssz::BYTES_PER_LENGTH_OFFSET * 4;
+
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.parent_hash);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.fee_recipient);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.state_root);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.receipts_root);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.logs_bloom);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.prev_randao);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_number);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_limit);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_used);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.timestamp);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.extra_data);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.base_fee_per_gas);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_hash);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.transactions);
+        encoder.append(&self.payload_inner.payload_inner.withdrawals);
+        encoder.append(&self.payload_inner.blob_gas_used);
+        encoder.append(&self.payload_inner.excess_blob_gas);
+        encoder.append(&self.block_access_list);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
+            + ssz::BYTES_PER_LENGTH_OFFSET
+            + self.block_access_list.len()
     }
 }
 

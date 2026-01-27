@@ -135,6 +135,12 @@ where
         // first collect all the slots that are used by the function call
         let access_list_result = provider.create_access_list(&tx).await?;
         let access_list = access_list_result.access_list;
+
+        // Track whether any call succeeded and capture the first error for diagnostics.
+        // If all overridden calls fail, we propagate the first error instead of returning Ok(None).
+        let mut any_call_succeeded = false;
+        let mut first_call_err: Option<TransportError> = None;
+
         // iterate over all the accessed slots and try to find the one that contains the
         // target value by overriding the slot and checking the function call result
         for item in access_list.0 {
@@ -149,9 +155,15 @@ where
                 let state_override =
                     StateOverridesBuilder::default().append(contract, account_override).build();
 
-                let Ok(result) = provider.call(tx.clone()).overrides(state_override).await else {
-                    // overriding this slot failed
-                    continue;
+                let result = match provider.call(tx.clone()).overrides(state_override).await {
+                    Ok(res) => {
+                        any_call_succeeded = true;
+                        res
+                    }
+                    Err(err) => {
+                        first_call_err.get_or_insert(err);
+                        continue;
+                    }
                 };
 
                 let Ok(result_value) = U256::abi_decode(&result) else {
@@ -164,6 +176,15 @@ where
                 }
             }
         }
+
+        // If no call succeeded and we have an error, propagate it rather than silently returning
+        // None
+        if !any_call_succeeded {
+            if let Some(err) = first_call_err {
+                return Err(err);
+            }
+        }
+
         Ok(None)
     }
 }

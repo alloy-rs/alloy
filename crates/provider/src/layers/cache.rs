@@ -225,7 +225,7 @@ where
             }
         }
 
-        let req = RequestType::new("eth_getLogs", filter.clone());
+        let req = RequestType::new("eth_getLogs", (filter,));
 
         let params_hash = req.params_hash().ok();
 

@@ -5,11 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Features
+
+- [rpc-types-eth] Add SimulateError::invalid_params constructor ([#3578](https://github.com/alloy-rs/alloy/issues/3578))
+- [rpc-types-beacon] Add SSZ support for beacon block types ([#3575](https://github.com/alloy-rs/alloy/issues/3575))
+
+### Miscellaneous Tasks
+
+- Revert "chore: add amsterdam support" ([#3573](https://github.com/alloy-rs/alloy/issues/3573))
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+### Other
+
+- Revert "chore: "reapply "chore: added slot num in payload attr"" ([#3567](https://github.com/alloy-rs/alloy/issues/3567))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Bug Fixes
+
+- Propagate eip712 feature to signer-local ([#3559](https://github.com/alloy-rs/alloy/issues/3559))
+- Avoid cloning withdrawals in payload body ([#3542](https://github.com/alloy-rs/alloy/issues/3542))
+- Missing populate_blob_hashes in TransactionBuilder7594::set_blob_sidecar_7594 ([#3534](https://github.com/alloy-rs/alloy/issues/3534))
+- Return cached pubkey in GcpSigner::get_pubkey ([#3521](https://github.com/alloy-rs/alloy/issues/3521))
+
+### Dependencies
+
+- [deps] Bump taiki-e/install-action from 2.66.1 to 2.66.7 ([#3550](https://github.com/alloy-rs/alloy/issues/3550))
+- [deps] Bump crate-ci/typos from 1.42.0 to 1.42.1 ([#3549](https://github.com/alloy-rs/alloy/issues/3549))
+
+### Documentation
+
+- [signer] Fix sign_dynamic_typed_data documentation ([#3545](https://github.com/alloy-rs/alloy/issues/3545))
+
+### Features
+
+- [rpc-types-beacon] Add SignedBeaconBlock and BeaconBlock types ([#3565](https://github.com/alloy-rs/alloy/issues/3565))
+- [envelope-macro] Generate `tx_type` ([#3563](https://github.com/alloy-rs/alloy/issues/3563))
+- [rpc-types-beacon] Add BeaconExecutionPayloadV4 support ([#3562](https://github.com/alloy-rs/alloy/issues/3562))
+- [eips] Add eip7928 module re-exporting alloy-eip7928 types ([#3558](https://github.com/alloy-rs/alloy/issues/3558))
+- [provider] Add new_payload_v4_requests accepting RequestsOrHash ([#3556](https://github.com/alloy-rs/alloy/issues/3556))
+- [engine] Add ExecutionPayloadV4 and ExecutionPayloadEnvelopeV6 types ([#3552](https://github.com/alloy-rs/alloy/issues/3552))
+- [rpc-types-engine] Add transaction_count helper to ExecutionData ([#3543](https://github.com/alloy-rs/alloy/issues/3543))
+- Add versioned_hashes helper to BlobsBundle and try_into_sealed to AnyRpcBlock ([#3527](https://github.com/alloy-rs/alloy/issues/3527))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- Rm non exhaustive ([#3564](https://github.com/alloy-rs/alloy/issues/3564))
+- "reapply "chore: added slot num in payload attr" ([#3530](https://github.com/alloy-rs/alloy/issues/3530))
+- Add amsterdam support ([#3152](https://github.com/alloy-rs/alloy/issues/3152))
+- Unpin from `nightly-2026-01-10` ([#3547](https://github.com/alloy-rs/alloy/issues/3547))
+- [rpc] Enable `serde` feature for `url` dep in `alloy-rpc-client` ([#3529](https://github.com/alloy-rs/alloy/issues/3529))
+- Remove redundant clone in reth ([#3525](https://github.com/alloy-rs/alloy/issues/3525))
+- Added slot num in payload attr ([#3524](https://github.com/alloy-rs/alloy/issues/3524))
+
+### Other
+
+- [fallback] Deduplicate top transport selection ([#3540](https://github.com/alloy-rs/alloy/issues/3540))
+- Update to tempoxyz ([#3541](https://github.com/alloy-rs/alloy/issues/3541))
+- Remove unused debug import from envelope module ([#3531](https://github.com/alloy-rs/alloy/issues/3531))
+- Revert "chore: added slot num in payload attr" ([#3528](https://github.com/alloy-rs/alloy/issues/3528))
+
+### Performance
+
+- [rpc-types-eth] Optimize FilterSet::to_value_or_array to avoid unnecessary allocations ([#3532](https://github.com/alloy-rs/alloy/issues/3532))
+
+### Refactor
+
+- [serde] Reuse deserialize_into in OtherFields::deserialize_as ([#3533](https://github.com/alloy-rs/alloy/issues/3533))
+
 ## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
 
 ### Features
 
 - [consensus] Relax Block::decode_sealed to accept any H: Decodable ([#3523](https://github.com/alloy-rs/alloy/issues/3523))
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
 
 ## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
 

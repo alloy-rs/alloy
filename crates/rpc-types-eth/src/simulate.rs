@@ -1,6 +1,8 @@
 //! 'eth_simulateV1' Request / Response types: <https://github.com/ethereum/execution-apis/pull/484>
 
-use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
+use crate::{
+    alloc::string::ToString, state::StateOverride, Block, BlockOverrides, Log, TransactionRequest,
+};
 use alloc::{string::String, vec::Vec};
 use alloy_primitives::{Bytes, U256};
 
@@ -190,6 +192,13 @@ pub struct SimulateError {
     pub code: i32,
     /// Message error
     pub message: String,
+}
+
+impl SimulateError {
+    /// Creates a new invalid params error.
+    pub fn invalid_params() -> Self {
+        Self { code: -32602, message: "invalid params".to_string() }
+    }
 }
 
 #[cfg(test)]
