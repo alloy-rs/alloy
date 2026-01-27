@@ -129,6 +129,27 @@ pub struct Header {
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_hash: Option<B256>,
+    /// The Keccak 256-bit hash of the block's access list.
+    ///
+    /// When no state changes are present, this field is the hash of an empty RLP list:
+    /// `keccak256(rlp.encode([]))` =
+    /// `0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347`
+    ///
+    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_access_list_hash: Option<B256>,
+    /// The slot number corresponding to this block, calculated in the consensus layer.
+    ///
+    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
+    pub slot_number: Option<u64>,
 }
 
 impl AsRef<Self> for Header {
@@ -161,6 +182,8 @@ impl Default for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            block_access_list_hash: None,
+            slot_number: None,
         }
     }
 }
@@ -299,6 +322,14 @@ impl Header {
             length += requests_hash.length();
         }
 
+        if let Some(block_access_list_hash) = self.block_access_list_hash {
+            length += block_access_list_hash.length();
+        }
+
+        if let Some(slot_number) = self.slot_number {
+            length += U256::from(slot_number).length();
+        }
+
         length
     }
 
@@ -351,6 +382,13 @@ impl Header {
     pub const fn prague_active(&self) -> bool {
         self.requests_hash.is_some()
     }
+
+    /// True if the Amsterdam hardfork is active.
+    ///
+    /// This function checks that the block access list hash is present.
+    pub const fn amsterdam_active(&self) -> bool {
+        self.block_access_list_hash.is_some()
+    }
 }
 
 impl Encodable for Header {
@@ -398,6 +436,14 @@ impl Encodable for Header {
         if let Some(ref requests_hash) = self.requests_hash {
             requests_hash.encode(out);
         }
+
+        if let Some(ref block_access_list_hash) = self.block_access_list_hash {
+            block_access_list_hash.encode(out);
+        }
+
+        if let Some(ref slot_number) = self.slot_number {
+            U256::from(*slot_number).encode(out);
+        }
     }
 
     fn length(&self) -> usize {
@@ -437,6 +483,8 @@ impl Decodable for Header {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            block_access_list_hash: None,
+            slot_number: None,
         };
         if started_len - buf.len() < rlp_head.payload_length {
             this.base_fee_per_gas = Some(u64::decode(buf)?);
@@ -464,6 +512,16 @@ impl Decodable for Header {
         // Decode requests hash.
         if started_len - buf.len() < rlp_head.payload_length {
             this.requests_hash = Some(B256::decode(buf)?);
+        }
+
+        // Decode block access list hash.
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.block_access_list_hash = Some(B256::decode(buf)?);
+        }
+
+        // Decode slot number.
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.slot_number = Some(u64::decode(buf)?);
         }
 
         let consumed = started_len - buf.len();
@@ -512,6 +570,10 @@ pub(crate) const fn generate_valid_header(
     // Placeholder for future EIP adjustments
     header.requests_hash = None;
 
+    // Clear Amsterdam-related fields for now
+    header.block_access_list_hash = None;
+    header.slot_number = None;
+
     header
 }
 
@@ -541,6 +603,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             excess_blob_gas: u.arbitrary()?,
             parent_beacon_block_root: u.arbitrary()?,
             requests_hash: u.arbitrary()?,
+            block_access_list_hash: u.arbitrary()?,
+            slot_number: u.arbitrary()?,
             withdrawals_root: u.arbitrary()?,
         };
 
@@ -569,6 +633,7 @@ pub trait BlockHeader {
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
             mix_hash: self.mix_hash(),
+            slot_number: self.slot_number(),
         }
     }
 
@@ -643,6 +708,16 @@ pub trait BlockHeader {
 
     /// Retrieves the requests hash of the block, if available
     fn requests_hash(&self) -> Option<B256>;
+
+    /// Retrieves the block access list hash of the block, if available
+    ///
+    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+    fn block_access_list_hash(&self) -> Option<B256>;
+
+    /// Retrieves the slot number of the block, if available
+    ///
+    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
+    fn slot_number(&self) -> Option<u64>;
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
@@ -830,6 +905,14 @@ impl BlockHeader for Header {
         self.requests_hash
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.block_access_list_hash
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.slot_number
+    }
+
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
     }
@@ -917,6 +1000,14 @@ impl<T: BlockHeader> BlockHeader for alloy_serde::WithOtherFields<T> {
         self.inner.requests_hash()
     }
 
+    fn block_access_list_hash(&self) -> Option<B256> {
+        self.inner.block_access_list_hash()
+    }
+
+    fn slot_number(&self) -> Option<u64> {
+        self.inner.slot_number()
+    }
+
     fn extra_data(&self) -> &Bytes {
         self.inner.extra_data()
     }
@@ -977,6 +1068,10 @@ pub(crate) mod serde_bincode_compat {
         parent_beacon_block_root: Option<B256>,
         #[serde(default)]
         requests_hash: Option<B256>,
+        #[serde(default)]
+        block_access_list_hash: Option<B256>,
+        #[serde(default)]
+        slot_number: Option<u64>,
         extra_data: Cow<'a, Bytes>,
     }
 
@@ -1003,6 +1098,8 @@ pub(crate) mod serde_bincode_compat {
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
+                block_access_list_hash: value.block_access_list_hash,
+                slot_number: value.slot_number,
                 extra_data: Cow::Borrowed(&value.extra_data),
             }
         }
@@ -1031,6 +1128,8 @@ pub(crate) mod serde_bincode_compat {
                 excess_blob_gas: value.excess_blob_gas,
                 parent_beacon_block_root: value.parent_beacon_block_root,
                 requests_hash: value.requests_hash,
+                block_access_list_hash: value.block_access_list_hash,
+                slot_number: value.slot_number,
                 extra_data: value.extra_data.into_owned(),
             }
         }
