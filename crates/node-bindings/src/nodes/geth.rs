@@ -112,7 +112,7 @@ impl GethInstance {
 
     /// Returns the IPC endpoint of this instance
     pub fn ipc_endpoint(&self) -> String {
-        self.ipc.clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
+        self.ipc.as_ref().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
     /// Returns the HTTP endpoint url of this instance
