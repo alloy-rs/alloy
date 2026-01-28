@@ -1,0 +1,66 @@
+[package]
+name = "alloy-eip4361"
+description = "Sign-In with Ethereum (EIP-4361) utilities"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["k256"] }
+thiserror.workspace = true
+
+# Parser
+winnow = { version = "0.7", default-features = false, features = ["alloc"] }
+
+# URI and domain parsing
+iri-string = "0.7"
+http.workspace = true
+
+# Timestamp handling
+time = { version = "0.3", features = ["parsing", "formatting"] }
+
+# Enum utilities
+strum = { workspace = true, features = ["derive"] }
+
+# Derive macros
+derive_more = { workspace = true, features = ["as_ref", "display"] }
+
+# Optional dependencies
+alloy-eip1271 = { workspace = true, optional = true }
+alloy-provider = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+alloy-contract.workspace = true
+alloy-provider = { workspace = true, features = ["reqwest", "anvil-node"] }
+alloy-signer-local = { workspace = true, features = ["mnemonic"] }
+alloy-sol-types.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = ["std"]
+std = []
+rand = ["dep:rand"]
+serde = ["dep:serde", "alloy-primitives/serde", "time/serde"]
+eip1271 = ["dep:alloy-eip1271"]
+provider = ["eip1271", "dep:alloy-provider", "dep:async-trait"]
