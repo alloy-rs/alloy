@@ -92,6 +92,22 @@ pub const BYTES_PER_COMMITMENT: usize = 48;
 /// How many bytes are in a proof
 pub const BYTES_PER_PROOF: usize = 48;
 
+/// Max ratio is the maximum ratio of numerator/denominator that
+/// can be calculated without overflowing u128.
+///
+/// fake_exponential approximates: factor * e^(numerator/denominator)
+/// We want to ensure that factor * e^(numerator/denominator) <= u128::MAX
+///
+///   Divide both sides by factor:
+///   e^(numerator/denominator) ≤ u128::MAX / factor
+///   Take natural log of both sides:
+///   numerator/denominator ≤ ln(u128::MAX / factor)
+///   We don't know the factor here, but assume 1 to calculate an upper bound to the ratio
+///   that would cause the result to overflow u128.
+///   ln(u128::MAX) = 88.72 so any integer ratio > 88 will overflow u128.
+///   Ratios lower than this may still overflow if when the factor is greater than 1.
+pub const MAX_RATIO_FAKE_EXPONENTIAL: u128 = 88;
+
 /// A Blob serialized as 0x-prefixed hex string
 pub type Blob = FixedBytes<BYTES_PER_BLOB>;
 
@@ -254,7 +270,7 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
-pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
+pub fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
     eip7840::BlobParams::cancun().next_block_excess_blob_gas_osaka(
         parent_excess_blob_gas,
         parent_blob_gas_used,
@@ -268,7 +284,7 @@ pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_u
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
     eip7840::BlobParams::cancun().calc_blob_fee(excess_blob_gas)
 }
 
@@ -283,25 +299,36 @@ pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-pub const fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
+pub fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert!(denominator != 0, "attempt to divide by zero");
 
-    let mut i = 1;
-    let mut output = 0;
-    let mut numerator_accum = factor * denominator;
-    while numerator_accum > 0 {
-        output += numerator_accum;
+    use num_bigint::BigUint;
+    use num_traits::{ToPrimitive, Zero};
 
-        // Use checked multiplication to prevent overflow
-        let Some(val) = numerator_accum.checked_mul(numerator) else {
-            break;
-        };
+    if numerator / denominator > MAX_RATIO_FAKE_EXPONENTIAL {
+        panic!("ratio of numerator and denominator is larger than 88 which would cause the result to overflow u128");
+    }
+    let denominator_bi = BigUint::from(denominator);
+    let numerator_bi = BigUint::from(numerator);
 
-        // Denominator is asserted as not zero at the start of the function.
-        numerator_accum = val / (denominator * i);
+    let mut i: u128 = 1;
+    let mut output = BigUint::default();
+    let mut numerator_accum = BigUint::from(factor) * &denominator_bi;
+
+    while !numerator_accum.is_zero() {
+        output += &numerator_accum;
+
+        // Equivalent to: accum = (accum * numerator) / (denominator * i)
+        numerator_accum *= &numerator_bi;
+        numerator_accum /= &denominator_bi;
+        numerator_accum /= BigUint::from(i);
+
         i += 1;
     }
-    output / denominator
+
+    (output / denominator_bi)
+        .to_u128()
+        .expect("fake_exponential overflow (result does not fit in u128)")
 }
 
 #[cfg(test)]
@@ -395,6 +422,8 @@ mod tests {
             (2, 5, 2, 23),   // approximate 24.36
             (1, 50000000, 2225652, 5709098764),
             (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1),
+            (1, 299453931, 5007716, 93359993185840258978230108), // diverged from geth due to internal overflow before using num_bigint.
+            (1, 88, 1, 165162653699637111792770913913821835905), // Max allowed ratio of 88
         ] {
             let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
@@ -412,21 +441,24 @@ mod tests {
     }
 
     #[test]
-    fn fake_exp_handles_overflow() {
-        // Test with very large excess blob gas values that would cause overflow
+    #[should_panic(expected = "ratio")]
+    fn fake_exp_panics_on_large_numerator_denominator_ratio() {
+        // The max ratio is 88, so any ratio larger than 88 should panic.
         let factor = 1u128; // BLOB_TX_MIN_BLOB_GASPRICE
-        let numerator = u64::MAX as u128; // Very large excess blob gas
-        let denominator = 5007716u128; // BLOB_GASPRICE_UPDATE_FRACTION_PECTRA
+        let numerator = 89u128; // Very large excess blob gas
+        let denominator = 1; // BLOB_GASPRICE_UPDATE_FRACTION_PECTRA
+        fake_exponential(factor, numerator, denominator);
+    }
 
-        // This should not panic even with very large inputs
-        let result = fake_exponential(factor, numerator, denominator);
-
-        // The result should be a valid value (not panic)
-        assert!(result > 0);
-
-        // Test with Prague parameters
-        let prague_params = crate::eip7840::BlobParams::prague();
-        // This should also not panic when excess_blob_gas is very large
-        let _blob_fee = prague_params.calc_blob_fee(u64::MAX);
+    #[test]
+    #[should_panic(expected = "overflow")]
+    fn fake_exp_panics_when_result_overflows_u128() {
+        // The max ratio of 88 is a loose upper bound, when the
+        // factor is greater than one smaller ratio's may cause
+        // the output to overflow u128.
+        let factor = 100u128; // BLOB_TX_MIN_BLOB_GASPRICE
+        let numerator = 88u128; // Very large excess blob gas
+        let denominator = 1; // BLOB_GASPRICE_UPDATE_FRACTION_PECTRA
+        fake_exponential(factor, numerator, denominator);
     }
 }
