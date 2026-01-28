@@ -37,7 +37,7 @@ pub struct FallbackService<S> {
     sequential_methods: Arc<HashSet<String>>,
 }
 
-impl<S: Clone> FallbackService<S> {
+impl<S> FallbackService<S> {
     /// Create a new fallback service from a list of transports.
     ///
     /// The `active_transport_count` parameter controls how many transports are used for requests
