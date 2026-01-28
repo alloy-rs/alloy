@@ -521,7 +521,6 @@ mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_primitives::{address, hex};
-    use alloy_rpc_types_eth::TransactionRequest;
     use alloy_transport::mock::Asserter;
 
     // https://etherscan.io/address/0xcA11bde05977b3631167028862bE2a173976CA11#code
