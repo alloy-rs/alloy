@@ -93,12 +93,12 @@ impl WsConnect {
         self.retry_interval = retry_interval;
         self
     }
-}
-
-impl IntoClientRequest for WsConnect {
-    fn into_client_request(self) -> tungstenite::Result<tungstenite::handshake::client::Request> {
-        let mut request: http::Request<()> = self.url.into_client_request()?;
-        if let Some(auth) = self.auth {
+    
+fn build_request(
+        &self,
+    ) -> tungstenite::Result<tungstenite::handshake::client::Request> {
+        let mut request: http::Request<()> = self.url.as_str().into_client_request()?;
+        if let Some(auth) = &self.auth {
             let mut auth_value = http::HeaderValue::from_str(&auth.to_string())?;
             auth_value.set_sensitive(true);
 
@@ -109,13 +109,19 @@ impl IntoClientRequest for WsConnect {
     }
 }
 
+impl IntoClientRequest for WsConnect {
+    fn into_client_request(self) -> tungstenite::Result<tungstenite::handshake::client::Request> {
+        self.build_request()
+    }
+}
+
 impl PubSubConnect for WsConnect {
     fn is_local(&self) -> bool {
         alloy_transport::utils::guess_local_url(&self.url)
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
-        let request = self.clone().into_client_request();
+        let request = self.build_request();
         let req = request.map_err(TransportErrorKind::custom)?;
         let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
             .await
