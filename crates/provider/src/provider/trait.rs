@@ -468,6 +468,85 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockReceipts", (block,)).into()
     }
 
+    /// Gets a block header by its [`BlockId`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_eips::BlockId;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///
+    ///     // Gets the latest block header.
+    ///     let header = provider.get_header(BlockId::latest()).await.unwrap();
+    ///
+    ///     // Gets the block header by number.
+    ///     let header = provider.get_header(BlockId::number(0)).await.unwrap();
+    /// }
+    /// ```
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        match block {
+            BlockId::Hash(hash) => self.get_header_by_hash(hash.block_hash).await,
+            BlockId::Number(number) => self.get_header_by_number(number).await,
+        }
+    }
+
+    /// Gets a block header by its [`BlockHash`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_primitives::b256;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///     let block_hash = b256!("6032d03ee8e43e8999c2943152a4daebfc4b75b7f7a9647d2677299d215127da");
+    ///
+    ///     // Gets a block header by its hash.
+    ///     let header = provider.get_header_by_hash(block_hash).await.unwrap();
+    /// }
+    /// ```
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.client().request("eth_getHeaderByHash", (hash,)).await
+    }
+
+    /// Gets a block header by its [`BlockNumberOrTag`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_eips::BlockNumberOrTag;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///
+    ///     // Gets a block header by its number.
+    ///     let header = provider.get_header_by_number(BlockNumberOrTag::Number(0)).await.unwrap();
+    ///
+    ///     // Gets the latest block header.
+    ///     let header = provider.get_header_by_number(BlockNumberOrTag::Latest).await.unwrap();
+    /// }
+    /// ```
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.client().request("eth_getHeaderByNumber", (number,)).await
+    }
+
     /// Gets the bytecode located at the corresponding [`Address`].
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.client().request("eth_getCode", address).into()
