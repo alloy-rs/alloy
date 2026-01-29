@@ -121,7 +121,7 @@ mod tests {
         let s = include_str!("examples/sidecar.json");
         let resp: BeaconBlobBundle = serde_json::from_str(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
-        assert_eq!(json, serde_json::to_value(resp.clone()).unwrap());
+        assert_eq!(json, serde_json::to_value(&resp).unwrap());
         assert_eq!(6, resp.data.len());
     }
 }
