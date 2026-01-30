@@ -793,7 +793,7 @@ pub trait BlockHeader {
             && self.ommers_hash() == EMPTY_OMMER_ROOT_HASH;
 
         let bal_empty =
-            self.block_access_list_hash().map_or(true, |hash| hash == EMPTY_BLOCK_ACCESS_LIST_HASH);
+            self.block_access_list_hash().is_none_or(|hash| hash == EMPTY_BLOCK_ACCESS_LIST_HASH);
 
         self.withdrawals_root().map_or(txs_and_ommers_empty && bal_empty, |withdrawals_root| {
             txs_and_ommers_empty && bal_empty && withdrawals_root == EMPTY_ROOT_HASH
