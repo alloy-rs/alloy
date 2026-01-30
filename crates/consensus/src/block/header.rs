@@ -8,6 +8,7 @@ use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip1898::BlockWithParent,
     eip7840::BlobParams,
+    eip7928::EMPTY_BLOCK_ACCESS_LIST_HASH,
     merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
 };
@@ -785,12 +786,17 @@ pub trait BlockHeader {
         BlockNumHash { number: self.number().saturating_sub(1), hash: self.parent_hash() }
     }
 
-    /// Checks if the header is considered empty - has no transactions, no ommers or withdrawals
+    /// Checks if the header is considered empty - has no transactions, no ommers or withdrawals or
+    /// bal
     fn is_empty(&self) -> bool {
         let txs_and_ommers_empty = self.transactions_root() == EMPTY_ROOT_HASH
             && self.ommers_hash() == EMPTY_OMMER_ROOT_HASH;
-        self.withdrawals_root().map_or(txs_and_ommers_empty, |withdrawals_root| {
-            txs_and_ommers_empty && withdrawals_root == EMPTY_ROOT_HASH
+
+        let bal_empty =
+            self.block_access_list_hash().is_none_or(|hash| hash == EMPTY_BLOCK_ACCESS_LIST_HASH);
+
+        self.withdrawals_root().map_or(txs_and_ommers_empty && bal_empty, |withdrawals_root| {
+            txs_and_ommers_empty && bal_empty && withdrawals_root == EMPTY_ROOT_HASH
         })
     }
 
