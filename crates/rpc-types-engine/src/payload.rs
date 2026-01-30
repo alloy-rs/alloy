@@ -1974,6 +1974,13 @@ impl ExecutionPayload {
         self.as_v4().map(|payload| &payload.block_access_list)
     }
 
+    /// Returns the slot number for the payload (EIP-7843).
+    ///
+    /// Returns `None` for pre-Amsterdam payloads (V1, V2, V3).
+    pub fn slot_number(&self) -> Option<u64> {
+        self.as_v4().map(|payload| payload.slot_number)
+    }
+
     /// Returns the gas limit for the payload.
     pub const fn gas_limit(&self) -> u64 {
         self.as_v1().gas_limit
