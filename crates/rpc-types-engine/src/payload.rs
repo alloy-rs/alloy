@@ -275,7 +275,7 @@ impl ExecutionPayloadEnvelopeV4 {
         let versioned_hashes = self.blobs_bundle.versioned_hashes();
 
         let cancun_fields = CancunPayloadFields { parent_beacon_block_root, versioned_hashes };
-        let prague_fields = PraguePayloadFields::from(self.execution_requests);
+        let prague_fields = PraguePayloadFields::new(self.execution_requests);
 
         (
             ExecutionPayload::V3(self.envelope_inner.execution_payload),
@@ -346,7 +346,7 @@ impl ExecutionPayloadEnvelopeV5 {
         let versioned_hashes = self.blobs_bundle.versioned_hashes();
 
         let cancun_fields = CancunPayloadFields { parent_beacon_block_root, versioned_hashes };
-        let prague_fields = PraguePayloadFields::from(self.execution_requests);
+        let prague_fields = PraguePayloadFields::new(self.execution_requests);
 
         (
             ExecutionPayload::V3(self.execution_payload),
