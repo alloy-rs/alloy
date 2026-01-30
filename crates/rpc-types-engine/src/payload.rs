@@ -2462,8 +2462,17 @@ pub struct PayloadAttributes {
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3>
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
-    /// Slot of the current block enabled with Amsterdam fork
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    /// Slot of the current block enabled with Amsterdam fork.
+    ///
+    /// See <https://github.com/ethereum/execution-apis/pull/731>
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub slot_number: Option<u64>,
 }
 
@@ -3561,5 +3570,22 @@ mod tests {
         let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
         assert_eq!(attrs.timestamp, 0x1234);
         assert!(attrs.slot_number.is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_attributes_with_hex_slot_number() {
+        let json = r#"{
+            "timestamp": "0x2",
+            "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "suggestedFeeRecipient": "0x0000000000000000000000000000000000000000",
+            "withdrawals": [],
+            "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "slotNumber": "0x0"
+        }"#;
+
+        let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
+        assert_eq!(attrs.timestamp, 0x2);
+        assert_eq!(attrs.slot_number, Some(0));
     }
 }
