@@ -73,6 +73,8 @@ rand.workspace = true
 serde_json.workspace = true
 assert_matches.workspace = true
 
+serial_test = { workspace = true }
+
 [features]
 default = ["std"]
 std = [

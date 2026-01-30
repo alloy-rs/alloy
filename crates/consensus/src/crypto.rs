@@ -309,8 +309,9 @@ mod impl_secp256k1 {
         sig: &[u8; 65],
         msg: &[u8; 32],
     ) -> Result<Address, Error> {
-        let sig =
-            RecoverableSignature::from_compact(&sig[0..64], RecoveryId::try_from(sig[64] as i32)?)?;
+        let recid = (sig[64] % 2) as i32;
+
+        let sig = RecoverableSignature::from_compact(&sig[0..64], RecoveryId::try_from(recid)?)?;
 
         let public = SECP256K1.recover_ecdsa(&Message::from_digest(*msg), &sig)?;
         Ok(public_key_to_address(public))
@@ -524,7 +525,10 @@ mod tests {
     }
 
     #[cfg(feature = "crypto-backend")]
+    // Tests in this module share a global crypto provider (OnceLock) and must run serially.
     mod backend_tests {
+        use serial_test::serial;
+
         use crate::crypto::{backend::CryptoProvider, RecoveryError};
         use alloc::sync::Arc;
         use alloy_primitives::{Address, Signature, B256};
