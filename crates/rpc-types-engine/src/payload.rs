@@ -1,6 +1,6 @@
 //! Payload types.
 
-use crate::{ExecutionPayloadSidecar, PayloadError};
+use crate::{CancunPayloadFields, ExecutionPayloadSidecar, PayloadError, PraguePayloadFields};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -262,6 +262,27 @@ pub struct ExecutionPayloadEnvelopeV5 {
 }
 
 impl ExecutionPayloadEnvelopeV4 {
+    /// Converts this V4 envelope into an [`ExecutionPayload`] and [`ExecutionPayloadSidecar`].
+    ///
+    /// The `parent_beacon_block_root` is required because it is not part of the envelope
+    /// but is needed for the sidecar's [`CancunPayloadFields`].
+    ///
+    /// The versioned hashes are computed from the blobs bundle commitments.
+    pub fn into_payload_and_sidecar(
+        self,
+        parent_beacon_block_root: B256,
+    ) -> (ExecutionPayload, ExecutionPayloadSidecar) {
+        let versioned_hashes = self.blobs_bundle.versioned_hashes();
+
+        let cancun_fields = CancunPayloadFields { parent_beacon_block_root, versioned_hashes };
+        let prague_fields = PraguePayloadFields::from(self.execution_requests);
+
+        (
+            ExecutionPayload::V3(self.envelope_inner.execution_payload),
+            ExecutionPayloadSidecar::v4(cancun_fields, prague_fields),
+        )
+    }
+
     /// Converts this V4 envelope into a [`ExecutionPayloadEnvelopeV5`] by computing EIP-7594
     /// cell proofs for the blobs bundle.
     ///
@@ -312,6 +333,27 @@ impl TryFrom<ExecutionPayloadEnvelopeV4> for ExecutionPayloadEnvelopeV5 {
 }
 
 impl ExecutionPayloadEnvelopeV5 {
+    /// Converts this V5 envelope into an [`ExecutionPayload`] and [`ExecutionPayloadSidecar`].
+    ///
+    /// The `parent_beacon_block_root` is required because it is not part of the envelope
+    /// but is needed for the sidecar's [`CancunPayloadFields`].
+    ///
+    /// The versioned hashes are computed from the blobs bundle commitments.
+    pub fn into_payload_and_sidecar(
+        self,
+        parent_beacon_block_root: B256,
+    ) -> (ExecutionPayload, ExecutionPayloadSidecar) {
+        let versioned_hashes = self.blobs_bundle.versioned_hashes();
+
+        let cancun_fields = CancunPayloadFields { parent_beacon_block_root, versioned_hashes };
+        let prague_fields = PraguePayloadFields::from(self.execution_requests);
+
+        (
+            ExecutionPayload::V3(self.execution_payload),
+            ExecutionPayloadSidecar::v4(cancun_fields, prague_fields),
+        )
+    }
+
     /// Converts this V5 envelope into a [`ExecutionPayloadEnvelopeV4`] by computing EIP-4844
     /// blob proofs for the blobs bundle.
     ///
