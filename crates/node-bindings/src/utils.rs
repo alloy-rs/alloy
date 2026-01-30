@@ -60,18 +60,12 @@ pub(crate) fn unused_port() -> u16 {
 /// For keys end with '=', find value until ' ' is encountered or end of line
 /// For keys end with ':', find value until ',' is encountered or end of line
 pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
-    let mut key_equal = Cow::from(key);
-    let mut key_colon = Cow::from(key);
-
-    // Prepare both key variants
-    if !key_equal.ends_with('=') {
-        key_equal = format!("{key}=").into();
-    }
-    if !key_colon.ends_with(": ") {
-        key_colon = format!("{key}: ").into();
-    }
-
     // Try to find the key with '='
+    let key_equal = if key.ends_with('=') {
+        Cow::Borrowed(key)
+    } else {
+        Cow::Owned(format!("{key}="))
+    };
     if let Some(pos) = line.find(key_equal.as_ref()) {
         let start = pos + key_equal.len();
         let end = line[start..].find(' ').map(|i| start + i).unwrap_or(line.len());
@@ -81,6 +75,11 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     }
 
     // If not found, try to find the key with ': '
+    let key_colon = if key.ends_with(": ") {
+        Cow::Borrowed(key)
+    } else {
+        Cow::Owned(format!("{key}: "))
+    };
     if let Some(pos) = line.find(key_colon.as_ref()) {
         let start = pos + key_colon.len();
         let end = line[start..].find(',').map(|i| start + i).unwrap_or(line.len()); // Assuming comma or end of line
