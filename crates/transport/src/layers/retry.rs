@@ -271,7 +271,7 @@ where
                     // try to extract the requested backoff from the error or compute the next
                     // backoff based on retry count
                     let backoff_hint = this.policy.backoff_hint(&err);
-                    let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
+                    let next_backoff = backoff_hint.unwrap_or(this.initial_backoff());
 
                     let seconds_to_wait_for_compute_budget = compute_unit_offset_in_secs(
                         this.avg_cost,
