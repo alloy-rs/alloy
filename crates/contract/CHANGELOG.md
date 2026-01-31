@@ -5,11 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Bug Fixes
+
+- [contract] Deduplicate clear_decoder method ([#3449](https://github.com/alloy-rs/alloy/issues/3449))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+- Release 1.4.0
+
+### Performance
+
+- [contract] Remove redundant allocation in TransportErrorExt ([#3477](https://github.com/alloy-rs/alloy/issues/3477))
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Features
+
+- [`contract`] Add sidecar_7594 to CallBuilder ([#3424](https://github.com/alloy-rs/alloy/issues/3424))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Dependencies
+
+- [deps] Run cargo shear ([#3405](https://github.com/alloy-rs/alloy/issues/3405))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+
+### Other
+
+- Remove redundant std::self import from CallBuilder ([#3313](https://github.com/alloy-rs/alloy/issues/3313))
+
+## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
+- Remove unnecessary Unpin bound on decoder in EthCall futures ([#3267](https://github.com/alloy-rs/alloy/issues/3267))
+
+### Other
+
+- Add contract eth_call block overrides ([#3233](https://github.com/alloy-rs/alloy/issues/3233))
+
+### Refactor
+
+- [contract] Remove redundant PhantomData from StorageSlotFinder ([#3277](https://github.com/alloy-rs/alloy/issues/3277))
+
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
 
 ### Features
 
 - Add CallBuilder::send,deploy_sync ([#3200](https://github.com/alloy-rs/alloy/issues/3200))
+
+### Miscellaneous Tasks
+
+- Release 1.1.2
 
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 

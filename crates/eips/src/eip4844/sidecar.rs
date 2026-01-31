@@ -360,14 +360,15 @@ impl BlobTransactionSidecar {
         I: IntoIterator<Item = B>,
         B: AsRef<str>,
     {
-        let mut b = Vec::new();
+        let mut converted = Vec::new();
         for blob in blobs {
-            b.push(c_kzg::Blob::from_hex(blob.as_ref())?)
+            converted.push(crate::eip4844::utils::hex_to_blob(blob)?);
         }
-        Self::try_from_blobs(b)
+        Self::try_from_blobs(converted)
     }
 
-    /// Tries to create a new [`BlobTransactionSidecar`] from the given blob bytes.
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blob
+    /// bytes.
     ///
     /// See also [`Blob::from_bytes`](c_kzg::Blob::from_bytes)
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
@@ -376,11 +377,37 @@ impl BlobTransactionSidecar {
         I: IntoIterator<Item = B>,
         B: AsRef<[u8]>,
     {
-        let mut b = Vec::new();
+        let mut converted = Vec::new();
         for blob in blobs {
-            b.push(c_kzg::Blob::from_bytes(blob.as_ref())?)
+            converted.push(crate::eip4844::utils::bytes_to_blob(blob)?);
         }
-        Self::try_from_blobs(b)
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs
+    /// and KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len());
+        for blob in &blobs {
+            // SAFETY: same size
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let proof = settings.compute_blob_kzg_proof(blob, &commitment.to_bytes())?;
+
+            // SAFETY: same size
+            unsafe {
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
+            }
+        }
+
+        Ok(Self::new(blobs, commitments, proofs))
     }
 
     /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs.
@@ -388,30 +415,10 @@ impl BlobTransactionSidecar {
     /// This uses the global/default KZG settings, see also
     /// [`EnvKzgSettings::Default`](crate::eip4844::env_settings::EnvKzgSettings).
     #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
-    pub fn try_from_blobs(blobs: Vec<c_kzg::Blob>) -> Result<Self, c_kzg::Error> {
+    pub fn try_from_blobs(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error> {
         use crate::eip4844::env_settings::EnvKzgSettings;
 
-        let kzg_settings = EnvKzgSettings::Default;
-
-        let commitments = blobs
-            .iter()
-            .map(|blob| {
-                kzg_settings.get().blob_to_kzg_commitment(&blob.clone()).map(|blob| blob.to_bytes())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let proofs = blobs
-            .iter()
-            .zip(commitments.iter())
-            .map(|(blob, commitment)| {
-                kzg_settings
-                    .get()
-                    .compute_blob_kzg_proof(blob, commitment)
-                    .map(|blob| blob.to_bytes())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(Self::from_kzg(blobs, commitments, proofs))
+        Self::try_from_blobs_with_settings(blobs, EnvKzgSettings::Default.get())
     }
 
     /// Outputs the RLP length of the [BlobTransactionSidecar] fields, without

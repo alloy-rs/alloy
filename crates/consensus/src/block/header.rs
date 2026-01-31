@@ -1,5 +1,5 @@
 use crate::{
-    block::HeaderInfo,
+    block::{HeaderInfo, HeaderRoots},
     constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
     Block, BlockBody,
 };
@@ -15,7 +15,6 @@ use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
-use core::mem;
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -187,6 +186,17 @@ impl Header {
         keccak256(&out)
     }
 
+    /// Decodes the RLP-encoded header and computes the hash from the raw RLP bytes.
+    ///
+    /// This is more efficient than decoding and then re-encoding to compute the hash,
+    /// as it reuses the original RLP bytes for hashing.
+    pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
+        let start = *buf;
+        let header = Self::decode(buf)?;
+        let hash = keccak256(&start[..start.len() - buf.len()]);
+        Ok(header.seal_unchecked(hash))
+    }
+
     /// Check if the ommers hash equals to empty hash list.
     pub fn ommers_hash_is_empty(&self) -> bool {
         self.ommers_hash == EMPTY_OMMER_ROOT_HASH
@@ -240,27 +250,7 @@ impl Header {
     /// Calculate a heuristic for the in-memory size of the [Header].
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<B256>() + // parent hash
-        mem::size_of::<B256>() + // ommers hash
-        mem::size_of::<Address>() + // beneficiary
-        mem::size_of::<B256>() + // state root
-        mem::size_of::<B256>() + // transactions root
-        mem::size_of::<B256>() + // receipts root
-        mem::size_of::<Option<B256>>() + // withdrawals root
-        mem::size_of::<Bloom>() + // logs bloom
-        mem::size_of::<U256>() + // difficulty
-        mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u64>() + // gas limit
-        mem::size_of::<u64>() + // gas used
-        mem::size_of::<u64>() + // timestamp
-        mem::size_of::<B256>() + // mix hash
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u64>>() + // base fee per gas
-        mem::size_of::<Option<u64>>() + // blob gas used
-        mem::size_of::<Option<u64>>() + // excess blob gas
-        mem::size_of::<Option<B256>>() + // parent beacon block root
-        mem::size_of::<Option<B256>>() + // requests root
-        self.extra_data.len() // extra data
+        size_of::<Self>() + self.extra_data.len()
     }
 
     fn header_payload_length(&self) -> usize {
@@ -579,6 +569,18 @@ pub trait BlockHeader {
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
             mix_hash: self.mix_hash(),
+        }
+    }
+
+    /// Returns all roots contained in the header.
+    fn header_roots(&self) -> HeaderRoots {
+        HeaderRoots {
+            state_root: self.state_root(),
+            transactions_root: self.transactions_root(),
+            receipts_root: self.receipts_root(),
+            withdrawals_root: self.withdrawals_root(),
+            parent_beacon_block_root: self.parent_beacon_block_root(),
+            logs_bloom: self.logs_bloom(),
         }
     }
 

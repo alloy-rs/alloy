@@ -52,6 +52,11 @@ impl<T, Sig> Signed<T, Sig> {
     }
 
     /// Returns a mutable reference to the transaction.
+    ///
+    /// # Warning
+    ///
+    /// Modifying the transaction structurally invalidates the signature and hash.
+    #[doc(hidden)]
     pub const fn tx_mut(&mut self) -> &mut T {
         &mut self.tx
     }
@@ -487,6 +492,16 @@ where
     ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
         let signature_hash = self.signature_hash();
         crate::crypto::secp256k1::recover_signer_unchecked(self.signature(), signature_hash)
+    }
+
+    fn recover_with_buf(
+        &self,
+        buf: &mut alloc::vec::Vec<u8>,
+    ) -> Result<alloy_primitives::Address, crate::crypto::RecoveryError> {
+        buf.clear();
+        self.tx.encode_for_signing(buf);
+        let signature_hash = alloy_primitives::keccak256(buf);
+        crate::crypto::secp256k1::recover_signer(self.signature(), signature_hash)
     }
 
     fn recover_unchecked_with_buf(

@@ -213,7 +213,7 @@ impl GcpSigner {
 
     /// Fetch the pubkey associated with this signer's key.
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpSignerError> {
-        request_get_pubkey(&self.client, &self.key_name).await.and_then(decode_pubkey)
+        Ok(self.pubkey)
     }
 
     /// Sign a digest with this signer's key
@@ -221,8 +221,11 @@ impl GcpSigner {
         request_sign_digest(&self.client, &self.key_name, digest).await.and_then(decode_signature)
     }
 
-    /// Sign a digest with this signer's key and add the eip155 `v` value
-    /// corresponding to the input chain_id
+    /// Sign a digest with this signer's key and recover a `Signature` with the
+    /// correct y-parity for the given public key.
+    ///
+    /// The digest is expected to already include any EIP-155 chain ID encoding
+    /// via the transaction's signature hash.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpSignerError> {
         let sig = self.sign_digest(digest).await?;

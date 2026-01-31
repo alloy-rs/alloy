@@ -59,35 +59,13 @@ impl<N: Network> RootProvider<N> {
         Self::connect_with(s.parse::<BuiltInConnectionString>()?).await
     }
 
-    /// Creates a new root provider from the provided connection details.
-    #[deprecated(since = "0.9.0", note = "use `connect` instead")]
-    pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
-        Self::connect(s).await
-    }
-
     /// Connects to a transport with the given connector.
     pub async fn connect_with<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
         ClientBuilder::default().connect_with(conn).await.map(Self::new)
     }
-
-    /// Connects to a boxed transport with the given connector.
-    #[deprecated(
-        since = "0.9.0",
-        note = "`RootProvider` is now always boxed, use `connect_with` instead"
-    )]
-    pub async fn connect_boxed<C: TransportConnect>(conn: C) -> Result<Self, TransportError> {
-        Self::connect_with(conn).await
-    }
 }
 
 impl<N: Network> RootProvider<N> {
-    /// Boxes the inner client.
-    #[deprecated(since = "0.9.0", note = "`RootProvider` is now always boxed")]
-    #[expect(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
-    }
-
     /// Gets the subscription corresponding to the given RPC subscription ID.
     #[cfg(feature = "pubsub")]
     pub async fn get_subscription<R: alloy_json_rpc::RpcRecv>(

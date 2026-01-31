@@ -4,16 +4,18 @@ use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{
     eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
+    TransactionBuilderError, TxSigner,
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{
-    state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
+    state::StateOverride, AccessList, BlobTransactionSidecar, BlobTransactionSidecarEip7594,
+    BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::marker::PhantomData;
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -249,18 +251,6 @@ impl<P: Provider<N>, N: Network> DynCallBuilder<P, N> {
         )
         .to(*address))
     }
-
-    /// Clears the decoder, returning a raw call builder.
-    #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
-        RawCallBuilder {
-            request: self.request,
-            block: self.block,
-            state: self.state,
-            provider: self.provider,
-            decoder: (),
-        }
-    }
 }
 
 #[doc(hidden)]
@@ -272,7 +262,7 @@ impl<'a, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<&'a P, C, N> {
     }
 }
 
-impl<P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<P, C, N> {
+impl<P: Provider<N>, D, N: Network> CallBuilder<P, D, N> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
     pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
@@ -421,6 +411,15 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         N::TransactionRequest: TransactionBuilder4844,
     {
         self.request.set_blob_sidecar(blob_sidecar);
+        self
+    }
+
+    /// Sets the EIP-7594 `sidecar` field in the transaction to the provided value.
+    pub fn sidecar_7594(mut self, sidecar: BlobTransactionSidecarEip7594) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder7594,
+    {
+        self.request.set_blob_sidecar_7594(sidecar);
         self
     }
 
@@ -979,6 +978,24 @@ mod tests {
         let gas = wallet_provider.estimate_gas(tx).await.unwrap();
 
         assert_eq!(gas, 56555);
+    }
+
+    #[test]
+    fn change_sidecar_7594() {
+        use alloy_consensus::Blob;
+
+        let sidecar =
+            BlobTransactionSidecarEip7594::new(vec![Blob::repeat_byte(0xAB)], vec![], vec![]);
+        let call_builder = build_call_builder().sidecar_7594(sidecar.clone());
+
+        let set_sidecar = call_builder
+            .request
+            .sidecar
+            .expect("sidecar should be set")
+            .into_eip7594()
+            .expect("sidecar should be EIP-7594 variant");
+
+        assert_eq!(set_sidecar, sidecar, "EIP-7594 sidecar should match the one we set");
     }
 
     #[tokio::test]

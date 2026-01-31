@@ -220,7 +220,7 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 
-    /// Returns the number of blobs of [`SignedAuthorization`] in this transactions
+    /// Returns the number of [`SignedAuthorization`]s in this transactions
     ///
     /// This is convenience function for `len(authorization_list)`.
     ///
@@ -234,6 +234,9 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
 pub trait TransactionEnvelope: Transaction {
     /// The enum of transaction types.
     type TxType: Typed2718;
+
+    /// Returns the transaction type.
+    fn tx_type(&self) -> Self::TxType;
 }
 
 /// A signable transaction.
@@ -269,7 +272,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// RLP-encodes the transaction for signing.
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
 
-    /// Outputs the length of the signature RLP encoding for the transaction.
+    /// Returns the length of the RLP-encoded transaction for signing.
     fn payload_len_for_signature(&self) -> usize;
 
     /// RLP-encodes the transaction for signing it. Used to calculate `signature_hash`.
@@ -578,7 +581,6 @@ impl<T: TxHashRef> TxHashRef for alloy_eips::eip2718::WithEncoded<T> {
 mod tests {
     use crate::{Signed, TransactionEnvelope, TxEip1559, TxEnvelope, TxType};
     use alloy_primitives::Signature;
-    use rand::Rng;
 
     #[test]
     fn test_custom_envelope() {
@@ -613,8 +615,6 @@ mod tests {
         assert_eq!(MyTxType::try_from(2u8).unwrap(), MyTxType::Ethereum(TxType::Eip1559));
         assert_eq!(MyTxType::try_from(10u8).unwrap(), MyTxType::MyTx);
 
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
         let tx = Signed::new_unhashed(
             TxEip1559 {
                 chain_id: 1,

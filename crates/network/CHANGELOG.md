@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- Add versioned_hashes helper to BlobsBundle and try_into_sealed to AnyRpcBlock ([#3527](https://github.com/alloy-rs/alloy/issues/3527))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+- Release 1.4.0
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Features
+
+- [`contract`] Add sidecar_7594 to CallBuilder ([#3424](https://github.com/alloy-rs/alloy/issues/3424))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Documentation
+
+- [network] Fix outdated Network trait example in README ([#3346](https://github.com/alloy-rs/alloy/issues/3346))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Remove cyclic dev dep ([#3411](https://github.com/alloy-rs/alloy/issues/3411))
+
+## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
+
+### Bug Fixes
+
+- [network] Correct priority_fee_or_price field order in UnknownTypedTransaction ([#3301](https://github.com/alloy-rs/alloy/issues/3301))
+
+### Documentation
+
+- Add documentation for build_unsigned and build methods ([#3187](https://github.com/alloy-rs/alloy/issues/3187))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
+
+## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
+
+### Miscellaneous Tasks
+
+- Release 1.1.2
+
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 
 ### Features

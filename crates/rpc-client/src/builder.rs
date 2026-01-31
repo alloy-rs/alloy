@@ -189,19 +189,4 @@ impl<L> ClientBuilder<L> {
         let transport = connect.get_transport().await?;
         Ok(self.transport(transport, connect.is_local()))
     }
-
-    /// Connect a transport, producing an [`RpcClient`] with a [`BoxTransport`]
-    /// connection.
-    #[deprecated(
-        since = "0.9.0",
-        note = "RpcClient is now always boxed, use `connect_with` instead"
-    )]
-    pub async fn connect_boxed<C>(self, connect: C) -> TransportResult<RpcClient>
-    where
-        C: TransportConnect,
-        L: Layer<BoxTransport>,
-        L::Service: IntoBoxTransport,
-    {
-        self.connect_with(connect).await
-    }
 }

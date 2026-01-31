@@ -143,7 +143,7 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.get_account_info(address)
     }
 
-    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<Address, alloy_consensus::TrieAccount> {
         self.0.get_account(address)
     }
 
@@ -182,6 +182,24 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         self.0.get_block_receipts(block)
+    }
+
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        self.0.get_header(block).await
+    }
+
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.0.get_header_by_hash(hash).await
+    }
+
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.0.get_header_by_number(number).await
     }
 
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {

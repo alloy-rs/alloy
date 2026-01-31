@@ -285,7 +285,10 @@ signer-mnemonic-all-languages = [
     "alloy-signer-local?/mnemonic-all-languages",
 ]
 signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
-
+secp256k1 = [
+	"alloy-consensus?/secp256k1",
+	"alloy-signer-local?/secp256k1"
+]
 # transports
 transports = ["dep:alloy-transport"]
 transport-http = ["transports", "dep:alloy-transport-http"]
@@ -340,6 +343,7 @@ eip712 = [
     "alloy-signer-aws?/eip712",
     "alloy-signer-gcp?/eip712",
     "alloy-signer-ledger?/eip712",
+    "alloy-signer-local?/eip712",
     "alloy-signer-turnkey?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",

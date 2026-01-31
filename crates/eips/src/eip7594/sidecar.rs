@@ -545,9 +545,84 @@ impl BlobTransactionSidecarEip7594 {
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecarEip7594].
     #[inline]
     pub const fn size(&self) -> usize {
-        self.blobs.len() * BYTES_PER_BLOB + // blobs
-               self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
-               self.cell_proofs.len() * BYTES_PER_PROOF // proofs
+        self.blobs.capacity() * BYTES_PER_BLOB
+            + self.commitments.capacity() * BYTES_PER_COMMITMENT
+            + self.cell_proofs.capacity() * BYTES_PER_PROOF
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the hex encoded blob str.
+    ///
+    /// See also [`Blob::from_hex`](c_kzg::Blob::from_hex)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_hex<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::hex_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given blob
+    /// bytes.
+    ///
+    /// See also [`Blob::from_bytes`](c_kzg::Blob::from_bytes)
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs_bytes<I, B>(blobs: I) -> Result<Self, c_kzg::Error>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        let mut converted = Vec::new();
+        for blob in blobs {
+            converted.push(crate::eip4844::utils::bytes_to_blob(blob)?);
+        }
+        Self::try_from_blobs(converted)
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given
+    /// blobs and KZG settings.
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs_with_settings(
+        blobs: Vec<Blob>,
+        settings: &c_kzg::KzgSettings,
+    ) -> Result<Self, c_kzg::Error> {
+        let mut commitments = Vec::with_capacity(blobs.len());
+        let mut proofs = Vec::with_capacity(blobs.len());
+        for blob in &blobs {
+            // SAFETY: same size
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let commitment = settings.blob_to_kzg_commitment(blob)?;
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob)?;
+
+            // SAFETY: same size
+            unsafe {
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                for kzg_proof in kzg_proofs.iter() {
+                    proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(
+                        kzg_proof.to_bytes(),
+                    ));
+                }
+            }
+        }
+
+        Ok(Self::new(blobs, commitments, proofs))
+    }
+
+    /// Tries to create a new [`BlobTransactionSidecarEip7594`] from the given
+    /// blobs.
+    ///
+    /// This uses the global/default KZG settings, see also
+    /// [`EnvKzgSettings::Default`](crate::eip4844::env_settings::EnvKzgSettings).
+    #[cfg(feature = "kzg")]
+    pub fn try_from_blobs(blobs: Vec<Blob>) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+
+        Self::try_from_blobs_with_settings(blobs, EnvKzgSettings::Default.get())
     }
 
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
@@ -793,6 +868,116 @@ impl Decodable7594 for BlobTransactionSidecarEip7594 {
             return Err(alloy_rlp::Error::Custom("invalid wrapper version"));
         }
         Self::rlp_decode_fields(buf)
+    }
+}
+
+/// Bincode-compatible [`BlobTransactionSidecarVariant`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    use crate::eip4844::{Blob, Bytes48};
+    use alloc::{borrow::Cow, vec::Vec};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::BlobTransactionSidecarVariant`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_eips::eip7594::{serde_bincode_compat, BlobTransactionSidecarVariant};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::BlobTransactionSidecarVariant")]
+    ///     sidecar: BlobTransactionSidecarVariant,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct BlobTransactionSidecarVariant<'a> {
+        /// The blob data (common to both variants).
+        pub blobs: Cow<'a, Vec<Blob>>,
+        /// The blob commitments (common to both variants).
+        pub commitments: Cow<'a, Vec<Bytes48>>,
+        /// The blob proofs (EIP-4844 only).
+        pub proofs: Option<Cow<'a, Vec<Bytes48>>>,
+        /// The cell proofs (EIP-7594 only).
+        pub cell_proofs: Option<Cow<'a, Vec<Bytes48>>>,
+    }
+
+    impl<'a> From<&'a super::BlobTransactionSidecarVariant> for BlobTransactionSidecarVariant<'a> {
+        fn from(value: &'a super::BlobTransactionSidecarVariant) -> Self {
+            match value {
+                super::BlobTransactionSidecarVariant::Eip4844(sidecar) => Self {
+                    blobs: Cow::Borrowed(&sidecar.blobs),
+                    commitments: Cow::Borrowed(&sidecar.commitments),
+                    proofs: Some(Cow::Borrowed(&sidecar.proofs)),
+                    cell_proofs: None,
+                },
+                super::BlobTransactionSidecarVariant::Eip7594(sidecar) => Self {
+                    blobs: Cow::Borrowed(&sidecar.blobs),
+                    commitments: Cow::Borrowed(&sidecar.commitments),
+                    proofs: None,
+                    cell_proofs: Some(Cow::Borrowed(&sidecar.cell_proofs)),
+                },
+            }
+        }
+    }
+
+    impl<'a> BlobTransactionSidecarVariant<'a> {
+        fn try_into_inner(self) -> Result<super::BlobTransactionSidecarVariant, &'static str> {
+            match (self.proofs, self.cell_proofs) {
+                (Some(proofs), None) => Ok(super::BlobTransactionSidecarVariant::Eip4844(
+                    crate::eip4844::BlobTransactionSidecar {
+                        blobs: self.blobs.into_owned(),
+                        commitments: self.commitments.into_owned(),
+                        proofs: proofs.into_owned(),
+                    },
+                )),
+                (None, Some(cell_proofs)) => Ok(super::BlobTransactionSidecarVariant::Eip7594(
+                    super::BlobTransactionSidecarEip7594 {
+                        blobs: self.blobs.into_owned(),
+                        commitments: self.commitments.into_owned(),
+                        cell_proofs: cell_proofs.into_owned(),
+                    },
+                )),
+                (None, None) => Err("Missing both 'proofs' and 'cell_proofs'"),
+                (Some(_), Some(_)) => Err("Both 'proofs' and 'cell_proofs' cannot be present"),
+            }
+        }
+    }
+
+    impl<'a> From<BlobTransactionSidecarVariant<'a>> for super::BlobTransactionSidecarVariant {
+        fn from(value: BlobTransactionSidecarVariant<'a>) -> Self {
+            value.try_into_inner().expect("Invalid BlobTransactionSidecarVariant")
+        }
+    }
+
+    impl SerializeAs<super::BlobTransactionSidecarVariant> for BlobTransactionSidecarVariant<'_> {
+        fn serialize_as<S>(
+            source: &super::BlobTransactionSidecarVariant,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            BlobTransactionSidecarVariant::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::BlobTransactionSidecarVariant>
+        for BlobTransactionSidecarVariant<'de>
+    {
+        fn deserialize_as<D>(
+            deserializer: D,
+        ) -> Result<super::BlobTransactionSidecarVariant, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let value = BlobTransactionSidecarVariant::deserialize(deserializer)?;
+            value.try_into_inner().map_err(serde::de::Error::custom)
+        }
     }
 }
 

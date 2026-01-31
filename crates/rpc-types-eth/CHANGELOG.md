@@ -5,11 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Features
+
+- [rpc-types-eth] Add SimulateError::invalid_params constructor ([#3578](https://github.com/alloy-rs/alloy/issues/3578))
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Bug Fixes
+
+- Missing populate_blob_hashes in TransactionBuilder7594::set_blob_sidecar_7594 ([#3534](https://github.com/alloy-rs/alloy/issues/3534))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+
+### Performance
+
+- [rpc-types-eth] Optimize FilterSet::to_value_or_array to avoid unnecessary allocations ([#3532](https://github.com/alloy-rs/alloy/issues/3532))
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+- Release 1.4.2
+
+### Refactor
+
+- [rpc-types-eth] Remove redundant clones in block tests ([#3514](https://github.com/alloy-rs/alloy/issues/3514))
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Bug Fixes
+
+- Support Eip7594 blob format for tx build ([#3446](https://github.com/alloy-rs/alloy/issues/3446))
+
+### Features
+
+- [rpc-types-eth] Add Params::from_json_value ([#3466](https://github.com/alloy-rs/alloy/issues/3466))
+- [rpc-types-eth] Implement FromStr for SubscriptionKind ([#3465](https://github.com/alloy-rs/alloy/issues/3465))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+- Release 1.4.0
+
+### Refactor
+
+- [rpc-types-eth] Remove redundant clones in serde tests ([#3491](https://github.com/alloy-rs/alloy/issues/3491))
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Documentation
+
+- `s/EIP-4337/ERC-4337/g;` ([#3431](https://github.com/alloy-rs/alloy/issues/3431))
+
+### Features
+
+- [`contract`] Add sidecar_7594 to CallBuilder ([#3424](https://github.com/alloy-rs/alloy/issues/3424))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Bug Fixes
+
+- Saturate gas price in deser for unknown networks ([#3095](https://github.com/alloy-rs/alloy/issues/3095))
+- [rpc-types-eth] Correct build_7702 panic documentation ([#3332](https://github.com/alloy-rs/alloy/issues/3332))
+- Align EIP1186AccountProofResponse::is_empty with EIP-161 ([#3303](https://github.com/alloy-rs/alloy/issues/3303))
+- More flexible `BadBlock` type ([#3322](https://github.com/alloy-rs/alloy/issues/3322))
+
+### Documentation
+
+- Fix swapped filter doc comments ([#3308](https://github.com/alloy-rs/alloy/issues/3308))
+- [rpc-types-eth] Fix swapped docs for get_to_block/get_from_block ([#3307](https://github.com/alloy-rs/alloy/issues/3307))
+
+### Features
+
+- Add `transactionReceipts` into SubscriptionKind ([#2974](https://github.com/alloy-rs/alloy/issues/2974))
+- Add bincode compat support for BlobTransactionSidecarVariant ([#3325](https://github.com/alloy-rs/alloy/issues/3325))
+- Allow fusaka sidecars in the tx request ([#3321](https://github.com/alloy-rs/alloy/issues/3321))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Remove cyclic dev dep ([#3411](https://github.com/alloy-rs/alloy/issues/3411))
+- Make receipt generic ([#3357](https://github.com/alloy-rs/alloy/issues/3357))
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+
+### Other
+
+- Remove transactionReceipts subscription kind ([#3409](https://github.com/alloy-rs/alloy/issues/3409))
+
+## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
+
+### Bug Fixes
+
+- Correct SyncInfo.stages doc to list of  Stage  entries ([#3226](https://github.com/alloy-rs/alloy/issues/3226))
+
+### Features
+
+- Add extract_block_range for Filter ([#3300](https://github.com/alloy-rs/alloy/issues/3300))
+- Add into-hashes-vec ([#3257](https://github.com/alloy-rs/alloy/issues/3257))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
+
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
 
 ### Features
 
 - [rpc-types] Add `FillTransaction` response type ([#3210](https://github.com/alloy-rs/alloy/issues/3210))
+
+### Miscellaneous Tasks
+
+- Release 1.1.2
 
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 

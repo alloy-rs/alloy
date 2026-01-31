@@ -72,7 +72,7 @@ impl TraceFilter {
         self
     }
 
-    /// Sets the `from_address` field of the struct
+    /// Sets the `mode` field of the struct
     pub const fn mode(mut self, mode: TraceFilterMode) -> Self {
         self.mode = mode;
         self

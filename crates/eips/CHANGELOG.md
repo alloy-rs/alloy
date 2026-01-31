@@ -5,6 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Revert "chore: add amsterdam support" ([#3573](https://github.com/alloy-rs/alloy/issues/3573))
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- [eips] Add eip7928 module re-exporting alloy-eip7928 types ([#3558](https://github.com/alloy-rs/alloy/issues/3558))
+- [provider] Add new_payload_v4_requests accepting RequestsOrHash ([#3556](https://github.com/alloy-rs/alloy/issues/3556))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- Add amsterdam support ([#3152](https://github.com/alloy-rs/alloy/issues/3152))
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Bug Fixes
+
+- [eips] Use for loop in blob conversion to avoid stack overflow ([#3499](https://github.com/alloy-rs/alloy/issues/3499))
+
+### Features
+
+- [rpc-types-engine] Add ExecutionPayloadEnvelope V4/V5 conversions ([#3510](https://github.com/alloy-rs/alloy/issues/3510))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+- Release 1.4.0
+
+### Other
+
+- [eips] Make Blob import conditional ([#3472](https://github.com/alloy-rs/alloy/issues/3472))
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Bug Fixes
+
+- Update `SidecarBuilder::build` to allow 7594 ([#3428](https://github.com/alloy-rs/alloy/issues/3428))
+
+### Features
+
+- Add try_from_blobs for BlobTransactionSidecarEip7594 ([#3425](https://github.com/alloy-rs/alloy/issues/3425))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Bug Fixes
+
+- Simplify size functions ([#3403](https://github.com/alloy-rs/alloy/issues/3403))
+
+### Features
+
+- Add bincode compat support for BlobTransactionSidecarVariant ([#3325](https://github.com/alloy-rs/alloy/issues/3325))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+
+## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
+
+### Bug Fixes
+
+- [eip1898] RpcBlockHash serde to use rename_all = \"camelCase\" ([#3255](https://github.com/alloy-rs/alloy/issues/3255))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
+
+## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
+
+### Miscellaneous Tasks
+
+- Release 1.1.2
+
 ## [1.1.1](https://github.com/alloy-rs/alloy/releases/tag/v1.1.1) - 2025-11-13
 
 ### Features

@@ -54,12 +54,19 @@ yubihsm = { version = "0.42", features = [
     "usb",
 ], optional = true }
 
+# secp256k1
+secp256k1 = { workspace = true, optional = true, features = [
+    "recovery",
+    "rand",
+    "global-context",
+] }
+
 [dev-dependencies]
 alloy-dyn-abi.workspace = true
 alloy-sol-types.workspace = true
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-network.workspace = true
-assert_matches.workspace = true
+
 serde_json.workspace = true
 serde.workspace = true
 tempfile.workspace = true
@@ -75,5 +82,10 @@ keystore-geth-compat = ["keystore", "eth-keystore?/geth-compat"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39", "zeroize"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
+secp256k1 = [
+	"dep:secp256k1",
+	"alloy-consensus/secp256k1",
+	"yubihsm?/secp256k1"
+]
 
 eip712 = ["alloy-signer/eip712"]

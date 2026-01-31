@@ -47,9 +47,9 @@ pub type RpcFut<'a, T> = futures_utils_wasm::BoxFuture<'a, TransportResult<T>>;
 
 /// Cross platform time types.
 mod time {
-    #[cfg(target_family = "wasm")]
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
     pub(crate) use wasmtimer::std::Instant;
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
     pub(crate) use std::time::Instant;
 }

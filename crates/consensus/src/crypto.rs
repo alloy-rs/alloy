@@ -52,6 +52,9 @@ pub const SECP256K1N_HALF: U256 = U256::from_be_bytes([
     0x5D, 0x57, 0x6E, 0x73, 0x57, 0xA4, 0x50, 0x1D, 0xDF, 0xE9, 0x2F, 0x46, 0x68, 0x1B, 0x20, 0xA0,
 ]);
 
+/// Serialized uncompressed public key
+pub type UncompressedPublicKey = [u8; 65];
+
 /// Crypto backend module for pluggable cryptographic implementations.
 #[cfg(feature = "crypto-backend")]
 pub mod backend {
@@ -115,6 +118,14 @@ pub mod backend {
         fn recover_signer_unchecked(
             &self,
             sig: &[u8; 65],
+            msg: &[u8; 32],
+        ) -> Result<Address, RecoveryError>;
+
+        /// Verify a signature against a public key and message hash, without ensuring low S values.
+        fn verify_and_compute_signer_unchecked(
+            &self,
+            pubkey: &[u8; 65],
+            sig: &[u8; 64],
             msg: &[u8; 32],
         ) -> Result<Address, RecoveryError>;
     }
@@ -238,13 +249,52 @@ pub mod secp256k1 {
         }
         recover_signer_unchecked(signature, hash)
     }
+
+    /// Verify a signature against a public key and message hash, _without ensuring that the
+    /// signature has a low `s` value_.
+    pub fn verify_and_compute_signer_unchecked(
+        pubkey: &UncompressedPublicKey,
+        signature: &Signature,
+        hash: B256,
+    ) -> Result<Address, RecoveryError> {
+        let mut sig: [u8; 64] = [0; 64];
+
+        sig[0..32].copy_from_slice(&signature.r().to_be_bytes::<32>());
+        sig[32..64].copy_from_slice(&signature.s().to_be_bytes::<32>());
+
+        // Try dynamic backend first when crypto-backend feature is enabled
+        #[cfg(feature = "crypto-backend")]
+        if let Some(provider) = super::backend::try_get_provider() {
+            return provider.verify_and_compute_signer_unchecked(pubkey, &sig, &hash.0);
+        }
+
+        // Fallback to compile-time selected implementation
+        imp::verify_and_compute_signer_unchecked(pubkey, &sig, &hash.0)
+            .map_err(|_| RecoveryError::new())
+    }
+
+    /// Verify a signature against a public key and message hash. This ensures that the signature S
+    /// value is lower than `secp256k1n / 2`, as specified in
+    /// [EIP-2](https://eips.ethereum.org/EIPS/eip-2).
+    ///
+    /// If the S value is too large, then this will return a `RecoveryError`
+    pub fn verify_and_compute_signer(
+        pubkey: &UncompressedPublicKey,
+        signature: &Signature,
+        hash: B256,
+    ) -> Result<Address, RecoveryError> {
+        if signature.s() > SECP256K1N_HALF {
+            return Err(RecoveryError::from_source(InvalidSignatureS));
+        }
+        verify_and_compute_signer_unchecked(pubkey, signature, hash)
+    }
 }
 
 #[cfg(feature = "secp256k1")]
 mod impl_secp256k1 {
     pub(crate) use ::secp256k1::Error;
     use ::secp256k1::{
-        ecdsa::{RecoverableSignature, RecoveryId},
+        ecdsa::{RecoverableSignature, RecoveryId, Signature as SecpSignature},
         Message, PublicKey, SecretKey, SECP256K1,
     };
     use alloy_primitives::{keccak256, Address, Signature, B256, U256};
@@ -264,6 +314,21 @@ mod impl_secp256k1 {
 
         let public = SECP256K1.recover_ecdsa(&Message::from_digest(*msg), &sig)?;
         Ok(public_key_to_address(public))
+    }
+
+    /// Verifies a signature against a public key and returns the address.
+    pub(crate) fn verify_and_compute_signer_unchecked(
+        pubkey: &[u8; 65],
+        sig: &[u8; 64],
+        msg: &[u8; 32],
+    ) -> Result<Address, Error> {
+        let public_key = PublicKey::from_slice(pubkey)?;
+        let signature = SecpSignature::from_compact(&sig[0..64])?;
+        let message = Message::from_digest(*msg);
+
+        SECP256K1.verify_ecdsa(&message, &signature, &public_key)?;
+
+        Ok(public_key_to_address(public_key))
     }
 
     /// Signs message with the given secret key.
@@ -323,6 +388,28 @@ mod impl_k256 {
         // recover key
         let recovered_key = VerifyingKey::recover_from_prehash(&msg[..], &signature, recid)?;
         Ok(public_key_to_address(recovered_key))
+    }
+
+    /// Verifies a signature against a public key and returns the address.
+    pub(crate) fn verify_and_compute_signer_unchecked(
+        pubkey: &[u8; 65],
+        sig: &[u8; 64],
+        msg: &[u8; 32],
+    ) -> Result<Address, Error> {
+        use k256::ecdsa::signature::hazmat::PrehashVerifier;
+
+        let vk = VerifyingKey::from_sec1_bytes(pubkey)?;
+
+        let mut signature = k256::ecdsa::Signature::from_slice(&sig[0..64])?;
+
+        // normalize signature if needed
+        if let Some(sig_normalized) = signature.normalize_s() {
+            signature = sig_normalized;
+        }
+
+        vk.verify_prehash(&msg[..], &signature)?;
+
+        Ok(public_key_to_address(vk))
     }
 
     /// Signs message with the given secret key.
@@ -452,6 +539,19 @@ mod tests {
             fn recover_signer_unchecked(
                 &self,
                 _sig: &[u8; 65],
+                _msg: &[u8; 32],
+            ) -> Result<Address, RecoveryError> {
+                if self.should_fail {
+                    Err(RecoveryError::new())
+                } else {
+                    Ok(self.return_address)
+                }
+            }
+
+            fn verify_and_compute_signer_unchecked(
+                &self,
+                _pubkey: &[u8; 65],
+                _sig: &[u8; 64],
                 _msg: &[u8; 32],
             ) -> Result<Address, RecoveryError> {
                 if self.should_fail {

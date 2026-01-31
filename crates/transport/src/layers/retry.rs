@@ -15,10 +15,10 @@ use std::{
 use tower::{Layer, Service};
 use tracing::trace;
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// The default average cost of a request in Compute Units (CU).

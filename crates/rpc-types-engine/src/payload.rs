@@ -1,6 +1,6 @@
 //! Payload types.
 
-use crate::{ExecutionPayloadSidecar, PayloadError};
+use crate::{CancunPayloadFields, ExecutionPayloadSidecar, PayloadError, PraguePayloadFields};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -20,7 +20,7 @@ use alloy_eips::{
     eip7840::BlobParams,
     BlockNumHash,
 };
-use alloy_primitives::{bytes::BufMut, Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -261,6 +261,177 @@ pub struct ExecutionPayloadEnvelopeV5 {
     pub execution_requests: Requests,
 }
 
+impl ExecutionPayloadEnvelopeV4 {
+    /// Converts this V4 envelope into an [`ExecutionPayload`] and [`ExecutionPayloadSidecar`].
+    ///
+    /// The `parent_beacon_block_root` is required because it is not part of the envelope
+    /// but is needed for the sidecar's [`CancunPayloadFields`].
+    ///
+    /// The versioned hashes are computed from the blobs bundle commitments.
+    pub fn into_payload_and_sidecar(
+        self,
+        parent_beacon_block_root: B256,
+    ) -> (ExecutionPayload, ExecutionPayloadSidecar) {
+        let versioned_hashes = self.blobs_bundle.versioned_hashes();
+
+        let cancun_fields = CancunPayloadFields { parent_beacon_block_root, versioned_hashes };
+        let prague_fields = PraguePayloadFields::new(self.execution_requests);
+
+        (
+            ExecutionPayload::V3(self.envelope_inner.execution_payload),
+            ExecutionPayloadSidecar::v4(cancun_fields, prague_fields),
+        )
+    }
+
+    /// Converts this V4 envelope into a [`ExecutionPayloadEnvelopeV5`] by computing EIP-7594
+    /// cell proofs for the blobs bundle.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v5_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v5(
+        self,
+    ) -> Result<ExecutionPayloadEnvelopeV5, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v5_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V4 envelope into a [`ExecutionPayloadEnvelopeV5`] by computing EIP-7594
+    /// cell proofs for the blobs bundle using the provided KZG settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v5_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<ExecutionPayloadEnvelopeV5, alloy_eips::eip4844::c_kzg::Error> {
+        let blobs_bundle = self.envelope_inner.blobs_bundle.try_into_v2_with_settings(settings)?;
+        Ok(ExecutionPayloadEnvelopeV5 {
+            execution_payload: self.envelope_inner.execution_payload,
+            block_value: self.envelope_inner.block_value,
+            blobs_bundle,
+            should_override_builder: self.envelope_inner.should_override_builder,
+            execution_requests: self.execution_requests,
+        })
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<ExecutionPayloadEnvelopeV4> for ExecutionPayloadEnvelopeV5 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: ExecutionPayloadEnvelopeV4) -> Result<Self, Self::Error> {
+        value.try_into_v5()
+    }
+}
+
+impl ExecutionPayloadEnvelopeV5 {
+    /// Converts this V5 envelope into an [`ExecutionPayload`] and [`ExecutionPayloadSidecar`].
+    ///
+    /// The `parent_beacon_block_root` is required because it is not part of the envelope
+    /// but is needed for the sidecar's [`CancunPayloadFields`].
+    ///
+    /// The versioned hashes are computed from the blobs bundle commitments.
+    pub fn into_payload_and_sidecar(
+        self,
+        parent_beacon_block_root: B256,
+    ) -> (ExecutionPayload, ExecutionPayloadSidecar) {
+        let versioned_hashes = self.blobs_bundle.versioned_hashes();
+
+        let cancun_fields = CancunPayloadFields { parent_beacon_block_root, versioned_hashes };
+        let prague_fields = PraguePayloadFields::new(self.execution_requests);
+
+        (
+            ExecutionPayload::V3(self.execution_payload),
+            ExecutionPayloadSidecar::v4(cancun_fields, prague_fields),
+        )
+    }
+
+    /// Converts this V5 envelope into a [`ExecutionPayloadEnvelopeV4`] by computing EIP-4844
+    /// blob proofs for the blobs bundle.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v4_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v4(
+        self,
+    ) -> Result<ExecutionPayloadEnvelopeV4, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v4_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V5 envelope into a [`ExecutionPayloadEnvelopeV4`] by computing EIP-4844
+    /// blob proofs for the blobs bundle using the provided KZG settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v4_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<ExecutionPayloadEnvelopeV4, alloy_eips::eip4844::c_kzg::Error> {
+        let blobs_bundle = self.blobs_bundle.try_into_v1_with_settings(settings)?;
+        Ok(ExecutionPayloadEnvelopeV4 {
+            envelope_inner: ExecutionPayloadEnvelopeV3 {
+                execution_payload: self.execution_payload,
+                block_value: self.block_value,
+                blobs_bundle,
+                should_override_builder: self.should_override_builder,
+            },
+            execution_requests: self.execution_requests,
+        })
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<ExecutionPayloadEnvelopeV5> for ExecutionPayloadEnvelopeV4 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: ExecutionPayloadEnvelopeV5) -> Result<Self, Self::Error> {
+        value.try_into_v4()
+    }
+}
+
+/// This structure maps for the return value of `engine_getPayloadV6` of the beacon chain spec.
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_getpayloadv6>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadEnvelopeV6 {
+    /// Execution payload V4
+    pub execution_payload: ExecutionPayloadV4,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and EIP-7594 style cell proofs associated with the executed
+    /// payload.
+    ///
+    /// See also: <https://github.com/ethereum/execution-apis/blob/a091e7c3b6a5748a8843a1a9130d5fbfc3191a2c/src/engine/osaka.md#BlobsBundleV2>.
+    pub blobs_bundle: BlobsBundleV2,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Requests,
+}
+
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
@@ -338,10 +509,8 @@ impl ExecutionPayloadV1 {
         }
 
         // Calculate the transactions root using encoded bytes
-        let transactions_root = alloy_consensus::proofs::ordered_trie_root_with_encoder(
-            &self.transactions,
-            |item, buf| buf.put_slice(item),
-        );
+        let transactions_root =
+            alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions);
 
         let header = Header {
             parent_hash: self.parent_hash,
@@ -857,6 +1026,132 @@ impl ssz::Encode for ExecutionPayloadV3 {
     }
 }
 
+/// Execution payload V4 as defined in the Amsterdam fork.
+///
+/// This extends [`ExecutionPayloadV3`] with the `block_access_list` field for [EIP-7928].
+///
+/// See also:
+/// <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#executionpayloadv4>
+///
+/// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadV4 {
+    /// Inner V3 payload
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub payload_inner: ExecutionPayloadV3,
+    /// RLP-encoded block access list as defined in [EIP-7928].
+    ///
+    /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
+    pub block_access_list: Bytes,
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for ExecutionPayloadV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Bloom>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<Bytes>>()?;
+        builder.register_type::<Vec<Withdrawal>>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+
+        let mut decoder = builder.build()?;
+
+        Ok(Self {
+            payload_inner: ExecutionPayloadV3 {
+                payload_inner: ExecutionPayloadV2 {
+                    payload_inner: ExecutionPayloadV1 {
+                        parent_hash: decoder.decode_next()?,
+                        fee_recipient: decoder.decode_next()?,
+                        state_root: decoder.decode_next()?,
+                        receipts_root: decoder.decode_next()?,
+                        logs_bloom: decoder.decode_next()?,
+                        prev_randao: decoder.decode_next()?,
+                        block_number: decoder.decode_next()?,
+                        gas_limit: decoder.decode_next()?,
+                        gas_used: decoder.decode_next()?,
+                        timestamp: decoder.decode_next()?,
+                        extra_data: decoder.decode_next()?,
+                        base_fee_per_gas: decoder.decode_next()?,
+                        block_hash: decoder.decode_next()?,
+                        transactions: decoder.decode_next()?,
+                    },
+                    withdrawals: decoder.decode_next()?,
+                },
+                blob_gas_used: decoder.decode_next()?,
+                excess_blob_gas: decoder.decode_next()?,
+            },
+            block_access_list: decoder.decode_next()?,
+        })
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for ExecutionPayloadV4 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 5
+            + <Address as ssz::Encode>::ssz_fixed_len()
+            + <Bloom as ssz::Encode>::ssz_fixed_len()
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 6
+            + <U256 as ssz::Encode>::ssz_fixed_len()
+            + ssz::BYTES_PER_LENGTH_OFFSET * 4;
+
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.parent_hash);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.fee_recipient);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.state_root);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.receipts_root);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.logs_bloom);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.prev_randao);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_number);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_limit);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_used);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.timestamp);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.extra_data);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.base_fee_per_gas);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_hash);
+        encoder.append(&self.payload_inner.payload_inner.payload_inner.transactions);
+        encoder.append(&self.payload_inner.payload_inner.withdrawals);
+        encoder.append(&self.payload_inner.blob_gas_used);
+        encoder.append(&self.payload_inner.excess_blob_gas);
+        encoder.append(&self.block_access_list);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
+            + ssz::BYTES_PER_LENGTH_OFFSET
+            + self.block_access_list.len()
+    }
+}
+
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -921,6 +1216,14 @@ impl BlobsBundleV1 {
         Self::default()
     }
 
+    /// Computes the versioned hashes from the KZG commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        self.commitments
+            .iter()
+            .map(|c| alloy_eips::eip4844::kzg_to_versioned_hash(c.as_slice()))
+            .collect()
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// # Panics
@@ -962,6 +1265,58 @@ impl BlobsBundleV1 {
         let Self { commitments, proofs, blobs } = self;
         Ok(BlobTransactionSidecar { blobs, commitments, proofs })
     }
+
+    /// Converts this V1 bundle into a [`BlobsBundleV2`] by computing EIP-7594 cell proofs.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v2_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundle has mismatched lengths or if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v2(self) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v2_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V1 bundle into a [`BlobsBundleV2`] by computing EIP-7594 cell proofs
+    /// using the provided KZG settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundle has mismatched lengths or if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v2_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<BlobsBundleV2, alloy_eips::eip4844::c_kzg::Error> {
+        use alloy_eips::eip7594::CELLS_PER_EXT_BLOB;
+
+        let mut cell_proofs = Vec::with_capacity(self.blobs.len() * CELLS_PER_EXT_BLOB);
+
+        for blob in self.blobs.iter() {
+            // SAFETY: Blob and alloy_eips::eip4844::c_kzg::Blob have the same memory layout
+            let blob_kzg =
+                unsafe { core::mem::transmute::<&Blob, &alloy_eips::eip4844::c_kzg::Blob>(blob) };
+
+            // Compute cells and their KZG proofs for this blob
+            let (_cells, kzg_proofs) = settings.compute_cells_and_kzg_proofs(blob_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                for kzg_proof in kzg_proofs.iter() {
+                    cell_proofs.push(core::mem::transmute::<
+                        alloy_eips::eip4844::c_kzg::Bytes48,
+                        Bytes48,
+                    >(kzg_proof.to_bytes()));
+                }
+            }
+        }
+
+        Ok(BlobsBundleV2 { commitments: self.commitments, proofs: cell_proofs, blobs: self.blobs })
+    }
 }
 
 impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
@@ -982,6 +1337,15 @@ impl TryFrom<BlobsBundleV1> for BlobTransactionSidecar {
 
     fn try_from(value: BlobsBundleV1) -> Result<Self, Self::Error> {
         value.try_into_sidecar()
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<BlobsBundleV1> for BlobsBundleV2 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: BlobsBundleV1) -> Result<Self, Self::Error> {
+        value.try_into_v2()
     }
 }
 
@@ -1086,6 +1450,14 @@ impl BlobsBundleV2 {
         Self::default()
     }
 
+    /// Computes the versioned hashes from the KZG commitments.
+    pub fn versioned_hashes(&self) -> Vec<B256> {
+        self.commitments
+            .iter()
+            .map(|c| alloy_eips::eip4844::kzg_to_versioned_hash(c.as_slice()))
+            .collect()
+    }
+
     /// Take `len` blob data from the bundle.
     ///
     /// Note this will take `len * CELLS_PER_EXT_BLOB` proofs.
@@ -1143,6 +1515,59 @@ impl BlobsBundleV2 {
         let Self { commitments, proofs, blobs } = self;
         Ok(BlobTransactionSidecarEip7594 { blobs, commitments, cell_proofs: proofs })
     }
+
+    /// Converts this V2 bundle into a [`BlobsBundleV1`] by computing EIP-4844 blob proofs.
+    ///
+    /// This uses the default KZG settings. See [`Self::try_into_v1_with_settings`] for custom
+    /// settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v1(self) -> Result<BlobsBundleV1, alloy_eips::eip4844::c_kzg::Error> {
+        self.try_into_v1_with_settings(
+            alloy_eips::eip4844::env_settings::EnvKzgSettings::Default.get(),
+        )
+    }
+
+    /// Converts this V2 bundle into a [`BlobsBundleV1`] by computing EIP-4844 blob proofs
+    /// using the provided KZG settings.
+    ///
+    /// This recomputes the blob proofs from the blobs and commitments. The cell proofs from
+    /// V2 are discarded as they are not used in V1.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if KZG proof computation fails.
+    #[cfg(feature = "kzg")]
+    pub fn try_into_v1_with_settings(
+        self,
+        settings: &alloy_eips::eip4844::c_kzg::KzgSettings,
+    ) -> Result<BlobsBundleV1, alloy_eips::eip4844::c_kzg::Error> {
+        let mut proofs = Vec::with_capacity(self.blobs.len());
+
+        for (blob, commitment) in self.blobs.iter().zip(self.commitments.iter()) {
+            // SAFETY: Blob and alloy_eips::eip4844::c_kzg::Blob have the same memory layout
+            let blob_kzg =
+                unsafe { core::mem::transmute::<&Blob, &alloy_eips::eip4844::c_kzg::Blob>(blob) };
+            let commitment_kzg = unsafe {
+                core::mem::transmute::<&Bytes48, &alloy_eips::eip4844::c_kzg::Bytes48>(commitment)
+            };
+
+            // Compute the blob proof
+            let proof = settings.compute_blob_kzg_proof(blob_kzg, commitment_kzg)?;
+
+            // SAFETY: same size
+            unsafe {
+                proofs.push(core::mem::transmute::<alloy_eips::eip4844::c_kzg::Bytes48, Bytes48>(
+                    proof.to_bytes(),
+                ));
+            }
+        }
+
+        Ok(BlobsBundleV1 { commitments: self.commitments, proofs, blobs: self.blobs })
+    }
 }
 
 impl From<Vec<BlobTransactionSidecarEip7594>> for BlobsBundleV2 {
@@ -1163,6 +1588,15 @@ impl TryFrom<BlobsBundleV2> for BlobTransactionSidecarEip7594 {
 
     fn try_from(value: BlobsBundleV2) -> Result<Self, Self::Error> {
         value.try_into_sidecar()
+    }
+}
+
+#[cfg(feature = "kzg")]
+impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
+    type Error = alloy_eips::eip4844::c_kzg::Error;
+
+    fn try_from(value: BlobsBundleV2) -> Result<Self, Self::Error> {
+        value.try_into_v1()
     }
 }
 
@@ -1847,7 +2281,8 @@ impl ExecutionPayloadBodyV1 {
 
     /// Converts a [`alloy_consensus::Block`] into an execution payload body.
     pub fn from_block<T: Encodable2718, H>(block: Block<T, H>) -> Self {
-        Self::new(block.body.withdrawals.clone(), block.body.transactions())
+        let BlockBody { withdrawals, transactions, .. } = block.into_body();
+        Self::new(withdrawals, transactions.iter())
     }
 }
 
@@ -2101,6 +2536,11 @@ impl ExecutionData {
     /// Return the withdrawals for the payload or attributes.
     pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
         self.payload.withdrawals()
+    }
+
+    /// Returns the number of transactions in the payload.
+    pub const fn transaction_count(&self) -> usize {
+        self.payload.transactions().len()
     }
 
     /// Tries to create a new unsealed block from the given payload and payload sidecar.
