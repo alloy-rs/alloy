@@ -171,7 +171,7 @@ impl serde::Serialize for BlockNumberOrTag {
         S: serde::Serializer,
     {
         match *self {
-            Self::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
+            Self::Number(x) => alloy_serde::quantity::serialize(&x, serializer),
             Self::Latest => serializer.serialize_str("latest"),
             Self::Finalized => serializer.serialize_str("finalized"),
             Self::Safe => serializer.serialize_str("safe"),
