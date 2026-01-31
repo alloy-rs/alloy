@@ -1,0 +1,40 @@
+[package]
+name = "alloy-eip1271"
+description = "EIP-1271 smart contract signature verification"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-contract.workspace = true
+alloy-provider.workspace = true
+alloy-sol-types.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+alloy-node-bindings.workspace = true
+alloy-provider = { workspace = true, features = ["anvil-node"] }
+alloy-signer-local.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = []
