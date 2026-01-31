@@ -29,7 +29,7 @@ impl serde::Serialize for Index {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&format!("0x{:x}", self.0))
+        alloy_serde::quantity::serialize(&(self.0 as u64), serializer)
     }
 }
 
