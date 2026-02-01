@@ -985,6 +985,22 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
+    fn block_number_or_tag_serialization() {
+        let number = BlockNumberOrTag::Number(0);
+        assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x0\"");
+
+        let number = BlockNumberOrTag::Number(16);
+        assert_eq!(serde_json::to_string(&number).unwrap(), "\"0x10\"");
+
+        let latest = BlockNumberOrTag::Latest;
+        assert_eq!(serde_json::to_string(&latest).unwrap(), "\"latest\"");
+
+        let pending = BlockNumberOrTag::Pending;
+        assert_eq!(serde_json::to_string(&pending).unwrap(), "\"pending\"");
+    }
+    
+    #[test]
     fn block_id_as_u64() {
         assert_eq!(BlockId::number(123).as_u64(), Some(123));
         assert_eq!(BlockId::number(0).as_u64(), Some(0));
