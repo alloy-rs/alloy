@@ -96,10 +96,10 @@ impl<T: PubSubConnect> PubSubService<T> {
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            let (in_flight, _) = InFlight::new(req.clone(), sub.tx.receiver_count());
+            let (in_flight, _) = InFlight::new(req, sub.tx.receiver_count());
+            let msg = in_flight.request.serialized().to_owned();
             self.in_flights.insert(in_flight);
 
-            let msg = req.into_serialized();
             self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
         }
 
