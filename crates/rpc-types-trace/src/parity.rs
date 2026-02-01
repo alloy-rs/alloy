@@ -776,7 +776,7 @@ mod tests {
         let val = serde_json::from_str::<TransactionTrace>(input).unwrap();
         assert!(val.action.is_selfdestruct());
 
-        let json = serde_json::to_value(val.clone()).unwrap();
+        let json = serde_json::to_value(&val).unwrap();
         let expect = serde_json::from_str::<serde_json::Value>(input).unwrap();
         assert_eq!(json, expect);
         let s = serde_json::to_string(&val).unwrap();
