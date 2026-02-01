@@ -47,7 +47,14 @@ pub struct SyncStatusMetadata {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub current_block: u64,
     /// The highest block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub highest_block: Option<u64>,
 }
 
@@ -346,8 +353,12 @@ mod tests {
         assert_eq!(metadata, deserialized);
 
         // Test without highest_block
-        let metadata_no_highest =
-            SyncStatusMetadata { syncing: false, starting_block: 0, current_block: 100, highest_block: None };
+        let metadata_no_highest = SyncStatusMetadata {
+            syncing: false,
+            starting_block: 0,
+            current_block: 100,
+            highest_block: None,
+        };
         let serialized = serde_json::to_string(&metadata_no_highest).unwrap();
         assert_eq!(serialized, r#"{"syncing":false,"startingBlock":"0x0","currentBlock":"0x64"}"#);
 
