@@ -422,7 +422,7 @@ mod tests {
         let serialized: String = serde_json::to_string_pretty(&deserialized).unwrap();
 
         let origin: serde_json::Value = serde_json::from_str(txpool_content_json).unwrap();
-        let serialized_value = serde_json::to_value(deserialized.clone()).unwrap();
+        let serialized_value = serde_json::to_value(&deserialized).unwrap();
         assert_eq!(origin, serialized_value);
         assert_eq!(deserialized, serde_json::from_str::<TxpoolContent>(&serialized).unwrap());
     }
@@ -489,9 +489,8 @@ mod tests {
         );
         pending_map.insert(
             Address::from_str("0512261a7486b1e29704ac49a5eb355b6fd86872").unwrap(),
-            pending_map_inner.clone(),
+            std::mem::take(&mut pending_map_inner),
         );
-        pending_map_inner.clear();
         pending_map_inner.insert(
             "252350".to_string(),
             TxpoolInspectSummary {
@@ -530,9 +529,8 @@ mod tests {
         );
         pending_map.insert(
             Address::from_str("201354729f8d0f8b64e9a0c353c672c6a66b3857").unwrap(),
-            pending_map_inner.clone(),
+            std::mem::take(&mut pending_map_inner),
         );
-        pending_map_inner.clear();
         pending_map_inner.insert(
             "40".to_string(),
             TxpoolInspectSummary {
@@ -568,9 +566,8 @@ mod tests {
         );
         queued_map.insert(
             Address::from_str("0f87ffcd71859233eb259f42b236c8e9873444e3").unwrap(),
-            queued_map_inner.clone(),
+            std::mem::take(&mut queued_map_inner),
         );
-        queued_map_inner.clear();
         queued_map_inner.insert(
             "3".to_string(),
             TxpoolInspectSummary {
