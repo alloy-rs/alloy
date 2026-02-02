@@ -5,6 +5,8 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// Increases the default recursion limit of 128 due to the deep type nesting
+// of the AWS SDK combined with async-trait and tracing instrumentation.
 #![recursion_limit = "256"]
 
 #[macro_use]
