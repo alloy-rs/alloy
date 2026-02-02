@@ -5,3 +5,11 @@ slow-timeout = { period = "30s", terminate-after = 4 }
 [[profile.default.overrides]]
 filter = "test(can_launch_reth_custom_ports)"
 retries = { backoff = "exponential", count = 5, delay = "3s", jitter = true }
+
+[test-groups.node-bindings]
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = "package(alloy-node-bindings)"
+test-group = "node-bindings"
+retries = { backoff = "exponential", count = 3, delay = "3s", jitter = true }
