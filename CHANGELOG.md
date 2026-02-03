@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Other
+
+- Revert "feat(rpc-types-eth): add optional timestamp field to Transaction" ([#3638](https://github.com/alloy-rs/alloy/issues/3638))
+
 ## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
 
 ### Bug Fixes
@@ -34,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding an ECDSA verify ([#3595](https://github.com/alloy-rs/alloy/issues/3595))
 - [rpc-types-eth] Add blob_base_fee to BlockOverrides ([#3585](https://github.com/alloy-rs/alloy/issues/3585))
 - [rpc-client] Allow setting terminal error codes on pollers ([#3421](https://github.com/alloy-rs/alloy/issues/3421))
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
 
 ### Other
 

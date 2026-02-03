@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [clippy] Remove instrumentation to prevent deep recursion violating regular 128 limit, undo [#3633](https://github.com/alloy-rs/alloy/issues/3633) ([#3634](https://github.com/alloy-rs/alloy/issues/3634))
 - [ci, signer-aws] Increase recursion limit to fix `error: queries overflow the depth limit!` ([#3633](https://github.com/alloy-rs/alloy/issues/3633))
 
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
 ## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
 
 ### Miscellaneous Tasks

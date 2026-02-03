@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
 
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
 ### Other
 
 - Use collect_str for FunctionSelector serialization ([#3622](https://github.com/alloy-rs/alloy/issues/3622))

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [rpc-types-engine] Add ExecutionPayloadBodyV2 for EIP-7928 ([#3636](https://github.com/alloy-rs/alloy/issues/3636))
 - [rpc-types-engine] Add into_payload_and_sidecar to V4 and V5 envelopes ([#3624](https://github.com/alloy-rs/alloy/issues/3624))
 
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
 ## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
 
 ### Miscellaneous Tasks

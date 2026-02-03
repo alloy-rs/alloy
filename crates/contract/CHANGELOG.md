@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [contract] Propagate TransportError when all eth_call overrides fail ([#3316](https://github.com/alloy-rs/alloy/issues/3316))
 
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
 ## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
 
 ### Miscellaneous Tasks

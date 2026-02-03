@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [provider] Add EIP-7928 block access list helper methods ([#3637](https://github.com/alloy-rs/alloy/issues/3637))
 - [provider] Add get_header methods ([#3617](https://github.com/alloy-rs/alloy/issues/3617))
 
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
 ### Performance
 
 - Avoid cloning Filter in cache `get_logs` ([#3597](https://github.com/alloy-rs/alloy/issues/3597))
