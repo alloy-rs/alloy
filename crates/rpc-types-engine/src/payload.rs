@@ -26,6 +26,11 @@ use core::iter::{FromIterator, IntoIterator};
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
+/// The execution payload body V2 response that allows for `null` values.
+///
+/// See also: <https://eips.ethereum.org/EIPS/eip-7928>
+pub type ExecutionPayloadBodiesV2 = Vec<Option<ExecutionPayloadBodyV2>>;
+
 /// And 8-byte identifier for an execution payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -2292,6 +2297,69 @@ impl<T: Encodable2718, H> From<Block<T, H>> for ExecutionPayloadBodyV1 {
     }
 }
 
+/// This structure contains a body of an execution payload (V2).
+///
+/// V2 extends V1 with the `blockAccessList` field introduced in EIP-7928.
+///
+/// See also: <https://eips.ethereum.org/EIPS/eip-7928>
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+pub struct ExecutionPayloadBodyV2 {
+    /// Enveloped encoded transactions.
+    pub transactions: Vec<Bytes>,
+    /// All withdrawals in the block.
+    ///
+    /// Will always be `None` if pre shanghai.
+    pub withdrawals: Option<Vec<Withdrawal>>,
+    /// The RLP-encoded block access list.
+    ///
+    /// Will be `None` for pre-Amsterdam blocks or when data has been pruned.
+    pub block_access_list: Option<Bytes>,
+}
+
+impl ExecutionPayloadBodyV2 {
+    /// Creates an [`ExecutionPayloadBodyV2`] from the given withdrawals, transactions, and block
+    /// access list.
+    pub fn new<'a, T>(
+        withdrawals: Option<Withdrawals>,
+        transactions: impl IntoIterator<Item = &'a T>,
+        block_access_list: Option<Bytes>,
+    ) -> Self
+    where
+        T: Encodable2718 + 'a,
+    {
+        Self {
+            transactions: transactions.into_iter().map(|tx| tx.encoded_2718().into()).collect(),
+            withdrawals: withdrawals.map(Withdrawals::into_inner),
+            block_access_list,
+        }
+    }
+
+    /// Converts a [`alloy_consensus::Block`] into an execution payload body, with an optional
+    /// block access list.
+    pub fn from_block<T: Encodable2718, H>(
+        block: Block<T, H>,
+        block_access_list: Option<Bytes>,
+    ) -> Self {
+        let BlockBody { withdrawals, transactions, .. } = block.into_body();
+        Self::new(withdrawals, transactions.iter(), block_access_list)
+    }
+}
+
+impl From<ExecutionPayloadBodyV1> for ExecutionPayloadBodyV2 {
+    fn from(v1: ExecutionPayloadBodyV1) -> Self {
+        Self { transactions: v1.transactions, withdrawals: v1.withdrawals, block_access_list: None }
+    }
+}
+
+impl From<ExecutionPayloadBodyV2> for ExecutionPayloadBodyV1 {
+    fn from(v2: ExecutionPayloadBodyV2) -> Self {
+        Self { transactions: v2.transactions, withdrawals: v2.withdrawals }
+    }
+}
+
 /// This structure contains the attributes required to initiate a payload build process in the
 /// context of an `engine_forkchoiceUpdated` call.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -3397,5 +3465,74 @@ mod tests {
         if let Ok(with_encoded) = &decoded_with_encoded[0] {
             assert_eq!(with_encoded.encoded_bytes(), &transaction);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_execution_payload_body_v2() {
+        let body = ExecutionPayloadBodyV2 {
+            transactions: vec![Bytes::from(vec![0x01, 0x02, 0x03])],
+            withdrawals: Some(vec![Withdrawal {
+                index: 1,
+                validator_index: 2,
+                address: Address::default(),
+                amount: 100,
+            }]),
+            block_access_list: Some(Bytes::from(vec![0xaa, 0xbb, 0xcc])),
+        };
+
+        let serialized = serde_json::to_string(&body).unwrap();
+        let deserialized: ExecutionPayloadBodyV2 = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, body);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_execution_payload_body_v2_null_fields() {
+        let body = ExecutionPayloadBodyV2 {
+            transactions: vec![],
+            withdrawals: None,
+            block_access_list: None,
+        };
+
+        let serialized = serde_json::to_string(&body).unwrap();
+        let deserialized: ExecutionPayloadBodyV2 = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, body);
+    }
+
+    #[test]
+    fn execution_payload_body_v1_to_v2_conversion() {
+        let v1 = ExecutionPayloadBodyV1 {
+            transactions: vec![Bytes::from(vec![0x01, 0x02])],
+            withdrawals: Some(vec![Withdrawal {
+                index: 1,
+                validator_index: 2,
+                address: Address::default(),
+                amount: 100,
+            }]),
+        };
+
+        let v2: ExecutionPayloadBodyV2 = v1.clone().into();
+        assert_eq!(v2.transactions, v1.transactions);
+        assert_eq!(v2.withdrawals, v1.withdrawals);
+        assert_eq!(v2.block_access_list, None);
+    }
+
+    #[test]
+    fn execution_payload_body_v2_to_v1_conversion() {
+        let v2 = ExecutionPayloadBodyV2 {
+            transactions: vec![Bytes::from(vec![0x01, 0x02])],
+            withdrawals: Some(vec![Withdrawal {
+                index: 1,
+                validator_index: 2,
+                address: Address::default(),
+                amount: 100,
+            }]),
+            block_access_list: Some(Bytes::from(vec![0xaa, 0xbb])),
+        };
+
+        let v1: ExecutionPayloadBodyV1 = v2.clone().into();
+        assert_eq!(v1.transactions, v2.transactions);
+        assert_eq!(v1.withdrawals, v2.withdrawals);
     }
 }
