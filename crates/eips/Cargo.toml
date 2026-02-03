@@ -27,7 +27,7 @@ workspace = true
 alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
-alloy-eip7928.workspace = true
+alloy-eip7928 = { workspace = true, features = ["rlp"] }
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
