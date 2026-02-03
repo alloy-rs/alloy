@@ -538,6 +538,8 @@ impl ExecutionPayloadV1 {
             excess_blob_gas: None,
             parent_beacon_block_root: None,
             requests_hash: None,
+            block_access_list_hash: None,
+            slot_number: None,
             extra_data: self.extra_data,
             // Defaults
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
@@ -1046,6 +1048,11 @@ pub struct ExecutionPayloadV4 {
     ///
     /// [EIP-7928]: https://eips.ethereum.org/EIPS/eip-7928
     pub block_access_list: Bytes,
+    /// The slot number corresponding to this block, calculated in the consensus layer.
+    ///
+    /// [EIP-7843]: https://eips.ethereum.org/EIPS/eip-7843
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub slot_number: u64,
 }
 
 #[cfg(feature = "ssz")]
@@ -1075,6 +1082,7 @@ impl ssz::Decode for ExecutionPayloadV4 {
         builder.register_type::<u64>()?;
         builder.register_type::<u64>()?;
         builder.register_type::<Bytes>()?;
+        builder.register_type::<u64>()?;
 
         let mut decoder = builder.build()?;
 
@@ -1103,6 +1111,7 @@ impl ssz::Decode for ExecutionPayloadV4 {
                 excess_blob_gas: decoder.decode_next()?,
             },
             block_access_list: decoder.decode_next()?,
+            slot_number: decoder.decode_next()?,
         })
     }
 }
@@ -1117,7 +1126,7 @@ impl ssz::Encode for ExecutionPayloadV4 {
         let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 5
             + <Address as ssz::Encode>::ssz_fixed_len()
             + <Bloom as ssz::Encode>::ssz_fixed_len()
-            + <u64 as ssz::Encode>::ssz_fixed_len() * 6
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 7 // includes slot_number
             + <U256 as ssz::Encode>::ssz_fixed_len()
             + ssz::BYTES_PER_LENGTH_OFFSET * 4;
 
@@ -1141,6 +1150,7 @@ impl ssz::Encode for ExecutionPayloadV4 {
         encoder.append(&self.payload_inner.blob_gas_used);
         encoder.append(&self.payload_inner.excess_blob_gas);
         encoder.append(&self.block_access_list);
+        encoder.append(&self.slot_number);
 
         encoder.finalize();
     }
@@ -1149,6 +1159,89 @@ impl ssz::Encode for ExecutionPayloadV4 {
         <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
             + ssz::BYTES_PER_LENGTH_OFFSET
             + self.block_access_list.len()
+            + <u64 as ssz::Encode>::ssz_fixed_len()
+    }
+}
+
+impl ExecutionPayloadV4 {
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`].
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow<T, H>(block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked(block.header.hash_slow(), block)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    pub fn from_block_unchecked<T, H>(block_hash: B256, block: &Block<T, H>) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
+        Self {
+            payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
+            block_access_list: Default::default(),
+            slot_number: block.header.slot_number().unwrap_or_default(),
+        }
+    }
+
+    /// Returns the timestamp for the execution payload.
+    pub const fn timestamp(&self) -> u64 {
+        self.payload_inner.timestamp()
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`].
+    ///
+    /// This performs the same conversion as the underlying V3 payload, but calculates the
+    /// block access list hash and sets the slot number.
+    ///
+    /// See also [`ExecutionPayloadV3::try_into_block`].
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// See also [`ExecutionPayloadV3::try_into_block_with`].
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block = self.payload_inner.into_block_raw()?;
+
+        let block_access_list_hash = alloy_primitives::keccak256(&self.block_access_list);
+        base_block.header.block_access_list_hash = Some(block_access_list_hash);
+        base_block.header.slot_number = Some(self.slot_number);
+
+        Ok(base_block)
+    }
+}
+
+impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
+    type Error = PayloadError;
+
+    fn try_from(value: ExecutionPayloadV4) -> Result<Self, Self::Error> {
+        value.try_into_block()
     }
 }
 
@@ -1613,6 +1706,8 @@ pub enum ExecutionPayload {
     V2(ExecutionPayloadV2),
     /// V3 payload
     V3(ExecutionPayloadV3),
+    /// V4 payload (Amsterdam)
+    V4(ExecutionPayloadV4),
 }
 
 impl ExecutionPayload {
@@ -1646,7 +1741,10 @@ impl ExecutionPayload {
     {
         let sidecar = ExecutionPayloadSidecar::from_block(block);
 
-        let execution_payload = if block.header.parent_beacon_block_root().is_some() {
+        let execution_payload = if block.header.block_access_list_hash().is_some() {
+            // block with block access list hash: V4 (Amsterdam)
+            Self::V4(ExecutionPayloadV4::from_block_unchecked(block_hash, block))
+        } else if block.header.parent_beacon_block_root().is_some() {
             // block with parent beacon block root: V3
             Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
         } else if block.body.withdrawals.is_some() {
@@ -1752,6 +1850,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload.into_block_raw(),
             Self::V2(payload) => payload.into_block_raw(),
             Self::V3(payload) => payload.into_block_raw(),
+            Self::V4(payload) => payload.into_block_raw(),
         }
     }
 
@@ -1761,6 +1860,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &payload.payload_inner,
             Self::V3(payload) => &payload.payload_inner.payload_inner,
+            Self::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -1770,6 +1870,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &mut payload.payload_inner,
             Self::V3(payload) => &mut payload.payload_inner.payload_inner,
+            Self::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -1779,6 +1880,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => payload.payload_inner,
             Self::V3(payload) => payload.payload_inner.payload_inner,
+            Self::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -1788,6 +1890,7 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&payload.payload_inner),
+            Self::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
@@ -1797,6 +1900,7 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&mut payload.payload_inner),
+            Self::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
@@ -1805,6 +1909,7 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
@@ -1813,6 +1918,23 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&mut payload.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V4 payload, if any.
+    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
+        match self {
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
+        }
+    }
+
+    /// Returns a mutable reference to the V4 payload, if any.
+    pub const fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
+        match self {
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
         }
     }
 
@@ -1846,6 +1968,7 @@ impl ExecutionPayload {
             blob_gas_used: self.blob_gas_used(),
             difficulty: U256::ZERO,
             mix_hash: Some(self.prev_randao()),
+            slot_number: self.as_v4().map(|payload| payload.slot_number),
         }
     }
 
@@ -2315,6 +2438,9 @@ pub struct PayloadAttributes {
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3>
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
+    /// Slot of the current block enabled with Amsterdam fork
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub slot_number: Option<u64>,
 }
 
 /// This structure contains the result of processing a payload or fork choice update.
@@ -3397,5 +3523,19 @@ mod tests {
         if let Ok(with_encoded) = &decoded_with_encoded[0] {
             assert_eq!(with_encoded.encoded_bytes(), &transaction);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_payload_attributes_without_slot_number() {
+        let json = r#"{
+            "timestamp": "0x1234",
+            "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "suggestedFeeRecipient": "0x0000000000000000000000000000000000000000"
+        }"#;
+
+        let attrs: PayloadAttributes = serde_json::from_str(json).unwrap();
+        assert_eq!(attrs.timestamp, 0x1234);
+        assert!(attrs.slot_number.is_none());
     }
 }
