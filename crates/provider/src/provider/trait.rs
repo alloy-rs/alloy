@@ -144,7 +144,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// Get the block number for a given block identifier.
     ///
     /// This is a convenience function that fetches the block header when the block identifier is
-    /// not a number.
+    /// not a number. Falls back to fetching the full block if header RPC is not supported.
     async fn get_block_number_by_id(
         &self,
         block_id: BlockId,
@@ -153,8 +153,13 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
             _ => {
-                let header = self.get_header(block_id).await?;
-                Ok(header.map(|h| h.number()))
+                // Try get_header first (more efficient), fallback to get_block if not supported.
+                // Not all nodes support eth_getHeaderByHash/eth_getHeaderByNumber.
+                if let Ok(header) = self.get_header(block_id).await {
+                    return Ok(header.map(|h| h.number()));
+                }
+                let block = self.get_block(block_id).await?;
+                Ok(block.map(|b| b.header().number()))
             }
         }
     }
