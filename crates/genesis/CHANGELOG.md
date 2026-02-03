@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.5.2
 - Revert "chore: add amsterdam support" ([#3573](https://github.com/alloy-rs/alloy/issues/3573))
 
 ## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21

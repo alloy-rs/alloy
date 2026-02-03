@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [rpc-types-beacon] Add SSZ support for beacon block types ([#3575](https://github.com/alloy-rs/alloy/issues/3575))
 
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
 ## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
 
 ### Miscellaneous Tasks

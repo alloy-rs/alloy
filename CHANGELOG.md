@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Bug Fixes
+
+- [node-bindings] Kill anvil child on timeout ([#3635](https://github.com/alloy-rs/alloy/issues/3635))
+- [clippy] Remove instrumentation to prevent deep recursion violating regular 128 limit, undo [#3633](https://github.com/alloy-rs/alloy/issues/3633) ([#3634](https://github.com/alloy-rs/alloy/issues/3634))
+- [ci, signer-aws] Increase recursion limit to fix `error: queries overflow the depth limit!` ([#3633](https://github.com/alloy-rs/alloy/issues/3633))
+- Reduce test flakiness for node-bindings and network tests ([#3632](https://github.com/alloy-rs/alloy/issues/3632))
+- [consensus] Mark tx_mut as hidden with invalidation warning ([#3608](https://github.com/alloy-rs/alloy/issues/3608))
+- [rpc-types-eth] Add serde alias for MovePrecompileToAddress ([#3589](https://github.com/alloy-rs/alloy/issues/3589))
+- Clarify boolean return docs ([#3586](https://github.com/alloy-rs/alloy/issues/3586))
+- [contract] Propagate TransportError when all eth_call overrides fail ([#3316](https://github.com/alloy-rs/alloy/issues/3316))
+
+### Dependencies
+
+- [deps] Bump taiki-e/install-action from 2.66.7 to 2.67.13 ([#3603](https://github.com/alloy-rs/alloy/issues/3603))
+- [deps] Bump foundry-rs/foundry-toolchain from 1.6.0 to 1.7.0 ([#3602](https://github.com/alloy-rs/alloy/issues/3602))
+- [deps] Bump crate-ci/typos from 1.42.1 to 1.42.2 ([#3601](https://github.com/alloy-rs/alloy/issues/3601))
+
+### Features
+
+- [rpc-types-engine] Add ExecutionPayloadBodyV2 for EIP-7928 ([#3636](https://github.com/alloy-rs/alloy/issues/3636))
+- [provider] Add EIP-7928 block access list helper methods ([#3637](https://github.com/alloy-rs/alloy/issues/3637))
+- [rpc-types-engine] Add into_payload_and_sidecar to V4 and V5 envelopes ([#3624](https://github.com/alloy-rs/alloy/issues/3624))
+- [provider] Add get_header methods ([#3617](https://github.com/alloy-rs/alloy/issues/3617))
+- [rpc-types-eth] Add optional timestamp field to Transaction ([#3606](https://github.com/alloy-rs/alloy/issues/3606))
+- Adding an ECDSA verify ([#3595](https://github.com/alloy-rs/alloy/issues/3595))
+- [rpc-types-eth] Add blob_base_fee to BlockOverrides ([#3585](https://github.com/alloy-rs/alloy/issues/3585))
+- [rpc-client] Allow setting terminal error codes on pollers ([#3421](https://github.com/alloy-rs/alloy/issues/3421))
+
+### Other
+
+- Use collect_str for FunctionSelector serialization ([#3622](https://github.com/alloy-rs/alloy/issues/3622))
+- [rpc-types-eth] Remove redundant is_some checks in TransactionInput normalization ([#3613](https://github.com/alloy-rs/alloy/issues/3613))
+- Increase nextest retries for flaky reth test ([#3582](https://github.com/alloy-rs/alloy/issues/3582))
+
+### Performance
+
+- Avoid cloning Filter in cache `get_logs` ([#3597](https://github.com/alloy-rs/alloy/issues/3597))
+
 ## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
 
 ### Features
@@ -14,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.5.2
 - Revert "chore: add amsterdam support" ([#3573](https://github.com/alloy-rs/alloy/issues/3573))
 
 ## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
