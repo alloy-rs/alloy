@@ -143,8 +143,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Get the block number for a given block identifier.
     ///
-    /// This is a convenience function that fetches the full block when the block identifier is not
-    /// a number.
+    /// This is a convenience function that fetches the block header when the block identifier is
+    /// not a number.
     async fn get_block_number_by_id(
         &self,
         block_id: BlockId,
@@ -153,8 +153,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
             _ => {
-                let block = self.get_block(block_id).await?;
-                Ok(block.map(|b| b.header().number()))
+                let header = self.get_header(block_id).await?;
+                Ok(header.map(|h| h.number()))
             }
         }
     }
