@@ -40,8 +40,6 @@ pub struct TransactionInfo {
     pub block_number: Option<u64>,
     /// Base fee of the block.
     pub base_fee: Option<u64>,
-    /// Timestamp of the block.
-    pub block_timestamp: Option<u64>,
 }
 
 impl TransactionInfo {
