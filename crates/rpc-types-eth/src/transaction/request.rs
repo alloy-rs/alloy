@@ -1599,11 +1599,14 @@ impl FromStr for TransactionInputKind {
     type Err = ParseTransactionInputKindError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "input" => Ok(Self::Input),
-            "data" => Ok(Self::Data),
-            "both" => Ok(Self::Both),
-            _ => Err(ParseTransactionInputKindError { input: s.to_string() }),
+        if s.eq_ignore_ascii_case("input") {
+            Ok(Self::Input)
+        } else if s.eq_ignore_ascii_case("data") {
+            Ok(Self::Data)
+        } else if s.eq_ignore_ascii_case("both") {
+            Ok(Self::Both)
+        } else {
+            Err(ParseTransactionInputKindError { input: s.to_string() })
         }
     }
 }
@@ -1858,6 +1861,14 @@ mod tests {
     }
 
     #[test]
+    fn parse_transaction_input_kind_case_insensitive() {
+        assert_eq!("input".parse::<TransactionInputKind>().unwrap(), TransactionInputKind::Input);
+        assert_eq!("DATA".parse::<TransactionInputKind>().unwrap(), TransactionInputKind::Data);
+        assert_eq!("Both".parse::<TransactionInputKind>().unwrap(), TransactionInputKind::Both);
+        assert!("other".parse::<TransactionInputKind>().is_err());
+    }
+
+    #[test]
     #[cfg(feature = "serde")]
     fn serde_empty() {
         let tx = TransactionRequest::default();
@@ -1966,7 +1977,11 @@ mod tests {
 
             let maybe_eip2930_tx: Result<TypedTransaction, _> =
                 eip2930_request.build_consensus_tx();
-            assert_matches!(maybe_eip2930_tx, Ok(TypedTransaction::Eip2930(TxEip2930 { access_list, .. })) if access_list == access_list);
+            assert_matches!(
+                maybe_eip2930_tx,
+                Ok(TypedTransaction::Eip2930(TxEip2930 { access_list: actual_access_list, .. }))
+                    if actual_access_list == access_list
+            );
 
             // Negative case
             let eip2930_request_missing_nonce = TransactionRequest {
@@ -2030,7 +2045,13 @@ mod tests {
 
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
                 eip4844_request.build_consensus_tx();
-            assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 { max_fee_per_blob_gas, .. }))) if max_fee_per_blob_gas == max_fee_per_blob_gas);
+            assert_matches!(
+                maybe_eip4844_tx,
+                Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 {
+                    max_fee_per_blob_gas: actual_max_fee_per_blob_gas,
+                    ..
+                }))) if actual_max_fee_per_blob_gas == max_fee_per_blob_gas
+            );
 
             // Negative case
             let eip4844_request_incorrect_to = TransactionRequest {
@@ -2056,6 +2077,7 @@ mod tests {
             // Positive case
             let sidecar =
                 BlobTransactionSidecar::new(vec![Blob::repeat_byte(0xFA)], Vec::new(), Vec::new());
+            let expected_sidecar = BlobTransactionSidecarVariant::from(sidecar.clone());
             let eip4844_request = TransactionRequest {
                 to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
                 max_fee_per_gas: Some(1234),
@@ -2072,7 +2094,7 @@ mod tests {
                 eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx,
             Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
-            sidecar, .. }))) if sidecar == sidecar);
+            sidecar: actual_sidecar, .. }))) if actual_sidecar == expected_sidecar);
 
             // with create to
             let sidecar =
