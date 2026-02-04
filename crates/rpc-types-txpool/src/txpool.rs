@@ -489,9 +489,8 @@ mod tests {
         );
         pending_map.insert(
             Address::from_str("0512261a7486b1e29704ac49a5eb355b6fd86872").unwrap(),
-            pending_map_inner.clone(),
+            std::mem::take(&mut pending_map_inner),
         );
-        pending_map_inner.clear();
         pending_map_inner.insert(
             "252350".to_string(),
             TxpoolInspectSummary {
