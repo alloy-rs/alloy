@@ -168,14 +168,15 @@ where
             let future = async move {
                 let start = Instant::now();
                 let result = transport.call(req_clone).await;
+                let duration = start.elapsed();
                 trace!(
                     "Transport[{}] completed: latency={:?}, status={}",
                     transport.id,
-                    start.elapsed(),
+                    duration,
                     if result.is_ok() { "success" } else { "fail" }
                 );
 
-                (result, transport, start.elapsed())
+                (result, transport, duration)
             };
 
             futures.push(future);
@@ -236,8 +237,9 @@ where
             match transport.call(req_clone).await {
                 Ok(response) => {
                     // Record success and return immediately
-                    transport.track_success(start.elapsed());
-                    trace!("Transport[{}] succeeded in {:?}", transport.id, start.elapsed());
+                    let duration = start.elapsed();
+                    transport.track_success(duration);
+                    trace!("Transport[{}] succeeded in {:?}", transport.id, duration);
                     self.log_transport_rankings();
                     return Ok(response);
                 }
