@@ -826,7 +826,7 @@ mod tests {
     #[test]
     fn arbitrary_header() {
         let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
+        rand::rng().fill(bytes.as_mut_slice());
         let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 

@@ -183,7 +183,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and
     /// constructing the phrase using the thread RNG.
     pub fn build_random(&self) -> Result<PrivateKeySigner, LocalSignerError> {
-        self.build_random_with(&mut rand::thread_rng())
+        self.build_random_with(&mut rand::rng())
     }
 
     /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and

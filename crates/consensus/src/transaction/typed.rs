@@ -488,7 +488,7 @@ pub(crate) mod serde_bincode_compat {
             }
 
             let mut bytes = [0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            rand::rng().fill(bytes.as_mut_slice());
             let data = Data {
                 transaction: EthereumTypedTransaction::arbitrary(
                     &mut arbitrary::Unstructured::new(&bytes),

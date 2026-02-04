@@ -190,7 +190,7 @@ impl Reth {
             auth_port: DEFAULT_AUTH_PORT,
             p2p_port: DEFAULT_P2P_PORT,
             block_time: None,
-            instance: rand::thread_rng().gen_range(1..200),
+            instance: rand::rng().random_range(1..200),
             discovery_enabled: true,
             program: None,
             ipc_path: None,

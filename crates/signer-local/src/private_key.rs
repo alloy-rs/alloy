@@ -53,10 +53,10 @@ impl LocalSigner<SigningKey> {
         SigningKey::from_slice(bytes).map(Self::from_signing_key)
     }
 
-    /// Creates a new random keypair seeded with [`rand::thread_rng()`].
+    /// Creates a new random keypair seeded with [`rand::rng()`].
     #[inline]
     pub fn random() -> Self {
-        Self::random_with(&mut rand::thread_rng())
+        Self::random_with(&mut rand::rng())
     }
 
     /// Creates a new random keypair seeded with the provided RNG.
@@ -278,7 +278,7 @@ mod tests {
     fn encrypted_json_keystore_new() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let (key, uuid) =
             LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
@@ -290,7 +290,7 @@ mod tests {
     fn encrypted_json_keystore_from_pk() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let private_key =
             hex::decode("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b")
@@ -317,7 +317,7 @@ mod tests {
 
         use eth_keystore::EthKeystore;
         let dir = tempdir().unwrap();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let (key, uuid) =
             LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
@@ -334,7 +334,7 @@ mod tests {
     fn signs_msg() {
         let message = "Some data";
         let hash = alloy_primitives::utils::eip191_hash_message(message);
-        let key = LocalSigner::<SigningKey>::random_with(&mut rand::thread_rng());
+        let key = LocalSigner::<SigningKey>::random_with(&mut rand::rng());
         let address = key.address;
 
         // sign a message

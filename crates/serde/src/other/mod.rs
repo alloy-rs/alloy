@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn other_fields_arbitrary() {
         let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
+        rand::rng().fill(bytes.as_mut_slice());
 
         let _ = arbitrary::Unstructured::new(&bytes).arbitrary::<OtherFields>().unwrap();
     }

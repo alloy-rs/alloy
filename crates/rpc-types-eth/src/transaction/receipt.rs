@@ -326,7 +326,7 @@ mod test {
     #[test]
     fn transaction_receipt_arbitrary() {
         let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
+        rand::rng().fill(bytes.as_mut_slice());
 
         let _: TransactionReceipt =
             TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();

@@ -62,7 +62,7 @@ fn clique_correctly_configured() {
     }
 
     run_with_tempdir_sync("geth-test-", |temp_dir_path| {
-        let private_key = SigningKey::random(&mut rand::thread_rng());
+        let private_key = SigningKey::random(&mut rand::rng());
         let geth = Geth::new()
             .set_clique_private_key(private_key)
             .chain_id(1337u64)

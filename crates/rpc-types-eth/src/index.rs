@@ -83,7 +83,7 @@ impl<'a> serde::Deserialize<'a> for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{thread_rng, Rng};
+    use rand::Rng;
     #[cfg(feature = "serde")]
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -91,9 +91,9 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_index_rand() {
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..100 {
-            let index = Index(rng.gen());
+            let index = Index(rng.random());
             let val = serde_json::to_string(&index).unwrap();
             let de: Index = serde_json::from_str(&val).unwrap();
             assert_eq!(index, de);

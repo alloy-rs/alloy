@@ -436,7 +436,7 @@ mod tests {
         use super::impl_secp256k1::*;
         use alloy_primitives::B256;
 
-        let (secret, public) = secp256k1::generate_keypair(&mut rand::thread_rng());
+        let (secret, public) = secp256k1::generate_keypair(&mut rand::rng());
         let signer = public_key_to_address(public);
 
         let message = b"hello world";
@@ -458,7 +458,7 @@ mod tests {
         use super::impl_k256::*;
         use alloy_primitives::B256;
 
-        let secret = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
+        let secret = k256::ecdsa::SigningKey::random(&mut rand::rng());
         let public = *secret.verifying_key();
         let signer = public_key_to_address(public);
 
@@ -481,8 +481,7 @@ mod tests {
         use super::{impl_k256, impl_secp256k1};
         use alloy_primitives::B256;
 
-        let (secp256k1_secret, secp256k1_public) =
-            secp256k1::generate_keypair(&mut rand::thread_rng());
+        let (secp256k1_secret, secp256k1_public) = secp256k1::generate_keypair(&mut rand::rng());
         let k256_secret = k256::ecdsa::SigningKey::from_slice(&secp256k1_secret.secret_bytes())
             .expect("k256 secret");
         let k256_public = *k256_secret.verifying_key();
