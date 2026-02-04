@@ -999,7 +999,7 @@ mod tests {
         let pending = BlockNumberOrTag::Pending;
         assert_eq!(serde_json::to_string(&pending).unwrap(), "\"pending\"");
     }
-    
+
     #[test]
     fn block_id_as_u64() {
         assert_eq!(BlockId::number(123).as_u64(), Some(123));

@@ -109,7 +109,7 @@ mod tests {
         let index = Index::from(42);
         assert_eq!(serde_json::to_string(&index).unwrap(), "\"0x2a\"");
     }
-    
+
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_index_deserialization() {
