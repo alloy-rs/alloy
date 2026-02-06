@@ -143,8 +143,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Get the block number for a given block identifier.
     ///
-    /// This is a convenience function that fetches the full block when the block identifier is not
-    /// a number.
+    /// This is a convenience function that fetches the block header when the block identifier is
+    /// not a number. Falls back to fetching the full block if header RPC is not supported.
     async fn get_block_number_by_id(
         &self,
         block_id: BlockId,
@@ -153,6 +153,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
             _ => {
+                // Try get_header first (more efficient), fallback to get_block if not supported.
+                // Not all nodes support eth_getHeaderByHash/eth_getHeaderByNumber.
+                if let Ok(header) = self.get_header(block_id).await {
+                    return Ok(header.map(|h| h.number()));
+                }
                 let block = self.get_block(block_id).await?;
                 Ok(block.map(|b| b.header().number()))
             }
@@ -466,6 +471,36 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         block: BlockId,
     ) -> ProviderCall<(BlockId,), Option<Vec<N::ReceiptResponse>>> {
         self.client().request("eth_getBlockReceipts", (block,)).into()
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockId`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        match block {
+            BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
+            BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
+        }
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockHash`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListByBlockHash", (hash,)).await
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
     }
 
     /// Gets a block header by its [`BlockId`].

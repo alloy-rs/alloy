@@ -65,12 +65,6 @@ pub struct Transaction<T = TxEnvelope> {
 
     /// Deprecated effective gas price value.
     pub effective_gas_price: Option<u128>,
-
-    /// The Unix block_timestamp (in seconds) when the block containing this transaction was mined.
-    ///
-    /// `None` if the transaction is pending.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub block_timestamp: Option<u64>,
 }
 
 impl<T> Default for Transaction<T>
@@ -84,7 +78,6 @@ where
             block_number: Default::default(),
             transaction_index: Default::default(),
             effective_gas_price: Default::default(),
-            block_timestamp: Default::default(),
         }
     }
 }
@@ -125,41 +118,25 @@ impl<T> Transaction<T> {
 
     /// Applies the given closure to the inner transaction type.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
-        let Self {
-            inner,
-            block_hash,
-            block_number,
-            transaction_index,
-            effective_gas_price,
-            block_timestamp,
-        } = self;
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Transaction {
             inner: inner.map(f),
             block_hash,
             block_number,
             transaction_index,
             effective_gas_price,
-            block_timestamp,
         }
     }
 
     /// Applies the given fallible closure to the inner transactions.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
-        let Self {
-            inner,
-            block_hash,
-            block_number,
-            transaction_index,
-            effective_gas_price,
-            block_timestamp,
-        } = self;
+        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
         Ok(Transaction {
             inner: inner.try_map(f)?,
             block_hash,
             block_number,
             transaction_index,
             effective_gas_price,
-            block_timestamp,
         })
     }
 }
@@ -182,12 +159,7 @@ where
     /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
     pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
         let TransactionInfo {
-            block_hash,
-            block_number,
-            index: transaction_index,
-            base_fee,
-            block_timestamp,
-            ..
+            block_hash, block_number, index: transaction_index, base_fee, ..
         } = tx_info;
         let effective_gas_price = base_fee
             .map(|base_fee| {
@@ -201,7 +173,6 @@ where
             block_number,
             transaction_index,
             effective_gas_price: Some(effective_gas_price),
-            block_timestamp,
         }
     }
 }
@@ -222,7 +193,6 @@ where
             // We don't know the base fee of the block when we're constructing this from
             // `Transaction`
             base_fee: None,
-            block_timestamp: self.block_timestamp,
         }
     }
 }
@@ -512,12 +482,6 @@ mod tx_serde {
 
         #[serde(flatten)]
         gas_price: MaybeGasPrice,
-        #[serde(
-            default,
-            with = "alloy_serde::quantity::opt",
-            skip_serializing_if = "Option::is_none"
-        )]
-        block_timestamp: Option<u64>,
     }
 
     impl<T: TransactionTrait> From<Transaction<T>> for TransactionSerdeHelper<T> {
@@ -528,7 +492,6 @@ mod tx_serde {
                 block_number,
                 transaction_index,
                 effective_gas_price,
-                block_timestamp,
             } = value;
 
             let (inner, from) = inner.into_parts();
@@ -547,7 +510,6 @@ mod tx_serde {
                 transaction_index,
                 from,
                 gas_price: MaybeGasPrice { effective_gas_price },
-                block_timestamp,
             }
         }
     }
@@ -563,7 +525,6 @@ mod tx_serde {
                 transaction_index,
                 from,
                 gas_price,
-                block_timestamp,
             } = value;
 
             // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice` (making
@@ -578,7 +539,6 @@ mod tx_serde {
                 block_number,
                 transaction_index,
                 effective_gas_price,
-                block_timestamp,
             })
         }
     }
