@@ -8,6 +8,9 @@ pub use anvil::{AnvilLayer, AnvilProvider};
 mod batch;
 pub use batch::{CallBatchLayer, CallBatchProvider};
 
+mod block_id;
+pub use block_id::{BlockIdLayer, BlockIdProvider};
+
 mod chain;
 pub use chain::ChainLayer;
 

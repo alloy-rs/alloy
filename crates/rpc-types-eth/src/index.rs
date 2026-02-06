@@ -29,7 +29,7 @@ impl serde::Serialize for Index {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&format!("0x{:x}", self.0))
+        alloy_serde::quantity::serialize(&(self.0 as u64), serializer)
     }
 }
 
@@ -98,6 +98,16 @@ mod tests {
             let de: Index = serde_json::from_str(&val).unwrap();
             assert_eq!(index, de);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_index_serialization() {
+        let index = Index::from(0);
+        assert_eq!(serde_json::to_string(&index).unwrap(), "\"0x0\"");
+
+        let index = Index::from(42);
+        assert_eq!(serde_json::to_string(&index).unwrap(), "\"0x2a\"");
     }
 
     #[test]

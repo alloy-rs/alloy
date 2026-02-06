@@ -1641,7 +1641,7 @@ impl TransactionInput {
     pub fn normalize_input(&mut self) {
         let data = self.data.take();
         // If input is None but data has a value, copy data to input
-        if self.input.is_none() && data.is_some() {
+        if self.input.is_none() {
             self.input = data;
         }
     }
@@ -1657,7 +1657,7 @@ impl TransactionInput {
     /// This removes `input` the data field.
     pub fn normalize_data(&mut self) {
         let input = self.input.take();
-        if self.data.is_none() && input.is_some() {
+        if self.data.is_none() {
             self.data = input;
         }
     }
