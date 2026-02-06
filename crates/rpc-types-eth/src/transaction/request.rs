@@ -335,6 +335,20 @@ impl TransactionRequest {
             || self.max_fee_per_blob_gas.is_some()
     }
 
+    /// Returns true if the EIP-4844 blob data fields are set (sidecar or versioned hashes).
+    ///
+    /// This differs from [`Self::has_eip4844_fields`] in that it does not consider
+    /// `max_fee_per_blob_gas` alone as sufficient to indicate a blob transaction.
+    /// This matches go-ethereum behavior where only the presence of `blob_versioned_hashes`
+    /// determines if a transaction is a blob transaction.
+    ///
+    /// Use this method when determining the transaction type for building/simulation,
+    /// as just having a blob fee cap without actual blob data should not force the
+    /// transaction to be EIP-4844.
+    pub const fn has_eip4844_blob_data(&self) -> bool {
+        self.sidecar.is_some() || self.blob_versioned_hashes.is_some()
+    }
+
     /// Returns true if _any_ of the EIP-1559 fee fields are set:
     /// - max fee per gas
     /// - max priority fee per gas
@@ -735,10 +749,14 @@ impl TransactionRequest {
     ///
     /// The type is determined in the following order:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if any EIP-4844 fields are set (sidecar, blob hashes, max blob fee)
+    /// - EIP-4844 if blob data fields are set (sidecar or blob hashes)
     /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
     /// - EIP-2930 if access_list is set
     /// - Legacy otherwise
+    ///
+    /// Note: `max_fee_per_blob_gas` alone does NOT indicate EIP-4844. This matches go-ethereum
+    /// behavior where only the presence of `blob_versioned_hashes` or sidecar determines if a
+    /// transaction is a blob transaction.
     ///
     /// # Examples
     ///
@@ -752,8 +770,12 @@ impl TransactionRequest {
     /// request.authorization_list = Some(vec![]);
     /// assert_eq!(request.minimal_tx_type(), TxType::Eip7702);
     ///
-    /// // EIP-4844 with max_fee_per_blob_gas
+    /// // max_fee_per_blob_gas alone does NOT make it EIP-4844
     /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy); // NOT Eip4844!
+    ///
+    /// // EIP-4844 with blob_versioned_hashes
+    /// let request = TransactionRequest { blob_versioned_hashes: Some(vec![]), ..Default::default() };
     /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
     ///
     /// // EIP-1559 with max_fee_per_gas
@@ -772,16 +794,18 @@ impl TransactionRequest {
     /// let request = TransactionRequest::default();
     /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
     ///
-    /// // Priority example: EIP-4844 overrides EIP-1559
-    /// let mut request = TransactionRequest::default()
-    ///     .max_fee_per_gas(2000000000) // EIP-1559 (ignored)
-    ///     .max_fee_per_blob_gas(1000000000); // EIP-4844 (takes priority)
+    /// // Priority example: EIP-4844 (with blob hashes) overrides EIP-1559
+    /// let request = TransactionRequest {
+    ///     max_fee_per_gas: Some(2000000000),
+    ///     blob_versioned_hashes: Some(vec![]),
+    ///     ..Default::default()
+    /// };
     /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
     /// ```
     pub const fn minimal_tx_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.has_eip4844_fields() {
+        } else if self.has_eip4844_blob_data() {
             TxType::Eip4844
         } else if self.has_eip1559_fields() {
             TxType::Eip1559
@@ -800,10 +824,14 @@ impl TransactionRequest {
     ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if sidecar, blob_versioned_hashes, or max_blob_fee_per_gas is set
+    /// - EIP-4844 if sidecar or blob_versioned_hashes is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
+    ///
+    /// Note: `max_fee_per_blob_gas` alone does NOT indicate EIP-4844. This matches go-ethereum
+    /// behavior where only the presence of `blob_versioned_hashes` or sidecar determines if a
+    /// transaction is a blob transaction.
     ///
     /// # Examples
     ///
@@ -817,8 +845,12 @@ impl TransactionRequest {
     /// request.authorization_list = Some(vec![]);
     /// assert_eq!(request.preferred_type(), TxType::Eip7702);
     ///
-    /// // EIP-4844 with max_fee_per_blob_gas
+    /// // EIP-4844 requires blob_versioned_hashes or sidecar, not just max_fee_per_blob_gas
     /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // NOT Eip4844!
+    ///
+    /// // EIP-4844 with blob_versioned_hashes
+    /// let request = TransactionRequest { blob_versioned_hashes: Some(vec![]), ..Default::default() };
     /// assert_eq!(request.preferred_type(), TxType::Eip4844);
     ///
     /// // EIP-2930 with both access_list and gas_price
@@ -864,7 +896,7 @@ impl TransactionRequest {
     pub const fn preferred_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.has_eip4844_fields() {
+        } else if self.has_eip4844_blob_data() {
             TxType::Eip4844
         } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
