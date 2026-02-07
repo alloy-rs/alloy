@@ -80,6 +80,7 @@ pub struct TransactionRequest {
         serde(
             default,
             skip_serializing_if = "Option::is_none",
+            alias = "gasLimit",
             with = "alloy_serde::quantity::opt"
         )
     )]
@@ -1842,6 +1843,14 @@ mod tests {
     fn serde_tx_request() {
         let s = r#"{"accessList":[],"data":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02"}"#;
         let _req = serde_json::from_str::<TransactionRequest>(s).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_gas_limit_alias() {
+        let s = r#"{"gasLimit":"0x5208"}"#;
+        let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
+        assert_eq!(req.gas, Some(0x5208));
     }
 
     #[test]
