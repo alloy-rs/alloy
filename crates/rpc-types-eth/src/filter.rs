@@ -953,7 +953,7 @@ impl serde::Serialize for Filter {
             s.serialize_field("address", &address)?;
         }
 
-        let mut filtered_topics = Vec::new();
+        let mut filtered_topics = Vec::with_capacity(self.topics.len());
         let mut filtered_topics_len = 0;
         for (i, topic) in self.topics.iter().enumerate() {
             if !topic.is_empty() {
