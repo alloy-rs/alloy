@@ -1,4 +1,4 @@
-use super::WsBackend;
+use super::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use futures::{
@@ -58,7 +58,11 @@ impl PubSubConnect for WsConnect {
             WsMeta::connect(&self.url, None).await.map_err(TransportErrorKind::custom)?.1.fuse();
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-        let backend = WsBackend { socket, interface };
+        let backend = WsBackend {
+            socket,
+            interface,
+            keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+        };
 
         backend.spawn();
 
