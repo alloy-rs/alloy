@@ -106,7 +106,8 @@ impl<T: InMemorySize, H: InMemorySize> InMemorySize for crate::BlockBody<T, H> {
     fn size(&self) -> usize {
         self.transactions.iter().map(T::size).sum::<usize>()
             + self.ommers.iter().map(H::size).sum::<usize>()
-            + self.withdrawals
+            + self
+                .withdrawals
                 .as_ref()
                 .map_or(core::mem::size_of::<Option<Withdrawals>>(), Withdrawals::total_size)
     }
