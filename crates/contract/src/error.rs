@@ -21,11 +21,9 @@ pub enum Error {
     /// Called `deploy` with a transaction that is not a deployment transaction.
     #[error("transaction is not a deployment transaction")]
     NotADeploymentTransaction,
-    /// The deployment transaction reverted.
-    #[error("deployment transaction reverted")]
-    DeploymentReverted,
-    /// `contractAddress` was not found in the deployment transaction's receipt.
-    #[error("missing `contractAddress` from deployment transaction receipt")]
+    /// Contract was not deployed: either the deployment transaction reverted or `contractAddress`
+    /// was not found in the receipt.
+    #[error("contract not deployed: deployment transaction failed")]
     ContractNotDeployed,
     /// The contract returned no data.
     #[error("contract call to `{0}` returned no data (\"0x\"); the called address might not be a contract")]

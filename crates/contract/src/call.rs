@@ -574,7 +574,7 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         let pending_tx = self.send().await?;
         let receipt = pending_tx.get_receipt().await?;
         if !receipt.status() {
-            return Err(Error::DeploymentReverted);
+            return Err(Error::ContractNotDeployed);
         }
         receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
@@ -604,7 +604,7 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         }
         let receipt = self.send_sync().await?;
         if !receipt.status() {
-            return Err(Error::DeploymentReverted);
+            return Err(Error::ContractNotDeployed);
         }
         receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
