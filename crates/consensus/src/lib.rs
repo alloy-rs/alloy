@@ -32,6 +32,9 @@ pub use receipt::{
     ReceiptWithBloom, Receipts, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
 };
 
+pub mod size;
+pub use size::InMemorySize;
+
 pub mod conditional;
 pub mod proofs;
 
