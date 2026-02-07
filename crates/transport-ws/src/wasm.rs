@@ -20,12 +20,20 @@ pub struct WsConnect {
     /// The interval between retries.
     /// Default is 3 seconds.
     retry_interval: Duration,
+    /// The interval between keepalive pings.
+    /// Default is 10 seconds.
+    keepalive_interval: Duration,
 }
 
 impl WsConnect {
     /// Creates a new websocket connection configuration.
     pub fn new<S: Into<String>>(url: S) -> Self {
-        Self { url: url.into(), max_retries: 10, retry_interval: Duration::from_secs(3) }
+        Self {
+            url: url.into(),
+            max_retries: 10,
+            retry_interval: Duration::from_secs(3),
+            keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
+        }
     }
 
     /// Sets the max number of retries before failing and exiting the connection.
@@ -39,6 +47,18 @@ impl WsConnect {
     /// Default is 3 seconds.
     pub const fn with_retry_interval(mut self, retry_interval: Duration) -> Self {
         self.retry_interval = retry_interval;
+        self
+    }
+
+    /// Sets the keepalive ping interval.
+    ///
+    /// A ping is sent if no other messages have been sent within this interval.
+    /// If the server does not respond with a pong before the next ping is due,
+    /// the connection is considered dead and will be closed.
+    ///
+    /// Default is 10 seconds.
+    pub const fn with_keepalive_interval(mut self, keepalive_interval: Duration) -> Self {
+        self.keepalive_interval = keepalive_interval;
         self
     }
 
@@ -58,11 +78,7 @@ impl PubSubConnect for WsConnect {
             WsMeta::connect(&self.url, None).await.map_err(TransportErrorKind::custom)?.1.fuse();
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-        let backend = WsBackend {
-            socket,
-            interface,
-            keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
-        };
+        let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
 
         backend.spawn();
 
