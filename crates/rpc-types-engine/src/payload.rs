@@ -1157,6 +1157,96 @@ impl ssz::Encode for ExecutionPayloadV4 {
     }
 }
 
+impl ExecutionPayloadV4 {
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`].
+    ///
+    /// Note: The `block_access_list` field is not part of the consensus [`Block`] and must be
+    /// provided separately.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow<T, H>(block: &Block<T, H>, block_access_list: Bytes) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked(block.hash_slow(), block, block_access_list)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV4`] using the given block hash.
+    ///
+    /// Note: The `block_access_list` field is not part of the consensus [`Block`] and must be
+    /// provided separately.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    pub fn from_block_unchecked<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+        block_access_list: Bytes,
+    ) -> Self
+    where
+        T: Encodable2718,
+        H: BlockHeader,
+    {
+        Self {
+            payload_inner: ExecutionPayloadV3::from_block_unchecked(block_hash, block),
+            block_access_list,
+        }
+    }
+
+    /// Returns the withdrawals for the payload.
+    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
+        &self.payload_inner.payload_inner.withdrawals
+    }
+
+    /// Returns the timestamp for the payload.
+    pub const fn timestamp(&self) -> u64 {
+        self.payload_inner.payload_inner.payload_inner.timestamp
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`].
+    ///
+    /// This performs the same conversion as the underlying V3 payload.
+    /// Note: `block_access_list` is not mapped to any block header/body field.
+    ///
+    /// See also [`ExecutionPayloadV3::try_into_block`].
+    pub fn try_into_block<T: Decodable2718>(self) -> Result<Block<T>, PayloadError> {
+        self.try_into_block_with(|tx| {
+            T::decode_2718_exact(tx.as_ref())
+                .map_err(alloy_rlp::Error::from)
+                .map_err(PayloadError::from)
+        })
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with a custom transaction mapper.
+    ///
+    /// See also [`ExecutionPayloadV3::try_into_block_with`].
+    pub fn try_into_block_with<T, F, E>(self, f: F) -> Result<Block<T>, PayloadError>
+    where
+        F: FnMut(Bytes) -> Result<T, E>,
+        E: Into<PayloadError>,
+    {
+        self.into_block_raw()?.try_map_transactions(f).map_err(Into::into)
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions.
+    ///
+    /// This is similar to [`Self::try_into_block_with`] but returns the transactions as raw bytes
+    /// without any conversion.
+    pub fn into_block_raw(self) -> Result<Block<Bytes>, PayloadError> {
+        self.payload_inner.into_block_raw()
+    }
+}
+
+impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
+    type Error = PayloadError;
+
+    fn try_from(value: ExecutionPayloadV4) -> Result<Self, Self::Error> {
+        value.try_into_block()
+    }
+}
+
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1605,8 +1695,8 @@ impl TryFrom<BlobsBundleV2> for BlobsBundleV1 {
     }
 }
 
-/// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2], or
-/// [ExecutionPayloadV3].
+/// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2],
+/// [ExecutionPayloadV3], or [ExecutionPayloadV4].
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
@@ -1618,6 +1708,8 @@ pub enum ExecutionPayload {
     V2(ExecutionPayloadV2),
     /// V3 payload
     V3(ExecutionPayloadV3),
+    /// V4 payload
+    V4(ExecutionPayloadV4),
 }
 
 impl ExecutionPayload {
@@ -1757,6 +1849,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload.into_block_raw(),
             Self::V2(payload) => payload.into_block_raw(),
             Self::V3(payload) => payload.into_block_raw(),
+            Self::V4(payload) => payload.into_block_raw(),
         }
     }
 
@@ -1766,6 +1859,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &payload.payload_inner,
             Self::V3(payload) => &payload.payload_inner.payload_inner,
+            Self::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -1775,6 +1869,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &mut payload.payload_inner,
             Self::V3(payload) => &mut payload.payload_inner.payload_inner,
+            Self::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -1784,6 +1879,7 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => payload.payload_inner,
             Self::V3(payload) => payload.payload_inner.payload_inner,
+            Self::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -1793,6 +1889,7 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&payload.payload_inner),
+            Self::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
@@ -1802,6 +1899,7 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&mut payload.payload_inner),
+            Self::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
@@ -1810,6 +1908,7 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
@@ -1818,6 +1917,23 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&mut payload.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V4 payload, if any.
+    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
+        match self {
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
+        }
+    }
+
+    /// Returns a mutable reference to the V4 payload, if any.
+    pub const fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
+        match self {
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
         }
     }
 
@@ -2045,6 +2161,12 @@ impl From<ExecutionPayloadV3> for ExecutionPayload {
     }
 }
 
+impl From<ExecutionPayloadV4> for ExecutionPayload {
+    fn from(payload: ExecutionPayloadV4) -> Self {
+        Self::V4(payload)
+    }
+}
+
 impl<T: Decodable2718> TryFrom<ExecutionPayload> for Block<T> {
     type Error = PayloadError;
 
@@ -2098,6 +2220,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                     // V3
                     BlobGasUsed,
                     ExcessBlobGas,
+                    // V4
+                    BlockAccessList,
                 }
 
                 let mut parent_hash = None;
@@ -2117,6 +2241,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 let mut withdrawals = None;
                 let mut blob_gas_used = None;
                 let mut excess_blob_gas = None;
+                let mut block_access_list = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -2154,6 +2279,9 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                         Fields::ExcessBlobGas => {
                             let raw = map.next_value::<U64>()?;
                             excess_blob_gas = Some(raw.to());
+                        }
+                        Fields::BlockAccessList => {
+                            block_access_list = Some(map.next_value()?);
                         }
                     }
                 }
@@ -2205,7 +2333,10 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 };
 
                 let Some(withdrawals) = withdrawals else {
-                    return if blob_gas_used.is_none() && excess_blob_gas.is_none() {
+                    return if blob_gas_used.is_none()
+                        && excess_blob_gas.is_none()
+                        && block_access_list.is_none()
+                    {
                         Ok(ExecutionPayload::V1(v1))
                     } else {
                         Err(serde::de::Error::custom("invalid enum variant"))
@@ -2215,15 +2346,27 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
                 if let (Some(blob_gas_used), Some(excess_blob_gas)) =
                     (blob_gas_used, excess_blob_gas)
                 {
-                    return Ok(ExecutionPayload::V3(ExecutionPayloadV3 {
+                    let v3 = ExecutionPayloadV3 {
                         payload_inner: ExecutionPayloadV2 { payload_inner: v1, withdrawals },
                         blob_gas_used,
                         excess_blob_gas,
-                    }));
+                    };
+
+                    if let Some(block_access_list) = block_access_list {
+                        return Ok(ExecutionPayload::V4(ExecutionPayloadV4 {
+                            payload_inner: v3,
+                            block_access_list,
+                        }));
+                    }
+
+                    return Ok(ExecutionPayload::V3(v3));
                 }
 
                 // reject incomplete V3 payloads even if they could construct a valid V2
-                if blob_gas_used.is_some() || excess_blob_gas.is_some() {
+                if blob_gas_used.is_some()
+                    || excess_blob_gas.is_some()
+                    || block_access_list.is_some()
+                {
                     return Err(serde::de::Error::custom("invalid enum variant"));
                 }
 
@@ -2249,6 +2392,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
             "withdrawals",
             "blobGasUsed",
             "excessBlobGas",
+            "blockAccessList",
         ];
         deserializer.deserialize_struct("ExecutionPayload", FIELDS, ExecutionPayloadVisitor)
     }

@@ -504,6 +504,8 @@ enum BeaconExecutionPayload<'a> {
     V2(BeaconExecutionPayloadV2<'a>),
     /// V3 payload
     V3(BeaconExecutionPayloadV3<'a>),
+    /// V4 payload
+    V4(BeaconExecutionPayloadV4<'a>),
 }
 
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
@@ -515,11 +517,13 @@ impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum BeaconExecutionPayloadDesc<'a> {
+            V4(BeaconExecutionPayloadV4<'a>),
             V3(BeaconExecutionPayloadV3<'a>),
             V2(BeaconExecutionPayloadV2<'a>),
             V1(BeaconExecutionPayloadV1<'a>),
         }
         match BeaconExecutionPayloadDesc::deserialize(deserializer)? {
+            BeaconExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             BeaconExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             BeaconExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             BeaconExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
@@ -533,6 +537,7 @@ impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
             BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
             BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
             BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
+            BeaconExecutionPayload::V4(payload) => Self::V4(ExecutionPayloadV4::from(payload)),
         }
     }
 }
@@ -548,6 +553,9 @@ impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
             }
             ExecutionPayload::V3(payload) => {
                 BeaconExecutionPayload::V3(BeaconExecutionPayloadV3::from(payload))
+            }
+            ExecutionPayload::V4(payload) => {
+                BeaconExecutionPayload::V4(BeaconExecutionPayloadV4::from(payload))
             }
         }
     }
@@ -820,6 +828,7 @@ mod tests {
             }
             ExecutionPayload::V2(_) => panic!("Expected V1 payload, got V2"),
             ExecutionPayload::V3(_) => panic!("Expected V1 payload, got V3"),
+            ExecutionPayload::V4(_) => panic!("Expected V1 payload, got V4"),
         }
     }
 }
