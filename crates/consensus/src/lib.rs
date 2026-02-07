@@ -85,6 +85,14 @@ pub mod serde_bincode_compat {
     };
 }
 
+/// Bincode compatibility traits and Block/BlockBody wrappers.
+///
+/// Contains the [`SerdeBincodeCompat`] trait and its implementations for consensus types.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat_traits;
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub use serde_bincode_compat_traits::{BincodeReprFor, RlpBincode, SerdeBincodeCompat};
+
 #[doc(hidden)]
 pub mod private {
     pub use alloy_eips;
