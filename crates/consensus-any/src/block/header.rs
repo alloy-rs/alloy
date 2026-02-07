@@ -11,10 +11,10 @@ pub struct AnyHeader {
     /// Hash of the parent
     pub parent_hash: B256,
     /// Hash of the uncles
-    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
+    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles", alias = "ommersHash"))]
     pub ommers_hash: B256,
     /// Alias of `author`
-    #[cfg_attr(feature = "serde", serde(rename = "miner"))]
+    #[cfg_attr(feature = "serde", serde(rename = "miner", alias = "beneficiary", alias = "author"))]
     pub beneficiary: Address,
     /// State root hash
     #[cfg_attr(feature = "serde", serde(deserialize_with = "lenient_state_root"))]
@@ -427,5 +427,38 @@ mod tests {
 
         let header: AnyHeader = serde_json::from_str(s).unwrap();
         assert_eq!(header.state_root, B256::ZERO);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserializes_alias_fields_for_beneficiary_and_ommers_hash() {
+        use super::*;
+        use alloy_primitives::{Address, B256};
+
+        let s = r#"{
+  "baseFeePerGas": "0x0",
+  "difficulty": "0x0",
+  "extraData": "0x",
+  "gasLimit": "0x160227b88",
+  "gasUsed": "0x360d92",
+  "hash": "0x00000000040a0687e0fc7194aabd024a4786ce94ad63855774f8d48896d8750b",
+  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "author": "0x9a96c8003a1e3a6866c08acff9f629e2a6ef062b",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "nonce": "0x0000000000000000",
+  "number": "0x40a0687",
+  "parentHash": "0x00000000040a068652c581a982a0d17976201ad44aa28eb4e24881e82f99ee04",
+  "receiptsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "ommersHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "transactionsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "size": "0xba05",
+  "stateRoot": "0x",
+  "timestamp": "0x6759f2f1",
+  "totalDifficulty": "0x0"
+}"#;
+
+        let header: AnyHeader = serde_json::from_str(s).unwrap();
+        assert_eq!(header.beneficiary, Address::from([0x9a, 0x96, 0xc8, 0x00, 0x3a, 0x1e, 0x3a, 0x68, 0x66, 0xc0, 0x8a, 0xcf, 0xf9, 0xf6, 0x29, 0xe2, 0xa6, 0xef, 0x06, 0x2b]));
+        assert_eq!(header.ommers_hash, B256::ZERO);
     }
 }
