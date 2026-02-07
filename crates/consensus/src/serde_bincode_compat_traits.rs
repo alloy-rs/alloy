@@ -107,7 +107,7 @@ mod block_bincode {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
-    /// Bincode-compatible [`alloy_consensus::Block`] serde implementation.
+    /// Bincode-compatible [`crate::Block`] serde implementation.
     #[derive(Serialize, Deserialize)]
     pub struct Block<'a, T: SerdeBincodeCompat, H: SerdeBincodeCompat> {
         header: H::BincodeRepr<'a>,
@@ -171,7 +171,7 @@ mod block_bincode {
         }
     }
 
-    /// Bincode-compatible [`alloy_consensus::BlockBody`] serde implementation.
+    /// Bincode-compatible [`crate::BlockBody`] serde implementation.
     #[derive(Serialize, Deserialize)]
     pub struct BlockBody<'a, T: SerdeBincodeCompat, H: SerdeBincodeCompat> {
         transactions: Vec<T::BincodeRepr<'a>>,
