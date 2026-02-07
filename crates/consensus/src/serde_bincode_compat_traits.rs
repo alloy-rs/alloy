@@ -87,8 +87,7 @@ impl SerdeBincodeCompat for crate::Header {
 }
 
 impl SerdeBincodeCompat for crate::EthereumTxEnvelope<crate::TxEip4844> {
-    type BincodeRepr<'a> =
-        crate::serde_bincode_compat::transaction::EthereumTxEnvelope<'a>;
+    type BincodeRepr<'a> = crate::serde_bincode_compat::transaction::EthereumTxEnvelope<'a>;
 
     fn as_repr(&self) -> Self::BincodeRepr<'_> {
         self.into()
@@ -118,15 +117,12 @@ mod block_bincode {
 
     impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> core::fmt::Debug for Block<'_, T, H> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.debug_struct("Block")
-                .field("header", &self.header)
-                .field("body", &self.body)
-                .finish()
+            f.debug_struct("Block").field("header", &self.header).field("body", &self.body).finish()
         }
     }
 
-    impl<'a, T: SerdeBincodeCompat, H: SerdeBincodeCompat>
-        From<&'a crate::Block<T, H>> for Block<'a, T, H>
+    impl<'a, T: SerdeBincodeCompat, H: SerdeBincodeCompat> From<&'a crate::Block<T, H>>
+        for Block<'a, T, H>
     {
         fn from(value: &'a crate::Block<T, H>) -> Self {
             Self { header: value.header.as_repr(), body: (&value.body).into() }
@@ -137,20 +133,14 @@ mod block_bincode {
         for crate::Block<T, H>
     {
         fn from(value: Block<'a, T, H>) -> Self {
-            Self {
-                header: SerdeBincodeCompat::from_repr(value.header),
-                body: value.body.into(),
-            }
+            Self { header: SerdeBincodeCompat::from_repr(value.header), body: value.body.into() }
         }
     }
 
-    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat>
-        SerializeAs<crate::Block<T, H>> for Block<'_, T, H>
+    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> SerializeAs<crate::Block<T, H>>
+        for Block<'_, T, H>
     {
-        fn serialize_as<S>(
-            source: &crate::Block<T, H>,
-            serializer: S,
-        ) -> Result<S::Ok, S::Error>
+        fn serialize_as<S>(source: &crate::Block<T, H>, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
@@ -158,8 +148,8 @@ mod block_bincode {
         }
     }
 
-    impl<'de, T: SerdeBincodeCompat, H: SerdeBincodeCompat>
-        DeserializeAs<'de, crate::Block<T, H>> for Block<'de, T, H>
+    impl<'de, T: SerdeBincodeCompat, H: SerdeBincodeCompat> DeserializeAs<'de, crate::Block<T, H>>
+        for Block<'de, T, H>
     {
         fn deserialize_as<D>(deserializer: D) -> Result<crate::Block<T, H>, D::Error>
         where
@@ -169,9 +159,7 @@ mod block_bincode {
         }
     }
 
-    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> SerdeBincodeCompat
-        for crate::Block<T, H>
-    {
+    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> SerdeBincodeCompat for crate::Block<T, H> {
         type BincodeRepr<'a> = Block<'a, T, H>;
 
         fn as_repr(&self) -> Self::BincodeRepr<'_> {
@@ -191,9 +179,7 @@ mod block_bincode {
         withdrawals: Cow<'a, Option<Withdrawals>>,
     }
 
-    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> core::fmt::Debug
-        for BlockBody<'_, T, H>
-    {
+    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> core::fmt::Debug for BlockBody<'_, T, H> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("BlockBody")
                 .field("transactions", &self.transactions)
@@ -203,8 +189,8 @@ mod block_bincode {
         }
     }
 
-    impl<'a, T: SerdeBincodeCompat, H: SerdeBincodeCompat>
-        From<&'a crate::BlockBody<T, H>> for BlockBody<'a, T, H>
+    impl<'a, T: SerdeBincodeCompat, H: SerdeBincodeCompat> From<&'a crate::BlockBody<T, H>>
+        for BlockBody<'a, T, H>
     {
         fn from(value: &'a crate::BlockBody<T, H>) -> Self {
             Self {
@@ -231,8 +217,8 @@ mod block_bincode {
         }
     }
 
-    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat>
-        SerializeAs<crate::BlockBody<T, H>> for BlockBody<'_, T, H>
+    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> SerializeAs<crate::BlockBody<T, H>>
+        for BlockBody<'_, T, H>
     {
         fn serialize_as<S>(
             source: &crate::BlockBody<T, H>,
@@ -248,9 +234,7 @@ mod block_bincode {
     impl<'de, T: SerdeBincodeCompat, H: SerdeBincodeCompat>
         DeserializeAs<'de, crate::BlockBody<T, H>> for BlockBody<'de, T, H>
     {
-        fn deserialize_as<D>(
-            deserializer: D,
-        ) -> Result<crate::BlockBody<T, H>, D::Error>
+        fn deserialize_as<D>(deserializer: D) -> Result<crate::BlockBody<T, H>, D::Error>
         where
             D: Deserializer<'de>,
         {
@@ -258,9 +242,7 @@ mod block_bincode {
         }
     }
 
-    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> SerdeBincodeCompat
-        for crate::BlockBody<T, H>
-    {
+    impl<T: SerdeBincodeCompat, H: SerdeBincodeCompat> SerdeBincodeCompat for crate::BlockBody<T, H> {
         type BincodeRepr<'a> = BlockBody<'a, T, H>;
 
         fn as_repr(&self) -> Self::BincodeRepr<'_> {
