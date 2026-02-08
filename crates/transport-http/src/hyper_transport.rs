@@ -10,9 +10,10 @@ use hyper::{
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
+use itertools::Itertools;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::{Layer, Service};
-use tracing::{debug, debug_span, trace, Instrument};
+use tracing::{debug, debug_span, instrument, trace, Instrument};
 
 #[cfg(feature = "hyper-tls")]
 type Hyper = hyper_util::client::legacy::Client<
@@ -112,6 +113,7 @@ where
     ResBody::Error: std::error::Error + Send + Sync + 'static,
     ResBody::Data: Send,
 {
+    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ")))]
     async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         debug!(count = req.len(), "sending request packet to server");
 
@@ -146,7 +148,7 @@ where
         if tracing::enabled!(tracing::Level::TRACE) {
             trace!(body = %String::from_utf8_lossy(&body), "response body");
         } else {
-            debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+            debug!(bytes = body.len(), "retrieved response body");
         }
 
         if !status.is_success() {
