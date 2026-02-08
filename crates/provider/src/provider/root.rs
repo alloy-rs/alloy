@@ -108,12 +108,6 @@ pub(crate) struct RootProviderInner<N: Network = Ethereum> {
     _network: PhantomData<N>,
 }
 
-impl<N: Network> Clone for RootProviderInner<N> {
-    fn clone(&self) -> Self {
-        Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
-    }
-}
-
 impl<N: Network> RootProviderInner<N> {
     pub(crate) fn new(client: RpcClient) -> Self {
         Self { client, heart: Default::default(), _network: PhantomData }
