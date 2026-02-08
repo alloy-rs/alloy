@@ -92,6 +92,13 @@ impl<'de> Deserialize<'de> for Id {
                 Ok(v.to_owned().into())
             }
 
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Id::String(v))
+            }
+
             fn visit_none<E>(self) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
