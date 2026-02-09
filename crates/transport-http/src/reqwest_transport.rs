@@ -35,7 +35,7 @@ impl Http<Client> {
         Self { client: Default::default(), url }
     }
 
-    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ")))]
+    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_reqwest(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         let resp = self
             .client

@@ -113,7 +113,7 @@ where
     ResBody::Error: std::error::Error + Send + Sync + 'static,
     ResBody::Data: Send,
 {
-    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ")))]
+    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_hyper(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         debug!(count = req.len(), "sending request packet to server");
 
