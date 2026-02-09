@@ -531,10 +531,8 @@ impl Geth {
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.keep();
-
-            // create a temp dir to store the genesis file
-            let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
+            let temp_genesis_dir = tempdir().map_err(NodeError::CreateDirError)?;
+            let temp_genesis_path = temp_genesis_dir.path().join("genesis.json");
 
             // create the genesis file
             let mut file = File::create(&temp_genesis_path).map_err(|_| {
@@ -565,10 +563,7 @@ impl Geth {
                 return Err(NodeError::InitError);
             }
 
-            // clean up the temp dir which is now persisted
-            std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
-                NodeError::GenesisError("could not remove genesis temp dir".to_string())
-            })?;
+            // temp_genesis_dir is dropped here, automatically cleaning up
         }
 
         if let Some(data_dir) = &self.data_dir {
