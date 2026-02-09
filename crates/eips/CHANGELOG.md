@@ -5,12 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
 
 ### Documentation
 
 - [eips] Clarify blob_base_cost default values for different hardforks ([#3664](https://github.com/alloy-rs/alloy/issues/3664))
 - [eips] Fix incorrect default precompute value in KZG settings doc ([#3657](https://github.com/alloy-rs/alloy/issues/3657))
+
+### Miscellaneous Tasks
+
+- Release 1.6.2
 
 ### Performance
 
