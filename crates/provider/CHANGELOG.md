@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Features
+
+- [provider] Add `with_default_block` to ProviderBuilder ([#3055](https://github.com/alloy-rs/alloy/issues/3055))
+- [provider] Add engine_getPayloadBodiesByHashV2 and engine_getPay… ([#3647](https://github.com/alloy-rs/alloy/issues/3647))
+
+### Performance
+
+- [provider] Use get_header instead of get_block in get_block_number_by_id ([#3640](https://github.com/alloy-rs/alloy/issues/3640))
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
 ## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
 
 ### Bug Fixes

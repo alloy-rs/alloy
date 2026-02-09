@@ -5,7 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Bug Fixes
+
+- [node-bindings] Fix temp dir leak in Geth genesis init ([#3662](https://github.com/alloy-rs/alloy/issues/3662))
+- [contract] Check receipt status before contract address in deploy ([#3654](https://github.com/alloy-rs/alloy/issues/3654))
+- [rpc-types] Don't return EIP-4844 type for max_fee_per_blob_gas alone ([#3651](https://github.com/alloy-rs/alloy/issues/3651))
+- [rpc-types-eth] Use hex serialization for SyncStatusMetadata block fields ([#3631](https://github.com/alloy-rs/alloy/issues/3631))
+
+### Documentation
+
+- [eips] Clarify blob_base_cost default values for different hardforks ([#3664](https://github.com/alloy-rs/alloy/issues/3664))
+- [eips] Fix incorrect default precompute value in KZG settings doc ([#3657](https://github.com/alloy-rs/alloy/issues/3657))
+
+### Features
+
+- [transport-ws] Make keepalive interval configurable ([#3660](https://github.com/alloy-rs/alloy/issues/3660))
+- [rpc-types-engine] Add `into_block_raw_with_transactions_root` to execution payloads ([#3452](https://github.com/alloy-rs/alloy/issues/3452))
+- [consensus] Add `InMemorySize` trait ([#3656](https://github.com/alloy-rs/alloy/issues/3656))
+- [provider] Add `with_default_block` to ProviderBuilder ([#3055](https://github.com/alloy-rs/alloy/issues/3055))
+- [provider] Add engine_getPayloadBodiesByHashV2 and engine_getPay… ([#3647](https://github.com/alloy-rs/alloy/issues/3647))
+
+### Miscellaneous Tasks
+
+- Improve rpc debug logs ([#3661](https://github.com/alloy-rs/alloy/issues/3661))
+
+### Performance
+
+- [rpc-types-eth] Use `Vec::with_capacity` in Filter serialization ([#3653](https://github.com/alloy-rs/alloy/issues/3653))
+- [serde] Remove unnecessary clone in OtherFields::deserialize_as ([#3652](https://github.com/alloy-rs/alloy/issues/3652))
+- [provider] Use get_header instead of get_block in get_block_number_by_id ([#3640](https://github.com/alloy-rs/alloy/issues/3640))
+- Optimize hex serialization for Index and BlockNumberOrTag ([#3626](https://github.com/alloy-rs/alloy/issues/3626))
+
 ## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
 
 ### Other
 
