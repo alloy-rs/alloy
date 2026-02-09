@@ -37,7 +37,8 @@ pub struct BlobParams {
     pub max_blobs_per_tx: u64,
     /// Minimum execution gas required to include a blob in a block.
     ///
-    /// Defaults to `0` unless set otherwise.
+    /// Defaults to `0` for Cancun and Prague hardforks, and [`BLOB_BASE_COST`] for Osaka and
+    /// later.
     pub blob_base_cost: u64,
 }
 
