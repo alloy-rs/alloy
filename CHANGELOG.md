@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.6.2
 - Improve rpc debug logs ([#3661](https://github.com/alloy-rs/alloy/issues/3661))
 
 ### Performance
