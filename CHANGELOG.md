@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [transport] Eagerly format itertools to prevent double-format panic ([#3668](https://github.com/alloy-rs/alloy/issues/3668))
 
+### Miscellaneous Tasks
+
+- Release 1.6.3
+
 ## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
 
 ### Bug Fixes
