@@ -820,7 +820,8 @@ impl Expander {
             quote! { #alloy_consensus::private::alloy_serde::reject_if_some }.to_string();
 
         let typed_names = self.variants.typed.iter().map(|v| &v.name).collect::<Vec<_>>();
-
+        let variant_types: Vec<_> = self.variants.typed.iter().map(|v| v.inner_type()).collect();
+        
         // Serde attributes and inner types for typed variants
         let typed_variants: Vec<_> = self
             .variants
@@ -919,13 +920,26 @@ impl Expander {
                     }
                 }
 
+                impl #impl_generics From<&#typed_name #ty_generics> for #tagged_enum_name #ty_generics
+                where
+                    #(#variant_types: Clone,)*
+                {
+                    fn from(value: &#typed_name #ty_generics) -> Self {
+                        match value {
+                            #(
+                                #typed_name::#typed_names(tx) => Self::#typed_names(tx.clone()),
+                            )*
+                        }
+                    }
+                }
+                
                 impl #impl_generics #serde::Serialize for #typed_name #ty_generics
                 where
                     #tagged_enum_name #ty_generics: #serde::Serialize,
-                    Self: Clone,
+                    #(#variant_types: Clone,)*
                 {
                     fn serialize<S: #serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                        #tagged_enum_name::from(self.clone()).serialize(serializer)
+                        #tagged_enum_name::from(self).serialize(serializer)
                     }
                 }
 
