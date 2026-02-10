@@ -41,9 +41,6 @@ pub use traits::{
     ExecutionPayload as ExecutionPayloadTrait, PayloadAttributes as PayloadAttributesTrait,
 };
 
-// Re-export trait names without the `Trait` suffix inside the traits module for direct use.
-// Users can also import from `alloy_rpc_types_engine::traits::{PayloadAttributes, ExecutionPayload}`.
-
 mod error;
 pub use error::*;
 

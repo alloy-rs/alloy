@@ -42,50 +42,23 @@ pub use alloy_network_primitives::{
     self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
 };
 
-/// RPC types used by the `eth_` RPC API.
-///
-/// This is a subset of [`Network`] trait with only RPC response types kept.
-pub trait RpcTypes: Send + Sync + Clone + Unpin + Debug + 'static {
-    /// Header response type.
-    type Header: RpcObject + HeaderResponse;
-    /// Receipt response type.
-    type Receipt: RpcObject + ReceiptResponse;
-    /// Transaction response type.
-    type TransactionResponse: RpcObject + TransactionResponse;
-    /// Transaction request type.
-    type TransactionRequest: RpcObject
-        + AsRef<alloy_rpc_types_eth::TransactionRequest>
-        + AsMut<alloy_rpc_types_eth::TransactionRequest>;
-}
-
-impl<T> RpcTypes for T
-where
-    T: Network<
-            TransactionRequest: AsRef<alloy_rpc_types_eth::TransactionRequest>
-                                    + AsMut<alloy_rpc_types_eth::TransactionRequest>,
-        > + Unpin,
-{
-    type Header = T::HeaderResponse;
-    type Receipt = T::ReceiptResponse;
-    type TransactionResponse = T::TransactionResponse;
-    type TransactionRequest = T::TransactionRequest;
-}
-
 /// Adapter for network specific transaction response.
-pub type RpcTransaction<T> = <T as RpcTypes>::TransactionResponse;
+pub type RpcTransaction<T> = <T as Network>::TransactionResponse;
 
 /// Adapter for network specific receipt response.
-pub type RpcReceipt<T> = <T as RpcTypes>::Receipt;
+pub type RpcReceiptEnvelope<T> = <T as Network>::ReceiptEnvelope;
+
+/// Adapter for network specific receipt response.
+pub type RpcReceiptResponse<T> = <T as Network>::ReceiptResponse;
 
 /// Adapter for network specific header response.
-pub type RpcHeader<T> = <T as RpcTypes>::Header;
+pub type RpcHeader<T> = <T as Network>::Header;
 
 /// Adapter for network specific block type.
-pub type RpcBlock<T> =
-    alloy_rpc_types_eth::Block<RpcTransaction<T>, RpcHeader<T>>;
+pub type RpcBlock<T> = alloy_rpc_types_eth::Block<RpcTransaction<T>, RpcHeader<T>>;
 
 /// Adapter for network specific transaction request.
-pub type RpcTxReq<T> = <T as RpcTypes>::TransactionRequest;
+pub type RpcTxReq<T> = <T as Network>::TransactionRequest;
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
