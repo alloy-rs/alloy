@@ -275,9 +275,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
+        with:
+          tool: zepter
       - name: run zepter
         run: |
-          cargo install zepter -f --locked
           zepter --version
           time zepter run check
 
