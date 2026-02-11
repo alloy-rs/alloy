@@ -63,18 +63,18 @@ jobs:
         uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
         with:
           tool: nextest
-      - name: pin deps for MSRV
+      - name: pin deps for MSRV # aws-smithy-* 2026-02-10 releases require rustc 1.91
         if: ${{ matrix.rust == '1.88' }} # MSRV
         run: |
-          cargo update aws-smithy-async --precise 1.2.5
-          cargo update aws-smithy-http --precise 0.62.3
-          cargo update aws-smithy-json --precise 0.61.5
-          cargo update aws-smithy-observability --precise 0.1.3
-          cargo update aws-smithy-query --precise 0.60.7
-          cargo update aws-smithy-runtime --precise 1.9.1
-          cargo update aws-smithy-runtime-api --precise 1.9.0
-          cargo update aws-smithy-types --precise 1.3.2
-          cargo update aws-smithy-xml --precise 0.60.10
+          cargo update aws-smithy-runtime --precise 1.10.0
+          cargo update aws-smithy-observability --precise 0.2.4
+          cargo update aws-smithy-http --precise 0.63.3
+          cargo update aws-smithy-runtime-api --precise 1.11.3
+          cargo update aws-smithy-async --precise 1.2.11
+          cargo update aws-smithy-json --precise 0.62.3
+          cargo update aws-smithy-query --precise 0.60.13
+          cargo update aws-smithy-xml --precise 0.60.13
+          cargo update aws-smithy-types --precise 1.4.3
       - name: build
         if: ${{ matrix.rust == '1.88' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
