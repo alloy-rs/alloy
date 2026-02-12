@@ -64,7 +64,7 @@ impl<T> Recovered<T> {
 
     /// Converts from `&Recovered<T>` to `Recovered<&T>`.
     pub const fn as_recovered_ref(&self) -> Recovered<&T> {
-        Recovered { inner: &self.inner, signer: self.signer() }
+        Recovered { inner: &self.inner, signer: self.signer }
     }
 
     /// Create [`Recovered`] from the given transaction and [`Address`] of the signer.
