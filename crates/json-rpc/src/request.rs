@@ -386,6 +386,14 @@ impl SerializedRequest {
         &self.meta.method
     }
 
+    /// Returns the request method.
+    pub fn method_clone(&self) -> Cow<'static, str> {
+        match &self.meta.method {
+            Cow::Borrowed(b) => Cow::Borrowed(b),
+            Cow::Owned(o) => Cow::Owned(o.clone()),
+        }
+    }
+
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
     pub const fn set_is_subscription(&mut self) {

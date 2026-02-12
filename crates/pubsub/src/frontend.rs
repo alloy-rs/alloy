@@ -12,6 +12,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
+use tracing::{debug, debug_span, Instrument};
 
 /// A `PubSubFrontend` is [`Transport`] composed of a channel to a running
 /// PubSub service.
@@ -62,13 +63,22 @@ impl PubSubFrontend {
     ) -> impl Future<Output = TransportResult<Response>> + Send + 'static {
         let tx = self.tx.clone();
         let channel_size = self.channel_size.load(Ordering::Relaxed);
+        let method_name = req.method_clone();
 
         async move {
+            debug!("sending request to backend");
             let (in_flight, rx) = InFlight::new(req, channel_size);
             tx.send(PubSubInstruction::Request(in_flight))
                 .map_err(|_| TransportErrorKind::backend_gone())?;
-            rx.await.map_err(|_| TransportErrorKind::backend_gone())?
+            let resp = rx.await.map_err(|_| TransportErrorKind::backend_gone())?;
+            if tracing::enabled!(tracing::Level::TRACE) {
+                trace!(?resp, "retrieved response");
+            } else {
+                debug!(resp=?resp.as_ref().map(|_| ()), "retrieved response");
+            };
+            resp
         }
+        .instrument(debug_span!("request", %method_name))
     }
 
     /// Send a packet of requests, by breaking it up into individual requests.
