@@ -75,3 +75,7 @@ jsonrpsee-types = [
 ssz = ["alloy-rpc-types-beacon?/ssz", "alloy-rpc-types-engine?/ssz"]
 k256 = ["alloy-rpc-types-eth?/k256"]
 kzg = ["alloy-rpc-types-engine?/kzg"]
+serde-bincode-compat = [
+    "alloy-rpc-types-eth?/serde-bincode-compat",
+    "alloy-rpc-types-mev?/serde-bincode-compat",
+]
