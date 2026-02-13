@@ -150,7 +150,7 @@ impl AwsSigner {
         key_id: String,
         chain_id: Option<ChainId>,
     ) -> Result<Self, AwsSignerError> {
-        let resp = request_get_pubkey(&kms, key_id.clone()).await?;
+        let resp = request_get_pubkey(&kms, &key_id).await?;
         let pubkey = decode_pubkey(resp)?;
         let address = alloy_signer::utils::public_key_to_address(&pubkey);
         debug!(?pubkey, %address, "instantiated AWS signer");
@@ -159,12 +159,12 @@ impl AwsSigner {
 
     /// Fetch the pubkey associated with a key ID.
     pub async fn get_pubkey_for_key(&self, key_id: String) -> Result<VerifyingKey, AwsSignerError> {
-        request_get_pubkey(&self.kms, key_id).await.and_then(decode_pubkey)
+        request_get_pubkey(&self.kms, &key_id).await.and_then(decode_pubkey)
     }
 
     /// Fetch the pubkey associated with this signer's key ID.
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, AwsSignerError> {
-        self.get_pubkey_for_key(self.key_id.clone()).await
+        request_get_pubkey(&self.kms, &self.key_id).await.and_then(decode_pubkey)
     }
 
     /// Sign a digest with the key associated with a key ID.
@@ -173,12 +173,12 @@ impl AwsSigner {
         key_id: String,
         digest: &B256,
     ) -> Result<ecdsa::Signature, AwsSignerError> {
-        request_sign_digest(&self.kms, key_id, digest).await.and_then(decode_signature)
+        request_sign_digest(&self.kms, &key_id, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key
     pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsSignerError> {
-        self.sign_digest_with_key(self.key_id.clone(), digest).await
+        request_sign_digest(&self.kms, &self.key_id, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key and applies EIP-155.
@@ -192,7 +192,7 @@ impl AwsSigner {
 #[instrument(skip(kms), err)]
 async fn request_get_pubkey(
     kms: &Client,
-    key_id: String,
+    key_id: &str,
 ) -> Result<GetPublicKeyOutput, AwsSignerError> {
     kms.get_public_key().key_id(key_id).send().await.map_err(Into::into)
 }
@@ -200,7 +200,7 @@ async fn request_get_pubkey(
 #[instrument(skip(kms, digest), fields(digest = %hex::encode(digest)), err)]
 async fn request_sign_digest(
     kms: &Client,
-    key_id: String,
+    key_id: &str,
     digest: &B256,
 ) -> Result<SignOutput, AwsSignerError> {
     kms.sign()
