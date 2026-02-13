@@ -83,6 +83,9 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
         ReceiptWithBloom { logs_bloom, receipt: self }
     }
 
+    /// Returns the EIP-2718 transaction type.
+    fn tx_type(&self) -> u8;
+
     /// Returns the cumulative gas used in the block after this transaction was executed.
     fn cumulative_gas_used(&self) -> u64;
 

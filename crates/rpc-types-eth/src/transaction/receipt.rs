@@ -217,6 +217,11 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
 }
 
 impl<T: TxReceipt> TransactionReceipt<T> {
+    /// Returns the EIP-2718 transaction type.
+    pub fn tx_type(&self) -> u8 {
+        self.inner.tx_type()
+    }
+
     /// Get the receipt logs.
     pub fn logs(&self) -> &[T::Log] {
         self.inner.logs()

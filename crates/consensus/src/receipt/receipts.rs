@@ -78,6 +78,10 @@ where
 {
     type Log = T;
 
+    fn tx_type(&self) -> u8 {
+        0
+    }
+
     fn status_or_post_state(&self) -> Eip658Value {
         self.status
     }
@@ -274,6 +278,10 @@ where
     R: TxReceipt,
 {
     type Log = R::Log;
+
+    fn tx_type(&self) -> u8 {
+        self.receipt.tx_type()
+    }
 
     fn status_or_post_state(&self) -> Eip658Value {
         self.receipt.status_or_post_state()

@@ -188,6 +188,16 @@ where
 {
     type Log = T;
 
+    fn tx_type(&self) -> u8 {
+        match self {
+            Self::Legacy(_) => LEGACY_TX_TYPE_ID,
+            Self::Eip2930(_) => EIP2930_TX_TYPE_ID,
+            Self::Eip1559(_) => EIP1559_TX_TYPE_ID,
+            Self::Eip4844(_) => EIP4844_TX_TYPE_ID,
+            Self::Eip7702(_) => EIP7702_TX_TYPE_ID,
+        }
+    }
+
     fn status_or_post_state(&self) -> Eip658Value {
         self.as_receipt().unwrap().status
     }
