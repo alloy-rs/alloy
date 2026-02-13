@@ -28,9 +28,7 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     type Log;
 
     /// Returns the EIP-2718 transaction type.
-    fn tx_type(&self) -> u8 {
-        0
-    }
+    fn tx_type(&self) -> u8;
 
     /// Returns the status or post state of the transaction.
     ///
