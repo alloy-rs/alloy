@@ -78,10 +78,6 @@ where
 {
     type Log = T;
 
-    fn tx_type(&self) -> u8 {
-        0
-    }
-
     fn status_or_post_state(&self) -> Eip658Value {
         self.status
     }
