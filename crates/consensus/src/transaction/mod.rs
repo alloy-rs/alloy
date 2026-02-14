@@ -63,6 +63,9 @@ pub use recovered::{Recovered, SignerRecoverable};
 mod hashable;
 pub use hashable::TxHashable;
 
+mod signed_tx;
+pub use signed_tx::SignedTransaction;
+
 #[cfg(feature = "serde")]
 pub use legacy::{signed_legacy_serde, untagged_legacy_serde};
 
