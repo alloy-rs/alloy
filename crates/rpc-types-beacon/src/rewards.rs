@@ -219,8 +219,7 @@ mod tests {
         assert_eq!(response.data[1].reward, -500);
 
         let roundtrip = serde_json::to_string(&response).unwrap();
-        let deserialized: SyncCommitteeRewardsResponse =
-            serde_json::from_str(&roundtrip).unwrap();
+        let deserialized: SyncCommitteeRewardsResponse = serde_json::from_str(&roundtrip).unwrap();
         assert_eq!(response, deserialized);
     }
 
@@ -275,8 +274,7 @@ mod tests {
         assert_eq!(total.inactivity, 0);
 
         let roundtrip = serde_json::to_string(&response).unwrap();
-        let deserialized: AttestationRewardsResponse =
-            serde_json::from_str(&roundtrip).unwrap();
+        let deserialized: AttestationRewardsResponse = serde_json::from_str(&roundtrip).unwrap();
         assert_eq!(response, deserialized);
     }
 
@@ -313,8 +311,7 @@ mod tests {
         assert_eq!(response.data.total_rewards[0].inclusion_delay, None);
 
         let roundtrip = serde_json::to_string(&response).unwrap();
-        let deserialized: AttestationRewardsResponse =
-            serde_json::from_str(&roundtrip).unwrap();
+        let deserialized: AttestationRewardsResponse = serde_json::from_str(&roundtrip).unwrap();
         assert_eq!(response, deserialized);
     }
 }
