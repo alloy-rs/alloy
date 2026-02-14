@@ -2,10 +2,10 @@
 //!
 //! See <https://ethereum.github.io/beacon-APIs/#/Config>
 
-use std::collections::BTreeMap;
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use std::collections::BTreeMap;
 
 /// Response from the [`/eth/v1/config/deposit_contract`](https://ethereum.github.io/beacon-APIs/#/Config/getDepositContract) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
