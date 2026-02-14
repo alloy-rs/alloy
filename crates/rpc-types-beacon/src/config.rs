@@ -2,7 +2,7 @@
 //!
 //! See <https://ethereum.github.io/beacon-APIs/#/Config>
 
-use alloc::collections::BTreeMap;
+use std::collections::BTreeMap;
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
