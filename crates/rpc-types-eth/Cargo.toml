@@ -42,8 +42,6 @@ serde_json = { workspace = true, optional = true }
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
 
-# jsonrpsee
-jsonrpsee-types = { workspace = true, optional = true }
 alloy-sol-types.workspace = true
 
 [dev-dependencies]
@@ -99,6 +97,5 @@ arbitrary = [
 	"alloy-consensus-any/arbitrary",
 	"alloy-sol-types/arbitrary"
 ]
-jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
 serde-bincode-compat = ["serde", "dep:serde_with", "alloy-eips/serde-bincode-compat"]
