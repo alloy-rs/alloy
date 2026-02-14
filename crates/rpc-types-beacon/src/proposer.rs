@@ -6,7 +6,7 @@ use crate::BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// Response from the `eth/v1/validator/duties/proposer/{epoch}` endpoint.
+/// Response from the [`/eth/v1/validator/duties/proposer/{epoch}`](https://ethereum.github.io/beacon-APIs/#/Validator/getProposerDuties) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposerDutiesResponse {
     /// Whether the response references an unverified execution payload.

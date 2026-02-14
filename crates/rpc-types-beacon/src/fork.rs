@@ -6,7 +6,7 @@ use alloy_primitives::FixedBytes;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// Response from the `eth/v1/beacon/states/{state_id}/fork` endpoint.
+/// Response from the [`/eth/v1/beacon/states/{state_id}/fork`](https://ethereum.github.io/beacon-APIs/#/Beacon/getStateFork) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ForkResponse {
     /// Whether the response references an unverified execution payload.
@@ -20,6 +20,8 @@ pub struct ForkResponse {
 }
 
 /// The [`Fork`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#fork) object from the CL spec.
+///
+/// See [`/eth/v1/beacon/states/{state_id}/fork`](https://ethereum.github.io/beacon-APIs/#/Beacon/getStateFork).
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fork {

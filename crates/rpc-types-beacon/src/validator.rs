@@ -7,7 +7,7 @@ use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// Response from the `eth/v1/beacon/states/{state_id}/validators` endpoint.
+/// Response from the [`/eth/v1/beacon/states/{state_id}/validators`](https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidators) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidatorsResponse {
     /// Whether the response references an unverified execution payload.
@@ -20,7 +20,7 @@ pub struct ValidatorsResponse {
     pub data: Vec<ValidatorData>,
 }
 
-/// Response from the `eth/v1/beacon/states/{state_id}/validators/{validator_id}` endpoint.
+/// Response from the [`/eth/v1/beacon/states/{state_id}/validators/{validator_id}`](https://ethereum.github.io/beacon-APIs/#/Beacon/getStateValidator) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidatorResponse {
     /// Whether the response references an unverified execution payload.
