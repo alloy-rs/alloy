@@ -834,10 +834,12 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serde_json_header() {
         #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
         struct SubParams<T> {
             result: T,
         }
         #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
         struct SubNotification<T> {
             params: SubParams<T>,
         }
