@@ -292,7 +292,7 @@ secp256k1 = [
 transports = ["dep:alloy-transport"]
 transport-http = ["transports", "dep:alloy-transport-http"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
-transport-ipc-mock = ["alloy-transport-ipc?/mock"]
+transport-ipc-mock = ["dep:alloy-transport-ipc", "alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
 transport-throttle = ["transports", "alloy-transport?/throttle"]
 
