@@ -2223,6 +2223,7 @@ mod tests {
 
         // Create test receipts with logs
         let receipt1 = Receipt {
+            tx_type: 0,
             status: alloy_consensus::Eip658Value::Eip658(true),
             cumulative_gas_used: 100000,
             logs: vec![
@@ -2238,6 +2239,7 @@ mod tests {
         };
 
         let receipt2 = Receipt {
+            tx_type: 0,
             status: alloy_consensus::Eip658Value::Eip658(true),
             cumulative_gas_used: 200000,
             logs: vec![alloy_primitives::Log {
@@ -2375,6 +2377,7 @@ mod tests {
         // Create test receipts for block 1
         let block1_receipts = vec![
             Receipt {
+                tx_type: 0,
                 status: alloy_consensus::Eip658Value::Eip658(true),
                 cumulative_gas_used: 100000,
                 logs: vec![
@@ -2389,6 +2392,7 @@ mod tests {
                 ],
             },
             Receipt {
+                tx_type: 0,
                 status: alloy_consensus::Eip658Value::Eip658(true),
                 cumulative_gas_used: 200000,
                 logs: vec![alloy_primitives::Log {
@@ -2400,6 +2404,7 @@ mod tests {
 
         // Create test receipts for block 2
         let block2_receipts = vec![Receipt {
+            tx_type: 0,
             status: alloy_consensus::Eip658Value::Eip658(true),
             cumulative_gas_used: 300000,
             logs: vec![

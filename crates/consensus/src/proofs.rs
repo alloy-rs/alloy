@@ -122,10 +122,13 @@ mod tests {
             ty: u8,
             buf: &mut &[u8],
         ) -> Eip2718Result<ReceiptWithBloom<Self>> {
-            let ty =
+            let tx_type =
                 TxType::try_from(ty).map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))?;
 
-            Ok(Receipt::rlp_decode_with_bloom(buf)?.map_receipt(|receipt| Self { ty, receipt }))
+            Ok(Receipt::rlp_decode_with_bloom(buf)?.map_receipt(|mut receipt| {
+                receipt.tx_type = ty;
+                Self { ty: tx_type, receipt }
+            }))
         }
 
         fn fallback_decode_with_bloom(buf: &mut &[u8]) -> Eip2718Result<ReceiptWithBloom<Self>> {
@@ -150,6 +153,7 @@ mod tests {
         let receipt = ReceiptWithBloom {
             receipt: TypedReceipt {
                 receipt: Receipt {
+                    tx_type: TxType::Eip2930 as u8,
                     status: Eip658Value::success(),
                     cumulative_gas_used: 102068,
                     logs,

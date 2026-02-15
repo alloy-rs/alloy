@@ -19,6 +19,12 @@ use core::fmt;
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
 pub struct Receipt<T = Log> {
+    /// The transaction type.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing, with = "alloy_serde::quantity")
+    )]
+    pub tx_type: u8,
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
@@ -36,8 +42,8 @@ impl<T> Receipt<T> {
     ///
     /// Returns the receipt with the new log type
     pub fn map_logs<U>(self, f: impl FnMut(T) -> U) -> Receipt<U> {
-        let Self { status, cumulative_gas_used, logs } = self;
-        Receipt { status, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
+        let Self { tx_type, status, cumulative_gas_used, logs } = self;
+        Receipt { tx_type, status, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
     }
 }
 
@@ -77,10 +83,6 @@ where
     T: AsRef<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     type Log = T;
-
-    fn tx_type(&self) -> u8 {
-        0
-    }
 
     fn status_or_post_state(&self) -> Eip658Value {
         self.status
@@ -156,7 +158,10 @@ impl<T: Decodable> Receipt<T> {
         let logs_bloom = Decodable::decode(buf)?;
         let logs = Decodable::decode(buf)?;
 
-        Ok(ReceiptWithBloom { receipt: Self { status, cumulative_gas_used, logs }, logs_bloom })
+        Ok(ReceiptWithBloom {
+            receipt: Self { tx_type: 0, status, cumulative_gas_used, logs },
+            logs_bloom,
+        })
     }
 }
 
@@ -176,6 +181,12 @@ impl<T: Decodable> RlpDecodableReceipt for Receipt<T> {
         }
 
         Ok(this)
+    }
+}
+
+impl<T> Typed2718 for Receipt<T> {
+    fn ty(&self) -> u8 {
+        self.tx_type
     }
 }
 
@@ -278,10 +289,6 @@ where
     R: TxReceipt,
 {
     type Log = R::Log;
-
-    fn tx_type(&self) -> u8 {
-        self.receipt.tx_type()
-    }
 
     fn status_or_post_state(&self) -> Eip658Value {
         self.receipt.status_or_post_state()
@@ -446,6 +453,7 @@ pub(crate) mod serde_bincode_compat {
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Receipt<'a, T: Clone = alloy_primitives::Log> {
+        tx_type: u8,
         logs: Cow<'a, [T]>,
         status: bool,
         cumulative_gas_used: u64,
@@ -454,6 +462,7 @@ pub(crate) mod serde_bincode_compat {
     impl<'a, T: Clone> From<&'a super::Receipt<T>> for Receipt<'a, T> {
         fn from(value: &'a super::Receipt<T>) -> Self {
             Self {
+                tx_type: value.tx_type,
                 logs: Cow::Borrowed(&value.logs),
                 // OP has no post state root variant
                 status: value.status.coerce_status(),
@@ -465,6 +474,7 @@ pub(crate) mod serde_bincode_compat {
     impl<'a, T: Clone> From<Receipt<'a, T>> for super::Receipt<T> {
         fn from(value: Receipt<'a, T>) -> Self {
             Self {
+                tx_type: value.tx_type,
                 status: value.status.into(),
                 cumulative_gas_used: value.cumulative_gas_used,
                 logs: value.logs.into_owned(),
@@ -544,6 +554,7 @@ mod test {
     #[test]
     fn root_vs_status() {
         let receipt = super::Receipt::<()> {
+            tx_type: 0,
             status: super::Eip658Value::Eip658(true),
             cumulative_gas_used: 0,
             logs: Vec::new(),
@@ -553,6 +564,7 @@ mod test {
         assert_eq!(json, r#"{"status":"0x1","cumulativeGasUsed":"0x0","logs":[]}"#);
 
         let receipt = super::Receipt::<()> {
+            tx_type: 0,
             status: super::Eip658Value::PostState(Default::default()),
             cumulative_gas_used: 0,
             logs: Vec::new(),
@@ -584,8 +596,12 @@ mod test {
 
     #[test]
     fn roundtrip_encodable_eip1559() {
-        let receipts =
-            Receipts { receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(Default::default())]] };
+        let receipts = Receipts {
+            receipt_vec: vec![vec![ReceiptEnvelope::Eip1559(ReceiptWithBloom {
+                receipt: Receipt { tx_type: 2, ..Default::default() },
+                ..Default::default()
+            })]],
+        };
 
         let mut out = vec![];
         receipts.encode(&mut out);

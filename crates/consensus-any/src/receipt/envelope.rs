@@ -101,10 +101,6 @@ where
 {
     type Log = T;
 
-    fn tx_type(&self) -> u8 {
-        self.r#type
-    }
-
     fn status_or_post_state(&self) -> Eip658Value {
         self.inner.receipt.status
     }

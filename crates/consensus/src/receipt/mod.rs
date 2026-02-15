@@ -27,9 +27,6 @@ pub trait TxReceipt: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     /// The associated log type.
     type Log;
 
-    /// Returns the EIP-2718 transaction type.
-    fn tx_type(&self) -> u8;
-
     /// Returns the status or post state of the transaction.
     ///
     /// ## Note
@@ -160,6 +157,7 @@ mod tests {
         let receipt =
             ReceiptEnvelope::Legacy(ReceiptWithBloom {
                 receipt: Receipt {
+                    tx_type: 0,
                     cumulative_gas_used: 0x1,
                     logs: vec![Log {
                         address: address!("0000000000000000000000000000000000000011"),
@@ -192,6 +190,7 @@ mod tests {
         let expected =
             ReceiptWithBloom {
                 receipt: Receipt {
+                    tx_type: 0,
                     cumulative_gas_used: 0x1,
                     logs: vec![Log {
                         address: address!("0000000000000000000000000000000000000011"),
@@ -215,6 +214,7 @@ mod tests {
     #[test]
     fn gigantic_receipt() {
         let receipt = Receipt {
+            tx_type: 0,
             cumulative_gas_used: 16747627,
             status: true.into(),
             logs: vec![
@@ -254,8 +254,12 @@ mod tests {
 
     #[test]
     fn can_encode_by_reference() {
-        let receipt: Receipt =
-            Receipt { cumulative_gas_used: 16747627, status: true.into(), logs: vec![] };
+        let receipt: Receipt = Receipt {
+            tx_type: 0,
+            cumulative_gas_used: 16747627,
+            status: true.into(),
+            logs: vec![],
+        };
 
         let encoded_ref = alloy_rlp::encode(&ReceiptWithBloom {
             receipt: &receipt,
