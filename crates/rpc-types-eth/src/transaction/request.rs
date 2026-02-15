@@ -280,7 +280,7 @@ impl TransactionRequest {
 
     /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
     ///
-    /// This removes `data` the data field.
+    /// This removes the `data` field.
     pub fn normalize_input(&mut self) {
         self.input.normalize_input()
     }
@@ -293,7 +293,7 @@ impl TransactionRequest {
 
     /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
     ///
-    /// This removes `input` the data field.
+    /// This removes the `input` field.
     pub fn normalize_data(&mut self) {
         self.input.normalize_data();
     }
@@ -304,7 +304,7 @@ impl TransactionRequest {
         self
     }
 
-    /// If only one field is set, this also sets the other field by with that value.
+    /// If only one field is set, this also sets the other field to that value.
     ///
     /// This is a noop if both fields are already set.
     pub fn set_input_and_data(&mut self) {
@@ -1693,10 +1693,9 @@ impl TransactionInput {
 
     /// Ensures that if either `input` or `data` is set, the `input` field contains the value.
     ///
-    /// This removes `data` the data field.
+    /// This removes the `data` field.
     pub fn normalize_input(&mut self) {
         let data = self.data.take();
-        // If input is None but data has a value, copy data to input
         if self.input.is_none() {
             self.input = data;
         }
@@ -1710,7 +1709,7 @@ impl TransactionInput {
 
     /// Ensures that if either `data` or `input` is set, the `data` field contains the value.
     ///
-    /// This removes `input` the data field.
+    /// This removes the `input` field.
     pub fn normalize_data(&mut self) {
         let input = self.input.take();
         if self.data.is_none() {
@@ -1724,7 +1723,7 @@ impl TransactionInput {
         self
     }
 
-    /// If only one field is set, this also sets the other field by with that value.
+    /// If only one field is set, this also sets the other field to that value.
     ///
     /// This is a noop if both fields are already set.
     pub fn set_both(&mut self) {
