@@ -79,6 +79,18 @@ impl BlobParams {
         }
     }
 
+    /// Returns [`BlobParams`] configuration activated with Amsterdam hardfork.
+    pub const fn amsterdam() -> Self {
+        Self {
+            target_blob_count: eip7691::TARGET_BLOBS_PER_BLOCK_ELECTRA,
+            max_blob_count: eip7691::MAX_BLOBS_PER_BLOCK_ELECTRA,
+            update_fraction: eip7691::BLOB_GASPRICE_UPDATE_FRACTION_PECTRA,
+            min_blob_fee: eip4844::BLOB_TX_MIN_BLOB_GASPRICE,
+            max_blobs_per_tx: eip7594::MAX_BLOBS_PER_TX_FUSAKA,
+            blob_base_cost: BLOB_BASE_COST,
+        }
+    }
+
     /// [`BlobParams`] for the [EIP-7892](https://eips.ethereum.org/EIPS/eip-7892) Blob parameter only hardfork BPO1.
     pub const fn bpo1() -> Self {
         Self {
