@@ -50,11 +50,11 @@ impl WsConnect {
         self
     }
 
-    /// Sets the keepalive ping interval.
+    /// Sets the keepalive interval knob for API parity with native transports.
     ///
-    /// A ping is sent if no other messages have been sent within this interval.
-    /// If the server does not respond with a pong before the next ping is due,
-    /// the connection is considered dead and will be closed.
+    /// Note: the WASM backend currently does not send websocket ping frames.
+    /// This value is stored on the backend and reserved for future keepalive
+    /// support.
     ///
     /// Default is 10 seconds.
     pub const fn with_keepalive_interval(mut self, keepalive_interval: Duration) -> Self {
@@ -112,11 +112,9 @@ impl WsBackend<Fuse<WsStream>> {
                 // We bias the loop as follows
                 // 1. New dispatch to server.
                 // 2. Response or notification from server.
-                // This ensures that keepalive is sent only if no other messages
-                // have been sent in the last 10 seconds. And prioritizes new
-                // dispatches over responses from the server. This will fail if
-                // the client saturates the task with dispatches, but that's
-                // probably not a big deal.
+                // This prioritizes new dispatches over responses from the
+                // server. This will fail if the client saturates the task with
+                // dispatches, but that's probably not a big deal.
                 tokio::select! {
                     biased;
                     // we've received a new dispatch, so we send it via
