@@ -7,7 +7,7 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{
-    error::ValueError, transaction::Recovered, BlobTransactionSidecar, SignableTransaction,
+    error::ValueError, transaction::Recovered, BlobTransactionSidecar, Signed, SignableTransaction,
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
     TxLegacy, TxType, Typed2718, TypedTransaction,
 };
@@ -1331,92 +1331,35 @@ impl From<TypedTransaction> for TransactionRequest {
 impl From<TxEnvelope> for TransactionRequest {
     fn from(envelope: TxEnvelope) -> Self {
         match envelope {
-            TxEnvelope::Legacy(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip2930(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip1559(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip4844(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
-            TxEnvelope::Eip7702(tx) => {
-                #[cfg(feature = "k256")]
-                {
-                    let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
-                    if let Some(from) = from {
-                        tx.from(from)
-                    } else {
-                        tx
-                    }
-                }
-
-                #[cfg(not(feature = "k256"))]
-                {
-                    tx.strip_signature().into()
-                }
-            }
+            TxEnvelope::Legacy(tx) => signed_to_request(tx),
+            TxEnvelope::Eip2930(tx) => signed_to_request(tx),
+            TxEnvelope::Eip1559(tx) => signed_to_request(tx),
+            TxEnvelope::Eip4844(tx) => signed_to_request(tx),
+            TxEnvelope::Eip7702(tx) => signed_to_request(tx),
         }
+    }
+}
+
+/// Converts a [`Signed`] transaction into a [`TransactionRequest`], recovering the signer if the
+/// `k256` feature is enabled.
+fn signed_to_request<T>(tx: Signed<T>) -> TransactionRequest
+where
+    T: SignableTransaction<Signature> + Into<TransactionRequest>,
+{
+    #[cfg(feature = "k256")]
+    {
+        let from = tx.recover_signer().ok();
+        let tx: TransactionRequest = tx.strip_signature().into();
+        if let Some(from) = from {
+            tx.from(from)
+        } else {
+            tx
+        }
+    }
+
+    #[cfg(not(feature = "k256"))]
+    {
+        tx.strip_signature().into()
     }
 }
 
