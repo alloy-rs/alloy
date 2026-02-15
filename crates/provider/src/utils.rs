@@ -31,27 +31,51 @@ pub trait Eip1559EstimatorFn: Send + Unpin {
     fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation;
 }
 
+/// Helper trait to make `Box<dyn Eip1559EstimatorFn>` cloneable.
+pub trait Eip1559EstimatorFnClone: Eip1559EstimatorFn {
+    /// Clone this estimator into a boxed trait object.
+    fn dyn_clone(&self) -> Box<dyn Eip1559EstimatorFnClone>;
+}
+
+impl<T> Eip1559EstimatorFnClone for T
+where
+    T: Eip1559EstimatorFn + Clone + 'static,
+{
+    fn dyn_clone(&self) -> Box<dyn Eip1559EstimatorFnClone> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Eip1559EstimatorFnClone> {
+    fn clone(&self) -> Self {
+        (**self).dyn_clone()
+    }
+}
+
 /// EIP-1559 estimator variants
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum Eip1559Estimator {
     /// Uses the builtin estimator
     #[default]
     Default,
     /// Uses a custom estimator
-    Custom(Box<dyn Eip1559EstimatorFn>),
+    Custom(Box<dyn Eip1559EstimatorFnClone>),
 }
 
 impl Eip1559Estimator {
     /// Creates a new estimator from a closure
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin + 'static,
+        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin + Clone + 'static,
     {
         Self::new_estimator(f)
     }
 
     /// Creates a new estimate fn
-    pub fn new_estimator<F: Eip1559EstimatorFn + 'static>(f: F) -> Self {
+    pub fn new_estimator<F>(f: F) -> Self
+    where
+        F: Eip1559EstimatorFn + Clone + 'static,
+    {
         Self::Custom(Box::new(f))
     }
 
