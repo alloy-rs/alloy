@@ -19,7 +19,8 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -261,6 +262,13 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.0.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.0.get_storage_values(requests)
     }
 
     fn get_transaction_by_hash(
