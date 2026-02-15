@@ -258,6 +258,14 @@ where
     P: Provider<N>,
     N: Network,
 {
+    #[inline]
+    fn legacy_calls(&self) -> Vec<Call> {
+        self.calls
+            .iter()
+            .map(|c| Call { target: c.target, callData: c.callData.clone() })
+            .collect()
+    }
+
     /// Set the address of the multicall3 contract
     ///
     /// Default is [`MULTICALL3_ADDRESS`].
@@ -319,22 +327,12 @@ where
 
     /// Creates the [`blockAndAggregateCall`]
     fn to_block_and_aggregate_call(&self) -> blockAndAggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        blockAndAggregateCall { calls }
+        blockAndAggregateCall { calls: self.legacy_calls() }
     }
 
     /// Creates the [`tryBlockAndAggregateCall`]
     fn to_try_block_and_aggregate_call(&self, require_success: bool) -> tryBlockAndAggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        tryBlockAndAggregateCall { requireSuccess: require_success, calls }
+        tryBlockAndAggregateCall { requireSuccess: require_success, calls: self.legacy_calls() }
     }
 
     /// Calls the `aggregate` function
@@ -406,12 +404,7 @@ where
 
     /// Creates the [`aggregate3Call`].
     fn to_aggregate_call(&self) -> aggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        aggregateCall { calls }
+        aggregateCall { calls: self.legacy_calls() }
     }
 
     /// Call the `tryAggregate` function
@@ -487,12 +480,7 @@ where
 
     /// Creates the [`tryAggregateCall`].
     fn to_try_aggregate_call(&self, require_success: bool) -> tryAggregateCall {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        tryAggregateCall { requireSuccess: require_success, calls }
+        tryAggregateCall { requireSuccess: require_success, calls: self.legacy_calls() }
     }
 
     /// Call the `aggregate3` function
@@ -594,12 +582,7 @@ where
 
     /// Call the `blockAndAggregate` function
     pub async fn block_and_aggregate(&self) -> Result<(u64, B256, T::SuccessReturns)> {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        let call = blockAndAggregateCall { calls };
+        let call = blockAndAggregateCall { calls: self.legacy_calls() };
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         let result = T::decode_return_results(&returnData)?;
@@ -616,12 +599,8 @@ where
         &self,
         require_success: bool,
     ) -> Result<(u64, B256, T::Returns)> {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        let call = tryBlockAndAggregateCall { requireSuccess: require_success, calls };
+        let call =
+            tryBlockAndAggregateCall { requireSuccess: require_success, calls: self.legacy_calls() };
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
