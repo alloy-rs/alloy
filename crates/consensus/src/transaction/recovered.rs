@@ -1,5 +1,5 @@
 use crate::crypto::RecoveryError;
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
@@ -131,6 +131,15 @@ impl<T> Recovered<&T> {
     /// Helper function to explicitly create a new copy of `Recovered<&T>`
     pub const fn copied(&self) -> Self {
         *self
+    }
+}
+
+impl<T: Clone> Recovered<Cow<'_, T>> {
+    /// Converts `Recovered<Cow<'_, T>>` into `Recovered<T>` by cloning the borrowed data if
+    /// necessary.
+    pub fn into_owned(self) -> Recovered<T> {
+        let Self { inner, signer } = self;
+        Recovered::new_unchecked(inner.into_owned(), signer)
     }
 }
 

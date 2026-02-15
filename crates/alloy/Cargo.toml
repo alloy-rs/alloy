@@ -251,7 +251,6 @@ rpc-types-engine = [
     "alloy-provider?/engine-api",
 ]
 rpc-types-eth = ["rpc-types", "alloy-rpc-types?/eth"]
-rpc-types-json = ["rpc-types", "alloy-rpc-types?/jsonrpsee-types"]
 rpc-types-mev = ["rpc-types", "alloy-rpc-types?/mev"]
 rpc-types-trace = [
     "rpc-types",

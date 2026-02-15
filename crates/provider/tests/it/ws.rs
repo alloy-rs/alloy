@@ -41,41 +41,48 @@ async fn ws_retry_pubsub() -> Result<(), Box<dyn std::error::Error>> {
 // <https://github.com/alloy-rs/alloy/issues/1601>
 #[tokio::test]
 async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Error>> {
-    async fn run_server() -> Result<std::net::SocketAddr, Box<dyn std::error::Error>> {
-        use jsonrpsee::server::{RpcModule, Server, SubscriptionMessage};
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::tungstenite::Message;
 
-        let server = Server::builder().build("127.0.0.1:0").await?;
-        let mut module = RpcModule::new(());
-        module
-            .register_subscription(
-                "subscribe_hello",
-                "s_hello",
-                "unsubscribe_hello",
-                |_, pending, _, _| async move {
-                    let sub = pending.accept().await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr()?;
 
-                    for i in 0..usize::MAX {
-                        let raw = serde_json::value::to_raw_value(&i).unwrap();
-                        let msg = SubscriptionMessage::from(raw);
-                        sub.send(msg).await.unwrap();
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                    }
+    tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
 
-                    Ok(())
-                },
-            )
-            .unwrap();
-        let addr = server.local_addr()?;
+        // Read the subscribe request.
+        let msg = ws.next().await.unwrap().unwrap();
+        let req: serde_json::Value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+        let id = req["id"].clone();
 
-        let handle = server.start(module);
+        // Respond with a subscription ID.
+        let resp = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": "0x1"
+        });
+        ws.send(Message::Text(resp.to_string().into())).await.unwrap();
 
-        tokio::spawn(handle.stopped());
+        // Send subscription notifications.
+        for i in 0..usize::MAX {
+            let notif = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "s_hello",
+                "params": {
+                    "subscription": "0x1",
+                    "result": i
+                }
+            });
+            if ws.send(Message::Text(notif.to_string().into())).await.is_err() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    });
 
-        Ok(addr)
-    }
     use alloy_provider::{Provider, ProviderBuilder};
-
-    let addr = run_server().await?;
 
     let ws_provider = ProviderBuilder::new().connect(format!("ws://{addr}").as_str()).await?;
     let mut request = ws_provider.client().request("subscribe_hello", ());
