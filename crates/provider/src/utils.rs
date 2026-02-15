@@ -192,7 +192,13 @@ pub type JoinedRecommendedFillers = JoinFill<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::vec;
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        vec,
+    };
 
     #[test]
     fn test_estimate_priority_fee() {
@@ -246,5 +252,38 @@ mod tests {
                 max_priority_fee_per_gas: 200_000_000_000_u128
             }
         );
+    }
+
+    #[test]
+    fn custom_estimator_is_cloneable_and_clones_inner_value() {
+        #[derive(Debug)]
+        struct CountingEstimator {
+            clones: Arc<AtomicUsize>,
+        }
+
+        impl Clone for CountingEstimator {
+            fn clone(&self) -> Self {
+                self.clones.fetch_add(1, Ordering::SeqCst);
+                Self { clones: self.clones.clone() }
+            }
+        }
+
+        impl Eip1559EstimatorFn for CountingEstimator {
+            fn estimate(&self, base_fee: u128, _rewards: &[Vec<u128>]) -> Eip1559Estimation {
+                Eip1559Estimation { max_fee_per_gas: base_fee, max_priority_fee_per_gas: 0 }
+            }
+        }
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let estimator =
+            Eip1559Estimator::new_estimator(CountingEstimator { clones: clones.clone() });
+
+        let estimator2 = estimator.clone();
+        assert_eq!(clones.load(Ordering::SeqCst), 1);
+
+        let rewards = vec![vec![123_u128]];
+        let a = estimator.estimate(10, &rewards);
+        let b = estimator2.estimate(10, &rewards);
+        assert_eq!(a, b);
     }
 }
