@@ -58,12 +58,14 @@ impl<T> ReceiptEnvelope<T> {
     where
         R: Into<ReceiptWithBloom<Receipt<T>>>,
     {
+        let mut receipt = receipt.into();
+        receipt.receipt.tx_type = tx_type as u8;
         match tx_type {
-            TxType::Legacy => Self::Legacy(receipt.into()),
-            TxType::Eip2930 => Self::Eip2930(receipt.into()),
-            TxType::Eip1559 => Self::Eip1559(receipt.into()),
-            TxType::Eip4844 => Self::Eip4844(receipt.into()),
-            TxType::Eip7702 => Self::Eip7702(receipt.into()),
+            TxType::Legacy => Self::Legacy(receipt),
+            TxType::Eip2930 => Self::Eip2930(receipt),
+            TxType::Eip1559 => Self::Eip1559(receipt),
+            TxType::Eip4844 => Self::Eip4844(receipt),
+            TxType::Eip7702 => Self::Eip7702(receipt),
         }
     }
 
@@ -290,7 +292,8 @@ impl Encodable2718 for ReceiptEnvelope {
 
 impl Decodable2718 for ReceiptEnvelope {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
-        let receipt = Decodable::decode(buf)?;
+        let mut receipt: ReceiptWithBloom<Receipt> = Decodable::decode(buf)?;
+        receipt.receipt.tx_type = ty;
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))? {
             TxType::Eip2930 => Ok(Self::Eip2930(receipt)),
             TxType::Eip1559 => Ok(Self::Eip1559(receipt)),
@@ -311,9 +314,11 @@ where
     T: arbitrary::Arbitrary<'a>,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let receipt = ReceiptWithBloom::<Receipt<T>>::arbitrary(u)?;
+        let mut receipt = ReceiptWithBloom::<Receipt<T>>::arbitrary(u)?;
 
-        match u.int_in_range(0..=4)? {
+        let variant = u.int_in_range(0..=4)?;
+        receipt.receipt.tx_type = variant as u8;
+        match variant {
             0 => Ok(Self::Legacy(receipt)),
             1 => Ok(Self::Eip2930(receipt)),
             2 => Ok(Self::Eip1559(receipt)),
@@ -384,6 +389,7 @@ pub(crate) mod serde_bincode_compat {
             let ReceiptEnvelope { tx_type, success, cumulative_gas_used, logs_bloom, logs } = value;
             let receipt = ReceiptWithBloom {
                 receipt: Receipt {
+                    tx_type: tx_type as u8,
                     status: success.into(),
                     cumulative_gas_used,
                     logs: logs.into_owned(),
@@ -473,6 +479,7 @@ mod test {
 
         let receipt = super::ReceiptWithBloom::<Receipt<()>> {
             receipt: super::Receipt {
+                tx_type: 0,
                 status: super::Eip658Value::PostState(b256!(
                     "284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10"
                 )),

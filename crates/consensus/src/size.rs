@@ -69,8 +69,9 @@ impl<T: TxEip4844Sidecar> InMemorySize for TxEip4844WithSidecar<T> {
 
 impl InMemorySize for Receipt {
     fn size(&self) -> usize {
-        let Self { status, cumulative_gas_used, logs } = self;
-        core::mem::size_of_val(status)
+        let Self { tx_type, status, cumulative_gas_used, logs } = self;
+        core::mem::size_of_val(tx_type)
+            + core::mem::size_of_val(status)
             + core::mem::size_of_val(cumulative_gas_used)
             + logs.iter().map(|log| log.size()).sum::<usize>()
     }

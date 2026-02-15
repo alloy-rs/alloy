@@ -1,5 +1,6 @@
 use crate::Log;
 use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
+use alloy_eips::Typed2718;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_sol_types::SolEvent;
@@ -213,6 +214,13 @@ impl<L> TransactionReceipt<ReceiptEnvelope<L>> {
         L: Into<alloy_primitives::Log>,
     {
         self.map_logs(Into::into)
+    }
+}
+
+impl<T: Typed2718> TransactionReceipt<T> {
+    /// Returns the EIP-2718 transaction type.
+    pub fn tx_type(&self) -> u8 {
+        self.inner.ty()
     }
 }
 
