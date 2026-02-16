@@ -782,7 +782,7 @@ mod tests {
     #[test]
     fn network_replaces_fillers() {
         // Add an extra filler before swapping, it should be dropped.
-        let builder = ProviderBuilder::new().filler(GasFiller::default()).network::<AnyNetwork>();
+        let builder = ProviderBuilder::new().filler(GasFiller).network::<AnyNetwork>();
 
         let _: ProviderBuilder<
             Identity,
