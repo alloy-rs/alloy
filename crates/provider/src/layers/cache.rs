@@ -7,7 +7,10 @@ use alloy_network::Network;
 use alloy_primitives::{
     keccak256, Address, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_rpc_types_eth::{BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log};
+use alloy_rpc_types_eth::{
+    BlockNumberOrTag, EIP1186AccountProofResponse, Filter, Log, StorageValuesRequest,
+    StorageValuesResponse,
+};
 use alloy_transport::{TransportErrorKind, TransportResult};
 use lru::LruCache;
 use parking_lot::RwLock;
@@ -268,6 +271,19 @@ where
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
             let req = RequestType::new("eth_getStorageAt", (address, key)).with_block_id(block_id);
+            cache_rpc_call_with_block!(cache, client, req)
+        })
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::new("eth_getStorageValues", (requests.clone(),))
+                .with_block_id(block_id);
             cache_rpc_call_with_block!(cache, client, req)
         })
     }

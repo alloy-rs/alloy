@@ -30,7 +30,8 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -802,6 +803,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.client().request("eth_getStorageAt", (address, key)).into()
+    }
+
+    /// Batch-fetches storage values from multiple addresses at multiple keys.
+    ///
+    /// See [EIP spec](https://github.com/ethereum/execution-apis/issues/752).
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.client().request("eth_getStorageValues", (requests,)).into()
     }
 
     /// Gets a transaction by its sender and nonce.

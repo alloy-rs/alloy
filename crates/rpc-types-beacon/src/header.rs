@@ -6,7 +6,7 @@ use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// The response to a request for beacon block headers: `getBlockHeaders`
+/// Response from the [`/eth/v1/beacon/headers`](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeaders) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeadersResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
@@ -20,7 +20,7 @@ pub struct HeadersResponse {
     pub data: Vec<HeaderData>,
 }
 
-/// The response to a request for a __single__ beacon block header: `headers/{id}`
+/// Response from the [`/eth/v1/beacon/headers/{block_id}`](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeader) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeaderResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
@@ -55,6 +55,8 @@ pub struct Header {
 }
 
 /// The header of a beacon block.
+///
+/// See [`BeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#beaconblockheader) in the CL spec.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]

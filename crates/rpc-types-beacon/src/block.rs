@@ -7,7 +7,7 @@ use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// The response to a request for a beacon block: `getBlockV2`
+/// Response from the [`/eth/v2/beacon/blocks/{block_id}`](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2) endpoint.
 ///
 /// See <https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockV2>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
