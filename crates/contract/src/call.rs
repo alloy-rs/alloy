@@ -553,7 +553,7 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
 
     /// Consuming version of [`call`](Self::call) that returns an owned future.
     ///
-    /// This is useful when you need to use the call in a [`tokio::try_join!`] or similar
+    /// This is useful when you need to use the call in a `tokio::try_join!` or similar
     /// combinator, where the future must not borrow from the [`CallBuilder`].
     ///
     /// # Examples
