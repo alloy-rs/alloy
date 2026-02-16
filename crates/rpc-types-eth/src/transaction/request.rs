@@ -252,6 +252,13 @@ impl TransactionRequest {
         self
     }
 
+    /// Marks this transaction as a contract creation (deploy) with no recipient.
+    #[inline]
+    pub const fn create(mut self) -> Self {
+        self.to = Some(TxKind::Create);
+        self
+    }
+
     /// Sets the value (amount) for the transaction.
     pub const fn value(mut self, value: U256) -> Self {
         self.value = Some(value);
