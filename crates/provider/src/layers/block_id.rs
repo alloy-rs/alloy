@@ -4,7 +4,7 @@ use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, StorageKey, StorageValue, U256, U64};
 use alloy_rpc_types_eth::{
     simulate::{SimulatePayload, SimulatedBlock},
-    AccessListResult, EIP1186AccountProofResponse,
+    AccessListResult, EIP1186AccountProofResponse, StorageValuesRequest, StorageValuesResponse,
 };
 use std::marker::PhantomData;
 
@@ -130,6 +130,13 @@ impl<P: Provider<N>, N: Network> Provider<N> for BlockIdProvider<P, N> {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.inner.get_storage_at(address, key).block_id(self.block_id)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.inner.get_storage_values(requests).block_id(self.block_id)
     }
 
     fn get_transaction_count(

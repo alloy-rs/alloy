@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// Response from the `eth/v1/node/syncing` endpoint.
+/// Response from the [`/eth/v1/node/syncing`](https://ethereum.github.io/beacon-APIs/#/Node/getSyncingStatus) endpoint.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncStatus {
@@ -19,7 +19,7 @@ pub struct SyncStatus {
     pub el_offline: bool,
 }
 
-/// Response from the `eth/v1/node/health` endpoint.
+/// Response from the [`/eth/v1/node/health`](https://ethereum.github.io/beacon-APIs/#/Node/getHealth) endpoint.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub enum HealthStatus {
     Ready,
@@ -28,13 +28,13 @@ pub enum HealthStatus {
     Unknown,
 }
 
-/// Response from the `eth/v1/node/version` endpoint.
+/// Response from the [`/eth/v1/node/version`](https://ethereum.github.io/beacon-APIs/#/Node/getNodeVersion) endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionData {
     pub version: String,
 }
 
-/// Root response from `/eth/v1/node/identity`
+/// Response from the [`/eth/v1/node/identity`](https://ethereum.github.io/beacon-APIs/#/Node/getNetworkIdentity) endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeIdentity {
     pub peer_id: String,
@@ -85,14 +85,14 @@ pub struct PeersMeta {
     pub count: usize,
 }
 
-/// Response from `/eth/v1/node/peers`.
+/// Response from the [`/eth/v1/node/peers`](https://ethereum.github.io/beacon-APIs/#/Node/getPeers) endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeersResponse {
     pub data: Vec<PeerInfo>,
     pub meta: PeersMeta,
 }
 
-/// Response from `/eth/v1/node/peer_count`.
+/// Response from the [`/eth/v1/node/peer_count`](https://ethereum.github.io/beacon-APIs/#/Node/getPeerCount) endpoint.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerCount {

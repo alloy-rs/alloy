@@ -262,7 +262,7 @@ impl Header {
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
-    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    /// Returns `None` if `excess_blob_gas`, `blob_gas_used`, or `base_fee_per_gas` is not set.
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas?,

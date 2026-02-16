@@ -2,7 +2,7 @@
 //!
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
-use crate::alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use alloy_primitives::{keccak256, Bytes, Sealable, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use auto_impl::auto_impl;
@@ -329,6 +329,20 @@ impl<T: Encodable2718> Encodable2718 for Sealed<T> {
     }
 }
 
+impl<T: Encodable2718 + Clone> Encodable2718 for Cow<'_, T> {
+    fn encode_2718_len(&self) -> usize {
+        (**self).encode_2718_len()
+    }
+
+    fn encode_2718(&self, out: &mut dyn BufMut) {
+        (**self).encode_2718(out)
+    }
+
+    fn trie_hash(&self) -> B256 {
+        (**self).trie_hash()
+    }
+}
+
 /// An [EIP-2718] envelope, blanket implemented for types that impl [`Encodable2718`] and
 /// [`Decodable2718`].
 ///
@@ -379,6 +393,12 @@ pub trait Typed2718 {
 impl<T: Typed2718> Typed2718 for Sealed<T> {
     fn ty(&self) -> u8 {
         self.inner().ty()
+    }
+}
+
+impl<T: Typed2718 + Clone> Typed2718 for Cow<'_, T> {
+    fn ty(&self) -> u8 {
+        (**self).ty()
     }
 }
 
