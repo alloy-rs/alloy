@@ -6,6 +6,9 @@ use core::fmt;
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
+pub(crate) mod receipt2;
+pub use receipt2::{EthereumReceipt, TxTy};
+
 mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 
@@ -17,7 +20,10 @@ use alloy_eips::{eip2718::Eip2718Result, Typed2718};
 /// Bincode-compatible serde implementations for receipt types.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) mod serde_bincode_compat {
-    pub use super::{envelope::serde_bincode_compat::*, receipts::serde_bincode_compat::*};
+    pub use super::{
+        envelope::serde_bincode_compat::*, receipt2::serde_bincode_compat::*,
+        receipts::serde_bincode_compat::*,
+    };
 }
 
 /// Receipt is the result of a transaction execution.
