@@ -532,8 +532,8 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, D, N> {
-        self.call_raw().with_decoder(&self.decoder)
+    pub fn call(&self) -> EthCall<D, N> {
+        self.call_raw().with_decoder(self.decoder.clone())
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
@@ -542,13 +542,52 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, (), N> {
+    pub fn call_raw(&self) -> EthCall<(), N> {
         let call = self.provider.call(self.request.clone()).block(self.block);
         let call = match self.state.clone() {
             Some(state) => call.overrides(state),
             None => call,
         };
         call.into()
+    }
+
+    /// Consuming version of [`call`](Self::call) that returns an owned future.
+    ///
+    /// This is useful when you need to use the call in a [`tokio::try_join!`] or similar
+    /// combinator, where the future must not borrow from the [`CallBuilder`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn test<P: alloy_provider::Provider + Clone>(provider: P) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_primitives::{Address, U256};
+    /// use alloy_sol_types::sol;
+    ///
+    /// sol! {
+    ///     #[sol(rpc)]
+    ///     contract MyContract {
+    ///         function balanceOf(address owner) external view returns (uint256);
+    ///         function totalSupply() external view returns (uint256);
+    ///     }
+    /// }
+    ///
+    /// let contract = MyContract::new(Address::ZERO, &provider);
+    ///
+    /// let balance_fut = contract.balanceOf(Address::ZERO).call_owned();
+    /// let supply_fut = contract.totalSupply().call_owned();
+    ///
+    /// // Both futures are owned and can be used in try_join!
+    /// let (balance, supply) = tokio::try_join!(balance_fut, supply_fut)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn call_owned(self) -> EthCall<D, N> {
+        let call = self.provider.call(self.request).block(self.block);
+        let call = match self.state {
+            Some(state) => call.overrides(state),
+            None => call,
+        };
+        EthCall::new(call, self.decoder)
     }
 
     /// Decodes the output of a contract function using the provided decoder.
