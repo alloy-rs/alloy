@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
+
+### Bug Fixes
+
+- Actually retry failed block fetches instead of skipping them ([#3698](https://github.com/alloy-rs/alloy/issues/3698))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.43.4 to 1.43.5 ([#3701](https://github.com/alloy-rs/alloy/issues/3701))
+- [deps] Bump taiki-e/install-action from 2.67.27 to 2.68.0 ([#3702](https://github.com/alloy-rs/alloy/issues/3702))
+- Remove jsonrpsee dependencies ([#3690](https://github.com/alloy-rs/alloy/issues/3690))
+- Bump MSRV to 1.91 ([#3691](https://github.com/alloy-rs/alloy/issues/3691))
+- [deps] Bump crate-ci/typos from 1.42.2 to 1.43.4 ([#3671](https://github.com/alloy-rs/alloy/issues/3671))
+- [deps] Bump taiki-e/install-action from 2.67.13 to 2.67.27 ([#3672](https://github.com/alloy-rs/alloy/issues/3672))
+
+### Documentation
+
+- Fix incomplete return condition in next_block_excess_blob_gas ([#3679](https://github.com/alloy-rs/alloy/issues/3679))
+
+### Features
+
+- [consensus] Add `EthereumReceipt` type ported from reth ([#3683](https://github.com/alloy-rs/alloy/issues/3683))
+- [rpc-types-eth] Add TransactionRequest::create() builder method ([#3704](https://github.com/alloy-rs/alloy/issues/3704))
+- [provider] Add get_storage_values for batch storage slot retrieval ([#3692](https://github.com/alloy-rs/alloy/issues/3692))
+- [rpc-types-beacon] Add proposer duties, state validators, and fork types ([#3688](https://github.com/alloy-rs/alloy/issues/3688))
+- Add trait impls for Cow to support Recovered<Cow<'_, T>> ([#3689](https://github.com/alloy-rs/alloy/issues/3689))
+- [provider] Add engine_getBlobsV1/V2 to EngineApi trait ([#3670](https://github.com/alloy-rs/alloy/issues/3670))
+
+### Other
+
+- Use install-action for zepter ([#3674](https://github.com/alloy-rs/alloy/issues/3674))
+
 ## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
 
 ### Bug Fixes
@@ -13,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.6.3
 - Release 1.6.3
 
 ## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09

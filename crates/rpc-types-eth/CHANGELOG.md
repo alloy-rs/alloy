@@ -5,15 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
 
 ### Bug Fixes
 
 - [rpc-types] Don't return EIP-4844 type for max_fee_per_blob_gas alone ([#3651](https://github.com/alloy-rs/alloy/issues/3651))
 - [rpc-types-eth] Use hex serialization for SyncStatusMetadata block fields ([#3631](https://github.com/alloy-rs/alloy/issues/3631))
 
+### Dependencies
+
+- Remove jsonrpsee dependencies ([#3690](https://github.com/alloy-rs/alloy/issues/3690))
+
+### Features
+
+- [rpc-types-eth] Add TransactionRequest::create() builder method ([#3704](https://github.com/alloy-rs/alloy/issues/3704))
+- [provider] Add get_storage_values for batch storage slot retrieval ([#3692](https://github.com/alloy-rs/alloy/issues/3692))
+
 ### Miscellaneous Tasks
 
+- Release 1.6.3
 - Release 1.6.2
 
 ### Performance
