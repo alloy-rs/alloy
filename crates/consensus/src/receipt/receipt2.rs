@@ -73,7 +73,12 @@ impl<T, L> EthereumReceipt<T, L> {
     /// Returns the receipt with the new log type.
     pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
         let Self { tx_type, success, cumulative_gas_used, logs } = self;
-        EthereumReceipt { tx_type, success, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
+        EthereumReceipt {
+            tx_type,
+            success,
+            cumulative_gas_used,
+            logs: logs.into_iter().map(f).collect(),
+        }
     }
 }
 
