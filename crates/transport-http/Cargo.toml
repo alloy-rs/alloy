@@ -86,4 +86,4 @@ traceparent = [
 ]
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]
-reqwest-rustls-tls = ["reqwest?/rustls-tls"]
+reqwest-rustls-tls = ["reqwest?/rustls"]
