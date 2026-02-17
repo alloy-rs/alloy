@@ -260,10 +260,7 @@ where
 {
     #[inline]
     fn legacy_calls(&self) -> Vec<Call> {
-        self.calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect()
+        self.calls.iter().map(|c| Call { target: c.target, callData: c.callData.clone() }).collect()
     }
 
     /// Set the address of the multicall3 contract
@@ -599,8 +596,10 @@ where
         &self,
         require_success: bool,
     ) -> Result<(u64, B256, T::Returns)> {
-        let call =
-            tryBlockAndAggregateCall { requireSuccess: require_success, calls: self.legacy_calls() };
+        let call = tryBlockAndAggregateCall {
+            requireSuccess: require_success,
+            calls: self.legacy_calls(),
+        };
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))
