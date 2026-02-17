@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use alloy_consensus::{transaction::TransactionMeta, EthereumReceipt};
+use alloy_consensus::transaction::TransactionMeta;
 use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 
 /// Ethereum Log emitted by a transaction
@@ -150,21 +150,6 @@ impl Log<LogData> {
             })
             .collect()
     }
-}
-
-/// Converts an [`EthereumReceipt`] with consensus [`alloy_primitives::Log`]s into one with
-/// RPC [`Log`]s by enriching each log with block/transaction metadata.
-///
-/// Uses [`Log::collect_for_receipt`] to populate RPC-specific fields such as block hash, block
-/// number, transaction hash, transaction index, and log index.
-pub fn into_rpc_receipt<T>(
-    receipt: EthereumReceipt<T>,
-    next_log_index: usize,
-    meta: TransactionMeta,
-) -> EthereumReceipt<T, Log> {
-    let EthereumReceipt { tx_type, success, cumulative_gas_used, logs } = receipt;
-    let logs = Log::collect_for_receipt(next_log_index, meta, logs);
-    EthereumReceipt { tx_type, success, cumulative_gas_used, logs }
 }
 
 impl<T> alloy_rlp::Encodable for Log<T>

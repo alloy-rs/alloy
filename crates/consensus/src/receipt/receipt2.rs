@@ -67,6 +67,16 @@ pub struct EthereumReceipt<T = TxType, L = Log> {
     pub logs: Vec<L>,
 }
 
+impl<T, L> EthereumReceipt<T, L> {
+    /// Converts the receipt's log type by applying a function to each log.
+    ///
+    /// Returns the receipt with the new log type.
+    pub fn map_logs<U>(self, f: impl FnMut(L) -> U) -> EthereumReceipt<T, U> {
+        let Self { tx_type, success, cumulative_gas_used, logs } = self;
+        EthereumReceipt { tx_type, success, cumulative_gas_used, logs: logs.into_iter().map(f).collect() }
+    }
+}
+
 impl<T: TxTy> EthereumReceipt<T> {
     /// Returns length of RLP-encoded receipt fields with the given [`Bloom`] without an RLP header.
     pub fn rlp_encoded_fields_length(&self, bloom: &Bloom) -> usize {
