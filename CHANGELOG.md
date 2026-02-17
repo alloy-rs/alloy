@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add trait impls for Cow to support Recovered<Cow<'_, T>> ([#3689](https://github.com/alloy-rs/alloy/issues/3689))
 - [provider] Add engine_getBlobsV1/V2 to EngineApi trait ([#3670](https://github.com/alloy-rs/alloy/issues/3670))
 
+### Miscellaneous Tasks
+
+- Release 1.7.0
+
 ### Other
 
 - Use install-action for zepter ([#3674](https://github.com/alloy-rs/alloy/issues/3674))
