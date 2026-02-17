@@ -386,6 +386,7 @@ pub(crate) mod serde_bincode_compat {
     mod tests {
         use crate::TxType;
         use arbitrary::Arbitrary;
+        use bincode::config;
         use rand::Rng;
         use serde_with::serde_as;
 
@@ -402,14 +403,15 @@ pub(crate) mod serde_bincode_compat {
             }
 
             let mut bytes = [0u8; 1024];
-            rand::rng().fill(bytes.as_mut_slice());
+            rand::thread_rng().fill(bytes.as_mut_slice());
             let data = Data {
                 receipt: EthereumReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
                     .unwrap(),
             };
 
-            let encoded = bincode::serialize(&data).unwrap();
-            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            let encoded = bincode::serde::encode_to_vec(&data, config::legacy()).unwrap();
+            let (decoded, _): (Data, _) =
+                bincode::serde::decode_from_slice(&encoded, config::legacy()).unwrap();
             assert_eq!(decoded, data);
         }
     }
