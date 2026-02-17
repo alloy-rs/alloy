@@ -212,8 +212,8 @@ where
                     if let Value::Object(map) = tx {
                         if let Some(Value::String(input)) = map.get_mut("input") {
                             // Truncate the input to the first 4 bytes (8 hex characters) plus 0x
-                            // prefix
-                            *input = input.chars().take(2 + 4 + 4).collect::<String>();
+                            // prefix, in place to avoid extra allocation.
+                            input.truncate(2 + 8);
                         }
                     }
                 }
