@@ -222,21 +222,19 @@ impl LedgerSigner {
         let address = {
             // extract the address from the response
             // Response format: [pub_key_len, pub_key..., addr_len, addr_hex...]
-            let pub_key_len = *result.first().ok_or(LedgerError::ShortResponse {
-                got: result.len(),
-                expected: 1,
-            })? as usize;
+            let pub_key_len = *result
+                .first()
+                .ok_or(LedgerError::ShortResponse { got: result.len(), expected: 1 })?
+                as usize;
             let offset = 1 + pub_key_len;
-            let addr_len = *result.get(offset).ok_or(LedgerError::ShortResponse {
-                got: result.len(),
-                expected: offset + 1,
-            })? as usize;
+            let addr_len = *result
+                .get(offset)
+                .ok_or(LedgerError::ShortResponse { got: result.len(), expected: offset + 1 })?
+                as usize;
             let end = offset + 1 + addr_len;
-            let address_str =
-                result.get(offset + 1..end).ok_or(LedgerError::ShortResponse {
-                    got: result.len(),
-                    expected: end,
-                })?;
+            let address_str = result
+                .get(offset + 1..end)
+                .ok_or(LedgerError::ShortResponse { got: result.len(), expected: end })?;
             let mut address = [0; 20];
             address.copy_from_slice(&hex::decode(address_str)?);
             address.into()
