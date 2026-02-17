@@ -87,7 +87,7 @@ pub struct SimulatedBlock<B = Block> {
 
 /// Captures the outcome of a transaction simulation.
 /// It includes the return value, logs produced, gas used, and the status of the transaction.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimCallResult {
