@@ -71,17 +71,13 @@ mod tests {
 
     impl RlpEncodableReceipt for TypedReceipt {
         fn rlp_encoded_length_with_bloom(&self, bloom: &alloy_primitives::Bloom) -> usize {
-            let mut payload_length = self.eip2718_encoded_length_with_bloom(bloom);
+            let payload_length = self.eip2718_encoded_length_with_bloom(bloom);
 
             if !self.ty.is_legacy() {
-                payload_length += alloy_rlp::Header {
-                    list: false,
-                    payload_length: self.eip2718_encoded_length_with_bloom(bloom),
-                }
-                .length();
+                payload_length + alloy_rlp::Header { list: false, payload_length }.length()
+            } else {
+                payload_length
             }
-
-            payload_length
         }
 
         fn rlp_encode_with_bloom(
@@ -90,11 +86,8 @@ mod tests {
             out: &mut dyn alloy_rlp::BufMut,
         ) {
             if !self.ty.is_legacy() {
-                alloy_rlp::Header {
-                    list: false,
-                    payload_length: self.eip2718_encoded_length_with_bloom(bloom),
-                }
-                .encode(out)
+                let payload_length = self.eip2718_encoded_length_with_bloom(bloom);
+                alloy_rlp::Header { list: false, payload_length }.encode(out)
             }
             self.eip2718_encode_with_bloom(bloom, out);
         }
