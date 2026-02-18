@@ -20,7 +20,7 @@ use alloy_eips::{
     eip7840::BlobParams,
     BlockNumHash,
 };
-use alloy_primitives::{Address, Bloom, Bytes, Sealable, B256, B64, U256};
+use alloy_primitives::{keccak256, Address, Bloom, Bytes, Sealable, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
@@ -1329,6 +1329,34 @@ impl ExecutionPayloadV4 {
 
         Ok(base_block)
     }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions using the
+    /// given `transactions_root`.
+    ///
+    /// See also [`ExecutionPayloadV1::into_block_raw_with_transactions_root`].
+    pub fn into_block_raw_with_transactions_root(
+        self,
+        transactions_root: B256,
+    ) -> Result<Block<Bytes>, PayloadError> {
+        self.into_block_raw_with_transactions_root_opt(Some(transactions_root))
+    }
+
+    /// Converts [`ExecutionPayloadV4`] to [`Block`] with raw [`Bytes`] transactions, optionally
+    /// using the given `transactions_root`.
+    ///
+    /// If `transactions_root` is `None`, it will be computed from the transactions.
+    pub fn into_block_raw_with_transactions_root_opt(
+        self,
+        transactions_root: Option<B256>,
+    ) -> Result<Block<Bytes>, PayloadError> {
+        let mut base_block =
+            self.payload_inner.into_block_raw_with_transactions_root_opt(transactions_root)?;
+
+        base_block.header.block_access_list_hash = Some(keccak256(self.block_access_list));
+        base_block.header.slot_number = Some(self.slot_number);
+
+        Ok(base_block)
+    }
 }
 
 impl<T: Decodable2718> TryFrom<ExecutionPayloadV4> for Block<T> {
@@ -1973,7 +2001,7 @@ impl ExecutionPayload {
                 payload.into_block_raw_with_transactions_root_opt(transactions_root)
             }
             Self::V4(payload) => {
-                payload.payload_inner.into_block_raw_with_transactions_root_opt(transactions_root)
+                payload.into_block_raw_with_transactions_root_opt(transactions_root)
             }
         }
     }
