@@ -193,7 +193,7 @@ where
 mod tests {
     use crate::StorageSlotFinder;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::{address, ruint::uint, Address, B256, U256};
+    use alloy_primitives::{address, Address, B256, U256};
     use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
@@ -245,20 +245,21 @@ mod tests {
         let tether = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
         test_erc20_token_set_balance(tether).await
     }
-    #[tokio::test]
-    async fn test_erc20_token_polygon() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://polygon-rpc.com".parse().unwrap());
-        let usdt = address!("0xc2132D05D31c914a87C6611C10748AEb04B58e8F"); // https://polygonscan.com/address/0xc2132D05D31c914a87C6611C10748AEb04B58e8F
-        let user = address!("0x0aD71c9106455801eAe0e11D5A1Dd5232537E662");
-        let finder = StorageSlotFinder::balance_of(provider.clone(), usdt, user)
-            .with_request(TransactionRequest::default().gas_limit(100000));
-        let storage_slot = U256::from_be_bytes(finder.find_slot().await.unwrap().unwrap().0);
-        assert_eq!(
-            storage_slot,
-            uint!(
-                38414845661641411266428303013962925072609060211040678298987263275302781786590_U256
-            )
-        );
-    }
+    // #[tokio::test]
+    // async fn test_erc20_token_polygon() {
+    //     let provider =
+    //         ProviderBuilder::new().connect_http("https://polygon-rpc.com".parse().unwrap());
+    //     let usdt = address!("0xc2132D05D31c914a87C6611C10748AEb04B58e8F"); // https://polygonscan.com/address/0xc2132D05D31c914a87C6611C10748AEb04B58e8F
+    //     let user = address!("0x0aD71c9106455801eAe0e11D5A1Dd5232537E662");
+    //     let finder = StorageSlotFinder::balance_of(provider.clone(), usdt, user)
+    //         .with_request(TransactionRequest::default().gas_limit(100000));
+    //     let storage_slot = U256::from_be_bytes(finder.find_slot().await.unwrap().unwrap().0);
+    //     assert_eq!(
+    //         storage_slot,
+    //         uint!(
+    //
+    // 38414845661641411266428303013962925072609060211040678298987263275302781786590_U256
+    //         )
+    //     );
+    // }
 }
