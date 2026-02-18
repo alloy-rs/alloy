@@ -1358,6 +1358,8 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
             #[serde(with = "alloy_serde::quantity")]
             excess_blob_gas: u64,
             block_access_list: Bytes,
+            #[serde(with = "alloy_serde::quantity")]
+            slot_number: u64,
         }
 
         let helper = Helper::deserialize(deserializer)?;
@@ -1386,6 +1388,7 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayloadV4 {
                 excess_blob_gas: helper.excess_blob_gas,
             },
             block_access_list: helper.block_access_list,
+            slot_number: helper.slot_number,
         })
     }
 }
@@ -4377,6 +4380,7 @@ mod tests {
                 excess_blob_gas: 0,
             },
             block_access_list: Bytes::from(vec![0xaa, 0xbb]),
+            slot_number: 0,
         };
 
         let serialized = serde_json::to_string(&payload).unwrap();
