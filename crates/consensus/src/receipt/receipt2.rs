@@ -178,8 +178,8 @@ impl<T: TxTy> RlpEncodableReceipt for EthereumReceipt<T> {
 
     fn rlp_encode_with_bloom(&self, bloom: &Bloom, out: &mut dyn BufMut) {
         if !self.tx_type.is_legacy() {
-            Header { list: false, payload_length: self.eip2718_encoded_length_with_bloom(bloom) }
-                .encode(out);
+            let payload_length = self.eip2718_encoded_length_with_bloom(bloom);
+            Header { list: false, payload_length }.encode(out);
         }
         self.eip2718_encode_with_bloom(bloom, out);
     }
