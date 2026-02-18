@@ -232,7 +232,7 @@ pub trait SignerRecoverable {
         buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<Address, RecoveryError> {
         let _ = buf;
-        self.recover_signer()
+        self.recover_signer_unchecked()
     }
 
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a
