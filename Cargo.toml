@@ -163,6 +163,7 @@ semver = "1.0"
 strum = { version = "0.27", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 url = "2.5"
+ref-cast = "1.0"
 
 # misc-testing
 arbitrary = "1.3"

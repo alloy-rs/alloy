@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
 use derive_more::derive::{AsRef, Deref, DerefMut, From, IntoIterator};
+use ref_cast::RefCast;
 
 /// Multiplier for converting gwei to wei.
 pub const GWEI_TO_WEI: u64 = 1_000_000_000;
@@ -55,7 +56,9 @@ impl Withdrawal {
     IntoIterator,
     RlpEncodableWrapper,
     RlpDecodableWrapper,
+    RefCast,
 )]
+#[repr(transparent)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
