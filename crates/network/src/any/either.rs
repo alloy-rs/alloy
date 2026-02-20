@@ -1,13 +1,14 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
-    error::ValueError, transaction::Either, Signed, Transaction as TransactionTrait, TxEip1559,
-    TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
+    error::ValueError, transaction::Either, SignableTransaction, Signed,
+    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope,
+    TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip7702::SignedAuthorization,
 };
-use alloy_primitives::{Bytes, ChainId, B256, U256};
+use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, B256, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
@@ -199,6 +200,29 @@ impl Typed2718 for AnyTypedTransaction {
         match self {
             Self::Ethereum(inner) => inner.ty(),
             Self::Unknown(inner) => inner.ty(),
+        }
+    }
+}
+
+impl SignableTransaction<Signature> for AnyTypedTransaction {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.set_chain_id(chain_id),
+            Self::Unknown(_) => (),
+        }
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.encode_for_signing(out),
+            Self::Unknown(_) => (),
+        }
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.payload_len_for_signature(),
+            Self::Unknown(_) => 0,
         }
     }
 }
