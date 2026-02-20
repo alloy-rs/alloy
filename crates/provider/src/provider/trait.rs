@@ -722,17 +722,17 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_eips::BlockNumberOrTag;
-    /// use alloy_provider::{Provider, ProviderBuilder};
-    /// use alloy_rpc_client::RpcClient;
-    /// use alloy_rpc_types_eth::Filter;
-    /// use alloy_transport::{
-    ///     layers::{RetryBackoffLayer, RetryPolicy},
-    ///     mock::{Asserter, MockTransport},
-    ///     TransportError,
-    /// };
-    /// use futures::StreamExt;
-    /// use std::time::Duration;
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use alloy_transport::{
+    /// #     layers::{RetryBackoffLayer, RetryPolicy},
+    /// #     mock::{Asserter, MockTransport},
+    /// #     TransportError,
+    /// # };
+    /// # use futures::StreamExt;
+    /// # use std::time::Duration;
     ///
     /// #[derive(Clone, Debug)]
     /// struct AlwaysRetryPolicy;
@@ -785,16 +785,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// ```no_run
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_eips::BlockNumberOrTag;
-    /// use alloy_provider::{Provider, ProviderBuilder};
-    /// use alloy_rpc_client::RpcClient;
-    /// use alloy_transport::{
-    ///     layers::{RetryBackoffLayer, RetryPolicy},
-    ///     mock::{Asserter, MockTransport},
-    ///     TransportError,
-    /// };
-    /// use futures::StreamExt;
-    /// use std::time::Duration;
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::{RetryBackoffLayer, RetryPolicy},
+    /// #     mock::{Asserter, MockTransport},
+    /// #     TransportError,
+    /// # };
+    /// # use futures::StreamExt;
+    /// # use std::time::Duration;
     ///
     /// #[derive(Clone, Debug)]
     /// struct AlwaysRetryPolicy;
