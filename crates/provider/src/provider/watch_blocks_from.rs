@@ -3,19 +3,12 @@ use alloy_eips::BlockNumberOrTag;
 use alloy_json_rpc::RpcError;
 use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
-use alloy_rpc_client::{ClientRef, WeakClient};
+use alloy_rpc_client::WeakClient;
 use alloy_transport::TransportResult;
-use async_stream::stream;
 use futures::Stream;
 use std::{marker::PhantomData, time::Duration};
 
-use super::watch_logs::fetch_head_block;
-
-#[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::sleep;
-
-#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-use tokio::time::sleep;
+use super::watch_from_common::{stream_from_head, StepFn};
 
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(7);
 
@@ -74,79 +67,27 @@ impl<N: Network> WatchBlocksFrom<N> {
     ) -> impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin + 'static {
         let Self { client, start_block, poll_interval, block_tag, kind, _phantom } = self;
 
-        let stream = stream! {
-            let mut current_block = start_block;
+        let full = kind.is_full();
+        let hashes = kind.is_hashes();
+        let step: StepFn<N::BlockResponse> = Box::new(move |client, current_block, _head| {
+            Box::pin(async move {
+                let block = client
+                    .request("eth_getBlockByNumber", (BlockNumberOrTag::from(current_block), full))
+                    .await?;
+                let block = if hashes { utils::convert_to_hashes(block) } else { block };
+                let block = block.ok_or(RpcError::NullResp)?;
+                Ok((current_block.saturating_add(1), block))
+            })
+        });
 
-            'task: loop {
-                let Some(client) = client.upgrade() else {
-                    break 'task;
-                };
-
-                let head = match fetch_head_block::<N::HeaderResponse>(client.as_ref(), block_tag).await {
-                    Ok(head) => head,
-                    Err(err) => {
-                        yield Err(err);
-                        sleep(poll_interval).await;
-                        continue 'task;
-                    }
-                };
-
-                if current_block > head {
-                    sleep(poll_interval).await;
-                    continue 'task;
-                }
-
-                while current_block <= head {
-                    let block = match fetch_block::<N>(
-                        client.as_ref(),
-                        current_block,
-                        kind.is_full(),
-                    )
-                    .await
-                    {
-                        Ok(Some(block)) => Some(block),
-                        Ok(None) => {
-                            yield Err(RpcError::NullResp);
-                            sleep(poll_interval).await;
-                            continue 'task;
-                        }
-                        Err(err) => {
-                            yield Err(err);
-                            sleep(poll_interval).await;
-                            continue 'task;
-                        }
-                    };
-
-                    let block = if kind.is_hashes() {
-                        utils::convert_to_hashes(block)
-                    } else {
-                        block
-                    };
-
-                    let Some(block) = block else {
-                        yield Err(RpcError::NullResp);
-                        sleep(poll_interval).await;
-                        continue 'task;
-                    };
-
-                    current_block = current_block.saturating_add(1);
-                    yield Ok(block);
-                }
-
-                sleep(poll_interval).await;
-            }
-        };
-
-        Box::pin(stream)
+        stream_from_head::<N::BlockResponse, N::HeaderResponse>(
+            client,
+            start_block,
+            poll_interval,
+            block_tag,
+            step,
+        )
     }
-}
-
-async fn fetch_block<N: Network>(
-    client: ClientRef<'_>,
-    number: u64,
-    full: bool,
-) -> TransportResult<Option<N::BlockResponse>> {
-    client.request("eth_getBlockByNumber", (BlockNumberOrTag::from(number), full)).await
 }
 
 #[cfg(test)]

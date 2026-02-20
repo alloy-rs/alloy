@@ -6,6 +6,8 @@ mod get_block;
 pub use get_block::SubFullBlocks;
 pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 
+mod watch_from_common;
+
 mod watch_logs;
 pub use watch_logs::WatchLogsFrom;
 
