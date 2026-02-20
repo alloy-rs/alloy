@@ -59,6 +59,9 @@ impl WatchLogsFrom {
     ///
     /// This can be buffered by the caller, for example with
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).
+    ///
+    /// This method does not implement retries internally. Configure retries on the underlying
+    /// client transport (for example with `RetryBackoffLayer`) if desired.
     pub fn into_stream(self) -> impl Stream<Item = RequestFuture<Vec<Log>>> + Unpin + 'static {
         let Self { client, start_block, filter, window_size, poll_interval, block_tag } = self;
 

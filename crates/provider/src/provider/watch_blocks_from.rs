@@ -1,11 +1,16 @@
 use crate::utils;
 use alloy_eips::BlockNumberOrTag;
-use alloy_json_rpc::RpcError;
 use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_rpc_client::WeakClient;
 use futures::Stream;
 use std::{marker::PhantomData, time::Duration};
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use tokio::time::sleep;
 
 use super::watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture};
 
@@ -64,6 +69,11 @@ impl<N: Network> WatchBlocksFrom<N> {
     ///
     /// Each future represents one `eth_getBlockByNumber` request for a single block.
     ///
+    /// If a request returns `NullResp`, the yielded future retries the same block until it
+    /// succeeds.
+    ///
+    /// Other request errors are surfaced to the caller.
+    ///
     /// This can be buffered by the caller, for example with
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).
     pub fn into_stream(
@@ -75,12 +85,19 @@ impl<N: Network> WatchBlocksFrom<N> {
         let hashes = kind.is_hashes();
         let step: FutureStepFn<N::BlockResponse> = Box::new(move |client, current_block, _head| {
             let fut: RequestFuture<N::BlockResponse> = Box::pin(async move {
-                let block = client
-                    .request("eth_getBlockByNumber", (BlockNumberOrTag::from(current_block), full))
-                    .await?;
-                let block = if hashes { utils::convert_to_hashes(block) } else { block };
-                let block = block.ok_or(RpcError::NullResp)?;
-                Ok(block)
+                loop {
+                    let block = client
+                        .request(
+                            "eth_getBlockByNumber",
+                            (BlockNumberOrTag::from(current_block), full),
+                        )
+                        .await?;
+                    let block = if hashes { utils::convert_to_hashes(block) } else { block };
+                    match block {
+                        Some(block) => return Ok(block),
+                        None => sleep(poll_interval).await,
+                    }
+                }
             });
             (current_block.saturating_add(1), fut)
         });
@@ -161,6 +178,33 @@ mod tests {
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
+
+        let second =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(second.header.number, 2);
+    }
+
+    #[tokio::test]
+    async fn retries_same_block_after_null_response() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let no_block: Option<Block> = None;
+        asserter.push_success(&1_u64);
+        asserter.push_success(&no_block);
+        asserter.push_success(&Some(block(1)));
+        asserter.push_success(&2_u64);
+        asserter.push_success(&Some(block(2)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream()
+            .buffered(1);
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.header.number, 1);
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
@@ -343,6 +387,32 @@ mod tests {
         asserter.push_success(&2_u64);
         asserter.push_success(&Some(block(1)));
         asserter.push_success(&Some(block(2)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream()
+            .buffered(2);
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.header.number, 1);
+
+        let second =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(second.header.number, 2);
+    }
+
+    #[tokio::test]
+    async fn buffered_stream_does_not_skip_after_null_response() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let no_block: Option<Block> = None;
+        asserter.push_success(&2_u64);
+        asserter.push_success(&no_block);
+        asserter.push_success(&Some(block(2)));
+        asserter.push_success(&Some(block(1)));
 
         let mut stream = provider
             .watch_blocks_from(1)

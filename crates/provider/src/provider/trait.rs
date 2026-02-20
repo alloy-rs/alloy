@@ -753,17 +753,21 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
     /// let provider = ProviderBuilder::new().connect_client(client);
     ///
-    /// let mut stream = provider
+    /// provider
     ///     .watch_logs_from(20_000_000, &Filter::new())
     ///     .block_tag(BlockNumberOrTag::Safe)
     ///     .window_size(500)
     ///     .into_stream()
-    ///     .buffered(8);
-    ///
-    /// if let Some(window) = stream.next().await {
-    ///     let logs = window?;
-    ///     println!("received {} logs", logs.len());
-    /// }
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(8)
+    ///     // Process many resolved windows concurrently.
+    ///     .for_each_concurrent(Some(8), |window| async move {
+    ///         match window {
+    ///             Ok(logs) => println!("received {} logs", logs.len()),
+    ///             Err(err) => eprintln!("window request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
     /// # Ok(())
     /// # }
     /// ```
@@ -778,8 +782,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// Each yielded future contains one block request.
     ///
-    /// This method does not implement retries internally. Configure retries on the underlying
-    /// client transport (for example with `RetryBackoffLayer`) if desired.
+    /// If a block request returns `NullResp`, the yielded future retries the same block until it
+    /// succeeds.
+    ///
+    /// Other errors are surfaced to the caller. Configure retries on the underlying client
+    /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
     ///
     /// # Examples
     ///
@@ -815,17 +822,23 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
     /// let provider = ProviderBuilder::new().connect_client(client);
     ///
-    /// let mut stream = provider
+    /// provider
     ///     .watch_blocks_from(20_000_000)
     ///     .block_tag(BlockNumberOrTag::Finalized)
     ///     .full()
     ///     .into_stream()
-    ///     .buffered(4);
-    ///
-    /// if let Some(block) = stream.next().await {
-    ///     let block = block?;
-    ///     let _ = block;
-    /// }
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(4)
+    ///     // Process many resolved blocks concurrently.
+    ///     .for_each_concurrent(Some(4), |block| async move {
+    ///         match block {
+    ///             Ok(block) => {
+    ///                 let _ = block;
+    ///             }
+    ///             Err(err) => eprintln!("block request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
     /// # Ok(())
     /// # }
     /// ```
