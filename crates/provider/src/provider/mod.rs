@@ -8,8 +8,8 @@ pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 
 mod watch_from_common;
 
-mod watch_logs;
-pub use watch_logs::WatchLogsFrom;
+mod watch_logs_from;
+pub use watch_logs_from::WatchLogsFrom;
 
 mod watch_blocks_from;
 pub use watch_blocks_from::WatchBlocksFrom;

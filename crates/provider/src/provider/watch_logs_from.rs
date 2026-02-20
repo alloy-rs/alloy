@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use super::watch_from_common::{stream_from_head, StepFn};
 
-const DEFAULT_WINDOW_SIZE: u64 = 2_000;
-const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(7);
+const DEFAULT_WINDOW_SIZE: u64 = 1000;
+const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 /// A builder for streaming logs from a historical block and continuing indefinitely.
 #[derive(Debug)]
@@ -128,5 +128,82 @@ mod tests {
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(second.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn waits_until_head_reaches_start_block() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let one_log: Vec<Log> = vec![Log::default()];
+        asserter.push_success(&9_u64);
+        asserter.push_success(&10_u64);
+        asserter.push_success(&one_log);
+
+        let mut stream = provider
+            .watch_logs_from(10, &Filter::new())
+            .block_tag(BlockNumberOrTag::Latest)
+            .window_size(2)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn window_size_zero_is_clamped_to_one() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let one_log: Vec<Log> = vec![Log::default()];
+        let no_logs: Vec<Log> = Vec::new();
+        asserter.push_success(&11_u64);
+        asserter.push_success(&one_log);
+        asserter.push_success(&no_logs);
+
+        let mut stream = provider
+            .watch_logs_from(10, &Filter::new())
+            .block_tag(BlockNumberOrTag::Latest)
+            .window_size(0)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.len(), 1);
+
+        let second =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert!(second.is_empty());
+    }
+
+    #[tokio::test]
+    async fn fixed_block_tag_number_does_not_fetch_head() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let one_log: Vec<Log> = vec![Log::default()];
+        asserter.push_success(&one_log);
+
+        let mut stream = provider
+            .watch_logs_from(10, &Filter::new())
+            .block_tag(BlockNumberOrTag::Number(10))
+            .window_size(10)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn stream_ends_when_provider_is_dropped() {
+        let provider =
+            ProviderBuilder::new().connect_mocked_client(alloy_transport::mock::Asserter::new());
+        let mut stream = provider.watch_logs_from(0, &Filter::new()).into_stream();
+        drop(provider);
+
+        let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
+        assert!(next.is_none());
     }
 }

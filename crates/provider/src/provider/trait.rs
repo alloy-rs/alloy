@@ -714,6 +714,28 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// This method does not implement retries internally. Configure retries on the underlying
     /// client transport (for example with `RetryBackoffLayer`) if desired.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_eips::BlockNumberOrTag;
+    /// use alloy_rpc_types_eth::Filter;
+    /// use futures::StreamExt;
+    ///
+    /// let mut stream = provider
+    ///     .watch_logs_from(20_000_000, &Filter::new())
+    ///     .block_tag(BlockNumberOrTag::Safe)
+    ///     .window_size(500)
+    ///     .into_stream();
+    ///
+    /// if let Some(window) = stream.next().await {
+    ///     let logs = window?;
+    ///     println!("received {} logs", logs.len());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom {
         WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
     }
@@ -725,6 +747,27 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// This method does not implement retries internally. Configure retries on the underlying
     /// client transport (for example with `RetryBackoffLayer`) if desired.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_eips::BlockNumberOrTag;
+    /// use futures::StreamExt;
+    ///
+    /// let mut stream = provider
+    ///     .watch_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .into_stream();
+    ///
+    /// if let Some(block) = stream.next().await {
+    ///     let block = block?;
+    ///     let _ = block;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
         WatchBlocksFrom::new(self.weak_client(), start_block)
     }

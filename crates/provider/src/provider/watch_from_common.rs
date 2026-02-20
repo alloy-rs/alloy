@@ -74,7 +74,7 @@ where
     Box::pin(stream)
 }
 
-pub(super) async fn fetch_head_block<HeaderResp: HeaderResponse + RpcRecv>(
+async fn fetch_head_block<HeaderResp: HeaderResponse + RpcRecv>(
     client: ClientRef<'_>,
     tag: BlockNumberOrTag,
 ) -> TransportResult<u64> {

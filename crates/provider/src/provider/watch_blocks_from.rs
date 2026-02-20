@@ -200,4 +200,68 @@ mod tests {
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.header.number, 1);
     }
+
+    #[tokio::test]
+    async fn waits_until_head_reaches_start_block() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&0_u64);
+        asserter.push_success(&1_u64);
+        asserter.push_success(&Some(block(1)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.header.number, 1);
+    }
+
+    #[tokio::test]
+    async fn fixed_block_tag_number_does_not_fetch_head() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&Some(block(5)));
+
+        let mut stream = provider
+            .watch_blocks_from(5)
+            .block_tag(BlockNumberOrTag::Number(5))
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.header.number, 5);
+    }
+
+    #[tokio::test]
+    async fn earliest_block_tag_starts_at_zero() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&Some(block(0)));
+
+        let mut stream = provider
+            .watch_blocks_from(0)
+            .block_tag(BlockNumberOrTag::Earliest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.header.number, 0);
+    }
+
+    #[tokio::test]
+    async fn stream_ends_when_provider_is_dropped() {
+        let provider =
+            ProviderBuilder::new().connect_mocked_client(alloy_transport::mock::Asserter::new());
+        let mut stream = provider.watch_blocks_from(0).into_stream();
+        drop(provider);
+
+        let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
+        assert!(next.is_none());
+    }
 }
