@@ -193,7 +193,7 @@ where
 mod tests {
     use crate::StorageSlotFinder;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::{address, ruint::uint, Address, B256, U256};
+    use alloy_primitives::{address, Address, B256, U256};
     use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
