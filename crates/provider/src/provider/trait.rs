@@ -4,7 +4,9 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+use super::{
+    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom, WatchLogsFrom,
+};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -703,6 +705,28 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Stream logs from a historical block using windowed `eth_getLogs` calls.
+    ///
+    /// This stream keeps polling after catching up and continues yielding new log windows
+    /// indefinitely.
+    ///
+    /// This method does not implement retries internally. Configure retries on the underlying
+    /// client transport (for example with `RetryBackoffLayer`) if desired.
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom {
+        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
+    }
+
+    /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
+    ///
+    /// This stream keeps polling after catching up and continues yielding new blocks
+    /// indefinitely.
+    ///
+    /// This method does not implement retries internally. Configure retries on the underlying
+    /// client transport (for example with `RetryBackoffLayer`) if desired.
+    fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
+        WatchBlocksFrom::new(self.weak_client(), start_block)
     }
 
     /// Watch for new pending transaction bodies by polling the provider with
