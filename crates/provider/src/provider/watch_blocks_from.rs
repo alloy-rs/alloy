@@ -62,6 +62,8 @@ impl<N: Network> WatchBlocksFrom<N> {
 
     /// Converts this builder into a stream of request futures.
     ///
+    /// Each future represents one `eth_getBlockByNumber` request for a single block.
+    ///
     /// This can be buffered by the caller, for example with
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).
     pub fn into_stream(
@@ -163,6 +165,30 @@ mod tests {
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(second.header.number, 2);
+    }
+
+    #[tokio::test]
+    async fn recovers_after_head_fetch_error() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_failure_msg("head boom");
+        asserter.push_success(&1_u64);
+        asserter.push_success(&Some(block(1)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream()
+            .buffered(1);
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
+        assert!(first.is_err());
+
+        let second =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(second.header.number, 1);
     }
 
     #[tokio::test]
@@ -268,6 +294,45 @@ mod tests {
 
         let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
         assert!(next.is_none());
+    }
+
+    #[tokio::test]
+    async fn yielded_future_outlives_provider() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&1_u64);
+        asserter.push_success(&Some(block(1)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let fut = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
+        drop(stream);
+        drop(provider);
+
+        let block = timeout(Duration::from_secs(1), fut).await.unwrap().unwrap();
+        assert_eq!(block.header.number, 1);
+    }
+
+    #[tokio::test]
+    async fn errors_when_cursor_cannot_advance() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+
+        let mut stream = provider
+            .watch_blocks_from(u64::MAX)
+            .block_tag(BlockNumberOrTag::Number(u64::MAX))
+            .poll_interval(Duration::from_millis(1))
+            .into_stream()
+            .buffered(1);
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
+        let err = first.unwrap_err();
+        assert!(err.is_local_usage_error());
     }
 
     #[tokio::test]
