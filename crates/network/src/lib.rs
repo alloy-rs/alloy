@@ -62,7 +62,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The network transaction envelope type.
     #[doc(alias = "TransactionEnvelope")]
-    type TxEnvelope: Eip2718Envelope + Transaction + Debug;
+    type TxEnvelope: Eip2718Envelope + Transaction + Debug + Clone;
 
     /// An enum over the various transaction types.
     #[doc(alias = "UnsignedTransaction")]
