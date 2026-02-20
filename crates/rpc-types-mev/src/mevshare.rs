@@ -154,7 +154,7 @@ impl EventHistoryParams {
 }
 
 /// 4-byte-function selector
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionSelector(pub [u8; 4]);
 
 // === impl FunctionSelector ===
