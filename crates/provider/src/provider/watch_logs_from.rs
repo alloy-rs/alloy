@@ -1,11 +1,10 @@
 use alloy_eips::BlockNumberOrTag;
 use alloy_rpc_client::WeakClient;
 use alloy_rpc_types_eth::{Filter, Header, Log};
-use alloy_transport::TransportResult;
 use futures::Stream;
 use std::time::Duration;
 
-use super::watch_from_common::{stream_from_head, StepFn};
+use super::watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture};
 
 const DEFAULT_WINDOW_SIZE: u64 = 1000;
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -53,21 +52,30 @@ impl WatchLogsFrom {
         self
     }
 
-    /// Converts this builder into a stream of log windows.
-    pub fn into_stream(self) -> impl Stream<Item = TransportResult<Vec<Log>>> + Unpin + 'static {
+    /// Converts this builder into a stream of request futures.
+    ///
+    /// This can be buffered by the caller, for example with
+    /// [`StreamExt::buffered`](futures::StreamExt::buffered).
+    pub fn into_stream(self) -> impl Stream<Item = RequestFuture<Vec<Log>>> + Unpin + 'static {
         let Self { client, start_block, filter, window_size, poll_interval, block_tag } = self;
 
-        let step: StepFn<Vec<Log>> = Box::new(move |client, current_block, head| {
-            let filter = filter.clone();
-            Box::pin(async move {
-                let to_block = current_block.saturating_add(window_size - 1).min(head);
-                let window_filter = filter.from_block(current_block).to_block(to_block);
+        let step: FutureStepFn<Vec<Log>> = Box::new(move |client, current_block, head| {
+            let to_block = current_block.saturating_add(window_size - 1).min(head);
+            let window_filter = filter.clone().from_block(current_block).to_block(to_block);
+            let fut: RequestFuture<Vec<Log>> = Box::pin(async move {
                 let logs = client.request("eth_getLogs", (window_filter,)).await?;
-                Ok((to_block.saturating_add(1), logs))
-            })
+                Ok(logs)
+            });
+            (to_block.saturating_add(1), fut)
         });
 
-        stream_from_head::<Vec<Log>, Header>(client, start_block, poll_interval, block_tag, step)
+        stream_from_head_futures::<Vec<Log>, Header>(
+            client,
+            start_block,
+            poll_interval,
+            block_tag,
+            step,
+        )
     }
 }
 
@@ -94,7 +102,8 @@ mod tests {
             .block_tag(BlockNumberOrTag::Latest)
             .window_size(2)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.len(), 1);
@@ -105,14 +114,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retries_same_window_after_error() {
+    async fn advances_to_next_window_after_error() {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
 
         let one_log: Vec<Log> = vec![Log::default()];
         asserter.push_success(&11_u64);
         asserter.push_failure_msg("boom");
-        asserter.push_success(&11_u64);
+        asserter.push_success(&12_u64);
         asserter.push_success(&one_log);
 
         let mut stream = provider
@@ -120,7 +129,8 @@ mod tests {
             .block_tag(BlockNumberOrTag::Latest)
             .window_size(2)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
@@ -145,7 +155,8 @@ mod tests {
             .block_tag(BlockNumberOrTag::Latest)
             .window_size(2)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.len(), 1);
@@ -167,7 +178,8 @@ mod tests {
             .block_tag(BlockNumberOrTag::Latest)
             .window_size(0)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.len(), 1);
@@ -190,7 +202,8 @@ mod tests {
             .block_tag(BlockNumberOrTag::Number(10))
             .window_size(10)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.len(), 1);
@@ -205,5 +218,32 @@ mod tests {
 
         let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
         assert!(next.is_none());
+    }
+
+    #[tokio::test]
+    async fn future_stream_can_be_buffered() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        let one_log: Vec<Log> = vec![Log::default()];
+        let no_logs: Vec<Log> = Vec::new();
+        asserter.push_success(&13_u64);
+        asserter.push_success(&one_log);
+        asserter.push_success(&no_logs);
+
+        let mut stream = provider
+            .watch_logs_from(10, &Filter::new())
+            .block_tag(BlockNumberOrTag::Latest)
+            .window_size(2)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream()
+            .buffered(2);
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.len(), 1);
+
+        let second =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert!(second.is_empty());
     }
 }

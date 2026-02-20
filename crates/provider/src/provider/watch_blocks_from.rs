@@ -4,13 +4,12 @@ use alloy_json_rpc::RpcError;
 use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_rpc_client::WeakClient;
-use alloy_transport::TransportResult;
 use futures::Stream;
 use std::{marker::PhantomData, time::Duration};
 
-use super::watch_from_common::{stream_from_head, StepFn};
+use super::watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture};
 
-const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(7);
+const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 /// A builder for streaming blocks from a historical block and continuing indefinitely.
 #[derive(Debug)]
@@ -61,26 +60,30 @@ impl<N: Network> WatchBlocksFrom<N> {
         self
     }
 
-    /// Converts this builder into a stream of blocks.
+    /// Converts this builder into a stream of request futures.
+    ///
+    /// This can be buffered by the caller, for example with
+    /// [`StreamExt::buffered`](futures::StreamExt::buffered).
     pub fn into_stream(
         self,
-    ) -> impl Stream<Item = TransportResult<N::BlockResponse>> + Unpin + 'static {
+    ) -> impl Stream<Item = RequestFuture<N::BlockResponse>> + Unpin + 'static {
         let Self { client, start_block, poll_interval, block_tag, kind, _phantom } = self;
 
         let full = kind.is_full();
         let hashes = kind.is_hashes();
-        let step: StepFn<N::BlockResponse> = Box::new(move |client, current_block, _head| {
-            Box::pin(async move {
+        let step: FutureStepFn<N::BlockResponse> = Box::new(move |client, current_block, _head| {
+            let fut: RequestFuture<N::BlockResponse> = Box::pin(async move {
                 let block = client
                     .request("eth_getBlockByNumber", (BlockNumberOrTag::from(current_block), full))
                     .await?;
                 let block = if hashes { utils::convert_to_hashes(block) } else { block };
                 let block = block.ok_or(RpcError::NullResp)?;
-                Ok((current_block.saturating_add(1), block))
-            })
+                Ok(block)
+            });
+            (current_block.saturating_add(1), fut)
         });
 
-        stream_from_head::<N::BlockResponse, N::HeaderResponse>(
+        stream_from_head_futures::<N::BlockResponse, N::HeaderResponse>(
             client,
             start_block,
             poll_interval,
@@ -123,7 +126,8 @@ mod tests {
             .watch_blocks_from(1)
             .block_tag(BlockNumberOrTag::Latest)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.header.number, 1);
@@ -137,31 +141,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retries_same_block_after_error() {
+    async fn advances_to_next_block_after_error() {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
 
-        asserter.push_success(&2_u64);
+        asserter.push_success(&1_u64);
         asserter.push_failure_msg("boom");
         asserter.push_success(&2_u64);
-        asserter.push_success(&Some(block(1)));
         asserter.push_success(&Some(block(2)));
 
         let mut stream = provider
             .watch_blocks_from(1)
             .block_tag(BlockNumberOrTag::Latest)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
         assert!(first.is_err());
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.header.number, 1);
-
-        let third = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(third.header.number, 2);
+        assert_eq!(second.header.number, 2);
     }
 
     #[tokio::test]
@@ -195,7 +196,8 @@ mod tests {
             .watch_blocks_from(1)
             .block_tag(BlockNumberOrTag::Latest)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.header.number, 1);
@@ -214,7 +216,8 @@ mod tests {
             .watch_blocks_from(1)
             .block_tag(BlockNumberOrTag::Latest)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.header.number, 1);
@@ -231,7 +234,8 @@ mod tests {
             .watch_blocks_from(5)
             .block_tag(BlockNumberOrTag::Number(5))
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.header.number, 5);
@@ -248,7 +252,8 @@ mod tests {
             .watch_blocks_from(0)
             .block_tag(BlockNumberOrTag::Earliest)
             .poll_interval(Duration::from_millis(1))
-            .into_stream();
+            .into_stream()
+            .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         assert_eq!(first.header.number, 0);
@@ -263,5 +268,29 @@ mod tests {
 
         let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
         assert!(next.is_none());
+    }
+
+    #[tokio::test]
+    async fn future_stream_can_be_buffered() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&2_u64);
+        asserter.push_success(&Some(block(1)));
+        asserter.push_success(&Some(block(2)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream()
+            .buffered(2);
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(first.header.number, 1);
+
+        let second =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        assert_eq!(second.header.number, 2);
     }
 }

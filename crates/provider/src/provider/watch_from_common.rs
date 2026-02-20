@@ -2,11 +2,11 @@ use alloy_eips::BlockNumberOrTag;
 use alloy_json_rpc::{RpcError, RpcRecv};
 use alloy_network_primitives::HeaderResponse;
 use alloy_primitives::U64;
-use alloy_rpc_client::{ClientRef, WeakClient};
+use alloy_rpc_client::{ClientRef, RpcClientInner, WeakClient};
 use alloy_transport::TransportResult;
 use async_stream::stream;
 use futures::Stream;
-use std::{future::Future, pin::Pin, time::Duration};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
@@ -14,19 +14,19 @@ use wasmtimer::tokio::sleep;
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
-pub(super) type StepFuture<'a, Item> =
-    Pin<Box<dyn Future<Output = TransportResult<(u64, Item)>> + 'a>>;
+pub(super) type RequestFuture<Item> =
+    Pin<Box<dyn Future<Output = TransportResult<Item>> + 'static>>;
 
-pub(super) type StepFn<Item> =
-    Box<dyn for<'a> FnMut(ClientRef<'a>, u64, u64) -> StepFuture<'a, Item> + 'static>;
+pub(super) type FutureStepFn<Item> =
+    Box<dyn FnMut(Arc<RpcClientInner>, u64, u64) -> (u64, RequestFuture<Item>) + 'static>;
 
-pub(super) fn stream_from_head<Item, HeaderResp>(
+pub(super) fn stream_from_head_futures<Item, HeaderResp>(
     client: WeakClient,
     start_block: u64,
     poll_interval: Duration,
     block_tag: BlockNumberOrTag,
-    mut step: StepFn<Item>,
-) -> impl Stream<Item = TransportResult<Item>> + Unpin + 'static
+    mut step: FutureStepFn<Item>,
+) -> impl Stream<Item = RequestFuture<Item>> + Unpin + 'static
 where
     HeaderResp: HeaderResponse + RpcRecv + 'static,
     Item: 'static,
@@ -42,7 +42,8 @@ where
             let head = match fetch_head_block::<HeaderResp>(client.as_ref(), block_tag).await {
                 Ok(head) => head,
                 Err(err) => {
-                    yield Err(err);
+                    let fut: RequestFuture<Item> = Box::pin(async move { Err(err) });
+                    yield fut;
                     sleep(poll_interval).await;
                     continue 'task;
                 }
@@ -54,17 +55,18 @@ where
             }
 
             while current_block <= head {
-                match step(client.as_ref(), current_block, head).await {
-                    Ok((next_block, item)) => {
-                        current_block = next_block;
-                        yield Ok(item);
-                    }
-                    Err(err) => {
-                        yield Err(err);
-                        sleep(poll_interval).await;
-                        continue 'task;
-                    }
+                let (next_block, item_fut) = step(client.clone(), current_block, head);
+                if next_block <= current_block {
+                    let err = RpcError::local_usage_str(
+                        "watch stream step did not advance block cursor",
+                    );
+                    let fut: RequestFuture<Item> = Box::pin(async move { Err(err) });
+                    yield fut;
+                    sleep(poll_interval).await;
+                    continue 'task;
                 }
+                current_block = next_block;
+                yield item_fut;
             }
 
             sleep(poll_interval).await;

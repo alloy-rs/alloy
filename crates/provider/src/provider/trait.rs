@@ -727,7 +727,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     .watch_logs_from(20_000_000, &Filter::new())
     ///     .block_tag(BlockNumberOrTag::Safe)
     ///     .window_size(500)
-    ///     .into_stream();
+    ///     .into_stream()
+    ///     .buffered(8);
     ///
     /// if let Some(window) = stream.next().await {
     ///     let logs = window?;
@@ -759,7 +760,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     .watch_blocks_from(20_000_000)
     ///     .block_tag(BlockNumberOrTag::Finalized)
     ///     .full()
-    ///     .into_stream();
+    ///     .into_stream()
+    ///     .buffered(4);
     ///
     /// if let Some(block) = stream.next().await {
     ///     let block = block?;
