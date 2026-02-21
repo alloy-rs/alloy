@@ -19,6 +19,12 @@ pub use transaction::{
     TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
 };
 
+pub mod convert;
+pub use convert::{
+    FromConsensusTx, IntoRpcTx, SignTxRequestError, SignableTxRequest, TryFromReceiptResponse,
+    TryFromTransactionResponse, TryIntoSimTx,
+};
+
 mod ethereum;
 pub use ethereum::{Ethereum, EthereumWallet, IntoWallet};
 
@@ -35,6 +41,24 @@ use alloy_eips::Typed2718;
 pub use alloy_network_primitives::{
     self as primitives, BlockResponse, ReceiptResponse, TransactionResponse,
 };
+
+/// Adapter for network specific transaction response.
+pub type RpcTransaction<T> = <T as Network>::TransactionResponse;
+
+/// Adapter for network specific receipt response.
+pub type RpcReceiptEnvelope<T> = <T as Network>::ReceiptEnvelope;
+
+/// Adapter for network specific receipt response.
+pub type RpcReceiptResponse<T> = <T as Network>::ReceiptResponse;
+
+/// Adapter for network specific header response.
+pub type RpcHeader<T> = <T as Network>::Header;
+
+/// Adapter for network specific block type.
+pub type RpcBlock<T> = alloy_rpc_types_eth::Block<RpcTransaction<T>, RpcHeader<T>>;
+
+/// Adapter for network specific transaction request.
+pub type RpcTxReq<T> = <T as Network>::TransactionRequest;
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
