@@ -99,6 +99,16 @@ pub struct SimCallResult {
     /// The amount of gas used by the transaction.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
+    /// Maximum gas consumed during execution, before refunds.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
+    pub max_used_gas: Option<u64>,
     /// The final status of the transaction, typically indicating success or failure.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub status: bool,
