@@ -1,4 +1,4 @@
-use crate::WsBackend;
+use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
 use futures::{SinkExt, StreamExt};
@@ -13,8 +13,6 @@ use tokio_tungstenite::{
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
-
-const KEEPALIVE: u64 = 10;
 
 /// Simple connection details for a websocket connection.
 #[derive(Clone, Debug)]
@@ -31,6 +29,9 @@ pub struct WsConnect {
     /// The interval between retries.
     /// Default is 3 seconds.
     retry_interval: Duration,
+    /// The interval between keepalive pings.
+    /// Default is 10 seconds.
+    keepalive_interval: Duration,
 }
 
 impl WsConnect {
@@ -42,6 +43,7 @@ impl WsConnect {
             config: None,
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
+            keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
         }
     }
 
@@ -93,6 +95,18 @@ impl WsConnect {
         self.retry_interval = retry_interval;
         self
     }
+
+    /// Sets the keepalive ping interval.
+    ///
+    /// A ping is sent if no other messages have been sent within this interval.
+    /// If the server does not respond with a pong before the next ping is due,
+    /// the connection is considered dead and will be closed.
+    ///
+    /// Default is 10 seconds.
+    pub const fn with_keepalive_interval(mut self, keepalive_interval: Duration) -> Self {
+        self.keepalive_interval = keepalive_interval;
+        self
+    }
 }
 
 impl IntoClientRequest for WsConnect {
@@ -122,7 +136,7 @@ impl PubSubConnect for WsConnect {
             .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-        let backend = WsBackend { socket, interface };
+        let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
 
         backend.spawn();
 
@@ -162,7 +176,7 @@ impl WsBackend<TungsteniteStream> {
         let fut = async move {
             let mut errored = false;
             let mut expecting_pong = false;
-            let keepalive = sleep(Duration::from_secs(KEEPALIVE));
+            let keepalive = sleep(self.keepalive_interval);
             tokio::pin!(keepalive);
             loop {
                 // We bias the loop as follows
@@ -170,7 +184,7 @@ impl WsBackend<TungsteniteStream> {
                 // 2. Keepalive.
                 // 3. Response or notification from server.
                 // This ensures that keepalive is sent only if no other messages
-                // have been sent in the last 10 seconds. And prioritizes new
+                // have been sent in the keepalive interval. And prioritizes new
                 // dispatches over responses from the server. This will fail if
                 // the client saturates the task with dispatches, but that's
                 // probably not a big deal.
@@ -183,7 +197,7 @@ impl WsBackend<TungsteniteStream> {
                         match inst {
                             Some(msg) => {
                                 // Reset the keepalive timer.
-                                keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
+                                keepalive.set(sleep(self.keepalive_interval));
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
                                     errored = true;
@@ -197,7 +211,7 @@ impl WsBackend<TungsteniteStream> {
                         }
                     },
                     // Send a ping to the server, if no other messages have been
-                    // sent in the last 10 seconds.
+                    // sent within the keepalive interval.
                     _ = &mut keepalive => {
                         // Still expecting a pong from the previous ping,
                         // meaning connection is errored.
@@ -207,7 +221,7 @@ impl WsBackend<TungsteniteStream> {
                             break
                         }
                         // Reset the keepalive timer.
-                        keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
+                        keepalive.set(sleep(self.keepalive_interval));
                         if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
                             errored = true;

@@ -28,9 +28,13 @@ pub use constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, Receipt, ReceiptEnvelope,
-    ReceiptWithBloom, Receipts, RlpDecodableReceipt, RlpEncodableReceipt, TxReceipt,
+    Eip2718DecodableReceipt, Eip2718EncodableReceipt, Eip658Value, EthereumReceipt, Receipt,
+    ReceiptEnvelope, ReceiptWithBloom, Receipts, RlpDecodableReceipt, RlpEncodableReceipt,
+    TxReceipt, TxTy,
 };
+
+pub mod size;
+pub use size::InMemorySize;
 
 pub mod conditional;
 pub mod proofs;

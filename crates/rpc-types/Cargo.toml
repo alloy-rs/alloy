@@ -68,10 +68,6 @@ arbitrary = [
 	"alloy-primitives/arbitrary",
     "alloy-rpc-types-engine?/arbitrary"
 ]
-jsonrpsee-types = [
-    "alloy-rpc-types-eth?/jsonrpsee-types",
-    "alloy-rpc-types-engine?/jsonrpsee-types",
-]
 ssz = ["alloy-rpc-types-beacon?/ssz", "alloy-rpc-types-engine?/ssz"]
 k256 = ["alloy-rpc-types-eth?/k256"]
 kzg = ["alloy-rpc-types-engine?/kzg"]

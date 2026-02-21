@@ -953,7 +953,7 @@ impl serde::Serialize for Filter {
             s.serialize_field("address", &address)?;
         }
 
-        let mut filtered_topics = Vec::new();
+        let mut filtered_topics = Vec::with_capacity(self.topics.len());
         let mut filtered_topics_len = 0;
         for (i, topic) in self.topics.iter().enumerate() {
             if !topic.is_empty() {
@@ -1348,26 +1348,6 @@ impl From<u64> for FilterId {
 impl From<String> for FilterId {
     fn from(str: String) -> Self {
         Self::Str(str)
-    }
-}
-
-#[cfg(feature = "jsonrpsee-types")]
-impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
-    fn from(value: FilterId) -> Self {
-        match value {
-            FilterId::Num(n) => jsonrpsee_types::SubscriptionId::Num(n),
-            FilterId::Str(s) => jsonrpsee_types::SubscriptionId::Str(s.into()),
-        }
-    }
-}
-
-#[cfg(feature = "jsonrpsee-types")]
-impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
-    fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
-        match value {
-            jsonrpsee_types::SubscriptionId::Num(n) => n.into(),
-            jsonrpsee_types::SubscriptionId::Str(s) => s.into_owned().into(),
-        }
     }
 }
 

@@ -1,7 +1,8 @@
-use alloc::string::String;
-#[cfg(feature = "serde")]
-use alloc::vec::Vec;
-use alloy_primitives::{Address, Bytes, B256, B512, KECCAK256_EMPTY, U256};
+use alloc::{string::String, vec::Vec};
+use alloy_primitives::{
+    map::AddressHashMap, Address, Bytes, StorageKey, StorageValue, B256, B512, KECCAK256_EMPTY,
+    U256,
+};
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::TrieAccount as Account;
@@ -106,6 +107,132 @@ impl EIP1186AccountProofResponse {
             && self.balance.is_zero()
             && self.storage_hash == alloy_consensus::constants::EMPTY_ROOT_HASH
             && self.code_hash == alloy_consensus::constants::KECCAK_EMPTY
+    }
+}
+
+/// Request type for `eth_getStorageValues`.
+///
+/// Maps contract addresses to the storage slot keys to read.
+///
+/// See also <https://github.com/ethereum/execution-apis/issues/752>.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct StorageValuesRequest(pub AddressHashMap<Vec<StorageKey>>);
+
+impl StorageValuesRequest {
+    /// Creates an empty request.
+    pub fn new() -> Self {
+        Self(AddressHashMap::default())
+    }
+
+    /// Adds storage keys to read for an address, replacing any existing keys.
+    ///
+    /// ```
+    /// use alloy_primitives::{address, b256};
+    /// use alloy_rpc_types_eth::StorageValuesRequest;
+    ///
+    /// let usdt = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
+    /// let req = StorageValuesRequest::new().with_keys(
+    ///     usdt,
+    ///     vec![
+    ///         b256!("0x0000000000000000000000000000000000000000000000000000000000000002"),
+    ///         b256!("0x0000000000000000000000000000000000000000000000000000000000000006"),
+    ///     ],
+    /// );
+    /// assert_eq!(req.total_slots(), 2);
+    /// ```
+    pub fn with_keys(mut self, address: Address, keys: Vec<StorageKey>) -> Self {
+        self.0.insert(address, keys);
+        self
+    }
+
+    /// Appends a single storage key for an address.
+    ///
+    /// If the address already has keys, the new key is appended.
+    pub fn with_key(mut self, address: Address, key: StorageKey) -> Self {
+        self.0.entry(address).or_default().push(key);
+        self
+    }
+
+    /// Returns the total number of storage slots requested across all addresses.
+    pub fn total_slots(&self) -> usize {
+        self.0.values().map(|keys| keys.len()).sum()
+    }
+
+    /// Returns the number of addresses in the request.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if the request is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Consumes the wrapper, returning the inner map.
+    pub fn into_inner(self) -> AddressHashMap<Vec<StorageKey>> {
+        self.0
+    }
+}
+
+impl From<AddressHashMap<Vec<StorageKey>>> for StorageValuesRequest {
+    fn from(map: AddressHashMap<Vec<StorageKey>>) -> Self {
+        Self(map)
+    }
+}
+
+/// Response type for `eth_getStorageValues`.
+///
+/// Maps contract addresses to the retrieved storage values. Each inner array
+/// corresponds positionally 1:1 with the input slots for that address.
+///
+/// See also <https://github.com/ethereum/execution-apis/issues/752>.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct StorageValuesResponse(pub AddressHashMap<Vec<StorageValue>>);
+
+impl StorageValuesResponse {
+    /// Creates an empty response.
+    pub fn new() -> Self {
+        Self(AddressHashMap::default())
+    }
+
+    /// Creates a response with the given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(AddressHashMap::with_capacity_and_hasher(capacity, Default::default()))
+    }
+
+    /// Inserts storage values for an address.
+    pub fn insert(&mut self, address: Address, values: Vec<StorageValue>) {
+        self.0.insert(address, values);
+    }
+
+    /// Returns the values for a given address.
+    pub fn get(&self, address: &Address) -> Option<&Vec<StorageValue>> {
+        self.0.get(address)
+    }
+
+    /// Returns the number of addresses in the response.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if the response is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Consumes the wrapper, returning the inner map.
+    pub fn into_inner(self) -> AddressHashMap<Vec<StorageValue>> {
+        self.0
+    }
+}
+
+impl From<AddressHashMap<Vec<StorageValue>>> for StorageValuesResponse {
+    fn from(map: AddressHashMap<Vec<StorageValue>>) -> Self {
+        Self(map)
     }
 }
 
