@@ -6,6 +6,14 @@ mod get_block;
 pub use get_block::SubFullBlocks;
 pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 
+mod watch_from_common;
+
+mod watch_logs_from;
+pub use watch_logs_from::WatchLogsFrom;
+
+mod watch_blocks_from;
+pub use watch_blocks_from::WatchBlocksFrom;
+
 mod prov_call;
 pub use prov_call::{BoxedFut, ProviderCall};
 

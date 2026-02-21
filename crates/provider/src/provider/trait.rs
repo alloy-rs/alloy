@@ -4,7 +4,9 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+use super::{
+    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom, WatchLogsFrom,
+};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -703,6 +705,145 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Stream logs from a historical block using windowed `eth_getLogs` calls.
+    ///
+    /// This stream keeps polling after catching up and continues yielding new log windows
+    /// indefinitely.
+    ///
+    /// Each yielded future contains one complete `eth_getLogs` window request. Buffering increases
+    /// the number of in-flight windows, but each request still covers up to `window_size` blocks.
+    ///
+    /// This method does not implement retries internally. Configure retries on the underlying
+    /// client transport (for example with `RetryBackoffLayer`) if desired.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use alloy_transport::{
+    /// #     layers::{RetryBackoffLayer, RetryPolicy},
+    /// #     mock::{Asserter, MockTransport},
+    /// #     TransportError,
+    /// # };
+    /// # use futures::StreamExt;
+    /// # use std::time::Duration;
+    ///
+    /// #[derive(Clone, Debug)]
+    /// struct AlwaysRetryPolicy;
+    ///
+    /// impl RetryPolicy for AlwaysRetryPolicy {
+    ///     fn should_retry(&self, _error: &TransportError) -> bool {
+    ///         true
+    ///     }
+    ///
+    ///     fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
+    ///         None
+    ///     }
+    /// }
+    ///
+    /// let retry_layer = RetryBackoffLayer::new_with_policy(u32::MAX, 100, 10_000, AlwaysRetryPolicy);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// provider
+    ///     .watch_logs_from(20_000_000, &Filter::new())
+    ///     .block_tag(BlockNumberOrTag::Safe)
+    ///     .window_size(500)
+    ///     .into_stream()
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(8)
+    ///     // Process many resolved windows concurrently.
+    ///     .for_each_concurrent(Some(8), |window| async move {
+    ///         match window {
+    ///             Ok(logs) => println!("received {} logs", logs.len()),
+    ///             Err(err) => eprintln!("window request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom {
+        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
+    }
+
+    /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
+    ///
+    /// This stream keeps polling after catching up and continues yielding new blocks
+    /// indefinitely.
+    ///
+    /// Each yielded future contains one block request.
+    ///
+    /// If a block request returns `NullResp`, the yielded future retries the same block until it
+    /// succeeds.
+    ///
+    /// Other errors are surfaced to the caller. Configure retries on the underlying client
+    /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::{RetryBackoffLayer, RetryPolicy},
+    /// #     mock::{Asserter, MockTransport},
+    /// #     TransportError,
+    /// # };
+    /// # use futures::StreamExt;
+    /// # use std::time::Duration;
+    ///
+    /// #[derive(Clone, Debug)]
+    /// struct AlwaysRetryPolicy;
+    ///
+    /// impl RetryPolicy for AlwaysRetryPolicy {
+    ///     fn should_retry(&self, _error: &TransportError) -> bool {
+    ///         true
+    ///     }
+    ///
+    ///     fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
+    ///         None
+    ///     }
+    /// }
+    ///
+    /// let retry_layer = RetryBackoffLayer::new_with_policy(u32::MAX, 100, 10_000, AlwaysRetryPolicy);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// provider
+    ///     .watch_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .into_stream()
+    ///     // Keep many RPC request futures in flight at the same time.
+    ///     .buffered(4)
+    ///     // Process many resolved blocks concurrently.
+    ///     .for_each_concurrent(Some(4), |block| async move {
+    ///         match block {
+    ///             Ok(block) => {
+    ///                 let _ = block;
+    ///             }
+    ///             Err(err) => eprintln!("block request failed: {err}"),
+    ///         }
+    ///     })
+    ///     .await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
+        WatchBlocksFrom::new(self.weak_client(), start_block)
     }
 
     /// Watch for new pending transaction bodies by polling the provider with
