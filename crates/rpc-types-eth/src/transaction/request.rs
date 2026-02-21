@@ -1103,6 +1103,14 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.blob_versioned_hashes.as_deref()
+    }
+
+    fn set_blob_versioned_hashes(&mut self, hashes: Vec<B256>) {
+        self.blob_versioned_hashes = Some(hashes);
+    }
+
     fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
         self.sidecar.as_ref()
     }

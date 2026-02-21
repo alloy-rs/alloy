@@ -5,6 +5,7 @@ use alloy_consensus::{
     BlobTransactionSidecar, BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant,
 };
 use alloy_eips::eip7702::SignedAuthorization;
+use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 
 /// Transaction builder type supporting EIP-4844 transaction fields with both EIP-4844 and EIP-7594
@@ -19,6 +20,23 @@ pub trait TransactionBuilder4844: Default + Sized + Send + Sync + 'static {
     /// Builder-pattern method for setting max fee per blob gas.
     fn with_max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
         self.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
+        self
+    }
+
+    /// Gets the EIP-4844 blob versioned hashes of the transaction.
+    ///
+    /// These may be set independently of the sidecar, e.g. when the sidecar
+    /// has been pruned but the hashes are still needed for `eth_call`.
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    /// Sets the EIP-4844 blob versioned hashes of the transaction.
+    fn set_blob_versioned_hashes(&mut self, _hashes: Vec<B256>) {}
+
+    /// Builder-pattern method for setting the EIP-4844 blob versioned hashes.
+    fn with_blob_versioned_hashes(mut self, hashes: Vec<B256>) -> Self {
+        self.set_blob_versioned_hashes(hashes);
         self
     }
 
@@ -108,6 +126,14 @@ where
 
     fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
         self.deref_mut().set_max_fee_per_blob_gas(max_fee_per_blob_gas)
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.deref().blob_versioned_hashes()
+    }
+
+    fn set_blob_versioned_hashes(&mut self, hashes: Vec<B256>) {
+        self.deref_mut().set_blob_versioned_hashes(hashes)
     }
 
     fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
