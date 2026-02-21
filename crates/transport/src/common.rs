@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine};
-use std::{fmt, net::SocketAddr};
+use std::fmt;
 
 /// Basic, bearer or raw authentication in http or websocket transport.
 ///
@@ -16,16 +16,17 @@ pub enum Authorization {
 
 impl Authorization {
     /// Extract the auth info from a URL.
+    ///
+    /// Returns [`Authorization::Basic`] if the URL contains userinfo (i.e.
+    /// `user:pass@host` or `user@host`).
     pub fn extract_from_url(url: &url::Url) -> Option<Self> {
         let username = url.username();
-        let password = url.password().unwrap_or_default();
+        let password = url.password();
 
-        // eliminates false positives on the authority
-        if username.contains("localhost") || username.parse::<SocketAddr>().is_ok() {
-            return None;
-        }
-
-        (!username.is_empty() || !password.is_empty()).then(|| Self::basic(username, password))
+        // Userinfo is present when the username is non-empty or a password was
+        // explicitly provided (even if empty, e.g. `:pass@host`).
+        let has_userinfo = !username.is_empty() || password.is_some();
+        has_userinfo.then(|| Self::basic(username, password.unwrap_or_default()))
     }
 
     /// Instantiate a new basic auth from an authority string.
@@ -86,15 +87,28 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_from_url_with_localhost() {
+    fn test_extract_from_url_with_localhost_username() {
+        // A username of "localhost" is valid userinfo and should be extracted.
         let url = Url::parse("http://localhost:password@domain.com").unwrap();
+        let auth = Authorization::extract_from_url(&url).unwrap();
+        assert_eq!(
+            auth,
+            Authorization::Basic(general_purpose::STANDARD.encode("localhost:password"))
+        );
+    }
+
+    #[test]
+    fn test_extract_from_url_plain_host() {
+        // No userinfo — just a host with a port.
+        let url = Url::parse("http://127.0.0.1:8080").unwrap();
         assert!(Authorization::extract_from_url(&url).is_none());
     }
 
     #[test]
-    fn test_extract_from_url_with_socket_address() {
-        let url = Url::parse("http://127.0.0.1:8080").unwrap();
-        assert!(Authorization::extract_from_url(&url).is_none());
+    fn test_extract_from_url_password_only() {
+        let url = Url::parse("http://:secret@domain.com").unwrap();
+        let auth = Authorization::extract_from_url(&url).unwrap();
+        assert_eq!(auth, Authorization::Basic(general_purpose::STANDARD.encode(":secret")));
     }
 
     #[test]
