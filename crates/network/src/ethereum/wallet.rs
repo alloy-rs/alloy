@@ -1,7 +1,9 @@
-use crate::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, Network, NetworkWallet, TxSigner};
+use crate::{
+    AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, FullSigner, Network, NetworkWallet, TxSigner,
+};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_primitives::{map::AddressHashMap, Address, Signature};
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use super::Ethereum;
 
@@ -9,7 +11,7 @@ use super::Ethereum;
 #[derive(Clone, Default)]
 pub struct EthereumWallet {
     default: Address,
-    signers: AddressHashMap<Arc<dyn TxSigner<Signature> + Send + Sync>>,
+    signers: AddressHashMap<ArcFullSigner>,
 }
 
 impl std::fmt::Debug for EthereumWallet {
@@ -23,7 +25,7 @@ impl std::fmt::Debug for EthereumWallet {
 
 impl<S> From<S> for EthereumWallet
 where
-    S: TxSigner<Signature> + Send + Sync + 'static,
+    S: FullSigner<Signature> + Send + Sync + 'static,
 {
     fn from(signer: S) -> Self {
         Self::new(signer)
@@ -34,7 +36,7 @@ impl EthereumWallet {
     /// Create a new signer with the given signer as the default signer.
     pub fn new<S>(signer: S) -> Self
     where
-        S: TxSigner<Signature> + Send + Sync + 'static,
+        S: FullSigner<Signature> + Send + Sync + 'static,
     {
         let mut this = Self::default();
         this.register_default_signer(signer);
@@ -48,9 +50,10 @@ impl EthereumWallet {
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
     pub fn register_signer<S>(&mut self, signer: S)
     where
-        S: TxSigner<Signature> + Send + Sync + 'static,
+        S: FullSigner<Signature> + Send + Sync + 'static,
     {
-        self.signers.insert(signer.address(), Arc::new(signer));
+        let arc_signer = ArcFullSigner::new(signer);
+        self.signers.insert(arc_signer.address(), arc_signer);
     }
 
     /// Register a new signer on this object, and set it as the default signer.
@@ -61,9 +64,9 @@ impl EthereumWallet {
     /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
     pub fn register_default_signer<S>(&mut self, signer: S)
     where
-        S: TxSigner<Signature> + Send + Sync + 'static,
+        S: FullSigner<Signature> + Send + Sync + 'static,
     {
-        self.default = signer.address();
+        self.default = TxSigner::address(&signer);
         self.register_signer(signer);
     }
 
@@ -90,15 +93,12 @@ impl EthereumWallet {
     }
 
     /// Get the default signer.
-    pub fn default_signer(&self) -> Arc<dyn TxSigner<Signature> + Send + Sync + 'static> {
+    pub fn default_signer(&self) -> ArcFullSigner {
         self.signers.get(&self.default).cloned().expect("invalid signer")
     }
 
     /// Get the signer for the given address.
-    pub fn signer_by_address(
-        &self,
-        address: Address,
-    ) -> Option<Arc<dyn TxSigner<Signature> + Send + Sync + 'static>> {
+    pub fn signer_by_address(&self, address: Address) -> Option<ArcFullSigner> {
         self.signers.get(&address).cloned()
     }
 
@@ -113,6 +113,61 @@ impl EthereumWallet {
                 alloy_signer::Error::other(format!("Missing signing credential for {sender}"))
             })?
             .sign_transaction(tx)
+            .await
+    }
+
+    /// Signs a hash with the given signer address.
+    ///
+    /// Hash can be arbitrary data or EIP-712 typed data hash.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use alloy_sol_types::{sol, eip712_domain};
+    /// use alloy_primitives::{address, keccak256, B256};
+    /// use alloy_signer_local::PrivateKeySigner;
+    /// sol! {
+    ///     struct Test {
+    ///         uint256 value;
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///   let domain = eip712_domain! {
+    ///      name: "Test",
+    ///      version: "1.0",
+    ///      chain_id: 1,
+    ///      verifying_contract: address!("0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"),
+    ///      salt: keccak256("test_salt"),
+    ///   };
+    ///   
+    ///   let alice: PrivateKeySigner = "0x...".parse()?;
+    ///   let bob: PrivateKeySigner = "0x...".parse()?;
+    ///
+    ///    let wallet = EthereumWallet::new(alice);
+    ///    wallet.register_signer(bob);
+    ///
+    ///    let t = Test { value: U256::from(0x42) };
+    ///
+    ///    let hash = t.eip712_signing_hash(&domain);
+    ///
+    ///    let signature = wallet.sign_hash_with(alice.address(), &hash).await?;
+    ///    
+    ///    Ok(())
+    /// }
+    /// ```
+    #[cfg(feature = "eip712")]
+    pub async fn sign_hash_with(
+        &self,
+        signer: Address,
+        hash: &alloy_primitives::B256,
+    ) -> alloy_signer::Result<Signature> {
+        self.signer_by_address(signer)
+            .ok_or_else(|| {
+                alloy_signer::Error::other(format!("Missing signing credential for {signer}"))
+            })?
+            .sign_hash(hash)
             .await
     }
 }
@@ -205,5 +260,55 @@ impl<W: NetworkWallet<N>, N: Network> IntoWallet<N> for W {
 
     fn into_wallet(self) -> Self::NetworkWallet {
         self
+    }
+}
+
+/// Wrapper type for [`FullSigner`] that is used in [`EthereumWallet`].
+///
+/// This is useful to disambiguate the function calls on a signer via [`EthereumWallet`] as
+/// [`TxSigner`] and [`Signer`] have the same methods e.g [`TxSigner::address`] and
+/// [`Signer::address`]
+///
+/// [`Signer`]: alloy_signer::Signer
+/// [`Signer::address`]: alloy_signer::Signer::address
+#[derive(Clone)]
+pub struct ArcFullSigner(Arc<dyn FullSigner<Signature> + Send + Sync>);
+
+impl Debug for ArcFullSigner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArcFullSigner").field("address", &self.address()).finish()
+    }
+}
+
+impl ArcFullSigner {
+    /// Create a new [`ArcFullSigner`] from a given [`FullSigner`].
+    pub fn new<S>(signer: S) -> Self
+    where
+        S: FullSigner<Signature> + Send + Sync + 'static,
+    {
+        Self(Arc::new(signer))
+    }
+
+    /// Get the address of the signer.
+    pub fn address(&self) -> Address {
+        self.0.address()
+    }
+
+    /// Get the underlying [`FullSigner`] as a reference.
+    pub fn signer(&self) -> &dyn FullSigner<Signature> {
+        self.0.as_ref()
+    }
+
+    /// Get the underlying [`FullSigner`] as an owned value.
+    pub fn into_signer(self) -> Arc<dyn FullSigner<Signature> + Send + Sync> {
+        self.0
+    }
+}
+
+impl Deref for ArcFullSigner {
+    type Target = dyn FullSigner<Signature> + Send + Sync;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
     }
 }

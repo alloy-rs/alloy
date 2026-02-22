@@ -79,6 +79,7 @@ wasmtimer.workspace = true
 alloy-consensus = { workspace = true, features = ["kzg", "k256"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
+alloy-network = { workspace = true, features = ["eip712"] }
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
 alloy-signer.workspace = true
