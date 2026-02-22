@@ -1,13 +1,13 @@
 use super::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
-use futures::{
-    sink::SinkExt,
-    stream::{Fuse, StreamExt},
-};
+use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
+use yawc::{
+    frame::{Frame, OpCode},
+    WebSocket,
+};
 
 /// Simple connection info for the websocket.
 #[derive(Clone, Debug)]
@@ -20,7 +20,7 @@ pub struct WsConnect {
     /// The interval between retries.
     /// Default is 3 seconds.
     retry_interval: Duration,
-    /// The interval between keepalive pings.
+    /// The keepalive interval for sending pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
 }
@@ -74,8 +74,9 @@ impl PubSubConnect for WsConnect {
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
+        let url: url::Url = self.url.parse().map_err(TransportErrorKind::custom)?;
         let socket =
-            WsMeta::connect(&self.url, None).await.map_err(TransportErrorKind::custom)?.1.fuse();
+            WebSocket::connect(url).await.map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -86,22 +87,27 @@ impl PubSubConnect for WsConnect {
     }
 }
 
-impl WsBackend<Fuse<WsStream>> {
+impl WsBackend<WebSocket> {
     /// Handle a message from the websocket.
     #[expect(clippy::result_unit_err)]
-    pub fn handle(&mut self, item: WsMessage) -> Result<(), ()> {
-        match item {
-            WsMessage::Text(text) => self.handle_text(&text),
-            WsMessage::Binary(_) => {
+    pub fn handle(&mut self, frame: Frame) -> Result<(), ()> {
+        match frame.opcode() {
+            OpCode::Text => self.handle_text(frame.as_str()),
+            OpCode::Binary => {
                 error!("Received binary message, expected text");
                 Err(())
             }
+            OpCode::Close => {
+                error!("WS server has gone away");
+                Err(())
+            }
+            OpCode::Ping | OpCode::Pong | OpCode::Continuation => Ok(()),
         }
     }
 
     /// Send a message to the websocket.
-    pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), WsErr> {
-        self.socket.send(WsMessage::Text(msg.get().to_owned())).await
+    pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), yawc::WebSocketError> {
+        self.socket.send(Frame::text(msg.get())).await
     }
 
     /// Spawn this backend on a loop.
