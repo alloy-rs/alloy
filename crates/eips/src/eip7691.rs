@@ -14,7 +14,7 @@ pub const BLOB_GASPRICE_UPDATE_FRACTION_PECTRA: u128 = 5007716;
 /// Same as [`crate::eip4844::calc_blob_gasprice`] but uses the
 /// [`BLOB_GASPRICE_UPDATE_FRACTION_PECTRA`].
 #[inline]
-pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
     fake_exponential(
         BLOB_TX_MIN_BLOB_GASPRICE,
         excess_blob_gas as u128,
