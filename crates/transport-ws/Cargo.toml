@@ -36,6 +36,7 @@ tracing.workspace = true
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 http = "1.1"
 tokio = { workspace = true, features = ["sync", "rt", "time"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
 
 # WASM only

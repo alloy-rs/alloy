@@ -36,7 +36,7 @@ allow = [
     "Zlib",
     # https://github.com/briansmith/ring/issues/902
     "LicenseRef-ring",
-    "CDLA-Permissive-2.0"
+    "CDLA-Permissive-2.0",
 ]
 
 exceptions = [
@@ -48,6 +48,8 @@ exceptions = [
     { allow = ["CC0-1.0"], name = "secp256k1" },
     { allow = ["CC0-1.0"], name = "secp256k1-sys" },
     { allow = ["BSD-2-Clause"], name = "zerocopy" },
+    # aws-lc-sys includes OpenSSL-licensed code from AWS-LC
+    { allow = ["OpenSSL"], name = "aws-lc-sys" },
 ]
 
 [[licenses.clarify]]
