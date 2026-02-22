@@ -1,0 +1,21 @@
+{
+  "name": "ERC20InsufficientBalance",
+  "decodedArguments": [
+    {
+      "value": "0x1122334455112233445511223344551122334455",
+      "type": "address",
+      "name": "arg0"
+    },
+    {
+      "value": "456",
+      "type": "uint256",
+      "name": "arg1"
+    },
+    {
+      "value": "500",
+      "type": "uint256",
+      "name": "arg2"
+    }
+  ]
+}
+

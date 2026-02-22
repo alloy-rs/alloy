@@ -1,0 +1,16 @@
+{
+  "name": "transfer",
+  "decodedArguments": [
+    {
+      "value": "0x1122334455112233445511223344551122334455",
+      "type": "address",
+      "name": "arg0"
+    },
+    {
+      "value": "2457",
+      "type": "uint256",
+      "name": "arg1"
+    }
+  ]
+}
+
