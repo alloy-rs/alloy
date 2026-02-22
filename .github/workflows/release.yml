@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Required for OIDC token exchange
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          cache-on-failure: true
+
+      - name: Authenticate with crates.io
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Install cargo-release
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
+
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          # Extract version from tag (removes 'v' prefix)
+          VERSION="${GITHUB_REF_NAME#v}"
+          
+          # Publish all crates in dependency order
+          # --no-confirm: non-interactive
+          # --no-tag: tag already exists from local release prep
+          # --no-push: don't push git changes
+          # --no-verify: skip cargo verify (CI already ran tests)
+          cargo release publish \
+            --no-confirm \
+            --no-tag \
+            --no-push \
+            --no-verify \
+            --execute
