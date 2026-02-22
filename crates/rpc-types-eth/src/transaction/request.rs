@@ -1335,6 +1335,12 @@ impl From<TypedTransaction> for TransactionRequest {
     }
 }
 
+impl<T: TransactionTrait> From<Recovered<T>> for TransactionRequest {
+    fn from(tx: Recovered<T>) -> Self {
+        Self::from_recovered_transaction(tx)
+    }
+}
+
 impl From<TxEnvelope> for TransactionRequest {
     fn from(envelope: TxEnvelope) -> Self {
         match envelope {
