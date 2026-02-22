@@ -218,11 +218,20 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// By default, the network is `Ethereum`. This method must be called to configure a different
     /// network.
     ///
+    /// This replaces the filler stack with the target network's recommended fillers. Any custom
+    /// fillers should be added **after** calling `.network()`.
+    ///
     /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, F, Net> {
-        ProviderBuilder { layer: self.layer, filler: self.filler, network: PhantomData }
+    pub fn network<Net: RecommendedFillers>(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, Net::RecommendedFillers>, Net> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: JoinFill::new(Identity, Net::recommended_fillers()),
+            network: PhantomData,
+        }
     }
 
     /// Add a chain layer to the stack being built. The layer will set
@@ -765,6 +774,27 @@ mod tests {
     #[tokio::test]
     async fn compile_with_network() {
         let p = ProviderBuilder::new_with_network::<AnyNetwork>().connect_anvil();
+        let num = p.get_block_number().await.unwrap();
+        assert_eq!(num, 0);
+    }
+
+    // Ensures `.network()` replaces fillers rather than keeping the old ones.
+    #[test]
+    fn network_replaces_fillers() {
+        // Add an extra filler before swapping, it should be dropped.
+        let builder = ProviderBuilder::new().filler(GasFiller).network::<AnyNetwork>();
+
+        let _: ProviderBuilder<
+            Identity,
+            JoinFill<Identity, <AnyNetwork as RecommendedFillers>::RecommendedFillers>,
+            AnyNetwork,
+        > = builder;
+    }
+
+    #[tokio::test]
+    async fn network_swap_works_at_runtime() {
+        // Verify that `ProviderBuilder::new().network::<AnyNetwork>()` produces a working provider.
+        let p = ProviderBuilder::new().network::<AnyNetwork>().connect_anvil();
         let num = p.get_block_number().await.unwrap();
         assert_eq!(num, 0);
     }
