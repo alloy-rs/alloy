@@ -7,17 +7,12 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{
-    error::ValueError, transaction::Recovered, BlobTransactionSidecar, SignableTransaction,
+    error::ValueError, transaction::Recovered, BlobTransactionSidecarVariant, SignableTransaction,
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
     TxLegacy, TxType, Typed2718, TypedTransaction,
 };
-use alloy_eips::{
-    eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant},
-    eip7702::SignedAuthorization,
-};
-use alloy_network_primitives::{
-    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
-};
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
@@ -1108,12 +1103,20 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.sidecar.as_ref().and_then(BlobTransactionSidecarVariant::as_eip4844)
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.blob_versioned_hashes.as_deref()
     }
 
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.sidecar = Some(sidecar.into());
+    fn set_blob_versioned_hashes(&mut self, hashes: Vec<B256>) {
+        self.blob_versioned_hashes = Some(hashes);
+    }
+
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
+        self.sidecar.as_ref()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {
+        self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
     }
 }
@@ -1125,25 +1128,6 @@ impl TransactionBuilder7702 for TransactionRequest {
 
     fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
         self.authorization_list = Some(authorization_list);
-    }
-}
-
-impl TransactionBuilder7594 for TransactionRequest {
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.max_fee_per_blob_gas
-    }
-
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
-        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
-    }
-
-    fn blob_sidecar_7594(&self) -> Option<&BlobTransactionSidecarEip7594> {
-        self.sidecar.as_ref().and_then(BlobTransactionSidecarVariant::as_eip7594)
-    }
-
-    fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594) {
-        self.sidecar = Some(BlobTransactionSidecarVariant::Eip7594(sidecar));
-        self.populate_blob_hashes();
     }
 }
 
@@ -1829,6 +1813,7 @@ pub struct FillTransaction<T = TypedTransaction> {
 mod tests {
     use super::*;
     use crate::Authorization;
+    use alloy_consensus::BlobTransactionSidecarEip7594;
     use alloy_primitives::b256;
     #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
