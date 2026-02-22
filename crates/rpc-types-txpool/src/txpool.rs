@@ -55,31 +55,28 @@ impl Visitor<'_> for TxpoolInspectSummaryVisitor {
     where
         E: de::Error,
     {
-        let addr_split: Vec<&str> = value.split(": ").collect();
-        if addr_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: to"));
-        }
-        let value_split: Vec<&str> = addr_split[1].split(" wei + ").collect();
-        if value_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit"));
-        }
-        let gas_split: Vec<&str> = value_split[1].split(" gas × ").collect();
-        if gas_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas"));
-        }
-        let gas_price_split: Vec<&str> = gas_split[1].split(" wei").collect();
-        if gas_price_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
-        }
-        let to = match addr_split[0] {
+        let (to_str, rest) = value
+            .split_once(": ")
+            .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: to"))?;
+        let (value_str, rest) = rest.split_once(" wei + ").ok_or_else(|| {
+            de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit")
+        })?;
+        let (gas_str, gas_price_str) = rest
+            .split_once(" gas × ")
+            .ok_or_else(|| de::Error::custom("invalid format for TxpoolInspectSummary: gas"))?;
+        let gas_price_str = gas_price_str.strip_suffix(" wei").ok_or_else(|| {
+            de::Error::custom("invalid format for TxpoolInspectSummary: gas_price")
+        })?;
+
+        let to = match to_str {
             "" | "0x" | "contract creation" => None,
             addr => {
                 Some(Address::from_str(addr.trim_start_matches("0x")).map_err(de::Error::custom)?)
             }
         };
-        let value = U256::from_str(value_split[0]).map_err(de::Error::custom)?;
-        let gas = u64::from_str(gas_split[0]).map_err(de::Error::custom)?;
-        let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
+        let value = U256::from_str(value_str).map_err(de::Error::custom)?;
+        let gas = u64::from_str(gas_str).map_err(de::Error::custom)?;
+        let gas_price = u128::from_str(gas_price_str).map_err(de::Error::custom)?;
 
         Ok(TxpoolInspectSummary { to, value, gas, gas_price })
     }
