@@ -14,6 +14,9 @@ use std::error::Error;
 mod unknowns;
 pub use unknowns::{AnyTxType, UnknownTxEnvelope, UnknownTypedTransaction};
 
+mod transaction;
+pub use transaction::AnyTransactionReceipt;
+
 pub use alloy_consensus_any::{AnyHeader, AnyReceiptEnvelope};
 
 use crate::{any::error::AnyConversionError, Network};
@@ -22,7 +25,7 @@ use alloy_consensus::{
     transaction::{Either, Recovered},
 };
 use alloy_network_primitives::{BlockResponse, TransactionResponse};
-pub use alloy_rpc_types_any::{AnyRpcHeader, AnyTransactionReceipt};
+pub use alloy_rpc_types_any::AnyRpcHeader;
 use alloy_rpc_types_eth::{AccessList, Block, BlockTransactions, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use derive_more::From;
