@@ -5,7 +5,8 @@
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
 use super::{
-    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom, WatchLogsFrom,
+    DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
+    WatchCanonicalBlocksFrom, WatchLogsFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -727,27 +728,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # use alloy_rpc_client::RpcClient;
     /// # use alloy_rpc_types_eth::Filter;
     /// # use alloy_transport::{
-    /// #     layers::{RetryBackoffLayer, RetryPolicy},
+    /// #     layers::RetryBackoffLayer,
     /// #     mock::{Asserter, MockTransport},
-    /// #     TransportError,
     /// # };
     /// # use futures::StreamExt;
-    /// # use std::time::Duration;
     ///
-    /// #[derive(Clone, Debug)]
-    /// struct AlwaysRetryPolicy;
-    ///
-    /// impl RetryPolicy for AlwaysRetryPolicy {
-    ///     fn should_retry(&self, _error: &TransportError) -> bool {
-    ///         true
-    ///     }
-    ///
-    ///     fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
-    ///         None
-    ///     }
-    /// }
-    ///
-    /// let retry_layer = RetryBackoffLayer::new_with_policy(u32::MAX, 100, 10_000, AlwaysRetryPolicy);
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
     /// let asserter = Asserter::new();
     /// let client =
     ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
@@ -796,27 +782,12 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// # use alloy_provider::{Provider, ProviderBuilder};
     /// # use alloy_rpc_client::RpcClient;
     /// # use alloy_transport::{
-    /// #     layers::{RetryBackoffLayer, RetryPolicy},
+    /// #     layers::RetryBackoffLayer,
     /// #     mock::{Asserter, MockTransport},
-    /// #     TransportError,
     /// # };
     /// # use futures::StreamExt;
-    /// # use std::time::Duration;
     ///
-    /// #[derive(Clone, Debug)]
-    /// struct AlwaysRetryPolicy;
-    ///
-    /// impl RetryPolicy for AlwaysRetryPolicy {
-    ///     fn should_retry(&self, _error: &TransportError) -> bool {
-    ///         true
-    ///     }
-    ///
-    ///     fn backoff_hint(&self, _error: &TransportError) -> Option<Duration> {
-    ///         None
-    ///     }
-    /// }
-    ///
-    /// let retry_layer = RetryBackoffLayer::new_with_policy(u32::MAX, 100, 10_000, AlwaysRetryPolicy);
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
     /// let asserter = Asserter::new();
     /// let client =
     ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
@@ -844,6 +815,32 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
         WatchBlocksFrom::new(self.weak_client(), start_block)
+    }
+
+    /// Stream canonical block events from a historical block.
+    ///
+    /// This wraps [`watch_blocks_from`](Self::watch_blocks_from) and performs canonical chain
+    /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) {
+    /// # use futures::StreamExt;
+    /// let mut stream = provider.watch_canonical_blocks_from(20_000_000).into_stream();
+    ///
+    /// while let Some(item) = stream.next().await {
+    ///     match item {
+    ///         Ok(event) => {
+    ///             let _ = event;
+    ///         }
+    ///         Err(err) => eprintln!("canonical stream failed: {err}"),
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
+        self.watch_blocks_from(start_block).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with
