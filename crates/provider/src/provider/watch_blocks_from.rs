@@ -3,7 +3,7 @@ use alloy_eips::BlockNumberOrTag;
 use alloy_json_rpc::RpcError;
 use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
-use alloy_rpc_client::WeakClient;
+use alloy_rpc_client::{RpcClientInner, WeakClient};
 use alloy_transport::TransportResult;
 use futures::Stream;
 use std::{marker::PhantomData, time::Duration};
@@ -14,7 +14,10 @@ use wasmtimer::tokio::sleep;
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
-use super::watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture};
+use super::{
+    watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture},
+    WatchCanonicalBlocksFrom,
+};
 
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -22,6 +25,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 #[derive(Debug, Clone)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
 pub struct WatchBlocksFrom<N: Network> {
+    /// A weak reference to the provider's RPC client, used to make requests in the stream.
     pub client: WeakClient,
     start_block: u64,
     poll_interval: Duration,
@@ -67,18 +71,23 @@ impl<N: Network> WatchBlocksFrom<N> {
         self
     }
 
+    /// Converts this builder into a canonical-stream builder that emits
+    /// [`CanonicalItem`](crate::provider::CanonicalItem) deltas on reorgs.
+    pub fn canonical(self) -> WatchCanonicalBlocksFrom<N> {
+        WatchCanonicalBlocksFrom::new(self)
+    }
+
+    /// Fetches a single block by number.
     pub async fn get_block(&self, block_number: u64) -> TransportResult<N::BlockResponse> {
-        let block = self
-            .client
-            .upgrade()
-            .ok_or_else(|| RpcError::local_usage_str("provider was dropped"))?
-            .request(
-                "eth_getBlockByNumber",
-                (BlockNumberOrTag::from(block_number), self.kind.is_full()),
-            )
-            .await?;
-        let block = if self.kind.is_hashes() { utils::convert_to_hashes(block) } else { block };
-        block.ok_or_else(|| RpcError::local_usage_str("block not found"))
+        get_block::<N>(
+            self.client
+                .upgrade()
+                .ok_or_else(|| RpcError::local_usage_str("provider was dropped"))?,
+            block_number,
+            self.kind,
+            self.poll_interval,
+        )
+        .await
     }
 
     /// Converts this builder into a stream of request futures.
@@ -97,24 +106,9 @@ impl<N: Network> WatchBlocksFrom<N> {
     ) -> impl Stream<Item = RequestFuture<N::BlockResponse>> + Unpin + 'static {
         let Self { client, start_block, poll_interval, block_tag, kind, _phantom } = self;
 
-        let full = kind.is_full();
-        let hashes = kind.is_hashes();
         let step: FutureStepFn<N::BlockResponse> = Box::new(move |client, current_block, _head| {
-            let fut: RequestFuture<N::BlockResponse> = Box::pin(async move {
-                loop {
-                    let block = client
-                        .request(
-                            "eth_getBlockByNumber",
-                            (BlockNumberOrTag::from(current_block), full),
-                        )
-                        .await?;
-                    let block = if hashes { utils::convert_to_hashes(block) } else { block };
-                    match block {
-                        Some(block) => return Ok(block),
-                        None => sleep(poll_interval).await,
-                    }
-                }
-            });
+            let fut: RequestFuture<N::BlockResponse> =
+                Box::pin(get_block::<N>(client, current_block, kind, poll_interval));
             (current_block.saturating_add(1), fut)
         });
 
@@ -125,6 +119,25 @@ impl<N: Network> WatchBlocksFrom<N> {
             block_tag,
             step,
         )
+    }
+}
+
+async fn get_block<N: Network>(
+    client: impl AsRef<RpcClientInner>,
+    block_number: u64,
+    kind: BlockTransactionsKind,
+    poll_interval: Duration,
+) -> TransportResult<N::BlockResponse> {
+    loop {
+        let block = client
+            .as_ref()
+            .request("eth_getBlockByNumber", (BlockNumberOrTag::from(block_number), kind.is_full()))
+            .await?;
+        let block = if kind.is_hashes() { utils::convert_to_hashes(block) } else { block };
+        match block {
+            Some(block) => return Ok(block),
+            None => sleep(poll_interval).await,
+        }
     }
 }
 

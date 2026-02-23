@@ -12,7 +12,7 @@ mod watch_logs_from;
 pub use watch_logs_from::WatchLogsFrom;
 
 mod watch_canonical_blocks_from;
-pub use watch_canonical_blocks_from::WatchCanonicalBlocksFrom;
+pub use watch_canonical_blocks_from::{CanonicalEvent, WatchCanonicalBlocksFrom};
 
 mod watch_blocks_from;
 pub use watch_blocks_from::WatchBlocksFrom;
