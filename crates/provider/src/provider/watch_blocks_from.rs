@@ -1,8 +1,10 @@
 use crate::utils;
 use alloy_eips::BlockNumberOrTag;
+use alloy_json_rpc::RpcError;
 use alloy_network::Network;
 use alloy_network_primitives::BlockTransactionsKind;
 use alloy_rpc_client::WeakClient;
+use alloy_transport::TransportResult;
 use futures::Stream;
 use std::{marker::PhantomData, time::Duration};
 
@@ -17,10 +19,10 @@ use super::watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFu
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 /// A builder for streaming blocks from a historical block and continuing indefinitely.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
 pub struct WatchBlocksFrom<N: Network> {
-    client: WeakClient,
+    pub client: WeakClient,
     start_block: u64,
     poll_interval: Duration,
     block_tag: BlockNumberOrTag,
@@ -63,6 +65,20 @@ impl<N: Network> WatchBlocksFrom<N> {
     pub const fn block_tag(mut self, block_tag: BlockNumberOrTag) -> Self {
         self.block_tag = block_tag;
         self
+    }
+
+    pub async fn get_block(&self, block_number: u64) -> TransportResult<N::BlockResponse> {
+        let block = self
+            .client
+            .upgrade()
+            .ok_or_else(|| RpcError::local_usage_str("provider was dropped"))?
+            .request(
+                "eth_getBlockByNumber",
+                (BlockNumberOrTag::from(block_number), self.kind.is_full()),
+            )
+            .await?;
+        let block = if self.kind.is_hashes() { utils::convert_to_hashes(block) } else { block };
+        block.ok_or_else(|| RpcError::local_usage_str("block not found"))
     }
 
     /// Converts this builder into a stream of request futures.

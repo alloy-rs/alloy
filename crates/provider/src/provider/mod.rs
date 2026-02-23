@@ -11,6 +11,9 @@ mod watch_from_common;
 mod watch_logs_from;
 pub use watch_logs_from::WatchLogsFrom;
 
+mod watch_canonical_blocks_from;
+pub use watch_canonical_blocks_from::WatchCanonicalBlocksFrom;
+
 mod watch_blocks_from;
 pub use watch_blocks_from::WatchBlocksFrom;
 

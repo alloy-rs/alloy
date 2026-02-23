@@ -6,7 +6,13 @@ use alloy_rpc_client::{ClientRef, RpcClientInner, WeakClient};
 use alloy_transport::TransportResult;
 use async_stream::stream;
 use futures::Stream;
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    collections::{vec_deque::Iter, VecDeque},
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
@@ -15,10 +21,10 @@ use wasmtimer::tokio::sleep;
 use tokio::time::sleep;
 
 pub(super) type RequestFuture<Item> =
-    Pin<Box<dyn Future<Output = TransportResult<Item>> + 'static>>;
+    Pin<Box<dyn Future<Output = TransportResult<Item>> + Send + 'static>>;
 
 pub(super) type FutureStepFn<Item> =
-    Box<dyn FnMut(Arc<RpcClientInner>, u64, u64) -> (u64, RequestFuture<Item>) + 'static>;
+    Box<dyn FnMut(Arc<RpcClientInner>, u64, u64) -> (u64, RequestFuture<Item>) + Send + 'static>;
 
 pub(super) fn stream_from_head_futures<Item, HeaderResp>(
     client: WeakClient,
@@ -91,5 +97,37 @@ async fn fetch_head_block<HeaderResp: HeaderResponse + RpcRecv>(
             .await?
             .map(|header| header.number())
             .ok_or(RpcError::NullResp),
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct FixedBuf<T> {
+    buf: VecDeque<T>,
+}
+
+impl<T> FixedBuf<T> {
+    pub(super) fn new(capacity: usize) -> Self {
+        Self { buf: VecDeque::with_capacity(capacity.max(1)) }
+    }
+
+    /// Pushes `item` and discards the oldest item if the buffer is full.
+    pub(super) fn push(&mut self, item: T) {
+        if self.buf.len() == self.buf.capacity() {
+            self.buf.pop_front();
+        }
+        self.buf.push_back(item);
+    }
+
+    /// Returns the most recent item, if any.
+    pub(super) fn pop(&mut self) -> Option<T> {
+        self.buf.pop_back()
+    }
+
+    pub(super) fn last(&self) -> Option<&T> {
+        self.buf.back()
+    }
+
+    pub(super) fn iter(&self) -> Iter<'_, T> {
+        self.buf.iter()
     }
 }
