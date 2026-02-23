@@ -46,13 +46,14 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
             let mut buffer = FixedBuf::new(self.max_reorg_depth);
 
             loop {
-                let mut stream = self.watch_blocks_from.clone().into_stream().buffered(self.rpc_concurrency).peekable();
+                let mut stream = self.watch_blocks_from.clone().into_stream().buffered(self.rpc_concurrency);
                 loop {
-                    let block = stream.peek().await.expect("Stream never ends")?;
+                    let next = stream.next().await.expect("Stream never ends")?;
 
                     loop {
+                        let mut block = &next;
                         if let Some(expected_parent_hash) = buffer.last().map(|b: &N::BlockResponse| b.header().parent_hash()) {
-                            let parent_hash = block.header().parent_hash();
+                            let parent_hash = next.header().parent_hash();
                             if parent_hash != expected_parent_hash {
                                 // Reorg detected.
                                 // first step is to check if the parent exists in our buffer.
@@ -68,26 +69,10 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                                 } else {
                                     // Parent was not found in buffer.
                                     // Request the parent manually
-                                    let parent = self.watch_blocks_from.get_block(block.header().number() - 1).await?;
+                                    // TODO: handle subtractions
+                                    let parent = self.watch_blocks_from.get_block(next.header().number() - 1).await?;
 
                                 }
-
-
-                                // TODO: handle subtractions
-                                let parent = self.watch_blocks_from.get_block(block.header().number() - 1).await?;
-                                
-                                // match buffer.pop() {
-                                //     Some(old) => {
-                                //         // pop the last item and try again until we find a common ancestor or run out of history
-                                //         yield Ok(CanonicalItem::Removed(old)); 
-                                //
-                                //     },
-                                //     None => {
-                                //         // We are in a reorg but have no history
-                                //         // TODO: halt stream here.
-                                //         yield Err(TransportErrorKind::custom_str("reorg detected but no history in buffer to pop"))
-                                //     }
-                                // }
                             } else {
                                 break;
                             }
@@ -96,47 +81,12 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                         }
                     }
 
-                    buffer.push(block.clone());
-                    yield Ok(CanonicalItem::Added(block)); 
+                    buffer.push(next.clone());
+                    yield Ok(CanonicalItem::Added(next)); 
                 }
-                // let Some(client) = client.upgrade() else {
-                //     break 'task;
-                // };
-                //
-                // let head = match fetch_head_block::<HeaderResp>(client.as_ref(), block_tag).await {
-                //     Ok(head) => head,
-                //     Err(err) => {
-                //         let fut: RequestFuture<Item> = Box::pin(async move { Err(err) });
-                //         yield fut;
-                //         sleep(poll_interval).await;
-                //         continue 'task;
-                //     }
-                // };
-                //
-                // if current_block > head {
-                //     sleep(poll_interval).await;
-                //     continue 'task;
-                // }
-                //
-                // while current_block <= head {
-                //     let (next_block, item_fut) = step(client.clone(), current_block, head);
-                //     if next_block <= current_block {
-                //         let err = RpcError::local_usage_str(
-                //             "watch stream step did not advance block cursor",
-                //         );
-                //         let fut: RequestFuture<Item> = Box::pin(async move { Err(err) });
-                //         yield fut;
-                //         sleep(poll_interval).await;
-                //         continue 'task;
-                //     }
-                //     current_block = next_block;
-                //     yield item_fut;
-                // }
-                //
-                // sleep(poll_interval).await;
             }
 
         }
-        .boxed::<>()
+        .boxed()
     }
 }
