@@ -83,7 +83,8 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + TransactionBuilder<Self>
         + Debug
         + From<Self::TxEnvelope>
-        + From<Self::UnsignedTx>;
+        + From<Self::UnsignedTx>
+        + From<Self::TransactionResponse>;
 
     /// The JSON body of a transaction response.
     #[doc(alias = "TxResponse")]
