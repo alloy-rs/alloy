@@ -406,10 +406,11 @@ mod tests {
             transaction_index: None,
         };
 
-        // Convert the transaction response back into a transaction request in generic way,
-        // and check that the fields are correctly populated.
-        let req: TransactionRequest = tx_response.as_ref().clone().into();
+        // Convert the transaction response into a transaction request via
+        // From<TransactionResponse>, and check that the fields are correctly populated.
+        let req: TransactionRequest = tx_response.into();
 
+        assert_eq!(TransactionBuilder::from(&req).unwrap(), from);
         assert_eq!(TransactionBuilder::chain_id(&req).unwrap(), 1337);
         assert_eq!(TransactionBuilder::nonce(&req).unwrap(), 12);
         assert_eq!(TransactionBuilder::max_priority_fee_per_gas(&req).unwrap(), 123);
