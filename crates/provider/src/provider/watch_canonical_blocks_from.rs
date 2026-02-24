@@ -69,63 +69,47 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                 // Contains the replacement chain segment to add.
                 // In non-reorg cases this is just `next`.
                 let mut front = &next;
-                let mut pending_additions = VecDeque::<N::BlockResponse>::new();
+                let mut pending = VecDeque::<N::BlockResponse>::new();
 
                 loop {
+                    // First item, carry on as usual.
                     let Some(canonical_tip) = buffer.last() else {
                         break;
                     };
 
                     let parent_hash = front.header().parent_hash();
 
+
                     // Normal extension of the canonical tip.
                     if parent_hash == canonical_tip.header().hash() {
                         break;
                     }
 
-                    // Reorg that connects to a retained ancestor.
-                    if let Some(pos) =
-                        buffer.iter().rev().position(|block| block.header().hash() == parent_hash)
-                    {
-                        for _ in 0..pos {
-                            let old =
-                                buffer.pop().expect("position is always < canonical buffer length");
-                            yield CanonicalEvent::Removed(old);
+                    // Reorg detected: the new block does not build on the current canonical tip.
+                    let height = front.header().number();
+                    let canonical_height = canonical_tip.header().number();
+                    if canonical_height + 1 == height {
+                        // The hashes don't match even though the block numbers are sequential.
+                        yield CanonicalEvent::Removed(buffer.pop().expect("position is always < canonical buffer length"));
+                        if buffer.len() == 0 {
+                            Err(TransportErrorKind::custom_str(
+                                "Deep reorg detected; no canonical history retained.",
+                            ))?;
                         }
-                        break;
                     }
 
-                    // Reorg parent was not found in retained history:
-                    // remove one canonical tip block and walk one parent block backward.
-                    let old = buffer.pop().expect("canonical tip exists");
-                    yield CanonicalEvent::Removed(old);
-
-                    let parent_number = front
-                        .header()
-                        .number()
-                        .checked_sub(1)
-                        .ok_or_else(|| {
-                            TransportErrorKind::custom_str("reorg detected at genesis block")
-                        })?;
-
-                    let parent = watch_blocks_from.get_block(parent_number).await?;
+                    let parent = watch_blocks_from.get_block(canonical_height).await?;
                     if parent.header().hash() != parent_hash {
                         // We have hit a second reorg.
                         // This means that `next` is no longer canonical.
+                        // Abandon progress and try to work backwards again.
                         continue 'stream;
                     }
-                    pending_additions.push_front(parent);
-                    front = pending_additions.front().expect("just pushed");
-
-                    // We exhausted retained canonical history before finding a common ancestor.
-                    if buffer.last().is_none() {
-                        Err(TransportErrorKind::custom_str(
-                            "reorg exceeds max_reorg_depth; canonical ancestor not found",
-                        ))?;
-                    }
+                    pending.push_front(parent);
+                    front = pending.front().expect("just pushed");
                 }
 
-                for block in pending_additions {
+                for block in pending {
                     buffer.push(block.clone());
                     yield CanonicalEvent::Added(block);
                 }

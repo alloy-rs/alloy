@@ -9,6 +9,7 @@ use futures::Stream;
 use std::{
     collections::{vec_deque::Iter, VecDeque},
     future::Future,
+    ops::Index,
     pin::Pin,
     sync::Arc,
     time::Duration,
@@ -127,7 +128,15 @@ impl<T> FixedBuf<T> {
         self.buf.back()
     }
 
+    pub(super) fn len(&self) -> usize {
+        self.buf.len()
+    }
+
     pub(super) fn iter(&self) -> Iter<'_, T> {
         self.buf.iter()
+    }
+
+    pub(super) fn get(&self, index: usize) -> Option<&T> {
+        self.buf.get(index)
     }
 }
