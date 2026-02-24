@@ -98,11 +98,8 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                 let mut front = &next;
                 let mut pending = VecDeque::<N::BlockResponse>::new();
 
-                loop {
-                    // First item, carry on as usual.
-                    let Some(canonical_tip) = buffer.last() else {
-                        break;
-                    };
+                // First item, carry on as usual.
+                while let Some(canonical_tip) = buffer.last() {
 
                     let parent_hash = front.header().parent_hash();
 
@@ -204,8 +201,6 @@ mod tests {
         time::Duration,
     };
     use tokio::time::timeout;
-
-    // ── MockChain ──────────────────────────────────────────────────────
 
     struct ChainState {
         blocks: HashMap<u64, Block>,
