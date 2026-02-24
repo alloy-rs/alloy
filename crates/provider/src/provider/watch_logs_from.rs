@@ -4,13 +4,19 @@ use alloy_rpc_types_eth::{Filter, Header, Log};
 use futures::Stream;
 use std::time::Duration;
 
-use super::watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture};
+use super::{
+    watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture},
+    WatchCanonicalLogsFrom,
+};
 
 const DEFAULT_WINDOW_SIZE: u64 = 1000;
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
+/// A single `eth_getLogs` response window and its queried range.
+pub type LogBatch = (u64, u64, Vec<Log>);
+
 /// A builder for streaming logs from a historical block and continuing indefinitely.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
 pub struct WatchLogsFrom {
     client: WeakClient,
@@ -52,6 +58,24 @@ impl WatchLogsFrom {
         self
     }
 
+    /// Converts this builder into a canonical-stream builder that emits
+    /// [`CanonicalEvent`](crate::provider::CanonicalEvent) deltas on reorgs.
+    pub fn canonical(self) -> WatchCanonicalLogsFrom {
+        WatchCanonicalLogsFrom::new(self)
+    }
+
+    pub(super) const fn configured_poll_interval(&self) -> Duration {
+        self.poll_interval
+    }
+
+    pub(super) fn client(&self) -> &WeakClient {
+        &self.client
+    }
+
+    pub(super) fn filter(&self) -> &Filter {
+        &self.filter
+    }
+
     /// Converts this builder into a stream of request futures.
     ///
     /// Each future represents one `eth_getLogs` request for a complete window. That means each
@@ -62,20 +86,20 @@ impl WatchLogsFrom {
     ///
     /// This method does not implement retries internally. Configure retries on the underlying
     /// client transport (for example with `RetryBackoffLayer`) if desired.
-    pub fn into_stream(self) -> impl Stream<Item = RequestFuture<Vec<Log>>> + Unpin + 'static {
+    pub fn into_stream(self) -> impl Stream<Item = RequestFuture<LogBatch>> + Unpin + 'static {
         let Self { client, start_block, filter, window_size, poll_interval, block_tag } = self;
 
-        let step: FutureStepFn<Vec<Log>> = Box::new(move |client, current_block, head| {
+        let step: FutureStepFn<LogBatch> = Box::new(move |client, current_block, head| {
             let to_block = current_block.saturating_add(window_size - 1).min(head);
             let window_filter = filter.clone().from_block(current_block).to_block(to_block);
-            let fut: RequestFuture<Vec<Log>> = Box::pin(async move {
+            let fut: RequestFuture<LogBatch> = Box::pin(async move {
                 let logs = client.request("eth_getLogs", (window_filter,)).await?;
-                Ok(logs)
+                Ok((current_block, to_block, logs))
             });
             (to_block.saturating_add(1), fut)
         });
 
-        stream_from_head_futures::<Vec<Log>, Header>(
+        stream_from_head_futures::<LogBatch, Header>(
             client,
             start_block,
             poll_interval,
@@ -112,11 +136,15 @@ mod tests {
             .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.len(), 1);
+        assert_eq!(first.0, 10);
+        assert_eq!(first.1, 11);
+        assert_eq!(first.2.len(), 1);
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert!(second.is_empty());
+        assert_eq!(second.0, 12);
+        assert_eq!(second.1, 12);
+        assert!(second.2.is_empty());
     }
 
     #[tokio::test]
@@ -143,7 +171,9 @@ mod tests {
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.len(), 1);
+        assert_eq!(second.0, 12);
+        assert_eq!(second.1, 12);
+        assert_eq!(second.2.len(), 1);
     }
 
     #[tokio::test]
@@ -169,7 +199,9 @@ mod tests {
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(second.len(), 1);
+        assert_eq!(second.0, 10);
+        assert_eq!(second.1, 10);
+        assert_eq!(second.2.len(), 1);
     }
 
     #[tokio::test]
@@ -191,7 +223,9 @@ mod tests {
             .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.len(), 1);
+        assert_eq!(first.0, 10);
+        assert_eq!(first.1, 10);
+        assert_eq!(first.2.len(), 1);
     }
 
     #[tokio::test]
@@ -214,11 +248,15 @@ mod tests {
             .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.len(), 1);
+        assert_eq!(first.0, 10);
+        assert_eq!(first.1, 10);
+        assert_eq!(first.2.len(), 1);
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert!(second.is_empty());
+        assert_eq!(second.0, 11);
+        assert_eq!(second.1, 11);
+        assert!(second.2.is_empty());
     }
 
     #[tokio::test]
@@ -238,7 +276,9 @@ mod tests {
             .buffered(1);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.len(), 1);
+        assert_eq!(first.0, 10);
+        assert_eq!(first.1, 10);
+        assert_eq!(first.2.len(), 1);
     }
 
     #[tokio::test]
@@ -273,7 +313,9 @@ mod tests {
         drop(provider);
 
         let logs = timeout(Duration::from_secs(1), fut).await.unwrap().unwrap();
-        assert_eq!(logs.len(), 1);
+        assert_eq!(logs.0, 10);
+        assert_eq!(logs.1, 10);
+        assert_eq!(logs.2.len(), 1);
     }
 
     #[tokio::test]
@@ -313,10 +355,14 @@ mod tests {
             .buffered(2);
 
         let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert_eq!(first.len(), 1);
+        assert_eq!(first.0, 10);
+        assert_eq!(first.1, 11);
+        assert_eq!(first.2.len(), 1);
 
         let second =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        assert!(second.is_empty());
+        assert_eq!(second.0, 12);
+        assert_eq!(second.1, 13);
+        assert!(second.2.is_empty());
     }
 }

@@ -749,7 +749,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///     // Process many resolved windows concurrently.
     ///     .for_each_concurrent(Some(8), |window| async move {
     ///         match window {
-    ///             Ok(logs) => println!("received {} logs", logs.len()),
+    ///             Ok((from, to, logs)) => {
+    ///                 println!("received {} logs for blocks {from}..={to}", logs.len());
+    ///             }
     ///             Err(err) => eprintln!("window request failed: {err}"),
     ///         }
     ///     })
@@ -841,6 +843,37 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
         self.watch_blocks_from(start_block).canonical()
+    }
+
+    /// Stream canonical log events from a historical block.
+    ///
+    /// This wraps [`watch_logs_from`](Self::watch_logs_from) and performs canonical chain
+    /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) {
+    /// # use alloy_rpc_types_eth::Filter;
+    /// # use futures::StreamExt;
+    /// let mut stream = provider.watch_canonical_logs_from(20_000_000, &Filter::new()).into_stream();
+    ///
+    /// while let Some(item) = stream.next().await {
+    ///     match item {
+    ///         Ok(event) => {
+    ///             let _ = event;
+    ///         }
+    ///         Err(err) => eprintln!("canonical log stream failed: {err}"),
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    fn watch_canonical_logs_from(
+        &self,
+        start_block: u64,
+        filter: &Filter,
+    ) -> WatchCanonicalLogsFrom {
+        self.watch_logs_from(start_block, filter).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with

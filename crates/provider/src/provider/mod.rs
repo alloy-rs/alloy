@@ -9,10 +9,13 @@ pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 mod watch_from_common;
 
 mod watch_logs_from;
-pub use watch_logs_from::WatchLogsFrom;
+pub use watch_logs_from::{LogBatch, WatchLogsFrom};
 
 mod watch_canonical_blocks_from;
 pub use watch_canonical_blocks_from::{CanonicalEvent, WatchCanonicalBlocksFrom};
+
+mod watch_canonical_logs_from;
+pub use watch_canonical_logs_from::WatchCanonicalLogsFrom;
 
 mod watch_blocks_from;
 pub use watch_blocks_from::WatchBlocksFrom;
