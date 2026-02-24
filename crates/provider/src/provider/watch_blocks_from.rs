@@ -92,6 +92,17 @@ impl<N: Network> WatchBlocksFrom<N> {
 
     /// Converts this builder into a stream of request futures.
     ///
+    /// This stream _does not_ handle reorgs. Instead, each item yielded from the stream
+    /// is strictly ordered in terms of block number, regardless of the blocks parent.
+    ///
+    /// For example (height, hash, parent):
+    ///
+    /// You should expect blocks in order by number with no gaps and with disjoint parents:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(3,3B,2B)]
+    ///
+    /// And you should not expect receiving two blocks with the same number:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(2,2B,1A)]
+    ///
     /// Each future represents one `eth_getBlockByNumber` request for a single block.
     ///
     /// If a request returns `NullResp`, the yielded future retries the same block until it
