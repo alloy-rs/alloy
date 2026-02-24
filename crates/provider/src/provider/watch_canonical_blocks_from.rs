@@ -1,11 +1,12 @@
 use crate::{transport::TransportErrorKind, WatchBlocksFrom};
 use alloy_consensus::BlockHeader;
+use alloy_eips::BlockNumberOrTag;
 use alloy_network::{BlockResponse as _, Network};
 use alloy_network_primitives::HeaderResponse;
 use alloy_transport::TransportResult;
 use async_stream::try_stream;
 use futures::{Stream, StreamExt as _};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 const RPC_CONCURRENCY_DEFAULT: usize = 4;
 const MAX_REORG_DEPTH_DEFAULT: usize = 64;
@@ -39,6 +40,30 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
             rpc_concurrency: RPC_CONCURRENCY_DEFAULT,
             max_reorg_depth: MAX_REORG_DEPTH_DEFAULT,
         }
+    }
+
+    /// Streams canonical blocks with full transaction bodies.
+    pub fn full(mut self) -> Self {
+        self.watch_blocks_from = self.watch_blocks_from.full();
+        self
+    }
+
+    /// Streams canonical blocks with transaction hashes only.
+    pub fn hashes(mut self) -> Self {
+        self.watch_blocks_from = self.watch_blocks_from.hashes();
+        self
+    }
+
+    /// Sets the poll interval used when the stream is caught up.
+    pub fn poll_interval(mut self, poll_interval: Duration) -> Self {
+        self.watch_blocks_from = self.watch_blocks_from.poll_interval(poll_interval);
+        self
+    }
+
+    /// Sets the head block tag used to determine stream progress.
+    pub fn block_tag(mut self, block_tag: BlockNumberOrTag) -> Self {
+        self.watch_blocks_from = self.watch_blocks_from.block_tag(block_tag);
+        self
     }
 
     /// Sets the number of in-flight `eth_getBlockByNumber` requests.
@@ -101,7 +126,12 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                         }
                     }
 
-                    let parent = watch_blocks_from.get_block(height - 1).await?;
+                    let parent_height = height.checked_sub(1).ok_or_else(|| {
+                        TransportErrorKind::custom_str(
+                            "Cannot backfill parent for genesis block during canonical reconciliation.",
+                        )
+                    })?;
+                    let parent = watch_blocks_from.get_block(parent_height).await?;
                     if parent.header().hash() != parent_hash {
                         // We have hit a second reorg.
                         // This means that `next` is no longer canonical.
@@ -597,6 +627,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn canonical_builder_exposes_watch_blocks_from_methods() {
+        let chain = MockChain::new();
+        chain.extend(&[block(1, 1, 0)]);
+
+        let provider = chain.provider();
+        let mut stream = provider
+            .watch_canonical_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .hashes()
+            .rpc_concurrency(1)
+            .max_reorg_depth(8)
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        match first {
+            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 1),
+            other => panic!("expected Added(1), got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn stream_ends_when_provider_is_dropped() {
         let chain = MockChain::new();
         let provider = chain.provider();
@@ -605,5 +657,39 @@ mod tests {
 
         let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
         assert!(next.is_none());
+    }
+
+    #[tokio::test]
+    async fn errors_instead_of_underflow_when_backfilling_genesis_parent() {
+        let chain = MockChain::new();
+        {
+            let mut state = chain.state.write().unwrap();
+            state.head = 2;
+            // Intentionally inconsistent mock state to force a malformed backfill path:
+            // request #1 -> block number 0 (hash=1), request #2 -> another block number 0
+            // with a non-matching parent hash. This drives reconciliation to `height == 0`.
+            state.blocks.insert(1, block(0, 1, 0));
+            state.blocks.insert(2, block(0, 2, 9));
+        }
+
+        let provider = chain.provider();
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .canonical()
+            .rpc_concurrency(1)
+            .max_reorg_depth(8)
+            .into_stream();
+
+        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        match first {
+            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 0),
+            other => panic!("expected Added(0), got {other:?}"),
+        }
+
+        let err =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap_err();
+        assert!(format!("{err}").contains("genesis block"));
     }
 }

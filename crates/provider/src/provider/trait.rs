@@ -809,10 +809,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// let provider = ProviderBuilder::new().connect_client(client);
     ///
     /// let mut stream = provider
-    ///     .watch_blocks_from(20_000_000)
+    ///     .watch_canonical_blocks_from(20_000_000)
     ///     .block_tag(BlockNumberOrTag::Finalized)
     ///     .full()
-    ///     .canonical()
     ///     .rpc_concurrency(4)
     ///     .max_reorg_depth(64)
     ///     .into_stream();
