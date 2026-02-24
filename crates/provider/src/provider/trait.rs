@@ -710,8 +710,19 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
     ///
-    /// This stream keeps polling after catching up and continues yielding new blocks
+    /// This stream continues polling after catching up and continues yielding new blocks
     /// indefinitely.
+    ///
+    /// This stream _does not_ handle reorgs. Instead, each item yielded from the stream
+    /// is strictly ordered in terms of block number, regardless of the blocks parent.
+    ///
+    /// For example (height, hash, parent):
+    ///
+    /// You should expect blocks in order by number with no gaps and with disjoint parents:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(3,3B,2B)]
+    ///
+    /// And you should not expect receiving two blocks with the same number:
+    /// [(1, 1A, 0A),(2, 2A, 1A),(2,2B,1A)]
     ///
     /// Each yielded future contains one block request.
     ///
@@ -720,6 +731,9 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     ///
     /// Other errors are surfaced to the caller. Configure retries on the underlying client
     /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
+    ///
+    /// This can be buffered by the caller, for example with
+    /// [`StreamExt::buffered`](futures::StreamExt::buffered).
     ///
     /// # Examples
     ///
@@ -769,21 +783,52 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// This wraps [`watch_blocks_from`](Self::watch_blocks_from) and performs canonical chain
     /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
     ///
+    /// On a reorg the stream emits
+    /// [`CanonicalEvent::Removed`](crate::provider::CanonicalEvent::Removed)
+    /// for each rolled-back block (newest first), then
+    /// [`CanonicalEvent::Added`](crate::provider::CanonicalEvent::Added) for the new chain segment.
+    ///
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn example(provider: impl alloy_provider::Provider) {
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use alloy_eips::BlockNumberOrTag;
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_provider::CanonicalEvent;
+    /// # use alloy_rpc_client::RpcClient;
+    /// # use alloy_transport::{
+    /// #     layers::RetryBackoffLayer,
+    /// #     mock::{Asserter, MockTransport},
+    /// # };
     /// # use futures::StreamExt;
-    /// let mut stream = provider.watch_canonical_blocks_from(20_000_000).into_stream();
     ///
-    /// while let Some(item) = stream.next().await {
-    ///     match item {
-    ///         Ok(event) => {
-    ///             let _ = event;
+    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
+    /// let asserter = Asserter::new();
+    /// let client =
+    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
+    /// let provider = ProviderBuilder::new().connect_client(client);
+    ///
+    /// let mut stream = provider
+    ///     .watch_blocks_from(20_000_000)
+    ///     .block_tag(BlockNumberOrTag::Finalized)
+    ///     .full()
+    ///     .canonical()
+    ///     .rpc_concurrency(4)
+    ///     .max_reorg_depth(64)
+    ///     .into_stream();
+    ///
+    /// while let Some(event) = stream.next().await {
+    ///     match event {
+    ///         Ok(CanonicalEvent::Added(block)) => {
+    ///             let _ = block;
+    ///         }
+    ///         Ok(CanonicalEvent::Removed(block)) => {
+    ///             let _ = block;
     ///         }
     ///         Err(err) => eprintln!("canonical stream failed: {err}"),
     ///     }
     /// }
+    /// # Ok(())
     /// # }
     /// ```
     fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {

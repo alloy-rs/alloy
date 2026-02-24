@@ -70,7 +70,7 @@ impl<N: Network> WatchBlocksFrom<N> {
     }
 
     /// Converts this builder into a canonical-stream builder that emits
-    /// [`CanonicalItem`](crate::provider::CanonicalItem) deltas on reorgs.
+    /// [`CanonicalEvent`] deltas on reorgs.
     pub fn canonical(self) -> WatchCanonicalBlocksFrom<N> {
         WatchCanonicalBlocksFrom::new(self)
     }
@@ -88,7 +88,10 @@ impl<N: Network> WatchBlocksFrom<N> {
         .await
     }
 
-    /// Converts this builder into a stream of request futures.
+    /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
+    ///
+    /// This stream continues polling after catching up and continues yielding new blocks
+    /// indefinitely.
     ///
     /// This stream _does not_ handle reorgs. Instead, each item yielded from the stream
     /// is strictly ordered in terms of block number, regardless of the blocks parent.
@@ -101,12 +104,13 @@ impl<N: Network> WatchBlocksFrom<N> {
     /// And you should not expect receiving two blocks with the same number:
     /// [(1, 1A, 0A),(2, 2A, 1A),(2,2B,1A)]
     ///
-    /// Each future represents one `eth_getBlockByNumber` request for a single block.
+    /// Each yielded future contains one block request.
     ///
-    /// If a request returns `NullResp`, the yielded future retries the same block until it
+    /// If a block request returns `NullResp`, the yielded future retries the same block until it
     /// succeeds.
     ///
-    /// Other request errors are surfaced to the caller.
+    /// Other errors are surfaced to the caller. Configure retries on the underlying client
+    /// transport (for example with `RetryBackoffLayer`) for transport-level retry behavior.
     ///
     /// This can be buffered by the caller, for example with
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).

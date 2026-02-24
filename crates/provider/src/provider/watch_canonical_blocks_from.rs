@@ -10,7 +10,11 @@ use std::collections::VecDeque;
 const RPC_CONCURRENCY_DEFAULT: usize = 4;
 const MAX_REORG_DEPTH_DEFAULT: usize = 64;
 
-/// A builder for streaming blocks from a historical block and continuing indefinitely.
+/// A builder for streaming canonical block events from a historical block.
+///
+/// This wraps [`WatchBlocksFrom`] and performs reorg detection: when the chain tip changes
+/// incompatibly, the stream yields [`CanonicalEvent::Removed`] for rolled-back blocks
+/// followed by [`CanonicalEvent::Added`] for the new canonical chain segment.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
 pub struct WatchCanonicalBlocksFrom<N: Network> {
@@ -76,7 +80,6 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                     };
 
                     let parent_hash = front.header().parent_hash();
-
 
                     // Normal extension of the canonical tip.
                     if parent_hash == canonical_tip.header().hash() {
