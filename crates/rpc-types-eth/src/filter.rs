@@ -711,10 +711,13 @@ impl Filter {
         }
     }
 
-    /// Returns `true` if the filter matches the given block. Checks both the
-    /// block number and hash.
+    /// Returns `true` if the filter matches the given block. Checks the block
+    /// hash when filtering by block hash, otherwise checks the block number range.
     pub fn matches_block(&self, block: &BlockNumHash) -> bool {
-        self.matches_block_range(block.number) || self.matches_block_hash(block.hash)
+        match self.block_option {
+            FilterBlockOption::AtBlockHash(hash) => hash == block.hash,
+            FilterBlockOption::Range { .. } => self.matches_block_range(block.number),
+        }
     }
 
     /// Returns `true` if either of the following is true:
