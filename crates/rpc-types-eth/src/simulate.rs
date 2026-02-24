@@ -210,7 +210,7 @@ impl SimulateError {
 
     /// Creates a new invalid params error.
     pub fn invalid_params() -> Self {
-        Self { code: Self::INVALID_PARAMS_ERROR_CODE, message: "invalid params".to_string() }
+        Self { code: Self::INVALID_PARAMS_ERROR_CODE, message: "invalid params".to_string(), data: None }
     }
 }
 
