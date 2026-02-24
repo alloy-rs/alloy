@@ -1,6 +1,4 @@
-use crate::{
-    provider::watch_from_common::FixedBuf, transport::TransportErrorKind, WatchBlocksFrom,
-};
+use crate::{transport::TransportErrorKind, WatchBlocksFrom};
 use alloy_consensus::BlockHeader;
 use alloy_network::{BlockResponse as _, Network};
 use alloy_network_primitives::HeaderResponse;
@@ -121,6 +119,38 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
             }
         }
         .boxed()
+    }
+}
+
+#[derive(Debug)]
+struct FixedBuf<T> {
+    buf: VecDeque<T>,
+}
+
+impl<T> FixedBuf<T> {
+    fn new(capacity: usize) -> Self {
+        Self { buf: VecDeque::with_capacity(capacity.max(1)) }
+    }
+
+    /// Pushes `item` and discards the oldest item if the buffer is full.
+    fn push(&mut self, item: T) {
+        if self.buf.len() == self.buf.capacity() {
+            self.buf.pop_front();
+        }
+        self.buf.push_back(item);
+    }
+
+    /// Returns the most recent item, if any.
+    fn pop(&mut self) -> Option<T> {
+        self.buf.pop_back()
+    }
+
+    fn last(&self) -> Option<&T> {
+        self.buf.back()
+    }
+
+    fn len(&self) -> usize {
+        self.buf.len()
     }
 }
 

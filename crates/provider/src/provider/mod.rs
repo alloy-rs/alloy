@@ -6,8 +6,6 @@ mod get_block;
 pub use get_block::SubFullBlocks;
 pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 
-mod watch_from_common;
-
 mod watch_canonical_blocks_from;
 pub use watch_canonical_blocks_from::{CanonicalEvent, WatchCanonicalBlocksFrom};
 

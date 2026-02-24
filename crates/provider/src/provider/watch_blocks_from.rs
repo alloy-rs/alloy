@@ -1,23 +1,21 @@
+use super::WatchCanonicalBlocksFrom;
 use crate::utils;
 use alloy_eips::BlockNumberOrTag;
-use alloy_json_rpc::RpcError;
+use alloy_json_rpc::{RpcError, RpcRecv};
 use alloy_network::Network;
-use alloy_network_primitives::BlockTransactionsKind;
-use alloy_rpc_client::{RpcClientInner, WeakClient};
+use alloy_network_primitives::{BlockTransactionsKind, HeaderResponse};
+use alloy_primitives::U64;
+use alloy_rpc_client::{ClientRef, RpcClientInner, WeakClient};
 use alloy_transport::TransportResult;
+use async_stream::stream;
 use futures::Stream;
-use std::{marker::PhantomData, time::Duration};
+use std::{future::Future, marker::PhantomData, pin::Pin, time::Duration};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
-
-use super::{
-    watch_from_common::{stream_from_head_futures, FutureStepFn, RequestFuture},
-    WatchCanonicalBlocksFrom,
-};
 
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -114,22 +112,59 @@ impl<N: Network> WatchBlocksFrom<N> {
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).
     pub fn into_stream(
         self,
-    ) -> impl Stream<Item = RequestFuture<N::BlockResponse>> + Unpin + 'static {
+    ) -> impl Stream<
+        Item = Pin<Box<dyn Future<Output = TransportResult<N::BlockResponse>> + Send + 'static>>,
+    > + Unpin
+           + 'static {
         let Self { client, start_block, poll_interval, block_tag, kind, _phantom } = self;
 
-        let step: FutureStepFn<N::BlockResponse> = Box::new(move |client, current_block, _head| {
-            let fut: RequestFuture<N::BlockResponse> =
-                Box::pin(get_block::<N>(client, current_block, kind, poll_interval));
-            (current_block.saturating_add(1), fut)
-        });
+        type Fut<T> = Pin<Box<dyn Future<Output = TransportResult<T>> + Send + 'static>>;
 
-        stream_from_head_futures::<N::BlockResponse, N::HeaderResponse>(
-            client,
-            start_block,
-            poll_interval,
-            block_tag,
-            step,
-        )
+        let stream = stream! {
+            let mut current_block = start_block;
+
+            'task: loop {
+                let Some(client) = client.upgrade() else {
+                    break 'task;
+                };
+
+                let head = match fetch_head_block::<N::HeaderResponse>(client.as_ref(), block_tag).await {
+                    Ok(head) => head,
+                    Err(err) => {
+                        let fut: Fut<N::BlockResponse> = Box::pin(async move { Err(err) });
+                        yield fut;
+                        sleep(poll_interval).await;
+                        continue 'task;
+                    }
+                };
+
+                if current_block > head {
+                    sleep(poll_interval).await;
+                    continue 'task;
+                }
+
+                while current_block <= head {
+                    let next_block = current_block.saturating_add(1);
+                    let item_fut: Fut<N::BlockResponse> =
+                        Box::pin(get_block::<N>(client.clone(), current_block, kind, poll_interval));
+                    if next_block <= current_block {
+                        let err = RpcError::local_usage_str(
+                            "watch stream step did not advance block cursor",
+                        );
+                        let fut: Fut<N::BlockResponse> = Box::pin(async move { Err(err) });
+                        yield fut;
+                        sleep(poll_interval).await;
+                        continue 'task;
+                    }
+                    current_block = next_block;
+                    yield item_fut;
+                }
+
+                sleep(poll_interval).await;
+            }
+        };
+
+        Box::pin(stream)
     }
 }
 
@@ -149,6 +184,24 @@ async fn get_block<N: Network>(
             Some(block) => return Ok(block),
             None => sleep(poll_interval).await,
         }
+    }
+}
+
+async fn fetch_head_block<HeaderResp: HeaderResponse + RpcRecv>(
+    client: ClientRef<'_>,
+    tag: BlockNumberOrTag,
+) -> TransportResult<u64> {
+    match tag {
+        BlockNumberOrTag::Number(number) => Ok(number),
+        BlockNumberOrTag::Earliest => Ok(0),
+        BlockNumberOrTag::Latest => {
+            client.request_noparams::<U64>("eth_blockNumber").await.map(|n| n.to())
+        }
+        _ => client
+            .request::<_, Option<HeaderResp>>("eth_getBlockByNumber", (tag, false))
+            .await?
+            .map(|header| header.number())
+            .ok_or(RpcError::NullResp),
     }
 }
 
