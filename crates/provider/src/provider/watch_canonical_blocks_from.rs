@@ -98,7 +98,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                         }
                     }
 
-                    let parent = watch_blocks_from.get_block(canonical_height).await?;
+                    let parent = watch_blocks_from.get_block(height - 1).await?;
                     if parent.header().hash() != parent_hash {
                         // We have hit a second reorg.
                         // This means that `next` is no longer canonical.
@@ -146,12 +146,14 @@ mod tests {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
 
-        // head + block 1,2,3,4 (where block 4 reorgs from block 2).
+        // Old chain: 1 -> 2 -> 3. New chain: 1 -> 2 -> 3' -> 4.
         asserter.push_success(&4_u64);
         asserter.push_success(&Some(block(1, 1, 0)));
         asserter.push_success(&Some(block(2, 2, 1)));
         asserter.push_success(&Some(block(3, 3, 2)));
-        asserter.push_success(&Some(block(4, 44, 2)));
+        asserter.push_success(&Some(block(4, 44, 33)));
+        // Backfill: block 3' (hash=33, parent=2) replaces old block 3.
+        asserter.push_success(&Some(block(3, 33, 2)));
 
         let mut stream = provider
             .watch_blocks_from(1)
@@ -162,36 +164,44 @@ mod tests {
             .max_reorg_depth(16)
             .into_stream();
 
-        let first = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let second =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let third = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let fourth =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
-        let fifth = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        // Added 1, 2, 3.
+        for expected in [1_u64, 2, 3] {
+            let item =
+                timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+            match item {
+                CanonicalEvent::Added(block) => assert_eq!(block.header.number, expected),
+                other => panic!("expected Added({expected}), got {other:?}"),
+            }
+        }
 
-        match first {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 1),
-            other => panic!("expected Added(1), got {other:?}"),
-        }
-        match second {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 2),
-            other => panic!("expected Added(2), got {other:?}"),
-        }
-        match third {
-            CanonicalEvent::Added(block) => assert_eq!(block.header.number, 3),
-            other => panic!("expected Added(3), got {other:?}"),
-        }
-        match fourth {
-            CanonicalEvent::Removed(block) => assert_eq!(block.header.number, 3),
+        // Removed 3, Added 3', Added 4.
+        let removed_3 =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        let added_3_prime =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        let added_4 =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+
+        match removed_3 {
+            CanonicalEvent::Removed(block) => {
+                assert_eq!(block.header.number, 3);
+                assert_eq!(block.header.hash, B256::with_last_byte(3));
+            }
             other => panic!("expected Removed(3), got {other:?}"),
         }
-        match fifth {
+        match added_3_prime {
+            CanonicalEvent::Added(block) => {
+                assert_eq!(block.header.number, 3);
+                assert_eq!(block.header.hash, B256::with_last_byte(33));
+            }
+            other => panic!("expected Added(3'), got {other:?}"),
+        }
+        match added_4 {
             CanonicalEvent::Added(block) => {
                 assert_eq!(block.header.number, 4);
                 assert_eq!(block.header.hash, B256::with_last_byte(44));
             }
-            other => panic!("expected Added(4'), got {other:?}"),
+            other => panic!("expected Added(4), got {other:?}"),
         }
     }
 
@@ -246,7 +256,7 @@ mod tests {
 
         let err =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap_err();
-        assert!(format!("{err}").contains("max_reorg_depth"));
+        assert!(format!("{err}").contains("Deep reorg detected"));
 
         // Stream ends after the first error.
         let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
@@ -338,17 +348,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn errors_when_backfilled_parent_hash_does_not_match_child_parent_hash() {
+    async fn recovers_when_chain_changes_during_backfill() {
         let asserter = alloy_transport::mock::Asserter::new();
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
 
+        // Old chain: 1 -> 2 -> 3.
         asserter.push_success(&4_u64);
         asserter.push_success(&Some(block(1, 1, 0)));
         asserter.push_success(&Some(block(2, 2, 1)));
         asserter.push_success(&Some(block(3, 3, 2)));
-        // Block 4 references parent hash 33, but parent backfill returns hash 34.
+        // Block 4 references parent hash 33 (a new block 3').
         asserter.push_success(&Some(block(4, 4, 33)));
+        // Backfill block 3: chain changed again, returns hash 34 instead of 33.
         asserter.push_success(&Some(block(3, 34, 2)));
+        // continue 'stream: buffer is now [1, 2], stream advances to next head poll.
+        asserter.push_success(&5_u64);
+        asserter.push_success(&Some(block(5, 5, 44)));
+        // Backfill from block 5 down to buffer tip (block 2).
+        asserter.push_success(&Some(block(4, 44, 33)));
+        asserter.push_success(&Some(block(3, 33, 2)));
 
         let mut stream = provider
             .watch_blocks_from(1)
@@ -359,6 +377,7 @@ mod tests {
             .max_reorg_depth(8)
             .into_stream();
 
+        // Added 1, 2, 3.
         for expected in [1_u64, 2, 3] {
             let item =
                 timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
@@ -368,19 +387,46 @@ mod tests {
             }
         }
 
+        // Removed 3 (from the failed first attempt).
         let removed_3 =
             timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
         match removed_3 {
-            CanonicalEvent::Removed(block) => assert_eq!(block.header.number, 3),
+            CanonicalEvent::Removed(block) => {
+                assert_eq!(block.header.number, 3);
+                assert_eq!(block.header.hash, B256::with_last_byte(3));
+            }
             other => panic!("expected Removed(3), got {other:?}"),
         }
 
-        let err =
-            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap_err();
-        assert!(format!("{err}").contains("parent hash mismatch"));
+        // After recovery: Added 3', Added 4', Added 5.
+        let added_3_prime =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        let added_4_prime =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
+        let added_5 =
+            timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap().unwrap();
 
-        let next = timeout(Duration::from_secs(1), stream.next()).await.unwrap();
-        assert!(next.is_none());
+        match added_3_prime {
+            CanonicalEvent::Added(block) => {
+                assert_eq!(block.header.number, 3);
+                assert_eq!(block.header.hash, B256::with_last_byte(33));
+            }
+            other => panic!("expected Added(3'), got {other:?}"),
+        }
+        match added_4_prime {
+            CanonicalEvent::Added(block) => {
+                assert_eq!(block.header.number, 4);
+                assert_eq!(block.header.hash, B256::with_last_byte(44));
+            }
+            other => panic!("expected Added(4'), got {other:?}"),
+        }
+        match added_5 {
+            CanonicalEvent::Added(block) => {
+                assert_eq!(block.header.number, 5);
+                assert_eq!(block.header.hash, B256::with_last_byte(5));
+            }
+            other => panic!("expected Added(5), got {other:?}"),
+        }
     }
 
     #[tokio::test]
