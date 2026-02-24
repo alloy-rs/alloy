@@ -86,6 +86,8 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
                     }
 
                     // Reorg detected: the new block does not build on the current canonical tip.
+                    // Because WatchBlocksFrom always emits sequential blocks in terms of number, 
+                    // we can yield `Removed` events here.
                     let height = front.header().number();
                     let canonical_height = canonical_tip.header().number();
                     if canonical_height + 1 == height {
@@ -259,8 +261,6 @@ mod tests {
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────
-
     fn block(number: u64, hash_last_byte: u8, parent_hash_last_byte: u8) -> Block {
         let mut block: Block = Block::default();
         block.header.inner.number = number;
@@ -268,8 +268,6 @@ mod tests {
         block.header.inner.parent_hash = B256::with_last_byte(parent_hash_last_byte);
         block
     }
-
-    // ── Tests ──────────────────────────────────────────────────────────
 
     #[tokio::test]
     async fn emits_removed_then_added_on_reorg_within_buffer() {

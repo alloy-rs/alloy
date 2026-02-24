@@ -6,7 +6,7 @@
 use super::get_block::SubFullBlocks;
 use super::{
     DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
-    WatchCanonicalBlocksFrom, WatchLogsFrom,
+    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchLogsFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
