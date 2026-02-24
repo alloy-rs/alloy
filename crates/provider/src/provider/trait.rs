@@ -6,7 +6,7 @@
 use super::get_block::SubFullBlocks;
 use super::{
     DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchBlocksFrom,
-    WatchCanonicalBlocksFrom, WatchCanonicalLogsFrom, WatchLogsFrom,
+    WatchCanonicalBlocksFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -708,61 +708,6 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
-    /// Stream logs from a historical block using windowed `eth_getLogs` calls.
-    ///
-    /// This stream keeps polling after catching up and continues yielding new log windows
-    /// indefinitely.
-    ///
-    /// Each yielded future contains one complete `eth_getLogs` window request. Buffering increases
-    /// the number of in-flight windows, but each request still covers up to `window_size` blocks.
-    ///
-    /// This method does not implement retries internally. Configure retries on the underlying
-    /// client transport (for example with `RetryBackoffLayer`) if desired.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// # use alloy_eips::BlockNumberOrTag;
-    /// # use alloy_provider::{Provider, ProviderBuilder};
-    /// # use alloy_rpc_client::RpcClient;
-    /// # use alloy_rpc_types_eth::Filter;
-    /// # use alloy_transport::{
-    /// #     layers::RetryBackoffLayer,
-    /// #     mock::{Asserter, MockTransport},
-    /// # };
-    /// # use futures::StreamExt;
-    ///
-    /// let retry_layer = RetryBackoffLayer::new(u32::MAX, 100, 10_000);
-    /// let asserter = Asserter::new();
-    /// let client =
-    ///     RpcClient::builder().layer(retry_layer).transport(MockTransport::new(asserter), true);
-    /// let provider = ProviderBuilder::new().connect_client(client);
-    ///
-    /// provider
-    ///     .watch_logs_from(20_000_000, &Filter::new())
-    ///     .block_tag(BlockNumberOrTag::Safe)
-    ///     .window_size(500)
-    ///     .into_stream()
-    ///     // Keep many RPC request futures in flight at the same time.
-    ///     .buffered(8)
-    ///     // Process many resolved windows concurrently.
-    ///     .for_each_concurrent(Some(8), |window| async move {
-    ///         match window {
-    ///             Ok((from, to, logs)) => {
-    ///                 println!("received {} logs for blocks {from}..={to}", logs.len());
-    ///             }
-    ///             Err(err) => eprintln!("window request failed: {err}"),
-    ///         }
-    ///     })
-    ///     .await;
-    /// # Ok(())
-    /// # }
-    /// ```
-    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom {
-        WatchLogsFrom::new(self.weak_client(), start_block, filter.clone())
-    }
-
     /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
     ///
     /// This stream keeps polling after catching up and continues yielding new blocks
@@ -843,37 +788,6 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     /// ```
     fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
         self.watch_blocks_from(start_block).canonical()
-    }
-
-    /// Stream canonical log events from a historical block.
-    ///
-    /// This wraps [`watch_logs_from`](Self::watch_logs_from) and performs canonical chain
-    /// reconciliation, yielding [`CanonicalEvent`](crate::provider::CanonicalEvent) values.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # async fn example(provider: impl alloy_provider::Provider) {
-    /// # use alloy_rpc_types_eth::Filter;
-    /// # use futures::StreamExt;
-    /// let mut stream = provider.watch_canonical_logs_from(20_000_000, &Filter::new()).into_stream();
-    ///
-    /// while let Some(item) = stream.next().await {
-    ///     match item {
-    ///         Ok(event) => {
-    ///             let _ = event;
-    ///         }
-    ///         Err(err) => eprintln!("canonical log stream failed: {err}"),
-    ///     }
-    /// }
-    /// # }
-    /// ```
-    fn watch_canonical_logs_from(
-        &self,
-        start_block: u64,
-        filter: &Filter,
-    ) -> WatchCanonicalLogsFrom {
-        self.watch_logs_from(start_block, filter).canonical()
     }
 
     /// Watch for new pending transaction bodies by polling the provider with

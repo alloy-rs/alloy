@@ -6,14 +6,7 @@ use alloy_rpc_client::{ClientRef, RpcClientInner, WeakClient};
 use alloy_transport::TransportResult;
 use async_stream::stream;
 use futures::Stream;
-use std::{
-    collections::{vec_deque::Iter, VecDeque},
-    future::Future,
-    ops::Index,
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::VecDeque, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
@@ -130,13 +123,5 @@ impl<T> FixedBuf<T> {
 
     pub(super) fn len(&self) -> usize {
         self.buf.len()
-    }
-
-    pub(super) fn iter(&self) -> Iter<'_, T> {
-        self.buf.iter()
-    }
-
-    pub(super) fn get(&self, index: usize) -> Option<&T> {
-        self.buf.get(index)
     }
 }

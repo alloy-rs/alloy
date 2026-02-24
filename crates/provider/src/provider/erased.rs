@@ -1,6 +1,5 @@
 use super::{
     EthCallMany, EthGetBlock, FilterPollerBuilder, WatchBlocksFrom, WatchCanonicalBlocksFrom,
-    WatchCanonicalLogsFrom, WatchLogsFrom,
 };
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -222,24 +221,12 @@ impl<N: Network> Provider<N> for DynProvider<N> {
         self.0.watch_logs(filter).await
     }
 
-    fn watch_logs_from(&self, start_block: u64, filter: &Filter) -> WatchLogsFrom {
-        self.0.watch_logs_from(start_block, filter)
-    }
-
     fn watch_blocks_from(&self, start_block: u64) -> WatchBlocksFrom<N> {
         self.0.watch_blocks_from(start_block)
     }
 
     fn watch_canonical_blocks_from(&self, start_block: u64) -> WatchCanonicalBlocksFrom<N> {
         self.0.watch_canonical_blocks_from(start_block)
-    }
-
-    fn watch_canonical_logs_from(
-        &self,
-        start_block: u64,
-        filter: &Filter,
-    ) -> WatchCanonicalLogsFrom {
-        self.0.watch_canonical_logs_from(start_block, filter)
     }
 
     async fn watch_full_pending_transactions(
