@@ -316,8 +316,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
                                 for block in start_block..=end_block {
                                     let single_filter =
                                         chunk_filter.clone().from_block(block).to_block(block);
-                                    fallback_logs
-                                        .extend(provider.get_logs(&single_filter).await?);
+                                    fallback_logs.extend(provider.get_logs(&single_filter).await?);
                                 }
                                 Ok((start_block, fallback_logs))
                             }
