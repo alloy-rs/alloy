@@ -67,7 +67,7 @@ where
             Self::Preparing { caller: _, params, method, map: _ } => {
                 f.debug_struct("Preparing").field("params", params).field("method", method).finish()
             }
-            Self::Running { .. } => f.debug_tuple("Running").finish(),
+            Self::Running { .. } => f.debug_struct("Running").finish(),
             Self::Polling => f.debug_tuple("Polling").finish(),
         }
     }

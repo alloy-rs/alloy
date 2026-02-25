@@ -246,9 +246,9 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CallManyInnerFut::Preparing { params, .. } => {
-                f.debug_tuple("Preparing").field(&params).finish()
+                f.debug_struct("Preparing").field("params", &params).finish()
             }
-            CallManyInnerFut::Running { .. } => f.debug_tuple("Running").finish(),
+            CallManyInnerFut::Running { .. } => f.debug_struct("Running").finish(),
             CallManyInnerFut::Polling => f.debug_tuple("Polling").finish(),
         }
     }
