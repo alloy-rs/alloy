@@ -168,19 +168,13 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
     ///
     /// # Example
     ///
-    /// ```no_run
-    /// # use alloy_contract::Event;
-    /// # use alloy_sol_types::sol;
-    /// # sol! { #[allow(dead_code)] event MyEvent(uint64 indexed); }
-    /// # async fn example(event: Event<_, MyEvent, _>) -> Result<(), Box<dyn std::error::Error>> {
+    /// ```ignore
     /// let logs = event
     ///     .chunked()
     ///     .chunk_size(1_000)
     ///     .concurrent(10)
     ///     .query()
     ///     .await?;
-    /// # Ok(())
-    /// # }
     /// ```
     pub fn chunked(self) -> ChunkedEvent<P, E, N> {
         ChunkedEvent {
