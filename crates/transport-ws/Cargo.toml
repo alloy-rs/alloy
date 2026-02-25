@@ -28,6 +28,7 @@ alloy-transport.workspace = true
 
 futures.workspace = true
 serde_json.workspace = true
+url.workspace = true
 tokio = { workspace = true, features = ["sync", "rt"] }
 tracing.workspace = true
 
