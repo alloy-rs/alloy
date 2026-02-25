@@ -23,8 +23,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 #[derive(Debug, Clone)]
 #[must_use = "this builder does nothing unless you call `.into_stream`"]
 pub struct WatchBlocksFrom<N: Network> {
-    /// A weak reference to the provider's RPC client, used to make requests in the stream.
-    pub client: WeakClient,
+    client: WeakClient,
     start_block: u64,
     poll_interval: Duration,
     block_tag: BlockNumberOrTag,
@@ -76,7 +75,7 @@ impl<N: Network> WatchBlocksFrom<N> {
     }
 
     /// Fetches a single block by number.
-    pub async fn get_block(&self, block_number: u64) -> TransportResult<N::BlockResponse> {
+    pub(super) async fn get_block(&self, block_number: u64) -> TransportResult<N::BlockResponse> {
         get_block::<N>(
             self.client
                 .upgrade()
