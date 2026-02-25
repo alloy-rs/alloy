@@ -159,48 +159,126 @@ impl<P: Provider<N>, E: SolEvent, N: Network> Event<P, E, N> {
         self.filter.topics[3] = topic.into();
         self
     }
+
+    /// Returns a [`ChunkedEvent`] builder for querying large block ranges.
+    ///
+    /// The builder attempts the full block range optimistically first. If that fails, it splits
+    /// the range into `chunk_size`-block windows and queries them concurrently. If an individual
+    /// chunk still fails, it falls back to block-by-block queries for that chunk.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alloy_contract::Event;
+    /// # use alloy_sol_types::sol;
+    /// # sol! { #[allow(dead_code)] event MyEvent(uint64 indexed); }
+    /// # async fn example(event: Event<_, MyEvent, _>) -> Result<(), Box<dyn std::error::Error>> {
+    /// let logs = event
+    ///     .chunked()
+    ///     .chunk_size(1_000)
+    ///     .concurrent(10)
+    ///     .query()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn chunked(self) -> ChunkedEvent<P, E, N> {
+        ChunkedEvent {
+            provider: self.provider,
+            filter: self.filter,
+            chunk_size: 1_000,
+            max_concurrent: 5,
+            _phantom: PhantomData,
+        }
+    }
 }
 
-impl<P: Provider<N> + Clone, E: SolEvent, N: Network> Event<P, E, N> {
-    /// Queries the blockchain for the selected filter using chunked requests to handle large
-    /// block ranges, and returns a vector of matching event logs.
+impl<P: Clone, E, N> Event<&P, E, N> {
+    /// Clones the provider and returns a new event with the cloned provider.
+    pub fn with_cloned_provider(self) -> Event<P, E, N> {
+        Event { provider: self.provider.clone(), filter: self.filter, _phantom: PhantomData }
+    }
+}
+
+/// A chunked event query builder.
+///
+/// Created via [`Event::chunked`]. Configure chunk size and concurrency, then call
+/// [`query`](ChunkedEvent::query) or [`query_raw`](ChunkedEvent::query_raw).
+///
+/// Attempts the full block range optimistically first. If that fails, the range is split into
+/// `chunk_size`-block windows queried concurrently (bounded by `max_concurrent`). If an
+/// individual chunk still fails, each block in that chunk is queried individually.
+#[must_use = "ChunkedEvent does nothing unless you call `query` or `query_raw`"]
+pub struct ChunkedEvent<P, E, N = Ethereum> {
+    provider: P,
+    filter: Filter,
+    chunk_size: u64,
+    max_concurrent: usize,
+    _phantom: PhantomData<(E, N)>,
+}
+
+impl<P: fmt::Debug, E, N> fmt::Debug for ChunkedEvent<P, E, N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChunkedEvent")
+            .field("provider", &self.provider)
+            .field("filter", &self.filter)
+            .field("chunk_size", &self.chunk_size)
+            .field("max_concurrent", &self.max_concurrent)
+            .field("event_type", &format_args!("{}", std::any::type_name::<E>()))
+            .finish()
+    }
+}
+
+impl<P, E, N> ChunkedEvent<P, E, N> {
+    /// Sets the chunk size in blocks (default: 1 000).
     ///
-    /// First tries the full range optimistically. If that fails, splits the range into chunks
-    /// of `chunk_size` blocks and queries them concurrently (up to 5 in parallel).
-    /// If an individual chunk fails, falls back to block-by-block queries for that chunk.
-    pub async fn query_chunked(&self, chunk_size: u64) -> Result<Vec<(E, Log)>, Error> {
-        let logs = self.query_raw_chunked(chunk_size).await?;
+    /// # Panics
+    ///
+    /// Panics if `chunk_size` is 0.
+    pub fn chunk_size(mut self, chunk_size: u64) -> Self {
+        assert!(chunk_size > 0, "chunk_size must be greater than 0");
+        self.chunk_size = chunk_size;
+        self
+    }
+
+    /// Sets the maximum number of concurrent chunk requests (default: 5).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_concurrent` is 0.
+    pub fn concurrent(mut self, max_concurrent: usize) -> Self {
+        assert!(max_concurrent > 0, "max_concurrent must be greater than 0");
+        self.max_concurrent = max_concurrent;
+        self
+    }
+}
+
+impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
+    /// Queries the blockchain for matching event logs, decoding them.
+    ///
+    /// See [`query_raw`](Self::query_raw) for the full description of the chunked strategy.
+    pub async fn query(&self) -> Result<Vec<(E, Log)>, Error> {
+        let logs = self.query_raw().await?;
         logs.into_iter().map(|log| Ok((decode_log(&log)?, log))).collect()
     }
 
-    /// Queries the blockchain for the selected filter using chunked requests to handle large
-    /// block ranges, and returns a vector of matching event logs, without decoding them.
+    /// Queries the blockchain for matching event logs, without decoding.
     ///
-    /// First tries the full range optimistically. If that fails, splits the range into chunks
-    /// of `chunk_size` blocks and queries them concurrently (up to 5 in parallel).
-    /// If an individual chunk fails, falls back to block-by-block queries for that chunk.
-    pub async fn query_raw_chunked(&self, chunk_size: u64) -> TransportResult<Vec<Log>> {
-        if chunk_size == 0 {
-            return Err(RpcError::local_usage_str("chunk_size must be greater than 0"));
-        }
-
-        // Try the full range first
+    /// Attempts the full block range optimistically first. If that fails, splits the range into
+    /// `chunk_size`-block windows queried concurrently (up to `max_concurrent` at a time). If an
+    /// individual chunk still fails, falls back to querying each block individually.
+    pub async fn query_raw(&self) -> TransportResult<Vec<Log>> {
         if let Ok(logs) = self.provider.get_logs(&self.filter).await {
             return Ok(logs);
         }
-
-        // Full-range failed; return the chunked fallback result (including its own error)
-        self.get_logs_chunked_concurrent(chunk_size).await
+        self.get_logs_chunked().await
     }
 
-    /// Retrieves logs using concurrent chunked requests with rate limiting.
-    ///
-    /// Divides the block range into chunks and processes them with a maximum of
-    /// 5 concurrent requests. Falls back to single-block queries if chunks fail.
-    async fn get_logs_chunked_concurrent(&self, chunk_size: u64) -> TransportResult<Vec<Log>> {
-        let (from_block, to_block) = extract_block_range(&self.filter);
-        let (Some(from), Some(to)) = (from_block, to_block) else {
-            // No concrete numeric range; chunking is not possible
+    /// Divides the block range into chunks and queries them concurrently, falling back to
+    /// single-block queries for any chunk that fails.
+    async fn get_logs_chunked(&self) -> TransportResult<Vec<Log>> {
+        let (from, to) = self.filter.extract_block_range();
+        let (Some(from), Some(to)) = (from, to) else {
             return Err(RpcError::local_usage_str(
                 "chunked queries require numeric from_block and to_block",
             ));
@@ -210,8 +288,9 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> Event<P, E, N> {
             return Ok(vec![]);
         }
 
-        // Create chunk ranges lazily (inclusive on both ends) using u64 arithmetic
-        // to avoid OOM on huge ranges.
+        let chunk_size = self.chunk_size;
+
+        // Lazily generate (start, end) pairs for each chunk to avoid OOM on huge ranges.
         let chunk_ranges = std::iter::successors(Some(from), move |&prev| {
             let end = prev.saturating_add(chunk_size - 1).min(to);
             if end >= to {
@@ -220,52 +299,40 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> Event<P, E, N> {
                 end.checked_add(1)
             }
         })
-        .map(move |chunk_start| (chunk_start, chunk_start.saturating_add(chunk_size - 1).min(to)));
+        .map(move |start| (start, start.saturating_add(chunk_size - 1).min(to)));
 
-        // Process chunks with controlled concurrency using buffered stream
         let all_results: Vec<TransportResult<(u64, Vec<Log>)>> =
             futures::stream::iter(chunk_ranges)
                 .map(|(start_block, end_block)| {
                     let chunk_filter =
                         self.filter.clone().from_block(start_block).to_block(end_block);
                     let provider = self.provider.clone();
-
                     async move {
                         match provider.get_logs(&chunk_filter).await {
                             Ok(logs) => Ok((start_block, logs)),
                             Err(_) => {
-                                // Fallback: try individual blocks in this chunk (best-effort)
+                                // Fallback: query each block individually
                                 let mut fallback_logs = Vec::new();
                                 for block in start_block..=end_block {
                                     let single_filter =
                                         chunk_filter.clone().from_block(block).to_block(block);
-                                    if let Ok(logs) = provider.get_logs(&single_filter).await {
-                                        fallback_logs.extend(logs);
-                                    }
+                                    fallback_logs
+                                        .extend(provider.get_logs(&single_filter).await?);
                                 }
                                 Ok((start_block, fallback_logs))
                             }
                         }
                     }
                 })
-                .buffered(5)
+                .buffered(self.max_concurrent)
                 .collect()
                 .await;
 
-        // Collect results, propagating any errors
         let mut resolved: Vec<(u64, Vec<Log>)> =
             all_results.into_iter().collect::<TransportResult<Vec<_>>>()?;
 
-        // Sort by start block and flatten
         resolved.sort_by_key(|(block_num, _)| *block_num);
         Ok(resolved.into_iter().flat_map(|(_, logs)| logs).collect())
-    }
-}
-
-impl<P: Clone, E, N> Event<&P, E, N> {
-    /// Clones the provider and returns a new event with the cloned provider.
-    pub fn with_cloned_provider(self) -> Event<P, E, N> {
-        Event { provider: self.provider.clone(), filter: self.filter, _phantom: PhantomData }
     }
 }
 
@@ -317,13 +384,6 @@ impl<E: SolEvent> EventPoller<E> {
             .flat_map(futures_util::stream::iter)
             .map(|log| decode_log(&log).map(|e| (e, log)))
     }
-}
-
-fn extract_block_range(filter: &Filter) -> (Option<u64>, Option<u64>) {
-    let FilterBlockOption::Range { from_block, to_block } = &filter.block_option else {
-        return (None, None);
-    };
-    (from_block.and_then(|b| b.as_number()), to_block.and_then(|b| b.as_number()))
 }
 
 fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
@@ -628,41 +688,41 @@ mod tests {
         }
     }
 
+    /// Verifies that the chunked query algorithm collects the correct logs and preserves
+    /// block ordering when events are spread across a large range requiring many chunks.
     #[tokio::test]
-    async fn query_chunked_hits_chunking_path() {
+    async fn chunked_query_collects_and_orders_logs() {
         use alloy_provider::ext::AnvilApi;
 
         let _ = tracing_subscriber::fmt::try_init();
 
         let anvil = alloy_node_bindings::Anvil::new().spawn();
-
         let pk: PrivateKeySigner =
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
-        let wallet = EthereumWallet::from(pk);
         let provider = alloy_provider::ProviderBuilder::new()
-            .wallet(wallet)
+            .wallet(EthereumWallet::from(pk))
             .connect_http(anvil.endpoint_url());
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        // Emit events at the start, middle, and end of a 10k block range
-        // to stress the merge across chunks
-        contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+        // Emit three events spread across a 10k-block range: start, middle, and end.
+        // This stresses chunk boundary handling and result ordering after the merge.
+        contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
         provider.anvil_mine(Some(4998), None).await.unwrap();
-        contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+        contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
         provider.anvil_mine(Some(4998), None).await.unwrap();
-        contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
-        provider.anvil_mine(Some(1), None).await.unwrap();
+        contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
 
-        // chunk_size=7 mirrors the Foundry PR (23879634–23889634), forcing ~1429 chunks
-        let event = contract.MyEvent_filter().from_block(0u64).to_block(10_000u64);
-        let chunked = event.get_logs_chunked_concurrent(7).await.unwrap();
-        let full = event.query_raw().await.unwrap();
+        // Use chunk_size=7 to force ~1429 chunks, exercising the concurrent dispatch and merge.
+        // get_logs_chunked() bypasses the optimistic full-range attempt so the chunking code
+        // is always exercised. query_raw() serves as the reference via the optimistic path.
+        let event =
+            contract.MyEvent_filter().from_block(0u64).to_block(10_000u64).chunked().chunk_size(7);
 
-        assert_eq!(chunked.len(), 3);
-        assert_eq!(chunked.len(), full.len());
-        for (c, f) in chunked.iter().zip(full.iter()) {
-            assert_eq!(c, f);
-        }
+        let chunked = event.get_logs_chunked().await.unwrap();
+        let reference = event.query_raw().await.unwrap();
+
+        assert_eq!(chunked.len(), 3, "expected exactly 3 events across all chunks");
+        assert_eq!(chunked, reference, "chunked result must match full-range query");
     }
 }
