@@ -238,6 +238,25 @@ pub enum AnyTxEnvelope {
     Unknown(UnknownTxEnvelope),
 }
 
+impl From<Signed<AnyTypedTransaction>> for AnyTxEnvelope {
+    fn from(value: Signed<AnyTypedTransaction>) -> Self {
+        let sig = *value.signature();
+        let tx = value.strip_signature();
+        match tx {
+            AnyTypedTransaction::Ethereum(typed_tx) => Self::Ethereum(match typed_tx {
+                TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(sig)),
+                TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(sig)),
+                TypedTransaction::Eip1559(tx) => TxEnvelope::Eip1559(tx.into_signed(sig)),
+                TypedTransaction::Eip4844(tx) => TxEnvelope::Eip4844(tx.into_signed(sig)),
+                TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(sig)),
+            }),
+            AnyTypedTransaction::Unknown(unknown_tx) => {
+                Self::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: unknown_tx })
+            }
+        }
+    }
+}
+
 impl AnyTxEnvelope {
     /// Returns true if this is the ethereum transaction variant
     pub const fn is_ethereum(&self) -> bool {

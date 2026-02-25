@@ -1,5 +1,5 @@
-use crate::{AnyNetwork, AnyTxEnvelope, AnyTypedTransaction, Network, NetworkWallet, TxSigner};
-use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
+use crate::{Network, NetworkWallet, TxSigner};
+use alloy_consensus::SignableTransaction;
 use alloy_primitives::{map::AddressHashMap, Address, Signature};
 use std::{fmt::Debug, sync::Arc};
 
@@ -117,10 +117,7 @@ impl EthereumWallet {
     }
 }
 
-impl<N> NetworkWallet<N> for EthereumWallet
-where
-    N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
-{
+impl<N: Network> NetworkWallet<N> for EthereumWallet {
     fn default_signer_address(&self) -> Address {
         self.default
     }
@@ -133,62 +130,13 @@ where
         self.signers.keys().copied()
     }
 
-    #[doc(alias = "sign_tx_from")]
     async fn sign_transaction_from(
         &self,
         sender: Address,
-        tx: TypedTransaction,
-    ) -> alloy_signer::Result<TxEnvelope> {
-        match tx {
-            TypedTransaction::Legacy(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip2930(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip1559(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip4844(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-            TypedTransaction::Eip7702(mut t) => {
-                let sig = self.sign_transaction_inner(sender, &mut t).await?;
-                Ok(t.into_signed(sig).into())
-            }
-        }
-    }
-}
-
-impl NetworkWallet<AnyNetwork> for EthereumWallet {
-    fn default_signer_address(&self) -> Address {
-        self.default
-    }
-
-    fn has_signer_for(&self, address: &Address) -> bool {
-        self.signers.contains_key(address)
-    }
-
-    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
-        self.signers.keys().copied()
-    }
-
-    #[doc(alias = "sign_tx_from")]
-    async fn sign_transaction_from(
-        &self,
-        sender: Address,
-        tx: AnyTypedTransaction,
-    ) -> alloy_signer::Result<AnyTxEnvelope> {
-        match tx {
-            AnyTypedTransaction::Ethereum(t) => Ok(AnyTxEnvelope::Ethereum(
-                NetworkWallet::<Ethereum>::sign_transaction_from(self, sender, t).await?,
-            )),
-            _ => Err(alloy_signer::Error::other("cannot sign UnknownTypedTransaction")),
-        }
+        mut tx: N::UnsignedTx,
+    ) -> alloy_signer::Result<N::TxEnvelope> {
+        let sig = self.sign_transaction_inner(sender, &mut tx).await?;
+        Ok(tx.into_signed(sig).into())
     }
 }
 

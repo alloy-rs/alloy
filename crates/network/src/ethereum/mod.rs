@@ -16,8 +16,6 @@ impl Network for Ethereum {
 
     type TxEnvelope = alloy_consensus::TxEnvelope;
 
-    type Signature = alloy_primitives::Signature;
-
     type UnsignedTx = alloy_consensus::TypedTransaction;
 
     type ReceiptEnvelope = alloy_consensus::ReceiptEnvelope;

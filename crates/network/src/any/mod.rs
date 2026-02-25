@@ -67,8 +67,6 @@ impl Network for AnyNetwork {
 
     type TxEnvelope = AnyTxEnvelope;
 
-    type Signature = alloy_primitives::Signature;
-
     type UnsignedTx = AnyTypedTransaction;
 
     type ReceiptEnvelope = AnyReceiptEnvelope;

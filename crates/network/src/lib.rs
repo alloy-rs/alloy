@@ -6,10 +6,11 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use alloy_consensus::{BlockHeader, SignableTransaction, Transaction, TxReceipt};
+use alloy_consensus::{BlockHeader, SignableTransaction, Signed, Transaction, TxReceipt};
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use alloy_network_primitives::HeaderResponse;
+use alloy_signer::Signature;
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -62,14 +63,11 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The network transaction envelope type.
     #[doc(alias = "TransactionEnvelope")]
-    type TxEnvelope: Eip2718Envelope + Transaction + Debug;
-
-    /// The network signature type.
-    type Signature;
+    type TxEnvelope: Eip2718Envelope + Transaction + Debug + From<Signed<Self::UnsignedTx>>;
 
     /// An enum over the various transaction types.
     #[doc(alias = "UnsignedTransaction")]
-    type UnsignedTx: From<Self::TxEnvelope> + SignableTransaction<Self::Signature>;
+    type UnsignedTx: From<Self::TxEnvelope> + SignableTransaction<Signature>;
 
     /// The network receipt envelope type.
     #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
