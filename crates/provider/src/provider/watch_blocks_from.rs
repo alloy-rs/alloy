@@ -278,7 +278,7 @@ impl<N: Network> WatchBlocksFrom<N> {
             client,
             start_block,
             poll_interval: DEFAULT_POLL_INTERVAL,
-            block_tag: BlockNumberOrTag::Finalized,
+            block_tag: BlockNumberOrTag::Latest,
             kind: BlockTransactionsKind::Hashes,
             _phantom: PhantomData,
         }
