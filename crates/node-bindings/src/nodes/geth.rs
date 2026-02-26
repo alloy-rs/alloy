@@ -4,9 +4,7 @@ use crate::{
     utils::{extract_endpoint, extract_value, unused_port, GracefulShutdown},
     NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
-use alloy_genesis::{CliqueConfig, Genesis};
-use alloy_primitives::Address;
-use k256::ecdsa::SigningKey;
+use alloy_genesis::Genesis;
 use std::{
     ffi::OsString,
     fs::{create_dir, File},
@@ -75,7 +73,6 @@ pub struct GethInstance {
     ipc: Option<PathBuf>,
     data_dir: Option<PathBuf>,
     genesis: Option<Genesis>,
-    clique_private_key: Option<SigningKey>,
 }
 
 impl GethInstance {
@@ -134,12 +131,6 @@ impl GethInstance {
     /// Returns the genesis configuration used to configure this instance
     pub const fn genesis(&self) -> Option<&Genesis> {
         self.genesis.as_ref()
-    }
-
-    /// Returns the private key used to configure clique on this instance
-    #[deprecated = "clique support was removed in geth >=1.14"]
-    pub const fn clique_private_key(&self) -> Option<&SigningKey> {
-        self.clique_private_key.as_ref()
     }
 
     /// Takes the stderr contained in the child process.
@@ -212,7 +203,6 @@ pub struct Geth {
     keep_err: bool,
     genesis: Option<Genesis>,
     mode: NodeMode,
-    clique_private_key: Option<SigningKey>,
     args: Vec<OsString>,
 }
 
@@ -250,27 +240,6 @@ impl Geth {
     /// Puts the `geth` instance in `dev` mode.
     pub fn dev(mut self) -> Self {
         self.mode = NodeMode::Dev(Default::default());
-        self
-    }
-
-    /// Returns whether the node is launched in Clique consensus mode.
-    pub const fn is_clique(&self) -> bool {
-        self.clique_private_key.is_some()
-    }
-
-    /// Calculates the address of the Clique consensus address.
-    pub fn clique_address(&self) -> Option<Address> {
-        self.clique_private_key.as_ref().map(|pk| Address::from_public_key(pk.verifying_key()))
-    }
-
-    /// Sets the Clique Private Key to the `geth` executable, which will be later
-    /// loaded on the node.
-    ///
-    /// The address derived from this private key will be used to set the `miner.etherbase` field
-    /// on the node.
-    #[deprecated = "clique support was removed in geth >=1.14"]
-    pub fn set_clique_private_key<T: Into<SigningKey>>(mut self, private_key: T) -> Self {
-        self.clique_private_key = Some(private_key.into());
         self
     }
 
@@ -440,7 +409,7 @@ impl Geth {
     }
 
     /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
-    pub fn try_spawn(mut self) -> Result<GethInstance, NodeError> {
+    pub fn try_spawn(self) -> Result<GethInstance, NodeError> {
         let bin_path = self
             .program
             .as_ref()
@@ -478,56 +447,13 @@ impl Geth {
         }
 
         // pass insecure unlock flag if set
-        let is_clique = self.is_clique();
-        if self.insecure_unlock || is_clique {
+        if self.insecure_unlock {
             cmd.arg("--allow-insecure-unlock");
-        }
-
-        if is_clique {
-            self.inner_disable_discovery();
         }
 
         // Set the port for authenticated APIs
         let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
         cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
-
-        // use geth init to initialize the datadir if the genesis exists
-        if is_clique {
-            let clique_addr = self.clique_address();
-            if let Some(genesis) = &mut self.genesis {
-                // set up a clique config with an instant sealing period and short (8 block) epoch
-                let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
-                genesis.config.clique = Some(clique_config);
-
-                let clique_addr = clique_addr.ok_or_else(|| {
-                    NodeError::CliqueAddressError(
-                        "could not calculates the address of the Clique consensus address."
-                            .to_string(),
-                    )
-                })?;
-
-                // set the extraData field
-                let extra_data_bytes =
-                    [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
-                genesis.extra_data = extra_data_bytes.into();
-            }
-
-            let clique_addr = self.clique_address().ok_or_else(|| {
-                NodeError::CliqueAddressError(
-                    "could not calculates the address of the Clique consensus address.".to_string(),
-                )
-            })?;
-
-            self.genesis = Some(Genesis::clique_genesis(
-                self.chain_id.ok_or(NodeError::ChainIdNotSet)?,
-                clique_addr,
-            ));
-
-            // we must set the etherbase if using clique
-            // need to use format! / Debug here because the Address Display impl doesn't show the
-            // entire address
-            cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
-        }
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
@@ -695,7 +621,6 @@ impl Geth {
             p2p_port,
             auth_port: self.authrpc_port,
             genesis: self.genesis,
-            clique_private_key: self.clique_private_key,
         })
     }
 }

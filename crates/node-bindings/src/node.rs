@@ -29,9 +29,6 @@ pub enum NodeError {
     #[error("could not read line from node output: {0}")]
     ReadLineError(std::io::Error),
 
-    /// The chain id was not set.
-    #[error("the chain ID was not set")]
-    ChainIdNotSet,
     /// Could not create the data directory.
     #[error("could not create directory: {0}")]
     CreateDirError(std::io::Error),
@@ -48,10 +45,6 @@ pub enum NodeError {
     /// Wait error
     #[error("could not wait for node to exit: {0}")]
     WaitError(std::io::Error),
-
-    /// Clique private key error
-    #[error("clique address error: {0}")]
-    CliqueAddressError(String),
 
     /// The private key could not be parsed.
     #[error("could not parse private key")]
