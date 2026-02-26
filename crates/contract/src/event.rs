@@ -271,11 +271,27 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     /// Divides the block range into chunks and queries them concurrently, falling back to
     /// single-block queries for any chunk that fails.
     async fn get_logs_chunked(&self) -> TransportResult<Vec<Log>> {
-        let (from, to) = self.filter.extract_block_range();
-        let (Some(from), Some(to)) = (from, to) else {
+        let FilterBlockOption::Range { from_block, to_block } = self.filter.block_option else {
             return Err(RpcError::local_usage_str(
-                "chunked queries require numeric from_block and to_block",
+                "chunked queries require a block range filter, not a block hash filter",
             ));
+        };
+
+        let from = match from_block {
+            None => 0,
+            Some(tag) => match tag.as_number() {
+                Some(n) => n,
+                None if tag == BlockNumberOrTag::Earliest => 0,
+                None => self.provider.get_block_number().await?,
+            },
+        };
+        let to = match to_block {
+            None => self.provider.get_block_number().await?,
+            Some(tag) => match tag.as_number() {
+                Some(n) => n,
+                None if tag == BlockNumberOrTag::Earliest => 0,
+                None => self.provider.get_block_number().await?,
+            },
         };
 
         if from > to {
@@ -304,7 +320,13 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
                     async move {
                         match provider.get_logs(&chunk_filter).await {
                             Ok(logs) => Ok((start_block, logs)),
-                            Err(_) => {
+                            Err(err) => {
+                                tracing::debug!(
+                                    %err,
+                                    start_block,
+                                    end_block,
+                                    "chunk query failed, falling back to single-block queries"
+                                );
                                 // Fallback: query each block individually
                                 let mut fallback_logs = Vec::new();
                                 for block in start_block..=end_block {
@@ -317,7 +339,7 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
                         }
                     }
                 })
-                .buffered(self.max_concurrent)
+                .buffer_unordered(self.max_concurrent)
                 .collect()
                 .await;
 
