@@ -7,6 +7,7 @@ use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct Log<T = LogData> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     /// Consensus log object

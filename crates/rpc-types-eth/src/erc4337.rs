@@ -271,9 +271,10 @@ pub enum SendUserOperation {
 }
 
 /// Response to sending a user operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct SendUserOperationResponse {
     /// The hash of the user operation.
     pub user_op_hash: Bytes,
@@ -283,6 +284,7 @@ pub struct SendUserOperationResponse {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct UserOperationReceipt {
     /// The hash of the user operation.
     pub user_op_hash: Bytes,
@@ -309,9 +311,10 @@ pub struct UserOperationReceipt {
 }
 
 /// Represents the gas estimation for a user operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct UserOperationGasEstimation {
     /// The gas limit for the pre-verification.
     pub pre_verification_gas: U256,

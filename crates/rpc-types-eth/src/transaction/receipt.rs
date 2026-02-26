@@ -13,6 +13,7 @@ use alloy_sol_types::SolEvent;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxReceipt")]
+#[non_exhaustive]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data.
     #[cfg_attr(feature = "serde", serde(flatten))]
