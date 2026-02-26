@@ -118,7 +118,7 @@ impl<N: Network> WatchBlocksFrom<N> {
     ///
     /// This can be buffered by the caller, for example with
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).
-    pub fn into_stream(self) -> WatchBlocksFromStream<N> {
+    pub const fn into_stream(self) -> WatchBlocksFromStream<N> {
         let current_block = self.start_block;
         WatchBlocksFromStream {
             inner: self,
@@ -166,10 +166,8 @@ enum WatchBlocksFromState {
     Done,
 }
 
-type BlockFut<T> = Pin<Box<dyn Future<Output = TransportResult<T>> + Send + 'static>>;
-
 impl<N: Network> Stream for WatchBlocksFromStream<N> {
-    type Item = BlockFut<N::BlockResponse>;
+    type Item = super::BlockFut<N::BlockResponse>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
@@ -230,7 +228,7 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
                         continue;
                     };
 
-                    let item_fut: BlockFut<N::BlockResponse> = Box::pin(get_block::<N>(
+                    let item_fut: super::BlockFut<N::BlockResponse> = Box::pin(get_block::<N>(
                         client,
                         this.current_block,
                         this.inner.kind,

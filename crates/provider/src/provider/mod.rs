@@ -1,3 +1,8 @@
+use alloy_transport::TransportResult;
+use std::{future::Future, pin::Pin};
+
+type BlockFut<T> = Pin<Box<dyn Future<Output = TransportResult<T>> + Send + 'static>>;
+
 mod eth_call;
 pub use eth_call::{Caller, EthCall, EthCallMany, EthCallManyParams, EthCallParams};
 
@@ -7,7 +12,9 @@ pub use get_block::SubFullBlocks;
 pub use get_block::{EthGetBlock, EthGetBlockParams, WatchBlocks};
 
 mod watch_canonical_blocks_from;
-pub use watch_canonical_blocks_from::{CanonicalEvent, WatchCanonicalBlocksFrom};
+pub use watch_canonical_blocks_from::{
+    CanonicalEvent, WatchCanonicalBlocksFrom, WatchCanonicalBlocksFromStream,
+};
 
 mod watch_blocks_from;
 pub use watch_blocks_from::{WatchBlocksFrom, WatchBlocksFromStream};
