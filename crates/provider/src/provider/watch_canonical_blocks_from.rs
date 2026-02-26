@@ -5,8 +5,10 @@ use alloy_network::{BlockResponse as _, Network};
 use alloy_network_primitives::HeaderResponse;
 use alloy_transport::{TransportError, TransportResult};
 use futures::{stream::Buffered, Stream, StreamExt as _};
+use pin_project::pin_project;
 use std::{
     collections::VecDeque,
+    future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -129,8 +131,10 @@ impl<N: Network> WatchCanonicalBlocksFromState<N> {
 }
 
 /// A stream of canonical block events produced by [`WatchCanonicalBlocksFrom`].
+#[pin_project]
 pub struct WatchCanonicalBlocksFromStream<N: Network> {
     watch_blocks_from: WatchBlocksFrom<N>,
+    #[pin]
     stream: Buffered<WatchBlocksFromStream<N>>,
     buffer: FixedBuf<N::BlockResponse>,
     state: WatchCanonicalBlocksFromState<N>,
@@ -148,33 +152,34 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
     type Item = TransportResult<CanonicalEvent<N::BlockResponse>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
+        let mut this = self.project();
 
         loop {
-            let state = std::mem::replace(&mut this.state, WatchCanonicalBlocksFromState::Done);
+            let state = std::mem::replace(this.state, WatchCanonicalBlocksFromState::Done);
             match state {
-                WatchCanonicalBlocksFromState::PollNext => match this.stream.poll_next_unpin(cx) {
+                WatchCanonicalBlocksFromState::PollNext => match this.stream.as_mut().poll_next(cx)
+                {
                     Poll::Pending => {
-                        this.state = WatchCanonicalBlocksFromState::PollNext;
+                        *this.state = WatchCanonicalBlocksFromState::PollNext;
                         return Poll::Pending;
                     }
                     Poll::Ready(None) => {
-                        this.state = WatchCanonicalBlocksFromState::Done;
+                        *this.state = WatchCanonicalBlocksFromState::Done;
                     }
                     Poll::Ready(Some(Ok(next))) => {
-                        this.state = WatchCanonicalBlocksFromState::Reconcile {
+                        *this.state = WatchCanonicalBlocksFromState::Reconcile {
                             next,
                             pending: VecDeque::new(),
                         };
                     }
                     Poll::Ready(Some(Err(err))) => {
-                        this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                        *this.state = WatchCanonicalBlocksFromState::EmitError { err };
                     }
                 },
                 WatchCanonicalBlocksFromState::Reconcile { next, pending } => {
                     let front = pending.front().unwrap_or(&next);
                     let Some(canonical_tip) = this.buffer.last() else {
-                        this.state = WatchCanonicalBlocksFromState::EmitPending {
+                        *this.state = WatchCanonicalBlocksFromState::EmitPending {
                             pending,
                             next: Some(next),
                         };
@@ -183,7 +188,7 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
 
                     let parent_hash = front.header().parent_hash();
                     if parent_hash == canonical_tip.header().hash() {
-                        this.state = WatchCanonicalBlocksFromState::EmitPending {
+                        *this.state = WatchCanonicalBlocksFromState::EmitPending {
                             pending,
                             next: Some(next),
                         };
@@ -201,19 +206,20 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
                             .pop()
                             .expect("position is always < canonical buffer length");
                         if this.buffer.len() == 0 {
-                            this.state = WatchCanonicalBlocksFromState::EmitError {
+                            *this.state = WatchCanonicalBlocksFromState::EmitError {
                                 err: TransportErrorKind::custom_str(
                                     "Deep reorg detected; no canonical history retained.",
                                 ),
                             };
                         } else {
-                            this.state = WatchCanonicalBlocksFromState::Reconcile { next, pending };
+                            *this.state =
+                                WatchCanonicalBlocksFromState::Reconcile { next, pending };
                         }
                         return Poll::Ready(Some(Ok(CanonicalEvent::Removed(removed))));
                     }
 
                     let Some(parent_height) = height.checked_sub(1) else {
-                        this.state = WatchCanonicalBlocksFromState::EmitError {
+                        *this.state = WatchCanonicalBlocksFromState::EmitError {
                             err: TransportErrorKind::custom_str(
                                 "Cannot backfill parent for genesis block during canonical reconciliation.",
                             ),
@@ -222,15 +228,14 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
                     };
 
                     let watch_blocks_from = this.watch_blocks_from.clone();
-                    let fut: super::BlockFut<N::BlockResponse> =
-                        Box::pin(async move { watch_blocks_from.get_block(parent_height).await });
-                    this.state =
+                    let fut = watch_blocks_from.get_block(parent_height);
+                    *this.state =
                         WatchCanonicalBlocksFromState::FetchingParent { next, pending, fut };
                 }
                 WatchCanonicalBlocksFromState::FetchingParent { next, mut pending, mut fut } => {
-                    match fut.as_mut().poll(cx) {
+                    match Pin::new(&mut fut).poll(cx) {
                         Poll::Pending => {
-                            this.state = WatchCanonicalBlocksFromState::FetchingParent {
+                            *this.state = WatchCanonicalBlocksFromState::FetchingParent {
                                 next,
                                 pending,
                                 fut,
@@ -238,43 +243,44 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
                             return Poll::Pending;
                         }
                         Poll::Ready(Err(err)) => {
-                            this.state = WatchCanonicalBlocksFromState::EmitError { err };
+                            *this.state = WatchCanonicalBlocksFromState::EmitError { err };
                         }
                         Poll::Ready(Ok(parent)) => {
                             let front = pending.front().unwrap_or(&next);
                             if parent.header().hash() != front.header().parent_hash() {
                                 // Parent no longer matches: a second reorg happened while
                                 // reconciling. Abandon this item and continue with next blocks.
-                                this.state = WatchCanonicalBlocksFromState::PollNext;
+                                *this.state = WatchCanonicalBlocksFromState::PollNext;
                                 continue;
                             }
 
                             pending.push_front(parent);
-                            this.state = WatchCanonicalBlocksFromState::Reconcile { next, pending };
+                            *this.state =
+                                WatchCanonicalBlocksFromState::Reconcile { next, pending };
                         }
                     }
                 }
                 WatchCanonicalBlocksFromState::EmitPending { mut pending, mut next } => {
                     if let Some(block) = pending.pop_front() {
                         this.buffer.push(block.clone());
-                        this.state = WatchCanonicalBlocksFromState::EmitPending { pending, next };
+                        *this.state = WatchCanonicalBlocksFromState::EmitPending { pending, next };
                         return Poll::Ready(Some(Ok(CanonicalEvent::Added(block))));
                     }
 
                     if let Some(next) = next.take() {
                         this.buffer.push(next.clone());
-                        this.state = WatchCanonicalBlocksFromState::PollNext;
+                        *this.state = WatchCanonicalBlocksFromState::PollNext;
                         return Poll::Ready(Some(Ok(CanonicalEvent::Added(next))));
                     }
 
-                    this.state = WatchCanonicalBlocksFromState::PollNext;
+                    *this.state = WatchCanonicalBlocksFromState::PollNext;
                 }
                 WatchCanonicalBlocksFromState::EmitError { err } => {
-                    this.state = WatchCanonicalBlocksFromState::Done;
+                    *this.state = WatchCanonicalBlocksFromState::Done;
                     return Poll::Ready(Some(Err(err)));
                 }
                 WatchCanonicalBlocksFromState::Done => {
-                    this.state = WatchCanonicalBlocksFromState::Done;
+                    *this.state = WatchCanonicalBlocksFromState::Done;
                     return Poll::Ready(None);
                 }
             }

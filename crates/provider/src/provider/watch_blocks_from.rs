@@ -1,28 +1,265 @@
 use super::WatchCanonicalBlocksFrom;
-use crate::utils;
 use alloy_eips::BlockNumberOrTag;
 use alloy_json_rpc::{RpcError, RpcRecv};
-use alloy_network::Network;
+use alloy_network::{BlockResponse, Network};
 use alloy_network_primitives::{BlockTransactionsKind, HeaderResponse};
 use alloy_primitives::U64;
-use alloy_rpc_client::{ClientRef, RpcClientInner, WeakClient};
-use alloy_transport::TransportResult;
+use alloy_rpc_client::{RpcCall, RpcClientInner, WeakClient};
+use alloy_transport::{TransportError, TransportResult};
 use futures::{ready, Stream};
+use pin_project::pin_project;
 use std::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::{sleep, Sleep};
+use wasmtimer::{
+    std::Instant,
+    tokio::{interval_at, Interval},
+};
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-use tokio::time::{sleep, Sleep};
+use tokio::time::{interval_at, Instant, Interval};
 
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+
+#[derive(Debug)]
+struct PollIntervalDelay {
+    timer: Option<Interval>,
+}
+
+impl PollIntervalDelay {
+    fn new(poll_interval: Duration) -> Self {
+        if poll_interval.is_zero() {
+            return Self { timer: None };
+        }
+        Self { timer: Some(interval_at(Instant::now() + poll_interval, poll_interval)) }
+    }
+
+    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        if let Some(timer) = &mut self.timer {
+            ready!(timer.poll_tick(cx));
+        }
+        Poll::Ready(())
+    }
+}
+
+/// Future returned by [`WatchBlocksFromStream`] items.
+#[pin_project]
+#[derive(Debug)]
+pub struct BlockFut<T>
+where
+    T: BlockResponse + RpcRecv,
+{
+    client: Option<Arc<RpcClientInner>>,
+    block_number: u64,
+    kind: BlockTransactionsKind,
+    poll_interval: Duration,
+    #[pin]
+    state: BlockFutState<T>,
+}
+
+#[pin_project(project = BlockFutStateProj)]
+#[derive(Debug)]
+enum BlockFutState<T>
+where
+    T: BlockResponse + RpcRecv,
+{
+    Request {
+        #[pin]
+        call: RpcCall<(BlockNumberOrTag, bool), Option<T>>,
+    },
+    Sleeping {
+        delay: PollIntervalDelay,
+    },
+    Ready {
+        result: Option<TransportResult<T>>,
+    },
+    Complete,
+}
+
+impl<T> BlockFut<T>
+where
+    T: BlockResponse + RpcRecv,
+{
+    pub(super) fn new(
+        client: Arc<RpcClientInner>,
+        block_number: u64,
+        kind: BlockTransactionsKind,
+        poll_interval: Duration,
+    ) -> Self {
+        let call = Self::block_request_call(&client, block_number, kind);
+        Self {
+            client: Some(client),
+            block_number,
+            kind,
+            poll_interval,
+            state: BlockFutState::Request { call },
+        }
+    }
+
+    pub(super) fn err(err: TransportError) -> Self {
+        Self {
+            client: None,
+            block_number: 0,
+            kind: BlockTransactionsKind::Hashes,
+            poll_interval: Duration::from_secs(0),
+            state: BlockFutState::Ready { result: Some(Err(err)) },
+        }
+    }
+
+    fn block_request_call(
+        client: &Arc<RpcClientInner>,
+        block_number: u64,
+        kind: BlockTransactionsKind,
+    ) -> RpcCall<(BlockNumberOrTag, bool), Option<T>> {
+        client
+            .request("eth_getBlockByNumber", (BlockNumberOrTag::from(block_number), kind.is_full()))
+    }
+}
+
+impl<T> Future for BlockFut<T>
+where
+    T: BlockResponse + RpcRecv,
+{
+    type Output = TransportResult<T>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        loop {
+            match this.state.as_mut().project() {
+                BlockFutStateProj::Request { call } => match ready!(call.poll(cx)) {
+                    Ok(Some(mut block)) => {
+                        if this.kind.is_hashes() && block.transactions().is_empty() {
+                            block.transactions_mut().convert_to_hashes();
+                        }
+                        this.state.set(BlockFutState::Complete);
+                        return Poll::Ready(Ok(block));
+                    }
+                    Ok(None) => {
+                        this.state.set(BlockFutState::Sleeping {
+                            delay: PollIntervalDelay::new(*this.poll_interval),
+                        });
+                    }
+                    Err(err) => {
+                        this.state.set(BlockFutState::Complete);
+                        return Poll::Ready(Err(err));
+                    }
+                },
+                BlockFutStateProj::Sleeping { delay } => {
+                    ready!(delay.poll(cx));
+                    let Some(client) = this.client.as_ref() else {
+                        this.state.set(BlockFutState::Complete);
+                        return Poll::Ready(Err(TransportError::local_usage_str(
+                            "provider was dropped",
+                        )));
+                    };
+                    this.state.set(BlockFutState::Request {
+                        call: Self::block_request_call(client, *this.block_number, *this.kind),
+                    });
+                }
+                BlockFutStateProj::Ready { result } => {
+                    let result = result.take().expect("polled BlockFut after completion");
+                    this.state.set(BlockFutState::Complete);
+                    return Poll::Ready(result);
+                }
+                BlockFutStateProj::Complete => panic!("polled BlockFut after completion"),
+            }
+        }
+    }
+}
+
+#[pin_project]
+#[derive(Debug)]
+struct FetchHeadFut<HeaderResp>
+where
+    HeaderResp: HeaderResponse + RpcRecv,
+{
+    #[pin]
+    state: FetchHeadFutState<HeaderResp>,
+}
+
+#[pin_project(project = FetchHeadFutStateProj)]
+#[derive(Debug)]
+enum FetchHeadFutState<HeaderResp>
+where
+    HeaderResp: HeaderResponse + RpcRecv,
+{
+    Latest {
+        #[pin]
+        call: RpcCall<[(); 0], U64>,
+    },
+    Tagged {
+        #[pin]
+        call: RpcCall<(BlockNumberOrTag, bool), Option<HeaderResp>>,
+    },
+    Ready {
+        result: Option<TransportResult<u64>>,
+    },
+    Complete,
+}
+
+impl<HeaderResp> FetchHeadFut<HeaderResp>
+where
+    HeaderResp: HeaderResponse + RpcRecv,
+{
+    fn new(client: Arc<RpcClientInner>, tag: BlockNumberOrTag) -> Self {
+        let state = match tag {
+            BlockNumberOrTag::Number(number) => {
+                FetchHeadFutState::Ready { result: Some(Ok(number)) }
+            }
+            BlockNumberOrTag::Earliest => FetchHeadFutState::Ready { result: Some(Ok(0)) },
+            BlockNumberOrTag::Latest => {
+                FetchHeadFutState::Latest { call: client.request_noparams("eth_blockNumber") }
+            }
+            _ => FetchHeadFutState::Tagged {
+                call: client.request("eth_getBlockByNumber", (tag, false)),
+            },
+        };
+        Self { state }
+    }
+}
+
+impl<HeaderResp> Future for FetchHeadFut<HeaderResp>
+where
+    HeaderResp: HeaderResponse + RpcRecv,
+{
+    type Output = TransportResult<u64>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        loop {
+            match this.state.as_mut().project() {
+                FetchHeadFutStateProj::Latest { call } => {
+                    let result = ready!(call.poll(cx)).map(|n| n.to());
+                    this.state.set(FetchHeadFutState::Complete);
+                    return Poll::Ready(result);
+                }
+                FetchHeadFutStateProj::Tagged { call } => {
+                    let result = match ready!(call.poll(cx)) {
+                        Ok(resp) => resp.map(|header| header.number()).ok_or(RpcError::NullResp),
+                        Err(err) => Err(err),
+                    };
+                    this.state.set(FetchHeadFutState::Complete);
+                    return Poll::Ready(result);
+                }
+                FetchHeadFutStateProj::Ready { result } => {
+                    let result = result.take().expect("polled FetchHeadFut after completion");
+                    this.state.set(FetchHeadFutState::Complete);
+                    return Poll::Ready(result);
+                }
+                FetchHeadFutStateProj::Complete => panic!("polled FetchHeadFut after completion"),
+            }
+        }
+    }
+}
 
 /// A builder for streaming blocks from a historical block and continuing indefinitely.
 #[derive(Debug, Clone)]
@@ -79,17 +316,12 @@ impl<N: Network> WatchBlocksFrom<N> {
         WatchCanonicalBlocksFrom::new(self)
     }
 
-    /// Fetches a single block by number.
-    pub(super) async fn get_block(&self, block_number: u64) -> TransportResult<N::BlockResponse> {
-        get_block::<N>(
-            self.client
-                .upgrade()
-                .ok_or_else(|| RpcError::local_usage_str("provider was dropped"))?,
-            block_number,
-            self.kind,
-            self.poll_interval,
-        )
-        .await
+    /// Creates a future that fetches a single block by number.
+    pub(super) fn get_block(&self, block_number: u64) -> BlockFut<N::BlockResponse> {
+        self.client
+            .upgrade()
+            .map(|client| BlockFut::new(client, block_number, self.kind, self.poll_interval))
+            .unwrap_or_else(|| BlockFut::err(RpcError::local_usage_str("provider was dropped")))
     }
 
     /// Stream blocks from a historical block using sequential `eth_getBlockByNumber` calls.
@@ -131,7 +363,7 @@ impl<N: Network> WatchBlocksFrom<N> {
 
 /// A stream of block-fetching futures produced by [`WatchBlocksFrom`].
 ///
-/// Each item is a boxed future that, when awaited, fetches one block via
+/// Each item is a [`BlockFut`] that, when awaited, fetches one block via
 /// `eth_getBlockByNumber`. Callers typically apply
 /// [`StreamExt::buffered`](futures::StreamExt::buffered) to resolve
 /// multiple block requests concurrently.
@@ -139,7 +371,7 @@ pub struct WatchBlocksFromStream<N: Network> {
     inner: WatchBlocksFrom<N>,
     current_block: u64,
     head: u64,
-    state: WatchBlocksFromState,
+    state: WatchBlocksFromState<N>,
 }
 
 impl<N: Network> std::fmt::Debug for WatchBlocksFromStream<N> {
@@ -153,21 +385,21 @@ impl<N: Network> std::fmt::Debug for WatchBlocksFromStream<N> {
     }
 }
 
-enum WatchBlocksFromState {
+enum WatchBlocksFromState<N: Network> {
     /// Upgrade the client and begin fetching head.
     FetchHead,
     /// Polling the in-flight head-block-number future.
-    FetchingHead { fut: Pin<Box<dyn Future<Output = TransportResult<u64>> + Send>> },
+    FetchingHead { fut: FetchHeadFut<N::HeaderResponse> },
     /// Yielding block futures for `current_block..=head`.
     Yielding,
     /// Sleeping between poll cycles.
-    Sleeping { sleep: Pin<Box<Sleep>> },
+    Sleeping { delay: PollIntervalDelay },
     /// Stream terminated.
     Done,
 }
 
 impl<N: Network> Stream for WatchBlocksFromStream<N> {
-    type Item = super::BlockFut<N::BlockResponse>;
+    type Item = BlockFut<N::BlockResponse>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
@@ -179,35 +411,33 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
                         this.state = WatchBlocksFromState::Done;
                         continue;
                     };
-                    let block_tag = this.inner.block_tag;
-                    let fut: Pin<Box<dyn Future<Output = TransportResult<u64>> + Send>> =
-                        Box::pin(async move {
-                            fetch_head_block::<N::HeaderResponse>(client.as_ref(), block_tag).await
-                        });
+                    let fut = FetchHeadFut::new(client, this.inner.block_tag);
                     this.state = WatchBlocksFromState::FetchingHead { fut };
                 }
-                WatchBlocksFromState::FetchingHead { fut } => match ready!(fut.as_mut().poll(cx)) {
-                    Ok(head) => {
-                        this.head = head;
-                        if this.current_block > head {
+                WatchBlocksFromState::FetchingHead { fut } => {
+                    match ready!(Pin::new(fut).poll(cx)) {
+                        Ok(head) => {
+                            this.head = head;
+                            if this.current_block > head {
+                                this.state = WatchBlocksFromState::Sleeping {
+                                    delay: PollIntervalDelay::new(this.inner.poll_interval),
+                                };
+                            } else {
+                                this.state = WatchBlocksFromState::Yielding;
+                            }
+                        }
+                        Err(err) => {
                             this.state = WatchBlocksFromState::Sleeping {
-                                sleep: Box::pin(sleep(this.inner.poll_interval)),
+                                delay: PollIntervalDelay::new(this.inner.poll_interval),
                             };
-                        } else {
-                            this.state = WatchBlocksFromState::Yielding;
+                            return Poll::Ready(Some(BlockFut::err(err)));
                         }
                     }
-                    Err(err) => {
-                        this.state = WatchBlocksFromState::Sleeping {
-                            sleep: Box::pin(sleep(this.inner.poll_interval)),
-                        };
-                        return Poll::Ready(Some(Box::pin(async move { Err(err) })));
-                    }
-                },
+                }
                 WatchBlocksFromState::Yielding => {
                     if this.current_block > this.head {
                         this.state = WatchBlocksFromState::Sleeping {
-                            sleep: Box::pin(sleep(this.inner.poll_interval)),
+                            delay: PollIntervalDelay::new(this.inner.poll_interval),
                         };
                         continue;
                     }
@@ -218,9 +448,9 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
                             "watch stream step did not advance block cursor",
                         );
                         this.state = WatchBlocksFromState::Sleeping {
-                            sleep: Box::pin(sleep(this.inner.poll_interval)),
+                            delay: PollIntervalDelay::new(this.inner.poll_interval),
                         };
-                        return Poll::Ready(Some(Box::pin(async move { Err(err) })));
+                        return Poll::Ready(Some(BlockFut::err(err)));
                     }
 
                     let Some(client) = this.inner.client.upgrade() else {
@@ -228,59 +458,22 @@ impl<N: Network> Stream for WatchBlocksFromStream<N> {
                         continue;
                     };
 
-                    let item_fut: super::BlockFut<N::BlockResponse> = Box::pin(get_block::<N>(
+                    let item_fut: BlockFut<N::BlockResponse> = BlockFut::new(
                         client,
                         this.current_block,
                         this.inner.kind,
                         this.inner.poll_interval,
-                    ));
+                    );
                     this.current_block = next_block;
                     return Poll::Ready(Some(item_fut));
                 }
-                WatchBlocksFromState::Sleeping { sleep } => {
-                    ready!(sleep.as_mut().poll(cx));
+                WatchBlocksFromState::Sleeping { delay } => {
+                    ready!(delay.poll(cx));
                     this.state = WatchBlocksFromState::FetchHead;
                 }
                 WatchBlocksFromState::Done => return Poll::Ready(None),
             }
         }
-    }
-}
-
-async fn get_block<N: Network>(
-    client: impl AsRef<RpcClientInner>,
-    block_number: u64,
-    kind: BlockTransactionsKind,
-    poll_interval: Duration,
-) -> TransportResult<N::BlockResponse> {
-    loop {
-        let block = client
-            .as_ref()
-            .request("eth_getBlockByNumber", (BlockNumberOrTag::from(block_number), kind.is_full()))
-            .await?;
-        let block = if kind.is_hashes() { utils::convert_to_hashes(block) } else { block };
-        match block {
-            Some(block) => return Ok(block),
-            None => sleep(poll_interval).await,
-        }
-    }
-}
-
-async fn fetch_head_block<HeaderResp: HeaderResponse + RpcRecv>(
-    client: ClientRef<'_>,
-    tag: BlockNumberOrTag,
-) -> TransportResult<u64> {
-    match tag {
-        BlockNumberOrTag::Number(number) => Ok(number),
-        BlockNumberOrTag::Earliest => Ok(0),
-        BlockNumberOrTag::Latest => {
-            client.request_noparams::<U64>("eth_blockNumber").await.map(|n| n.to())
-        }
-        _ => client
-            .request::<_, Option<HeaderResp>>("eth_getBlockByNumber", (tag, false))
-            .await?
-            .map(|header| header.number())
-            .ok_or(RpcError::NullResp),
     }
 }
 
