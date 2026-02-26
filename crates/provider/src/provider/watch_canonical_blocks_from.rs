@@ -1,10 +1,10 @@
-use crate::{transport::TransportErrorKind, WatchBlocksFrom};
+use crate::{transport::TransportErrorKind, WatchBlocksFrom, WatchBlocksFromStream};
 use alloy_consensus::BlockHeader;
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::{BlockResponse as _, Network};
 use alloy_network_primitives::HeaderResponse;
 use alloy_transport::{TransportError, TransportResult};
-use futures::{Stream, StreamExt as _};
+use futures::{stream::Buffered, Stream, StreamExt as _};
 use std::{
     collections::VecDeque,
     pin::Pin,
@@ -85,8 +85,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
     /// Converts the builder into a stream of canonical block events.
     pub fn into_stream(self) -> WatchCanonicalBlocksFromStream<N> {
         let Self { watch_blocks_from, rpc_concurrency, max_reorg_depth } = self;
-        let stream =
-            Box::pin(watch_blocks_from.clone().into_stream().buffered(rpc_concurrency.max(1)));
+        let stream = watch_blocks_from.clone().into_stream().buffered(rpc_concurrency.max(1));
 
         WatchCanonicalBlocksFromStream {
             watch_blocks_from,
@@ -132,7 +131,7 @@ impl<N: Network> WatchCanonicalBlocksFromState<N> {
 /// A stream of canonical block events produced by [`WatchCanonicalBlocksFrom`].
 pub struct WatchCanonicalBlocksFromStream<N: Network> {
     watch_blocks_from: WatchBlocksFrom<N>,
-    stream: Pin<Box<dyn Stream<Item = TransportResult<N::BlockResponse>> + Send + 'static>>,
+    stream: Buffered<WatchBlocksFromStream<N>>,
     buffer: FixedBuf<N::BlockResponse>,
     state: WatchCanonicalBlocksFromState<N>,
 }
@@ -145,8 +144,9 @@ impl<N: Network> std::fmt::Debug for WatchCanonicalBlocksFromStream<N> {
     }
 }
 
-// SAFETY: All pinned data is behind heap-allocated `Pin<Box<_>>`, so the
-// struct itself can be safely moved without invalidating internal pointers.
+// All fields are `Unpin` (`Buffered` is `Unpin` when its inner stream is,
+// and `WatchBlocksFromStream` auto-derives `Unpin`), so this is redundant
+// but kept explicit for clarity.
 impl<N: Network> Unpin for WatchCanonicalBlocksFromStream<N> {}
 
 impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
@@ -158,8 +158,7 @@ impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
         loop {
             let state = std::mem::replace(&mut this.state, WatchCanonicalBlocksFromState::Done);
             match state {
-                WatchCanonicalBlocksFromState::PollNext => match this.stream.as_mut().poll_next(cx)
-                {
+                WatchCanonicalBlocksFromState::PollNext => match this.stream.poll_next_unpin(cx) {
                     Poll::Pending => {
                         this.state = WatchCanonicalBlocksFromState::PollNext;
                         return Poll::Pending;
