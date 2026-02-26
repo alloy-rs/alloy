@@ -10,7 +10,7 @@ mod watch_canonical_blocks_from;
 pub use watch_canonical_blocks_from::{CanonicalEvent, WatchCanonicalBlocksFrom};
 
 mod watch_blocks_from;
-pub use watch_blocks_from::WatchBlocksFrom;
+pub use watch_blocks_from::{WatchBlocksFrom, WatchBlocksFromStream};
 
 mod prov_call;
 pub use prov_call::{BoxedFut, ProviderCall};

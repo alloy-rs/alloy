@@ -7,15 +7,20 @@ use alloy_network_primitives::{BlockTransactionsKind, HeaderResponse};
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientRef, RpcClientInner, WeakClient};
 use alloy_transport::TransportResult;
-use async_stream::stream;
-use futures::Stream;
-use std::{future::Future, marker::PhantomData, pin::Pin, time::Duration};
+use futures::{ready, Stream};
+use std::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-use wasmtimer::tokio::sleep;
+use wasmtimer::tokio::{sleep, Sleep};
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
-use tokio::time::sleep;
+use tokio::time::{sleep, Sleep};
 
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -28,7 +33,7 @@ pub struct WatchBlocksFrom<N: Network> {
     poll_interval: Duration,
     block_tag: BlockNumberOrTag,
     kind: BlockTransactionsKind,
-    _phantom: PhantomData<N>,
+    _phantom: PhantomData<fn() -> N>,
 }
 
 impl<N: Network> WatchBlocksFrom<N> {
@@ -113,61 +118,134 @@ impl<N: Network> WatchBlocksFrom<N> {
     ///
     /// This can be buffered by the caller, for example with
     /// [`StreamExt::buffered`](futures::StreamExt::buffered).
-    pub fn into_stream(
-        self,
-    ) -> impl Stream<
-        Item = Pin<Box<dyn Future<Output = TransportResult<N::BlockResponse>> + Send + 'static>>,
-    > + Unpin
-           + 'static {
-        let Self { client, start_block, poll_interval, block_tag, kind, _phantom } = self;
+    pub fn into_stream(self) -> WatchBlocksFromStream<N> {
+        let current_block = self.start_block;
+        WatchBlocksFromStream {
+            inner: self,
+            current_block,
+            head: 0,
+            state: WatchBlocksFromState::FetchHead,
+        }
+    }
+}
 
-        type Fut<T> = Pin<Box<dyn Future<Output = TransportResult<T>> + Send + 'static>>;
+/// A stream of block-fetching futures produced by [`WatchBlocksFrom`].
+///
+/// Each item is a boxed future that, when awaited, fetches one block via
+/// `eth_getBlockByNumber`. Callers typically apply
+/// [`StreamExt::buffered`](futures::StreamExt::buffered) to resolve
+/// multiple block requests concurrently.
+pub struct WatchBlocksFromStream<N: Network> {
+    inner: WatchBlocksFrom<N>,
+    current_block: u64,
+    head: u64,
+    state: WatchBlocksFromState,
+}
 
-        let stream = stream! {
-            let mut current_block = start_block;
+impl<N: Network> std::fmt::Debug for WatchBlocksFromStream<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WatchBlocksFromStream")
+            .field("current_block", &self.current_block)
+            .field("poll_interval", &self.inner.poll_interval)
+            .field("block_tag", &self.inner.block_tag)
+            .field("kind", &self.inner.kind)
+            .finish_non_exhaustive()
+    }
+}
 
-            'task: loop {
-                let Some(client) = client.upgrade() else {
-                    break 'task;
-                };
+enum WatchBlocksFromState {
+    /// Upgrade the client and begin fetching head.
+    FetchHead,
+    /// Polling the in-flight head-block-number future.
+    FetchingHead { fut: Pin<Box<dyn Future<Output = TransportResult<u64>> + Send>> },
+    /// Yielding block futures for `current_block..=head`.
+    Yielding,
+    /// Sleeping between poll cycles.
+    Sleeping { sleep: Pin<Box<Sleep>> },
+    /// Stream terminated.
+    Done,
+}
 
-                let head = match fetch_head_block::<N::HeaderResponse>(client.as_ref(), block_tag).await {
-                    Ok(head) => head,
-                    Err(err) => {
-                        let fut: Fut<N::BlockResponse> = Box::pin(async move { Err(err) });
-                        yield fut;
-                        sleep(poll_interval).await;
-                        continue 'task;
-                    }
-                };
+type BlockFut<T> = Pin<Box<dyn Future<Output = TransportResult<T>> + Send + 'static>>;
 
-                if current_block > head {
-                    sleep(poll_interval).await;
-                    continue 'task;
+impl<N: Network> Stream for WatchBlocksFromStream<N> {
+    type Item = BlockFut<N::BlockResponse>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        loop {
+            match &mut this.state {
+                WatchBlocksFromState::FetchHead => {
+                    let Some(client) = this.inner.client.upgrade() else {
+                        this.state = WatchBlocksFromState::Done;
+                        continue;
+                    };
+                    let block_tag = this.inner.block_tag;
+                    let fut: Pin<Box<dyn Future<Output = TransportResult<u64>> + Send>> =
+                        Box::pin(async move {
+                            fetch_head_block::<N::HeaderResponse>(client.as_ref(), block_tag).await
+                        });
+                    this.state = WatchBlocksFromState::FetchingHead { fut };
                 }
+                WatchBlocksFromState::FetchingHead { fut } => match ready!(fut.as_mut().poll(cx)) {
+                    Ok(head) => {
+                        this.head = head;
+                        if this.current_block > head {
+                            this.state = WatchBlocksFromState::Sleeping {
+                                sleep: Box::pin(sleep(this.inner.poll_interval)),
+                            };
+                        } else {
+                            this.state = WatchBlocksFromState::Yielding;
+                        }
+                    }
+                    Err(err) => {
+                        this.state = WatchBlocksFromState::Sleeping {
+                            sleep: Box::pin(sleep(this.inner.poll_interval)),
+                        };
+                        return Poll::Ready(Some(Box::pin(async move { Err(err) })));
+                    }
+                },
+                WatchBlocksFromState::Yielding => {
+                    if this.current_block > this.head {
+                        this.state = WatchBlocksFromState::Sleeping {
+                            sleep: Box::pin(sleep(this.inner.poll_interval)),
+                        };
+                        continue;
+                    }
 
-                while current_block <= head {
-                    let next_block = current_block.saturating_add(1);
-                    let item_fut: Fut<N::BlockResponse> =
-                        Box::pin(get_block::<N>(client.clone(), current_block, kind, poll_interval));
-                    if next_block <= current_block {
+                    let next_block = this.current_block.saturating_add(1);
+                    if next_block <= this.current_block {
                         let err = RpcError::local_usage_str(
                             "watch stream step did not advance block cursor",
                         );
-                        let fut: Fut<N::BlockResponse> = Box::pin(async move { Err(err) });
-                        yield fut;
-                        sleep(poll_interval).await;
-                        continue 'task;
+                        this.state = WatchBlocksFromState::Sleeping {
+                            sleep: Box::pin(sleep(this.inner.poll_interval)),
+                        };
+                        return Poll::Ready(Some(Box::pin(async move { Err(err) })));
                     }
-                    current_block = next_block;
-                    yield item_fut;
+
+                    let Some(client) = this.inner.client.upgrade() else {
+                        this.state = WatchBlocksFromState::Done;
+                        continue;
+                    };
+
+                    let item_fut: BlockFut<N::BlockResponse> = Box::pin(get_block::<N>(
+                        client,
+                        this.current_block,
+                        this.inner.kind,
+                        this.inner.poll_interval,
+                    ));
+                    this.current_block = next_block;
+                    return Poll::Ready(Some(item_fut));
                 }
-
-                sleep(poll_interval).await;
+                WatchBlocksFromState::Sleeping { sleep } => {
+                    ready!(sleep.as_mut().poll(cx));
+                    this.state = WatchBlocksFromState::FetchHead;
+                }
+                WatchBlocksFromState::Done => return Poll::Ready(None),
             }
-        };
-
-        Box::pin(stream)
+        }
     }
 }
 
@@ -456,6 +534,31 @@ mod tests {
 
         let block = timeout(Duration::from_secs(1), fut).await.unwrap().unwrap();
         assert_eq!(block.header.number, 1);
+    }
+
+    #[tokio::test]
+    async fn multiple_yielded_futures_outlive_provider() {
+        let asserter = alloy_transport::mock::Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+
+        asserter.push_success(&2_u64);
+        asserter.push_success(&Some(block(1)));
+        asserter.push_success(&Some(block(2)));
+
+        let mut stream = provider
+            .watch_blocks_from(1)
+            .block_tag(BlockNumberOrTag::Latest)
+            .poll_interval(Duration::from_millis(1))
+            .into_stream();
+
+        let fut1 = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
+        let fut2 = timeout(Duration::from_secs(1), stream.next()).await.unwrap().unwrap();
+        drop(provider);
+
+        let first = timeout(Duration::from_secs(1), fut1).await.unwrap().unwrap();
+        let second = timeout(Duration::from_secs(1), fut2).await.unwrap().unwrap();
+        assert_eq!(first.header.number, 1);
+        assert_eq!(second.header.number, 2);
     }
 
     #[tokio::test]
