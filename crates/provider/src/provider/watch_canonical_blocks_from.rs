@@ -98,6 +98,7 @@ impl<N: Network> WatchCanonicalBlocksFrom<N> {
     }
 }
 
+#[derive(Debug)]
 enum WatchCanonicalBlocksFromState<N: Network> {
     /// Polling the next block from `watch_blocks_from(...).buffered(...)`.
     PollNext,
@@ -117,20 +118,8 @@ enum WatchCanonicalBlocksFromState<N: Network> {
     Done,
 }
 
-impl<N: Network> WatchCanonicalBlocksFromState<N> {
-    const fn name(&self) -> &'static str {
-        match self {
-            Self::PollNext => "PollNext",
-            Self::Reconcile { .. } => "Reconcile",
-            Self::FetchingParent { .. } => "FetchingParent",
-            Self::EmitPending { .. } => "EmitPending",
-            Self::EmitError { .. } => "EmitError",
-            Self::Done => "Done",
-        }
-    }
-}
-
 /// A stream of canonical block events produced by [`WatchCanonicalBlocksFrom`].
+#[derive(Debug)]
 #[pin_project]
 pub struct WatchCanonicalBlocksFromStream<N: Network> {
     watch_blocks_from: WatchBlocksFrom<N>,
@@ -138,14 +127,6 @@ pub struct WatchCanonicalBlocksFromStream<N: Network> {
     stream: Buffered<WatchBlocksFromStream<N>>,
     buffer: FixedBuf<N::BlockResponse>,
     state: WatchCanonicalBlocksFromState<N>,
-}
-
-impl<N: Network> std::fmt::Debug for WatchCanonicalBlocksFromStream<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WatchCanonicalBlocksFromStream")
-            .field("state", &self.state.name())
-            .finish_non_exhaustive()
-    }
 }
 
 impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {

@@ -365,6 +365,7 @@ impl<N: Network> WatchBlocksFrom<N> {
 /// `eth_getBlockByNumber`. Callers typically apply
 /// [`StreamExt::buffered`](futures::StreamExt::buffered) to resolve
 /// multiple block requests concurrently.
+#[derive(Debug)]
 pub struct WatchBlocksFromStream<N: Network> {
     inner: WatchBlocksFrom<N>,
     current_block: u64,
@@ -372,17 +373,7 @@ pub struct WatchBlocksFromStream<N: Network> {
     state: WatchBlocksFromState<N>,
 }
 
-impl<N: Network> std::fmt::Debug for WatchBlocksFromStream<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WatchBlocksFromStream")
-            .field("current_block", &self.current_block)
-            .field("poll_interval", &self.inner.poll_interval)
-            .field("block_tag", &self.inner.block_tag)
-            .field("kind", &self.inner.kind)
-            .finish_non_exhaustive()
-    }
-}
-
+#[derive(Debug)]
 enum WatchBlocksFromState<N: Network> {
     /// Upgrade the client and begin fetching head.
     FetchHead,
