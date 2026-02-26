@@ -18,8 +18,10 @@ use std::collections::BTreeMap;
 #[serde(rename_all = "camelCase")]
 pub struct Forking {
     /// The URL of the JSON-RPC endpoint to fork from.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub json_rpc_url: Option<String>,
     /// The block number to fork from.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub block_number: Option<u64>,
 }
 
