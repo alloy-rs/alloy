@@ -103,7 +103,7 @@ where
         }
     }
 
-    pub(super) fn err(err: TransportError) -> Self {
+    pub(super) const fn err(err: TransportError) -> Self {
         Self {
             client: None,
             block_number: 0,
@@ -235,28 +235,26 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
-        loop {
-            match this.state.as_mut().project() {
-                FetchHeadFutStateProj::Latest { call } => {
-                    let result = ready!(call.poll(cx)).map(|n| n.to());
-                    this.state.set(FetchHeadFutState::Complete);
-                    return Poll::Ready(result);
-                }
-                FetchHeadFutStateProj::Tagged { call } => {
-                    let result = match ready!(call.poll(cx)) {
-                        Ok(resp) => resp.map(|header| header.number()).ok_or(RpcError::NullResp),
-                        Err(err) => Err(err),
-                    };
-                    this.state.set(FetchHeadFutState::Complete);
-                    return Poll::Ready(result);
-                }
-                FetchHeadFutStateProj::Ready { result } => {
-                    let result = result.take().expect("polled FetchHeadFut after completion");
-                    this.state.set(FetchHeadFutState::Complete);
-                    return Poll::Ready(result);
-                }
-                FetchHeadFutStateProj::Complete => panic!("polled FetchHeadFut after completion"),
+        match this.state.as_mut().project() {
+            FetchHeadFutStateProj::Latest { call } => {
+                let result = ready!(call.poll(cx)).map(|n| n.to());
+                this.state.set(FetchHeadFutState::Complete);
+                Poll::Ready(result)
             }
+            FetchHeadFutStateProj::Tagged { call } => {
+                let result = match ready!(call.poll(cx)) {
+                    Ok(resp) => resp.map(|header| header.number()).ok_or(RpcError::NullResp),
+                    Err(err) => Err(err),
+                };
+                this.state.set(FetchHeadFutState::Complete);
+                Poll::Ready(result)
+            }
+            FetchHeadFutStateProj::Ready { result } => {
+                let result = result.take().expect("polled FetchHeadFut after completion");
+                this.state.set(FetchHeadFutState::Complete);
+                Poll::Ready(result)
+            }
+            FetchHeadFutStateProj::Complete => panic!("polled FetchHeadFut after completion"),
         }
     }
 }
