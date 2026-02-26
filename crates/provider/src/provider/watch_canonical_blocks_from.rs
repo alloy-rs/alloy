@@ -144,11 +144,6 @@ impl<N: Network> std::fmt::Debug for WatchCanonicalBlocksFromStream<N> {
     }
 }
 
-// All fields are `Unpin` (`Buffered` is `Unpin` when its inner stream is,
-// and `WatchBlocksFromStream` auto-derives `Unpin`), so this is redundant
-// but kept explicit for clarity.
-impl<N: Network> Unpin for WatchCanonicalBlocksFromStream<N> {}
-
 impl<N: Network> Stream for WatchCanonicalBlocksFromStream<N> {
     type Item = TransportResult<CanonicalEvent<N::BlockResponse>>;
 
