@@ -115,11 +115,11 @@ impl Signer for TurnkeySigner {
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::TurnkeyClient(e)))?;
 
         // Parse r, s, v from response
-        let r_bytes = hex::decode(&response.r)
+        let r_bytes = hex::decode(&response.result.r)
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::Hex(e)))?;
-        let s_bytes = hex::decode(&response.s)
+        let s_bytes = hex::decode(&response.result.s)
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::Hex(e)))?;
-        let v_bytes = hex::decode(&response.v)
+        let v_bytes = hex::decode(&response.result.v)
             .map_err(|e| alloy_signer::Error::other(TurnkeySignerError::Hex(e)))?;
 
         if r_bytes.len() != 32 || s_bytes.len() != 32 || v_bytes.len() != 1 {
