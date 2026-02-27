@@ -1,12 +1,12 @@
 use crate::{
     BuildResult, Ethereum, Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder,
-    TransactionBuilder7702, TransactionBuilderError,
+    TransactionBuilder7702, TransactionBuilderDyn, TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList, TransactionInputKind};
 
-impl TransactionBuilder for TransactionRequest {
+impl TransactionBuilderDyn for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -31,18 +31,17 @@ impl TransactionBuilder for TransactionRequest {
         self.input.input()
     }
 
-    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
-        self.input.input = Some(input.into());
+    fn set_input(&mut self, input: Bytes) {
+        self.input.input = Some(input);
     }
 
-    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+    fn set_input_kind(&mut self, input: Bytes, kind: TransactionInputKind) {
         match kind {
-            TransactionInputKind::Input => self.input.input = Some(input.into()),
-            TransactionInputKind::Data => self.input.data = Some(input.into()),
+            TransactionInputKind::Input => self.input.input = Some(input),
+            TransactionInputKind::Data => self.input.data = Some(input),
             TransactionInputKind::Both => {
-                let bytes = input.into();
-                self.input.input = Some(bytes.clone());
-                self.input.data = Some(bytes);
+                self.input.input = Some(input.clone());
+                self.input.data = Some(input);
             }
         }
     }
@@ -140,6 +139,9 @@ impl TransactionBuilder for TransactionRequest {
         common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
     }
 }
+
+impl TransactionBuilder for TransactionRequest {}
+
 impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
         match ty {

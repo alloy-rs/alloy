@@ -16,7 +16,8 @@ mod transaction;
 pub use transaction::{
     BuildResult, FullSigner, FullSignerSync, NetworkTransactionBuilder, NetworkWallet,
     TransactionBuilder, TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
-    TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
+    TransactionBuilderDyn, TransactionBuilderError, TxSigner, TxSignerSync,
+    UnbuiltTransactionError,
 };
 
 mod ethereum;

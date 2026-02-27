@@ -4,7 +4,7 @@
 //!
 //! This module is not public API.
 use super::SolCallBuilder;
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{Network, TransactionBuilderDyn};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{MulticallItem, Provider};
 use alloy_sol_types::SolCall;

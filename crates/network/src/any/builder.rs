@@ -1,13 +1,13 @@
 use crate::{
     any::AnyNetwork, BuildResult, Network, NetworkTransactionBuilder, NetworkWallet,
-    TransactionBuilder, TransactionBuilderError,
+    TransactionBuilderDyn, TransactionBuilderError,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionInputKind, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use std::ops::{Deref, DerefMut};
 
-impl TransactionBuilder for WithOtherFields<TransactionRequest> {
+impl TransactionBuilderDyn for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {
         self.deref().chain_id()
     }
@@ -32,11 +32,11 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
         self.deref().input()
     }
 
-    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
+    fn set_input(&mut self, input: Bytes) {
         self.deref_mut().set_input(input);
     }
 
-    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+    fn set_input_kind(&mut self, input: Bytes, kind: TransactionInputKind) {
         self.deref_mut().set_input_kind(input, kind)
     }
 
@@ -118,6 +118,8 @@ impl TransactionBuilder for WithOtherFields<TransactionRequest> {
         self.deref().can_build()
     }
 }
+
+impl crate::TransactionBuilder for WithOtherFields<TransactionRequest> {}
 
 impl NetworkTransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
