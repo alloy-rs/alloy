@@ -5,33 +5,45 @@ use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
 use tokio::time::sleep;
-use tokio_tungstenite::{
-    tungstenite::{self, client::IntoClientRequest, Message},
-    MaybeTlsStream, WebSocketStream,
+use yawc::{
+    frame::{Frame, OpCode},
+    Options, WebSocket,
 };
 
-type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
-
-pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+/// Re-export yawc's [`Options`] as the WebSocket configuration type.
+pub type WebSocketConfig = Options;
 
 /// Simple connection details for a websocket connection.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsConnect {
     /// The URL to connect to.
     url: String,
     /// The authorization header to use.
     auth: Option<Authorization>,
     /// The websocket config.
-    config: Option<WebSocketConfig>,
+    config: Option<Options>,
     /// Max number of retries before failing and exiting the connection.
     /// Default is 10.
     max_retries: u32,
     /// The interval between retries.
     /// Default is 3 seconds.
     retry_interval: Duration,
-    /// The interval between keepalive pings.
+    /// The keepalive interval for sending pings.
     /// Default is 10 seconds.
     keepalive_interval: Duration,
+}
+
+impl std::fmt::Debug for WsConnect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WsConnect")
+            .field("url", &self.url)
+            .field("auth", &self.auth)
+            .field("config", &self.config.as_ref().map(|_| ".."))
+            .field("max_retries", &self.max_retries)
+            .field("retry_interval", &self.retry_interval)
+            .field("keepalive_interval", &self.keepalive_interval)
+            .finish()
+    }
 }
 
 impl WsConnect {
@@ -68,7 +80,7 @@ impl WsConnect {
     }
 
     /// Sets the websocket config.
-    pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
+    pub const fn with_config(mut self, config: Options) -> Self {
         self.config = Some(config);
         self
     }
@@ -84,7 +96,7 @@ impl WsConnect {
     }
 
     /// Get the websocket config.
-    pub const fn config(&self) -> Option<&WebSocketConfig> {
+    pub const fn config(&self) -> Option<&Options> {
         self.config.as_ref()
     }
 
@@ -115,31 +127,26 @@ impl WsConnect {
     }
 }
 
-impl IntoClientRequest for WsConnect {
-    fn into_client_request(self) -> tungstenite::Result<tungstenite::handshake::client::Request> {
-        let mut request: http::Request<()> = self.url.into_client_request()?;
-        if let Some(auth) = self.auth {
-            let mut auth_value = http::HeaderValue::from_str(&auth.to_string())?;
-            auth_value.set_sensitive(true);
-
-            request.headers_mut().insert(http::header::AUTHORIZATION, auth_value);
-        }
-
-        request.into_client_request()
-    }
-}
-
 impl PubSubConnect for WsConnect {
     fn is_local(&self) -> bool {
         alloy_transport::utils::guess_local_url(&self.url)
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
-        let request = self.clone().into_client_request();
-        let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
-            .await
-            .map_err(TransportErrorKind::custom)?;
+        let url: url::Url = self.url.parse().map_err(TransportErrorKind::custom)?;
+        let mut builder = WebSocket::connect(url);
+
+        // always add utf8 support to prevent `frame.as_str()` from panicking
+        let options = self.config.clone().unwrap_or_default().with_utf8();
+        builder = builder.with_options(options);
+
+        if let Some(auth) = &self.auth {
+            builder = builder.with_request(
+                yawc::HttpRequestBuilder::default().header("Authorization", auth.to_string()),
+            );
+        }
+
+        let socket = builder.await.map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
@@ -150,31 +157,34 @@ impl PubSubConnect for WsConnect {
     }
 }
 
-impl WsBackend<TungsteniteStream> {
+impl<S> WsBackend<WebSocket<S>>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+{
     /// Handle a message from the server.
     #[expect(clippy::result_unit_err)]
-    pub fn handle(&mut self, msg: Message) -> Result<(), ()> {
-        match msg {
-            Message::Text(text) => self.handle_text(&text),
-            Message::Close(frame) => {
-                if frame.is_some() {
-                    error!(?frame, "Received close frame with data");
+    pub fn handle(&mut self, frame: Frame) -> Result<(), ()> {
+        match frame.opcode() {
+            OpCode::Text => self.handle_text(frame.as_str()),
+            OpCode::Close => {
+                if let Ok(Some(reason)) = frame.close_reason() {
+                    error!(%reason, "Received close frame with data");
                 } else {
                     error!("WS server has gone away");
                 }
                 Err(())
             }
-            Message::Binary(_) => {
+            OpCode::Binary => {
                 error!("Received binary message, expected text");
                 Err(())
             }
-            Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => Ok(()),
+            OpCode::Ping | OpCode::Pong | OpCode::Continuation => Ok(()),
         }
     }
 
     /// Send a message to the server.
-    pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
-        self.socket.send(Message::Text(msg.get().to_owned().into())).await
+    pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), yawc::WebSocketError> {
+        self.socket.send(Frame::text(msg.get().to_owned())).await
     }
 
     /// Spawn a new backend task.
@@ -228,7 +238,7 @@ impl WsBackend<TungsteniteStream> {
                         }
                         // Reset the keepalive timer.
                         keepalive.set(sleep(self.keepalive_interval));
-                        if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
+                        if let Err(err) = self.socket.send(Frame::ping(&b""[..])).await {
                             error!(%err, "WS connection error");
                             errored = true;
                             break
@@ -239,18 +249,13 @@ impl WsBackend<TungsteniteStream> {
                     }
                     resp = self.socket.next() => {
                         match resp {
-                            Some(Ok(item)) => {
-                                if item.is_pong() {
+                            Some(item) => {
+                                if item.opcode() == OpCode::Pong {
                                     expecting_pong = false;
                                 }
                                 errored = self.handle(item).is_err();
                                 if errored { break }
                             },
-                            Some(Err(err)) => {
-                                error!(%err, "WS connection error");
-                                errored = true;
-                                break
-                            }
                             None => {
                                 error!("WS server has gone away");
                                 errored = true;

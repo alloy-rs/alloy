@@ -268,7 +268,7 @@ impl FromStr for BuiltInConnectionString {
 ///
 /// Provides a flexible way to configure various aspects of the connection,
 /// including authentication, retry behavior, and transport-specific settings.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 #[non_exhaustive]
 pub struct ConnectionConfig {
     /// Authorization header for authenticated connections.
@@ -280,6 +280,18 @@ pub struct ConnectionConfig {
     /// WebSocket-specific configuration.
     #[cfg(all(feature = "ws", not(target_family = "wasm")))]
     pub ws_config: Option<alloy_transport_ws::WebSocketConfig>,
+}
+
+impl std::fmt::Debug for ConnectionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("ConnectionConfig");
+        d.field("auth", &self.auth)
+            .field("max_retries", &self.max_retries)
+            .field("retry_interval", &self.retry_interval);
+        #[cfg(all(feature = "ws", not(target_family = "wasm")))]
+        d.field("ws_config", &self.ws_config.as_ref().map(|_| ".."));
+        d.finish()
+    }
 }
 
 impl ConnectionConfig {
