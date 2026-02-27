@@ -4,7 +4,7 @@ use crate::{
     MULTICALL3_ADDRESS,
 };
 use alloy_eips::BlockId;
-use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilderDyn};
+use alloy_network::{Ethereum, Network, TransactionBuilder, DynTransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_client::WeakClient;
 use alloy_sol_types::{SolCall, SolType, SolValue};

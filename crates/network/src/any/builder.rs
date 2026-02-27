@@ -1,13 +1,13 @@
 use crate::{
     any::AnyNetwork, BuildResult, Network, NetworkTransactionBuilder, NetworkWallet,
-    TransactionBuilderDyn, TransactionBuilderError,
+    DynTransactionBuilder, TransactionBuilderError,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionInputKind, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use std::ops::{Deref, DerefMut};
 
-impl TransactionBuilderDyn for WithOtherFields<TransactionRequest> {
+impl DynTransactionBuilder for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {
         self.deref().chain_id()
     }

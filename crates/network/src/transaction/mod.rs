@@ -1,7 +1,7 @@
 mod builder;
 pub use builder::{
     BuildResult, NetworkTransactionBuilder, TransactionBuilder, TransactionBuilder4844,
-    TransactionBuilder7594, TransactionBuilder7702, TransactionBuilderDyn, TransactionBuilderError,
+    TransactionBuilder7594, TransactionBuilder7702, DynTransactionBuilder, TransactionBuilderError,
     UnbuiltTransactionError,
 };
 

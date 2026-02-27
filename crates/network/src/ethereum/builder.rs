@@ -1,12 +1,12 @@
 use crate::{
     BuildResult, Ethereum, Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder,
-    TransactionBuilder7702, TransactionBuilderDyn, TransactionBuilderError,
+    TransactionBuilder7702, DynTransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList, TransactionInputKind};
 
-impl TransactionBuilderDyn for TransactionRequest {
+impl DynTransactionBuilder for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }

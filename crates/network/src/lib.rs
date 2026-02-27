@@ -16,7 +16,7 @@ mod transaction;
 pub use transaction::{
     BuildResult, FullSigner, FullSignerSync, NetworkTransactionBuilder, NetworkWallet,
     TransactionBuilder, TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
-    TransactionBuilderDyn, TransactionBuilderError, TxSigner, TxSignerSync,
+    DynTransactionBuilder, TransactionBuilderError, TxSigner, TxSignerSync,
     UnbuiltTransactionError,
 };
 

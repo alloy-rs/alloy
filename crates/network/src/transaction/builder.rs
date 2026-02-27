@@ -60,7 +60,7 @@ impl<N: Network> TransactionBuilderError<N> {
 /// Object-safe transaction builder trait.
 ///
 /// This is the core trait for building transactions with support for dynamic dispatch (`dyn
-/// TransactionBuilderDyn`). It provides:
+/// DynTransactionBuilder`). It provides:
 ///
 /// - **Getters** for all transaction fields (`chain_id()`, `nonce()`, `input()`, etc.)
 /// - **Setters** with concretized `Bytes` parameters (no generic type parameters)
@@ -69,7 +69,7 @@ impl<N: Network> TransactionBuilderError<N> {
 /// object-safe. For generic wrapper setters (e.g., `set_input<T: Into<Bytes>>`), use
 /// [`TransactionBuilder`].
 #[doc(alias = "TxBuilderDyn")]
-pub trait TransactionBuilderDyn: Send + Sync {
+pub trait DynTransactionBuilder: Send + Sync {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -191,7 +191,7 @@ pub trait TransactionBuilderDyn: Send + Sync {
 
 /// Sized transaction builder with builder-pattern and generic wrappers.
 ///
-/// This trait extends [`TransactionBuilderDyn`] with:
+/// This trait extends [`DynTransactionBuilder`] with:
 ///
 /// - **Generic setter wrappers**: `set_input<T: Into<Bytes>>()` accept any type convertible to
 ///   `Bytes`
@@ -200,10 +200,10 @@ pub trait TransactionBuilderDyn: Send + Sync {
 /// - **Specialized builders**: `with_deploy_code()`, `with_call()` for contract interactions
 ///
 /// The `Sized` bound enables consuming methods and builder patterns while maintaining default
-/// implementations inherited from [`TransactionBuilderDyn`].
+/// implementations inherited from [`DynTransactionBuilder`].
 #[doc(alias = "TxBuilder")]
 pub trait TransactionBuilder:
-    TransactionBuilderDyn + Default + Sized + Send + Sync + 'static
+    DynTransactionBuilder + Default + Sized + Send + Sync + 'static
 {
     /// Builder-pattern method for setting the chain ID.
     fn with_chain_id(mut self, chain_id: ChainId) -> Self {
@@ -224,10 +224,10 @@ pub trait TransactionBuilder:
     }
 
     /// Set the input data for the transaction (generic wrapper).
-    /// Delegates to [`TransactionBuilderDyn::set_input`] to combine ergonomic generics with
+    /// Delegates to [`DynTransactionBuilder::set_input`] to combine ergonomic generics with
     /// object-safety.
     fn set_input<T: Into<Bytes>>(&mut self, input: T) {
-        TransactionBuilderDyn::set_input(self, input.into());
+        DynTransactionBuilder::set_input(self, input.into());
     }
 
     /// Builder-pattern method for setting the input data.
@@ -237,10 +237,10 @@ pub trait TransactionBuilder:
     }
 
     /// Set the input data for the transaction, respecting the input kind (generic wrapper).
-    /// Delegates to [`TransactionBuilderDyn::set_input_kind`] to combine ergonomic generics with
+    /// Delegates to [`DynTransactionBuilder::set_input_kind`] to combine ergonomic generics with
     /// object-safety.
     fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
-        TransactionBuilderDyn::set_input_kind(self, input.into(), kind);
+        DynTransactionBuilder::set_input_kind(self, input.into(), kind);
     }
 
     /// Builder-pattern method for setting the input data, respecting the input kind
@@ -276,10 +276,10 @@ pub trait TransactionBuilder:
     /// Deploy the code by making a create call with data. This will set the
     /// `to` field to [`TxKind::Create`].
     ///
-    /// This delegates to [`TransactionBuilderDyn::set_input`] to handle the generic input
+    /// This delegates to [`DynTransactionBuilder::set_input`] to handle the generic input
     /// conversion.
     fn set_deploy_code<T: Into<Bytes>>(&mut self, code: T) {
-        TransactionBuilderDyn::set_input(self, code.into());
+        DynTransactionBuilder::set_input(self, code.into());
         self.set_create()
     }
 
@@ -293,9 +293,9 @@ pub trait TransactionBuilder:
     /// Set the data field to a contract call. This will clear the `to` field
     /// if it is set to [`TxKind::Create`].
     ///
-    /// This delegates to [`TransactionBuilderDyn::set_input`] to store the ABI-encoded call data.
+    /// This delegates to [`DynTransactionBuilder::set_input`] to store the ABI-encoded call data.
     fn set_call<T: SolCall>(&mut self, t: &T) {
-        TransactionBuilderDyn::set_input(self, t.abi_encode().into());
+        DynTransactionBuilder::set_input(self, t.abi_encode().into());
         if matches!(self.kind(), Some(TxKind::Create)) {
             self.clear_kind();
         }
