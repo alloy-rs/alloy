@@ -14,8 +14,8 @@ use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, FullSigner, FullSignerSync, NetworkWallet, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
+    BuildResult, FullSigner, FullSignerSync, NetworkTransactionBuilder, NetworkWallet,
+    TransactionBuilder, TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
     TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
 };
 
@@ -80,7 +80,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     /// The JSON body of a transaction request.
     #[doc(alias = "TxRequest")]
     type TransactionRequest: RpcObject
-        + TransactionBuilder<Self>
+        + NetworkTransactionBuilder<Self>
         + Debug
         + From<Self::TxEnvelope>
         + From<Self::UnsignedTx>;
