@@ -1,6 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
-use alloy_network::{Network, DynTransactionBuilder};
+use alloy_network::{DynTransactionBuilder, Network};
 use alloy_primitives::ChainId;
 use alloy_transport::TransportResult;
 

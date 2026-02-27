@@ -1,4 +1,4 @@
-use crate::{Network, NetworkTransactionBuilder, DynTransactionBuilder};
+use crate::{DynTransactionBuilder, Network, NetworkTransactionBuilder};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::Address;
 use alloy_signer::{Signer, SignerSync};

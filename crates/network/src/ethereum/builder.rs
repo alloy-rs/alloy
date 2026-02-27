@@ -1,6 +1,6 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkTransactionBuilder, NetworkWallet, TransactionBuilder,
-    TransactionBuilder7702, DynTransactionBuilder, TransactionBuilderError,
+    BuildResult, DynTransactionBuilder, Ethereum, Network, NetworkTransactionBuilder,
+    NetworkWallet, TransactionBuilder, TransactionBuilder7702, TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};

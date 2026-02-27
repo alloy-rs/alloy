@@ -1,6 +1,6 @@
 use crate::{
-    any::AnyNetwork, BuildResult, Network, NetworkTransactionBuilder, NetworkWallet,
-    DynTransactionBuilder, TransactionBuilderError,
+    any::AnyNetwork, BuildResult, DynTransactionBuilder, Network, NetworkTransactionBuilder,
+    NetworkWallet, TransactionBuilderError,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionInputKind, TransactionRequest};
