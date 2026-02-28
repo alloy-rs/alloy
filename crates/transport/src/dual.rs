@@ -49,7 +49,7 @@ impl<L, R, H> DualTransport<L, R, H> {
     where
         F: Fn(RequestPacket, L, R) -> TransportFut<'static> + Send + Sync,
     {
-        DualTransport { left, right, handler: f }
+        DualTransport::new(left, right, f)
     }
 }
 

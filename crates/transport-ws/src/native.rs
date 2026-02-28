@@ -135,6 +135,12 @@ impl PubSubConnect for WsConnect {
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
+        // Install the default rustls crypto provider if not already set.
+        // Required since rustls 0.23+ no longer auto-installs a provider.
+        let _ = rustls::crypto::CryptoProvider::install_default(
+            rustls::crypto::aws_lc_rs::default_provider(),
+        );
+
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
         let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
