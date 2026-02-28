@@ -711,10 +711,15 @@ impl Filter {
         }
     }
 
-    /// Returns `true` if the filter matches the given block. Checks both the
-    /// block number and hash.
+    /// Returns `true` if the filter matches the given block.
+    ///
+    /// For [`FilterBlockOption::AtBlockHash`] filters, only the block hash is checked.
+    /// For [`FilterBlockOption::Range`] filters, only the block number range is checked.
     pub fn matches_block(&self, block: &BlockNumHash) -> bool {
-        self.matches_block_range(block.number) || self.matches_block_hash(block.hash)
+        match self.block_option {
+            FilterBlockOption::AtBlockHash(_) => self.matches_block_hash(block.hash),
+            FilterBlockOption::Range { .. } => self.matches_block_range(block.number),
+        }
     }
 
     /// Returns `true` if either of the following is true:
@@ -2457,5 +2462,32 @@ mod tests {
         // Test empty filter (default Range with None values)
         let filter = Filter::new();
         assert_eq!(filter.extract_block_range(), (None, None));
+    }
+
+    #[test]
+    fn test_matches_block_at_block_hash() {
+        let target_hash = B256::with_last_byte(0xab);
+        let filter = Filter::new().at_block_hash(target_hash);
+
+        // Matching hash should return true regardless of block number
+        assert!(filter.matches_block(&BlockNumHash { number: 0, hash: target_hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 999, hash: target_hash }));
+
+        // Non-matching hash must return false
+        let wrong_hash = B256::with_last_byte(0xcd);
+        assert!(!filter.matches_block(&BlockNumHash { number: 0, hash: wrong_hash }));
+        assert!(!filter.matches_block(&BlockNumHash { number: 999, hash: wrong_hash }));
+    }
+
+    #[test]
+    fn test_matches_block_range_filter() {
+        let filter = Filter::new().from_block(10).to_block(20);
+
+        let hash = B256::ZERO;
+        assert!(!filter.matches_block(&BlockNumHash { number: 9, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 10, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 15, hash }));
+        assert!(filter.matches_block(&BlockNumHash { number: 20, hash }));
+        assert!(!filter.matches_block(&BlockNumHash { number: 21, hash }));
     }
 }

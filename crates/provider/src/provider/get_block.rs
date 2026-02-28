@@ -257,7 +257,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
-            Self::PendingBlock(call) => f.debug_tuple("PendingBlockCall").field(call).finish(),
+            Self::PendingBlock(call) => f.debug_tuple("PendingBlock").field(call).finish(),
             Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
         }
     }
