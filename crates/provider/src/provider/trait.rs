@@ -30,7 +30,8 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -143,8 +144,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Get the block number for a given block identifier.
     ///
-    /// This is a convenience function that fetches the full block when the block identifier is not
-    /// a number.
+    /// This is a convenience function that fetches the block header when the block identifier is
+    /// not a number. Falls back to fetching the full block if header RPC is not supported.
     async fn get_block_number_by_id(
         &self,
         block_id: BlockId,
@@ -153,6 +154,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
             _ => {
+                // Try get_header first (more efficient), fallback to get_block if not supported.
+                // Not all nodes support eth_getHeaderByHash/eth_getHeaderByNumber.
+                if let Ok(header) = self.get_header(block_id).await {
+                    return Ok(header.map(|h| h.number()));
+                }
                 let block = self.get_block(block_id).await?;
                 Ok(block.map(|b| b.header().number()))
             }
@@ -797,6 +803,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.client().request("eth_getStorageAt", (address, key)).into()
+    }
+
+    /// Batch-fetches storage values from multiple addresses at multiple keys.
+    ///
+    /// See [EIP spec](https://github.com/ethereum/execution-apis/issues/752).
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.client().request("eth_getStorageValues", (requests,)).into()
     }
 
     /// Gets a transaction by its sender and nonce.
