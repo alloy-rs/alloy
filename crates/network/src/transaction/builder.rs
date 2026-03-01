@@ -193,14 +193,10 @@ pub trait DynTransactionBuilder: Send + Sync + 'static {
 ///
 /// This trait extends [`DynTransactionBuilder`] with:
 ///
-/// - **Generic setter wrappers**: `set_input<T: Into<Bytes>>()` accept any type convertible to
-///   `Bytes`
 /// - **Builder-pattern methods**: `with_*()` methods return `self` for method chaining
 /// - **Functional methods**: `apply()` and `try_apply()` for composable transformations
-/// - **Specialized builders**: `with_deploy_code()`, `with_call()` for contract interactions
-///
-/// The `Sized` bound enables consuming methods and builder patterns while maintaining default
-/// implementations inherited from [`DynTransactionBuilder`].
+/// - **Generic setter wrappers**: `set_input<T: Into<Bytes>>()` accept any type convertible to
+///   `Bytes`
 #[doc(alias = "TxBuilder")]
 pub trait TransactionBuilder: DynTransactionBuilder + Default {
     /// Builder-pattern method for setting the chain ID.
