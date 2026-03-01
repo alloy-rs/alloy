@@ -107,7 +107,8 @@ const JWT_SECRET_LEN: usize = 64;
 /// The JWT `iat` (issued-at) claim cannot exceed +-60 seconds from the current time.
 const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
-/// The JWT `exp` (expiration time) claim is accepted if not older than 60 seconds from the current time.
+/// The JWT `exp` (expiration time) claim is accepted if not older than 60 seconds from the current
+/// time.
 const JWT_EXP_GRACE_PERIOD_SECS: Duration = Duration::from_secs(60);
 
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
