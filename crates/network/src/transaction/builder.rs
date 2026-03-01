@@ -69,7 +69,7 @@ impl<N: Network> TransactionBuilderError<N> {
 /// object-safe. For generic wrapper setters (e.g., `set_input<T: Into<Bytes>>`), use
 /// [`TransactionBuilder`].
 #[doc(alias = "TxBuilderDyn")]
-pub trait DynTransactionBuilder: Send + Sync {
+pub trait DynTransactionBuilder: Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -202,9 +202,7 @@ pub trait DynTransactionBuilder: Send + Sync {
 /// The `Sized` bound enables consuming methods and builder patterns while maintaining default
 /// implementations inherited from [`DynTransactionBuilder`].
 #[doc(alias = "TxBuilder")]
-pub trait TransactionBuilder:
-    DynTransactionBuilder + Default + Sized + Send + Sync + 'static
-{
+pub trait TransactionBuilder: DynTransactionBuilder + Default {
     /// Builder-pattern method for setting the chain ID.
     fn with_chain_id(mut self, chain_id: ChainId) -> Self {
         self.set_chain_id(chain_id);
