@@ -187,7 +187,7 @@ impl<TxReq> SimulatePayload<TxReq> {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulateError {
     /// Code error
-    /// -3200: Execution reverted
+    /// 3: Execution reverted
     /// -32015: VM execution error
     pub code: i32,
     /// Message error
