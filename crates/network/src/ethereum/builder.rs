@@ -404,6 +404,7 @@ mod tests {
             block_hash: None,
             block_number: None,
             transaction_index: None,
+            block_timestamp: None,
         };
 
         // Convert the transaction response into a transaction request via
