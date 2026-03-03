@@ -48,6 +48,10 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 rand = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
+# jsonwebtoken depends on getrandom/js on wasm
+[target.'cfg(target_family = "wasm")'.dependencies]
+getrandom = { workspace = true, features = ["js"] }
+
 [features]
 default = ["jwt", "std", "serde"]
 std = [

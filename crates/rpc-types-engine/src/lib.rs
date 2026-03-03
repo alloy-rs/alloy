@@ -10,6 +10,9 @@
 #[macro_use]
 extern crate alloc;
 
+#[cfg(target_family = "wasm")]
+use getrandom as _;
+
 mod cancun;
 pub use cancun::*;
 mod prague;
