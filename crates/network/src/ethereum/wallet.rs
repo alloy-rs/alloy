@@ -1,5 +1,5 @@
 use crate::{Network, NetworkWallet, TxSigner};
-use alloy_consensus::SignableTransaction;
+use alloy_consensus::{SignableTransaction, Signed};
 use alloy_primitives::{map::AddressHashMap, Address, Signature};
 use std::{fmt::Debug, sync::Arc};
 
@@ -120,7 +120,11 @@ impl EthereumWallet {
     }
 }
 
-impl<N: Network> NetworkWallet<N> for EthereumWallet {
+impl<N: Network> NetworkWallet<N> for EthereumWallet
+where
+    N::TxEnvelope: From<Signed<N::UnsignedTx>>,
+    N::UnsignedTx: SignableTransaction<Signature>,
+{
     fn default_signer_address(&self) -> Address {
         self.default
     }
