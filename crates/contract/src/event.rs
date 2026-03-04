@@ -5,7 +5,7 @@ use alloy_provider::{FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
 use alloy_transport::{RpcError, TransportResult};
-use futures::Stream;
+use futures::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use std::{fmt, marker::PhantomData};
 
@@ -203,6 +203,7 @@ impl<P: Clone, E, N> Event<&P, E, N> {
 /// `chunk_size`-block windows queried concurrently (bounded by `max_concurrent`). If an
 /// individual chunk still fails, each block in that chunk is queried individually.
 #[must_use = "ChunkedEvent does nothing unless you call `query` or `query_raw`"]
+#[derive(Clone)]
 pub struct ChunkedEvent<P, E, N = Ethereum> {
     provider: P,
     filter: Filter,
@@ -247,6 +248,17 @@ impl<P, E, N> ChunkedEvent<P, E, N> {
     }
 }
 
+impl<P: Provider<N> + Clone + 'static, E: SolEvent + Send + Sync + 'static, N: Network>
+    std::future::IntoFuture for ChunkedEvent<P, E, N>
+{
+    type Output = Result<Vec<(E, Log)>, Error>;
+    type IntoFuture = BoxFuture<'static, Self::Output>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(async move { self.query().await })
+    }
+}
+
 impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
     /// Queries the blockchain for matching event logs, decoding them.
     ///
@@ -277,77 +289,86 @@ impl<P: Provider<N> + Clone, E: SolEvent, N: Network> ChunkedEvent<P, E, N> {
             ));
         };
 
-        let from = match from_block {
-            None => 0,
-            Some(tag) => match tag.as_number() {
-                Some(n) => n,
-                None if tag == BlockNumberOrTag::Earliest => 0,
-                None => self.provider.get_block_number().await?,
-            },
-        };
-        let to = match to_block {
-            None => self.provider.get_block_number().await?,
-            Some(tag) => match tag.as_number() {
-                Some(n) => n,
-                None if tag == BlockNumberOrTag::Earliest => 0,
-                None => self.provider.get_block_number().await?,
-            },
-        };
+        let from =
+            resolve_block_tag(&self.provider, from_block.unwrap_or(BlockNumberOrTag::Earliest))
+                .await?;
+        let to =
+            resolve_block_tag(&self.provider, to_block.unwrap_or(BlockNumberOrTag::Latest)).await?;
 
         if from > to {
             return Ok(vec![]);
         }
 
-        let chunk_size = self.chunk_size;
-
-        // Lazily generate (start, end) pairs for each chunk to avoid OOM on huge ranges.
-        let chunk_ranges = std::iter::successors(Some(from), move |&prev| {
-            let end = prev.saturating_add(chunk_size - 1).min(to);
-            if end >= to {
-                None
-            } else {
-                end.checked_add(1)
-            }
-        })
-        .map(move |start| (start, start.saturating_add(chunk_size - 1).min(to)));
-
         let all_results: Vec<TransportResult<(u64, Vec<Log>)>> =
-            futures::stream::iter(chunk_ranges)
-                .map(|(start_block, end_block)| {
-                    let chunk_filter =
-                        self.filter.clone().from_block(start_block).to_block(end_block);
-                    let provider = self.provider.clone();
-                    async move {
-                        match provider.get_logs(&chunk_filter).await {
-                            Ok(logs) => Ok((start_block, logs)),
-                            Err(err) => {
-                                tracing::debug!(
-                                    %err,
-                                    start_block,
-                                    end_block,
-                                    "chunk query failed, falling back to single-block queries"
-                                );
-                                // Fallback: query each block individually
-                                let mut fallback_logs = Vec::new();
-                                for block in start_block..=end_block {
-                                    let single_filter =
-                                        chunk_filter.clone().from_block(block).to_block(block);
-                                    fallback_logs.extend(provider.get_logs(&single_filter).await?);
-                                }
-                                Ok((start_block, fallback_logs))
-                            }
-                        }
-                    }
-                })
-                .buffer_unordered(self.max_concurrent)
-                .collect()
-                .await;
+            self.chunk_stream(from, to).collect().await;
 
         let mut resolved: Vec<(u64, Vec<Log>)> =
             all_results.into_iter().collect::<TransportResult<Vec<_>>>()?;
 
         resolved.sort_by_key(|(block_num, _)| *block_num);
         Ok(resolved.into_iter().flat_map(|(_, logs)| logs).collect())
+    }
+
+    /// Returns a stream of per-chunk results over `[from, to]`.
+    ///
+    /// Each item is the result of querying one `chunk_size`-block window, falling back to
+    /// single-block queries if the chunk request fails. Results may arrive out of order due to
+    /// concurrent dispatch; callers are responsible for sorting if order matters.
+    fn chunk_stream(
+        &self,
+        from: u64,
+        to: u64,
+    ) -> impl Stream<Item = TransportResult<(u64, Vec<Log>)>> {
+        let filter = self.filter.clone();
+        let provider = self.provider.clone();
+        let max_concurrent = self.max_concurrent;
+
+        futures::stream::iter(chunk_ranges(from, to, self.chunk_size))
+            .map(move |(start_block, end_block)| {
+                let chunk_filter = filter.clone().from_block(start_block).to_block(end_block);
+                let provider = provider.clone();
+                async move { query_chunk(&provider, &chunk_filter, start_block, end_block).await }
+            })
+            .buffer_unordered(max_concurrent)
+    }
+}
+
+/// Lazily generates `(start, end)` block pairs for each chunk to avoid OOM on huge ranges.
+fn chunk_ranges(from: u64, to: u64, chunk_size: u64) -> impl Iterator<Item = (u64, u64)> {
+    std::iter::successors(Some(from), move |&prev| {
+        let end = prev.saturating_add(chunk_size - 1).min(to);
+        if end >= to {
+            None
+        } else {
+            end.checked_add(1)
+        }
+    })
+    .map(move |start| (start, start.saturating_add(chunk_size - 1).min(to)))
+}
+
+/// Queries a single chunk of blocks, falling back to block-by-block queries if the chunk fails.
+async fn query_chunk<P: Provider<N>, N: Network>(
+    provider: &P,
+    filter: &Filter,
+    start_block: u64,
+    end_block: u64,
+) -> TransportResult<(u64, Vec<Log>)> {
+    match provider.get_logs(filter).await {
+        Ok(logs) => Ok((start_block, logs)),
+        Err(err) => {
+            tracing::debug!(
+                %err,
+                start_block,
+                end_block,
+                "chunk query failed, falling back to single-block queries"
+            );
+            let mut fallback_logs = Vec::new();
+            for block in start_block..=end_block {
+                let single_filter = filter.clone().from_block(block).to_block(block);
+                fallback_logs.extend(provider.get_logs(&single_filter).await?);
+            }
+            Ok((start_block, fallback_logs))
+        }
     }
 }
 
@@ -398,6 +419,21 @@ impl<E: SolEvent> EventPoller<E> {
             .into_stream()
             .flat_map(futures_util::stream::iter)
             .map(|log| decode_log(&log).map(|e| (e, log)))
+    }
+}
+
+/// Resolves a [`BlockNumberOrTag`] to a concrete block number.
+///
+/// Returns `0` for [`BlockNumberOrTag::Earliest`] and fetches the latest block number from the
+/// provider for any other non-numeric tag (e.g. `Latest`, `Pending`, `Safe`, `Finalized`).
+async fn resolve_block_tag<P: Provider<N>, N: Network>(
+    provider: &P,
+    tag: BlockNumberOrTag,
+) -> TransportResult<u64> {
+    match tag.as_number() {
+        Some(n) => Ok(n),
+        None if tag == BlockNumberOrTag::Earliest => Ok(0),
+        None => provider.get_block_number().await,
     }
 }
 
