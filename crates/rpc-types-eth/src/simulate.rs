@@ -152,15 +152,27 @@ impl<TxReq> Default for SimulatePayload<TxReq> {
 
 impl<TxReq> SimulatePayload<TxReq> {
     /// Adds a block to the simulation payload.
-    pub fn extend(mut self, block: SimBlock<TxReq>) -> Self {
+    pub fn add_block(mut self, block: SimBlock<TxReq>) -> Self {
         self.block_state_calls.push(block);
         self
     }
 
     /// Adds multiple blocks to the simulation payload.
-    pub fn extend_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock<TxReq>>) -> Self {
+    pub fn add_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock<TxReq>>) -> Self {
         self.block_state_calls.extend(blocks);
         self
+    }
+
+    /// Adds a block to the simulation payload.
+    #[deprecated = "use `add_block` instead"]
+    pub fn extend(self, block: SimBlock<TxReq>) -> Self {
+        self.add_block(block)
+    }
+
+    /// Adds multiple blocks to the simulation payload.
+    #[deprecated = "use `add_blocks` instead"]
+    pub fn extend_blocks(self, blocks: impl IntoIterator<Item = SimBlock<TxReq>>) -> Self {
+        self.add_blocks(blocks)
     }
 
     /// Enables tracing of token transfers.
@@ -304,5 +316,19 @@ mod tests {
         assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
         assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
         assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_simulate_payload_block_builders() {
+        let payload: SimulatePayload<TransactionRequest> = SimulatePayload::default()
+            .add_block(SimBlock::default())
+            .add_blocks(vec![SimBlock::default(), SimBlock::default()]);
+        assert_eq!(payload.block_state_calls.len(), 3);
+
+        let payload: SimulatePayload<TransactionRequest> = SimulatePayload::default()
+            .extend(SimBlock::default())
+            .extend_blocks(vec![SimBlock::default(), SimBlock::default()]);
+        assert_eq!(payload.block_state_calls.len(), 3);
     }
 }
