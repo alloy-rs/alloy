@@ -4,8 +4,8 @@ use alloy_primitives::{Address, LogData, B256};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
-use alloy_transport::{RpcError, TransportResult};
-use futures::{future::BoxFuture, Stream};
+use alloy_transport::{BoxFuture, RpcError, TransportResult};
+use futures::Stream;
 use futures_util::StreamExt;
 use std::{fmt, marker::PhantomData};
 
