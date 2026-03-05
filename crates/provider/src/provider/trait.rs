@@ -2543,6 +2543,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_estimate_eip1559_fees_when_base_fee_zero() {
+        // Simulate BSC-like behavior where baseFeePerGas is present but zero.
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_config(|a| a.arg("--base-fee").arg("0"));
+
+        let err = provider.estimate_eip1559_fees().await.unwrap_err();
+        assert!(
+            matches!(err, RpcError::UnsupportedFeature("eip1559")),
+            "Expected UnsupportedFeature(\"eip1559\"), got {err:?}"
+        );
+    }
+
+    #[tokio::test]
     #[cfg(not(windows))]
     async fn eth_sign_transaction() {
         async_ci_only(|| async {
