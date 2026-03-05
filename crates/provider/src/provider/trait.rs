@@ -305,6 +305,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
                     .header()
                     .as_ref()
                     .base_fee_per_gas()
+                    .filter(|&base_fee| base_fee != 0)
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
                     .into()
             }
