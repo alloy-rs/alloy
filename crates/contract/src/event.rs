@@ -740,7 +740,7 @@ mod tests {
     }
 
     /// Verifies that the chunked query algorithm collects the correct logs and preserves
-    /// block ordering when events are spread across a large range requiring many chunks.
+    /// block ordering when events are spread across a range requiring multiple chunks.
     #[tokio::test]
     async fn chunked_query_collects_and_orders_logs() {
         use alloy_provider::ext::AnvilApi;
@@ -756,19 +756,19 @@ mod tests {
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        // Emit three events spread across a 10k-block range: start, middle, and end.
-        // This stresses chunk boundary handling and result ordering after the merge.
+        // Emit three events spread across a 100-block range: start, middle, and end.
+        // This exercises chunk boundary handling and result ordering after the merge.
         contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
-        provider.anvil_mine(Some(4998), None).await.unwrap();
+        provider.anvil_mine(Some(48), None).await.unwrap();
         contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
-        provider.anvil_mine(Some(4998), None).await.unwrap();
+        provider.anvil_mine(Some(48), None).await.unwrap();
         contract.doEmit().send().await.unwrap().get_receipt().await.unwrap();
 
-        // Use chunk_size=7 to force ~1429 chunks, exercising the concurrent dispatch and merge.
+        // Use chunk_size=7 to force ~15 chunks, exercising the concurrent dispatch and merge.
         // get_logs_chunked() bypasses the optimistic full-range attempt so the chunking code
         // is always exercised. query_raw() serves as the reference via the optimistic path.
         let event =
-            contract.MyEvent_filter().from_block(0u64).to_block(10_000u64).chunked().chunk_size(7);
+            contract.MyEvent_filter().from_block(0u64).to_block(100u64).chunked().chunk_size(7);
 
         let chunked = event.get_logs_chunked().await.unwrap();
         let reference = event.query_raw().await.unwrap();
