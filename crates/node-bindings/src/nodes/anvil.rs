@@ -126,12 +126,14 @@ impl Drop for AnvilInstance {
     fn drop(&mut self) {
         #[cfg(unix)]
         {
-            // anvil has settings for dumping thing the state,cache on SIGTERM, so we try to kill it
+            // anvil has settings for dumping the state, cache on SIGTERM, so we try to kill it
             // with sigterm
             if let Ok(out) =
                 Command::new("kill").arg("-SIGTERM").arg(self.child.id().to_string()).output()
             {
                 if out.status.success() {
+                    // Wait for the process to exit to avoid zombie processes
+                    let _ = self.child.wait();
                     return;
                 }
             }
@@ -139,6 +141,7 @@ impl Drop for AnvilInstance {
         if let Err(err) = self.child.kill() {
             eprintln!("alloy-node-bindings: failed to kill anvil process: {}", err);
         }
+        let _ = self.child.wait();
     }
 }
 
