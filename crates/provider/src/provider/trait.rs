@@ -2428,13 +2428,18 @@ mod tests {
 
         let results = provider.call_many(&bundles).context(&context).await.unwrap();
 
-        let tx1_res = EthCallResponse {
-            value: Some(
+        let tx1_res = {
+            let mut r = EthCallResponse::default();
+            r.value = Some(
                 hex!("0000000000000000000000000000000000000000000000000000000000000001").into(),
-            ),
-            error: None,
+            );
+            r
         };
-        let tx2_res = EthCallResponse { value: Some(Bytes::new()), error: None };
+        let tx2_res = {
+            let mut r = EthCallResponse::default();
+            r.value = Some(Bytes::new());
+            r
+        };
         let expected = vec![vec![tx1_res.clone(), tx2_res.clone()]];
 
         assert_eq!(results, expected);

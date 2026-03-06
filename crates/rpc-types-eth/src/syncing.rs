@@ -5,6 +5,7 @@ use alloy_primitives::{B512, U256};
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct SyncInfo {
     /// Starting block
     pub starting_block: U256,
@@ -26,6 +27,7 @@ pub struct SyncInfo {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct Stage {
     /// The name of the sync stage.
     #[cfg_attr(feature = "serde", serde(alias = "stage_name"))]
@@ -38,6 +40,7 @@ pub struct Stage {
 /// Peers info
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct Peers {
     /// Number of active peers
     pub active: usize,
@@ -52,6 +55,7 @@ pub struct Peers {
 /// Peer connection information
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct PeerInfo {
     /// Public node id
     pub id: Option<String>,
@@ -69,6 +73,7 @@ pub struct PeerInfo {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct PeerNetworkInfo {
     /// Remote endpoint address
     pub remote_address: String,
@@ -79,6 +84,7 @@ pub struct PeerNetworkInfo {
 /// Peer protocols information
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct PeerProtocolsInfo {
     /// Ethereum protocol information
     pub eth: Option<PeerEthProtocolInfo>,
@@ -90,6 +96,7 @@ pub struct PeerProtocolsInfo {
 /// Peer Ethereum protocol information
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct PeerEthProtocolInfo {
     /// Negotiated ethereum protocol version
     pub version: u32,
@@ -102,6 +109,7 @@ pub struct PeerEthProtocolInfo {
 /// Peer PIP protocol information
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct PipProtocolInfo {
     /// Negotiated PIP protocol version
     pub version: u32,
@@ -162,6 +170,7 @@ impl serde::Serialize for SyncStatus {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxStats")]
+#[non_exhaustive]
 pub struct TransactionStats {
     /// Block no this transaction was first seen.
     pub first_seen: u64,
@@ -173,6 +182,7 @@ pub struct TransactionStats {
 #[derive(Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct ChainStatus {
     /// Describes the gap in the blockchain, if there is one: (first, last)
     pub block_gap: Option<(U256, U256)>,

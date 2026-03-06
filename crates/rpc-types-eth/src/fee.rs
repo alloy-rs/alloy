@@ -1,8 +1,9 @@
 use alloc::vec::Vec;
 
 /// Internal struct to calculate reward percentiles
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[doc(alias = "TransactionGasAndReward")]
+#[non_exhaustive]
 pub struct TxGasAndReward {
     /// Gas used by the transaction
     pub gas_used: u64,
@@ -29,6 +30,7 @@ impl Ord for TxGasAndReward {
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct FeeHistory {
     /// An array of block base fees per gas.
     /// This includes the next block after the newest of the returned range,

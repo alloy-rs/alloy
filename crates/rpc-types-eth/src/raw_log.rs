@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 
 /// Ethereum Log
 #[derive(Clone, Debug, Default, PartialEq, Eq, RlpDecodable, RlpEncodable)]
+#[non_exhaustive]
 pub struct Log {
     /// Contract that emitted this log.
     pub address: Address,

@@ -11,6 +11,7 @@ pub use alloy_consensus::TrieAccount as Account;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct AccountInfo {
     /// Account balance
     pub balance: U256,
@@ -54,6 +55,7 @@ impl AccountInfo {
 #[cfg(feature = "serde")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct EIP1186StorageProof {
     /// Storage key.
     pub key: alloy_serde::storage::JsonStorageKey,
@@ -80,6 +82,7 @@ impl EIP1186StorageProof {
 #[cfg(feature = "serde")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct EIP1186AccountProofResponse {
     /// The account address.
     pub address: Address,
@@ -239,6 +242,7 @@ impl From<AddressHashMap<Vec<StorageValue>>> for StorageValuesResponse {
 /// Extended account information (used by `parity_allAccountInfo`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub struct ExtAccountInfo {
     /// Account name
     pub name: String,
@@ -252,9 +256,10 @@ pub struct ExtAccountInfo {
 /// account derived from a signature
 /// as well as information that tells if it is valid for
 /// the current chain
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct RecoveredAccount {
     /// address of the recovered account
     pub address: Address,

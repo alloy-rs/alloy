@@ -74,9 +74,10 @@ impl<TxReq> SimBlock<TxReq> {
 }
 
 /// Represents the result of simulating a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct SimulatedBlock<B = Block> {
     /// The simulated block.
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -90,6 +91,7 @@ pub struct SimulatedBlock<B = Block> {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct SimCallResult {
     /// The raw bytes returned by the transaction.
     pub return_data: Bytes,
@@ -182,9 +184,10 @@ impl<TxReq> SimulatePayload<TxReq> {
 }
 
 /// The error response returned by the `eth_simulateV1` method.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub struct SimulateError {
     /// Code error
     /// -3200: Execution reverted

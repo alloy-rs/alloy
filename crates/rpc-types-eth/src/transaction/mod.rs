@@ -50,6 +50,7 @@ pub mod serde_bincode_compat {
     )
 )]
 #[doc(alias = "Tx")]
+#[non_exhaustive]
 pub struct Transaction<T = TxEnvelope> {
     /// The inner transaction object
     pub inner: Recovered<T>,

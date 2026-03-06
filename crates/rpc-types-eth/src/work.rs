@@ -2,6 +2,7 @@ use alloy_primitives::B256;
 
 /// The result of an `eth_getWork` request
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Work {
     /// The proof-of-work hash.
     pub pow_hash: B256,
