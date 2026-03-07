@@ -30,6 +30,9 @@ pub mod layers;
 mod provider;
 pub use provider::*;
 
+mod range;
+pub use range::RangeRequest;
+
 pub mod utils;
 
 #[doc(no_inline)]
