@@ -574,6 +574,7 @@ impl Reth {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn can_set_host() {
@@ -593,5 +594,14 @@ mod tests {
             assert!(reth.endpoint().starts_with("http://localhost:"));
             assert!(reth.ws_endpoint().starts_with("ws://localhost:"));
         }
+    }
+
+    #[test]
+    fn ipc_path_enables_ipc() {
+        let ipc_path = PathBuf::from("custom-reth.ipc");
+        let reth = Reth::new().ipc_path(ipc_path.clone());
+
+        assert_eq!(reth.ipc_path, Some(ipc_path));
+        assert!(reth.ipc_enabled);
     }
 }

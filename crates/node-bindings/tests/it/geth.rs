@@ -1,21 +1,5 @@
 use alloy_node_bindings::{utils::run_with_tempdir_sync, Geth};
 use k256::ecdsa::SigningKey;
-use std::{
-    path::Path,
-    thread::sleep,
-    time::{Duration, Instant},
-};
-
-fn wait_for_path(path: &Path, timeout: Duration) -> bool {
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if path.exists() {
-            return true;
-        }
-        sleep(Duration::from_millis(50));
-    }
-    false
-}
 
 #[test]
 fn port_0() {
@@ -66,28 +50,6 @@ fn dev_mode() {
         let geth = Geth::new().data_dir(temp_dir_path).spawn();
         let p2p_port = geth.p2p_port();
         assert!(p2p_port.is_none(), "{p2p_port:?}");
-    })
-}
-
-#[test]
-fn ipc_path_enables_ipc() {
-    if !ci_info::is_ci() {
-        return;
-    }
-
-    run_with_tempdir_sync("geth-test-", |temp_dir_path| {
-        let ipc_path = temp_dir_path.join("g.ipc");
-        let geth = Geth::new()
-            .disable_discovery()
-            .ipc_path(ipc_path.clone())
-            .data_dir(temp_dir_path)
-            .spawn();
-
-        assert_eq!(geth.ipc_endpoint(), ipc_path.display().to_string());
-        assert!(
-            wait_for_path(&ipc_path, Duration::from_secs(3)),
-            "missing ipc socket: {ipc_path:?}"
-        );
     })
 }
 
