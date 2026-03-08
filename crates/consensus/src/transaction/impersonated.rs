@@ -1,4 +1,5 @@
 use crate::crypto::RecoveryError;
+use alloc::vec::Vec;
 use alloy_eips::{eip2718::Encodable2718, Typed2718};
 use alloy_primitives::{keccak256, Address, B256};
 use alloy_rlp::{bytes::BufMut, Decodable, Encodable};
