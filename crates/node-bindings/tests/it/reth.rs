@@ -2,6 +2,11 @@
 
 use alloy_genesis::Genesis;
 use alloy_node_bindings::{utils::run_with_tempdir_sync, Reth, RethInstance};
+use std::{
+    path::Path,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 /// The default HTTP port for Reth.
 const DEFAULT_HTTP_PORT: u16 = 8545;
@@ -15,6 +20,17 @@ const DEFAULT_AUTH_PORT: u16 = 8551;
 /// The default P2P port for Reth.
 const DEFAULT_P2P_PORT: u16 = 30303;
 
+fn wait_for_path(path: &Path, timeout: Duration) -> bool {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        if path.exists() {
+            return true;
+        }
+        sleep(Duration::from_millis(50));
+    }
+    false
+}
+
 #[test]
 #[cfg_attr(windows, ignore = "no reth on windows")]
 fn can_launch_reth() {
@@ -26,6 +42,25 @@ fn can_launch_reth() {
         let reth = Reth::new().data_dir(temp_dir_path).spawn();
 
         assert_ports(&reth, false);
+    });
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "no reth on windows")]
+fn can_launch_reth_with_custom_ipc_path() {
+    if !ci_info::is_ci() {
+        return;
+    }
+
+    run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+        let ipc_path = temp_dir_path.join("r.ipc");
+        let reth = Reth::new().ipc_path(ipc_path.clone()).data_dir(temp_dir_path).spawn();
+
+        assert_eq!(reth.ipc_endpoint(), ipc_path.display().to_string());
+        assert!(
+            wait_for_path(&ipc_path, Duration::from_secs(3)),
+            "missing ipc socket: {ipc_path:?}"
+        );
     });
 }
 
