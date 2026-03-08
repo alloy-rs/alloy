@@ -57,6 +57,9 @@ mod tx_type;
 mod meta;
 pub use meta::{TransactionInfo, TransactionMeta};
 
+mod impersonated;
+pub use impersonated::MaybeImpersonatedTransaction;
+
 mod recovered;
 pub use recovered::{Recovered, SignerRecoverable};
 
