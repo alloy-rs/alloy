@@ -5,10 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- [node-bindings] Implicitly enable IPC when setting ipc_path ([#3764](https://github.com/alloy-rs/alloy/issues/3764))
+- [pubsub] Remove duplicate log on subscription deserialization failure ([#3773](https://github.com/alloy-rs/alloy/issues/3773))
+- [ci] Add alloy-consensus-any to no_std check ([#3772](https://github.com/alloy-rs/alloy/issues/3772))
+- [eips] Use post-EIP-2028 non-zero byte calldata cost (16) ([#3755](https://github.com/alloy-rs/alloy/issues/3755))
+- [rpc-types-trace] Skip serializing None fields in TraceFilter ([#3739](https://github.com/alloy-rs/alloy/issues/3739))
+- [rpc-types-mev] Add Copy derive to FunctionSelector ([#3725](https://github.com/alloy-rs/alloy/issues/3725))
+- [rpc-types-eth] Matches_block always returns true for AtBlockHash… ([#3734](https://github.com/alloy-rs/alloy/issues/3734))
+- Correct Debug trait name for PendingBlock ([#3738](https://github.com/alloy-rs/alloy/issues/3738))
+- Correct Debug trait name for `JwtSecret` ([#3736](https://github.com/alloy-rs/alloy/issues/3736))
+- [rpc-types] Off-by-one in TransactionConditional has_exceeded checks ([#3721](https://github.com/alloy-rs/alloy/issues/3721))
+- [consensus] Use unchecked recovery in recover_unchecked_with_buf default impl ([#3719](https://github.com/alloy-rs/alloy/issues/3719))
+- [ci] Catch background process failures in install_test_binaries.sh ([#3718](https://github.com/alloy-rs/alloy/issues/3718))
+- Resolve infinite recursion in Sealable::hash_slow for Header ([#3709](https://github.com/alloy-rs/alloy/issues/3709))
+
+### Dependencies
+
+- [deps] Bump crate-ci/typos from 1.43.5 to 1.44.0 ([#3767](https://github.com/alloy-rs/alloy/issues/3767))
+- [deps] Bump taiki-e/install-action from 2.68.8 to 2.68.16 ([#3766](https://github.com/alloy-rs/alloy/issues/3766))
+- Bump deps ([#3712](https://github.com/alloy-rs/alloy/issues/3712))
+- Bump ethereum_ssz to 0.10 and tree_hash to 0.12 ([#3742](https://github.com/alloy-rs/alloy/issues/3742))
+- [deps] Bump taiki-e/install-action from 2.68.0 to 2.68.8 ([#3737](https://github.com/alloy-rs/alloy/issues/3737))
+
+### Documentation
+
+- [rpc-types-eth] Fix incorrect error code in SimulateError ([#3762](https://github.com/alloy-rs/alloy/issues/3762))
+
+### Features
+
+- [alloy] Support no_std for the meta crate ([#3786](https://github.com/alloy-rs/alloy/issues/3786))
+- [consensus] Add Block::from_transactions constructor ([#3784](https://github.com/alloy-rs/alloy/issues/3784))
+- [transport] Parse retry backoff hint from RPC error messages ([#3780](https://github.com/alloy-rs/alloy/issues/3780))
+- Add support for chunked queries ([#3747](https://github.com/alloy-rs/alloy/issues/3747))
+- [network] Signature flow generic over `Network` ([#3724](https://github.com/alloy-rs/alloy/issues/3724))
+- [eips] Allow custom system contracts in EIP-7910 ([#3765](https://github.com/alloy-rs/alloy/issues/3765))
+- Add `reth_get_block_execution_outcome` to `RethProviderExt` ([#3751](https://github.com/alloy-rs/alloy/issues/3751))
+- Impl From<Recovered<T>> for TransactionRequest ([#3731](https://github.com/alloy-rs/alloy/issues/3731))
+- [ws] Auto-extract basic auth from URL in WsConnect ([#3728](https://github.com/alloy-rs/alloy/issues/3728))
+
+### Refactor
+
+- [rpc-types-eth] Centralize SimulateError codes ([#3769](https://github.com/alloy-rs/alloy/issues/3769))
+- [node-bindings] Remove redundant TempDir::close calls ([#3756](https://github.com/alloy-rs/alloy/issues/3756))
+- [transport] Deduplicate DualTransport constructor logic ([#3746](https://github.com/alloy-rs/alloy/issues/3746))
+- [provider] Reuse helper functions in block_and_aggregate / try_block_and_aggregate ([#3752](https://github.com/alloy-rs/alloy/issues/3752))
+- [node-bindings] Remove redundant bounds checks in extract_value ([#3735](https://github.com/alloy-rs/alloy/issues/3735))
+
+### Testing
+
+- Remove flaky test_erc20_token_polygon test ([#3727](https://github.com/alloy-rs/alloy/issues/3727))
+
 ## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
 
 ### Miscellaneous Tasks
 
+- Release 1.7.3
 - Release 1.7.3
 - Release 1.7.2
 
