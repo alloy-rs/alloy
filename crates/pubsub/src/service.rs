@@ -4,7 +4,7 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
+use alloy_json_rpc::{PubSubItem, Request, Response, ResponsePayload, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -132,8 +132,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
         if let Some(server_id) = self.subs.server_id_for(&local_id) {
-            // TODO: ideally we can send this with an unused id
-            let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
+            let req = Request::new("eth_unsubscribe", self.in_flights.unused_id(), [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
             self.dispatch_request(brv)?;
