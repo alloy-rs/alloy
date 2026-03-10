@@ -182,6 +182,22 @@ impl<T, H> Block<T, H> {
     }
 }
 
+impl<T: Encodable2718> Block<T, Header> {
+    /// Creates a new block from a header and an iterator of transactions.
+    ///
+    /// Computes and sets the `transactions_root` on the header automatically.
+    /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    pub fn from_transactions(
+        mut header: Header,
+        transactions: impl IntoIterator<Item = T>,
+    ) -> Self {
+        let transactions: Vec<T> = transactions.into_iter().collect();
+        header.transactions_root = crate::proofs::calculate_transaction_root(&transactions);
+        header.ommers_hash = crate::EMPTY_OMMER_ROOT_HASH;
+        Self::new(header, BlockBody { transactions, ommers: Vec::new(), withdrawals: None })
+    }
+}
+
 impl<T, H> Default for Block<T, H>
 where
     H: Default,
