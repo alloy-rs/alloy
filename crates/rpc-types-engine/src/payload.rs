@@ -562,6 +562,91 @@ pub struct ExecutionPayloadV1 {
     pub transactions: Vec<Bytes>,
 }
 
+fn into_block_raw_from_payload_v1(
+    payload: ExecutionPayloadV1,
+    transactions_root: Option<B256>,
+    withdrawals: Option<Withdrawals>,
+) -> Result<Block<Bytes>, PayloadError> {
+    let ExecutionPayloadV1 {
+        parent_hash,
+        fee_recipient,
+        state_root,
+        receipts_root,
+        logs_bloom,
+        prev_randao,
+        block_number,
+        gas_limit,
+        gas_used,
+        timestamp,
+        extra_data,
+        base_fee_per_gas,
+        block_hash: _,
+        transactions,
+    } = payload;
+
+    if extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
+        return Err(PayloadError::ExtraData(extra_data));
+    }
+
+    // Keep payload transactions in raw Bytes form to avoid an extra Vec remap.
+    let header = Header {
+        parent_hash,
+        beneficiary: fee_recipient,
+        state_root,
+        transactions_root: transactions_root
+            .unwrap_or_else(|| alloy_consensus::proofs::ordered_trie_root_encoded(&transactions)),
+        receipts_root,
+        withdrawals_root: withdrawals
+            .as_ref()
+            .map(|withdrawals| alloy_consensus::proofs::calculate_withdrawals_root(withdrawals)),
+        logs_bloom,
+        number: block_number,
+        gas_limit,
+        gas_used,
+        timestamp,
+        mix_hash: prev_randao,
+        // WARNING: It's allowed for a base fee in EIP1559 to increase unbounded. We assume that
+        // it will fit in an u64. This is not always necessarily true, although it is extremely
+        // unlikely not to be the case, a u64 maximum would have 2^64 which equates to 18 ETH
+        // per gas.
+        base_fee_per_gas: Some(
+            base_fee_per_gas.try_into().map_err(|_| PayloadError::BaseFee(base_fee_per_gas))?,
+        ),
+        blob_gas_used: None,
+        excess_blob_gas: None,
+        parent_beacon_block_root: None,
+        requests_hash: None,
+        extra_data,
+        // Defaults
+        ommers_hash: EMPTY_OMMER_ROOT_HASH,
+        difficulty: Default::default(),
+        nonce: Default::default(),
+    };
+
+    Ok(Block::new(header, BlockBody { transactions, ommers: Vec::new(), withdrawals }))
+}
+
+fn into_block_raw_from_payload_v2(
+    payload: ExecutionPayloadV2,
+    transactions_root: Option<B256>,
+) -> Result<Block<Bytes>, PayloadError> {
+    into_block_raw_from_payload_v1(
+        payload.payload_inner,
+        transactions_root,
+        Some(payload.withdrawals.into()),
+    )
+}
+
+fn into_block_raw_from_payload_v3(
+    payload: ExecutionPayloadV3,
+    transactions_root: Option<B256>,
+) -> Result<Block<Bytes>, PayloadError> {
+    let mut block = into_block_raw_from_payload_v2(payload.payload_inner, transactions_root)?;
+    block.header.blob_gas_used = Some(payload.blob_gas_used);
+    block.header.excess_blob_gas = Some(payload.excess_blob_gas);
+    Ok(block)
+}
+
 impl ExecutionPayloadV1 {
     /// Returns the block number and hash as a [`BlockNumHash`].
     pub const fn block_num_hash(&self) -> BlockNumHash {
@@ -614,51 +699,7 @@ impl ExecutionPayloadV1 {
         self,
         transactions_root: Option<B256>,
     ) -> Result<Block<Bytes>, PayloadError> {
-        if self.extra_data.len() > MAXIMUM_EXTRA_DATA_SIZE {
-            return Err(PayloadError::ExtraData(self.extra_data));
-        }
-
-        let transactions_root = transactions_root.unwrap_or_else(|| {
-            alloy_consensus::proofs::ordered_trie_root_encoded(&self.transactions)
-        });
-
-        let header = Header {
-            parent_hash: self.parent_hash,
-            beneficiary: self.fee_recipient,
-            state_root: self.state_root,
-            transactions_root,
-            receipts_root: self.receipts_root,
-            withdrawals_root: None,
-            logs_bloom: self.logs_bloom,
-            number: self.block_number,
-            gas_limit: self.gas_limit,
-            gas_used: self.gas_used,
-            timestamp: self.timestamp,
-            mix_hash: self.prev_randao,
-            // WARNING: It's allowed for a base fee in EIP1559 to increase unbounded. We assume that
-            // it will fit in an u64. This is not always necessarily true, although it is extremely
-            // unlikely not to be the case, a u64 maximum would have 2^64 which equates to 18 ETH
-            // per gas.
-            base_fee_per_gas: Some(
-                self.base_fee_per_gas
-                    .try_into()
-                    .map_err(|_| PayloadError::BaseFee(self.base_fee_per_gas))?,
-            ),
-            blob_gas_used: None,
-            excess_blob_gas: None,
-            parent_beacon_block_root: None,
-            requests_hash: None,
-            extra_data: self.extra_data,
-            // Defaults
-            ommers_hash: EMPTY_OMMER_ROOT_HASH,
-            difficulty: Default::default(),
-            nonce: Default::default(),
-        };
-
-        Ok(Block {
-            header,
-            body: BlockBody { transactions: self.transactions, ommers: vec![], withdrawals: None },
-        })
+        into_block_raw_from_payload_v1(self, transactions_root, None)
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayloadV1`].
@@ -897,13 +938,7 @@ impl ExecutionPayloadV2 {
         self,
         transactions_root: Option<B256>,
     ) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_sealed_block =
-            self.payload_inner.into_block_raw_with_transactions_root_opt(transactions_root)?;
-        let withdrawals_root =
-            alloy_consensus::proofs::calculate_withdrawals_root(&self.withdrawals);
-        base_sealed_block.body.withdrawals = Some(self.withdrawals.into());
-        base_sealed_block.header.withdrawals_root = Some(withdrawals_root);
-        Ok(base_sealed_block)
+        into_block_raw_from_payload_v2(self, transactions_root)
     }
 }
 
@@ -1180,13 +1215,7 @@ impl ExecutionPayloadV3 {
         self,
         transactions_root: Option<B256>,
     ) -> Result<Block<Bytes>, PayloadError> {
-        let mut base_block =
-            self.payload_inner.into_block_raw_with_transactions_root_opt(transactions_root)?;
-
-        base_block.header.blob_gas_used = Some(self.blob_gas_used);
-        base_block.header.excess_blob_gas = Some(self.excess_blob_gas);
-
-        Ok(base_block)
+        into_block_raw_from_payload_v3(self, transactions_root)
     }
 }
 
