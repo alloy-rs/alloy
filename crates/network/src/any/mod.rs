@@ -45,10 +45,9 @@ use std::ops::{Deref, DerefMut};
 ///   transaction types. It will successfully decode an Ethereum [`TxEnvelope`], but will decode
 ///   only the type for any unknown transaction type. It will also leave the buffer unconsumed,
 ///   which will cause further deserialization to produce erroneous results.
-/// - The implementation of [`Encodable2718`] for [`AnyTypedTransaction`] will not work for
-///   non-Ethereum transaction types. It will encode the type for any unknown transaction type, but
-///   will not encode any other fields. This is symmetric with the decoding behavior, but still
-///   erroneous.
+/// - The implementation of [`Encodable2718`] for [`AnyTxEnvelope`] will panic for non-Ethereum
+///   transaction types. Unknown transaction types cannot be re-encoded through [`AnyNetwork`];
+///   use a custom transaction type and network implementation instead.
 /// - The [`TransactionRequest`] will build ONLY Ethereum types. It will error when attempting to
 ///   build any unknown type.
 /// - The [`Network::TransactionResponse`] may deserialize unknown metadata fields into the inner
