@@ -4,7 +4,7 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchHeaders};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -643,6 +643,39 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
 
         Ok(WatchBlocks::new(poller))
+    }
+
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes) and fetching the header for each
+    /// returned block hash.
+    ///
+    /// Returns the [`WatchHeaders`] type which consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of [`alloy_network_primitives::HeaderResponse`]s.
+    ///
+    /// Note that the backing RPC methods (`eth_getHeaderByHash` / `eth_getHeaderByNumber`) are
+    /// not supported by all clients.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 headers:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_headers().await?;
+    /// let mut stream = poller.into_stream().take(5);
+    /// while let Some(header) = stream.next().await {
+    ///   println!("new header: {header:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn watch_headers(&self) -> TransportResult<WatchHeaders<N::HeaderResponse>> {
+        let id = self.new_block_filter().await?;
+        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
+
+        Ok(WatchHeaders::new(poller))
     }
 
     /// Watch for new pending transaction by polling the provider with

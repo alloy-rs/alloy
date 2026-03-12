@@ -158,6 +158,23 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     Ok(blocks)
 }
 
+/// Fetches headers for a list of block hashes.
+pub(crate) async fn hashes_to_headers<
+    HeaderResp: alloy_network_primitives::HeaderResponse + RpcRecv,
+>(
+    hashes: Vec<B256>,
+    client: WeakClient,
+) -> TransportResult<Vec<Option<HeaderResp>>> {
+    let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
+    let headers = futures::future::try_join_all(
+        hashes
+            .into_iter()
+            .map(|hash| client.request::<_, Option<HeaderResp>>("eth_getHeaderByHash", (hash,))),
+    )
+    .await?;
+    Ok(headers)
+}
+
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],
 /// [`BlobGasFiller`], [`NonceFiller`], and [`ChainIdFiller`].
 pub type JoinedRecommendedFillers = JoinFill<
