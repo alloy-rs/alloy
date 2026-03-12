@@ -1,3 +1,18 @@
+//! # Alloy Network
+//! 
+//! `alloy-network` defines the Rust types for the Ethereum network RPC behavior.
+//! 
+//! It provides:
+//!  - Network specific transaction, block, and receipt types
+//!  - Abstractions over different Ethereum networks
+//!  - Utility traits and macros for wallets and signing
+//! 
+//!  ## Example
+//! ```rust
+//! use alloy_network::{Ethereum, EthereumWallet};
+//! // Define a network specific wallet that
+//! let wallet = EthereumWallet::default();
+//! ```
 #![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
