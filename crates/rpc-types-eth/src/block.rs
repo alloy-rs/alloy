@@ -1044,6 +1044,10 @@ mod tests {
         let overrides_with_block_hash =
             BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
         assert!(!overrides_with_block_hash.is_empty());
+
+        let overrides_with_beacon_root =
+            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1));
+        assert!(!overrides_with_beacon_root.is_empty());
     }
 
     #[test]
