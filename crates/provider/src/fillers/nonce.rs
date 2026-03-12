@@ -79,7 +79,7 @@ impl NonceManager for CachedNonceManager {
         let new_nonce = if *nonce == NONE {
             // Initialize the nonce if we haven't seen this account before.
             trace!(%address, "fetching nonce");
-            provider.get_transaction_count(address).await?
+            provider.get_transaction_count(address).pending().await?
         } else {
             trace!(%address, current_nonce = *nonce, "incrementing nonce");
             *nonce + 1
