@@ -12,7 +12,7 @@ use crate::{
 };
 use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
+use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844, TransactionBuilder7594};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::TransportResult;
 use futures::FutureExt;
@@ -280,15 +280,16 @@ pub struct BlobGasFiller {
 
 impl<N: Network> TxFiller<N> for BlobGasFiller
 where
-    N::TransactionRequest: TransactionBuilder4844,
+    N::TransactionRequest: TransactionBuilder4844 + TransactionBuilder7594,
 {
     type Fillable = u128;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        // Nothing to fill if non-eip4844 tx or `max_fee_per_blob_gas` is already set to a valid
-        // value.
-        if tx.blob_sidecar().is_none()
-            || tx.max_fee_per_blob_gas().is_some_and(|gas| gas >= BLOB_TX_MIN_BLOB_GASPRICE)
+        // Nothing to fill if non-blob tx or `max_fee_per_blob_gas` is already set to a valid
+        // value. Check both EIP-4844 and EIP-7594 sidecars.
+        if (tx.blob_sidecar().is_none() && tx.blob_sidecar_7594().is_none())
+            || TransactionBuilder4844::max_fee_per_blob_gas(tx)
+                .is_some_and(|gas| gas >= BLOB_TX_MIN_BLOB_GASPRICE)
         {
             return FillerControlFlow::Finished;
         }
@@ -306,7 +307,7 @@ where
     where
         P: Provider<N>,
     {
-        if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas() {
+        if let Some(max_fee_per_blob_gas) = TransactionBuilder4844::max_fee_per_blob_gas(tx) {
             if max_fee_per_blob_gas >= BLOB_TX_MIN_BLOB_GASPRICE {
                 return Ok(max_fee_per_blob_gas);
             }
@@ -329,7 +330,7 @@ where
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
         if let Some(builder) = tx.as_mut_builder() {
-            builder.set_max_fee_per_blob_gas(fillable);
+            TransactionBuilder4844::set_max_fee_per_blob_gas(builder, fillable);
         }
         Ok(tx)
     }
