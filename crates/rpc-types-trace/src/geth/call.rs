@@ -81,7 +81,56 @@ impl CallFrame {
     pub fn is_auth_call(&self) -> bool {
         self.typ == CallKind::AuthCall
     }
+    /// Returns an iterator over this call frame and its children.
+    pub fn call_frames(&self) -> CallFrameIter<'_> {
+        CallFrameIter {
+            stack: vec![core::slice::from_ref(self).iter()],
+            pushed_children: false,
+        }
+    }
 }
+
+/// A pre-order iterator over a [`CallFrame`] and its children.
+#[derive(Clone, Debug)]
+pub struct CallFrameIter<'a> {
+    stack: Vec<core::slice::Iter<'a, CallFrame>>,
+    pushed_children: bool,
+}
+
+impl<'a> CallFrameIter<'a> {
+    /// Skips the children of the most recently yielded call frame.
+    ///
+    /// If the last yielded frame had no children, or if this method is called
+    /// multiple times for the same frame, it does nothing.
+    #[inline]
+    pub fn skip_children(&mut self) {
+        if self.pushed_children {
+            self.stack.pop();
+            self.pushed_children = false;
+        }
+    }
+}
+
+impl<'a> Iterator for CallFrameIter<'a> {
+    type Item = &'a CallFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pushed_children = false;
+        while let Some(top) = self.stack.last_mut() {
+            if let Some(frame) = top.next() {
+                if !frame.calls.is_empty() {
+                    self.stack.push(frame.calls.iter());
+                    self.pushed_children = true;
+                }
+                return Some(frame);
+            } else {
+                self.stack.pop();
+            }
+        }
+        None
+    }
+}
+
 
 /// Represents a recorded log that is emitted during a trace call.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -316,6 +365,48 @@ mod tests {
     const LEGACY: &str = include_str!("../../test_data/call_tracer/legacy.json");
     const ONLY_TOP_CALL: &str = include_str!("../../test_data/call_tracer/only_top_call.json");
     const WITH_LOG: &str = include_str!("../../test_data/call_tracer/with_log.json");
+
+
+    #[test]
+    fn test_call_frame_iter() {
+        let frame = CallFrame {
+            typ: "CALL".to_string(),
+            calls: vec![
+                CallFrame {
+                    typ: "STATICCALL".to_string(),
+                    calls: vec![
+                        CallFrame {
+                            typ: "DELEGATECALL".to_string(),
+                            calls: vec![],
+                            ..Default::default()
+                        }
+                    ],
+                    ..Default::default()
+                },
+                CallFrame {
+                    typ: "CALL".to_string(),
+                    calls: vec![],
+                    ..Default::default()
+                }
+            ],
+            ..Default::default()
+        };
+
+        // Test normal iteration
+        let types: Vec<_> = frame.call_frames().map(|f| f.typ.as_str()).collect();
+        assert_eq!(types, vec!["CALL", "STATICCALL", "DELEGATECALL", "CALL"]);
+
+        // Test skip children
+        let mut iter = frame.call_frames();
+        let mut types = Vec::new();
+        while let Some(f) = iter.next() {
+            types.push(f.typ.as_str());
+            if f.typ == "STATICCALL" {
+                iter.skip_children();
+            }
+        }
+        assert_eq!(types, vec!["CALL", "STATICCALL", "CALL"]);
+    }
 
     #[test]
     fn test_serialize_call_trace() {
