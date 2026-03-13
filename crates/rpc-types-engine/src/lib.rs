@@ -34,6 +34,13 @@ pub use jwt::*;
 pub mod payload;
 pub use payload::*;
 
+#[cfg(feature = "serde")]
+pub mod traits;
+#[cfg(feature = "serde")]
+pub use traits::{
+    ExecutionPayload as ExecutionPayloadTrait, PayloadAttributes as PayloadAttributesTrait,
+};
+
 mod error;
 pub use error::*;
 

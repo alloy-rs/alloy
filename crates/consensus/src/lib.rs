@@ -43,9 +43,9 @@ pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
-    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, Transaction,
-    TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
-    TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
+    EthereumTxEnvelope, EthereumTypedTransaction, SignableTransaction, SignedTransaction,
+    Transaction, TransactionEnvelope, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
+    TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
 pub use alloy_eips::{
@@ -88,6 +88,14 @@ pub mod serde_bincode_compat {
         transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
 }
+
+/// Bincode compatibility traits and Block/BlockBody wrappers.
+///
+/// Contains the [`SerdeBincodeCompat`] trait and its implementations for consensus types.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat_traits;
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub use serde_bincode_compat_traits::{BincodeReprFor, RlpBincode, SerdeBincodeCompat};
 
 #[doc(hidden)]
 pub mod private {
