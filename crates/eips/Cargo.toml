@@ -27,11 +27,14 @@ workspace = true
 alloy-eip2124.workspace = true
 alloy-eip2930.workspace = true
 alloy-eip7702.workspace = true
+either.workspace = true
 alloy-eip7928.workspace = true
+auto_impl.workspace = true
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
-either.workspace = true
+num-bigint = { version = "0.4", default-features = false }
+num-traits = { version = "0.2", default-features = false }
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -62,7 +65,6 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 borsh = { workspace = true, optional = true, features = ["derive"] }
 
 # misc
-auto_impl.workspace = true
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
