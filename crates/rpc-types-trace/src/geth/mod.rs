@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Ser
 use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 // re-exports
 pub use self::{
-    call::{CallConfig, CallFrame, CallKind, CallLogFrame, FlatCallConfig},
+    call::{CallConfig, CallFrame, CallFrameIter, CallKind, CallLogFrame, FlatCallConfig},
     four_byte::FourByteFrame,
     noop::NoopFrame,
     pre_state::{

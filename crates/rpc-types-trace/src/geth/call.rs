@@ -46,6 +46,13 @@ pub struct CallFrame {
 }
 
 impl CallFrame {
+    /// Returns an iterator over all call frames in a nested `CallFrame` tree.
+    ///
+    /// The iterator performs a pre-order traversal of the call graph.
+    pub fn call_frames(&self) -> CallFrameIter<'_> {
+        CallFrameIter::new(self)
+    }
+
     /// Error selector is the first 4 bytes of calldata
     pub fn selector(&self) -> Option<Selector> {
         if self.input.len() < 4 {
@@ -305,6 +312,46 @@ impl From<CallKind> for CallType {
     }
 }
 
+/// An iterator over all call frames in a nested `CallFrame` tree.
+///
+/// This iterator performs a pre-order traversal of the call graph.
+/// It provides a `skip_children` method to prevent iterating over the children
+/// of the most recently yielded call frame.
+#[derive(Debug, Clone)]
+pub struct CallFrameIter<'a> {
+    stack: Vec<&'a CallFrame>,
+    pending_children: &'a [CallFrame],
+}
+
+impl<'a> CallFrameIter<'a> {
+    fn new(root: &'a CallFrame) -> Self {
+        Self { stack: vec![root], pending_children: &[] }
+    }
+
+    /// Skip the children of the most recently yielded call frame.
+    ///
+    /// If called after `next()` returns a call frame, that frame's children
+    /// will not be visited.
+    pub fn skip_children(&mut self) {
+        self.pending_children = &[];
+    }
+}
+
+impl<'a> Iterator for CallFrameIter<'a> {
+    type Item = &'a CallFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.pending_children.is_empty() {
+            self.stack.extend(self.pending_children.iter().rev());
+            self.pending_children = &[];
+        }
+
+        let next = self.stack.pop()?;
+        self.pending_children = &next.calls;
+        Some(next)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,6 +363,35 @@ mod tests {
     const LEGACY: &str = include_str!("../../test_data/call_tracer/legacy.json");
     const ONLY_TOP_CALL: &str = include_str!("../../test_data/call_tracer/only_top_call.json");
     const WITH_LOG: &str = include_str!("../../test_data/call_tracer/with_log.json");
+
+    #[test]
+    fn test_call_frame_iter() {
+        let mut root = CallFrame::default();
+        let mut child1 = CallFrame::default();
+        let mut child1_1 = CallFrame::default();
+        child1_1.typ = "CHILD_1_1".to_string();
+        child1.calls.push(child1_1);
+        let mut child2 = CallFrame::default();
+        child2.typ = "CHILD_2".to_string();
+
+        root.calls.push(child1);
+        root.calls.push(child2);
+
+        let mut iter = root.call_frames();
+        let first = iter.next().unwrap();
+        assert_eq!(first.typ, root.typ);
+
+        let second = iter.next().unwrap();
+        assert_eq!(second.calls.len(), 1);
+
+        // skip the children of child1
+        iter.skip_children();
+
+        let third = iter.next().unwrap();
+        assert_eq!(third.typ, "CHILD_2");
+
+        assert!(iter.next().is_none());
+    }
 
     #[test]
     fn test_serialize_call_trace() {
