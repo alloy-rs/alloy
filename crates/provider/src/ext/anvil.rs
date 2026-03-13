@@ -2,7 +2,7 @@
 
 use crate::{PendingTransactionBuilder, Provider};
 use alloy_consensus::Blob;
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{DynTransactionBuilder, Network};
 use alloy_primitives::{Address, Bytes, TxHash, B256, U128, U256, U64};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo, ReorgOptions};
 use alloy_rpc_types_eth::Block;

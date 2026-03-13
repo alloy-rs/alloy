@@ -1,12 +1,12 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilder7702,
-    TransactionBuilderError,
+    BuildResult, DynTransactionBuilder, Ethereum, Network, NetworkTransactionBuilder,
+    NetworkWallet, TransactionBuilder, TransactionBuilder7702, TransactionBuilderError,
 };
 use alloy_consensus::{TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList, TransactionInputKind};
 
-impl TransactionBuilder<Ethereum> for TransactionRequest {
+impl DynTransactionBuilder for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -31,18 +31,17 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.input.input()
     }
 
-    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
-        self.input.input = Some(input.into());
+    fn set_input(&mut self, input: Bytes) {
+        self.input.input = Some(input);
     }
 
-    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+    fn set_input_kind(&mut self, input: Bytes, kind: TransactionInputKind) {
         match kind {
-            TransactionInputKind::Input => self.input.input = Some(input.into()),
-            TransactionInputKind::Data => self.input.data = Some(input.into()),
+            TransactionInputKind::Input => self.input.input = Some(input),
+            TransactionInputKind::Data => self.input.data = Some(input),
             TransactionInputKind::Both => {
-                let bytes = input.into();
-                self.input.input = Some(bytes.clone());
-                self.input.data = Some(bytes);
+                self.input.input = Some(input.clone());
+                self.input.data = Some(input);
             }
         }
     }
@@ -115,16 +114,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.access_list = Some(access_list);
     }
 
-    fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
-        match ty {
-            TxType::Legacy => self.complete_legacy(),
-            TxType::Eip2930 => self.complete_2930(),
-            TxType::Eip1559 => self.complete_1559(),
-            TxType::Eip4844 => self.complete_4844(),
-            TxType::Eip7702 => self.complete_7702(),
-        }
-    }
-
     fn can_submit(&self) -> bool {
         // value and data may be None. If they are, they will be set to default.
         // gas fields and nonce may be None, if they are, they will be populated
@@ -148,6 +137,20 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
         let eip7702 = eip1559 && self.authorization_list().is_some();
         common && (legacy || eip2930 || eip1559 || eip4844 || eip7702)
+    }
+}
+
+impl TransactionBuilder for TransactionRequest {}
+
+impl NetworkTransactionBuilder<Ethereum> for TransactionRequest {
+    fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
+        match ty {
+            TxType::Legacy => self.complete_legacy(),
+            TxType::Eip2930 => self.complete_2930(),
+            TxType::Eip1559 => self.complete_1559(),
+            TxType::Eip4844 => self.complete_4844(),
+            TxType::Eip7702 => self.complete_7702(),
+        }
     }
 
     #[doc(alias = "output_transaction_type")]
@@ -185,7 +188,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 #[cfg(test)]
 mod tests {
     use crate::{
-        TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+        NetworkTransactionBuilder, TransactionBuilder, TransactionBuilder4844,
+        TransactionBuilder7702, TransactionBuilderError,
     };
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_eips::eip7702::Authorization;

@@ -57,27 +57,24 @@ impl<N: Network> TransactionBuilderError<N> {
     }
 }
 
-/// A Transaction builder for a network.
+/// Object-safe transaction builder trait.
 ///
-/// Transaction builders are primarily used to construct typed transactions that can be signed with
-/// [`TransactionBuilder::build`], or unsigned typed transactions with
-/// [`TransactionBuilder::build_unsigned`].
+/// This is the core trait for building transactions with support for dynamic dispatch (`dyn
+/// DynTransactionBuilder`). It provides:
 ///
-/// Transaction builders should be able to construct all available transaction types on a given
-/// network.
-#[doc(alias = "TxBuilder")]
-pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'static {
+/// - **Getters** for all transaction fields (`chain_id()`, `nonce()`, `input()`, etc.)
+/// - **Setters** with concretized `Bytes` parameters (no generic type parameters)
+///
+/// All setter methods take concrete types rather than generics, enabling the trait to be
+/// object-safe. For generic wrapper setters (e.g., `set_input<T: Into<Bytes>>`), use
+/// [`TransactionBuilder`].
+#[doc(alias = "TxBuilderDyn")]
+pub trait DynTransactionBuilder: Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
 
     /// Set the chain ID for the transaction.
     fn set_chain_id(&mut self, chain_id: ChainId);
-
-    /// Builder-pattern method for setting the chain ID.
-    fn with_chain_id(mut self, chain_id: ChainId) -> Self {
-        self.set_chain_id(chain_id);
-        self
-    }
 
     /// Get the nonce for the transaction.
     fn nonce(&self) -> Option<u64>;
@@ -88,40 +85,17 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Takes the nonce out of the transaction, clearing it.
     fn take_nonce(&mut self) -> Option<u64>;
 
-    /// Builder-pattern method for setting the nonce.
-    fn with_nonce(mut self, nonce: u64) -> Self {
-        self.set_nonce(nonce);
-        self
-    }
-
-    /// Takes the nonce out of the transaction, clearing it.
-    fn without_nonce(mut self) -> Self {
-        self.take_nonce();
-        self
-    }
-
     /// Get the input data for the transaction.
     fn input(&self) -> Option<&Bytes>;
 
-    /// Set the input data for the transaction.
-    fn set_input<T: Into<Bytes>>(&mut self, input: T);
+    /// Set the input data for the transaction (concretized from generic).
+    fn set_input(&mut self, input: Bytes);
 
-    /// Builder-pattern method for setting the input data.
-    fn with_input<T: Into<Bytes>>(mut self, input: T) -> Self {
-        self.set_input(input);
-        self
-    }
-
-    /// Set the input data for the transaction, respecting the input kind
-    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, _: TransactionInputKind) {
+    /// Set the input data for the transaction, respecting the input kind (concretized from
+    /// generic).
+    fn set_input_kind(&mut self, input: Bytes, _kind: TransactionInputKind) {
         // forward all to input by default
         self.set_input(input);
-    }
-
-    /// Builder-pattern method for setting the input data, respecting the input kind
-    fn with_input_kind<T: Into<Bytes>>(mut self, input: T, kind: TransactionInputKind) -> Self {
-        self.set_input_kind(input, kind);
-        self
     }
 
     /// Get the sender for the transaction.
@@ -129,12 +103,6 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Set the sender for the transaction.
     fn set_from(&mut self, from: Address);
-
-    /// Builder-pattern method for setting the sender.
-    fn with_from(mut self, from: Address) -> Self {
-        self.set_from(from);
-        self
-    }
 
     /// Get the kind of transaction.
     fn kind(&self) -> Option<TxKind>;
@@ -144,12 +112,6 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Set the kind of transaction.
     fn set_kind(&mut self, kind: TxKind);
-
-    /// Builder-pattern method for setting the kind of transaction.
-    fn with_kind(mut self, kind: TxKind) -> Self {
-        self.set_kind(kind);
-        self
-    }
 
     /// Get the recipient for the transaction.
     fn to(&self) -> Option<Address> {
@@ -164,50 +126,9 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self.set_kind(to.into());
     }
 
-    /// Builder-pattern method for setting the recipient.
-    fn with_to(mut self, to: Address) -> Self {
-        self.set_to(to);
-        self
-    }
-
     /// Set the `to` field to a create call.
     fn set_create(&mut self) {
         self.set_kind(TxKind::Create);
-    }
-
-    /// Set the `to` field to a create call.
-    fn into_create(mut self) -> Self {
-        self.set_create();
-        self
-    }
-
-    /// Deploy the code by making a create call with data. This will set the
-    /// `to` field to [`TxKind::Create`].
-    fn set_deploy_code<T: Into<Bytes>>(&mut self, code: T) {
-        self.set_input(code.into());
-        self.set_create()
-    }
-
-    /// Deploy the code by making a create call with data. This will set the
-    /// `to` field to [`TxKind::Create`].
-    fn with_deploy_code<T: Into<Bytes>>(mut self, code: T) -> Self {
-        self.set_deploy_code(code);
-        self
-    }
-
-    /// Set the data field to a contract call. This will clear the `to` field
-    /// if it is set to [`TxKind::Create`].
-    fn set_call<T: SolCall>(&mut self, t: &T) {
-        self.set_input(t.abi_encode());
-        if matches!(self.kind(), Some(TxKind::Create)) {
-            self.clear_kind();
-        }
-    }
-
-    /// Make a contract call with data.
-    fn with_call<T: SolCall>(mut self, t: &T) -> Self {
-        self.set_call(t);
-        self
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -229,35 +150,17 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Set the value for the transaction.
     fn set_value(&mut self, value: U256);
 
-    /// Builder-pattern method for setting the value.
-    fn with_value(mut self, value: U256) -> Self {
-        self.set_value(value);
-        self
-    }
-
     /// Get the legacy gas price for the transaction.
     fn gas_price(&self) -> Option<u128>;
 
     /// Set the legacy gas price for the transaction.
     fn set_gas_price(&mut self, gas_price: u128);
 
-    /// Builder-pattern method for setting the legacy gas price.
-    fn with_gas_price(mut self, gas_price: u128) -> Self {
-        self.set_gas_price(gas_price);
-        self
-    }
-
     /// Get the max fee per gas for the transaction.
     fn max_fee_per_gas(&self) -> Option<u128>;
 
-    /// Set the max fee per gas  for the transaction.
+    /// Set the max fee per gas for the transaction.
     fn set_max_fee_per_gas(&mut self, max_fee_per_gas: u128);
-
-    /// Builder-pattern method for setting max fee per gas .
-    fn with_max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
-        self.set_max_fee_per_gas(max_fee_per_gas);
-        self
-    }
 
     /// Get the max priority fee per gas for the transaction.
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
@@ -265,22 +168,11 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Set the max priority fee per gas for the transaction.
     fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: u128);
 
-    /// Builder-pattern method for setting max priority fee per gas.
-    fn with_max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
-        self.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
-        self
-    }
     /// Get the gas limit for the transaction.
     fn gas_limit(&self) -> Option<u64>;
 
     /// Set the gas limit for the transaction.
     fn set_gas_limit(&mut self, gas_limit: u64);
-
-    /// Builder-pattern method for setting the gas limit.
-    fn with_gas_limit(mut self, gas_limit: u64) -> Self {
-        self.set_gas_limit(gas_limit);
-        self
-    }
 
     /// Get the EIP-2930 access list for the transaction.
     fn access_list(&self) -> Option<&AccessList>;
@@ -288,12 +180,189 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Sets the EIP-2930 access list.
     fn set_access_list(&mut self, access_list: AccessList);
 
+    /// True if the builder contains all necessary information to be submitted
+    /// to the `eth_sendTransaction` endpoint.
+    fn can_submit(&self) -> bool;
+
+    /// True if the builder contains all necessary information to be built into
+    /// a valid transaction.
+    fn can_build(&self) -> bool;
+}
+
+/// Sized transaction builder with builder-pattern and generic wrappers.
+///
+/// This trait extends [`DynTransactionBuilder`] with:
+///
+/// - **Builder-pattern methods**: `with_*()` methods return `self` for method chaining
+/// - **Functional methods**: `apply()` and `try_apply()` for composable transformations
+/// - **Generic setter wrappers**: `set_input<T: Into<Bytes>>()` accept any type convertible to
+///   `Bytes`
+#[doc(alias = "TxBuilder")]
+pub trait TransactionBuilder: DynTransactionBuilder + Default {
+    /// Builder-pattern method for setting the chain ID.
+    fn with_chain_id(mut self, chain_id: ChainId) -> Self {
+        self.set_chain_id(chain_id);
+        self
+    }
+
+    /// Builder-pattern method for setting the nonce.
+    fn with_nonce(mut self, nonce: u64) -> Self {
+        self.set_nonce(nonce);
+        self
+    }
+
+    /// Takes the nonce out of the transaction, clearing it.
+    fn without_nonce(mut self) -> Self {
+        self.take_nonce();
+        self
+    }
+
+    /// Set the input data for the transaction (generic wrapper).
+    /// Delegates to [`DynTransactionBuilder::set_input`] to combine ergonomic generics with
+    /// object-safety.
+    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
+        DynTransactionBuilder::set_input(self, input.into());
+    }
+
+    /// Builder-pattern method for setting the input data.
+    fn with_input<T: Into<Bytes>>(mut self, input: T) -> Self {
+        TransactionBuilder::set_input(&mut self, input);
+        self
+    }
+
+    /// Set the input data for the transaction, respecting the input kind (generic wrapper).
+    /// Delegates to [`DynTransactionBuilder::set_input_kind`] to combine ergonomic generics with
+    /// object-safety.
+    fn set_input_kind<T: Into<Bytes>>(&mut self, input: T, kind: TransactionInputKind) {
+        DynTransactionBuilder::set_input_kind(self, input.into(), kind);
+    }
+
+    /// Builder-pattern method for setting the input data, respecting the input kind
+    fn with_input_kind<T: Into<Bytes>>(mut self, input: T, kind: TransactionInputKind) -> Self {
+        TransactionBuilder::set_input_kind(&mut self, input, kind);
+        self
+    }
+
+    /// Builder-pattern method for setting the sender.
+    fn with_from(mut self, from: Address) -> Self {
+        self.set_from(from);
+        self
+    }
+
+    /// Builder-pattern method for setting the kind of transaction.
+    fn with_kind(mut self, kind: TxKind) -> Self {
+        self.set_kind(kind);
+        self
+    }
+
+    /// Builder-pattern method for setting the recipient.
+    fn with_to(mut self, to: Address) -> Self {
+        self.set_to(to);
+        self
+    }
+
+    /// Set the `to` field to a create call.
+    fn into_create(mut self) -> Self {
+        self.set_create();
+        self
+    }
+
+    /// Deploy the code by making a create call with data. This will set the
+    /// `to` field to [`TxKind::Create`].
+    ///
+    /// This delegates to [`DynTransactionBuilder::set_input`] to handle the generic input
+    /// conversion.
+    fn set_deploy_code<T: Into<Bytes>>(&mut self, code: T) {
+        DynTransactionBuilder::set_input(self, code.into());
+        self.set_create()
+    }
+
+    /// Deploy the code by making a create call with data. This will set the
+    /// `to` field to [`TxKind::Create`].
+    fn with_deploy_code<T: Into<Bytes>>(mut self, code: T) -> Self {
+        self.set_deploy_code(code);
+        self
+    }
+
+    /// Set the data field to a contract call. This will clear the `to` field
+    /// if it is set to [`TxKind::Create`].
+    ///
+    /// This delegates to [`DynTransactionBuilder::set_input`] to store the ABI-encoded call data.
+    fn set_call<T: SolCall>(&mut self, t: &T) {
+        DynTransactionBuilder::set_input(self, t.abi_encode().into());
+        if matches!(self.kind(), Some(TxKind::Create)) {
+            self.clear_kind();
+        }
+    }
+
+    /// Make a contract call with data.
+    fn with_call<T: SolCall>(mut self, t: &T) -> Self {
+        self.set_call(t);
+        self
+    }
+
+    /// Builder-pattern method for setting the value.
+    fn with_value(mut self, value: U256) -> Self {
+        self.set_value(value);
+        self
+    }
+
+    /// Builder-pattern method for setting the legacy gas price.
+    fn with_gas_price(mut self, gas_price: u128) -> Self {
+        self.set_gas_price(gas_price);
+        self
+    }
+
+    /// Builder-pattern method for setting max fee per gas .
+    fn with_max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
+        self.set_max_fee_per_gas(max_fee_per_gas);
+        self
+    }
+
+    /// Builder-pattern method for setting max priority fee per gas.
+    fn with_max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
+        self.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        self
+    }
+
+    /// Builder-pattern method for setting the gas limit.
+    fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+        self.set_gas_limit(gas_limit);
+        self
+    }
+
     /// Builder-pattern method for setting the access list.
     fn with_access_list(mut self, access_list: AccessList) -> Self {
         self.set_access_list(access_list);
         self
     }
 
+    /// Apply a function to the builder, returning the modified builder.
+    fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
+    /// Apply a fallible function to the builder, returning the modified builder or an error.
+    fn try_apply<F, E>(self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self) -> Result<Self, E>,
+    {
+        f(self)
+    }
+}
+
+/// Network-specific transaction builder operations.
+///
+/// This trait extends [`TransactionBuilder`] with network-dependent functionality. It enables:
+///
+/// - **Transaction request validation**: Check completeness for each transaction type
+/// - **Transaction Type detection**: Automatically determine the best transaction type based on
+///   fields
+/// - **Transaction building**: Construct signed envelope or typed transaction.
+pub trait NetworkTransactionBuilder<N: Network>: TransactionBuilder {
     /// Check if all necessary keys are present to build the specified type,
     /// returning a list of missing keys.
     fn complete_type(&self, ty: N::TxType) -> Result<(), Vec<&'static str>>;
@@ -320,30 +389,6 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self.assert_preferred(ty);
         self
     }
-
-    /// Apply a function to the builder, returning the modified builder.
-    fn apply<F>(self, f: F) -> Self
-    where
-        F: FnOnce(Self) -> Self,
-    {
-        f(self)
-    }
-
-    /// Apply a fallible function to the builder, returning the modified builder or an error.
-    fn try_apply<F, E>(self, f: F) -> Result<Self, E>
-    where
-        F: FnOnce(Self) -> Result<Self, E>,
-    {
-        f(self)
-    }
-
-    /// True if the builder contains all necessary information to be submitted
-    /// to the `eth_sendTransaction` endpoint.
-    fn can_submit(&self) -> bool;
-
-    /// True if the builder contains all necessary information to be built into
-    /// a valid transaction.
-    fn can_build(&self) -> bool;
 
     /// Returns the transaction type that this builder will attempt to build.
     /// This does not imply that the builder is ready to build.
