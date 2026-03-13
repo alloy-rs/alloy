@@ -25,47 +25,44 @@ mod private {
 /// An [`alloy_provider::EthCall`] with an abi decoder.
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone, Debug)]
-pub struct EthCall<'coder, D, N>
+pub struct EthCall<D, N>
 where
     N: Network,
     D: CallDecoder,
 {
     inner: alloy_provider::EthCall<N, Bytes>,
 
-    decoder: &'coder D,
+    decoder: D,
 }
 
-impl<'coder, D, N> EthCall<'coder, D, N>
+impl<D, N> EthCall<D, N>
 where
     N: Network,
     D: CallDecoder,
 {
     /// Create a new [`EthCall`].
-    pub const fn new(inner: alloy_provider::EthCall<N, Bytes>, decoder: &'coder D) -> Self {
+    pub fn new(inner: alloy_provider::EthCall<N, Bytes>, decoder: D) -> Self {
         Self { inner, decoder }
     }
 }
 
-impl<N> EthCall<'static, (), N>
+impl<N> EthCall<(), N>
 where
     N: Network,
 {
     /// Create a new [`EthCall`].
-    pub const fn new_raw(inner: alloy_provider::EthCall<N, Bytes>) -> Self {
-        Self::new(inner, &RAW_CODER)
+    pub fn new_raw(inner: alloy_provider::EthCall<N, Bytes>) -> Self {
+        Self::new(inner, RAW_CODER)
     }
 }
 
-impl<D, N> EthCall<'_, D, N>
+impl<D, N> EthCall<D, N>
 where
     N: Network,
     D: CallDecoder,
 {
     /// Swap the decoder for this call.
-    pub fn with_decoder<E>(self, decoder: &E) -> EthCall<'_, E, N>
-    where
-        E: CallDecoder,
-    {
+    pub fn with_decoder<E: CallDecoder>(self, decoder: E) -> EthCall<E, N> {
         EthCall { inner: self.inner, decoder }
     }
 
@@ -110,23 +107,23 @@ where
     }
 }
 
-impl<N> From<alloy_provider::EthCall<N, Bytes>> for EthCall<'static, (), N>
+impl<N> From<alloy_provider::EthCall<N, Bytes>> for EthCall<(), N>
 where
     N: Network,
 {
     fn from(inner: alloy_provider::EthCall<N, Bytes>) -> Self {
-        Self { inner, decoder: &RAW_CODER }
+        Self { inner, decoder: RAW_CODER }
     }
 }
 
-impl<'coder, D, N> std::future::IntoFuture for EthCall<'coder, D, N>
+impl<D, N> std::future::IntoFuture for EthCall<D, N>
 where
-    D: CallDecoder,
+    D: CallDecoder + Unpin,
     N: Network,
 {
     type Output = Result<D::CallOutput>;
 
-    type IntoFuture = EthCallFut<'coder, D, N>;
+    type IntoFuture = EthCallFut<D, N>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut { inner: self.inner.into_future(), decoder: self.decoder }
@@ -138,18 +135,18 @@ where
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug)]
 #[expect(unnameable_types)]
-pub struct EthCallFut<'coder, D, N>
+pub struct EthCallFut<D, N>
 where
     N: Network,
     D: CallDecoder,
 {
     inner: <alloy_provider::EthCall<N, Bytes> as IntoFuture>::IntoFuture,
-    decoder: &'coder D,
+    decoder: D,
 }
 
-impl<D, N> std::future::Future for EthCallFut<'_, D, N>
+impl<D, N> std::future::Future for EthCallFut<D, N>
 where
-    D: CallDecoder,
+    D: CallDecoder + Unpin,
     N: Network,
 {
     type Output = Result<D::CallOutput>;
@@ -176,7 +173,7 @@ where
 /// It is an implementation detail of [`CallBuilder`].
 ///
 /// [`CallBuilder`]: crate::CallBuilder
-pub trait CallDecoder: private::Sealed {
+pub trait CallDecoder: private::Sealed + Clone {
     // Not public API.
 
     /// The output type of the contract function.
