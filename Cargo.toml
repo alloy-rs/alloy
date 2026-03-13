@@ -107,6 +107,7 @@ sha2 = { version = "0.10", default-features = false }
 secp256k1 = { version = "0.30", default-features = false }
 spki = { version = "0.7", default-features = false }
 zeroize = { version = "1.8.1", default-features = false }
+getrandom = "0.2"
 
 # async
 async-stream = "0.3"
@@ -152,7 +153,7 @@ derive_more = { version = "2", default-features = false }
 either = { version = "1.15", default-features = false }
 http = "1.1.0"
 itertools = { version = ">=0.13, <=0.14", default-features = false }
-jsonwebtoken = "9.3.0"
+jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 lru = "0.16"
 once_cell = { version = "1.21", default-features = false }
 parking_lot = "0.12.3"

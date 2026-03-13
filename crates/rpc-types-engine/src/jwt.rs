@@ -107,6 +107,10 @@ const JWT_SECRET_LEN: usize = 64;
 /// The JWT `iat` (issued-at) claim cannot exceed +-60 seconds from the current time.
 const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
+/// The JWT `exp` (expiration time) claim is accepted if not older than 60 seconds from the current
+/// time.
+const JWT_EXP_GRACE_PERIOD_SECS: Duration = Duration::from_secs(60);
+
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
 #[cfg(feature = "serde")]
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
@@ -143,6 +147,13 @@ impl Claims {
     pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
         now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
+    }
+
+    /// Returns true if there is no `exp` claim or if the token is not yet expired (with leeway).
+    pub fn is_exp_valid(&self) -> bool {
+        let Some(exp) = self.exp else { return true };
+        let now_secs = get_current_timestamp();
+        exp + JWT_EXP_GRACE_PERIOD_SECS.as_secs() >= now_secs
     }
 }
 
@@ -221,13 +232,17 @@ impl JwtSecret {
         // Create a new validation object with the required signature algorithm
         // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
         let mut validation = Validation::new(JWT_SIGNATURE_ALGO);
-        validation.set_required_spec_claims(&["iat"]);
+        validation.required_spec_claims.clear();
+        validation.validate_exp = false;
         let bytes = &self.0;
 
         match jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
             Ok(token) => {
                 if !token.claims.is_within_time_window() {
                     Err(JwtError::InvalidIssuanceTimestamp)?
+                }
+                if !token.claims.is_exp_valid() {
+                    Err(JwtError::JwtDecodingError("exp claim has expired".into()))?
                 }
             }
             Err(err) => match *err.kind() {
