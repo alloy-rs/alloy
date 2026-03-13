@@ -697,7 +697,9 @@ impl BlobTransactionSidecarEip7594 {
             for blob in &self.blobs {
                 let blob = core::mem::transmute::<&Blob, &c_kzg::Blob>(blob);
                 let blob_cells = proof_settings.compute_cells(blob)?;
-                cells.extend_from_slice(blob_cells.as_ref());
+                for cell in blob_cells.iter() {
+                    cells.push(*cell);
+                }
             }
 
             proof_settings.verify_cell_kzg_proof_batch(
