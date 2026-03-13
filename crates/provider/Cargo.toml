@@ -99,7 +99,7 @@ http.workspace = true
 alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 ci_info.workspace = true
 similar-asserts.workspace = true
-jsonrpsee = { workspace = true, features = ["server"] }
+tokio-tungstenite.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]

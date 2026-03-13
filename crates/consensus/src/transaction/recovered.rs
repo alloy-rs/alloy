@@ -1,5 +1,5 @@
 use crate::crypto::RecoveryError;
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use alloy_eips::{
     eip2718::{Encodable2718, WithEncoded},
     Typed2718,
@@ -134,6 +134,15 @@ impl<T> Recovered<&T> {
     }
 }
 
+impl<T: Clone> Recovered<Cow<'_, T>> {
+    /// Converts `Recovered<Cow<'_, T>>` into `Recovered<T>` by cloning the borrowed data if
+    /// necessary.
+    pub fn into_owned(self) -> Recovered<T> {
+        let Self { inner, signer } = self;
+        Recovered::new_unchecked(inner.into_owned(), signer)
+    }
+}
+
 impl<T: Encodable> Encodable for Recovered<T> {
     /// This encodes the transaction _with_ the signature, and an rlp header.
     fn encode(&self, out: &mut dyn bytes::BufMut) {
@@ -223,7 +232,7 @@ pub trait SignerRecoverable {
         buf: &mut alloc::vec::Vec<u8>,
     ) -> Result<Address, RecoveryError> {
         let _ = buf;
-        self.recover_signer()
+        self.recover_signer_unchecked()
     }
 
     /// Recover the signer via [`SignerRecoverable::recover_signer`] and returns a

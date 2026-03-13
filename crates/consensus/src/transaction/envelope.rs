@@ -9,7 +9,6 @@ use crate::{
 };
 use alloy_eips::{eip2718::Encodable2718, eip7594::Encodable7594};
 use alloy_primitives::{Bytes, Signature, B256};
-use core::fmt::Debug;
 
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///

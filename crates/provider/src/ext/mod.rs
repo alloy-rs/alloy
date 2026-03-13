@@ -15,6 +15,11 @@ mod engine;
 #[cfg(feature = "engine-api")]
 pub use engine::EngineApi;
 
+#[cfg(feature = "engine-api")]
+mod testing;
+#[cfg(feature = "engine-api")]
+pub use testing::TestingApi;
+
 #[cfg(feature = "debug-api")]
 mod debug;
 #[cfg(feature = "debug-api")]

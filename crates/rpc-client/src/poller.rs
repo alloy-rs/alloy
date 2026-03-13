@@ -6,6 +6,7 @@ use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
+    collections::HashSet,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -72,6 +73,7 @@ pub struct PollerBuilder<Params, Resp> {
     channel_size: usize,
     poll_interval: Duration,
     limit: usize,
+    terminal_error_codes: HashSet<i64>,
 
     _pd: PhantomData<fn() -> Resp>,
 }
@@ -92,6 +94,7 @@ where
             channel_size: 16,
             poll_interval,
             limit: usize::MAX,
+            terminal_error_codes: HashSet::default(),
             _pd: PhantomData,
         }
     }
@@ -125,6 +128,28 @@ where
     /// Sets a limit on the number of successful polls.
     pub fn with_limit(mut self, limit: Option<usize>) -> Self {
         self.set_limit(limit);
+        self
+    }
+
+    /// Returns the error codes this poller terminates on.
+    pub fn terminal_error_codes(&self) -> impl IntoIterator<Item = &i64> {
+        self.terminal_error_codes.iter()
+    }
+
+    /// Sets the error codes this poller will terminate on.
+    pub fn set_terminal_error_codes<I>(&mut self, error_codes: I)
+    where
+        I: IntoIterator<Item = i64>,
+    {
+        self.terminal_error_codes = HashSet::from_iter(error_codes);
+    }
+
+    /// Sets the error codes this poller will terminate on.
+    pub fn with_terminal_error_codes<I>(mut self, error_codes: I) -> Self
+    where
+        I: IntoIterator<Item = i64>,
+    {
+        self.set_terminal_error_codes(error_codes);
         self
     }
 
@@ -233,6 +258,7 @@ pub struct PollerStream<Resp, Output = Resp, Map = fn(Resp) -> Output> {
     params: Box<RawValue>,
     poll_interval: Duration,
     limit: usize,
+    terminal_error_codes: HashSet<i64>,
     poll_count: usize,
     state: PollState<Resp>,
     span: Span,
@@ -269,6 +295,7 @@ impl<Resp> PollerStream<Resp> {
             params,
             poll_interval: builder.poll_interval,
             limit: builder.limit,
+            terminal_error_codes: builder.terminal_error_codes,
             poll_count: 0,
             state: PollState::Waiting,
             span,
@@ -314,6 +341,7 @@ where
             params: self.params,
             poll_interval: self.poll_interval,
             limit: self.limit,
+            terminal_error_codes: self.terminal_error_codes,
             poll_count: self.poll_count,
             state: self.state,
             span: self.span,
@@ -372,12 +400,20 @@ where
                         Err(err) => {
                             error!(%err, "failed to poll");
 
-                            // If the error is a filter not found error, stop
-                            // the poller. Error codes are not consistent
-                            // across reth/geth/nethermind, so we check
-                            // just the message.
                             if let Some(resp) = err.as_error_resp() {
-                                if resp.message.contains("filter not found") {
+                                // Check for terminal error codes if they are set
+                                if this.terminal_error_codes.contains(&resp.code) {
+                                    warn!("server returned terminal error code, stopping poller");
+                                    this.state = PollState::Finished;
+                                    continue;
+                                }
+
+                                // If no terminal error codes are set, check the message to see if
+                                // we should stop the poller. Error codes are not consistent
+                                // across reth/geth/nethermind, so we cannot check the error code.
+                                if resp.message.contains("filter not found")
+                                    && this.terminal_error_codes.is_empty()
+                                {
                                     warn!("server has dropped the filter, stopping poller");
                                     this.state = PollState::Finished;
                                     continue;

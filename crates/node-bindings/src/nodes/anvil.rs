@@ -473,6 +473,7 @@ impl Anvil {
         let mut wallet = None;
         loop {
             if start + timeout <= Instant::now() {
+                let _ = child.kill();
                 return Err(NodeError::Timeout);
             }
 

@@ -96,7 +96,7 @@ impl RethInstance {
 
     /// Returns the IPC endpoint of this instance.
     pub fn ipc_endpoint(&self) -> String {
-        self.ipc.clone().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
+        self.ipc.as_ref().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
     /// Returns the HTTP endpoint url of this instance.
@@ -309,8 +309,11 @@ impl Reth {
     }
 
     /// Sets the IPC path for the socket.
+    ///
+    /// This also enables IPC, as setting a path implies the intent to use IPC.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
+        self.ipc_enabled = true;
         self
     }
 

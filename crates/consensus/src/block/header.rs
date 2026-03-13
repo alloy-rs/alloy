@@ -167,7 +167,7 @@ impl Default for Header {
 
 impl Sealable for Header {
     fn hash_slow(&self) -> B256 {
-        self.hash_slow()
+        Self::hash_slow(self)
     }
 }
 
@@ -184,6 +184,17 @@ impl Header {
         let mut out = Vec::<u8>::new();
         self.encode(&mut out);
         keccak256(&out)
+    }
+
+    /// Decodes the RLP-encoded header and computes the hash from the raw RLP bytes.
+    ///
+    /// This is more efficient than decoding and then re-encoding to compute the hash,
+    /// as it reuses the original RLP bytes for hashing.
+    pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
+        let start = *buf;
+        let header = Self::decode(buf)?;
+        let hash = keccak256(&start[..start.len() - buf.len()]);
+        Ok(header.seal_unchecked(hash))
     }
 
     /// Check if the ommers hash equals to empty hash list.
@@ -227,7 +238,7 @@ impl Header {
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
-    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    /// Returns `None` if `excess_blob_gas`, `blob_gas_used`, or `base_fee_per_gas` is not set.
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas?,
