@@ -305,6 +305,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
                     .header()
                     .as_ref()
                     .base_fee_per_gas()
+                    .filter(|&base_fee| base_fee != 0)
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
                     .into()
             }
@@ -2539,6 +2540,19 @@ mod tests {
                 max_priority_fee_per_gas: 0,
             }))
             .await;
+    }
+
+    #[tokio::test]
+    async fn test_estimate_eip1559_fees_when_base_fee_zero() {
+        // Simulate BSC-like behavior where baseFeePerGas is present but zero.
+        let provider = ProviderBuilder::new()
+            .connect_anvil_with_config(|a| a.arg("--base-fee").arg("0"));
+
+        let err = provider.estimate_eip1559_fees().await.unwrap_err();
+        assert!(
+            matches!(err, RpcError::UnsupportedFeature("eip1559")),
+            "Expected UnsupportedFeature(\"eip1559\"), got {err:?}"
+        );
     }
 
     #[tokio::test]
