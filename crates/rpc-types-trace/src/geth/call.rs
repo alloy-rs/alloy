@@ -46,6 +46,37 @@ pub struct CallFrame {
 }
 
 impl CallFrame {
+    /// Returns an iterator over this frame and all nested child frames in depth-first pre-order.
+    ///
+    /// Use [`CallFrameIter::skip_children`] to avoid descending into the children of the most
+    /// recently yielded frame.
+    ///
+    /// # Examples
+    ///
+    /// Iterate over all frames:
+    /// ```
+    /// # use alloy_rpc_types_trace::geth::CallFrame;
+    /// # let frame = CallFrame::default();
+    /// for call in frame.iter() {
+    ///     println!("{} -> {:?}", call.from, call.to);
+    /// }
+    /// ```
+    ///
+    /// Skip child calls selectively:
+    /// ```
+    /// # use alloy_rpc_types_trace::geth::CallFrame;
+    /// # let frame = CallFrame::default();
+    /// let mut iter = frame.iter();
+    /// while let Some(call) = iter.next() {
+    ///     if call.is_static_call() {
+    ///         iter.skip_children(); // don't descend into static calls
+    ///     }
+    /// }
+    /// ```
+    pub fn iter(&self) -> CallFrameIter<'_> {
+        CallFrameIter::new(self)
+    }
+
     /// Error selector is the first 4 bytes of calldata
     pub fn selector(&self) -> Option<Selector> {
         if self.input.len() < 4 {
@@ -305,6 +336,50 @@ impl From<CallKind> for CallType {
     }
 }
 
+/// An iterator over [`CallFrame`]s in depth-first pre-order.
+///
+/// Created by [`CallFrame::iter`]. Use [`skip_children`](Self::skip_children) to avoid descending
+/// into the children of the most recently yielded frame.
+#[derive(Debug, Clone)]
+pub struct CallFrameIter<'a> {
+    /// Stack of frames yet to be yielded.
+    stack: Vec<&'a CallFrame>,
+    /// Number of children pushed onto the stack by the last call to `next`.
+    last_children_count: usize,
+}
+
+impl<'a> CallFrameIter<'a> {
+    fn new(frame: &'a CallFrame) -> Self {
+        Self { stack: vec![frame], last_children_count: 0 }
+    }
+
+    /// Skips the children of the most recently yielded [`CallFrame`].
+    ///
+    /// Any children that were pushed onto the internal stack by the last call to
+    /// [`next`](Iterator::next) are removed, so iteration continues with the next sibling or
+    /// ancestor instead.
+    ///
+    /// Has no effect if called more than once without an intervening `next`, or if the last frame
+    /// had no children.
+    pub fn skip_children(&mut self) {
+        let len = self.stack.len();
+        self.stack.truncate(len.saturating_sub(self.last_children_count));
+        self.last_children_count = 0;
+    }
+}
+
+impl<'a> Iterator for CallFrameIter<'a> {
+    type Item = &'a CallFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let frame = self.stack.pop()?;
+        // Push children in reverse order so the first child is popped first.
+        self.stack.extend(frame.calls.iter().rev());
+        self.last_children_count = frame.calls.len();
+        Some(frame)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -375,5 +450,66 @@ mod tests {
         assert_eq!(log_frame_hex.position, Some(5));
         assert_eq!(log_frame_hex.index, Some(10));
         assert_eq!(log_frame, log_frame_hex);
+    }
+
+    /// Helper to build a call frame tree for testing.
+    fn make_frame(label: &str, children: Vec<CallFrame>) -> CallFrame {
+        CallFrame {
+            typ: label.to_string(),
+            calls: children,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_callframe_iter_all() {
+        // Build tree:  A -> [B -> [D, E], C]
+        let root = make_frame("A", vec![
+            make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+            make_frame("C", vec![]),
+        ]);
+
+        let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
+        assert_eq!(labels, vec!["A", "B", "D", "E", "C"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_skip_children() {
+        // Build tree:  A -> [B -> [D, E], C]
+        let root = make_frame("A", vec![
+            make_frame("B", vec![make_frame("D", vec![]), make_frame("E", vec![])]),
+            make_frame("C", vec![]),
+        ]);
+
+        let mut labels = Vec::new();
+        let mut iter = root.iter();
+        while let Some(frame) = iter.next() {
+            labels.push(frame.typ.as_str());
+            if frame.typ == "B" {
+                iter.skip_children(); // skip D and E
+            }
+        }
+        assert_eq!(labels, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_single() {
+        let root = make_frame("root", vec![]);
+        let labels: Vec<&str> = root.iter().map(|f| f.typ.as_str()).collect();
+        assert_eq!(labels, vec!["root"]);
+    }
+
+    #[test]
+    fn test_callframe_iter_skip_root_children() {
+        let root = make_frame("A", vec![
+            make_frame("B", vec![]),
+            make_frame("C", vec![]),
+        ]);
+
+        let mut iter = root.iter();
+        let first = iter.next().unwrap();
+        assert_eq!(first.typ, "A");
+        iter.skip_children();
+        assert!(iter.next().is_none());
     }
 }
