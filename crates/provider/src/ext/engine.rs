@@ -110,6 +110,16 @@ pub trait EngineApi<N>: Send + Sync {
         payload_attributes: Option<PayloadAttributes>,
     ) -> TransportResult<ForkchoiceUpdated>;
 
+    /// Updates the execution layer client with the given fork choice, as specified for the
+    /// Amsterdam fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/amsterdam.md#engine_forkchoiceupdatedv4>
+    async fn fork_choice_updated_v4(
+        &self,
+        fork_choice_state: ForkchoiceState,
+        payload_attributes: Option<PayloadAttributes>,
+    ) -> TransportResult<ForkchoiceUpdated>;
+
     /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Paris fork.
     ///
@@ -236,19 +246,6 @@ pub trait EngineApi<N>: Send + Sync {
         start: u64,
         count: u64,
     ) -> TransportResult<ExecutionPayloadBodiesV2>;
-
-    /// Returns the Block Access Lists for the given block hashes.
-    ///
-    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
-    async fn get_bals_by_hash_v1(
-        &self,
-        block_hashes: Vec<BlockHash>,
-    ) -> TransportResult<Vec<Bytes>>;
-
-    /// Returns the Block Access Lists for the given block range.
-    ///
-    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
-    async fn get_bals_by_range_v1(&self, start: u64, count: u64) -> TransportResult<Vec<Bytes>>;
 
     /// Returns the requested blobs and their associated proofs for the given versioned hashes.
     ///
