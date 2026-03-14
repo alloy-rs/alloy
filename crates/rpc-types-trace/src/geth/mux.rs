@@ -1,17 +1,17 @@
 //! Geth `muxTracer` types.
 
 use crate::geth::{GethDebugBuiltInTracerType, GethDebugTracerConfig, GethTrace};
-use alloy_primitives::map::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// A `muxTracer` config that contains the configuration for running multiple tracers in one go.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MuxConfig(pub HashMap<GethDebugBuiltInTracerType, Option<GethDebugTracerConfig>>);
+pub struct MuxConfig(pub BTreeMap<GethDebugBuiltInTracerType, Option<GethDebugTracerConfig>>);
 
 /// A `muxTracer` frame response that contains the results of multiple tracers
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MuxFrame(pub HashMap<GethDebugBuiltInTracerType, GethTrace>);
+pub struct MuxFrame(pub BTreeMap<GethDebugBuiltInTracerType, GethTrace>);
 
 #[cfg(test)]
 mod tests {
@@ -62,7 +62,7 @@ mod tests {
         let call_config = CallConfig { only_top_call: Some(true), with_log: Some(true) };
         let prestate_config = PreStateConfig { diff_mode: Some(true), ..Default::default() };
 
-        opts.tracing_options.tracer_config = MuxConfig(HashMap::from_iter([
+        opts.tracing_options.tracer_config = MuxConfig(BTreeMap::from([
             (GethDebugBuiltInTracerType::FourByteTracer, None),
             (GethDebugBuiltInTracerType::CallTracer, Some(call_config.into())),
             (GethDebugBuiltInTracerType::PreStateTracer, Some(prestate_config.into())),
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_mux_frame() {
-        let expected = HashMap::from([
+        let expected = BTreeMap::from([
             (
                 GethDebugBuiltInTracerType::FourByteTracer,
                 GethTrace::FourByteTracer(serde_json::from_str(FOUR_BYTE_FRAME).unwrap()),

@@ -315,7 +315,7 @@ impl From<Erc7562Frame> for GethTrace {
 /// Available built-in tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers>
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum GethDebugBuiltInTracerType {
     /// The 4byteTracer collects the function selectors of every function executed in the lifetime
     /// of a transaction, along with the size of the supplied call data. The result is a
