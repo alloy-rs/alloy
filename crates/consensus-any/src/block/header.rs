@@ -1,5 +1,6 @@
 use alloy_consensus::{error::ValueError, BlockHeader, Header};
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256};
+use alloy_rlp::{length_of_length, BufMut, Encodable};
 
 /// Block header representation with certain fields made optional to account for possible
 /// differences in network implementations.
@@ -223,6 +224,105 @@ impl AnyHeader {
             requests_hash,
         }
     }
+
+    fn header_payload_length(&self) -> usize {
+        let mut length = 0;
+        length += self.parent_hash.length();
+        length += self.ommers_hash.length();
+        length += self.beneficiary.length();
+        length += self.state_root.length();
+        length += self.transactions_root.length();
+        length += self.receipts_root.length();
+        length += self.logs_bloom.length();
+        length += self.difficulty.length();
+        length += U256::from(self.number).length();
+        length += U256::from(self.gas_limit).length();
+        length += U256::from(self.gas_used).length();
+        length += self.timestamp.length();
+        length += self.extra_data.length();
+        length += self.mix_hash.unwrap_or_default().length();
+        length += self.nonce.unwrap_or_default().length();
+
+        if let Some(base_fee) = self.base_fee_per_gas {
+            length += U256::from(base_fee).length();
+        }
+
+        if let Some(root) = self.withdrawals_root {
+            length += root.length();
+        }
+
+        if let Some(blob_gas_used) = self.blob_gas_used {
+            length += U256::from(blob_gas_used).length();
+        }
+
+        if let Some(excess_blob_gas) = self.excess_blob_gas {
+            length += U256::from(excess_blob_gas).length();
+        }
+
+        if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
+            length += parent_beacon_block_root.length();
+        }
+
+        if let Some(requests_hash) = self.requests_hash {
+            length += requests_hash.length();
+        }
+
+        length
+    }
+}
+
+impl Encodable for AnyHeader {
+    fn encode(&self, out: &mut dyn BufMut) {
+        let list_header =
+            alloy_rlp::Header { list: true, payload_length: self.header_payload_length() };
+        list_header.encode(out);
+        self.parent_hash.encode(out);
+        self.ommers_hash.encode(out);
+        self.beneficiary.encode(out);
+        self.state_root.encode(out);
+        self.transactions_root.encode(out);
+        self.receipts_root.encode(out);
+        self.logs_bloom.encode(out);
+        self.difficulty.encode(out);
+        U256::from(self.number).encode(out);
+        U256::from(self.gas_limit).encode(out);
+        U256::from(self.gas_used).encode(out);
+        self.timestamp.encode(out);
+        self.extra_data.encode(out);
+        self.mix_hash.unwrap_or_default().encode(out);
+        self.nonce.unwrap_or_default().encode(out);
+
+        if let Some(ref base_fee) = self.base_fee_per_gas {
+            U256::from(*base_fee).encode(out);
+        }
+
+        if let Some(ref root) = self.withdrawals_root {
+            root.encode(out);
+        }
+
+        if let Some(ref blob_gas_used) = self.blob_gas_used {
+            U256::from(*blob_gas_used).encode(out);
+        }
+
+        if let Some(ref excess_blob_gas) = self.excess_blob_gas {
+            U256::from(*excess_blob_gas).encode(out);
+        }
+
+        if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
+            parent_beacon_block_root.encode(out);
+        }
+
+        if let Some(ref requests_hash) = self.requests_hash {
+            requests_hash.encode(out);
+        }
+    }
+
+    fn length(&self) -> usize {
+        let mut length = 0;
+        length += self.header_payload_length();
+        length += length_of_length(length);
+        length
+    }
 }
 
 impl BlockHeader for AnyHeader {
@@ -395,6 +495,45 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn any_header_rlp_encoding_matches_header() {
+        let header = Header::default();
+        let any_header = AnyHeader::from(header.clone());
+
+        let mut header_buf = Vec::new();
+        header.encode(&mut header_buf);
+
+        let mut any_header_buf = Vec::new();
+        any_header.encode(&mut any_header_buf);
+
+        assert_eq!(header_buf, any_header_buf);
+        assert_eq!(header.length(), any_header.length());
+    }
+
+    #[test]
+    fn any_header_rlp_encoding_with_all_fields() {
+        let header = Header {
+            base_fee_per_gas: Some(1000),
+            withdrawals_root: Some(B256::repeat_byte(0x01)),
+            blob_gas_used: Some(50000),
+            excess_blob_gas: Some(25000),
+            parent_beacon_block_root: Some(B256::repeat_byte(0x02)),
+            requests_hash: Some(B256::repeat_byte(0x03)),
+            ..Default::default()
+        };
+        let any_header = AnyHeader::from(header.clone());
+
+        let mut header_buf = Vec::new();
+        header.encode(&mut header_buf);
+
+        let mut any_header_buf = Vec::new();
+        any_header.encode(&mut any_header_buf);
+
+        assert_eq!(header_buf, any_header_buf);
+        assert_eq!(header.length(), any_header.length());
+    }
 
     // <https://github.com/alloy-rs/alloy/issues/2494>
     #[test]
