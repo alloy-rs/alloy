@@ -1168,7 +1168,7 @@ impl AsMut<Self> for TransactionRequest {
 
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
-        tx.into_request()
+        tx.into_recovered().into()
     }
 }
 
