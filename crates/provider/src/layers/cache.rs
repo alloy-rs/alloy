@@ -307,11 +307,15 @@ where
             let client = client
                 .upgrade()
                 .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
-            let result = client.request(req.method(), req.params()).await?;
+            let result: Option<N::TransactionResponse> =
+                client.request(req.method(), req.params()).await?;
 
-            let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-            let hash = req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+            if result.is_some() {
+                let json_str =
+                    serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
+                let hash = req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(result)
         }))
@@ -335,11 +339,14 @@ where
                 .upgrade()
                 .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
 
-            let result = client.request(req.method(), req.params()).await?;
+            let result: Option<Bytes> = client.request(req.method(), req.params()).await?;
 
-            let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-            let hash = req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+            if result.is_some() {
+                let json_str =
+                    serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
+                let hash = req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(result)
         }))
@@ -366,11 +373,15 @@ where
                 .upgrade()
                 .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"))?;
 
-            let result = client.request(req.method(), req.params()).await?;
+            let result: Option<N::ReceiptResponse> =
+                client.request(req.method(), req.params()).await?;
 
-            let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-            let hash = req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+            if result.is_some() {
+                let json_str =
+                    serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
+                let hash = req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(result)
         }))
@@ -581,6 +592,7 @@ mod tests {
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{bytes, hex, utils::Unit, Bytes, FixedBytes};
     use alloy_rpc_types_eth::{BlockId, TransactionRequest};
+    use alloy_transport::mock::Asserter;
 
     #[tokio::test]
     async fn test_get_proof() {
@@ -662,6 +674,51 @@ mod tests {
             shared_cache.save_cache(path).unwrap();
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn test_receipt_none_is_not_cached() {
+        let cache_layer = CacheLayer::new(100);
+        let shared_cache = cache_layer.cache();
+        let asserter = Asserter::new();
+        let provider =
+            ProviderBuilder::new().layer(cache_layer).connect_mocked_client(asserter.clone());
+
+        let tx_hash = B256::with_last_byte(1);
+        let req = RequestType::new("eth_getTransactionReceipt", (tx_hash,));
+        let hash = req.params_hash().unwrap();
+
+        asserter.push_success(&Option::<serde_json::Value>::None);
+        asserter.push_success(&Some(serde_json::json!({
+            "blockHash": B256::with_last_byte(2),
+            "blockNumber": "0x1",
+            "contractAddress": serde_json::Value::Null,
+            "cumulativeGasUsed": "0x5208",
+            "effectiveGasPrice": "0x1",
+            "from": Address::with_last_byte(3),
+            "gasUsed": "0x5208",
+            "logs": [],
+            "logsBloom": format!("0x{}", "0".repeat(512)),
+            "status": "0x1",
+            "to": Address::with_last_byte(4),
+            "transactionHash": tx_hash,
+            "transactionIndex": "0x0",
+            "type": "0x0"
+        })));
+
+        let receipt = provider.get_transaction_receipt(tx_hash).await.unwrap();
+        assert!(receipt.is_none());
+        assert!(shared_cache.get(&hash).is_none());
+        assert_eq!(asserter.read_q().len(), 1);
+
+        let mined_receipt = provider.get_transaction_receipt(tx_hash).await.unwrap();
+        assert!(mined_receipt.is_some());
+        assert!(shared_cache.get(&hash).is_some());
+        assert!(asserter.read_q().is_empty());
+
+        let cached_receipt = provider.get_transaction_receipt(tx_hash).await.unwrap();
+        assert_eq!(cached_receipt, mined_receipt);
+        assert!(asserter.read_q().is_empty());
     }
 
     #[tokio::test]
