@@ -1112,6 +1112,10 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.sidecar.as_ref().and_then(BlobTransactionSidecarVariant::as_eip4844)
     }
 
+    fn has_blob_sidecar(&self) -> bool {
+        self.sidecar.is_some()
+    }
+
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
         self.sidecar = Some(sidecar.into());
         self.populate_blob_hashes();
