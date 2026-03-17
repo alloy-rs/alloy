@@ -271,7 +271,7 @@ impl fmt::Debug for BlobGasEstimator {
     }
 }
 
-/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
+/// Filler for the `max_fee_per_blob_gas` field in blob transactions.
 #[derive(Clone, Debug, Default)]
 pub struct BlobGasFiller {
     /// The blob gas estimator to use.
@@ -285,9 +285,9 @@ where
     type Fillable = u128;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        // Nothing to fill if non-eip4844 tx or `max_fee_per_blob_gas` is already set to a valid
-        // value.
-        if tx.blob_sidecar().is_none()
+        // Nothing to fill if no blob sidecar is present or `max_fee_per_blob_gas` is already set
+        // to a valid value.
+        if !tx.has_blob_sidecar()
             || tx.max_fee_per_blob_gas().is_some_and(|gas| gas >= BLOB_TX_MIN_BLOB_GASPRICE)
         {
             return FillerControlFlow::Finished;
@@ -342,6 +342,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_consensus::{SidecarBuilder, SimpleCoder, Transaction};
     use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
+    use alloy_network::Ethereum;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -436,6 +437,18 @@ mod tests {
         assert_eq!(
             receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
             DATA_GAS_PER_BLOB
+        );
+    }
+
+    #[test]
+    fn eip7594_sidecar_marks_blob_gas_filler_ready() {
+        let sidecar =
+            SidecarBuilder::<SimpleCoder>::from_slice(b"Hello World").build_7594().unwrap();
+        let tx = TransactionRequest { sidecar: Some(sidecar.into()), ..Default::default() };
+
+        assert_eq!(
+            <BlobGasFiller as TxFiller<Ethereum>>::status(&BlobGasFiller::default(), &tx),
+            FillerControlFlow::Ready
         );
     }
 }
