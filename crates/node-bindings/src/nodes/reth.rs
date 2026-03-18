@@ -8,12 +8,13 @@ use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
     ffi::OsString,
-    fs::create_dir,
+    fs::{create_dir, File},
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, ChildStdout, Command, Stdio},
     time::Instant,
 };
+use tempfile::tempdir;
 use url::Url;
 
 /// The exposed APIs
@@ -381,6 +382,46 @@ impl Reth {
             .as_ref()
             .map_or_else(|| RETH.as_ref(), |bin| bin.as_os_str())
             .to_os_string();
+
+        if let Some(data_dir) = &self.data_dir {
+            // Create the directory eagerly so both `reth init` and `reth node` use the same path.
+            if !data_dir.exists() {
+                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
+            }
+        }
+
+        if let Some(genesis) = &self.genesis {
+            let temp_genesis_dir = tempdir().map_err(NodeError::CreateDirError)?;
+            let temp_genesis_path = temp_genesis_dir.path().join("genesis.json");
+
+            let mut file = File::create(&temp_genesis_path).map_err(|_| {
+                NodeError::GenesisError("could not create genesis file".to_string())
+            })?;
+            serde_json::to_writer_pretty(&mut file, genesis).map_err(|_| {
+                NodeError::GenesisError("could not write genesis to file".to_string())
+            })?;
+
+            let mut init_cmd = Command::new(&bin_path);
+            init_cmd.arg("init");
+
+            if let Some(data_dir) = &self.data_dir {
+                init_cmd.arg("--datadir").arg(data_dir);
+            }
+
+            init_cmd.arg("--chain").arg(&temp_genesis_path);
+            init_cmd.stdout(Stdio::null());
+            init_cmd.stderr(Stdio::null());
+
+            let res = init_cmd
+                .spawn()
+                .map_err(NodeError::SpawnError)?
+                .wait()
+                .map_err(NodeError::WaitError)?;
+            if !res.success() {
+                return Err(NodeError::InitError);
+            }
+        }
+
         let mut cmd = Command::new(&bin_path);
         // `reth` uses stdout for its logs
         cmd.stdout(Stdio::piped());
@@ -457,11 +498,6 @@ impl Reth {
 
         if let Some(data_dir) = &self.data_dir {
             cmd.arg("--datadir").arg(data_dir);
-
-            // create the directory if it doesn't exist
-            if !data_dir.exists() {
-                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
-            }
         }
 
         if self.discovery_enabled {
