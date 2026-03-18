@@ -3,7 +3,7 @@
 #![allow(unknown_lints, mismatched_lifetime_syntaxes)]
 
 #[cfg(feature = "pubsub")]
-use super::get_block::SubFullBlocks;
+use super::get_block::{SubFinalizedBlocks, SubFullBlocks};
 use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
@@ -1291,6 +1291,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
     #[cfg(feature = "pubsub")]
     fn subscribe_full_blocks(&self) -> SubFullBlocks<N> {
         SubFullBlocks::new(self.subscribe_blocks(), self.weak_client())
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn subscribe_finalized_blocks(&self) -> SubFinalizedBlocks<N> {
+        SubFinalizedBlocks::new(self.subscribe_blocks(), self.weak_client())
     }
 
     /// Subscribe to a stream of pending transaction hashes.
