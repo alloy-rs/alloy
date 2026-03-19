@@ -2113,6 +2113,24 @@ impl ExecutionPayload {
     }
 
     /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block.(for BAL)
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    ///
+    /// Note: This re-calculates the block hash.
+    pub fn from_block_slow_with_bal<T, H>(
+        block: &Block<T, H>,
+        block_access_list: Bytes,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader + Sealable,
+    {
+        Self::from_block_unchecked_with_bal(block.hash_slow(), block, block_access_list)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
     /// [`ExecutionPayloadSidecar`] extracted from the block.
     ///
     /// See also [`ExecutionPayloadV3::from_block_unchecked`].
@@ -2130,6 +2148,43 @@ impl ExecutionPayload {
         let execution_payload = if block.header.block_access_list_hash().is_some() {
             // block with block access list hash: V4 (Amsterdam)
             Self::V4(ExecutionPayloadV4::from_block_unchecked(block_hash, block))
+        } else if block.header.parent_beacon_block_root().is_some() {
+            // block with parent beacon block root: V3
+            Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
+        } else if block.body.withdrawals.is_some() {
+            // block with withdrawals: V2
+            Self::V2(ExecutionPayloadV2::from_block_unchecked(block_hash, block))
+        } else {
+            // otherwise V1
+            Self::V1(ExecutionPayloadV1::from_block_unchecked(block_hash, block))
+        };
+
+        (execution_payload, sidecar)
+    }
+
+    /// Converts [`alloy_consensus::Block`] to [`ExecutionPayload`] and also returns the
+    /// [`ExecutionPayloadSidecar`] extracted from the block along with block access list.
+    ///
+    /// See also [`ExecutionPayloadV3::from_block_unchecked`].
+    /// See also [`ExecutionPayloadSidecar::from_block`].
+    pub fn from_block_unchecked_with_bal<T, H>(
+        block_hash: B256,
+        block: &Block<T, H>,
+        block_access_list: Bytes,
+    ) -> (Self, ExecutionPayloadSidecar)
+    where
+        T: Encodable2718 + Transaction,
+        H: BlockHeader,
+    {
+        let sidecar = ExecutionPayloadSidecar::from_block(block);
+
+        let execution_payload = if block.header.block_access_list_hash().is_some() {
+            // block with block access list hash: V4 (Amsterdam)
+            Self::V4(ExecutionPayloadV4::from_block_unchecked_with_bal(
+                block_hash,
+                block,
+                block_access_list,
+            ))
         } else if block.header.parent_beacon_block_root().is_some() {
             // block with parent beacon block root: V3
             Self::V3(ExecutionPayloadV3::from_block_unchecked(block_hash, block))
