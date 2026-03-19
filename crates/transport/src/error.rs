@@ -153,16 +153,28 @@ impl HttpError {
     }
 }
 
-/// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
-pub(crate) trait RpcErrorExt {
+/// Extension trait for classifying [`TransportError`] values.
+pub trait RpcErrorExt {
     /// Analyzes whether to retry the request depending on the error.
     fn is_retryable(&self) -> bool;
 
-    /// Fetches the backoff hint from the error message if present
+    /// Fetches the backoff hint from the error message if present.
     fn backoff_hint(&self) -> Option<std::time::Duration>;
+
+    /// Returns `true` if the error indicates the transaction is already known.
+    fn is_already_known(&self) -> bool;
+
+    /// Returns `true` if the error indicates the replacement transaction is underpriced.
+    fn is_replacement_underpriced(&self) -> bool;
+
+    /// Returns `true` if the error indicates the transaction is underpriced.
+    fn is_transaction_underpriced(&self) -> bool;
+
+    /// Returns `true` if the error indicates the nonce is too low.
+    fn is_nonce_too_low(&self) -> bool;
 }
 
-impl RpcErrorExt for RpcError<TransportErrorKind> {
+impl RpcErrorExt for TransportError {
     fn is_retryable(&self) -> bool {
         match self {
             // There was a transport-level error. This is either a non-retryable error,
@@ -219,6 +231,31 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
         }
         None
     }
+
+    fn is_already_known(&self) -> bool {
+        // see also: op-geth: https://github.com/ethereum-optimism/op-geth/blob/e666543dc5500428ee7c940e54263fe4968c5efd/core/txpool/legacypool/legacypool.go#L991-L993
+        // reth: https://github.com/paradigmxyz/reth/blob/a3b749676c6c748bf977983c189f9f4c4f9e9fbe/crates/rpc/rpc-eth-types/src/error/mod.rs#L663-L665
+        self.as_error_resp().map(|err| err.message == "already known").unwrap_or_default()
+    }
+
+    fn is_replacement_underpriced(&self) -> bool {
+        // see also: geth: https://github.com/ethereum/go-ethereum/blob/a56558d0920b74b6553185de4aff79c3de534e01/core/txpool/errors.go#L38-L38
+        self.as_error_resp()
+            .map(|err| err.message.contains("replacement transaction underpriced"))
+            .unwrap_or_default()
+    }
+
+    fn is_transaction_underpriced(&self) -> bool {
+        // see also: geth: https://github.com/ethereum/go-ethereum/blob/a56558d0920b74b6553185de4aff79c3de534e01/core/txpool/errors.go#L34-L34
+        self.as_error_resp()
+            .map(|err| err.message.contains("transaction underpriced"))
+            .unwrap_or_default()
+    }
+
+    fn is_nonce_too_low(&self) -> bool {
+        // see also: geth: https://github.com/ethereum/go-ethereum/blob/85077be58edea572f29c3b1a6a055077f1a56a8b/core/error.go#L45-L47
+        self.as_error_resp().map(|err| err.message.contains("nonce too low")).unwrap_or_default()
+    }
 }
 
 /// Parses a duration from messages like "try again in 4ms", "try again in 1s".
@@ -240,6 +277,7 @@ fn parse_retry_after(message: &str) -> Option<std::time::Duration> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::borrow::Cow;
 
     #[test]
     fn test_retry_error() {
@@ -287,5 +325,71 @@ mod tests {
         let err = r#"{"code":429,"event":-33200,"message":"Too Many Requests","details":"You have surpassed your allowed throughput limit. Reduce the amount of requests per second or upgrade for more capacity."}"#;
         let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
         assert!(TransportError::ErrorResp(err).is_retryable());
+    }
+
+    #[test]
+    fn detects_already_known() {
+        let err = TransportError::ErrorResp(ErrorPayload {
+            code: -32000,
+            message: Cow::Borrowed("already known"),
+            data: None,
+        });
+
+        assert!(err.is_already_known());
+        assert!(!err.is_replacement_underpriced());
+        assert!(!err.is_transaction_underpriced());
+        assert!(!err.is_nonce_too_low());
+    }
+
+    #[test]
+    fn detects_replacement_underpriced() {
+        let err = TransportError::ErrorResp(ErrorPayload {
+            code: -32000,
+            message: Cow::Borrowed("replacement transaction underpriced"),
+            data: None,
+        });
+
+        assert!(err.is_replacement_underpriced());
+        assert!(err.is_transaction_underpriced());
+        assert!(!err.is_already_known());
+        assert!(!err.is_nonce_too_low());
+    }
+
+    #[test]
+    fn detects_transaction_underpriced() {
+        let err = TransportError::ErrorResp(ErrorPayload {
+            code: -32000,
+            message: Cow::Borrowed("transaction underpriced"),
+            data: None,
+        });
+
+        assert!(err.is_transaction_underpriced());
+        assert!(!err.is_replacement_underpriced());
+        assert!(!err.is_already_known());
+        assert!(!err.is_nonce_too_low());
+    }
+
+    #[test]
+    fn detects_nonce_too_low() {
+        let err = TransportError::ErrorResp(ErrorPayload {
+            code: -32000,
+            message: Cow::Borrowed("nonce too low"),
+            data: None,
+        });
+
+        assert!(err.is_nonce_too_low());
+        assert!(!err.is_already_known());
+        assert!(!err.is_replacement_underpriced());
+        assert!(!err.is_transaction_underpriced());
+    }
+
+    #[test]
+    fn ignores_non_error_response_variants() {
+        let err = TransportErrorKind::custom_str("already known");
+
+        assert!(!err.is_already_known());
+        assert!(!err.is_replacement_underpriced());
+        assert!(!err.is_transaction_underpriced());
+        assert!(!err.is_nonce_too_low());
     }
 }
