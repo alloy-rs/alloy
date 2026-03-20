@@ -6,7 +6,7 @@ use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-/// The response to a request for beacon block headers: `getBlockHeaders`
+/// Response from the [`/eth/v1/beacon/headers`](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeaders) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeadersResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
@@ -20,7 +20,7 @@ pub struct HeadersResponse {
     pub data: Vec<HeaderData>,
 }
 
-/// The response to a request for a __single__ beacon block header: `headers/{id}`
+/// Response from the [`/eth/v1/beacon/headers/{block_id}`](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlockHeader) endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HeaderResponse {
     /// True if the response references an unverified execution payload. Optimistic information may
@@ -55,8 +55,11 @@ pub struct Header {
 }
 
 /// The header of a beacon block.
+///
+/// See [`BeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#beaconblockheader) in the CL spec.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BeaconBlockHeader {
     /// The slot to which this block corresponds.
     #[serde_as(as = "DisplayFromStr")]
@@ -122,5 +125,25 @@ mod tests {
             }
         }"#;
         let _header_response: HeaderResponse = serde_json::from_str(s).unwrap();
+    }
+
+    #[cfg(feature = "ssz")]
+    mod ssz_tests {
+        use super::*;
+        use ssz::{Decode, Encode};
+
+        #[test]
+        fn ssz_roundtrip_beacon_block_header() {
+            let header = BeaconBlockHeader {
+                slot: 12345,
+                proposer_index: 678,
+                parent_root: B256::repeat_byte(0x11),
+                state_root: B256::repeat_byte(0x22),
+                body_root: B256::repeat_byte(0x33),
+            };
+            let encoded = header.as_ssz_bytes();
+            let decoded = BeaconBlockHeader::from_ssz_bytes(&encoded).unwrap();
+            assert_eq!(header, decoded);
+        }
     }
 }

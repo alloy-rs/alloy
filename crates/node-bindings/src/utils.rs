@@ -75,18 +75,14 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     if let Some(pos) = line.find(key_equal.as_ref()) {
         let start = pos + key_equal.len();
         let end = line[start..].find(' ').map(|i| start + i).unwrap_or(line.len());
-        if start <= line.len() && end <= line.len() {
-            return Some(line[start..end].trim());
-        }
+        return Some(line[start..end].trim());
     }
 
     // If not found, try to find the key with ': '
     if let Some(pos) = line.find(key_colon.as_ref()) {
         let start = pos + key_colon.len();
         let end = line[start..].find(',').map(|i| start + i).unwrap_or(line.len()); // Assuming comma or end of line
-        if start <= line.len() && end <= line.len() {
-            return Some(line[start..end].trim());
-        }
+        return Some(line[start..end].trim());
     }
 
     // If neither variant matches, return None
@@ -105,10 +101,6 @@ pub fn run_with_tempdir_sync(prefix: &str, f: impl FnOnce(PathBuf)) {
     let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path);
-    #[cfg(not(windows))]
-    {
-        let _ = temp_dir.close();
-    }
 }
 
 /// Runs the given async closure with a temporary directory.
@@ -120,10 +112,6 @@ where
     let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path).await;
-    #[cfg(not(windows))]
-    {
-        let _ = temp_dir.close();
-    }
 }
 
 #[cfg(test)]

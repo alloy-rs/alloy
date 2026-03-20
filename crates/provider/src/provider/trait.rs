@@ -30,7 +30,8 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -143,8 +144,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Get the block number for a given block identifier.
     ///
-    /// This is a convenience function that fetches the full block when the block identifier is not
-    /// a number.
+    /// This is a convenience function that fetches the block header when the block identifier is
+    /// not a number. Falls back to fetching the full block if header RPC is not supported.
     async fn get_block_number_by_id(
         &self,
         block_id: BlockId,
@@ -153,6 +154,11 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
             _ => {
+                // Try get_header first (more efficient), fallback to get_block if not supported.
+                // Not all nodes support eth_getHeaderByHash/eth_getHeaderByNumber.
+                if let Ok(header) = self.get_header(block_id).await {
+                    return Ok(header.map(|h| h.number()));
+                }
                 let block = self.get_block(block_id).await?;
                 Ok(block.map(|b| b.header().number()))
             }
@@ -468,6 +474,115 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockReceipts", (block,)).into()
     }
 
+    /// Gets the EIP-7928 block access list by [`BlockId`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        match block {
+            BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
+            BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
+        }
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockHash`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListByBlockHash", (hash,)).await
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
+    }
+
+    /// Gets a block header by its [`BlockId`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_eips::BlockId;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///
+    ///     // Gets the latest block header.
+    ///     let header = provider.get_header(BlockId::latest()).await.unwrap();
+    ///
+    ///     // Gets the block header by number.
+    ///     let header = provider.get_header(BlockId::number(0)).await.unwrap();
+    /// }
+    /// ```
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        match block {
+            BlockId::Hash(hash) => self.get_header_by_hash(hash.block_hash).await,
+            BlockId::Number(number) => self.get_header_by_number(number).await,
+        }
+    }
+
+    /// Gets a block header by its [`BlockHash`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_primitives::b256;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///     let block_hash = b256!("6032d03ee8e43e8999c2943152a4daebfc4b75b7f7a9647d2677299d215127da");
+    ///
+    ///     // Gets a block header by its hash.
+    ///     let header = provider.get_header_by_hash(block_hash).await.unwrap();
+    /// }
+    /// ```
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.client().request("eth_getHeaderByHash", (hash,)).await
+    }
+
+    /// Gets a block header by its [`BlockNumberOrTag`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_provider::{Provider, ProviderBuilder};
+    /// # use alloy_eips::BlockNumberOrTag;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let provider =
+    ///         ProviderBuilder::new().connect_http("https://eth.merkle.io".parse().unwrap());
+    ///
+    ///     // Gets a block header by its number.
+    ///     let header = provider.get_header_by_number(BlockNumberOrTag::Number(0)).await.unwrap();
+    ///
+    ///     // Gets the latest block header.
+    ///     let header = provider.get_header_by_number(BlockNumberOrTag::Latest).await.unwrap();
+    /// }
+    /// ```
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.client().request("eth_getHeaderByNumber", (number,)).await
+    }
+
     /// Gets the bytecode located at the corresponding [`Address`].
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.client().request("eth_getCode", address).into()
@@ -688,6 +803,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.client().request("eth_getStorageAt", (address, key)).into()
+    }
+
+    /// Batch-fetches storage values from multiple addresses at multiple keys.
+    ///
+    /// See [EIP spec](https://github.com/ethereum/execution-apis/issues/752).
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.client().request("eth_getStorageValues", (requests,)).into()
     }
 
     /// Gets a transaction by its sender and nonce.

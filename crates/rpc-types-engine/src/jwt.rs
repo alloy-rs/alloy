@@ -266,7 +266,7 @@ impl JwtSecret {
 
 impl core::fmt::Debug for JwtSecret {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("JwtSecretHash").field(&"{{}}").finish()
+        f.debug_tuple("JwtSecret").field(&"{{}}").finish()
     }
 }
 

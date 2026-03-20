@@ -641,7 +641,7 @@ impl From<Header> for alloy_serde::WithOtherFields<Header> {
 /// BlockOverrides is a set of header fields to override.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase"))]
 pub struct BlockOverrides {
     /// Overrides the block number.
     ///
@@ -696,6 +696,17 @@ pub struct BlockOverrides {
         serde(default, skip_serializing_if = "Option::is_none", alias = "baseFeePerGas")
     )]
     pub base_fee: Option<U256>,
+    /// Overrides the blob base fee of the block.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub blob_base_fee: Option<U256>,
+    /// Overrides the parent beacon block root of the block.
+    ///
+    /// Only used by `eth_simulateV1` — not applicable to `eth_call` or `eth_estimateGas`.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "parentBeaconBlockRoot")
+    )]
+    pub beacon_root: Option<B256>,
     /// A dictionary that maps blockNumber to a user-defined hash. It can be queried from the
     /// EVM opcode BLOCKHASH.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -712,6 +723,8 @@ impl BlockOverrides {
             && self.coinbase.is_none()
             && self.random.is_none()
             && self.base_fee.is_none()
+            && self.blob_base_fee.is_none()
+            && self.beacon_root.is_none()
             && self.block_hash.is_none()
     }
 
@@ -754,6 +767,18 @@ impl BlockOverrides {
     /// Sets the base fee override
     pub const fn with_base_fee(mut self, base_fee: U256) -> Self {
         self.base_fee = Some(base_fee);
+        self
+    }
+
+    /// Sets the blob base fee override
+    pub const fn with_blob_base_fee(mut self, blob_base_fee: U256) -> Self {
+        self.blob_base_fee = Some(blob_base_fee);
+        self
+    }
+
+    /// Sets the parent beacon block root override
+    pub const fn with_beacon_root(mut self, beacon_root: B256) -> Self {
+        self.beacon_root = Some(beacon_root);
         self
     }
 
@@ -821,14 +846,24 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "jsonrpsee-types", feature = "serde"))]
+    #[cfg(feature = "serde")]
     fn serde_json_header() {
-        use jsonrpsee_types::SubscriptionResponse;
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct SubParams<T> {
+            result: T,
+        }
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct SubNotification<T> {
+            params: SubParams<T>,
+        }
+
         let resp = r#"{"jsonrpc":"2.0","method":"eth_subscribe","params":{"subscription":"0x7eef37ff35d471f8825b1c8f67a5d3c0","result":{"hash":"0x7a7ada12e140961a32395059597764416499f4178daf1917193fad7bd2cc6386","parentHash":"0xdedbd831f496e705e7f2ec3c8dcb79051040a360bf1455dbd7eb8ea6ad03b751","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","miner":"0x0000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","number":"0x8","gasUsed":"0x0","gasLimit":"0x1c9c380","extraData":"0x","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x642aa48f","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000"}}}"#;
-        let _header: SubscriptionResponse<'_, Header> = serde_json::from_str(resp).unwrap();
+        let _header: SubNotification<Header> = serde_json::from_str(resp).unwrap();
 
         let resp = r#"{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x1a14b6bdcf4542fabf71c4abee244e47","result":{"author":"0x000000568b9b5a365eaa767d42e74ed88915c204","difficulty":"0x1","extraData":"0x4e65746865726d696e6420312e392e32322d302d6463373666616366612d32308639ad8ff3d850a261f3b26bc2a55e0f3a718de0dd040a19a4ce37e7b473f2d7481448a1e1fd8fb69260825377c0478393e6055f471a5cf839467ce919a6ad2700","gasLimit":"0x7a1200","gasUsed":"0x0","hash":"0xa4856602944fdfd18c528ef93cc52a681b38d766a7e39c27a47488c8461adcb0","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","number":"0x434822","parentHash":"0x1a9bdc31fc785f8a95efeeb7ae58f40f6366b8e805f47447a52335c95f4ceb49","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","size":"0x261","stateRoot":"0xf38c4bf2958e541ec6df148e54ce073dc6b610f8613147ede568cb7b5c2d81ee","totalDifficulty":"0x633ebd","timestamp":"0x604726b0","transactions":[],"transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","uncles":[]}}}"#;
-        let _header: SubscriptionResponse<'_, Header> = serde_json::from_str(resp).unwrap();
+        let _header: SubNotification<Header> = serde_json::from_str(resp).unwrap();
     }
 
     #[test]
@@ -1009,6 +1044,10 @@ mod tests {
         let overrides_with_block_hash =
             BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
         assert!(!overrides_with_block_hash.is_empty());
+
+        let overrides_with_beacon_root =
+            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1));
+        assert!(!overrides_with_beacon_root.is_empty());
     }
 
     #[test]

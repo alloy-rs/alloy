@@ -13,6 +13,7 @@ use alloy_eips::eip4895::Withdrawal;
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
     ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayloadV4,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
@@ -432,6 +433,64 @@ pub mod beacon_payload_v3 {
         D: Deserializer<'de>,
     {
         BeaconExecutionPayloadV3::deserialize(deserializer).map(Into::into)
+    }
+}
+
+/// Beacon API representation of [`ExecutionPayloadV4`].
+///
+/// See also <https://github.com/alloy-rs/alloy/pull/3330>
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+struct BeaconExecutionPayloadV4<'a> {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    payload_inner: BeaconExecutionPayloadV3<'a>,
+    /// RLP-encoded block access list as defined in EIP-7928.
+    block_access_list: Cow<'a, Bytes>,
+}
+
+impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
+    fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
+        let BeaconExecutionPayloadV4 { payload_inner, block_access_list } = payload;
+        Self {
+            payload_inner: payload_inner.into(),
+            block_access_list: block_access_list.into_owned(),
+        }
+    }
+}
+
+impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
+    fn from(value: &'a ExecutionPayloadV4) -> Self {
+        let ExecutionPayloadV4 { payload_inner, block_access_list } = value;
+        BeaconExecutionPayloadV4 {
+            payload_inner: payload_inner.into(),
+            block_access_list: Cow::Borrowed(block_access_list),
+        }
+    }
+}
+
+/// A helper serde module to convert from/to the Beacon API which uses quoted decimals rather than
+/// big-endian hex.
+pub mod beacon_payload_v4 {
+    use super::*;
+
+    /// Serialize the payload attributes for the beacon API.
+    pub fn serialize<S>(
+        payload_attributes: &ExecutionPayloadV4,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        BeaconExecutionPayloadV4::from(payload_attributes).serialize(serializer)
+    }
+
+    /// Deserialize the payload attributes for the beacon API.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ExecutionPayloadV4, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        BeaconExecutionPayloadV4::deserialize(deserializer).map(Into::into)
     }
 }
 

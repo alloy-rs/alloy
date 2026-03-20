@@ -4,7 +4,7 @@ use alloy_primitives::{
     Bytes, B256, U256,
 };
 use core::{fmt, str::FromStr};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 /// A storage key type that can be serialized to and from a hex string up to 32 bytes. Used for
 /// `eth_getStorageAt` and `eth_getProof` RPCs.
@@ -26,13 +26,23 @@ use serde::{Deserialize, Deserializer, Serialize};
 ///
 /// The contained [B256] and From implementation for String are used to preserve the input and
 /// implement this behavior from geth.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum JsonStorageKey {
     /// A full 32-byte key (tried first during deserialization)
     Hash(B256),
     /// A number (fallback if B256 deserialization fails)
     Number(U256),
+}
+
+impl<'de> Deserialize<'de> for JsonStorageKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = alloc::string::String::deserialize(deserializer)?;
+        s.parse().map_err(de::Error::custom)
+    }
 }
 
 impl JsonStorageKey {
@@ -254,6 +264,14 @@ mod tests {
         let result = JsonStorageKey::from_str(&long_hex_str);
 
         assert!(matches!(result, Err(ParseError::BaseConvertError(BaseConvertError::Overflow))));
+    }
+
+    #[test]
+    fn test_deserialize_too_long_storage_key() {
+        // 65 hex zeros after 0x — should be rejected even though the numeric value is 0
+        let key = "0x00000000000000000000000000000000000000000000000000000000000000000";
+        let result: Result<JsonStorageKey, _> = serde_json::from_str(&json!(key).to_string());
+        assert!(result.is_err(), "storage key with 65 hex chars should fail deserialization");
     }
 
     #[test]

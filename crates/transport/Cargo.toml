@@ -33,7 +33,7 @@ thiserror = { workspace = true, features = ["std"] }
 tower.workspace = true
 url.workspace = true
 tracing.workspace = true
-governor = { version = "0.8.1", default-features = false, features = [
+governor = { version = "0.10", default-features = false, features = [
     "std",
     "quanta",
 ], optional = true }

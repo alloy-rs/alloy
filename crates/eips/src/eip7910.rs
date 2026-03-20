@@ -1,9 +1,12 @@
 //! Implementation of [`EIP-7910`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7910.md).
 
 use crate::{eip2935, eip4788, eip6110, eip7002, eip7251, eip7840::BlobParams};
-use alloc::{borrow::ToOwned, collections::BTreeMap, string::String};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+};
 use alloy_primitives::{Address, Bytes};
-use core::{fmt, str};
+use core::{cmp::Ordering, convert::Infallible, fmt, str};
 
 /// Response type for `eth_config`
 #[derive(Clone, Debug, PartialEq)]
@@ -75,7 +78,7 @@ pub struct EthForkConfig {
 }
 
 /// System-level contracts for [`EthForkConfig`].
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr))]
 pub enum SystemContract {
     /// Beacon roots system contract.
@@ -88,6 +91,20 @@ pub enum SystemContract {
     HistoryStorage,
     /// Withdrawal requests predeploy system contract.
     WithdrawalRequestPredeploy,
+    /// A custom system contract not defined by a known EIP.
+    Other(String),
+}
+
+impl PartialOrd for SystemContract {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SystemContract {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_string().cmp(&other.to_string())
+    }
 }
 
 impl fmt::Display for SystemContract {
@@ -98,13 +115,14 @@ impl fmt::Display for SystemContract {
             Self::DepositContract => "DEPOSIT_CONTRACT",
             Self::HistoryStorage => "HISTORY_STORAGE",
             Self::WithdrawalRequestPredeploy => "WITHDRAWAL_REQUEST_PREDEPLOY",
+            Self::Other(name) => return write!(f, "{name}"),
         };
         write!(f, "{str}_ADDRESS")
     }
 }
 
 impl str::FromStr for SystemContract {
-    type Err = ParseSystemContractError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let system_contract = match s {
@@ -113,7 +131,7 @@ impl str::FromStr for SystemContract {
             "DEPOSIT_CONTRACT_ADDRESS" => Self::DepositContract,
             "HISTORY_STORAGE_ADDRESS" => Self::HistoryStorage,
             "WITHDRAWAL_REQUEST_PREDEPLOY_ADDRESS" => Self::WithdrawalRequestPredeploy,
-            _ => return Err(ParseSystemContractError::Unknown(s.to_owned())),
+            _ => Self::Other(s.into()),
         };
         Ok(system_contract)
     }
@@ -150,14 +168,6 @@ impl SystemContract {
     }
 }
 
-/// Parse error for [`SystemContract`].
-#[derive(Debug, thiserror::Error)]
-pub enum ParseSystemContractError {
-    /// System contract unknown.
-    #[error("unknown system contract: {0}")]
-    Unknown(String),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,10 +190,11 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn system_contract_serde_roundtrip() {
-        for contract in SystemContract::ALL {
+        for contract in &SystemContract::ALL {
             assert_eq!(
-                contract,
-                serde_json::from_value(serde_json::to_value(contract).unwrap()).unwrap()
+                *contract,
+                serde_json::from_value::<SystemContract>(serde_json::to_value(contract).unwrap())
+                    .unwrap()
             );
         }
     }

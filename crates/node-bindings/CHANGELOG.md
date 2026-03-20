@@ -5,10 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- [node-bindings] Implicitly enable IPC when setting ipc_path ([#3764](https://github.com/alloy-rs/alloy/issues/3764))
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+### Refactor
+
+- [node-bindings] Remove redundant TempDir::close calls ([#3756](https://github.com/alloy-rs/alloy/issues/3756))
+- [node-bindings] Remove redundant bounds checks in extract_value ([#3735](https://github.com/alloy-rs/alloy/issues/3735))
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Bug Fixes
+
+- [node-bindings] Fix temp dir leak in Geth genesis init ([#3662](https://github.com/alloy-rs/alloy/issues/3662))
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+- Release 1.7.0
+- Release 1.6.3
+- Release 1.6.2
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Bug Fixes
+
+- [node-bindings] Kill anvil child on timeout ([#3635](https://github.com/alloy-rs/alloy/issues/3635))
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- Remove redundant clone in reth ([#3525](https://github.com/alloy-rs/alloy/issues/3525))
+
 ## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
 
 ### Miscellaneous Tasks
 
+- Release 1.4.3
 - Release 1.4.2
 
 ## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13

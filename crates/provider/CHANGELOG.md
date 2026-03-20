@@ -5,6 +5,109 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- Correct Debug trait name for PendingBlock ([#3738](https://github.com/alloy-rs/alloy/issues/3738))
+
+### Features
+
+- Add `reth_get_block_execution_outcome` to `RethProviderExt` ([#3751](https://github.com/alloy-rs/alloy/issues/3751))
+- [ws] Auto-extract basic auth from URL in WsConnect ([#3728](https://github.com/alloy-rs/alloy/issues/3728))
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+### Refactor
+
+- [provider] Reuse helper functions in block_and_aggregate / try_block_and_aggregate ([#3752](https://github.com/alloy-rs/alloy/issues/3752))
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Bug Fixes
+
+- Actually retry failed block fetches instead of skipping them ([#3698](https://github.com/alloy-rs/alloy/issues/3698))
+
+### Dependencies
+
+- Remove jsonrpsee dependencies ([#3690](https://github.com/alloy-rs/alloy/issues/3690))
+
+### Features
+
+- [provider] Add get_storage_values for batch storage slot retrieval ([#3692](https://github.com/alloy-rs/alloy/issues/3692))
+- [provider] Add engine_getBlobsV1/V2 to EngineApi trait ([#3670](https://github.com/alloy-rs/alloy/issues/3670))
+- [provider] Add `with_default_block` to ProviderBuilder ([#3055](https://github.com/alloy-rs/alloy/issues/3055))
+- [provider] Add engine_getPayloadBodiesByHashV2 and engine_getPay… ([#3647](https://github.com/alloy-rs/alloy/issues/3647))
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+- Release 1.7.0
+- Release 1.6.3
+- Release 1.6.2
+
+### Performance
+
+- [provider] Use get_header instead of get_block in get_block_number_by_id ([#3640](https://github.com/alloy-rs/alloy/issues/3640))
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Bug Fixes
+
+- Reduce test flakiness for node-bindings and network tests ([#3632](https://github.com/alloy-rs/alloy/issues/3632))
+- Clarify boolean return docs ([#3586](https://github.com/alloy-rs/alloy/issues/3586))
+
+### Features
+
+- [provider] Add EIP-7928 block access list helper methods ([#3637](https://github.com/alloy-rs/alloy/issues/3637))
+- [provider] Add get_header methods ([#3617](https://github.com/alloy-rs/alloy/issues/3617))
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+### Performance
+
+- Avoid cloning Filter in cache `get_logs` ([#3597](https://github.com/alloy-rs/alloy/issues/3597))
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- [provider] Add new_payload_v4_requests accepting RequestsOrHash ([#3556](https://github.com/alloy-rs/alloy/issues/3556))
+- [engine] Add ExecutionPayloadV4 and ExecutionPayloadEnvelopeV6 types ([#3552](https://github.com/alloy-rs/alloy/issues/3552))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
 ## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
 
 ### Features

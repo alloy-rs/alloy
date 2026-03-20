@@ -61,7 +61,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log,
+    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -537,6 +537,24 @@ where
         self.inner.get_block_receipts(block)
     }
 
+    async fn get_header(&self, block: BlockId) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header(block).await
+    }
+
+    async fn get_header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header_by_hash(hash).await
+    }
+
+    async fn get_header_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<N::HeaderResponse>> {
+        self.inner.get_header_by_number(number).await
+    }
+
     fn get_code_at(&self, address: Address) -> RpcWithBlock<Address, Bytes> {
         self.inner.get_code_at(address)
     }
@@ -596,6 +614,13 @@ where
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.inner.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.inner.get_storage_values(requests)
     }
 
     fn get_transaction_by_hash(

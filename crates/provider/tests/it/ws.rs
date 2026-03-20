@@ -41,41 +41,48 @@ async fn ws_retry_pubsub() -> Result<(), Box<dyn std::error::Error>> {
 // <https://github.com/alloy-rs/alloy/issues/1601>
 #[tokio::test]
 async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Error>> {
-    async fn run_server() -> Result<std::net::SocketAddr, Box<dyn std::error::Error>> {
-        use jsonrpsee::server::{RpcModule, Server, SubscriptionMessage};
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::tungstenite::Message;
 
-        let server = Server::builder().build("127.0.0.1:0").await?;
-        let mut module = RpcModule::new(());
-        module
-            .register_subscription(
-                "subscribe_hello",
-                "s_hello",
-                "unsubscribe_hello",
-                |_, pending, _, _| async move {
-                    let sub = pending.accept().await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr()?;
 
-                    for i in 0..usize::MAX {
-                        let raw = serde_json::value::to_raw_value(&i).unwrap();
-                        let msg = SubscriptionMessage::from(raw);
-                        sub.send(msg).await.unwrap();
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                    }
+    tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
 
-                    Ok(())
-                },
-            )
-            .unwrap();
-        let addr = server.local_addr()?;
+        // Read the subscribe request.
+        let msg = ws.next().await.unwrap().unwrap();
+        let req: serde_json::Value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+        let id = req["id"].clone();
 
-        let handle = server.start(module);
+        // Respond with a subscription ID.
+        let resp = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": "0x1"
+        });
+        ws.send(Message::Text(resp.to_string().into())).await.unwrap();
 
-        tokio::spawn(handle.stopped());
+        // Send subscription notifications.
+        for i in 0..usize::MAX {
+            let notif = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "s_hello",
+                "params": {
+                    "subscription": "0x1",
+                    "result": i
+                }
+            });
+            if ws.send(Message::Text(notif.to_string().into())).await.is_err() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    });
 
-        Ok(addr)
-    }
     use alloy_provider::{Provider, ProviderBuilder};
-
-    let addr = run_server().await?;
 
     let ws_provider = ProviderBuilder::new().connect(format!("ws://{addr}").as_str()).await?;
     let mut request = ws_provider.client().request("subscribe_hello", ());
@@ -87,6 +94,60 @@ async fn test_subscription_race_condition() -> Result<(), Box<dyn std::error::Er
 
     let num: usize = sub.recv().await.unwrap();
     assert_eq!(num, 0);
+
+    Ok(())
+}
+
+// Verifies that basic auth credentials embedded in a WS URL are automatically
+// extracted and sent as an Authorization header.
+#[tokio::test]
+async fn ws_basic_auth_from_url() -> Result<(), Box<dyn std::error::Error>> {
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr()?;
+
+    let (auth_tx, auth_rx) = tokio::sync::oneshot::channel::<Option<String>>();
+
+    tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+
+        // Use accept_hdr_async to inspect the Authorization header during the
+        // WS upgrade handshake.
+        let mut auth_tx = Some(auth_tx);
+        let callback = |request: &http::Request<()>,
+                        response: http::Response<()>|
+         -> Result<http::Response<()>, http::Response<Option<String>>> {
+            let auth_value = request
+                .headers()
+                .get(http::header::AUTHORIZATION)
+                .map(|v| v.to_str().unwrap().to_string());
+            auth_tx.take().unwrap().send(auth_value).unwrap();
+            Ok(response)
+        };
+
+        let mut ws = tokio_tungstenite::accept_hdr_async(stream, callback).await.unwrap();
+
+        // Read the eth_blockNumber request and respond.
+        let msg = ws.next().await.unwrap().unwrap();
+        let req: serde_json::Value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+        let id = req["id"].clone();
+
+        let resp = serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": "0x1" });
+        ws.send(Message::Text(resp.to_string().into())).await.unwrap();
+    });
+
+    // URL with embedded basic auth — the provider should auto-extract it.
+    let url = format!("ws://user:pass@{addr}");
+    let provider = ProviderBuilder::new().disable_recommended_fillers().connect(&url).await?;
+    let num = provider.get_block_number().await?;
+    assert_eq!(num, 1);
+
+    // Verify the server received the Authorization header.
+    let auth_header = auth_rx.await?.expect("Authorization header was not sent");
+    assert!(auth_header.starts_with("Basic "), "expected Basic auth, got: {auth_header}");
 
     Ok(())
 }

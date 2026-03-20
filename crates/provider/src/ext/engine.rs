@@ -1,11 +1,13 @@
 use crate::Provider;
+use alloy_eips::eip7685::RequestsOrHash;
 use alloy_network::Network;
-use alloy_primitives::{BlockHash, Bytes, B256};
+use alloy_primitives::{BlockHash, Bytes, B256, U64};
 use alloy_rpc_types_engine::{
-    ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
-    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadEnvelopeV5,
-    ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState,
-    ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatus,
+    BlobAndProofV1, BlobAndProofV2, ClientVersionV1, ExecutionPayloadBodiesV1,
+    ExecutionPayloadBodiesV2, ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3,
+    ExecutionPayloadEnvelopeV4, ExecutionPayloadEnvelopeV5, ExecutionPayloadEnvelopeV6,
+    ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4,
+    ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatus,
 };
 use alloy_transport::TransportResult;
 
@@ -47,6 +49,31 @@ pub trait EngineApi<N>: Send + Sync {
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
         execution_requests: Vec<Bytes>,
+    ) -> TransportResult<PayloadStatus>;
+
+    /// Sends the given payload to the execution layer client, as specified for the Prague fork.
+    ///
+    /// This is a variant of [`Self::new_payload_v4`] that accepts [`RequestsOrHash`] for the
+    /// execution requests, allowing either the full requests or just a precomputed hash.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/03911ffc053b8b806123f1fc237184b0092a485a/src/engine/prague.md#engine_newpayloadv4>
+    async fn new_payload_v4_requests(
+        &self,
+        payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
+    ) -> TransportResult<PayloadStatus>;
+
+    /// Sends the given payload to the execution layer client, as specified for the Amsterdam fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_newpayloadv5>
+    async fn new_payload_v5(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
     ) -> TransportResult<PayloadStatus>;
 
     /// Updates the execution layer client with the given fork choice, as specified for the Paris
@@ -142,6 +169,18 @@ pub trait EngineApi<N>: Send + Sync {
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV5>;
 
+    /// Returns the most recent version of the payload that is available in the corresponding
+    /// payload build process at the time of receiving this call.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/7b4d9f62a3fe62b9b8dcb355f1c5a38b5ff084f6/src/engine/amsterdam.md#engine_getpayloadv6>
+    ///
+    /// Note:
+    /// > Provider software MAY stop the corresponding build process after serving this call.
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV6>;
+
     /// Returns the execution payload bodies by the given hash.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/shanghai.md#engine_getpayloadbodiesbyhashv1>
@@ -167,6 +206,70 @@ pub trait EngineApi<N>: Send + Sync {
         start: u64,
         count: u64,
     ) -> TransportResult<ExecutionPayloadBodiesV1>;
+
+    /// Returns the execution payload bodies by the given hash.
+    ///
+    /// This is a V2 variant that includes the `blockAccessList` field per EIP-7928.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
+    async fn get_payload_bodies_by_hash_v2(
+        &self,
+        block_hashes: Vec<BlockHash>,
+    ) -> TransportResult<ExecutionPayloadBodiesV2>;
+
+    /// Returns the execution payload bodies by the range starting at `start`, containing `count`
+    /// blocks.
+    ///
+    /// This is a V2 variant that includes the `blockAccessList` field per EIP-7928.
+    ///
+    /// WARNING: This method is associated with the BeaconBlocksByRange message in the consensus
+    /// layer p2p specification, meaning the input should be treated as untrusted or potentially
+    /// adversarial.
+    ///
+    /// Implementers should take care when acting on the input to this method, specifically
+    /// ensuring that the range is limited properly, and that the range boundaries are computed
+    /// correctly and without panics.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
+    async fn get_payload_bodies_by_range_v2(
+        &self,
+        start: u64,
+        count: u64,
+    ) -> TransportResult<ExecutionPayloadBodiesV2>;
+
+    /// Returns the Block Access Lists for the given block hashes.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
+    async fn get_bals_by_hash_v1(
+        &self,
+        block_hashes: Vec<BlockHash>,
+    ) -> TransportResult<Vec<Bytes>>;
+
+    /// Returns the Block Access Lists for the given block range.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-7928>
+    async fn get_bals_by_range_v1(&self, start: u64, count: u64) -> TransportResult<Vec<Bytes>>;
+
+    /// Returns the requested blobs and their associated proofs for the given versioned hashes.
+    ///
+    /// Returns `None` for any blob that is not available.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/pull/559>
+    async fn get_blobs_v1(
+        &self,
+        versioned_hashes: Vec<B256>,
+    ) -> TransportResult<Vec<Option<BlobAndProofV1>>>;
+
+    /// Returns the requested blobs and their associated cell proofs for the given versioned
+    /// hashes.
+    ///
+    /// Returns `None` for any blob that is not available.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/pull/630>
+    async fn get_blobs_v2(
+        &self,
+        versioned_hashes: Vec<B256>,
+    ) -> TransportResult<Vec<Option<BlobAndProofV2>>>;
 
     /// Returns the execution client version information.
     ///
@@ -227,6 +330,36 @@ where
         self.client()
             .request(
                 "engine_newPayloadV4",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
+            .await
+    }
+
+    async fn new_payload_v4_requests(
+        &self,
+        payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request(
+                "engine_newPayloadV4",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
+            .await
+    }
+
+    async fn new_payload_v5(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+        execution_requests: RequestsOrHash,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request(
+                "engine_newPayloadV5",
                 (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
             )
             .await
@@ -294,6 +427,13 @@ where
         self.client().request("engine_getPayloadV5", (payload_id,)).await
     }
 
+    async fn get_payload_v6(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV6> {
+        self.client().request("engine_getPayloadV6", (payload_id,)).await
+    }
+
     async fn get_payload_bodies_by_hash_v1(
         &self,
         block_hashes: Vec<BlockHash>,
@@ -306,7 +446,51 @@ where
         start: u64,
         count: u64,
     ) -> TransportResult<ExecutionPayloadBodiesV1> {
-        self.client().request("engine_getPayloadBodiesByRangeV1", (start, count)).await
+        self.client()
+            .request("engine_getPayloadBodiesByRangeV1", (U64::from(start), U64::from(count)))
+            .await
+    }
+
+    async fn get_payload_bodies_by_hash_v2(
+        &self,
+        block_hashes: Vec<BlockHash>,
+    ) -> TransportResult<ExecutionPayloadBodiesV2> {
+        self.client().request("engine_getPayloadBodiesByHashV2", (block_hashes,)).await
+    }
+
+    async fn get_payload_bodies_by_range_v2(
+        &self,
+        start: u64,
+        count: u64,
+    ) -> TransportResult<ExecutionPayloadBodiesV2> {
+        self.client()
+            .request("engine_getPayloadBodiesByRangeV2", (U64::from(start), U64::from(count)))
+            .await
+    }
+
+    async fn get_bals_by_hash_v1(
+        &self,
+        block_hashes: Vec<BlockHash>,
+    ) -> TransportResult<Vec<Bytes>> {
+        self.client().request("engine_getBALsByHashV1", (block_hashes,)).await
+    }
+
+    async fn get_bals_by_range_v1(&self, start: u64, count: u64) -> TransportResult<Vec<Bytes>> {
+        self.client().request("engine_getBALsByRangeV1", (U64::from(start), U64::from(count))).await
+    }
+
+    async fn get_blobs_v1(
+        &self,
+        versioned_hashes: Vec<B256>,
+    ) -> TransportResult<Vec<Option<BlobAndProofV1>>> {
+        self.client().request("engine_getBlobsV1", (versioned_hashes,)).await
+    }
+
+    async fn get_blobs_v2(
+        &self,
+        versioned_hashes: Vec<B256>,
+    ) -> TransportResult<Vec<Option<BlobAndProofV2>>> {
+        self.client().request("engine_getBlobsV2", (versioned_hashes,)).await
     }
 
     async fn get_client_version_v1(
