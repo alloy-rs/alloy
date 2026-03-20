@@ -10,6 +10,7 @@ body:
 
         Thanks for taking the time to report this bug!
   - type: dropdown
+    id: component
     attributes:
       label: Component
       description: What component is the bug in?
@@ -29,10 +30,12 @@ body:
     validations:
       required: true
   - type: input
+    id: alloy-version
     attributes:
       label: What version of Alloy are you on?
       placeholder: "Run `cargo tree | grep alloy` and paste the output here"
   - type: dropdown
+    id: operating-system
     attributes:
       label: Operating System
       description: What operating system are you on?
@@ -43,6 +46,7 @@ body:
         - Linux
         - Other (please specify)
   - type: textarea
+    id: description
     attributes:
       label: Describe the bug
       description: Please include code snippets as well if relevant.
