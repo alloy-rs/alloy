@@ -30,12 +30,10 @@ body:
     validations:
       required: true
   - type: input
-    id: alloy-version
     attributes:
       label: What version of Alloy are you on?
       placeholder: "Run `cargo tree | grep alloy` and paste the output here"
   - type: dropdown
-    id: operating-system
     attributes:
       label: Operating System
       description: What operating system are you on?
