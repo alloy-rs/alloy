@@ -77,21 +77,9 @@ pub use extended::Extended;
 ///
 /// Read more: <https://github.com/bincode-org/bincode/issues/326>
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub mod serde_bincode_compat {
-    pub use super::{
-        block::serde_bincode_compat::*,
-        receipt::serde_bincode_compat::*,
-        transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
-    };
-}
-
-/// Bincode compatibility traits and Block/BlockBody wrappers.
-///
-/// Contains the [`SerdeBincodeCompat`] trait and its implementations for consensus types.
+pub mod serde_bincode_compat;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub mod serde_bincode_compat_traits;
-#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub use serde_bincode_compat_traits::{BincodeReprFor, RlpBincode, SerdeBincodeCompat};
+pub use serde_bincode_compat::{BincodeReprFor, RlpBincode, SerdeBincodeCompat};
 
 #[doc(hidden)]
 pub mod private {
