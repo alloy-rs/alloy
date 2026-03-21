@@ -1,13 +1,7 @@
-//! Bincode compatibility support for consensus types.
+//! Bincode compatibility traits and helpers for consensus types.
 //!
-//! This module re-exports the bincode-compatible serde wrappers for consensus types and provides
-//! traits for converting to and from those representations without panicking on decode failures.
-
-pub use super::{
-    block::serde_bincode_compat::*,
-    receipt::serde_bincode_compat::*,
-    transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
-};
+//! This module provides traits for converting to and from bincode-compatible representations
+//! without panicking on decode failures, along with compat wrappers for block types.
 
 use alloc::vec::Vec;
 use alloy_primitives::Bytes;

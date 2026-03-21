@@ -77,9 +77,21 @@ pub use extended::Extended;
 ///
 /// Read more: <https://github.com/bincode-org/bincode/issues/326>
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub mod serde_bincode_compat;
+pub mod serde_bincode_compat {
+    pub use super::{
+        block::serde_bincode_compat::*,
+        receipt::serde_bincode_compat::*,
+        serde_bincode_compat_traits::{
+            BincodeReprFor, Block, BlockBody, BlockBodyReprError, BlockReprError, RlpBincode,
+            SerdeBincodeCompat,
+        },
+        transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
+    };
+}
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
-pub use serde_bincode_compat::{BincodeReprFor, RlpBincode, SerdeBincodeCompat};
+pub mod serde_bincode_compat_traits;
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub use serde_bincode_compat_traits::{BincodeReprFor, RlpBincode, SerdeBincodeCompat};
 
 #[doc(hidden)]
 pub mod private {
