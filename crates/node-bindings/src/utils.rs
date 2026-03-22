@@ -38,6 +38,7 @@ impl GracefulShutdown {
         }
 
         child.kill().unwrap_or_else(|_| panic!("could not kill {}", process_name));
+        let _ = child.wait();
     }
 }
 
@@ -188,5 +189,19 @@ mod tests {
             assert!(path.is_dir(), "Temporary directory should be a directory");
         })
         .await;
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn graceful_shutdown_reaps_after_force_kill() {
+        let mut child = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("trap '' TERM; while :; do :; done")
+            .spawn()
+            .unwrap();
+
+        GracefulShutdown::shutdown(&mut child, 0, "sh");
+
+        assert!(child.try_wait().unwrap().is_some());
     }
 }
