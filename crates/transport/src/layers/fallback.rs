@@ -20,6 +20,9 @@ const STABILITY_WEIGHT: f64 = 0.7;
 const LATENCY_WEIGHT: f64 = 0.3;
 const DEFAULT_SAMPLE_COUNT: usize = 10;
 const DEFAULT_ACTIVE_TRANSPORT_COUNT: usize = 3;
+const ZERO_ACTIVE_TRANSPORT_COUNT_ERROR: &str =
+    "Fallback service active transport count must be greater than zero";
+const NO_TRANSPORTS_CONFIGURED_ERROR: &str = "No transports configured for fallback service";
 
 /// The [`FallbackService`] consumes multiple transports and is able to
 /// query them in parallel, returning the first successful response.
@@ -120,6 +123,19 @@ impl<S: Clone> FallbackService<S> {
         transports_clone.truncate(self.active_transport_count);
         transports_clone
     }
+
+    /// Returns the top transports or a clear error if the fallback service is misconfigured.
+    fn top_transports_or_error(&self) -> Result<Vec<ScoredTransport<S>>, TransportError> {
+        if self.active_transport_count == 0 {
+            return Err(TransportErrorKind::custom_str(ZERO_ACTIVE_TRANSPORT_COUNT_ERROR));
+        }
+
+        if self.transports.is_empty() {
+            return Err(TransportErrorKind::custom_str(NO_TRANSPORTS_CONFIGURED_ERROR));
+        }
+
+        Ok(self.top_transports())
+    }
 }
 
 impl<S> FallbackService<S>
@@ -156,13 +172,7 @@ where
 
         // Default: parallel execution for methods with deterministic results
         // Get the top transports to use for this request
-        let top_transports = self.top_transports();
-
-        if top_transports.is_empty() {
-            return Err(TransportErrorKind::custom_str(
-                "No transports available for fallback service",
-            ));
-        }
+        let top_transports = self.top_transports_or_error()?;
 
         // Create a collection of future requests
         let mut futures = FuturesUnordered::new();
@@ -228,13 +238,7 @@ where
         trace!("Using sequential fallback for method with non-deterministic results");
 
         // Get transports sorted by score (best first)
-        let top_transports = self.top_transports();
-
-        if top_transports.is_empty() {
-            return Err(TransportErrorKind::custom_str(
-                "No transports available for fallback service",
-            ));
-        }
+        let top_transports = self.top_transports_or_error()?;
 
         let mut last_error = None;
 
@@ -674,6 +678,39 @@ mod tests {
     fn success_response(data: &str) -> ResponsePayload {
         let raw = serde_json::value::RawValue::from_string(format!("\"{}\"", data)).unwrap();
         ResponsePayload::Success(raw)
+    }
+
+    #[tokio::test]
+    async fn test_zero_active_transport_count_returns_clear_error() {
+        let transport =
+            DelayedMockTransport::new(Duration::from_millis(10), success_response("result"));
+        let mut fallback_service = FallbackService::new(vec![transport.clone()], 0);
+
+        let request = Request::new(
+            "eth_sendRawTransactionSync",
+            Id::Number(1),
+            [serde_json::Value::String("0xabcdef".to_string())],
+        );
+        let serialized = request.serialize().unwrap();
+        let request_packet = RequestPacket::Single(serialized);
+
+        let err = fallback_service.call(request_packet).await.unwrap_err();
+
+        assert_eq!(err.to_string(), ZERO_ACTIVE_TRANSPORT_COUNT_ERROR);
+        assert_eq!(transport.call_count(), 0, "Transport should not be called");
+    }
+
+    #[tokio::test]
+    async fn test_no_transports_returns_clear_error() {
+        let mut fallback_service = FallbackService::new(Vec::<DelayedMockTransport>::new(), 1);
+
+        let request = Request::new("eth_blockNumber", Id::Number(1), ());
+        let serialized = request.serialize().unwrap();
+        let request_packet = RequestPacket::Single(serialized);
+
+        let err = fallback_service.call(request_packet).await.unwrap_err();
+
+        assert_eq!(err.to_string(), NO_TRANSPORTS_CONFIGURED_ERROR);
     }
 
     #[tokio::test]
