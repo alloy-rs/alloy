@@ -2539,7 +2539,7 @@ mod tests {
             .connect_anvil();
 
         let _ = provider
-            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_fee, _rewards| Eip1559Estimation {
+            .estimate_eip1559_fees_with(Eip1559Estimator::new(|_ctx| Eip1559Estimation {
                 max_fee_per_gas: 0,
                 max_priority_fee_per_gas: 0,
             }))

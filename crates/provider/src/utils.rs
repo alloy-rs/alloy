@@ -212,24 +212,29 @@ mod tests {
 
     #[test]
     fn test_estimate_priority_fee() {
+        // Normal blocks (ratio > 0.1): median of [3B, 10B, 200B] = 10B
         let rewards =
             vec![vec![10_000_000_000_u128], vec![200_000_000_000_u128], vec![3_000_000_000_u128]];
-        assert_eq!(super::estimate_priority_fee(&rewards), 10_000_000_000_u128);
+        let ratios = vec![0.5, 0.8, 0.3];
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 10_000_000_000_u128);
 
+        // Even count: median of [2B, 3B, 5B, 400B] = (3B+5B)/2 = 4B
         let rewards = vec![
             vec![400_000_000_000_u128],
             vec![2_000_000_000_u128],
             vec![5_000_000_000_u128],
             vec![3_000_000_000_u128],
         ];
+        let ratios = vec![0.9, 0.5, 0.6, 0.4];
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 4_000_000_000_u128);
 
-        assert_eq!(super::estimate_priority_fee(&rewards), 4_000_000_000_u128);
-
+        // All zero rewards -> min priority fee
         let rewards = vec![vec![0_u128], vec![0_u128], vec![0_u128]];
+        let ratios = vec![0.5, 0.5, 0.5];
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), EIP1559_MIN_PRIORITY_FEE);
 
-        assert_eq!(super::estimate_priority_fee(&rewards), EIP1559_MIN_PRIORITY_FEE);
-
-        assert_eq!(super::estimate_priority_fee(&[]), EIP1559_MIN_PRIORITY_FEE);
+        // Empty rewards -> min priority fee
+        assert_eq!(super::estimate_priority_fee(&[], &[]), EIP1559_MIN_PRIORITY_FEE);
     }
 
     #[test]
@@ -240,11 +245,18 @@ mod tests {
             vec![200_000_000_000_u128],
             vec![300_000_000_000_u128],
         ];
+        let ratios = vec![0.5, 0.6, 0.7];
+        let ctx = super::FeeEstimationContext {
+            base_fee_per_gas,
+            rewards: &rewards,
+            gas_used_ratio: &ratios,
+        };
+        // Median = 200B, but capped at 3 * 1B = 3B
         assert_eq!(
-            super::eip1559_default_estimator(base_fee_per_gas, &rewards),
+            super::eip1559_default_estimator(&ctx),
             Eip1559Estimation {
-                max_fee_per_gas: 202_000_000_000_u128,
-                max_priority_fee_per_gas: 200_000_000_000_u128
+                max_fee_per_gas: 2_000_000_000_u128 + 3_000_000_000_u128,
+                max_priority_fee_per_gas: 3_000_000_000_u128,
             }
         );
 
@@ -254,13 +266,85 @@ mod tests {
             vec![200_000_000_000_u128],
             vec![300_000_000_000_u128],
         ];
-
+        let ratios = vec![0.5, 0.6, 0.7];
+        let ctx = super::FeeEstimationContext {
+            base_fee_per_gas,
+            rewards: &rewards,
+            gas_used_ratio: &ratios,
+        };
+        // base_fee=0, cap=0, so priority_fee falls back to MIN_PRIORITY_FEE
         assert_eq!(
-            super::eip1559_default_estimator(base_fee_per_gas, &rewards),
+            super::eip1559_default_estimator(&ctx),
             Eip1559Estimation {
-                max_fee_per_gas: 200_000_000_000_u128,
-                max_priority_fee_per_gas: 200_000_000_000_u128
+                max_fee_per_gas: EIP1559_MIN_PRIORITY_FEE,
+                max_priority_fee_per_gas: EIP1559_MIN_PRIORITY_FEE,
             }
         );
+    }
+
+    #[test]
+    fn test_estimate_priority_fee_all_low_ratio() {
+        // All blocks below 10% gas usage — rewards ignored entirely
+        let rewards = vec![vec![50_000_000_000_u128], vec![80_000_000_000_u128]];
+        let ratios = vec![0.05, 0.02];
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), EIP1559_MIN_PRIORITY_FEE);
+    }
+
+    #[test]
+    fn test_estimate_priority_fee_mixed_blocks() {
+        // 3 empty blocks with high tips + 2 busy blocks with reasonable tips
+        let rewards = vec![
+            vec![500_000_000_000_u128], // empty block, high tip — should be filtered
+            vec![2_000_000_000_u128],   // busy block
+            vec![800_000_000_000_u128], // empty block, high tip — should be filtered
+            vec![3_000_000_000_u128],   // busy block
+            vec![999_000_000_000_u128], // empty block, high tip — should be filtered
+        ];
+        let ratios = vec![0.01, 0.5, 0.03, 0.7, 0.02];
+        // Only busy blocks [2B, 3B] -> median = (2B + 3B) / 2 = 2.5B
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 2_500_000_000_u128);
+    }
+
+    #[test]
+    fn test_eip1559_default_estimator_cap() {
+        let base_fee_per_gas = 1_000_000_000_u128; // 1 gwei
+        let rewards = vec![vec![100_000_000_000_u128]]; // 100 gwei — way above 3x base
+        let ratios = vec![0.9]; // busy block, not filtered
+        let ctx = super::FeeEstimationContext {
+            base_fee_per_gas,
+            rewards: &rewards,
+            gas_used_ratio: &ratios,
+        };
+        let est = super::eip1559_default_estimator(&ctx);
+        // priority_fee capped at 3 * 1 gwei = 3 gwei
+        assert_eq!(est.max_priority_fee_per_gas, 3_000_000_000_u128);
+        assert_eq!(est.max_fee_per_gas, 2_000_000_000_u128 + 3_000_000_000_u128);
+    }
+
+    #[test]
+    fn test_estimate_priority_fee_length_mismatch() {
+        // rewards has 4 entries, gas_used_ratio has 2 — zip takes shortest (2)
+        let rewards = vec![
+            vec![1_000_000_000_u128],
+            vec![2_000_000_000_u128],
+            vec![3_000_000_000_u128],
+            vec![4_000_000_000_u128],
+        ];
+        let ratios = vec![0.5, 0.8]; // only 2 ratios
+        // zip pairs: (1B, 0.5), (2B, 0.8) — both above threshold
+        // median of [1B, 2B] = (1B + 2B) / 2 = 1.5B
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 1_500_000_000_u128);
+    }
+
+    #[test]
+    fn test_estimate_priority_fee_invalid_ratios() {
+        let rewards = vec![
+            vec![5_000_000_000_u128],
+            vec![6_000_000_000_u128],
+            vec![7_000_000_000_u128],
+        ];
+        let ratios = vec![f64::NAN, f64::INFINITY, 0.5];
+        // NaN and Infinity are filtered out; only (7B, 0.5) survives
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 7_000_000_000_u128);
     }
 }
