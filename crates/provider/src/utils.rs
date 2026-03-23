@@ -21,14 +21,32 @@ pub const EIP1559_BASE_FEE_MULTIPLIER: u128 = 2;
 pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
 /// The minimum priority fee to provide.
 pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
+/// Minimum gas used ratio for a block's reward to be included in fee estimation.
+/// Blocks below this threshold are considered "near-empty" and their rewards are ignored
+/// to prevent outlier tips from skewing estimates on low-traffic chains.
+pub const EIP1559_FEE_ESTIMATION_MIN_GAS_USED_RATIO: f64 = 0.1;
+/// Maximum multiplier of base fee used to cap the estimated priority fee.
+/// Prevents the priority fee from exceeding `base_fee * N` even after filtering.
+pub const EIP1559_PRIORITY_FEE_BASE_FEE_CAP_MULTIPLIER: u128 = 3;
+
+/// Context for EIP-1559 fee estimation, holding read-only references to fee history data.
+#[derive(Debug, Clone, Copy)]
+pub struct FeeEstimationContext<'a> {
+    /// The latest base fee per gas (in wei).
+    pub base_fee_per_gas: u128,
+    /// Per-block priority fee reward samples from `eth_feeHistory`.
+    pub rewards: &'a [Vec<u128>],
+    /// Per-block gas used ratio (0.0 = empty block, 1.0 = full block).
+    pub gas_used_ratio: &'a [f64],
+}
 
 /// An estimator function for EIP1559 fees.
-pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
+pub type EstimatorFunction = fn(&FeeEstimationContext<'_>) -> Eip1559Estimation;
 
 /// A trait responsible for estimating EIP-1559 values
 pub trait Eip1559EstimatorFn: Send + Unpin {
-    /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
-    fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation;
+    /// Estimates the EIP-1559 fees given the fee estimation context.
+    fn estimate(&self, ctx: &FeeEstimationContext<'_>) -> Eip1559Estimation;
 }
 
 /// EIP-1559 estimator variants
@@ -45,7 +63,7 @@ impl Eip1559Estimator {
     /// Creates a new estimator from a closure
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin + 'static,
+        F: Fn(&FeeEstimationContext<'_>) -> Eip1559Estimation + Send + Unpin + 'static,
     {
         Self::new_estimator(f)
     }
@@ -56,20 +74,20 @@ impl Eip1559Estimator {
     }
 
     /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
-    pub fn estimate(self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
+    pub fn estimate(self, ctx: &FeeEstimationContext<'_>) -> Eip1559Estimation {
         match self {
-            Self::Default => eip1559_default_estimator(base_fee, rewards),
-            Self::Custom(val) => val.estimate(base_fee, rewards),
+            Self::Default => eip1559_default_estimator(ctx),
+            Self::Custom(val) => val.estimate(ctx),
         }
     }
 }
 
 impl<F> Eip1559EstimatorFn for F
 where
-    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin,
+    F: Fn(&FeeEstimationContext<'_>) -> Eip1559Estimation + Send + Unpin,
 {
-    fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
-        (self)(base_fee, rewards)
+    fn estimate(&self, ctx: &FeeEstimationContext<'_>) -> Eip1559Estimation {
+        (self)(ctx)
     }
 }
 
@@ -87,19 +105,30 @@ impl fmt::Debug for Eip1559Estimator {
     }
 }
 
-fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
-    let mut rewards =
-        rewards.iter().filter_map(|r| r.first()).filter(|r| **r > 0_u128).collect::<Vec<_>>();
-    if rewards.is_empty() {
+fn estimate_priority_fee(rewards: &[Vec<u128>], gas_used_ratio: &[f64]) -> u128 {
+    let mut filtered: Vec<u128> = rewards
+        .iter()
+        .zip(gas_used_ratio.iter())
+        .filter(|(_, &ratio)| {
+            ratio.is_finite()
+                && ratio.clamp(0.0, 1.0) >= EIP1559_FEE_ESTIMATION_MIN_GAS_USED_RATIO
+        })
+        .filter_map(|(r, _)| r.first().copied())
+        .filter(|&r| r > 0)
+        .collect();
+
+    if filtered.is_empty() {
         return EIP1559_MIN_PRIORITY_FEE;
     }
 
-    rewards.sort_unstable();
+    filtered.sort_unstable();
 
-    let n = rewards.len();
-
-    let median =
-        if n % 2 == 0 { (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2 } else { *rewards[n / 2] };
+    let n = filtered.len();
+    let median = if n % 2 == 0 {
+        (filtered[n / 2 - 1] + filtered[n / 2]) / 2
+    } else {
+        filtered[n / 2]
+    };
 
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
@@ -108,12 +137,23 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
 ///
 /// Based on the work by [MetaMask](https://github.com/MetaMask/core/blob/0fd4b397e7237f104d1c81579a0c4321624d076b/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56);
 /// constants for "medium" priority level are used.
-pub fn eip1559_default_estimator(
-    base_fee_per_gas: u128,
-    rewards: &[Vec<u128>],
-) -> Eip1559Estimation {
-    let max_priority_fee_per_gas = estimate_priority_fee(rewards);
-    let potential_max_fee = base_fee_per_gas * EIP1559_BASE_FEE_MULTIPLIER;
+///
+/// Improvements over the original:
+/// - Blocks with gas used ratio below [`EIP1559_FEE_ESTIMATION_MIN_GAS_USED_RATIO`] are excluded
+///   from reward sampling to avoid outlier tips on low-traffic chains.
+/// - Priority fee is capped at `base_fee * [`EIP1559_PRIORITY_FEE_BASE_FEE_CAP_MULTIPLIER`]` as a
+///   safety bound.
+pub fn eip1559_default_estimator(ctx: &FeeEstimationContext<'_>) -> Eip1559Estimation {
+    let priority_fee = estimate_priority_fee(ctx.rewards, ctx.gas_used_ratio);
+
+    // Cap priority fee relative to base fee to prevent extreme overestimates.
+    let capped = std::cmp::min(
+        priority_fee,
+        ctx.base_fee_per_gas.saturating_mul(EIP1559_PRIORITY_FEE_BASE_FEE_CAP_MULTIPLIER),
+    );
+    let max_priority_fee_per_gas = std::cmp::max(capped, EIP1559_MIN_PRIORITY_FEE);
+
+    let potential_max_fee = ctx.base_fee_per_gas * EIP1559_BASE_FEE_MULTIPLIER;
 
     Eip1559Estimation {
         max_fee_per_gas: potential_max_fee + max_priority_fee_per_gas,
