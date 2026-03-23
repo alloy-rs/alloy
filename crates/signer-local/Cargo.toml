@@ -38,7 +38,15 @@ zeroize = { workspace = true, optional = true, features = [
 ] }
 
 # keystore
-eth-keystore = { version = "0.5.0", default-features = false, optional = true }
+aes = { version = "0.8", optional = true }
+ctr = { version = "0.9", optional = true }
+hmac = { version = "0.12", optional = true }
+pbkdf2 = { version = "0.12", default-features = false, optional = true }
+scrypt = { version = "0.11", default-features = false, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+uuid = { version = "1", features = ["v4", "serde"], optional = true }
 
 # mnemonic
 coins-bip32 = { version = "0.12", default-features = false, optional = true }
@@ -77,8 +85,17 @@ yubihsm = { version = "0.42", features = ["mockhsm"] }
 
 [features]
 zeroize = ["dep:zeroize"]
-keystore = ["dep:eth-keystore"]
-keystore-geth-compat = ["keystore", "eth-keystore?/geth-compat"]
+keystore = [
+	"dep:aes",
+	"dep:ctr",
+	"dep:hmac",
+	"dep:pbkdf2",
+	"dep:scrypt",
+	"dep:serde",
+	"dep:serde_json",
+	"dep:sha2",
+	"dep:uuid",
+]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39", "zeroize"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]

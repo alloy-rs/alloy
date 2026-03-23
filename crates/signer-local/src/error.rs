@@ -33,8 +33,8 @@ pub enum LocalSignerError {
     #[cfg(feature = "mnemonic")]
     MnemonicBuilderError(#[from] super::mnemonic::MnemonicBuilderError),
 
-    /// [`eth_keystore`] error.
+    /// Keystore error.
     #[cfg(feature = "keystore")]
     #[error(transparent)]
-    EthKeystoreError(#[from] eth_keystore::KeystoreError),
+    KeystoreError(#[from] super::keystore::KeystoreError),
 }
