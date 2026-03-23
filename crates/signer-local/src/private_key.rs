@@ -309,10 +309,8 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "keystore")]
+    #[cfg(feature = "keystore-geth-compat")]
     fn test_encrypted_json_keystore_with_address() {
-        // create and store an encrypted JSON keystore in this directory
-
         use std::fs::File;
 
         use crate::EthKeystore;
@@ -325,8 +323,8 @@ mod tests {
         let file = File::open(path).unwrap();
         let keystore = serde_json::from_reader::<_, EthKeystore>(file).unwrap();
 
-        // address is None by default (not set during encrypt)
-        assert!(keystore.address.is_none());
+        assert!(keystore.address.is_some());
+        assert_eq!(keystore.address.unwrap(), key.address());
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }

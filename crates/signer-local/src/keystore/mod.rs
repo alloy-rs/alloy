@@ -1,7 +1,11 @@
 //! Ethereum keystore management.
 //!
-//! Reimplements [`eth-keystore`](https://crates.io/crates/eth-keystore) functionality inline
-//! using alloy primitives and direct crypto crate dependencies.
+//! Implementation of the [Web3 Secret Storage Definition][w3-spec] for encrypted JSON keystores.
+//!
+//! Derived from [`eth-keystore`](https://crates.io/crates/eth-keystore) (Apache-2.0, Rohit
+//! Narurkar), rewritten to use alloy primitives and direct crypto dependencies.
+//!
+//! [w3-spec]: https://ethereum.org/en/developers/docs/data-structures-and-encoding/web3-secret-storage/
 
 use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
@@ -334,8 +338,20 @@ where
     let id = Uuid::new_v4();
     let name = name.map(|n| n.to_string()).unwrap_or_else(|| id.to_string());
 
+    // Derive address from private key when geth-compat is enabled.
+    #[cfg(feature = "keystore-geth-compat")]
+    let address = {
+        use alloy_signer::utils::secret_key_to_address;
+        use k256::ecdsa::SigningKey;
+        SigningKey::from_slice(pk.as_ref())
+            .map(|key| Some(secret_key_to_address(&key)))
+            .unwrap_or(None)
+    };
+    #[cfg(not(feature = "keystore-geth-compat"))]
+    let address = None;
+
     let keystore = EthKeystore {
-        address: None,
+        address,
         crypto: CryptoJson {
             cipher: String::from(DEFAULT_CIPHER),
             cipherparams: CipherparamsJson { iv },

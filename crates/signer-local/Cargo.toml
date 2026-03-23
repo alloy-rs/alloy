@@ -96,6 +96,7 @@ keystore = [
 	"dep:sha2",
 	"dep:uuid",
 ]
+keystore-geth-compat = ["keystore"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39", "zeroize"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
