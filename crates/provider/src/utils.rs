@@ -73,7 +73,7 @@ impl Eip1559Estimator {
         Self::Custom(Box::new(f))
     }
 
-    /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
+    /// Estimates the EIP-1559 fees given the fee estimation context.
     pub fn estimate(self, ctx: &FeeEstimationContext<'_>) -> Eip1559Estimation {
         match self {
             Self::Default => eip1559_default_estimator(ctx),
@@ -339,5 +339,14 @@ mod tests {
         let ratios = vec![f64::NAN, f64::INFINITY, 0.5];
         // NaN and Infinity are filtered out; only (7B, 0.5) survives
         assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 7_000_000_000_u128);
+    }
+
+    #[test]
+    fn test_estimate_priority_fee_boundary_ratio() {
+        // Ratio exactly at threshold (0.1) should be included
+        let rewards = vec![vec![10_000_000_000_u128], vec![20_000_000_000_u128]];
+        let ratios = vec![0.1, 0.09];
+        // Only first block (ratio = 0.1) passes, second (0.09) filtered out
+        assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 10_000_000_000_u128);
     }
 }
