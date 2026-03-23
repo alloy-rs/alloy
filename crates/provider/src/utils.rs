@@ -110,8 +110,7 @@ fn estimate_priority_fee(rewards: &[Vec<u128>], gas_used_ratio: &[f64]) -> u128 
         .iter()
         .zip(gas_used_ratio.iter())
         .filter(|(_, &ratio)| {
-            ratio.is_finite()
-                && ratio.clamp(0.0, 1.0) >= EIP1559_FEE_ESTIMATION_MIN_GAS_USED_RATIO
+            ratio.is_finite() && ratio.clamp(0.0, 1.0) >= EIP1559_FEE_ESTIMATION_MIN_GAS_USED_RATIO
         })
         .filter_map(|(r, _)| r.first().copied())
         .filter(|&r| r > 0)
@@ -124,11 +123,8 @@ fn estimate_priority_fee(rewards: &[Vec<u128>], gas_used_ratio: &[f64]) -> u128 
     filtered.sort_unstable();
 
     let n = filtered.len();
-    let median = if n % 2 == 0 {
-        (filtered[n / 2 - 1] + filtered[n / 2]) / 2
-    } else {
-        filtered[n / 2]
-    };
+    let median =
+        if n % 2 == 0 { (filtered[n / 2 - 1] + filtered[n / 2]) / 2 } else { filtered[n / 2] };
 
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
@@ -331,18 +327,15 @@ mod tests {
             vec![4_000_000_000_u128],
         ];
         let ratios = vec![0.5, 0.8]; // only 2 ratios
-        // zip pairs: (1B, 0.5), (2B, 0.8) — both above threshold
-        // median of [1B, 2B] = (1B + 2B) / 2 = 1.5B
+                                     // zip pairs: (1B, 0.5), (2B, 0.8) — both above threshold
+                                     // median of [1B, 2B] = (1B + 2B) / 2 = 1.5B
         assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 1_500_000_000_u128);
     }
 
     #[test]
     fn test_estimate_priority_fee_invalid_ratios() {
-        let rewards = vec![
-            vec![5_000_000_000_u128],
-            vec![6_000_000_000_u128],
-            vec![7_000_000_000_u128],
-        ];
+        let rewards =
+            vec![vec![5_000_000_000_u128], vec![6_000_000_000_u128], vec![7_000_000_000_u128]];
         let ratios = vec![f64::NAN, f64::INFINITY, 0.5];
         // NaN and Infinity are filtered out; only (7B, 0.5) survives
         assert_eq!(super::estimate_priority_fee(&rewards, &ratios), 7_000_000_000_u128);
