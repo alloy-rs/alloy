@@ -12,6 +12,9 @@ extern crate tracing;
 mod connect;
 pub use connect::PubSubConnect;
 
+mod fallback;
+pub use fallback::FallbackPubSubConnect;
+
 mod frontend;
 pub use frontend::PubSubFrontend;
 
