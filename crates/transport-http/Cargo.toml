@@ -90,12 +90,4 @@ traceparent = [
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]
 reqwest-rustls-tls = ["reqwest?/rustls"]
-mpp = [
-    "dep:mpp",
-    "dep:alloy-json-rpc",
-    "dep:serde_json",
-    "dep:tower",
-    "dep:tracing",
-]
-
-
+mpp = ["dep:mpp"]
