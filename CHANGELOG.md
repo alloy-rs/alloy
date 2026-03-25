@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.8.0
 - Add `id` attributes to issue templates ([#3822](https://github.com/alloy-rs/alloy/issues/3822))
 - [eips] Add doc to let check happy ([#3797](https://github.com/alloy-rs/alloy/issues/3797))
 - [rpc] Clippy happy with outer match ([#3793](https://github.com/alloy-rs/alloy/issues/3793))
