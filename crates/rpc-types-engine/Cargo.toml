@@ -68,7 +68,7 @@ serde = [
 	"alloy-primitives/serde",
 	"rand?/serde",
 ]
-jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
+jwt = ["std", "dep:jsonwebtoken", "dep:rand", "jsonwebtoken?/rust_crypto"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg", "alloy-eips/kzg"]
 arbitrary = ["dep:arbitrary", "std", "alloy-primitives/arbitrary", "alloy-serde/arbitrary", "alloy-consensus/arbitrary", "alloy-eips/arbitrary"]
