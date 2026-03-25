@@ -23,8 +23,15 @@ pub use hyper_util;
 mod layers;
 #[cfg(all(not(target_family = "wasm"), feature = "jwt-auth"))]
 pub use layers::{AuthLayer, AuthService};
+#[cfg(all(not(target_family = "wasm"), feature = "mpp", feature = "hyper"))]
+pub use layers::{MppLayer, MppService};
 #[cfg(all(not(target_family = "wasm"), feature = "traceparent"))]
 pub use layers::{TraceParentLayer, TraceParentService};
+
+#[cfg(all(feature = "mpp", feature = "reqwest"))]
+mod mpp_reqwest;
+#[cfg(all(feature = "mpp", feature = "reqwest"))]
+pub use mpp_reqwest::{MppReqwestClient, MppReqwestConnect, MppReqwestTransport};
 
 #[cfg(all(not(target_family = "wasm"), feature = "hyper"))]
 mod hyper_transport;

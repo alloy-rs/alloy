@@ -39,6 +39,17 @@ tokio = { workspace = true, features = ["sync", "rt", "time"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
 
+# mpp payment support
+mpp = { version = "0.7", default-features = false, features = ["client"], optional = true }
+
 # WASM only
 [target.'cfg(target_family = "wasm")'.dependencies]
 ws_stream_wasm = "0.7.4"
+
+[features]
+mpp = ["dep:mpp"]
+mpp-tempo = [
+    "mpp",
+    "mpp/tempo",
+]
+

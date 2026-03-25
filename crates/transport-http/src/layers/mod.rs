@@ -11,3 +11,8 @@ pub use auth::{AuthLayer, AuthService};
 mod trace;
 #[cfg(feature = "traceparent")]
 pub use trace::{TraceParentLayer, TraceParentService};
+
+#[cfg(all(feature = "mpp", feature = "hyper"))]
+mod mpp;
+#[cfg(all(feature = "mpp", feature = "hyper"))]
+pub use self::mpp::{MppLayer, MppService};

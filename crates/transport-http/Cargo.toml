@@ -49,6 +49,9 @@ opentelemetry = { version = "0.31.0", optional = true }
 opentelemetry-http = { version = "0.31.0", optional = true}
 tracing-opentelemetry = { version = "0.32.0", optional = true}
 
+# mpp payment layer
+mpp = { version = "0.7", default-features = false, features = ["client"], optional = true }
+
 [features]
 default = ["reqwest", "reqwest-default-tls", "traceparent"]
 reqwest = [
@@ -87,3 +90,15 @@ traceparent = [
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]
 reqwest-rustls-tls = ["reqwest?/rustls"]
+mpp = [
+    "dep:mpp",
+    "dep:alloy-json-rpc",
+    "dep:serde_json",
+    "dep:tower",
+    "dep:tracing",
+]
+mpp-tempo = [
+    "mpp",
+    "mpp/tempo",
+]
+

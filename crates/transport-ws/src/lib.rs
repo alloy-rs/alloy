@@ -17,6 +17,11 @@ mod native;
 #[cfg(not(target_family = "wasm"))]
 pub use native::{WebSocketConfig, WsConnect};
 
+#[cfg(all(not(target_family = "wasm"), feature = "mpp"))]
+mod mpp;
+#[cfg(all(not(target_family = "wasm"), feature = "mpp"))]
+pub use self::mpp::MppWsConnect;
+
 #[cfg(target_family = "wasm")]
 mod wasm;
 #[cfg(target_family = "wasm")]
