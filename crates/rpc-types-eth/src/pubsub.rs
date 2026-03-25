@@ -1,7 +1,7 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Header, Log, Transaction};
-use alloc::{boxed::Box, format};
+use alloc::boxed::Box;
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 
@@ -41,11 +41,20 @@ pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
     pub syncing: bool,
     /// The starting block.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub starting_block: u64,
     /// The current block.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub current_block: u64,
     /// The highest block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub highest_block: Option<u64>,
 }
 
@@ -103,6 +112,31 @@ pub enum SubscriptionKind {
     Syncing,
 }
 
+impl core::fmt::Display for SubscriptionKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NewHeads => write!(f, "newHeads"),
+            Self::Logs => write!(f, "logs"),
+            Self::NewPendingTransactions => write!(f, "newPendingTransactions"),
+            Self::Syncing => write!(f, "syncing"),
+        }
+    }
+}
+
+impl core::str::FromStr for SubscriptionKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "newHeads" => Ok(Self::NewHeads),
+            "logs" => Ok(Self::Logs),
+            "newPendingTransactions" => Ok(Self::NewPendingTransactions),
+            "syncing" => Ok(Self::Syncing),
+            _ => Err("invalid subscription kind"),
+        }
+    }
+}
+
 /// Any additional parameters for a subscription.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Params {
@@ -126,6 +160,20 @@ impl Params {
     #[inline]
     pub const fn is_logs(&self) -> bool {
         matches!(self, Self::Logs(_))
+    }
+
+    /// Creates a new [`Params`] from a [`serde_json::Value`].
+    #[cfg(feature = "serde")]
+    pub fn from_json_value(v: serde_json::Value) -> Result<Self, serde_json::Error> {
+        if v.is_null() {
+            return Ok(Self::None);
+        }
+
+        if let Some(val) = v.as_bool() {
+            return Ok(val.into());
+        }
+
+        serde_json::from_value::<Filter>(v).map(Into::into)
     }
 }
 
@@ -161,21 +209,8 @@ impl<'a> serde::Deserialize<'a> for Params {
     where
         D: serde::Deserializer<'a>,
     {
-        use serde::de::Error;
-
         let v = serde_json::Value::deserialize(deserializer)?;
-
-        if v.is_null() {
-            return Ok(Self::None);
-        }
-
-        if let Some(val) = v.as_bool() {
-            return Ok(val.into());
-        }
-
-        serde_json::from_value::<Filter>(v)
-            .map(Into::into)
-            .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
+        Self::from_json_value(v).map_err(serde::de::Error::custom)
     }
 }
 
@@ -245,6 +280,29 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    fn subscription_kind_str_roundtrip() {
+        use core::str::FromStr;
+
+        for kind in [
+            SubscriptionKind::NewHeads,
+            SubscriptionKind::Logs,
+            SubscriptionKind::NewPendingTransactions,
+            SubscriptionKind::Syncing,
+        ] {
+            let s = kind.to_string();
+            let parsed: SubscriptionKind = s.parse().unwrap();
+            assert_eq!(kind, parsed);
+
+            // Verify FromStr matches serde
+            let serde_str = serde_json::to_string(&kind).unwrap();
+            let serde_str = serde_str.trim_matches('"');
+            assert_eq!(s, serde_str);
+            assert_eq!(SubscriptionKind::from_str(serde_str).unwrap(), kind);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     fn params_serialize_none() {
         let param = Params::None;
         let serialized = serde_json::to_string(&param).unwrap();
@@ -271,5 +329,40 @@ mod tests {
         let serialized = serde_json::to_string(&param).unwrap();
         let expected = serde_json::to_string(&filter).unwrap();
         assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn sync_status_metadata_serde() {
+        let metadata = SyncStatusMetadata {
+            syncing: true,
+            starting_block: 900,
+            current_block: 902,
+            highest_block: Some(1108),
+        };
+
+        let serialized = serde_json::to_string(&metadata).unwrap();
+        // Block numbers should be hex-encoded per EIP-1474
+        assert_eq!(
+            serialized,
+            r#"{"syncing":true,"startingBlock":"0x384","currentBlock":"0x386","highestBlock":"0x454"}"#
+        );
+
+        // Roundtrip
+        let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(metadata, deserialized);
+
+        // Test without highest_block
+        let metadata_no_highest = SyncStatusMetadata {
+            syncing: false,
+            starting_block: 0,
+            current_block: 100,
+            highest_block: None,
+        };
+        let serialized = serde_json::to_string(&metadata_no_highest).unwrap();
+        assert_eq!(serialized, r#"{"syncing":false,"startingBlock":"0x0","currentBlock":"0x64"}"#);
+
+        let deserialized: SyncStatusMetadata = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(metadata_no_highest, deserialized);
     }
 }

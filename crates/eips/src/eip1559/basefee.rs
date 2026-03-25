@@ -16,6 +16,7 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct BaseFeeParams {
     /// The base_fee_max_change_denominator from EIP-1559
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]

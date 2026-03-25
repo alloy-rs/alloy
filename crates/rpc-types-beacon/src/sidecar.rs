@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::vec::IntoIter;
 
-/// Bundle of blobs for a given block
+/// Bundle of blobs for a given block.
+///
+/// See [`/eth/v1/beacon/blob_sidecars/{block_id}`](https://ethereum.github.io/beacon-APIs/#/Beacon/getBlobSidecars).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, derive_more::IntoIterator)]
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
@@ -21,12 +23,12 @@ impl BeaconBlobBundle {
     }
 
     /// Returns the number of blobs in the bundle.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Returns if the bundle is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 

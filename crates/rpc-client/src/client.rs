@@ -147,8 +147,8 @@ impl RpcClient {
 
     /// Sets the poll interval for the client in milliseconds.
     ///
-    /// Note: This will only set the poll interval for the client if it is the only reference to the
-    /// inner client. If the reference is held by many, then it will not update the poll interval.
+    /// Note: `RpcClient` internally wraps an `Arc<RpcClientInner>`, so updating the poll interval
+    /// changes it for all `RpcClient` handles that share the same inner client.
     pub fn with_poll_interval(self, poll_interval: Duration) -> Self {
         self.inner().set_poll_interval(poll_interval);
         self
@@ -167,13 +167,6 @@ impl RpcClient {
         Resp: RpcRecv + Clone,
     {
         PollerBuilder::new(self.get_weak(), method, params)
-    }
-
-    /// Boxes the transport.
-    #[deprecated(since = "0.9.0", note = "`RpcClient` is now always boxed")]
-    #[expect(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
     }
 
     /// Create a new [`BatchRequest`] builder.
@@ -384,14 +377,6 @@ impl RpcClientInner {
         method: impl Into<Cow<'static, str>>,
     ) -> RpcCall<NoParams, Resp> {
         self.request(method, [])
-    }
-
-    /// Type erase the service in the transport, allowing it to be used in a
-    /// generic context.
-    #[deprecated(since = "0.9.0", note = "`RpcClientInner` is now always boxed")]
-    #[expect(clippy::missing_const_for_fn)]
-    pub fn boxed(self) -> Self {
-        self
     }
 }
 

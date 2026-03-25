@@ -1,7 +1,23 @@
-use crate::BlockTransactions;
+use crate::{BlockTransactions, InclusionInfo};
 use alloy_consensus::{BlockHeader, Transaction};
+use alloy_eips::BlockNumHash;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
+
+/// Error returned when a transaction failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransactionFailedError {
+    /// Hash of the failed transaction.
+    pub transaction_hash: TxHash,
+}
+
+impl core::fmt::Display for TransactionFailedError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Transaction {} failed", self.transaction_hash)
+    }
+}
+
+impl core::error::Error for TransactionFailedError {}
 
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
@@ -23,6 +39,13 @@ pub trait ReceiptResponse {
 
     /// Number of the block this transaction was included within.
     fn block_number(&self) -> Option<u64>;
+
+    /// Returns the [`BlockNumHash`] of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
+    fn block_hash_num(&self) -> Option<BlockNumHash> {
+        Some(BlockNumHash::new(self.block_number()?, self.block_hash()?))
+    }
 
     /// Transaction Hash.
     fn transaction_hash(&self) -> TxHash;
@@ -60,6 +83,15 @@ pub trait ReceiptResponse {
     ///
     /// EIP98 makes this field optional.
     fn state_root(&self) -> Option<B256>;
+
+    /// Ensures the transaction was successful, returning an error if it failed.
+    fn ensure_success(&self) -> Result<(), TransactionFailedError> {
+        if self.status() {
+            Ok(())
+        } else {
+            Err(TransactionFailedError { transaction_hash: self.transaction_hash() })
+        }
+    }
 }
 
 /// Transaction JSON-RPC response. Aggregates transaction data with its block and signer context.
@@ -68,11 +100,22 @@ pub trait TransactionResponse: Transaction {
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
 
-    /// Block hash
+    /// Returns the hash of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
     fn block_hash(&self) -> Option<BlockHash>;
 
-    /// Block number
+    /// Returns the number of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
     fn block_number(&self) -> Option<u64>;
+
+    /// Returns the [`BlockNumHash`] of the block this transaction was mined in.
+    ///
+    /// Returns `None` if this transaction is still pending.
+    fn block_hash_num(&self) -> Option<BlockNumHash> {
+        Some(BlockNumHash::new(self.block_number()?, self.block_hash()?))
+    }
 
     /// Transaction Index
     fn transaction_index(&self) -> Option<u64>;
@@ -103,6 +146,17 @@ pub trait TransactionResponse: Transaction {
             0 => None,
             ty => Some(ty),
         }
+    }
+
+    /// Returns the [`InclusionInfo`] if the transaction has been included.
+    ///
+    /// Returns `None` if this transaction is still pending (missing block number, hash, or index).
+    fn inclusion_info(&self) -> Option<InclusionInfo> {
+        Some(InclusionInfo {
+            block_hash: self.block_hash()?,
+            block_number: self.block_number()?,
+            transaction_index: self.transaction_index()?,
+        })
     }
 }
 

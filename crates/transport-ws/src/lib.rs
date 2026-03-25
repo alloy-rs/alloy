@@ -10,19 +10,20 @@
 extern crate tracing;
 
 use alloy_pubsub::ConnectionInterface;
+use std::time::Duration;
 
 #[cfg(not(target_family = "wasm"))]
 mod native;
 #[cfg(not(target_family = "wasm"))]
 pub use native::{WebSocketConfig, WsConnect};
 
-#[cfg(not(target_family = "wasm"))]
-use rustls as _;
-
 #[cfg(target_family = "wasm")]
 mod wasm;
 #[cfg(target_family = "wasm")]
 pub use wasm::WsConnect;
+
+/// The default keepalive interval in seconds.
+const DEFAULT_KEEPALIVE: u64 = 10;
 
 /// An ongoing connection to a backend.
 ///
@@ -37,6 +38,9 @@ pub struct WsBackend<T> {
 
     /// The interface to the connection.
     pub(crate) interface: ConnectionInterface,
+
+    /// The keepalive interval for sending pings.
+    pub(crate) keepalive_interval: Duration,
 }
 
 impl<T> WsBackend<T> {

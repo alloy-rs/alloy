@@ -88,7 +88,11 @@ pub struct InclusionListSummaryEntryV1 {
 
 impl fmt::Display for InclusionListSummaryEntryV1 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "InclusionListEntryV1 {{ address: {}, nonce: {} }}", self.address, self.nonce)
+        write!(
+            f,
+            "InclusionListSummaryEntryV1 {{ address: {}, nonce: {} }}",
+            self.address, self.nonce
+        )
     }
 }
 

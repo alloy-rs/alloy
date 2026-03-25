@@ -55,8 +55,11 @@ impl CallFrame {
     }
 
     /// Returns true if this call reverted.
-    pub const fn is_revert(&self) -> bool {
-        self.revert_reason.is_some()
+    pub fn is_revert(&self) -> bool {
+        if self.revert_reason.is_some() {
+            return true;
+        }
+        matches!(self.error.as_deref(), Some("execution reverted"))
     }
 
     /// Returns true if this is a regular call

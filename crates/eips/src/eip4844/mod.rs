@@ -2,6 +2,10 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+/// Re-export the `c_kzg` crate for downstream consumers.
+#[cfg(feature = "kzg")]
+pub use c_kzg;
+
 /// Module houses the KZG settings, enabling Custom and Default
 #[cfg(feature = "kzg")]
 pub mod env_settings;
@@ -61,42 +65,14 @@ pub const DATA_GAS_PER_BLOB: u64 = 131_072u64; // 32*4096 = 131072 == 2^17 == 0x
 pub const BYTES_PER_BLOB: usize = 131_072;
 
 /// Maximum data gas for data blobs in a single block.
-#[deprecated(
-    since = "0.15.3",
-    note = "use hardfork specific MAX_DATA_GAS_PER_BLOCK_DENCUN constant or `BlobParams::max_blob_gas_per_block`"
-)]
-pub const MAX_DATA_GAS_PER_BLOCK: u64 = MAX_DATA_GAS_PER_BLOCK_DENCUN;
-
-/// Maximum data gas for data blobs in a single block.
 pub const MAX_DATA_GAS_PER_BLOCK_DENCUN: u64 = 786_432u64; // 0xC0000 = 6 * 0x20000
-
-/// Target data gas for data blobs in a single block.
-#[deprecated(
-    since = "0.15.3",
-    note = "use hardfork specific TARGET_DATA_GAS_PER_BLOCK_DENCUN constant or `BlobParams::target_blob_gas_per_block`"
-)]
-pub const TARGET_DATA_GAS_PER_BLOCK: u64 = TARGET_DATA_GAS_PER_BLOCK_DENCUN;
 
 /// Target data gas for data blobs in a single block.
 pub const TARGET_DATA_GAS_PER_BLOCK_DENCUN: u64 = 393_216u64; // 0x60000 = 3 * 0x20000
 
 /// Maximum number of data blobs in a single block.
-#[deprecated(
-    since = "0.15.3",
-    note = "use hardfork specific MAX_BLOBS_PER_BLOCK_DENCUN constant or `BlobParams.max_blob_count`"
-)]
-pub const MAX_BLOBS_PER_BLOCK: usize = MAX_BLOBS_PER_BLOCK_DENCUN; // 786432 / 131072  = 6
-
-/// Maximum number of data blobs in a single block.
 pub const MAX_BLOBS_PER_BLOCK_DENCUN: usize =
     (MAX_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB) as usize; // 786432 / 131072  = 6
-
-/// Target number of data blobs in a single block.
-#[deprecated(
-    since = "0.15.3",
-    note = "use hardfork specific TARGET_BLOBS_PER_BLOCK_DENCUN constant or `BlobParams.target_blob_count`"
-)]
-pub const TARGET_BLOBS_PER_BLOCK: u64 = TARGET_BLOBS_PER_BLOCK_DENCUN; // 393216 / 131072 = 3
 
 /// Target number of data blobs in a single block.
 pub const TARGET_BLOBS_PER_BLOCK_DENCUN: u64 = TARGET_DATA_GAS_PER_BLOCK_DENCUN / DATA_GAS_PER_BLOB; // 393216 / 131072 = 3

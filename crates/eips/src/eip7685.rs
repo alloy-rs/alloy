@@ -22,6 +22,10 @@ pub const EMPTY_REQUESTS_HASH: B256 =
 pub struct Requests(Vec<Bytes>);
 
 impl Requests {
+    /// Create a new [`Requests`] container from an iterator of items convertible to [`Bytes`].
+    pub fn from_requests<T: Into<Bytes>>(requests: impl IntoIterator<Item = T>) -> Self {
+        Self(requests.into_iter().map(Into::into).collect())
+    }
     /// Construct a new [`Requests`] container with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
@@ -180,6 +184,12 @@ impl RequestsOrHash {
 impl Default for RequestsOrHash {
     fn default() -> Self {
         Self::Requests(Requests::default())
+    }
+}
+
+impl From<Vec<Bytes>> for RequestsOrHash {
+    fn from(requests: Vec<Bytes>) -> Self {
+        Self::Requests(requests.into())
     }
 }
 

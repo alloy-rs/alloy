@@ -1,4 +1,5 @@
 use crate::{ErrorPayload, RpcRecv};
+use alloy_primitives::B256;
 use serde_json::value::RawValue;
 
 /// An RPC error.
@@ -146,5 +147,43 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
             Self::Transport(err) => Some(err),
             _ => None,
         }
+    }
+}
+
+impl<E> RpcError<E, Box<RawValue>> {
+    /// Parses the error data field as a hex string of specified length.
+    ///
+    /// Returns `Some(T)` if the data contains a valid hex string of the expected length.
+    fn parse_data<T: std::str::FromStr>(&self) -> Option<T> {
+        let error_payload = self.as_error_resp()?;
+        let data = error_payload.data.as_ref()?;
+        let data_str = data.get().trim_matches('"').trim();
+        data_str.parse().ok()
+    }
+
+    /// Extracts a transaction hash from the error data field.
+    ///
+    /// Useful for EIP-7966 `eth_sendRawTransactionSync` errors that return
+    /// the transaction hash even when the transaction fails.
+    ///
+    /// Returns `Some(hash)` if the data contains a valid 32-byte hex string.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use alloy_json_rpc::{RpcError, ErrorPayload};
+    /// use alloy_primitives::B256;
+    ///
+    /// // Simulate an EIP-7966 error response
+    /// let json = r#"{"code":5,"message":"insufficient funds","data":"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"}"#;
+    /// let error_payload: ErrorPayload = serde_json::from_str(json).unwrap();
+    /// let rpc_error: RpcError<(), _> = RpcError::ErrorResp(error_payload);
+    ///
+    /// if let Some(tx_hash) = rpc_error.tx_hash_data() {
+    ///     println!("Transaction hash: {}", tx_hash);
+    /// }
+    /// ```
+    pub fn tx_hash_data(&self) -> Option<B256> {
+        self.parse_data()
     }
 }

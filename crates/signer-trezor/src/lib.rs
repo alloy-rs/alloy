@@ -14,11 +14,3 @@ pub use signer::TrezorSigner;
 
 mod types;
 pub use types::{DerivationType as HDPath, TrezorError};
-
-#[doc(hidden)]
-#[deprecated(note = "use `TrezorSigner` instead")]
-pub type Trezor = TrezorSigner;
-
-#[doc(hidden)]
-#[deprecated(note = "use `HDPath` instead")]
-pub type TrezorHDPath = HDPath;

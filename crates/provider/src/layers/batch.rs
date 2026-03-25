@@ -12,10 +12,10 @@ use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use std::{fmt, future::IntoFuture, marker::PhantomData, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// This is chosen somewhat arbitrarily. It should be short enough to not cause a noticeable
@@ -351,7 +351,15 @@ impl<P: Provider<N> + 'static, N: Network> CallBatchBackend<P, N> {
     }
 
     async fn send_batch(&mut self) {
-        let pending = std::mem::take(&mut self.pending);
+        let mut pending = std::mem::take(&mut self.pending);
+
+        // Remove requests where the client has disconnected.
+        pending.retain(|msg| !msg.tx.is_closed());
+
+        // If all clients disconnected, return early.
+        if pending.is_empty() {
+            return;
+        }
 
         // If there's only a single call, avoid batching and perform the request directly.
         if pending.len() == 1 {

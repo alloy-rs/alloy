@@ -13,10 +13,10 @@ use alloy_transport::{
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasmtimer::tokio::sleep;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::time::sleep;
 
 /// The service contains the backend handle, a subscription manager, and the
@@ -123,14 +123,10 @@ impl<T: PubSubConnect> PubSubService<T> {
 
     /// Service a GetSub instruction.
     ///
-    /// If the subscription exists, the waiter is sent a broadcast receiver. If
-    /// the subscription does not exist, the waiter is sent nothing, and the
-    /// `tx` is dropped. This notifies the waiter that the subscription does
-    /// not exist.
-    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<RawSubscription>) {
-        if let Some(rx) = self.subs.get_subscription(local_id) {
-            let _ = tx.send(rx);
-        }
+    /// If the subscription exists, the waiter is sent `Some` broadcast receiver. If
+    /// the subscription does not exist, the waiter is sent `None`.
+    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<Option<RawSubscription>>) {
+        let _ = tx.send(self.subs.get_subscription(local_id));
     }
 
     /// Service an unsubscribe instruction.

@@ -1,13 +1,14 @@
 use crate::{UnknownTxEnvelope, UnknownTypedTransaction};
 use alloy_consensus::{
-    error::ValueError, transaction::Either, Signed, Transaction as TransactionTrait, TxEip1559,
-    TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, Typed2718, TypedTransaction,
+    error::ValueError, transaction::Either, SignableTransaction, Signed,
+    Transaction as TransactionTrait, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope,
+    TxLegacy, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Encodable2718},
     eip7702::SignedAuthorization,
 };
-use alloy_primitives::{Bytes, ChainId, B256, U256};
+use alloy_primitives::{bytes::BufMut, Bytes, ChainId, Signature, B256, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
 
@@ -203,6 +204,29 @@ impl Typed2718 for AnyTypedTransaction {
     }
 }
 
+impl SignableTransaction<Signature> for AnyTypedTransaction {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.set_chain_id(chain_id),
+            Self::Unknown(_) => (),
+        }
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.encode_for_signing(out),
+            Self::Unknown(_) => (),
+        }
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        match self {
+            Self::Ethereum(typed_tx) => typed_tx.payload_len_for_signature(),
+            Self::Unknown(_) => 0,
+        }
+    }
+}
+
 /// Transaction envelope for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -212,6 +236,25 @@ pub enum AnyTxEnvelope {
     Ethereum(TxEnvelope),
     /// A transaction with unknown type.
     Unknown(UnknownTxEnvelope),
+}
+
+impl From<Signed<AnyTypedTransaction>> for AnyTxEnvelope {
+    fn from(value: Signed<AnyTypedTransaction>) -> Self {
+        let sig = *value.signature();
+        let tx = value.strip_signature();
+        match tx {
+            AnyTypedTransaction::Ethereum(typed_tx) => Self::Ethereum(match typed_tx {
+                TypedTransaction::Legacy(tx) => TxEnvelope::Legacy(tx.into_signed(sig)),
+                TypedTransaction::Eip2930(tx) => TxEnvelope::Eip2930(tx.into_signed(sig)),
+                TypedTransaction::Eip1559(tx) => TxEnvelope::Eip1559(tx.into_signed(sig)),
+                TypedTransaction::Eip4844(tx) => TxEnvelope::Eip4844(tx.into_signed(sig)),
+                TypedTransaction::Eip7702(tx) => TxEnvelope::Eip7702(tx.into_signed(sig)),
+            }),
+            AnyTypedTransaction::Unknown(unknown_tx) => {
+                Self::Unknown(UnknownTxEnvelope { hash: B256::ZERO, inner: unknown_tx })
+            }
+        }
+    }
 }
 
 impl AnyTxEnvelope {
@@ -264,6 +307,29 @@ impl AnyTxEnvelope {
     ///
     /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
     /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::any::AnyTxEnvelope;
+    /// # use alloy_consensus::transaction::Either;
+    /// # // Assuming you have a custom type: struct CustomTx;
+    /// # // impl TryFrom<alloy_network::any::UnknownTxEnvelope> for CustomTx { ... }
+    /// # fn example(envelope: AnyTxEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    /// # struct CustomTx;
+    /// # impl TryFrom<alloy_network::any::UnknownTxEnvelope> for CustomTx {
+    /// #     type Error = String;
+    /// #     fn try_from(_: alloy_network::any::UnknownTxEnvelope) -> Result<Self, Self::Error> {
+    /// #         Ok(CustomTx)
+    /// #     }
+    /// # }
+    /// match envelope.try_into_either::<CustomTx>()? {
+    ///     Either::Left(eth_tx) => { /* Ethereum transaction */ }
+    ///     Either::Right(custom_tx) => { /* Custom transaction */ }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn try_into_either<T>(self) -> Result<Either<TxEnvelope, T>, T::Error>
     where
         T: TryFrom<UnknownTxEnvelope>,
@@ -276,6 +342,25 @@ impl AnyTxEnvelope {
     ///
     /// Returns `Either::Left` with the ethereum `TxEnvelope` if this is the
     /// [`AnyTxEnvelope::Ethereum`] variant and [`Either::Right`] with the converted variant.
+    ///
+    /// Use this for custom conversion logic when [`try_into_either`](Self::try_into_either) is
+    /// insufficient.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use alloy_network::any::AnyTxEnvelope;
+    /// # use alloy_consensus::transaction::Either;
+    /// # use alloy_primitives::B256;
+    /// # fn example(envelope: AnyTxEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    /// let result = envelope.try_map_unknown(|unknown| Ok::<B256, String>(unknown.hash))?;
+    /// match result {
+    ///     Either::Left(eth_tx) => { /* Ethereum */ }
+    ///     Either::Right(hash) => { /* Unknown tx hash */ }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn try_map_unknown<T, E>(
         self,
         f: impl FnOnce(UnknownTxEnvelope) -> Result<T, E>,

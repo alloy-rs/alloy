@@ -16,8 +16,8 @@ pub struct SyncInfo {
     pub warp_chunks_amount: Option<U256>,
     /// Warp sync snapshot chunks processed.
     pub warp_chunks_processed: Option<U256>,
-    /// The details of the sync stages as an hashmap
-    /// where the key is the name of the stage and the value is the block number.
+    /// The details of the sync stages as a list of entries; each `Stage` contains the
+    /// stage name and the latest processed block for that stage.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub stages: Option<Vec<Stage>>,
 }

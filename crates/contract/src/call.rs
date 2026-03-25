@@ -4,16 +4,18 @@ use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{
     eip2718::Encodable2718, Ethereum, IntoWallet, Network, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
+    TransactionBuilderError, TxSigner,
 };
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{
-    state::StateOverride, AccessList, BlobTransactionSidecar, BlockId, SignedAuthorization,
+    state::StateOverride, AccessList, BlobTransactionSidecar, BlobTransactionSidecarEip7594,
+    BlockId, SignedAuthorization,
 };
 use alloy_sol_types::SolCall;
-use std::{self, marker::PhantomData};
+use std::marker::PhantomData;
 
 // NOTE: The `T` generic here is kept to mitigate breakage with the `sol!` macro.
 // It should always be `()` and has no effect on the implementation.
@@ -249,18 +251,6 @@ impl<P: Provider<N>, N: Network> DynCallBuilder<P, N> {
         )
         .to(*address))
     }
-
-    /// Clears the decoder, returning a raw call builder.
-    #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
-        RawCallBuilder {
-            request: self.request,
-            block: self.block,
-            state: self.state,
-            provider: self.provider,
-            decoder: (),
-        }
-    }
 }
 
 #[doc(hidden)]
@@ -272,7 +262,7 @@ impl<'a, P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<&'a P, C, N> {
     }
 }
 
-impl<P: Provider<N>, C: SolCall, N: Network> SolCallBuilder<P, C, N> {
+impl<P: Provider<N>, D, N: Network> CallBuilder<P, D, N> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
     pub fn clear_decoder(self) -> RawCallBuilder<P, N> {
@@ -421,6 +411,15 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         N::TransactionRequest: TransactionBuilder4844,
     {
         self.request.set_blob_sidecar(blob_sidecar);
+        self
+    }
+
+    /// Sets the EIP-7594 `sidecar` field in the transaction to the provided value.
+    pub fn sidecar_7594(mut self, sidecar: BlobTransactionSidecarEip7594) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder7594,
+    {
+        self.request.set_blob_sidecar_7594(sidecar);
         self
     }
 
@@ -574,6 +573,39 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
         }
         let pending_tx = self.send().await?;
         let receipt = pending_tx.get_receipt().await?;
+        if !receipt.status() {
+            return Err(Error::ContractNotDeployed);
+        }
+        receipt.contract_address().ok_or(Error::ContractNotDeployed)
+    }
+
+    /// Broadcasts the underlying transaction to the network as a deployment transaction and waits
+    /// for the receipt, returning the address of the deployed contract.
+    ///
+    /// This uses `eth_sendRawTransactionSync` ([EIP-7966](https://eips.ethereum.org/EIPS/eip-7966)),
+    /// which returns the transaction receipt in the same request rather than just the transaction
+    /// hash.
+    ///
+    /// Returns an error if the transaction is not a deployment transaction, or if the contract
+    /// address is not found in the deployment transaction's receipt.
+    ///
+    /// For more fine-grained control over the deployment process, use
+    /// [`deploy`](Self::deploy) instead.
+    ///
+    /// Note that the deployment address can be pre-calculated if the `from` address and `nonce` are
+    /// known using [`calculate_create_address`](Self::calculate_create_address).
+    ///
+    /// # Note
+    ///
+    /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
+    pub async fn deploy_sync(&self) -> Result<Address> {
+        if !self.request.kind().is_some_and(|to| to.is_create()) {
+            return Err(Error::NotADeploymentTransaction);
+        }
+        let receipt = self.send_sync().await?;
+        if !receipt.status() {
+            return Err(Error::ContractNotDeployed);
+        }
         receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
 
@@ -583,6 +615,23 @@ impl<P: Provider<N>, D: CallDecoder, N: Network> CallBuilder<P, D, N> {
     /// See [`Provider::send_transaction`] for more information.
     pub async fn send(&self) -> Result<PendingTransactionBuilder<N>> {
         Ok(self.provider.send_transaction(self.request.clone()).await?)
+    }
+
+    /// Broadcasts the underlying transaction to the network and waits for the receipt.
+    ///
+    /// This uses `eth_sendRawTransactionSync` ([EIP-7966](https://eips.ethereum.org/EIPS/eip-7966)),
+    /// which returns the transaction receipt in the same request rather than just the transaction
+    /// hash.
+    ///
+    /// Returns the transaction receipt if the transaction was confirmed.
+    ///
+    /// See [`Provider::send_transaction_sync`] for more information.
+    ///
+    /// # Note
+    ///
+    /// Not all providers and clients support `eth_sendRawTransactionSync` yet.
+    pub async fn send_sync(&self) -> Result<N::ReceiptResponse> {
+        Ok(self.provider.send_transaction_sync(self.request.clone()).await?)
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -861,6 +910,41 @@ mod tests {
         )
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deploy_and_call_with_priority_sync() {
+        let provider = ProviderBuilder::new().connect_anvil_with_wallet();
+        let counter_address =
+            Counter::deploy_builder(provider.clone()).deploy_sync().await.unwrap();
+        let counter_contract = Counter::new(counter_address, provider.clone());
+        let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
+        let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
+        let receipt = counter_contract
+            .increment()
+            .max_fee_per_gas(max_fee_per_gas.to())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
+            .send_sync()
+            .await
+            .expect("Could not send transaction");
+        let transaction_hash = receipt.transaction_hash;
+        let transaction = provider
+            .get_transaction_by_hash(transaction_hash)
+            .await
+            .expect("failed to fetch tx")
+            .expect("tx not included");
+        assert_eq!(
+            transaction.max_fee_per_gas(),
+            max_fee_per_gas.to::<u128>(),
+            "max_fee_per_gas of the transaction should be set to the right value"
+        );
+        assert_eq!(
+            transaction
+                .max_priority_fee_per_gas()
+                .expect("max_priority_fee_per_gas of the transaction should be set"),
+            max_priority_fee_per_gas.to::<u128>(),
+            "max_priority_fee_per_gas of the transaction should be set to the right value"
+        )
+    }
+
     sol! {
         #[sol(rpc, bytecode = "6080604052348015600e575f80fd5b506101448061001c5f395ff3fe60806040526004361061001d575f3560e01c8063785d04f514610021575b5f80fd5b61003461002f3660046100d5565b610036565b005b5f816001600160a01b0316836040515f6040518083038185875af1925050503d805f811461007f576040519150601f19603f3d011682016040523d82523d5f602084013e610084565b606091505b50509050806100d05760405162461bcd60e51b81526020600482015260146024820152734661696c656420746f2073656e64206d6f6e657960601b604482015260640160405180910390fd5b505050565b5f80604083850312156100e6575f80fd5b8235915060208301356001600160a01b0381168114610103575f80fd5b80915050925092905056fea2646970667358221220188e65dcedbc4bd68fdebc795292d5a9bf643385f138383969a28f796ff8858664736f6c63430008190033")]
         contract SendMoney {
@@ -900,6 +984,24 @@ mod tests {
         let gas = wallet_provider.estimate_gas(tx).await.unwrap();
 
         assert_eq!(gas, 56555);
+    }
+
+    #[test]
+    fn change_sidecar_7594() {
+        use alloy_consensus::Blob;
+
+        let sidecar =
+            BlobTransactionSidecarEip7594::new(vec![Blob::repeat_byte(0xAB)], vec![], vec![]);
+        let call_builder = build_call_builder().sidecar_7594(sidecar.clone());
+
+        let set_sidecar = call_builder
+            .request
+            .sidecar
+            .expect("sidecar should be set")
+            .into_eip7594()
+            .expect("sidecar should be EIP-7594 variant");
+
+        assert_eq!(set_sidecar, sidecar, "EIP-7594 sidecar should match the one we set");
     }
 
     #[tokio::test]

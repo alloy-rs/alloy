@@ -2,7 +2,7 @@ use core::ops::{Deref, DerefMut};
 
 use alloc::vec::Vec;
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_eips::eip7702::SignedAuthorization;
+use alloy_eips::{eip7594::BlobTransactionSidecarEip7594, eip7702::SignedAuthorization};
 use alloy_serde::WithOtherFields;
 
 /// Transaction builder type supporting EIP-4844 transaction fields.
@@ -50,6 +50,27 @@ pub trait TransactionBuilder7702: Default + Sized + Send + Sync + 'static {
     }
 }
 
+/// Transaction builder type supporting EIP-7594 transaction fields.
+pub trait TransactionBuilder7594: Default + Sized + Send + Sync + 'static {
+    /// Get the max fee per blob gas for the transaction.
+    fn max_fee_per_blob_gas(&self) -> Option<u128>;
+
+    /// Set the max fee per blob gas for the transaction.
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128);
+
+    /// Gets the EIP-7594 blob sidecar of the transaction.
+    fn blob_sidecar_7594(&self) -> Option<&BlobTransactionSidecarEip7594>;
+
+    /// Sets the EIP-7594 blob sidecar of the transaction.
+    fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594);
+
+    /// Builder-pattern method for setting the EIP-7594 blob sidecar of the transaction.
+    fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecarEip7594) -> Self {
+        self.set_blob_sidecar_7594(sidecar);
+        self
+    }
+}
+
 impl<T> TransactionBuilder4844 for WithOtherFields<T>
 where
     T: TransactionBuilder4844,
@@ -81,5 +102,26 @@ where
 
     fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
         self.deref_mut().set_authorization_list(authorization_list)
+    }
+}
+
+impl<T> TransactionBuilder7594 for WithOtherFields<T>
+where
+    T: TransactionBuilder7594,
+{
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.deref().max_fee_per_blob_gas()
+    }
+
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
+        self.deref_mut().set_max_fee_per_blob_gas(max_fee_per_blob_gas)
+    }
+
+    fn blob_sidecar_7594(&self) -> Option<&BlobTransactionSidecarEip7594> {
+        self.deref().blob_sidecar_7594()
+    }
+
+    fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594) {
+        self.deref_mut().set_blob_sidecar_7594(sidecar)
     }
 }

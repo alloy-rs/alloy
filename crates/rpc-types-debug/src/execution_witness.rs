@@ -2,7 +2,8 @@ use alloc::vec::Vec;
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
 
-/// Represents the execution witness of a block. Contains an optional map of state preimages.
+/// Represents the execution witness of a block. Contains lists of required preimages and
+/// headers used during execution and verification.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionWitness {
     /// List of all hashed trie nodes preimages that were required during the execution of
@@ -15,10 +16,10 @@ pub struct ExecutionWitness {
     /// (unhashed account addresses and storage slots, respectively) that were required during
     /// the execution of the block.
     pub keys: Vec<Bytes>,
-    /// Block headers required for proving correctness of stateless execution.
+    /// RLP-encoded block headers required for proving correctness of stateless execution.
     ///
-    /// This collection stores ancestor(parent) block headers needed to verify:
-    /// - State reads are correct (ie the code and accounts are correct wrt the pre-state root)
+    /// This collection stores block headers needed to verify:
+    /// - State reads are correct (i.e. the code and accounts are correct wrt the pre-state root)
     /// - BLOCKHASH opcode execution results are correct
     ///
     /// ## Why this field will be empty in the future

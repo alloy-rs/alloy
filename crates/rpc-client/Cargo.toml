@@ -42,12 +42,12 @@ alloy-transport-ws = { workspace = true, optional = true }
 
 reqwest = { workspace = true, optional = true }
 
-url = { workspace = true, optional = true }
+url = { workspace = true, optional = true, features = ["serde"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 alloy-transport-ipc = { workspace = true, optional = true }
 
-[target.'cfg(target_family = "wasm")'.dependencies]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 wasmtimer.workspace = true
 
 [dev-dependencies]

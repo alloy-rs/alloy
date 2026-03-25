@@ -3,7 +3,7 @@
 use alloy_primitives::{BlockHash, TxHash};
 use serde::{Deserialize, Serialize};
 
-/// Opcode gas usage for a transaction.
+/// Opcode gas usage for a block.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpcodeGas {

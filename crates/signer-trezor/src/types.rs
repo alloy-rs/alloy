@@ -21,7 +21,7 @@ pub enum DerivationType {
 impl fmt::Display for DerivationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Self::TrezorLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
+            Self::TrezorLive(index) => write!(f, "m/44'/60'/0'/0/{index}"),
             Self::Other(inner) => f.write_str(inner),
         }
     }

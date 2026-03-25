@@ -1,4 +1,8 @@
-use std::future::IntoFuture;
+use std::{
+    fmt::{self, Formatter},
+    future::IntoFuture,
+    sync::Arc,
+};
 
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
@@ -35,10 +39,11 @@ pub enum GasFillable {
 /// ## Note:
 ///
 /// The layer will populate gas fields based on the following logic:
-/// - if `gas_price` is set, it will process as a legacy tx and populate the `gas_limit` field if
-///   unset.
-/// - if `access_list` is set, it will process as a 2930 tx and populate the `gas_limit` and
-///   `gas_price` field if unset.
+/// - if `gas_price` is set, it will process as a legacy tx (or EIP-2930 if `access_list` is also
+///   set) and populate the `gas_limit` field if unset, and `gas_price` if unset for EIP-2930.
+/// - if `access_list` is set but `gas_price` is not set, it will process as an EIP-1559 tx (which
+///   can also have an access_list) and populate the `gas_limit`, `max_fee_per_gas` and
+///   `max_priority_fee_per_gas` fields if unset.
 /// - if `blob_sidecar` is set, it will process as an EIP-4844 tx and populate the `gas_limit`,
 ///   `max_fee_per_gas`, and `max_priority_fee_per_gas` fields if unset. The `max_fee_per_blob_gas`
 ///   is populated by [`BlobGasFiller`].
@@ -186,9 +191,92 @@ impl<N: Network> TxFiller<N> for GasFiller {
     }
 }
 
+/// An estimator function for blob gas fees.
+pub type BlobGasEstimatorFunction = fn(u128, &[f64]) -> u128;
+
+/// A trait responsible for estimating blob gas values
+pub trait BlobGasEstimatorFn: Send + Sync + Unpin {
+    /// Estimates the blob gas fee given the base fee per blob gas
+    /// and the blob gas usage ratio.
+    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128;
+}
+
+/// Blob Gas estimator variants
+#[derive(Default, Clone)]
+pub enum BlobGasEstimator {
+    /// Uses the builtin estimator
+    #[default]
+    Default,
+    /// Uses a custom estimator
+    Custom(Arc<dyn BlobGasEstimatorFn>),
+}
+
+impl BlobGasEstimator {
+    /// Creates a new estimator from a closure
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin + 'static,
+    {
+        Self::new_estimator(f)
+    }
+
+    /// Creates a new estimate fn
+    pub fn new_estimator<F: BlobGasEstimatorFn + 'static>(f: F) -> Self {
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Create a custom estimator
+    pub fn custom<F>(f: F) -> Self
+    where
+        F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin + 'static,
+    {
+        Self::Custom(Arc::new(f))
+    }
+
+    /// Create a scaled estimator
+    pub fn scaled(scale: u128) -> Self {
+        Self::custom(move |base_fee, _| base_fee.saturating_mul(scale))
+    }
+
+    /// Estimates the blob gas fee given the base fee per blob gas
+    /// and the blob gas usage ratio.
+    pub fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128 {
+        match self {
+            Self::Default => base_fee_per_blob_gas,
+            Self::Custom(val) => val.estimate(base_fee_per_blob_gas, blob_gas_used_ratio),
+        }
+    }
+}
+
+impl<F> BlobGasEstimatorFn for F
+where
+    F: Fn(u128, &[f64]) -> u128 + Send + Sync + Unpin,
+{
+    fn estimate(&self, base_fee_per_blob_gas: u128, blob_gas_used_ratio: &[f64]) -> u128 {
+        (self)(base_fee_per_blob_gas, blob_gas_used_ratio)
+    }
+}
+
+impl fmt::Debug for BlobGasEstimator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlobGasEstimator")
+            .field(
+                "estimator",
+                &match self {
+                    Self::Default => "default",
+                    Self::Custom(_) => "custom",
+                },
+            )
+            .finish()
+    }
+}
+
 /// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BlobGasFiller;
+#[derive(Clone, Debug, Default)]
+pub struct BlobGasFiller {
+    /// The blob gas estimator to use.
+    pub estimator: BlobGasEstimator,
+}
 
 impl<N: Network> TxFiller<N> for BlobGasFiller
 where
@@ -224,13 +312,15 @@ where
             }
         }
 
-        provider
-            .get_fee_history(2, BlockNumberOrTag::Latest, &[])
-            .await?
-            .base_fee_per_blob_gas
-            .last()
-            .ok_or(RpcError::NullResp)
-            .copied()
+        // Fetch the latest fee_history
+        let fee_history = provider.get_fee_history(2, BlockNumberOrTag::Latest, &[]).await?;
+
+        let base_fee_per_blob_gas =
+            fee_history.base_fee_per_blob_gas.last().ok_or(RpcError::NullResp).copied()?;
+
+        let blob_gas_used_ratio = fee_history.blob_gas_used_ratio;
+
+        Ok(self.estimator.estimate(base_fee_per_blob_gas, &blob_gas_used_ratio))
     }
 
     async fn fill(
@@ -299,11 +389,11 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = sidecar.build_4844().unwrap();
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            sidecar: Some(sidecar),
+            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 
@@ -326,12 +416,12 @@ mod tests {
         let provider = ProviderBuilder::new().connect_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = sidecar.build_4844().unwrap();
 
         let tx = TransactionRequest {
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             max_fee_per_blob_gas: Some(0),
-            sidecar: Some(sidecar),
+            sidecar: Some(sidecar.into()),
             ..Default::default()
         };
 

@@ -1,18 +1,17 @@
+use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 use crate::{SignableTransaction, Transaction, TxType};
 use alloy_eips::{
     eip2718::IsTyped2718, eip2930::AccessList, eip7702::SignedAuthorization, Typed2718,
 };
 use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable};
-use core::mem;
-
-use super::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx};
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip1559Transaction", alias = "TransactionEip1559", alias = "Eip1559Tx")]
 pub struct TxEip1559 {
     /// EIP-155: Simple replay attack protection
@@ -31,11 +30,9 @@ pub struct TxEip1559 {
         serde(with = "alloy_serde::quantity", rename = "gas", alias = "gasLimit")
     )]
     pub gas_limit: u64,
-    /// A scalar value equal to the maximum
-    /// amount of gas that should be used in executing
-    /// this transaction. This is paid up-front, before any
-    /// computation is done and may not be increased
-    /// later; formally Tg.
+    /// A scalar value equal to the maximum total fee per unit of gas
+    /// the sender is willing to pay. The actual fee paid per gas is
+    /// the minimum of this and `base_fee + max_priority_fee_per_gas`.
     ///
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
@@ -92,15 +89,7 @@ impl TxEip1559 {
     /// transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u64>() + // gas_limit
-        mem::size_of::<u128>() + // max_fee_per_gas
-        mem::size_of::<u128>() + // max_priority_fee_per_gas
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() // input
+        size_of::<Self>() + self.access_list.size() + self.input.len()
     }
 }
 

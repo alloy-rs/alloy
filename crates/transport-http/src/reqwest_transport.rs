@@ -4,9 +4,10 @@ use alloy_transport::{
     utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
     TransportFut, TransportResult,
 };
+use itertools::Itertools;
 use std::task;
 use tower::Service;
-use tracing::{debug, debug_span, trace, Instrument};
+use tracing::{debug, debug_span, instrument, trace, Instrument};
 use url::Url;
 
 /// Rexported from [`reqwest`].
@@ -34,6 +35,7 @@ impl Http<Client> {
         Self { client: Default::default(), url }
     }
 
+    #[instrument(name = "request", skip_all, fields(method_names = %req.method_names().take(3).format(", ").to_string()))]
     async fn do_reqwest(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
         let resp = self
             .client
@@ -55,7 +57,7 @@ impl Http<Client> {
         if tracing::enabled!(tracing::Level::TRACE) {
             trace!(body = %String::from_utf8_lossy(&body), "response body");
         } else {
-            debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+            debug!(bytes = body.len(), "retrieved response body");
         }
 
         if !status.is_success() {
@@ -88,6 +90,6 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let this = self.clone();
         let span = debug_span!("ReqwestTransport", url = %this.url);
-        Box::pin(this.do_reqwest(req).instrument(span))
+        Box::pin(this.do_reqwest(req).instrument(span.or_current()))
     }
 }

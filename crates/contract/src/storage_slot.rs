@@ -44,7 +44,6 @@ where
     calldata: Bytes,
     expected_value: U256,
     base_request: N::TransactionRequest,
-    _phantom: std::marker::PhantomData<N>,
 }
 
 impl<P, N> StorageSlotFinder<P, N>
@@ -69,7 +68,6 @@ where
             calldata,
             expected_value,
             base_request: N::TransactionRequest::default(),
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -130,30 +128,42 @@ where
     /// any encoding or hashing. For mappings, the actual storage location might be
     /// computed using keccak256 hashing.
     pub async fn find_slot(self) -> Result<Option<B256>, TransportError> {
-        let tx = self.base_request.clone().with_to(self.contract).with_input(self.calldata.clone());
+        let Self { provider, contract, calldata, expected_value, base_request } = self;
+
+        let tx = base_request.with_to(contract).with_input(calldata);
 
         // first collect all the slots that are used by the function call
-        let access_list_result = self.provider.create_access_list(&tx.clone()).await?;
+        let access_list_result = provider.create_access_list(&tx).await?;
         let access_list = access_list_result.access_list;
+
+        // Track whether any call succeeded and capture the first error for diagnostics.
+        // If all overridden calls fail, we propagate the first error instead of returning Ok(None).
+        let mut any_call_succeeded = false;
+        let mut first_call_err: Option<TransportError> = None;
+
         // iterate over all the accessed slots and try to find the one that contains the
         // target value by overriding the slot and checking the function call result
         for item in access_list.0 {
-            if item.address != self.contract {
+            if item.address != contract {
                 continue;
             };
             for slot in &item.storage_keys {
                 let account_override = AccountOverride::default().with_state_diff(std::iter::once(
-                    (*slot, B256::from(self.expected_value.to_be_bytes())),
+                    (*slot, B256::from(expected_value.to_be_bytes())),
                 ));
 
-                let state_override = StateOverridesBuilder::default()
-                    .append(self.contract, account_override)
-                    .build();
+                let state_override =
+                    StateOverridesBuilder::default().append(contract, account_override).build();
 
-                let Ok(result) = self.provider.call(tx.clone()).overrides(state_override).await
-                else {
-                    // overriding this slot failed
-                    continue;
+                let result = match provider.call(tx.clone()).overrides(state_override).await {
+                    Ok(res) => {
+                        any_call_succeeded = true;
+                        res
+                    }
+                    Err(err) => {
+                        first_call_err.get_or_insert(err);
+                        continue;
+                    }
                 };
 
                 let Ok(result_value) = U256::abi_decode(&result) else {
@@ -161,11 +171,20 @@ where
                     continue;
                 };
 
-                if result_value == self.expected_value {
+                if result_value == expected_value {
                     return Ok(Some(*slot));
                 }
             }
         }
+
+        // If no call succeeded and we have an error, propagate it rather than silently returning
+        // None
+        if !any_call_succeeded {
+            if let Some(err) = first_call_err {
+                return Err(err);
+            }
+        }
+
         Ok(None)
     }
 }
@@ -174,7 +193,7 @@ where
 mod tests {
     use crate::StorageSlotFinder;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::{address, ruint::uint, Address, B256, U256};
+    use alloy_primitives::{address, Address, B256, U256};
     use alloy_provider::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_rpc_types_eth::TransactionRequest;
     use alloy_sol_types::sol;
@@ -225,21 +244,5 @@ mod tests {
     async fn test_erc20_tether_set_balance() {
         let tether = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
         test_erc20_token_set_balance(tether).await
-    }
-    #[tokio::test]
-    async fn test_erc20_token_polygon() {
-        let provider =
-            ProviderBuilder::new().connect_http("https://polygon-rpc.com".parse().unwrap());
-        let usdt = address!("0xc2132D05D31c914a87C6611C10748AEb04B58e8F"); // https://polygonscan.com/address/0xc2132D05D31c914a87C6611C10748AEb04B58e8F
-        let user = address!("0x0aD71c9106455801eAe0e11D5A1Dd5232537E662");
-        let finder = StorageSlotFinder::balance_of(provider.clone(), usdt, user)
-            .with_request(TransactionRequest::default().gas_limit(100000));
-        let storage_slot = U256::from_be_bytes(finder.find_slot().await.unwrap().unwrap().0);
-        assert_eq!(
-            storage_slot,
-            uint!(
-                38414845661641411266428303013962925072609060211040678298987263275302781786590_U256
-            )
-        );
     }
 }

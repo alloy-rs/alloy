@@ -1,5 +1,5 @@
 use crate::{
-    block::HeaderInfo,
+    block::{HeaderInfo, HeaderRoots},
     constants::{EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH},
     Block, BlockBody,
 };
@@ -15,12 +15,12 @@ use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
-use core::mem;
 
 /// Ethereum Block header
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 pub struct Header {
     /// The Keccak 256-bit hash of the parent
     /// block’s header, in its entirety; formally Hp.
@@ -167,7 +167,7 @@ impl Default for Header {
 
 impl Sealable for Header {
     fn hash_slow(&self) -> B256 {
-        self.hash_slow()
+        Self::hash_slow(self)
     }
 }
 
@@ -184,6 +184,17 @@ impl Header {
         let mut out = Vec::<u8>::new();
         self.encode(&mut out);
         keccak256(&out)
+    }
+
+    /// Decodes the RLP-encoded header and computes the hash from the raw RLP bytes.
+    ///
+    /// This is more efficient than decoding and then re-encoding to compute the hash,
+    /// as it reuses the original RLP bytes for hashing.
+    pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
+        let start = *buf;
+        let header = Self::decode(buf)?;
+        let hash = keccak256(&start[..start.len() - buf.len()]);
+        Ok(header.seal_unchecked(hash))
     }
 
     /// Check if the ommers hash equals to empty hash list.
@@ -227,7 +238,7 @@ impl Header {
     /// Calculate excess blob gas for the next block according to the EIP-4844
     /// spec.
     ///
-    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    /// Returns `None` if `excess_blob_gas`, `blob_gas_used`, or `base_fee_per_gas` is not set.
     pub fn next_block_excess_blob_gas(&self, blob_params: BlobParams) -> Option<u64> {
         Some(blob_params.next_block_excess_blob_gas_osaka(
             self.excess_blob_gas?,
@@ -239,27 +250,7 @@ impl Header {
     /// Calculate a heuristic for the in-memory size of the [Header].
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<B256>() + // parent hash
-        mem::size_of::<B256>() + // ommers hash
-        mem::size_of::<Address>() + // beneficiary
-        mem::size_of::<B256>() + // state root
-        mem::size_of::<B256>() + // transactions root
-        mem::size_of::<B256>() + // receipts root
-        mem::size_of::<Option<B256>>() + // withdrawals root
-        mem::size_of::<Bloom>() + // logs bloom
-        mem::size_of::<U256>() + // difficulty
-        mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u64>() + // gas limit
-        mem::size_of::<u64>() + // gas used
-        mem::size_of::<u64>() + // timestamp
-        mem::size_of::<B256>() + // mix hash
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u128>>() + // base fee per gas
-        mem::size_of::<Option<u128>>() + // blob gas used
-        mem::size_of::<Option<u128>>() + // excess blob gas
-        mem::size_of::<Option<B256>>() + // parent beacon block root
-        mem::size_of::<Option<B256>>() + // requests root
-        self.extra_data.len() // extra data
+        size_of::<Self>() + self.extra_data.len()
     }
 
     fn header_payload_length(&self) -> usize {
@@ -578,6 +569,18 @@ pub trait BlockHeader {
             blob_gas_used: self.blob_gas_used(),
             difficulty: self.difficulty(),
             mix_hash: self.mix_hash(),
+        }
+    }
+
+    /// Returns all roots contained in the header.
+    fn header_roots(&self) -> HeaderRoots {
+        HeaderRoots {
+            state_root: self.state_root(),
+            transactions_root: self.transactions_root(),
+            receipts_root: self.receipts_root(),
+            withdrawals_root: self.withdrawals_root(),
+            parent_beacon_block_root: self.parent_beacon_block_root(),
+            logs_bloom: self.logs_bloom(),
         }
     }
 

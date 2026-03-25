@@ -8,13 +8,13 @@ use alloy_eips::{
 };
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
-use core::mem;
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "LegacyTransaction", alias = "TransactionLegacy", alias = "LegacyTx")]
 pub struct TxLegacy {
     /// Added as EIP-155: Simple replay attack protection
@@ -77,13 +77,7 @@ impl TxLegacy {
     /// Calculates a heuristic for the in-memory size of the [TxLegacy] transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<Option<ChainId>>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u128>() + // gas_price
-        mem::size_of::<u64>() + // gas_limit
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
-        self.input.len() // input
+        size_of::<Self>() + self.input.len()
     }
 
     /// Outputs the length of EIP-155 fields. Only outputs a non-zero value for EIP-155 legacy
