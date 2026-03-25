@@ -40,48 +40,6 @@ impl<P> MppWsConnect<P> {
     }
 }
 
-#[cfg(feature = "mpp-tempo")]
-impl MppWsConnect<mpp::client::TempoProvider> {
-    /// Create an [`MppWsConnect`] backed by a `TempoProvider` in direct signing mode.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `rpc_url` is not a valid URL.
-    pub fn with_tempo_signer(
-        inner: WsConnect,
-        signer: mpp::PrivateKeySigner,
-        rpc_url: impl AsRef<str>,
-    ) -> Result<Self, mpp::MppError> {
-        Ok(Self::new(inner, mpp::client::TempoProvider::new(signer, rpc_url)?))
-    }
-
-    /// Create an [`MppWsConnect`] backed by a `TempoProvider` in keychain
-    /// (access key) signing mode.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `rpc_url` is not a valid URL.
-    pub fn with_tempo_access_key(
-        inner: WsConnect,
-        signer: mpp::PrivateKeySigner,
-        wallet_address: mpp::Address,
-        rpc_url: impl AsRef<str>,
-    ) -> Result<Self, mpp::MppError> {
-        use mpp::client::tempo::signing::{KeychainVersion, TempoSigningMode};
-
-        Ok(Self::new(
-            inner,
-            mpp::client::TempoProvider::new(signer, rpc_url)?.with_signing_mode(
-                TempoSigningMode::Keychain {
-                    wallet: wallet_address,
-                    key_authorization: None,
-                    version: KeychainVersion::V2,
-                },
-            ),
-        ))
-    }
-}
-
 impl<P> PubSubConnect for MppWsConnect<P>
 where
     P: PaymentProvider + 'static,

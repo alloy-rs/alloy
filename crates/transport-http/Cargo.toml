@@ -97,8 +97,5 @@ mpp = [
     "dep:tower",
     "dep:tracing",
 ]
-mpp-tempo = [
-    "mpp",
-    "mpp/tempo",
-]
+
 

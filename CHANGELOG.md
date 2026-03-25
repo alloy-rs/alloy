@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Dependencies
+
+- "chore: bump ethereum_ssz to 0.10 and tree_hash to 0.12" ([#3839](https://github.com/alloy-rs/alloy/issues/3839))
+
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Bug Fixes
+
+- [rpc-client] Detect `is_local` in `connect_with_config` ([#3837](https://github.com/alloy-rs/alloy/issues/3837))
+- Better arbitrary impl for header ([#3829](https://github.com/alloy-rs/alloy/issues/3829))
+- [node-bindings] Use graceful shutdown for anvil ([#3824](https://github.com/alloy-rs/alloy/issues/3824))
+- [build] Bump `gcloud-sdk` `0.27.4` -> `0.29.0` for `reqwest` `0.13` compatibility ([#3823](https://github.com/alloy-rs/alloy/issues/3823))
+- [transport] Return clear error when no transports available ([#3806](https://github.com/alloy-rs/alloy/issues/3806))
+- [rpc-client] Return error instead of panic on unexpected batch response ([#3807](https://github.com/alloy-rs/alloy/issues/3807))
+- [consensus] Delegate is_create() for Extended::Other instead of hardcoding false ([#3796](https://github.com/alloy-rs/alloy/issues/3796))
+- [provider] Detect EIP-7594 blob sidecars in BlobGasFiller ([#3815](https://github.com/alloy-rs/alloy/issues/3815))
+- [rpc-types-debug] Enable serde_with alloc for no_std ([#3811](https://github.com/alloy-rs/alloy/issues/3811))
+- [eips] Eip 7594 replace unoptimized iter ([#3804](https://github.com/alloy-rs/alloy/issues/3804))
+- [flashblocks] Correct receipts type in FlashBlock metadata ([#3795](https://github.com/alloy-rs/alloy/issues/3795))
+- [provider] Use pending nonce in CachedNonceManager init ([#3802](https://github.com/alloy-rs/alloy/issues/3802))
+- [serde] Validate JsonStorageKey length during deserialization ([#3792](https://github.com/alloy-rs/alloy/issues/3792))
+
+### Dependencies
+
+- [deps] Bump taiki-e/install-action from 2.68.34 to 2.69.7 ([#3830](https://github.com/alloy-rs/alloy/issues/3830))
+- [deps] Bump Swatinem/rust-cache from 2.8.2 to 2.9.1 ([#3813](https://github.com/alloy-rs/alloy/issues/3813))
+- [deps] Bump taiki-e/install-action from 2.68.25 to 2.68.34 ([#3814](https://github.com/alloy-rs/alloy/issues/3814))
+- [deps] Bump taiki-e/install-action from 2.68.16 to 2.68.25 ([#3788](https://github.com/alloy-rs/alloy/issues/3788))
+
+### Features
+
+- [provider] Add `watch_headers` to `Provider` trait ([#3800](https://github.com/alloy-rs/alloy/issues/3800))
+- [rpc-types-eth] Add parent beacon root to BlockOverrides ([#3798](https://github.com/alloy-rs/alloy/issues/3798))
+
+### Miscellaneous Tasks
+
+- Release 1.8.0
+- Release 1.8.0
+- Add `id` attributes to issue templates ([#3822](https://github.com/alloy-rs/alloy/issues/3822))
+- [eips] Add doc to let check happy ([#3797](https://github.com/alloy-rs/alloy/issues/3797))
+- [rpc] Clippy happy with outer match ([#3793](https://github.com/alloy-rs/alloy/issues/3793))
+
 ## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
 
 ### Bug Fixes
@@ -46,6 +90,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `reth_get_block_execution_outcome` to `RethProviderExt` ([#3751](https://github.com/alloy-rs/alloy/issues/3751))
 - Impl From<Recovered<T>> for TransactionRequest ([#3731](https://github.com/alloy-rs/alloy/issues/3731))
 - [ws] Auto-extract basic auth from URL in WsConnect ([#3728](https://github.com/alloy-rs/alloy/issues/3728))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
 
 ### Refactor
 
