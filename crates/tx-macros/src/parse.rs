@@ -73,6 +73,8 @@ pub(crate) enum VariantKind {
     Flattened,
 }
 
+const EIP2718_TX_TYPE_ID_MAX: u8 = 0x7f;
+
 impl VariantKind {
     /// Returns serde transaction enum tag and aliases.
     pub(crate) fn serde_tag_and_aliases(&self) -> (String, Vec<String>) {
@@ -172,6 +174,15 @@ impl GroupedVariants {
         for variant in variants {
             let EnvelopeVariant { ident, fields, kind, attrs, typed } = variant;
 
+            if let VariantKind::Typed(ty) = &kind {
+                if *ty > EIP2718_TX_TYPE_ID_MAX {
+                    return Err(darling::Error::custom(format!(
+                        "transaction type ID must be in range 0x00..=0x7f per EIP-2718, got {ty:#04x}"
+                    ))
+                    .with_span(&ident));
+                }
+            }
+
             let mut serde_attrs = None;
             let mut doc_attrs = Vec::new();
 
@@ -244,6 +255,8 @@ impl GroupedVariants {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use darling::FromDeriveInput;
+    use syn::DeriveInput;
 
     #[test]
     fn serde_tag() {
@@ -259,5 +272,36 @@ mod tests {
             VariantKind::Typed(10).serde_tag_and_aliases(),
             ("0xa".to_string(), vec!["0x0a".to_string(), "0xA".to_string()])
         );
+    }
+
+    #[test]
+    fn rejects_typed_variant_above_eip2718_max() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum ExampleEnvelope {
+                #[envelope(ty = 128)]
+                Tx(u8),
+            }
+        };
+
+        let args = EnvelopeArgs::from_derive_input(&input).expect("envelope args should parse");
+        match GroupedVariants::from_args(args) {
+            Ok(_) => panic!("ty = 128 should be rejected"),
+            Err(err) => {
+                assert!(err.to_string().contains("range 0x00..=0x7f"), "unexpected error: {err}")
+            }
+        }
+    }
+
+    #[test]
+    fn accepts_typed_variant_at_eip2718_max() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum ExampleEnvelope {
+                #[envelope(ty = 127)]
+                Tx(u8),
+            }
+        };
+
+        let args = EnvelopeArgs::from_derive_input(&input).expect("envelope args should parse");
+        GroupedVariants::from_args(args).expect("ty = 127 should remain valid");
     }
 }
