@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Dependencies
+
+- "chore: bump ethereum_ssz to 0.10 and tree_hash to 0.12" ([#3839](https://github.com/alloy-rs/alloy/issues/3839))
+
 ## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
 
 ### Bug Fixes
@@ -37,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.8.0
 - Release 1.8.0
 - Add `id` attributes to issue templates ([#3822](https://github.com/alloy-rs/alloy/issues/3822))
 - [eips] Add doc to let check happy ([#3797](https://github.com/alloy-rs/alloy/issues/3797))
