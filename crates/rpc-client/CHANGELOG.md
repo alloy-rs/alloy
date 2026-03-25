@@ -5,10 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Bug Fixes
+
+- [rpc-client] Detect `is_local` in `connect_with_config` ([#3837](https://github.com/alloy-rs/alloy/issues/3837))
+- [rpc-client] Return error instead of panic on unexpected batch response ([#3807](https://github.com/alloy-rs/alloy/issues/3807))
+
 ## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
 
 ### Miscellaneous Tasks
 
+- Release 1.7.4
 - Release 1.7.3
 - Release 1.7.2
 

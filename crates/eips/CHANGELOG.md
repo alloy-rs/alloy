@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Bug Fixes
+
+- [eips] Eip 7594 replace unoptimized iter ([#3804](https://github.com/alloy-rs/alloy/issues/3804))
+
+### Miscellaneous Tasks
+
+- [eips] Add doc to let check happy ([#3797](https://github.com/alloy-rs/alloy/issues/3797))
+
 ## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
 
 ### Bug Fixes
@@ -17,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.7.4
 - Release 1.7.3
 - Release 1.7.2
 
