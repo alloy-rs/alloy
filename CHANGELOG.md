@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [serde] Fix off-by-one in JsonStorageKey length check ([#3843](https://github.com/alloy-rs/alloy/issues/3843))
 
+### Miscellaneous Tasks
+
+- Release 1.8.2
+
 ### Other
 
 - "fix(serde): validate JsonStorageKey length during deserialization" ([#3842](https://github.com/alloy-rs/alloy/issues/3842))
