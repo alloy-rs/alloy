@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 1.8.1
 - Release 1.8.0
 - [eips] Add doc to let check happy ([#3797](https://github.com/alloy-rs/alloy/issues/3797))
 
