@@ -8,7 +8,7 @@ use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportErrorKind, TransportResult,
+    TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
@@ -111,14 +111,23 @@ impl<T: PubSubConnect> PubSubService<T> {
         self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
     }
 
-    /// Service a request.
-    fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
-        let brv = in_flight.request();
+    fn is_backend_gone(err: &TransportError) -> bool {
+        err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone)
+    }
 
-        self.dispatch_request(brv.serialized().to_owned())?;
-        self.in_flights.insert(in_flight);
-
-        Ok(())
+    /// Service a request, reconnecting and retrying if the backend disappeared
+    /// before the request could be dispatched.
+    async fn service_request_with_reconnect(&mut self, in_flight: InFlight) -> TransportResult<()> {
+        loop {
+            match self.dispatch_request(in_flight.request().serialized().to_owned()) {
+                Ok(()) => {
+                    self.in_flights.insert(in_flight);
+                    return Ok(());
+                }
+                Err(err) if Self::is_backend_gone(&err) => self.reconnect_with_retries().await?,
+                Err(err) => return Err(err),
+            }
+        }
     }
 
     /// Service a GetSub instruction.
@@ -129,29 +138,47 @@ impl<T: PubSubConnect> PubSubService<T> {
         let _ = tx.send(self.subs.get_subscription(local_id));
     }
 
-    /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
-        if let Some(server_id) = self.subs.server_id_for(&local_id) {
+    /// Service an unsubscribe instruction without resurrecting the
+    /// subscription during reconnect.
+    async fn service_unsubscribe_with_reconnect(&mut self, local_id: B256) -> TransportResult<()> {
+        let server_id = self.subs.server_id_for(&local_id).cloned();
+
+        // Remove local state before reconnecting so this subscription is not
+        // reissued by a successful reconnect.
+        self.subs.remove_sub(local_id);
+        let removed = self.in_flights.remove_subscription_requests(&local_id);
+        trace!(?local_id, removed, "removed pending resubscribe requests");
+
+        if let Some(server_id) = server_id {
             // TODO: ideally we can send this with an unused id
             let req = Request::new("eth_unsubscribe", Id::Number(1), [server_id]);
             let brv = req.serialize().expect("no ser error").take_request();
 
-            self.dispatch_request(brv)?;
+            match self.dispatch_request(brv) {
+                Ok(()) => Ok(()),
+                Err(err) if Self::is_backend_gone(&err) => self.reconnect_with_retries().await,
+                Err(err) => Err(err),
+            }
+        } else {
+            Ok(())
         }
-        self.subs.remove_sub(local_id);
-        Ok(())
     }
 
-    /// Service an instruction
-    fn service_ix(&mut self, ix: PubSubInstruction) -> TransportResult<()> {
-        trace!(?ix, "servicing instruction");
+    /// Service an instruction, reconnecting when the backend disappears while
+    /// dispatching user-driven work.
+    async fn service_ix_with_reconnect(&mut self, ix: PubSubInstruction) -> TransportResult<()> {
+        trace!(?ix, "servicing instruction with reconnect");
         match ix {
-            PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
+            PubSubInstruction::Request(in_flight) => {
+                self.service_request_with_reconnect(in_flight).await
+            }
             PubSubInstruction::GetSub(alias, tx) => {
                 self.service_get_sub(alias, tx);
                 Ok(())
             }
-            PubSubInstruction::Unsubscribe(alias) => self.service_unsubscribe(alias),
+            PubSubInstruction::Unsubscribe(alias) => {
+                self.service_unsubscribe_with_reconnect(alias).await
+            }
         }
     }
 
@@ -245,7 +272,7 @@ impl<T: PubSubConnect> PubSubService<T> {
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            if let Err(e) = self.service_ix(req) {
+                            if let Err(e) = self.service_ix_with_reconnect(req).await {
                                 break Err(e)
                             }
                         } else {
@@ -261,5 +288,162 @@ impl<T: PubSubConnect> PubSubService<T> {
             }
         };
         fut.spawn_task();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ConnectionInterface;
+    use alloy_json_rpc::{PubSubItem, Request, ResponsePayload, SubId};
+    use serde::Deserialize;
+    use std::{
+        collections::VecDeque,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Mutex,
+        },
+        time::Duration,
+    };
+    use tokio::time::timeout;
+
+    #[derive(Debug)]
+    struct HeldDeadBackend {
+        _to_frontend: mpsc::UnboundedSender<PubSubItem>,
+        _error: oneshot::Sender<()>,
+        _shutdown: oneshot::Receiver<()>,
+    }
+
+    #[derive(Clone, Debug, Default)]
+    struct MockConnect {
+        handles: Arc<Mutex<VecDeque<ConnectionHandle>>>,
+        reconnects: Arc<AtomicUsize>,
+    }
+
+    impl MockConnect {
+        fn new(handles: Vec<ConnectionHandle>) -> Self {
+            Self {
+                handles: Arc::new(Mutex::new(handles.into())),
+                reconnects: Arc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn reconnects(&self) -> usize {
+            self.reconnects.load(Ordering::Relaxed)
+        }
+
+        fn next_handle(&self) -> TransportResult<ConnectionHandle> {
+            self.handles
+                .lock()
+                .expect("poisoned mutex")
+                .pop_front()
+                .ok_or_else(|| TransportErrorKind::custom_str("missing mock connection handle"))
+        }
+    }
+
+    impl PubSubConnect for MockConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.next_handle()
+        }
+
+        async fn try_reconnect(&self) -> TransportResult<ConnectionHandle> {
+            self.reconnects.fetch_add(1, Ordering::Relaxed);
+            self.next_handle()
+        }
+    }
+
+    fn dead_handle() -> (ConnectionHandle, HeldDeadBackend) {
+        let (handle, interface) = ConnectionHandle::new();
+        let ConnectionInterface { from_frontend, to_frontend, error, shutdown } = interface;
+        drop(from_frontend);
+        (handle, HeldDeadBackend { _to_frontend: to_frontend, _error: error, _shutdown: shutdown })
+    }
+
+    fn response_handle(result: Box<RawValue>) -> ConnectionHandle {
+        let (handle, mut interface) = ConnectionHandle::new();
+        tokio::spawn(async move {
+            #[derive(Deserialize)]
+            struct IncomingRequest {
+                id: Id,
+            }
+
+            while let Some(msg) = interface.recv_from_frontend().await {
+                let request: IncomingRequest =
+                    serde_json::from_str(msg.get()).expect("valid serialized request");
+                let response = alloy_json_rpc::Response {
+                    id: request.id,
+                    payload: ResponsePayload::Success(result.clone()),
+                };
+                if interface.send_to_frontend(PubSubItem::Response(response)).is_err() {
+                    break;
+                }
+            }
+        });
+        handle
+    }
+
+    #[tokio::test]
+    async fn reconnects_request_dispatches_when_backend_is_already_gone() {
+        let (dead, _guard) = dead_handle();
+        let connector =
+            MockConnect::new(vec![dead, response_handle(to_json_raw_value(&"0x1").unwrap())]);
+        let frontend = PubSubService::connect(connector.clone()).await.unwrap();
+
+        let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let response = timeout(Duration::from_secs(1), frontend.send(request))
+            .await
+            .expect("request should not hang")
+            .expect("request should succeed");
+
+        assert_eq!(connector.reconnects(), 1);
+        match response.payload {
+            ResponsePayload::Success(result) => assert_eq!(result.get(), r#""0x1""#),
+            payload => panic!("unexpected payload: {payload:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_clears_pending_resubscribe_responses() {
+        let (handle, _guard) = dead_handle();
+        let (_tx, reqs) = mpsc::unbounded_channel();
+        let connector = MockConnect::default();
+        let mut service = PubSubService {
+            handle,
+            connector,
+            reqs,
+            subs: SubscriptionManager::default(),
+            in_flights: RequestManager::default(),
+        };
+
+        let request =
+            Request::new("eth_subscribe", Id::Number(7), ("newHeads",)).serialize().unwrap();
+        let local_id = request.params_hash();
+
+        let (in_flight, _) = InFlight::new(request.clone(), 16);
+        service.handle_sub_response(in_flight, SubId::from(String::from("0xdeadbeef"))).unwrap();
+        assert!(service.subs.get_subscription(local_id).is_some());
+
+        service.subs.drop_server_ids();
+        let (pending_resubscribe, _) = InFlight::new(request.clone(), 16);
+        service.in_flights.insert(pending_resubscribe);
+        assert_eq!(service.in_flights.len(), 1);
+
+        service.service_unsubscribe_with_reconnect(local_id).await.unwrap();
+        assert!(service.subs.get_subscription(local_id).is_none());
+        assert_eq!(service.in_flights.len(), 0);
+
+        let late_response = alloy_json_rpc::Response {
+            id: request.id().clone(),
+            payload: ResponsePayload::Success(
+                to_json_raw_value(&SubId::from(String::from("0xbeef"))).unwrap(),
+            ),
+        };
+        service.handle_item(PubSubItem::Response(late_response)).unwrap();
+
+        assert!(service.subs.get_subscription(local_id).is_none());
     }
 }

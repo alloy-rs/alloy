@@ -1,6 +1,6 @@
 use crate::managers::InFlight;
 use alloy_json_rpc::{Id, Response, SubId};
-use alloy_primitives::map::HashMap;
+use alloy_primitives::{map::HashMap, B256};
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]
@@ -22,6 +22,25 @@ impl RequestManager {
     /// Insert a new in-flight request.
     pub(crate) fn insert(&mut self, in_flight: InFlight) {
         self.reqs.insert(in_flight.request.id().clone(), in_flight);
+    }
+
+    /// Remove pending subscription requests for the provided local ID.
+    pub(crate) fn remove_subscription_requests(&mut self, local_id: &B256) -> usize {
+        let req_ids = self
+            .reqs
+            .iter()
+            .filter_map(|(id, in_flight)| {
+                (in_flight.is_subscription() && in_flight.request.params_hash() == *local_id)
+                    .then(|| id.clone())
+            })
+            .collect::<Vec<_>>();
+
+        let removed = req_ids.len();
+        for req_id in req_ids {
+            self.reqs.remove(&req_id);
+        }
+
+        removed
     }
 
     /// Handle a response by sending the payload to the waiter.
