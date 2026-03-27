@@ -11,6 +11,7 @@ use alloy_transport::{
     TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
+use std::time::Instant;
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
@@ -37,6 +38,46 @@ pub(crate) struct PubSubService<T> {
 
     /// The request manager.
     pub(crate) in_flights: RequestManager,
+
+    /// Tracks reconnect loops that repeatedly fail before the backend makes progress.
+    reconnects: ReconnectTracker,
+}
+
+const RAPID_RECONNECT_ERR: &str = "pubsub service exceeded rapid reconnect limit";
+// Replayed in-flight requests can otherwise recreate the same backend failure forever.
+const MAX_RAPID_RECONNECTS: u32 = 10;
+
+#[derive(Debug, Default)]
+struct ReconnectTracker {
+    rapid_reconnects: u32,
+    last_reconnect: Option<Instant>,
+}
+
+impl ReconnectTracker {
+    fn record_reconnect(
+        &mut self,
+        now: Instant,
+        retry_interval: std::time::Duration,
+    ) -> TransportResult<()> {
+        self.rapid_reconnects =
+            if self.last_reconnect.is_some_and(|last| now.duration_since(last) <= retry_interval) {
+                self.rapid_reconnects.saturating_add(1)
+            } else {
+                1
+            };
+        self.last_reconnect = Some(now);
+
+        if self.rapid_reconnects > MAX_RAPID_RECONNECTS {
+            return Err(TransportErrorKind::custom_str(RAPID_RECONNECT_ERR));
+        }
+
+        Ok(())
+    }
+
+    fn record_progress(&mut self) {
+        self.rapid_reconnects = 0;
+        self.last_reconnect = None;
+    }
 }
 
 impl<T: PubSubConnect> PubSubService<T> {
@@ -51,6 +92,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: Default::default(),
+            reconnects: Default::default(),
         };
         this.spawn();
         Ok(PubSubFrontend::new(tx))
@@ -216,6 +258,11 @@ impl<T: PubSubConnect> PubSubService<T> {
         }
     }
 
+    async fn reconnect_or_fail(&mut self) -> TransportResult<()> {
+        self.reconnect_with_retries().await?;
+        self.reconnects.record_reconnect(Instant::now(), self.handle.retry_interval)
+    }
+
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
@@ -231,14 +278,15 @@ impl<T: PubSubConnect> PubSubService<T> {
                             if let Err(e) = self.handle_item(item) {
                                 break Err(e)
                             }
-                        } else if let Err(e) = self.reconnect_with_retries().await {
+                            self.reconnects.record_progress();
+                        } else if let Err(e) = self.reconnect_or_fail().await {
                             break Err(e)
                         }
                     }
 
                     _ = &mut self.handle.error => {
                         error!("Pubsub service backend error.");
-                        if let Err(e) = self.reconnect_with_retries().await {
+                        if let Err(e) = self.reconnect_or_fail().await {
                             break Err(e)
                         }
                     }
@@ -261,5 +309,108 @@ impl<T: PubSubConnect> PubSubService<T> {
             }
         };
         fut.spawn_task();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_json_rpc::{Id, Request};
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        time::Duration,
+    };
+    use tokio::time::timeout;
+
+    #[test]
+    fn reconnect_tracker_limits_rapid_reconnects() {
+        let now = Instant::now();
+        let mut tracker = ReconnectTracker::default();
+
+        for attempt in 0..MAX_RAPID_RECONNECTS {
+            tracker
+                .record_reconnect(
+                    now + Duration::from_millis(u64::from(attempt) * 100),
+                    Duration::from_secs(1),
+                )
+                .unwrap();
+        }
+        let err = tracker
+            .record_reconnect(
+                now + Duration::from_millis(u64::from(MAX_RAPID_RECONNECTS) * 100),
+                Duration::from_secs(1),
+            )
+            .unwrap_err();
+
+        assert_eq!(err.to_string(), RAPID_RECONNECT_ERR);
+    }
+
+    #[test]
+    fn reconnect_tracker_resets_after_progress() {
+        let now = Instant::now();
+        let mut tracker = ReconnectTracker::default();
+
+        tracker.record_reconnect(now, Duration::from_secs(1)).unwrap();
+        tracker.record_progress();
+        tracker.record_reconnect(now + Duration::from_millis(100), Duration::from_secs(1)).unwrap();
+    }
+
+    #[derive(Clone, Debug)]
+    struct FailingReplayConnect {
+        connects: Arc<AtomicUsize>,
+        requests: Arc<AtomicUsize>,
+        max_retries: u32,
+        retry_interval: Duration,
+    }
+
+    impl FailingReplayConnect {
+        fn new(max_retries: u32, retry_interval: Duration) -> Self {
+            Self {
+                connects: Arc::new(AtomicUsize::new(0)),
+                requests: Arc::new(AtomicUsize::new(0)),
+                max_retries,
+                retry_interval,
+            }
+        }
+    }
+
+    impl PubSubConnect for FailingReplayConnect {
+        fn is_local(&self) -> bool {
+            true
+        }
+
+        async fn connect(&self) -> TransportResult<ConnectionHandle> {
+            self.connects.fetch_add(1, Ordering::SeqCst);
+
+            let (handle, mut interface) = ConnectionHandle::new();
+            let requests = self.requests.clone();
+            tokio::spawn(async move {
+                if interface.recv_from_frontend().await.is_some() {
+                    requests.fetch_add(1, Ordering::SeqCst);
+                    interface.close_with_error();
+                }
+            });
+
+            Ok(handle.with_max_retries(self.max_retries).with_retry_interval(self.retry_interval))
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn stops_replayed_requests_from_reconnecting_forever() {
+        let connector = FailingReplayConnect::new(u32::MAX, Duration::from_millis(50));
+        let frontend = PubSubService::connect(connector.clone()).await.unwrap();
+        let request = Request::new("eth_getLogs", Id::Number(1), ()).serialize().unwrap();
+
+        let err = timeout(Duration::from_secs(1), frontend.send(request))
+            .await
+            .expect("request should complete")
+            .unwrap_err();
+
+        assert_eq!(err.to_string(), "backend connection task has stopped");
+        assert!(connector.connects.load(Ordering::SeqCst) > 1);
+        assert!(connector.requests.load(Ordering::SeqCst) <= MAX_RAPID_RECONNECTS as usize + 2);
     }
 }
