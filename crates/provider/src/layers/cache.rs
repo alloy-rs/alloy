@@ -183,11 +183,13 @@ where
 
             let result = client.request(req.method(), req.params()).await?;
 
-            let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-
             if !redirect {
-                let hash = req.params_hash()?;
-                let _ = cache.put(hash, json_str);
+                if let Some(ref receipts) = result {
+                    let json_str =
+                        serde_json::to_string(receipts).map_err(TransportErrorKind::custom)?;
+                    let hash = req.params_hash()?;
+                    let _ = cache.put(hash, json_str);
+                }
             }
 
             Ok(result)
