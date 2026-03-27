@@ -8,7 +8,7 @@ use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
 use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportError, TransportErrorKind, TransportResult,
+    TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
@@ -111,10 +111,6 @@ impl<T: PubSubConnect> PubSubService<T> {
         self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
     }
 
-    fn is_backend_gone(err: &TransportError) -> bool {
-        err.as_transport_err().is_some_and(TransportErrorKind::is_backend_gone)
-    }
-
     /// Service a request.
     fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
         let brv = in_flight.request();
@@ -123,21 +119,6 @@ impl<T: PubSubConnect> PubSubService<T> {
         self.in_flights.insert(in_flight);
 
         Ok(())
-    }
-
-    /// Service a request, reconnecting and retrying if the backend disappeared
-    /// before the request could be dispatched.
-    async fn service_request_with_reconnect(&mut self, in_flight: InFlight) -> TransportResult<()> {
-        loop {
-            match self.dispatch_request(in_flight.request().serialized().to_owned()) {
-                Ok(()) => {
-                    self.in_flights.insert(in_flight);
-                    return Ok(());
-                }
-                Err(err) if Self::is_backend_gone(&err) => self.reconnect_with_retries().await?,
-                Err(err) => return Err(err),
-            }
-        }
     }
 
     /// Service a GetSub instruction.
@@ -264,14 +245,26 @@ impl<T: PubSubConnect> PubSubService<T> {
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            let result = match req {
+                            match req {
                                 PubSubInstruction::Request(in_flight) => {
-                                    self.service_request_with_reconnect(in_flight).await
+                                    if let Err(err) = self.service_request(in_flight) {
+                                        if err
+                                            .as_transport_err()
+                                            .is_some_and(TransportErrorKind::is_backend_gone)
+                                        {
+                                            if let Err(e) = self.reconnect_with_retries().await {
+                                                break Err(e)
+                                            }
+                                        } else {
+                                            break Err(err)
+                                        }
+                                    }
                                 }
-                                req => self.service_ix(req),
-                            };
-                            if let Err(e) = result {
-                                break Err(e)
+                                req => {
+                                    if let Err(e) = self.service_ix(req) {
+                                        break Err(e)
+                                    }
+                                }
                             }
                         } else {
                             info!("Pubsub service request channel closed. Shutting down.");
@@ -322,7 +315,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reconnects_request_dispatches_when_backend_is_already_gone() {
+    async fn reconnects_after_request_dispatch_hits_backend_gone() {
         let (dead_handle, dead_interface) = ConnectionHandle::new();
         let ConnectionInterface { from_frontend, to_frontend, error, shutdown } = dead_interface;
         drop(from_frontend);
@@ -330,27 +323,34 @@ mod tests {
 
         let (reconnected_handle, mut reconnected_interface) = ConnectionHandle::new();
         let connector = MockConnect(Arc::new(Mutex::new(Some(reconnected_handle))));
-        let (_tx, reqs) = mpsc::unbounded_channel();
-        let mut service = PubSubService {
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let service = PubSubService {
             handle: dead_handle,
             connector,
             reqs,
             subs: SubscriptionManager::default(),
             in_flights: RequestManager::default(),
         };
+        service.spawn();
 
-        let request = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
-        let expected = request.serialized().get().to_owned();
-        let (in_flight, _) = InFlight::new(request, 16);
+        let first = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
+        let (in_flight, rx) = InFlight::new(first, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
 
-        service.service_request_with_reconnect(in_flight).await.unwrap();
+        timeout(Duration::from_secs(1), rx)
+            .await
+            .expect("failed request should resolve promptly")
+            .expect_err("raced request should be dropped when the backend is gone");
 
-        assert_eq!(service.in_flights.len(), 1);
+        let second = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
+        let expected = second.serialized().get().to_owned();
+        let (in_flight, _rx) = InFlight::new(second, 16);
+        tx.send(PubSubInstruction::Request(in_flight)).unwrap();
 
         let dispatched =
             timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
                 .await
-                .expect("request should be dispatched to the new backend")
+                .expect("request should be dispatched after reconnect")
                 .expect("new backend should receive the request");
         assert_eq!(dispatched.get(), expected);
     }
