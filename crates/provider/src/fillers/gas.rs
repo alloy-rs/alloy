@@ -70,6 +70,7 @@ pub enum GasFillable {
 /// # Ok(())
 /// # }
 /// ```
+#[non_exhaustive]
 #[derive(Clone, Debug, Default)]
 pub struct GasFiller {
     /// The eip1559 gas estimator to use.
