@@ -245,25 +245,16 @@ impl<T: PubSubConnect> PubSubService<T> {
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            match req {
-                                PubSubInstruction::Request(in_flight) => {
-                                    if let Err(err) = self.service_request(in_flight) {
-                                        if err
-                                            .as_transport_err()
-                                            .is_some_and(TransportErrorKind::is_backend_gone)
-                                        {
-                                            if let Err(e) = self.reconnect_with_retries().await {
-                                                break Err(e)
-                                            }
-                                        } else {
-                                            break Err(err)
-                                        }
-                                    }
-                                }
-                                req => {
-                                    if let Err(e) = self.service_ix(req) {
+                            if let Err(err) = self.service_ix(req) {
+                                if err
+                                    .as_transport_err()
+                                    .is_some_and(TransportErrorKind::is_backend_gone)
+                                {
+                                    if let Err(e) = self.reconnect_with_retries().await {
                                         break Err(e)
                                     }
+                                } else {
+                                    break Err(err)
                                 }
                             }
                         } else {
