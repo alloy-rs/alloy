@@ -355,8 +355,11 @@ impl Geth {
     }
 
     /// Sets the IPC path for the socket.
+    ///
+    /// This also enables IPC, as setting a path implies the intent to use IPC.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
+        self.ipc_enabled = true;
         self
     }
 

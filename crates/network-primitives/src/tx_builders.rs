@@ -39,6 +39,14 @@ pub trait TransactionBuilder4844: Default + Sized + Send + Sync + 'static {
         self.blob_sidecar().and_then(|s| s.as_eip4844())
     }
 
+    /// Returns true if the transaction contains any blob sidecar data.
+    ///
+    /// By default this checks only the EIP-4844 sidecar accessor. Types that can also carry
+    /// alternate blob sidecar formats, such as EIP-7594, should override this method.
+    fn has_blob_sidecar(&self) -> bool {
+        self.blob_sidecar().is_some()
+    }
+
     /// Sets the EIP-4844 blob sidecar of the transaction.
     ///
     /// Note: This will also set the versioned blob hashes accordingly:
@@ -112,6 +120,10 @@ where
 
     fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
         self.deref().blob_sidecar()
+    }
+
+    fn has_blob_sidecar(&self) -> bool {
+        self.deref().has_blob_sidecar()
     }
 
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {

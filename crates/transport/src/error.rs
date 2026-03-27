@@ -197,6 +197,7 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
 
     fn backoff_hint(&self) -> Option<std::time::Duration> {
         if let Self::ErrorResp(resp) = self {
+            // try to extract backoff from the error data (infura-style)
             let data = resp.try_data_as::<serde_json::Value>();
             if let Some(Ok(data)) = data {
                 // if daily rate limit exceeded, infura returns the requested backoff in the error
@@ -210,8 +211,29 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
                     return Some(std::time::Duration::from_secs(seconds as u64 + 1));
                 }
             }
+
+            // try to extract backoff from the error message, e.g. "try again in 4ms"
+            if let Some(duration) = parse_retry_after(&resp.message) {
+                return Some(duration);
+            }
         }
         None
+    }
+}
+
+/// Parses a duration from messages like "try again in 4ms", "try again in 1s".
+fn parse_retry_after(message: &str) -> Option<std::time::Duration> {
+    let after = message.split_once("try again in ")?.1.trim_start();
+
+    let digits_len = after.as_bytes().iter().take_while(|b| b.is_ascii_digit()).count();
+    let (digits, rest) = after.split_at(digits_len);
+    let value: u64 = digits.parse().ok()?;
+
+    let unit = rest.trim().trim_end_matches(|c: char| c.is_ascii_punctuation());
+    match unit {
+        "ms" => Some(std::time::Duration::from_millis(value)),
+        "s" => Some(std::time::Duration::from_secs(value)),
+        _ => None,
     }
 }
 
@@ -224,6 +246,40 @@ mod tests {
         let err = "{\"code\":-32007,\"message\":\"100/second request limit reached - reduce calls per second or upgrade your account at quicknode.com\"}";
         let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
         assert!(TransportError::ErrorResp(err).is_retryable());
+    }
+
+    #[test]
+    fn test_retry_error_rate_limited() {
+        let err = r#"{"code":-32005,"message":"rate limited, try again in 4ms","data":null}"#;
+        let err = serde_json::from_str::<ErrorPayload>(err).unwrap();
+        let err = TransportError::ErrorResp(err);
+        assert!(err.is_retryable());
+        assert_eq!(err.backoff_hint(), Some(std::time::Duration::from_millis(4)));
+    }
+
+    #[test]
+    fn parse_retry_after_millis() {
+        assert_eq!(
+            parse_retry_after("try again in 4ms"),
+            Some(std::time::Duration::from_millis(4))
+        );
+        assert_eq!(
+            parse_retry_after("rate limited, try again in 100ms"),
+            Some(std::time::Duration::from_millis(100))
+        );
+    }
+
+    #[test]
+    fn parse_retry_after_seconds() {
+        assert_eq!(parse_retry_after("try again in 2s"), Some(std::time::Duration::from_secs(2)));
+    }
+
+    #[test]
+    fn parse_retry_after_none() {
+        assert_eq!(parse_retry_after("some other error"), None);
+        assert_eq!(parse_retry_after("try again in"), None);
+        assert_eq!(parse_retry_after("try again in ms"), None);
+        assert_eq!(parse_retry_after("try again in 4us"), None);
     }
 
     #[test]

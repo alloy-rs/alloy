@@ -1107,6 +1107,10 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.sidecar.as_ref()
     }
 
+    fn has_blob_sidecar(&self) -> bool {
+        self.sidecar.is_some()
+    }
+
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {
         self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
@@ -1308,6 +1312,12 @@ impl From<TypedTransaction> for TransactionRequest {
             TypedTransaction::Eip4844(tx) => tx.into(),
             TypedTransaction::Eip7702(tx) => tx.into(),
         }
+    }
+}
+
+impl<T: TransactionTrait> From<Recovered<T>> for TransactionRequest {
+    fn from(tx: Recovered<T>) -> Self {
+        Self::from_recovered_transaction(tx)
     }
 }
 
