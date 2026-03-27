@@ -1,5 +1,6 @@
 use crate::{BuiltInConnectionString, ConnectionConfig, RpcClient};
 use alloy_transport::{BoxTransport, IntoBoxTransport, TransportConnect, TransportResult};
+use std::str::FromStr;
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
@@ -174,9 +175,11 @@ impl<L> ClientBuilder<L> {
         L: Layer<BoxTransport>,
         L::Service: IntoBoxTransport,
     {
-        let transport = BuiltInConnectionString::connect_with(s, config).await?;
+        let connect = BuiltInConnectionString::from_str(s)?;
+        let is_local = connect.is_local();
+        let transport = connect.connect_boxed_with(config).await?;
         let transport = self.builder.service(transport);
-        Ok(RpcClient::new(transport.into_box_transport(), false))
+        Ok(RpcClient::new(transport.into_box_transport(), is_local))
     }
 
     /// Connect a transport, producing an [`RpcClient`].
