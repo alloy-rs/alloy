@@ -153,15 +153,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         match block_id {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
-            _ => {
-                // Try get_header first (more efficient), fallback to get_block if not supported.
-                // Not all nodes support eth_getHeaderByHash/eth_getHeaderByNumber.
-                if let Ok(header) = self.get_header(block_id).await {
-                    return Ok(header.map(|h| h.number()));
-                }
-                let block = self.get_block(block_id).await?;
-                Ok(block.map(|b| b.header().number()))
-            }
+            _ => Ok(self.get_header(block_id).await?.map(|h| h.number())),
         }
     }
 
@@ -553,7 +545,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         hash: BlockHash,
     ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.client().request("eth_getHeaderByHash", (hash,)).await
+        match self.client().request("eth_getHeaderByHash", (hash,)).await {
+            Ok(header) => Ok(header),
+            // eth_getHeaderByHash is non-standard; fall back to eth_getBlockByHash
+            Err(err) if err.as_error_resp().is_some_and(|e| e.code == -32601) => {
+                Ok(self.get_block_by_hash(hash).await?.map(|b| b.header().clone()))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Gets a block header by its [`BlockNumberOrTag`].
@@ -580,7 +579,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         number: BlockNumberOrTag,
     ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.client().request("eth_getHeaderByNumber", (number,)).await
+        match self.client().request("eth_getHeaderByNumber", (number,)).await {
+            Ok(header) => Ok(header),
+            // eth_getHeaderByNumber is non-standard; fall back to eth_getBlockByNumber
+            Err(err) if err.as_error_resp().is_some_and(|e| e.code == -32601) => {
+                Ok(self.get_block_by_number(number).await?.map(|b| b.header().clone()))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Gets the bytecode located at the corresponding [`Address`].
