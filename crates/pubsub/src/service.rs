@@ -83,8 +83,7 @@ impl<T: PubSubConnect> PubSubService<T> {
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
         for (_, in_flight) in self.in_flights.iter() {
             let msg = in_flight.request.serialized().to_owned();
-            // Same as `dispatch_request`, but inlined to avoid double-borrowing `self`.
-            self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
+            self.dispatch_request(msg)?;
         }
 
         // Re-subscribe to all active subscriptions
@@ -100,7 +99,7 @@ impl<T: PubSubConnect> PubSubService<T> {
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
-            self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
+            self.dispatch_request(msg)?;
         }
 
         Ok(())
