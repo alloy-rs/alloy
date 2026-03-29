@@ -202,8 +202,7 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
                     .then_some(min_blob_fee),
-                max_blobs_per_tx: (max_blobs_per_tx != max_blob_count)
-                    .then_some(max_blobs_per_tx),
+                max_blobs_per_tx: (max_blobs_per_tx != max_blob_count).then_some(max_blobs_per_tx),
                 blob_base_cost: (blob_base_cost != 0).then_some(blob_base_cost),
             }
         }

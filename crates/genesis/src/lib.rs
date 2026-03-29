@@ -455,7 +455,6 @@ pub struct ChainConfig {
 #[cfg(feature = "serde-bincode-compat")]
 pub mod serde_bincode_compat {
     use alloc::{
-        borrow::Cow,
         collections::BTreeMap,
         string::{String, ToString},
     };
@@ -463,6 +462,47 @@ pub mod serde_bincode_compat {
     use alloy_serde::OtherFields;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`alloy_eips::eip7840::BlobParams`] representation.
+    ///
+    /// The original [`alloy_eips::eip7840::BlobParams`] uses a custom serde implementation
+    /// with `Option` fields via `SerdeHelper`, which is incompatible with bincode's legacy
+    /// format. This struct serializes the raw fields directly.
+    #[derive(Debug, Serialize, Deserialize)]
+    struct BincBlobParams {
+        target_blob_count: u64,
+        max_blob_count: u64,
+        update_fraction: u128,
+        min_blob_fee: u128,
+        max_blobs_per_tx: u64,
+        blob_base_cost: u64,
+    }
+
+    impl From<&alloy_eips::eip7840::BlobParams> for BincBlobParams {
+        fn from(value: &alloy_eips::eip7840::BlobParams) -> Self {
+            Self {
+                target_blob_count: value.target_blob_count,
+                max_blob_count: value.max_blob_count,
+                update_fraction: value.update_fraction,
+                min_blob_fee: value.min_blob_fee,
+                max_blobs_per_tx: value.max_blobs_per_tx,
+                blob_base_cost: value.blob_base_cost,
+            }
+        }
+    }
+
+    impl From<BincBlobParams> for alloy_eips::eip7840::BlobParams {
+        fn from(value: BincBlobParams) -> Self {
+            Self {
+                target_blob_count: value.target_blob_count,
+                max_blob_count: value.max_blob_count,
+                update_fraction: value.update_fraction,
+                min_blob_fee: value.min_blob_fee,
+                max_blobs_per_tx: value.max_blobs_per_tx,
+                blob_base_cost: value.blob_base_cost,
+            }
+        }
+    }
 
     /// Bincode-compatible [`super::ChainConfig`] serde implementation.
     ///
@@ -480,7 +520,7 @@ pub mod serde_bincode_compat {
     /// }
     /// ```
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct ChainConfig<'a> {
+    pub struct ChainConfig {
         chain_id: u64,
         #[serde(default)]
         homestead_block: Option<u64>,
@@ -545,14 +585,14 @@ pub mod serde_bincode_compat {
         #[serde(default)]
         deposit_contract_address: Option<Address>,
         #[serde(default)]
-        blob_schedule: Cow<'a, BTreeMap<String, super::BlobParams>>,
+        blob_schedule: BTreeMap<String, BincBlobParams>,
         /// Extra fields as string key-value pairs (bincode-compatible alternative to OtherFields)
         #[serde(default)]
         extra_fields: BTreeMap<String, String>,
     }
 
-    impl<'a> From<&'a super::ChainConfig> for ChainConfig<'a> {
-        fn from(value: &'a super::ChainConfig) -> Self {
+    impl From<&super::ChainConfig> for ChainConfig {
+        fn from(value: &super::ChainConfig) -> Self {
             Self {
                 chain_id: value.chain_id,
                 homestead_block: value.homestead_block,
@@ -586,7 +626,11 @@ pub mod serde_bincode_compat {
                 clique: value.clique,
                 parlia: value.parlia,
                 deposit_contract_address: value.deposit_contract_address,
-                blob_schedule: Cow::Borrowed(&value.blob_schedule),
+                blob_schedule: value
+                    .blob_schedule
+                    .iter()
+                    .map(|(k, v)| (k.clone(), BincBlobParams::from(v)))
+                    .collect(),
                 extra_fields: {
                     let mut extra_fields = BTreeMap::new();
                     for (k, v) in &value.extra_fields {
@@ -599,8 +643,8 @@ pub mod serde_bincode_compat {
         }
     }
 
-    impl From<ChainConfig<'_>> for super::ChainConfig {
-        fn from(value: ChainConfig<'_>) -> Self {
+    impl From<ChainConfig> for super::ChainConfig {
+        fn from(value: ChainConfig) -> Self {
             Self {
                 chain_id: value.chain_id,
                 homestead_block: value.homestead_block,
@@ -645,26 +689,30 @@ pub mod serde_bincode_compat {
                     extra_fields
                 },
                 deposit_contract_address: value.deposit_contract_address,
-                blob_schedule: value.blob_schedule.into_owned(),
+                blob_schedule: value
+                    .blob_schedule
+                    .into_iter()
+                    .map(|(k, v)| (k, alloy_eips::eip7840::BlobParams::from(v)))
+                    .collect(),
             }
         }
     }
 
-    impl<'a> SerializeAs<super::ChainConfig> for ChainConfig<'a> {
+    impl SerializeAs<super::ChainConfig> for ChainConfig {
         fn serialize_as<S>(source: &super::ChainConfig, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            ChainConfig::from(source).serialize(serializer)
+            Self::from(source).serialize(serializer)
         }
     }
 
-    impl<'de> DeserializeAs<'de, super::ChainConfig> for ChainConfig<'de> {
+    impl<'de> DeserializeAs<'de, super::ChainConfig> for ChainConfig {
         fn deserialize_as<D>(deserializer: D) -> Result<super::ChainConfig, D::Error>
         where
             D: Deserializer<'de>,
         {
-            ChainConfig::deserialize(deserializer).map(Into::into)
+            Self::deserialize(deserializer).map(Into::into)
         }
     }
 
