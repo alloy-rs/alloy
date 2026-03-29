@@ -173,6 +173,16 @@ mod serde_impl {
         target_blob_count: u64,
         #[serde(skip)]
         min_blob_fee: Option<u128>,
+        /// Maximum number of blobs per transaction.
+        ///
+        /// Defaults to `max_blob_count` if not set.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_blobs_per_tx: Option<u64>,
+        /// Minimum execution gas required to include a blob in a block.
+        ///
+        /// Defaults to `0` if not set.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        blob_base_cost: Option<u64>,
     }
 
     impl From<BlobParams> for SerdeHelper {
@@ -182,8 +192,8 @@ mod serde_impl {
                 max_blob_count,
                 update_fraction,
                 min_blob_fee,
-                max_blobs_per_tx: _,
-                blob_base_cost: _,
+                max_blobs_per_tx,
+                blob_base_cost,
             } = params;
 
             Self {
@@ -192,23 +202,91 @@ mod serde_impl {
                 update_fraction,
                 min_blob_fee: (min_blob_fee != eip4844::BLOB_TX_MIN_BLOB_GASPRICE)
                     .then_some(min_blob_fee),
+                max_blobs_per_tx: (max_blobs_per_tx != max_blob_count)
+                    .then_some(max_blobs_per_tx),
+                blob_base_cost: (blob_base_cost != 0).then_some(blob_base_cost),
             }
         }
     }
 
     impl From<SerdeHelper> for BlobParams {
         fn from(helper: SerdeHelper) -> Self {
-            let SerdeHelper { target_blob_count, max_blob_count, update_fraction, min_blob_fee } =
-                helper;
+            let SerdeHelper {
+                target_blob_count,
+                max_blob_count,
+                update_fraction,
+                min_blob_fee,
+                max_blobs_per_tx,
+                blob_base_cost,
+            } = helper;
 
             Self {
                 target_blob_count,
                 max_blob_count,
                 update_fraction,
                 min_blob_fee: min_blob_fee.unwrap_or(eip4844::BLOB_TX_MIN_BLOB_GASPRICE),
-                max_blobs_per_tx: max_blob_count,
-                blob_base_cost: 0,
+                max_blobs_per_tx: max_blobs_per_tx.unwrap_or(max_blob_count),
+                blob_base_cost: blob_base_cost.unwrap_or(0),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_blob_params_serde_roundtrip() {
+        // Test all predefined configurations roundtrip correctly.
+        let configs = [
+            ("cancun", BlobParams::cancun()),
+            ("prague", BlobParams::prague()),
+            ("osaka", BlobParams::osaka()),
+            ("bpo1", BlobParams::bpo1()),
+            ("bpo2", BlobParams::bpo2()),
+        ];
+
+        for (name, params) in configs {
+            let json = serde_json::to_string(&params).unwrap();
+            let deserialized: BlobParams = serde_json::from_str(&json).unwrap();
+            assert_eq!(params, deserialized, "serde roundtrip failed for {name}");
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_blob_params_serde_roundtrip_custom() {
+        // Test a custom configuration where max_blobs_per_tx != max_blob_count
+        // and blob_base_cost != 0.
+        let params = BlobParams {
+            target_blob_count: 4,
+            max_blob_count: 8,
+            update_fraction: 3338477,
+            min_blob_fee: 1,
+            max_blobs_per_tx: 6,
+            blob_base_cost: 8192,
+        };
+
+        let json = serde_json::to_string(&params).unwrap();
+        let deserialized: BlobParams = serde_json::from_str(&json).unwrap();
+        assert_eq!(params, deserialized);
+
+        // Verify the extra fields are present in JSON.
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["maxBlobsPerTx"], 6);
+        assert_eq!(value["blobBaseCost"], 8192);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_blob_params_serde_defaults_on_missing_fields() {
+        // When maxBlobsPerTx and blobBaseCost are absent, they should default
+        // to max_blob_count and 0 respectively.
+        let json = r#"{"baseFeeUpdateFraction":3338477,"max":8,"target":4}"#;
+        let params: BlobParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.max_blobs_per_tx, params.max_blob_count);
+        assert_eq!(params.blob_base_cost, 0);
     }
 }
