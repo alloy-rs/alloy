@@ -583,6 +583,11 @@ type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 #[cfg(any(test, feature = "anvil-node"))]
 impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     /// Build this provider with anvil, using the BoxTransport.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil(self) -> F::Provider
     where
         F: TxFiller<N> + ProviderLayer<L::Provider, N>,
@@ -597,6 +602,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
     /// Build this provider with anvil, using the BoxTransport. This
     /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil_with_wallet(
         self,
     ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<L::Provider, N>>::Provider
@@ -614,6 +624,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 
     /// Build this provider with anvil, using the BoxTransport. The
     /// given function is used to configure the anvil instance.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil_with_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
@@ -635,6 +650,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 
     /// Build this provider with anvil, using the BoxTransport. The
     /// given function is used to configure the anvil instance.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     #[deprecated(since = "0.12.6", note = "use `connect_anvil_with_config` instead")]
     pub fn on_anvil_with_config(
         self,
@@ -654,6 +674,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 
     /// Build this provider with anvil, using the BoxTransport.
     /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     pub fn connect_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
@@ -683,6 +708,11 @@ impl<L, F, N: Network> ProviderBuilder<L, F, N> {
 
     /// Build this provider with anvil, using the BoxTransport.
     /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
+    ///
+    /// This method requires the `anvil-node` feature on `alloy-provider`.
+    /// When using the `alloy` meta-crate, enable `provider-anvil-node`, or
+    /// combine `providers` with `node-bindings`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "anvil-node")))]
     #[deprecated(since = "0.12.6", note = "use `connect_anvil_with_wallet_and_config` instead")]
     pub fn on_anvil_with_wallet_and_config(
         self,

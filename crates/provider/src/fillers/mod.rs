@@ -376,6 +376,7 @@ where
     /// # use alloy_rpc_types_eth::TransactionRequest;
     /// # use alloy_network::TransactionBuilder;
     ///
+    /// # #[cfg(feature = "anvil-node")]
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     // Create transaction request
     ///     let tx_request = TransactionRequest::default()
@@ -400,6 +401,8 @@ where
     ///
     ///     Ok(())
     /// }
+    /// # #[cfg(not(feature = "anvil-node"))]
+    /// # fn example() {}
     /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
