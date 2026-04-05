@@ -181,3 +181,110 @@ async fn ws_unsubscribe() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+// <https://github.com/alloy-rs/alloy/issues/3821>
+// Server accepts the WS upgrade and then immediately sends a close frame.
+// With a bounded retry budget the provider call should return Err instead of
+// looping forever.
+#[tokio::test]
+async fn ws_close_frame_exhausts_retry_budget() {
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::tungstenite::{
+        protocol::{frame::coding::CloseCode, CloseFrame},
+        Message,
+    };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        loop {
+            let Ok((stream, _)) = listener.accept().await else { break };
+            tokio::spawn(async move {
+                let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await else {
+                    return;
+                };
+                // Read one request so the client actually sends something.
+                let _ = ws.next().await;
+                // Reply with a close frame carrying data, triggering the
+                // error path in WsBackend::handle.
+                let close = Message::Close(Some(CloseFrame {
+                    code: CloseCode::Again,
+                    reason: "service restart".into(),
+                }));
+                let _ = ws.send(close).await;
+            });
+        }
+    });
+
+    let ws = WsConnect::new(format!("ws://{addr}"))
+        .with_max_retries(2)
+        .with_retry_interval(std::time::Duration::from_millis(50));
+
+    let rpc_client = RpcClient::builder().ws(ws).await;
+    let Ok(rpc_client) = rpc_client else {
+        // If the initial connect itself failed, that is acceptable.
+        return;
+    };
+    let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(rpc_client);
+
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        provider.get_block_number(),
+    )
+    .await;
+    assert!(result.is_ok(), "get_block_number should not hang forever");
+    if let Ok(inner) = result {
+        assert!(inner.is_err(), "expected transport error from dying backend");
+    }
+}
+
+// <https://github.com/alloy-rs/alloy/issues/3821>
+// Server accepts the WS upgrade and echoes non-JSON-RPC text back. The
+// deserialization failure in WsBackend::handle_text triggers close_with_error,
+// which should be bounded by the new consecutive-death budget.
+#[tokio::test]
+async fn ws_invalid_text_exhausts_retry_budget() {
+    use futures::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        loop {
+            let Ok((stream, _)) = listener.accept().await else { break };
+            tokio::spawn(async move {
+                let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await else {
+                    return;
+                };
+                // Read the request, then send back garbage text that will
+                // fail JSON-RPC deserialization.
+                let _ = ws.next().await;
+                let _ = ws.send(Message::Text("not valid json-rpc".into())).await;
+            });
+        }
+    });
+
+    let ws = WsConnect::new(format!("ws://{addr}"))
+        .with_max_retries(2)
+        .with_retry_interval(std::time::Duration::from_millis(50));
+
+    let rpc_client = RpcClient::builder().ws(ws).await;
+    let Ok(rpc_client) = rpc_client else {
+        return;
+    };
+    let provider = ProviderBuilder::new().disable_recommended_fillers().connect_client(rpc_client);
+
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        provider.get_block_number(),
+    )
+    .await;
+    assert!(result.is_ok(), "get_block_number should not hang forever");
+    if let Ok(inner) = result {
+        assert!(inner.is_err(), "expected transport error from invalid text");
+    }
+}
