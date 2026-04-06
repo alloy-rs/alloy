@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use alloy_primitives::Bytes;
+use alloy_rlp::Encodable;
 use serde::{Deserialize, Serialize};
 
 /// Represents the execution witness of a block. Contains lists of required preimages and
@@ -61,4 +62,25 @@ pub struct ExecutionWitness {
     /// The naive way to construct the headers would be to unconditionally include the last
     /// 256 block headers. However note, we may not need all 256, like in the example above.
     pub headers: Vec<Bytes>,
+}
+
+impl ExecutionWitness {
+    /// Sets the `headers` field from already RLP-encoded headers.
+    pub fn with_rlp_headers(mut self, headers: Vec<Bytes>) -> Self {
+        self.headers = headers;
+        self
+    }
+
+    /// Sets the `headers` field by RLP-encoding each item.
+    pub fn with_headers<H: Encodable>(mut self, headers: impl IntoIterator<Item = H>) -> Self {
+        self.headers = headers
+            .into_iter()
+            .map(|header| {
+                let mut buf = Vec::new();
+                header.encode(&mut buf);
+                buf.into()
+            })
+            .collect();
+        self
+    }
 }

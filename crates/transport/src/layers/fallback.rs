@@ -158,6 +158,12 @@ where
         // Get the top transports to use for this request
         let top_transports = self.top_transports();
 
+        if top_transports.is_empty() {
+            return Err(TransportErrorKind::custom_str(
+                "No transports available for fallback service",
+            ));
+        }
+
         // Create a collection of future requests
         let mut futures = FuturesUnordered::new();
 
@@ -223,6 +229,12 @@ where
 
         // Get transports sorted by score (best first)
         let top_transports = self.top_transports();
+
+        if top_transports.is_empty() {
+            return Err(TransportErrorKind::custom_str(
+                "No transports available for fallback service",
+            ));
+        }
 
         let mut last_error = None;
 
