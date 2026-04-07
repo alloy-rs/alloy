@@ -368,13 +368,16 @@ mod tests {
         service.spawn();
 
         let first = Request::new("eth_blockNumber", Id::Number(1), ()).serialize().unwrap();
-        let (in_flight, rx) = InFlight::new(first, 16);
+        let expected_first = first.serialized().get().to_owned();
+        let (in_flight, _rx) = InFlight::new(first, 16);
         tx.send(PubSubInstruction::Request(in_flight)).unwrap();
 
-        timeout(Duration::from_secs(1), rx)
-            .await
-            .expect("failed request should resolve promptly")
-            .expect_err("raced request should be dropped when the backend is gone");
+        let replayed =
+            timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
+                .await
+                .expect("in-flight request should be replayed after reconnect")
+                .expect("reconnected backend should receive replayed request");
+        assert_eq!(replayed.get(), expected_first);
 
         let second = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
         let expected = second.serialized().get().to_owned();
