@@ -166,10 +166,9 @@ mod contract {
 #[cfg(feature = "provider")]
 mod provider {
     use crate::{
-        dns_encode, namehash, reverse_address, EnsError, EnsRegistry,
-        EnsResolver, EnsResolver::EnsResolverInstance,
-        ReverseRegistrar::ReverseRegistrarInstance, UniversalResolver,
-        ENS_ADDRESS, ENS_REVERSE_REGISTRAR_DOMAIN, UNIVERSAL_RESOLVER_ADDRESS,
+        dns_encode, namehash, reverse_address, EnsError, EnsRegistry, EnsResolver,
+        EnsResolver::EnsResolverInstance, ReverseRegistrar::ReverseRegistrarInstance,
+        UniversalResolver, ENS_ADDRESS, ENS_REVERSE_REGISTRAR_DOMAIN, UNIVERSAL_RESOLVER_ADDRESS,
     };
     use alloy_primitives::{Address, Bytes, B256};
     use alloy_provider::{Network, Provider};
@@ -318,7 +317,10 @@ pub fn namehash(name: &str) -> B256 {
 /// ```
 /// use alloy_ens::dns_encode;
 /// assert_eq!(dns_encode("eth"), vec![3, b'e', b't', b'h', 0]);
-/// assert_eq!(dns_encode("vitalik.eth"), vec![7, b'v', b'i', b't', b'a', b'l', b'i', b'k', 3, b'e', b't', b'h', 0]);
+/// assert_eq!(
+///     dns_encode("vitalik.eth"),
+///     vec![7, b'v', b'i', b't', b'a', b'l', b'i', b'k', 3, b'e', b't', b'h', 0]
+/// );
 /// ```
 pub fn dns_encode(name: &str) -> Vec<u8> {
     let mut result = Vec::with_capacity(name.len() + 2);
