@@ -372,11 +372,10 @@ mod tests {
         let (in_flight, _rx) = InFlight::new(first, 16);
         tx.send(PubSubInstruction::Request(in_flight)).unwrap();
 
-        let replayed =
-            timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
-                .await
-                .expect("in-flight request should be replayed after reconnect")
-                .expect("reconnected backend should receive replayed request");
+        let replayed = timeout(Duration::from_secs(1), reconnected_interface.recv_from_frontend())
+            .await
+            .expect("in-flight request should be replayed after reconnect")
+            .expect("reconnected backend should receive replayed request");
         assert_eq!(replayed.get(), expected_first);
 
         let second = Request::new("eth_chainId", Id::Number(2), ()).serialize().unwrap();
