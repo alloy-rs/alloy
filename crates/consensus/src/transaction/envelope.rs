@@ -1377,7 +1377,7 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
-        let tx = TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844(tx);
+        let tx: TxEip4844Variant = tx.into();
         let signature = Signature::test_signature().with_parity(true);
         test_encode_decode_roundtrip(tx, Some(signature));
     }
@@ -1531,7 +1531,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip_eip4844() {
-        let tx = TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844(TxEip4844 {
+        let tx: TxEip4844Variant = TxEip4844 {
             chain_id: 1,
             nonce: 100,
             max_fee_per_gas: 50_000_000_000,
@@ -1546,7 +1546,8 @@ mod tests {
             }]),
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
-        });
+        }
+        .into();
         test_serde_roundtrip(tx);
 
         let tx = TxEip4844Variant::<BlobTransactionSidecarVariant>::TxEip4844WithSidecar(
