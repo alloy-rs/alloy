@@ -31,7 +31,7 @@ async-trait = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-provider = { workspace = true, features = ["reqwest"] }
+alloy-provider = { workspace = true, features = ["reqwest", "reqwest-default-tls"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
