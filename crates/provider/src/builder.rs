@@ -6,6 +6,7 @@ use crate::{
     },
     layers::{BlockIdLayer, CallBatchLayer, ChainLayer},
     provider::SendableTx,
+    utils::Eip1559Estimator,
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
@@ -256,7 +257,17 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// See [`GasFiller`] for more information.
     pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
-        self.filler(GasFiller)
+        self.filler(GasFiller::default())
+    }
+
+    /// Add EIP-1559 gas estimation to the stack being built, using the provided estimator.
+    ///
+    /// See [`GasFiller`] and [`Eip1559Estimator`] for more information.
+    pub fn with_eip1559_estimator(
+        self,
+        estimator: Eip1559Estimator,
+    ) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
+        self.filler(GasFiller { estimator })
     }
 
     /// Add nonce management to the stack being built.
