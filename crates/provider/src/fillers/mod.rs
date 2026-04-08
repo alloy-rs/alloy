@@ -61,7 +61,7 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, EIP1186AccountProofResponse, EthCallResponse, FeeHistory, Filter,
-    FilterChanges, Log,
+    FilterChanges, Log, StorageValuesRequest, StorageValuesResponse,
 };
 use alloy_transport::{TransportError, TransportResult};
 use async_trait::async_trait;
@@ -376,6 +376,7 @@ where
     /// # use alloy_rpc_types_eth::TransactionRequest;
     /// # use alloy_network::TransactionBuilder;
     ///
+    /// # #[cfg(feature = "anvil-node")]
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     // Create transaction request
     ///     let tx_request = TransactionRequest::default()
@@ -400,6 +401,8 @@ where
     ///
     ///     Ok(())
     /// }
+    /// # #[cfg(not(feature = "anvil-node"))]
+    /// # fn example() {}
     /// ```
     pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
@@ -614,6 +617,13 @@ where
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.inner.get_storage_at(address, key)
+    }
+
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.inner.get_storage_values(requests)
     }
 
     fn get_transaction_by_hash(

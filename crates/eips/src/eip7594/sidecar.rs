@@ -29,6 +29,12 @@ pub enum BlobTransactionSidecarVariant {
     Eip7594(BlobTransactionSidecarEip7594),
 }
 
+impl Default for BlobTransactionSidecarVariant {
+    fn default() -> Self {
+        Self::Eip4844(BlobTransactionSidecar::default())
+    }
+}
+
 impl BlobTransactionSidecarVariant {
     /// Returns true if this is a [`BlobTransactionSidecarVariant::Eip4844`].
     pub const fn is_eip4844(&self) -> bool {
@@ -696,7 +702,8 @@ impl BlobTransactionSidecarEip7594 {
             let mut cells = Vec::with_capacity(blobs_len * CELLS_PER_EXT_BLOB);
             for blob in &self.blobs {
                 let blob = core::mem::transmute::<&Blob, &c_kzg::Blob>(blob);
-                cells.extend(proof_settings.compute_cells(blob)?.into_iter());
+                let blob_cells = proof_settings.compute_cells(blob)?;
+                cells.extend_from_slice(blob_cells.as_ref());
             }
 
             proof_settings.verify_cell_kzg_proof_batch(
@@ -984,6 +991,11 @@ pub mod serde_bincode_compat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "kzg")]
+    use crate::eip4844::{
+        builder::{SidecarBuilder, SimpleCoder},
+        env_settings::EnvKzgSettings,
+    };
 
     #[test]
     fn sidecar_variant_rlp_roundtrip() {
@@ -1073,5 +1085,15 @@ mod tests {
         encoded.clear();
         sidecar_variant_7594.encode_7594(&mut encoded);
         assert_eq!(sidecar_variant_7594, Decodable7594::decode_7594(&mut &encoded[..]).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "kzg")]
+    fn validate_7594_sidecar() {
+        let sidecar =
+            SidecarBuilder::<SimpleCoder>::from_slice(b"Blobs are fun!").build_7594().unwrap();
+        let versioned_hashes = sidecar.versioned_hashes().collect::<Vec<_>>();
+
+        sidecar.validate(&versioned_hashes, EnvKzgSettings::Default.get()).unwrap();
     }
 }

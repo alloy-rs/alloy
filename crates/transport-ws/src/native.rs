@@ -1,4 +1,4 @@
-use crate::WsBackend;
+use crate::{WsBackend, DEFAULT_KEEPALIVE};
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
 use futures::{SinkExt, StreamExt};
@@ -13,8 +13,6 @@ use tokio_tungstenite::{
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
-
-const KEEPALIVE: u64 = 10;
 
 /// Simple connection details for a websocket connection.
 #[derive(Clone, Debug)]
@@ -31,17 +29,27 @@ pub struct WsConnect {
     /// The interval between retries.
     /// Default is 3 seconds.
     retry_interval: Duration,
+    /// The interval between keepalive pings.
+    /// Default is 10 seconds.
+    keepalive_interval: Duration,
 }
 
 impl WsConnect {
     /// Creates a new websocket connection configuration.
+    ///
+    /// If the URL contains credentials (e.g. `wss://user:pass@host`), they are
+    /// automatically extracted and set as the [`Authorization`] header.
     pub fn new<S: Into<String>>(url: S) -> Self {
+        let url = url.into();
+        let auth =
+            url::Url::parse(&url).ok().and_then(|parsed| Authorization::extract_from_url(&parsed));
         Self {
-            url: url.into(),
-            auth: None,
+            url,
+            auth,
             config: None,
             max_retries: 10,
             retry_interval: Duration::from_secs(3),
+            keepalive_interval: Duration::from_secs(DEFAULT_KEEPALIVE),
         }
     }
 
@@ -93,6 +101,18 @@ impl WsConnect {
         self.retry_interval = retry_interval;
         self
     }
+
+    /// Sets the keepalive ping interval.
+    ///
+    /// A ping is sent if no other messages have been sent within this interval.
+    /// If the server does not respond with a pong before the next ping is due,
+    /// the connection is considered dead and will be closed.
+    ///
+    /// Default is 10 seconds.
+    pub const fn with_keepalive_interval(mut self, keepalive_interval: Duration) -> Self {
+        self.keepalive_interval = keepalive_interval;
+        self
+    }
 }
 
 impl IntoClientRequest for WsConnect {
@@ -115,6 +135,12 @@ impl PubSubConnect for WsConnect {
     }
 
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
+        // Install the default rustls crypto provider if not already set.
+        // Required since rustls 0.23+ no longer auto-installs a provider.
+        let _ = rustls::crypto::CryptoProvider::install_default(
+            rustls::crypto::aws_lc_rs::default_provider(),
+        );
+
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
         let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
@@ -122,7 +148,7 @@ impl PubSubConnect for WsConnect {
             .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-        let backend = WsBackend { socket, interface };
+        let backend = WsBackend { socket, interface, keepalive_interval: self.keepalive_interval };
 
         backend.spawn();
 
@@ -162,7 +188,7 @@ impl WsBackend<TungsteniteStream> {
         let fut = async move {
             let mut errored = false;
             let mut expecting_pong = false;
-            let keepalive = sleep(Duration::from_secs(KEEPALIVE));
+            let keepalive = sleep(self.keepalive_interval);
             tokio::pin!(keepalive);
             loop {
                 // We bias the loop as follows
@@ -170,7 +196,7 @@ impl WsBackend<TungsteniteStream> {
                 // 2. Keepalive.
                 // 3. Response or notification from server.
                 // This ensures that keepalive is sent only if no other messages
-                // have been sent in the last 10 seconds. And prioritizes new
+                // have been sent in the keepalive interval. And prioritizes new
                 // dispatches over responses from the server. This will fail if
                 // the client saturates the task with dispatches, but that's
                 // probably not a big deal.
@@ -183,7 +209,7 @@ impl WsBackend<TungsteniteStream> {
                         match inst {
                             Some(msg) => {
                                 // Reset the keepalive timer.
-                                keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
+                                keepalive.set(sleep(self.keepalive_interval));
                                 if let Err(err) = self.send(msg).await {
                                     error!(%err, "WS connection error");
                                     errored = true;
@@ -197,7 +223,7 @@ impl WsBackend<TungsteniteStream> {
                         }
                     },
                     // Send a ping to the server, if no other messages have been
-                    // sent in the last 10 seconds.
+                    // sent within the keepalive interval.
                     _ = &mut keepalive => {
                         // Still expecting a pong from the previous ping,
                         // meaning connection is errored.
@@ -207,7 +233,7 @@ impl WsBackend<TungsteniteStream> {
                             break
                         }
                         // Reset the keepalive timer.
-                        keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
+                        keepalive.set(sleep(self.keepalive_interval));
                         if let Err(err) = self.socket.send(Message::Ping(Default::default())).await {
                             error!(%err, "WS connection error");
                             errored = true;
@@ -245,5 +271,44 @@ impl WsBackend<TungsteniteStream> {
             }
         };
         fut.spawn_task()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_basic_auth_from_url() {
+        let ws = WsConnect::new("wss://user:pass@example.com/path");
+        assert_eq!(ws.url(), "wss://user:pass@example.com/path");
+        assert_eq!(ws.auth(), Some(&Authorization::basic("user", "pass")));
+    }
+
+    #[test]
+    fn parse_username_only_from_url() {
+        let ws = WsConnect::new("ws://user@example.com");
+        assert_eq!(ws.url(), "ws://user@example.com");
+        assert_eq!(ws.auth(), Some(&Authorization::basic("user", "")));
+    }
+
+    #[test]
+    fn no_auth_when_url_has_no_credentials() {
+        let ws = WsConnect::new("wss://example.com/rpc");
+        assert_eq!(ws.url(), "wss://example.com/rpc");
+        assert!(ws.auth().is_none());
+    }
+
+    #[test]
+    fn explicit_auth_overrides_url_auth() {
+        let ws =
+            WsConnect::new("wss://user:pass@example.com").with_auth(Authorization::bearer("tok"));
+        assert_eq!(ws.auth(), Some(&Authorization::bearer("tok")));
+    }
+
+    #[test]
+    fn no_auth_for_localhost_username() {
+        let ws = WsConnect::new("ws://localhost:8545");
+        assert!(ws.auth().is_none());
     }
 }

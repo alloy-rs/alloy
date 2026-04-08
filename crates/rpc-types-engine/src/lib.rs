@@ -45,6 +45,8 @@ pub use testing::*;
 
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobAndProofV1;
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobAndProofV2;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
 ///
@@ -66,4 +68,6 @@ pub const CAPABILITIES: &[&str] = &[
     "engine_newPayloadV4",
     "engine_getPayloadBodiesByHashV1",
     "engine_getPayloadBodiesByRangeV1",
+    "engine_getPayloadBodiesByHashV2",
+    "engine_getPayloadBodiesByRangeV2",
 ];

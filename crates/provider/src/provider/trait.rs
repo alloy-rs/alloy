@@ -4,7 +4,7 @@
 
 #[cfg(feature = "pubsub")]
 use super::get_block::SubFullBlocks;
-use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks};
+use super::{DynProvider, Empty, EthCallMany, MulticallBuilder, WatchBlocks, WatchHeaders};
 #[cfg(feature = "pubsub")]
 use crate::GetSubscription;
 use crate::{
@@ -30,7 +30,8 @@ use alloy_rpc_types_eth::{
     erc4337::TransactionConditional,
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, Bundle, EIP1186AccountProofResponse,
-    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log, SyncStatus,
+    EthCallResponse, FeeHistory, FillTransaction, Filter, FilterChanges, Index, Log,
+    StorageValuesRequest, StorageValuesResponse, SyncStatus,
 };
 use alloy_transport::TransportResult;
 use serde_json::value::RawValue;
@@ -143,8 +144,8 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
 
     /// Get the block number for a given block identifier.
     ///
-    /// This is a convenience function that fetches the full block when the block identifier is not
-    /// a number.
+    /// This is a convenience function that fetches the block header when the block identifier is
+    /// not a number. Falls back to fetching the full block if header RPC is not supported.
     async fn get_block_number_by_id(
         &self,
         block_id: BlockId,
@@ -152,10 +153,7 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         match block_id {
             BlockId::Number(BlockNumberOrTag::Number(num)) => Ok(Some(num)),
             BlockId::Number(BlockNumberOrTag::Latest) => self.get_block_number().await.map(Some),
-            _ => {
-                let block = self.get_block(block_id).await?;
-                Ok(block.map(|b| b.header().number()))
-            }
+            _ => Ok(self.get_header(block_id).await?.map(|h| h.number())),
         }
     }
 
@@ -468,6 +466,36 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         self.client().request("eth_getBlockReceipts", (block,)).into()
     }
 
+    /// Gets the EIP-7928 block access list by [`BlockId`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list(&self, block: BlockId) -> TransportResult<Option<Bytes>> {
+        match block {
+            BlockId::Hash(hash) => self.get_block_access_list_by_hash(hash.block_hash).await,
+            BlockId::Number(number) => self.get_block_access_list_by_number(number).await,
+        }
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockHash`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListByBlockHash", (hash,)).await
+    }
+
+    /// Gets the EIP-7928 block access list by [`BlockNumberOrTag`].
+    ///
+    /// Returns the RLP-encoded block access list, or `None` if the block is not found.
+    async fn get_block_access_list_by_number(
+        &self,
+        number: BlockNumberOrTag,
+    ) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getBlockAccessListByBlockNumber", (number,)).await
+    }
+
     /// Gets a block header by its [`BlockId`].
     ///
     /// # Examples
@@ -517,7 +545,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         hash: BlockHash,
     ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.client().request("eth_getHeaderByHash", (hash,)).await
+        match self.client().request("eth_getHeaderByHash", (hash,)).await {
+            Ok(header) => Ok(header),
+            // eth_getHeaderByHash is non-standard; fall back to eth_getBlockByHash
+            Err(err) if err.as_error_resp().is_some_and(|e| e.code == -32601) => {
+                Ok(self.get_block_by_hash(hash).await?.map(|b| b.header().clone()))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Gets a block header by its [`BlockNumberOrTag`].
@@ -544,7 +579,14 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         &self,
         number: BlockNumberOrTag,
     ) -> TransportResult<Option<N::HeaderResponse>> {
-        self.client().request("eth_getHeaderByNumber", (number,)).await
+        match self.client().request("eth_getHeaderByNumber", (number,)).await {
+            Ok(header) => Ok(header),
+            // eth_getHeaderByNumber is non-standard; fall back to eth_getBlockByNumber
+            Err(err) if err.as_error_resp().is_some_and(|e| e.code == -32601) => {
+                Ok(self.get_block_by_number(number).await?.map(|b| b.header().clone()))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// Gets the bytecode located at the corresponding [`Address`].
@@ -607,6 +649,39 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
 
         Ok(WatchBlocks::new(poller))
+    }
+
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes) and fetching the header for each
+    /// returned block hash.
+    ///
+    /// Returns the [`WatchHeaders`] type which consumes the stream of block hashes from
+    /// [`PollerBuilder`] and returns a stream of [`alloy_network_primitives::HeaderResponse`]s.
+    ///
+    /// Note that the backing RPC methods (`eth_getHeaderByHash` / `eth_getHeaderByNumber`) are
+    /// not supported by all clients.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 headers:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_headers().await?;
+    /// let mut stream = poller.into_stream().take(5);
+    /// while let Some(header) = stream.next().await {
+    ///   println!("new header: {header:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn watch_headers(&self) -> TransportResult<WatchHeaders<N::HeaderResponse>> {
+        let id = self.new_block_filter().await?;
+        let poller = PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,));
+
+        Ok(WatchHeaders::new(poller))
     }
 
     /// Watch for new pending transaction by polling the provider with
@@ -767,6 +842,16 @@ pub trait Provider<N: Network = Ethereum>: Send + Sync {
         key: U256,
     ) -> RpcWithBlock<(Address, U256), StorageValue> {
         self.client().request("eth_getStorageAt", (address, key)).into()
+    }
+
+    /// Batch-fetches storage values from multiple addresses at multiple keys.
+    ///
+    /// See [EIP spec](https://github.com/ethereum/execution-apis/issues/752).
+    fn get_storage_values(
+        &self,
+        requests: StorageValuesRequest,
+    ) -> RpcWithBlock<(StorageValuesRequest,), StorageValuesResponse> {
+        self.client().request("eth_getStorageValues", (requests,)).into()
     }
 
     /// Gets a transaction by its sender and nonce.

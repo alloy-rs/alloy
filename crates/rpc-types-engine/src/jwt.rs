@@ -1,4 +1,21 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
+//!
+//! # Feature flags
+//!
+//! This module is gated behind the `jwt` feature, which is **not enabled by default**.
+//! Enabling `jwt` alone is not sufficient to build this crate: the underlying
+//! [`jsonwebtoken`] crate requires a cryptographic backend, and this crate does not
+//! select one for you. You must opt in to a backend explicitly via one of:
+//!
+//! - `jwt-aws-lc-rs` — enables `jwt` together with `jsonwebtoken/aws_lc_rs` (recommended
+//!   for most platforms; uses [aws-lc-rs](https://github.com/aws/aws-lc-rs)).
+//! - Enabling `jsonwebtoken/rust_crypto` (or the individual `hmac` + `sha2` features) from your own
+//!   `Cargo.toml` if you prefer the pure-Rust backend.
+//!
+//! Building with just `jwt` and no backend will fail to link the HS256 implementation
+//! used by [`JwtSecret::validate`] and [`JwtSecret::encode`]. This is intentional so
+//! downstream crates can choose the backend that fits their target and licensing
+//! constraints rather than inheriting one transitively.
 
 use alloc::string::String;
 use alloy_primitives::hex;
@@ -107,6 +124,10 @@ const JWT_SECRET_LEN: usize = 64;
 /// The JWT `iat` (issued-at) claim cannot exceed +-60 seconds from the current time.
 const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
+/// The JWT `exp` (expiration time) claim is accepted if not older than 60 seconds from the current
+/// time.
+const JWT_EXP_GRACE_PERIOD_SECS: Duration = Duration::from_secs(60);
+
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
 #[cfg(feature = "serde")]
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
@@ -143,6 +164,13 @@ impl Claims {
     pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
         now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
+    }
+
+    /// Returns true if there is no `exp` claim or if the token is not yet expired (with leeway).
+    pub fn is_exp_valid(&self) -> bool {
+        let Some(exp) = self.exp else { return true };
+        let now_secs = get_current_timestamp();
+        exp + JWT_EXP_GRACE_PERIOD_SECS.as_secs() >= now_secs
     }
 }
 
@@ -216,18 +244,30 @@ impl JwtSecret {
     /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
+    ///
+    /// # Crypto backend
+    ///
+    /// HS256 verification is performed by [`jsonwebtoken`], which requires a cryptographic
+    /// backend to be selected at build time. This crate does not pick one for you; enable
+    /// either the `jwt-aws-lc-rs` feature on this crate, or one of `jsonwebtoken`'s own
+    /// backend features (`aws_lc_rs`, `rust_crypto`, or `hmac` + `sha2`) from your
+    /// `Cargo.toml`. Without a backend selected the crate will fail to build.
     #[cfg(feature = "serde")]
     pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
         // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
         let mut validation = Validation::new(JWT_SIGNATURE_ALGO);
-        validation.set_required_spec_claims(&["iat"]);
+        validation.required_spec_claims.clear();
+        validation.validate_exp = false;
         let bytes = &self.0;
 
         match jsonwebtoken::decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
             Ok(token) => {
                 if !token.claims.is_within_time_window() {
                     Err(JwtError::InvalidIssuanceTimestamp)?
+                }
+                if !token.claims.is_exp_valid() {
+                    Err(JwtError::JwtDecodingError("exp claim has expired".into()))?
                 }
             }
             Err(err) => match *err.kind() {
@@ -266,7 +306,7 @@ impl JwtSecret {
 
 impl core::fmt::Debug for JwtSecret {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("JwtSecretHash").field(&"{{}}").finish()
+        f.debug_tuple("JwtSecret").field(&"{{}}").finish()
     }
 }
 

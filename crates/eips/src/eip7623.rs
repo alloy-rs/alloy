@@ -5,8 +5,8 @@
 /// The standard cost of calldata token.
 pub const STANDARD_TOKEN_COST: u64 = 4;
 
-/// The cost of a non-zero byte in calldata.
-pub const NON_ZERO_BYTE_DATA_COST: u64 = 68;
+/// The cost of a non-zero byte in calldata post-[EIP-2028](https://eips.ethereum.org/EIPS/eip-2028).
+pub const NON_ZERO_BYTE_DATA_COST: u64 = 16;
 
 /// The multiplier for a non zero byte in calldata.
 pub const NON_ZERO_BYTE_MULTIPLIER: u64 = NON_ZERO_BYTE_DATA_COST / STANDARD_TOKEN_COST;
