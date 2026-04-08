@@ -72,7 +72,7 @@ hyper-tls = ["hyper", "dep:hyper-tls"]
 jwt-auth = [
     "hyper",
     "dep:alloy-rpc-types-engine",
-    "alloy-rpc-types-engine/jwt",
+    "alloy-rpc-types-engine/jwt-aws-lc-rs",
     "alloy-rpc-types-engine/serde",
     "dep:jsonwebtoken",
 ]
