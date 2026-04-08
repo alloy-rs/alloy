@@ -169,7 +169,8 @@ pub struct AccountOverride {
         serde(
             default,
             skip_serializing_if = "Option::is_none",
-            rename = "movePrecompileToAddress"
+            rename = "movePrecompileToAddress",
+            alias = "MovePrecompileToAddress"
         )
     )]
     pub move_precompile_to: Option<Address>,

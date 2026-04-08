@@ -23,7 +23,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Stops impersonating an account if previously set with `anvil_impersonateAccount`.
     async fn anvil_stop_impersonating_account(&self, address: Address) -> TransportResult<()>;
 
-    /// If set to true will make every account impersonated.
+    /// If set to `true`, impersonates all accounts.
     async fn anvil_auto_impersonate_account(&self, enabled: bool) -> TransportResult<()>;
 
     /// Impersonates the `from` address in the given transaction request, optionally funds the
@@ -152,7 +152,7 @@ pub trait AnvilApi<N: Network>: Send + Sync {
     /// Reorg the chain
     async fn anvil_reorg(&self, options: ReorgOptions) -> TransportResult<()>;
 
-    /// Rollback the chain  
+    /// Rollback the chain
     async fn anvil_rollback(&self, depth: Option<u64>) -> TransportResult<()>;
 
     /// Retrieves a blob by its versioned hash.
@@ -525,7 +525,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -566,7 +566,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -595,7 +595,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -1235,12 +1235,12 @@ mod tests {
                     let bob = accounts[1];
                     let sidecar: SidecarBuilder<SimpleCoder> =
                         SidecarBuilder::from_slice(b"Blobs are fun!");
-                    let sidecar = sidecar.build().unwrap();
+                    let sidecar = sidecar.build_4844().unwrap();
 
                     let tx = TransactionRequest::default()
                         .with_from(alice)
                         .with_to(bob)
-                        .with_blob_sidecar(sidecar.clone());
+                        .with_blob_sidecar_4844(sidecar.clone());
 
                     let pending_tx = provider.send_transaction(tx).await.unwrap();
                     let _receipt = pending_tx.get_receipt().await.unwrap();
@@ -1275,12 +1275,12 @@ mod tests {
                     let bob = accounts[1];
                     let sidecar: SidecarBuilder<SimpleCoder> =
                         SidecarBuilder::from_slice(b"Blobs are fun!");
-                    let sidecar = sidecar.build().unwrap();
+                    let sidecar = sidecar.build_4844().unwrap();
 
                     let tx = TransactionRequest::default()
                         .with_from(alice)
                         .with_to(bob)
-                        .with_blob_sidecar(sidecar.clone());
+                        .with_blob_sidecar_4844(sidecar.clone());
 
                     let pending_tx = provider.send_transaction(tx).await.unwrap();
                     let receipt = pending_tx.get_receipt().await.unwrap();

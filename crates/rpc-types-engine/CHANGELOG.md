@@ -5,10 +5,195 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3](https://github.com/alloy-rs/alloy/releases/tag/v1.8.3) - 2026-03-27
+
+### Miscellaneous Tasks
+
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.0
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Bug Fixes
+
+- Correct Debug trait name for `JwtSecret` ([#3736](https://github.com/alloy-rs/alloy/issues/3736))
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+
+## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+### Performance
+
+- [engine] Remove serde(flatten) from execution payload types ([#3713](https://github.com/alloy-rs/alloy/issues/3713))
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
+
+### Dependencies
+
+- Remove jsonrpsee dependencies ([#3690](https://github.com/alloy-rs/alloy/issues/3690))
+
+### Features
+
+- [provider] Add engine_getBlobsV1/V2 to EngineApi trait ([#3670](https://github.com/alloy-rs/alloy/issues/3670))
+
+### Miscellaneous Tasks
+
+- Release 1.7.0
+
+## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.3
+
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Features
+
+- [rpc-types-engine] Add `into_block_raw_with_transactions_root` to execution payloads ([#3452](https://github.com/alloy-rs/alloy/issues/3452))
+
+### Miscellaneous Tasks
+
+- Release 1.6.2
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Features
+
+- [rpc-types-engine] Add ExecutionPayloadBodyV2 for EIP-7928 ([#3636](https://github.com/alloy-rs/alloy/issues/3636))
+- [rpc-types-engine] Add into_payload_and_sidecar to V4 and V5 envelopes ([#3624](https://github.com/alloy-rs/alloy/issues/3624))
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+### Other
+
+- Revert "chore: "reapply "chore: added slot num in payload attr"" ([#3567](https://github.com/alloy-rs/alloy/issues/3567))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Bug Fixes
+
+- Avoid cloning withdrawals in payload body ([#3542](https://github.com/alloy-rs/alloy/issues/3542))
+
+### Features
+
+- [engine] Add ExecutionPayloadV4 and ExecutionPayloadEnvelopeV6 types ([#3552](https://github.com/alloy-rs/alloy/issues/3552))
+- [rpc-types-engine] Add transaction_count helper to ExecutionData ([#3543](https://github.com/alloy-rs/alloy/issues/3543))
+- Add versioned_hashes helper to BlobsBundle and try_into_sealed to AnyRpcBlock ([#3527](https://github.com/alloy-rs/alloy/issues/3527))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- "reapply "chore: added slot num in payload attr" ([#3530](https://github.com/alloy-rs/alloy/issues/3530))
+- Added slot num in payload attr ([#3524](https://github.com/alloy-rs/alloy/issues/3524))
+
+### Other
+
+- Revert "chore: added slot num in payload attr" ([#3528](https://github.com/alloy-rs/alloy/issues/3528))
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Features
+
+- Add engine_getPayloadV5 ([#3515](https://github.com/alloy-rs/alloy/issues/3515))
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Features
+
+- [engine] Add TestingApi with testing_buildBlockV1 support ([#3511](https://github.com/alloy-rs/alloy/issues/3511))
+- [rpc-types-engine] Add ExecutionPayloadEnvelope V4/V5 conversions ([#3510](https://github.com/alloy-rs/alloy/issues/3510))
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
+### Miscellaneous Tasks
+
+- Release 1.4.0
+- Update alloy-trie ([#3454](https://github.com/alloy-rs/alloy/issues/3454))
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Bug Fixes
+
+- [rpc-types-engine] Correct doc comment for PrePragueBlockWithEip7702Transactions ([#3437](https://github.com/alloy-rs/alloy/issues/3437))
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Documentation
+
+- Fix Maybe*PayloadFields into_inner doc comments ([#3324](https://github.com/alloy-rs/alloy/issues/3324))
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Miscellaneous Tasks
 
+- Release 1.1.3
 - Add contains helper ([#3302](https://github.com/alloy-rs/alloy/issues/3302))
 
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
@@ -626,18 +811,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.3](https://github.com/alloy-rs/alloy/releases/tag/v0.7.3) - 2024-12-05
 
-### Miscellaneous Tasks
-
-- Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
 ### Dependencies
 
 - [general] Bump MSRV to 1.81, use `core::error::Error` on `no-std` compatible crates ([#1552](https://github.com/alloy-rs/alloy/issues/1552))
 
 ### Miscellaneous Tasks
 
+- Release 0.7.3
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 
 ### Other

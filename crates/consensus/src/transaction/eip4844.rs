@@ -11,7 +11,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
-use core::{fmt, mem};
+use core::fmt;
 
 #[cfg(feature = "kzg")]
 use alloy_eips::eip4844::BlobTransactionValidationError;
@@ -29,7 +29,7 @@ use alloy_eips::eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarV
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionVariant")]
-pub enum TxEip4844Variant<T = BlobTransactionSidecar> {
+pub enum TxEip4844Variant<T = BlobTransactionSidecarVariant> {
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
     /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
@@ -72,6 +72,14 @@ impl<T: Encodable7594> From<Signed<TxEip4844WithSidecar<T>>> for Signed<TxEip484
     fn from(value: Signed<TxEip4844WithSidecar<T>>) -> Self {
         let (tx, signature, hash) = value.into_parts();
         Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
+    }
+}
+
+impl From<TxEip4844WithSidecar<BlobTransactionSidecar>>
+    for TxEip4844Variant<BlobTransactionSidecarVariant>
+{
+    fn from(tx: TxEip4844WithSidecar<BlobTransactionSidecar>) -> Self {
+        Self::TxEip4844WithSidecar(tx.map_sidecar(Into::into))
     }
 }
 
@@ -170,7 +178,7 @@ impl<T> TxEip4844Variant<T> {
     pub fn take_sidecar(&mut self) -> Option<T> {
         // Use a placeholder to temporarily replace self
         let placeholder = Self::TxEip4844(TxEip4844::default());
-        match mem::replace(self, placeholder) {
+        match core::mem::replace(self, placeholder) {
             tx @ Self::TxEip4844(_) => {
                 // Put the original transaction back
                 *self = tx;
@@ -839,17 +847,10 @@ impl TxEip4844 {
     /// Calculates a heuristic for the in-memory size of the [TxEip4844Variant] transaction.
     #[inline]
     pub fn size(&self) -> usize {
-        mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<u64>() + // gas_limit
-        mem::size_of::<u128>() + // max_fee_per_gas
-        mem::size_of::<u128>() + // max_priority_fee_per_gas
-        mem::size_of::<Address>() + // to
-        mem::size_of::<U256>() + // value
-        self.access_list.size() + // access_list
-        self.input.len() +  // input
-        self.blob_versioned_hashes.capacity() * mem::size_of::<B256>() + // blob hashes size
-        mem::size_of::<u128>() // max_fee_per_data_gas
+        size_of::<Self>()
+            + self.access_list.size()
+            + self.input.len()
+            + self.blob_versioned_hashes.capacity() * size_of::<B256>()
     }
 }
 
@@ -1046,7 +1047,7 @@ impl<T> From<TxEip4844WithSidecar<T>> for TxEip4844 {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
-pub struct TxEip4844WithSidecar<T = BlobTransactionSidecar> {
+pub struct TxEip4844WithSidecar<T = BlobTransactionSidecarVariant> {
     /// The actual transaction.
     #[cfg_attr(feature = "serde", serde(flatten))]
     #[doc(alias = "transaction")]

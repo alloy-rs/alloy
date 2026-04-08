@@ -1,6 +1,3 @@
-// Allow to keep the deprecated items for compatibility
-#![allow(deprecated)]
-
 use crate::{u256_numeric_string, Privacy, Validity};
 
 use alloy_eips::{eip2718::Encodable2718, BlockNumberOrTag};

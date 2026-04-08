@@ -31,7 +31,6 @@ alloy-consensus = { workspace = true, features = ["serde"] }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-rand.workspace = true
 
 [features]
 default = ["std"]

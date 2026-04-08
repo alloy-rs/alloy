@@ -7,17 +7,12 @@ use alloc::{
     vec::Vec,
 };
 use alloy_consensus::{
-    error::ValueError, transaction::Recovered, BlobTransactionSidecar, SignableTransaction,
+    error::ValueError, transaction::Recovered, BlobTransactionSidecarVariant, SignableTransaction,
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
     TxLegacy, TxType, Typed2718, TypedTransaction,
 };
-use alloy_eips::{
-    eip7594::{BlobTransactionSidecarEip7594, BlobTransactionSidecarVariant},
-    eip7702::SignedAuthorization,
-};
-use alloy_network_primitives::{
-    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
-};
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::{TransactionBuilder4844, TransactionBuilder7702};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use core::{hash::Hash, str::FromStr};
 
@@ -252,6 +247,13 @@ impl TransactionRequest {
         self
     }
 
+    /// Marks this transaction as a contract creation (deploy) with no recipient.
+    #[inline]
+    pub const fn create(mut self) -> Self {
+        self.to = Some(TxKind::Create);
+        self
+    }
+
     /// Sets the value (amount) for the transaction.
     pub const fn value(mut self, value: U256) -> Self {
         self.value = Some(value);
@@ -333,6 +335,20 @@ impl TransactionRequest {
         self.sidecar.is_some()
             || self.blob_versioned_hashes.is_some()
             || self.max_fee_per_blob_gas.is_some()
+    }
+
+    /// Returns true if the EIP-4844 blob data fields are set (sidecar or versioned hashes).
+    ///
+    /// This differs from [`Self::has_eip4844_fields`] in that it does not consider
+    /// `max_fee_per_blob_gas` alone as sufficient to indicate a blob transaction.
+    /// This matches go-ethereum behavior where only the presence of `blob_versioned_hashes`
+    /// determines if a transaction is a blob transaction.
+    ///
+    /// Use this method when determining the transaction type for building/simulation,
+    /// as just having a blob fee cap without actual blob data should not force the
+    /// transaction to be EIP-4844.
+    pub const fn has_eip4844_blob_data(&self) -> bool {
+        self.sidecar.is_some() || self.blob_versioned_hashes.is_some()
     }
 
     /// Returns true if _any_ of the EIP-1559 fee fields are set:
@@ -582,9 +598,7 @@ impl TransactionRequest {
     pub fn build_4844_with_sidecar(mut self) -> Result<TxEip4844WithSidecar, ValueError<Self>> {
         self.populate_blob_hashes();
 
-        let Some(sidecar) =
-            self.sidecar.take().and_then(BlobTransactionSidecarVariant::into_eip4844)
-        else {
+        let Some(sidecar) = self.sidecar.take() else {
             return Err(ValueError::new(self, "Missing 'sidecar' field for Eip4844 transaction."));
         };
 
@@ -737,10 +751,14 @@ impl TransactionRequest {
     ///
     /// The type is determined in the following order:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if any EIP-4844 fields are set (sidecar, blob hashes, max blob fee)
+    /// - EIP-4844 if blob data fields are set (sidecar or blob hashes)
     /// - EIP-1559 if any EIP-1559 fee fields are set (max fee per gas, max priority fee)
     /// - EIP-2930 if access_list is set
     /// - Legacy otherwise
+    ///
+    /// Note: `max_fee_per_blob_gas` alone does NOT indicate EIP-4844. This matches go-ethereum
+    /// behavior where only the presence of `blob_versioned_hashes` or sidecar determines if a
+    /// transaction is a blob transaction.
     ///
     /// # Examples
     ///
@@ -754,8 +772,12 @@ impl TransactionRequest {
     /// request.authorization_list = Some(vec![]);
     /// assert_eq!(request.minimal_tx_type(), TxType::Eip7702);
     ///
-    /// // EIP-4844 with max_fee_per_blob_gas
+    /// // max_fee_per_blob_gas alone does NOT make it EIP-4844
     /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.minimal_tx_type(), TxType::Legacy); // NOT Eip4844!
+    ///
+    /// // EIP-4844 with blob_versioned_hashes
+    /// let request = TransactionRequest { blob_versioned_hashes: Some(vec![]), ..Default::default() };
     /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
     ///
     /// // EIP-1559 with max_fee_per_gas
@@ -774,16 +796,18 @@ impl TransactionRequest {
     /// let request = TransactionRequest::default();
     /// assert_eq!(request.minimal_tx_type(), TxType::Legacy);
     ///
-    /// // Priority example: EIP-4844 overrides EIP-1559
-    /// let mut request = TransactionRequest::default()
-    ///     .max_fee_per_gas(2000000000) // EIP-1559 (ignored)
-    ///     .max_fee_per_blob_gas(1000000000); // EIP-4844 (takes priority)
+    /// // Priority example: EIP-4844 (with blob hashes) overrides EIP-1559
+    /// let request = TransactionRequest {
+    ///     max_fee_per_gas: Some(2000000000),
+    ///     blob_versioned_hashes: Some(vec![]),
+    ///     ..Default::default()
+    /// };
     /// assert_eq!(request.minimal_tx_type(), TxType::Eip4844);
     /// ```
     pub const fn minimal_tx_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.has_eip4844_fields() {
+        } else if self.has_eip4844_blob_data() {
             TxType::Eip4844
         } else if self.has_eip1559_fields() {
             TxType::Eip1559
@@ -802,10 +826,14 @@ impl TransactionRequest {
     ///
     /// Types are preferred as follows:
     /// - EIP-7702 if authorization_list is set
-    /// - EIP-4844 if sidecar, blob_versioned_hashes, or max_blob_fee_per_gas is set
+    /// - EIP-4844 if sidecar or blob_versioned_hashes is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
+    ///
+    /// Note: `max_fee_per_blob_gas` alone does NOT indicate EIP-4844. This matches go-ethereum
+    /// behavior where only the presence of `blob_versioned_hashes` or sidecar determines if a
+    /// transaction is a blob transaction.
     ///
     /// # Examples
     ///
@@ -819,8 +847,12 @@ impl TransactionRequest {
     /// request.authorization_list = Some(vec![]);
     /// assert_eq!(request.preferred_type(), TxType::Eip7702);
     ///
-    /// // EIP-4844 with max_fee_per_blob_gas
+    /// // EIP-4844 requires blob_versioned_hashes or sidecar, not just max_fee_per_blob_gas
     /// let request = TransactionRequest::default().max_fee_per_blob_gas(1000000000);
+    /// assert_eq!(request.preferred_type(), TxType::Eip1559); // NOT Eip4844!
+    ///
+    /// // EIP-4844 with blob_versioned_hashes
+    /// let request = TransactionRequest { blob_versioned_hashes: Some(vec![]), ..Default::default() };
     /// assert_eq!(request.preferred_type(), TxType::Eip4844);
     ///
     /// // EIP-2930 with both access_list and gas_price
@@ -866,7 +898,7 @@ impl TransactionRequest {
     pub const fn preferred_type(&self) -> TxType {
         if self.authorization_list.is_some() {
             TxType::Eip7702
-        } else if self.has_eip4844_fields() {
+        } else if self.has_eip4844_blob_data() {
             TxType::Eip4844
         } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
@@ -1071,12 +1103,16 @@ impl TransactionBuilder4844 for TransactionRequest {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.sidecar.as_ref().and_then(BlobTransactionSidecarVariant::as_eip4844)
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecarVariant> {
+        self.sidecar.as_ref()
     }
 
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.sidecar = Some(sidecar.into());
+    fn has_blob_sidecar(&self) -> bool {
+        self.sidecar.is_some()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecarVariant) {
+        self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
     }
 }
@@ -1088,24 +1124,6 @@ impl TransactionBuilder7702 for TransactionRequest {
 
     fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
         self.authorization_list = Some(authorization_list);
-    }
-}
-
-impl TransactionBuilder7594 for TransactionRequest {
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.max_fee_per_blob_gas
-    }
-
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
-        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
-    }
-
-    fn blob_sidecar_7594(&self) -> Option<&BlobTransactionSidecarEip7594> {
-        self.sidecar.as_ref().and_then(BlobTransactionSidecarVariant::as_eip7594)
-    }
-
-    fn set_blob_sidecar_7594(&mut self, sidecar: BlobTransactionSidecarEip7594) {
-        self.sidecar = Some(BlobTransactionSidecarVariant::Eip7594(sidecar));
     }
 }
 
@@ -1130,7 +1148,7 @@ impl AsMut<Self> for TransactionRequest {
 
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> Self {
-        tx.into_request()
+        tx.into_recovered().into()
     }
 }
 
@@ -1239,7 +1257,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
     fn from(tx: TxEip4844WithSidecar) -> Self {
         let TxEip4844WithSidecar { tx, sidecar } = tx;
         let mut tx: Self = tx.into();
-        tx.sidecar = Some(sidecar.into());
+        tx.sidecar = Some(sidecar);
         tx
     }
 }
@@ -1248,7 +1266,11 @@ impl From<TxEip4844Variant> for TransactionRequest {
     fn from(tx: TxEip4844Variant) -> Self {
         match tx {
             TxEip4844Variant::TxEip4844(tx) => tx.into(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.into(),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+                let mut req: Self = tx.tx.into();
+                req.sidecar = Some(tx.sidecar);
+                req
+            }
         }
     }
 }
@@ -1294,6 +1316,12 @@ impl From<TypedTransaction> for TransactionRequest {
             TypedTransaction::Eip4844(tx) => tx.into(),
             TypedTransaction::Eip7702(tx) => tx.into(),
         }
+    }
+}
+
+impl<T: TransactionTrait> From<Recovered<T>> for TransactionRequest {
+    fn from(tx: Recovered<T>) -> Self {
+        Self::from_recovered_transaction(tx)
     }
 }
 
@@ -1537,7 +1565,7 @@ pub(super) mod serde_bincode_compat {
         use crate::TransactionRequest;
         use arbitrary::Arbitrary;
         use bincode::config;
-        use rand::Rng;
+        use rand::{rngs::StdRng, Rng, SeedableRng};
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
 
@@ -1553,7 +1581,7 @@ pub(super) mod serde_bincode_compat {
             }
 
             let mut bytes = vec![0u8; 1024];
-            rand::thread_rng().fill(bytes.as_mut_slice());
+            StdRng::seed_from_u64(0x3600_4844_7594_7702).fill(bytes.as_mut_slice());
             let data = Data {
                 transaction: TransactionRequest::arbitrary(&mut arbitrary::Unstructured::new(
                     &bytes,
@@ -1666,7 +1694,7 @@ impl TransactionInput {
     pub fn normalize_input(&mut self) {
         let data = self.data.take();
         // If input is None but data has a value, copy data to input
-        if self.input.is_none() && data.is_some() {
+        if self.input.is_none() {
             self.input = data;
         }
     }
@@ -1682,7 +1710,7 @@ impl TransactionInput {
     /// This removes `input` the data field.
     pub fn normalize_data(&mut self) {
         let input = self.input.take();
-        if self.data.is_none() && input.is_some() {
+        if self.data.is_none() {
             self.data = input;
         }
     }
@@ -1791,6 +1819,7 @@ pub struct FillTransaction<T = TypedTransaction> {
 mod tests {
     use super::*;
     use crate::Authorization;
+    use alloy_consensus::BlobTransactionSidecarEip7594;
     use alloy_primitives::b256;
     #[cfg(feature = "serde")]
     use alloy_serde::WithOtherFields;
@@ -2112,6 +2141,32 @@ mod tests {
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
 
+        // EIP-4844 with EIP-7594 sidecar
+        {
+            use alloy_eips::eip4844::Blob;
+
+            // Positive case
+            let sidecar = BlobTransactionSidecarEip7594::new(
+                vec![Blob::repeat_byte(0xFA)],
+                Vec::new(),
+                Vec::new(),
+            );
+            let eip4844_request = TransactionRequest {
+                to: Some(TxKind::Call(Address::repeat_byte(0xDE))),
+                max_fee_per_gas: Some(1234),
+                max_priority_fee_per_gas: Some(678),
+                nonce: Some(57),
+                gas: Some(123456),
+                max_fee_per_blob_gas: Some(13579),
+                blob_versioned_hashes: Some(vec![B256::repeat_byte(0xAB)]),
+                sidecar: Some(sidecar.into()),
+                ..Default::default()
+            };
+
+            // this panics because EIP-7594 sidecar is ignored
+            eip4844_request.build_consensus_tx().unwrap();
+        }
+
         // EIP-7702
         {
             let eip4844_request = TransactionRequest {
@@ -2189,5 +2244,33 @@ mod tests {
         let auths = req.authorization_list.unwrap();
         assert_eq!(auths.len(), 1);
         assert_eq!(auths[0].y_parity(), 0);
+    }
+
+    #[test]
+    fn set_blob_sidecar_7594_populates_versioned_hashes() {
+        use alloy_eips::eip4844::{kzg_to_versioned_hash, Blob, Bytes48};
+
+        // Create a sidecar with a known commitment
+        let commitment = Bytes48::repeat_byte(0x42);
+        let sidecar = BlobTransactionSidecarEip7594::new(
+            vec![Blob::repeat_byte(0xFA)],
+            vec![commitment],
+            vec![Bytes48::repeat_byte(0x11)], // cell proof
+        );
+
+        // Calculate expected versioned hash from the commitment
+        let expected_hash = kzg_to_versioned_hash(commitment.as_slice());
+
+        // Create a transaction request and set the sidecar
+        let mut tx_request = TransactionRequest::default();
+        assert!(tx_request.blob_versioned_hashes.is_none());
+
+        tx_request.set_blob_sidecar_7594(sidecar);
+
+        // Verify that blob_versioned_hashes was populated
+        assert!(tx_request.blob_versioned_hashes.is_some());
+        let hashes = tx_request.blob_versioned_hashes.unwrap();
+        assert_eq!(hashes.len(), 1);
+        assert_eq!(hashes[0], expected_hash);
     }
 }

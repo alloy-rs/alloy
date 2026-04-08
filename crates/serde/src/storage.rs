@@ -73,7 +73,7 @@ impl FromStr for JsonStorageKey {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() > 64 && !(s.len() == 66 && s.starts_with("0x")) {
+        if s.len() > 65 && !(s.len() == 66 && s.starts_with("0x")) {
             return Err(ParseError::BaseConvertError(BaseConvertError::Overflow));
         }
 
@@ -186,6 +186,10 @@ mod tests {
             "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",   // Number
             "0xabc",                                                              // Number
             "0xabcd",                                                             // Number
+            // 0x + 63 hex chars (U256 value, total len = 65)
+            "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Number
+            // 0x + 64 hex chars (max U256, total len = 66)
+            "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Hash
         ];
 
         for input in test_cases {
@@ -254,6 +258,42 @@ mod tests {
         let result = JsonStorageKey::from_str(&long_hex_str);
 
         assert!(matches!(result, Err(ParseError::BaseConvertError(BaseConvertError::Overflow))));
+    }
+
+    #[test]
+    fn test_deserialize_too_long_storage_key() {
+        let key = "0x".to_string() + &"f".repeat(68);
+        let result: Result<JsonStorageKey, _> = serde_json::from_str(&json!(key).to_string());
+        assert!(result.is_err(), "storage key with 68 hex chars should fail deserialization");
+    }
+
+    #[test]
+    fn test_from_str_length_boundaries() {
+        // 0x + 63 hex chars = 65 total — valid U256
+        let key_63 = "0x".to_string() + &"f".repeat(63);
+        let result = JsonStorageKey::from_str(&key_63);
+        assert!(result.is_ok(), "0x + 63 hex chars should be a valid U256 storage key");
+        assert!(matches!(result.unwrap(), JsonStorageKey::Number(_)));
+
+        // 0x + 64 hex chars = 66 total — valid B256
+        let key_64 = "0x".to_string() + &"f".repeat(64);
+        let result = JsonStorageKey::from_str(&key_64);
+        assert!(result.is_ok(), "0x + 64 hex chars should be a valid B256 storage key");
+        assert!(matches!(result.unwrap(), JsonStorageKey::Hash(_)));
+
+        // 0x + 65 hex chars = 67 total — overflow
+        let key_65 = "0x".to_string() + &"f".repeat(65);
+        assert!(JsonStorageKey::from_str(&key_65).is_err());
+
+        // 64 bare hex chars — valid B256
+        let bare_64 = "f".repeat(64);
+        let result = JsonStorageKey::from_str(&bare_64);
+        assert!(result.is_ok(), "64 bare hex chars should be a valid B256 storage key");
+        assert!(matches!(result.unwrap(), JsonStorageKey::Hash(_)));
+
+        // 65 bare hex chars — overflow
+        let bare_65 = "f".repeat(65);
+        assert!(JsonStorageKey::from_str(&bare_65).is_err());
     }
 
     #[test]

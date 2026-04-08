@@ -10,8 +10,8 @@ use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
 
 use alloy_consensus::transaction::Recovered;
 pub use alloy_consensus::{
-    transaction::TransactionInfo, BlobTransactionSidecar, Receipt, ReceiptEnvelope,
-    ReceiptWithBloom, Transaction as TransactionTrait,
+    transaction::TransactionInfo, BlobTransactionSidecar, BlobTransactionSidecarEip7594, Receipt,
+    ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
 };
 pub use alloy_consensus_any::AnyReceiptEnvelope;
 pub use alloy_eips::{
@@ -65,6 +65,12 @@ pub struct Transaction<T = TxEnvelope> {
 
     /// Deprecated effective gas price value.
     pub effective_gas_price: Option<u128>,
+
+    /// The Unix block_timestamp (in seconds) when the block containing this transaction was mined.
+    ///
+    /// `None` if the transaction is pending.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub block_timestamp: Option<u64>,
 }
 
 impl<T> Default for Transaction<T>
@@ -78,6 +84,7 @@ where
             block_number: Default::default(),
             transaction_index: Default::default(),
             effective_gas_price: Default::default(),
+            block_timestamp: Default::default(),
         }
     }
 }
@@ -118,25 +125,41 @@ impl<T> Transaction<T> {
 
     /// Applies the given closure to the inner transaction type.
     pub fn map<Tx>(self, f: impl FnOnce(T) -> Tx) -> Transaction<Tx> {
-        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
+        let Self {
+            inner,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            block_timestamp,
+        } = self;
         Transaction {
             inner: inner.map(f),
             block_hash,
             block_number,
             transaction_index,
             effective_gas_price,
+            block_timestamp,
         }
     }
 
     /// Applies the given fallible closure to the inner transactions.
     pub fn try_map<Tx, E>(self, f: impl FnOnce(T) -> Result<Tx, E>) -> Result<Transaction<Tx>, E> {
-        let Self { inner, block_hash, block_number, transaction_index, effective_gas_price } = self;
+        let Self {
+            inner,
+            block_hash,
+            block_number,
+            transaction_index,
+            effective_gas_price,
+            block_timestamp,
+        } = self;
         Ok(Transaction {
             inner: inner.try_map(f)?,
             block_hash,
             block_number,
             transaction_index,
             effective_gas_price,
+            block_timestamp,
         })
     }
 }
@@ -159,7 +182,12 @@ where
     /// Converts a consensus `tx` with an additional context `tx_info` into an RPC [`Transaction`].
     pub fn from_transaction(tx: Recovered<T>, tx_info: TransactionInfo) -> Self {
         let TransactionInfo {
-            block_hash, block_number, index: transaction_index, base_fee, ..
+            block_hash,
+            block_number,
+            index: transaction_index,
+            base_fee,
+            block_timestamp,
+            ..
         } = tx_info;
         let effective_gas_price = base_fee
             .map(|base_fee| {
@@ -173,6 +201,7 @@ where
             block_number,
             transaction_index,
             effective_gas_price: Some(effective_gas_price),
+            block_timestamp,
         }
     }
 }
@@ -193,6 +222,7 @@ where
             // We don't know the base fee of the block when we're constructing this from
             // `Transaction`
             base_fee: None,
+            block_timestamp: self.block_timestamp,
         }
     }
 }
@@ -447,20 +477,23 @@ mod tx_serde {
     //!
     //! This is needed because we might need to deserialize the `gasPrice` field into both
     //! [`crate::Transaction::effective_gas_price`] and [`alloy_consensus::TxLegacy::gas_price`].
+    //!
+    //! Additionally, during deserialization this module handles the case where the `gasPrice` field
+    //! is larger than `u128::MAX` by saturating it to `u128::MAX`. This is known to happen on
+    //! some networks.
+    //!
+    //! See <https://github.com/alloy-rs/alloy/issues/2842> for example.
+
     use super::*;
+    use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};
 
     /// Helper struct which will be flattened into the transaction and will only contain `gasPrice`
     /// field if inner [`TxEnvelope`] did not consume it.
     #[derive(Serialize, Deserialize)]
     struct MaybeGasPrice {
-        #[serde(
-            default,
-            rename = "gasPrice",
-            skip_serializing_if = "Option::is_none",
-            with = "alloy_serde::quantity::opt"
-        )]
-        pub effective_gas_price: Option<u128>,
+        #[serde(default, rename = "gasPrice", skip_serializing_if = "Option::is_none")]
+        pub effective_gas_price: Option<U256>,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -479,6 +512,12 @@ mod tx_serde {
 
         #[serde(flatten)]
         gas_price: MaybeGasPrice,
+        #[serde(
+            default,
+            with = "alloy_serde::quantity::opt",
+            skip_serializing_if = "Option::is_none"
+        )]
+        block_timestamp: Option<u64>,
     }
 
     impl<T: TransactionTrait> From<Transaction<T>> for TransactionSerdeHelper<T> {
@@ -489,12 +528,17 @@ mod tx_serde {
                 block_number,
                 transaction_index,
                 effective_gas_price,
+                block_timestamp,
             } = value;
 
             let (inner, from) = inner.into_parts();
 
-            // if inner transaction has its own `gasPrice` don't serialize it in this struct.
-            let effective_gas_price = effective_gas_price.filter(|_| inner.gas_price().is_none());
+            let effective_gas_price = if inner.gas_price().is_none() {
+                effective_gas_price.map(U256::from)
+            } else {
+                // If inner transaction has its own `gasPrice` don't serialize it in this struct.
+                None
+            };
 
             Self {
                 inner,
@@ -503,6 +547,7 @@ mod tx_serde {
                 transaction_index,
                 from,
                 gas_price: MaybeGasPrice { effective_gas_price },
+                block_timestamp,
             }
         }
     }
@@ -518,11 +563,14 @@ mod tx_serde {
                 transaction_index,
                 from,
                 gas_price,
+                block_timestamp,
             } = value;
 
-            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice`, otherwise
-            // return error
-            let effective_gas_price = inner.gas_price().or(gas_price.effective_gas_price);
+            // Try to get `gasPrice` field from inner envelope or from `MaybeGasPrice` (making
+            // sure to saturate when converting to u128), otherwise return error.
+            let effective_gas_price = inner
+                .gas_price()
+                .or_else(|| gas_price.effective_gas_price.map(|g| g.saturating_to()));
 
             Ok(Self {
                 inner: Recovered::new_unchecked(inner, from),
@@ -530,6 +578,7 @@ mod tx_serde {
                 block_number,
                 transaction_index,
                 effective_gas_price,
+                block_timestamp,
             })
         }
     }

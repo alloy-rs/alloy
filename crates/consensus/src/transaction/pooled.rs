@@ -196,13 +196,16 @@ mod tests {
                 panic!("Expected EIP-4844 transaction");
             };
             let tx = tx.into_parts().0;
-            assert!(!tx.sidecar.blobs.is_empty());
+            assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
 
-            let tx =
-                tx.try_map_sidecar(|sidecar| sidecar.try_into_7594(kzg_settings.get())).unwrap();
+            let tx = tx
+                .try_map_sidecar(|sidecar| {
+                    sidecar.try_convert_into_eip7594_with_settings(kzg_settings.get())
+                })
+                .unwrap();
 
-            assert!(!tx.sidecar.blobs.is_empty());
+            assert!(!tx.sidecar.blobs().is_empty());
             assert!(tx.validate_blob(kzg_settings.get()).is_ok());
         }
     }

@@ -594,7 +594,7 @@ impl Expander {
             where
                 #(#variant_types: #alloy_eips::Decodable2718),*
             {
-                fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+                fn decode(buf: &mut &[u8]) -> #alloy_rlp::Result<Self> {
                     Ok(<Self as #alloy_eips::Decodable2718>::network_decode(buf)?)
                 }
             }
@@ -609,12 +609,30 @@ impl Expander {
         let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
         let alloy_consensus = &self.alloy_consensus;
 
+        let tx_type_arms = self.variants.all.iter().map(|v| {
+            let name = &v.name;
+            match &v.kind {
+                VariantKind::Typed(_) => quote! {
+                    Self::#name(_) => #tx_type_enum_name::#name
+                },
+                VariantKind::Flattened => quote! {
+                    Self::#name(inner) => #tx_type_enum_name::#name(#alloy_consensus::TransactionEnvelope::tx_type(inner))
+                },
+            }
+        });
+
         quote! {
             impl #impl_generics #alloy_consensus::TransactionEnvelope for #input_type_name #ty_generics
             where
                 Self: #alloy_consensus::Transaction
             {
                 type TxType = #tx_type_enum_name;
+
+                fn tx_type(&self) -> Self::TxType {
+                    match self {
+                        #(#tx_type_arms,)*
+                    }
+                }
             }
         }
     }

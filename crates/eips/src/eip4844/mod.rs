@@ -2,6 +2,10 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+/// Re-export the `c_kzg` crate for downstream consumers.
+#[cfg(feature = "kzg")]
+pub use c_kzg;
+
 /// Module houses the KZG settings, enabling Custom and Default
 #[cfg(feature = "kzg")]
 pub mod env_settings;
@@ -124,6 +128,7 @@ where
 
 #[cfg(all(not(debug_assertions), feature = "serde"))]
 #[inline(always)]
+/// Helper function to deserialize boxed blobs from a serde deserializer.
 pub fn deserialize_blobs<'de, D>(deserializer: D) -> Result<alloc::vec::Vec<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,

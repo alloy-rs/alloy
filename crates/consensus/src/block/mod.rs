@@ -7,7 +7,7 @@ mod traits;
 pub use traits::EthBlock;
 
 mod meta;
-pub use meta::HeaderInfo;
+pub use meta::{HeaderInfo, HeaderRoots};
 
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
@@ -15,7 +15,7 @@ pub(crate) use header::serde_bincode_compat;
 use crate::Transaction;
 use alloc::vec::Vec;
 use alloy_eips::{eip2718::WithEncoded, eip4895::Withdrawals, Encodable2718, Typed2718};
-use alloy_primitives::{Sealable, B256};
+use alloy_primitives::{keccak256, Sealable, Sealed, B256};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -179,6 +179,22 @@ impl<T, H> Block<T, H> {
         T: Encodable,
     {
         block_rlp::HelperRef::from_parts(header, body).length()
+    }
+}
+
+impl<T: Encodable2718> Block<T, Header> {
+    /// Creates a new block from a header and an iterator of transactions.
+    ///
+    /// Computes and sets the `transactions_root` on the header automatically.
+    /// `ommers_hash` is set to [`EMPTY_OMMER_ROOT_HASH`](crate::EMPTY_OMMER_ROOT_HASH).
+    pub fn from_transactions(
+        mut header: Header,
+        transactions: impl IntoIterator<Item = T>,
+    ) -> Self {
+        let transactions: Vec<T> = transactions.into_iter().collect();
+        header.transactions_root = crate::proofs::calculate_transaction_root(&transactions);
+        header.ommers_hash = crate::EMPTY_OMMER_ROOT_HASH;
+        Self::new(header, BlockBody { transactions, ommers: Vec::new(), withdrawals: None })
     }
 }
 
@@ -373,6 +389,34 @@ mod block_rlp {
             Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
     }
+
+    impl<T: Decodable, H: Decodable> Block<T, H> {
+        /// Decodes the block from RLP, computing the header hash directly from the RLP bytes.
+        ///
+        /// This is more efficient than decoding the block and then sealing it, as the header
+        /// hash is computed from the raw RLP bytes without re-encoding.
+        pub fn decode_sealed(buf: &mut &[u8]) -> alloy_rlp::Result<Sealed<Self>> {
+            // Decode the outer block list header
+            let block_rlp_head = alloy_rlp::Header::decode(buf)?;
+            if !block_rlp_head.list {
+                return Err(alloy_rlp::Error::UnexpectedString);
+            }
+
+            // Decode header and compute hash from raw RLP bytes
+            let header_start = *buf;
+            let header = H::decode(buf)?;
+            let header_hash = keccak256(&header_start[..header_start.len() - buf.len()]);
+
+            // Decode remaining body fields
+            let transactions = Vec::<T>::decode(buf)?;
+            let ommers = Vec::<H>::decode(buf)?;
+            let withdrawals = if buf.is_empty() { None } else { Some(Decodable::decode(buf)?) };
+
+            let block = Self { header, body: BlockBody { transactions, ommers, withdrawals } };
+
+            Ok(Sealed::new_unchecked(block, header_hash))
+        }
+    }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
@@ -400,10 +444,130 @@ where
 mod tests {
     use super::*;
     use crate::{Signed, TxEnvelope, TxLegacy};
+    use alloy_rlp::Encodable;
 
     #[test]
     fn can_convert_block() {
         let block: Block<Signed<TxLegacy>> = Block::default();
         let _: Block<TxEnvelope> = block.convert_transactions();
+    }
+
+    #[test]
+    fn decode_sealed_produces_correct_hash() {
+        let block: Block<TxEnvelope> = Block::default();
+        let expected_hash = block.header.hash_slow();
+
+        let mut encoded = Vec::new();
+        block.encode(&mut encoded);
+
+        let mut buf = encoded.as_slice();
+        let sealed = Block::<TxEnvelope>::decode_sealed(&mut buf).unwrap();
+
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(*sealed.inner(), block);
+    }
+
+    #[test]
+    fn header_decode_sealed_produces_correct_hash() {
+        let header = Header::default();
+        let expected_hash = header.hash_slow();
+
+        let mut encoded = Vec::new();
+        header.encode(&mut encoded);
+
+        let mut buf = encoded.as_slice();
+        let sealed = Header::decode_sealed(&mut buf).unwrap();
+
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(*sealed.inner(), header);
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn decode_sealed_roundtrip_with_transactions() {
+        use crate::{SignableTransaction, TxLegacy};
+        use alloy_primitives::{Address, Signature, TxKind, U256};
+
+        let tx = TxLegacy {
+            nonce: 1,
+            gas_price: 100,
+            gas_limit: 21000,
+            to: TxKind::Call(Address::ZERO),
+            value: U256::from(1000),
+            input: Default::default(),
+            chain_id: Some(1),
+        };
+        let sig = Signature::new(U256::from(1), U256::from(2), false);
+        let signed = tx.into_signed(sig);
+        let envelope: TxEnvelope = signed.into();
+
+        let block = Block {
+            header: Header { number: 42, gas_limit: 30_000_000, ..Default::default() },
+            body: BlockBody { transactions: vec![envelope], ommers: vec![], withdrawals: None },
+        };
+
+        let expected_hash = block.header.hash_slow();
+
+        let mut encoded = Vec::new();
+        block.encode(&mut encoded);
+
+        let mut buf = encoded.as_slice();
+        let sealed = Block::<TxEnvelope>::decode_sealed(&mut buf).unwrap();
+
+        assert_eq!(sealed.hash(), expected_hash);
+        assert_eq!(sealed.header.number, 42);
+        assert_eq!(sealed.body.transactions.len(), 1);
+        assert!(buf.is_empty());
+    }
+}
+
+#[cfg(all(test, feature = "arbitrary"))]
+mod fuzz_tests {
+    use super::*;
+    use crate::{EthereumTxEnvelope, TxEip4844};
+    use alloy_rlp::Encodable;
+    use arbitrary::{Arbitrary, Unstructured};
+    use rand::Rng;
+
+    #[test]
+    fn fuzz_decode_sealed_block_roundtrip() {
+        for _ in 0..10 {
+            let mut bytes = [0u8; 1024 * 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let block = Block::<EthereumTxEnvelope<TxEip4844>>::arbitrary(&mut u).unwrap();
+            let expected_hash = block.header.hash_slow();
+
+            let mut encoded = Vec::new();
+            block.encode(&mut encoded);
+
+            let sealed =
+                Block::<EthereumTxEnvelope<TxEip4844>>::decode_sealed(&mut encoded.as_slice())
+                    .unwrap();
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), block);
+        }
+    }
+
+    #[test]
+    fn fuzz_header_decode_sealed_roundtrip() {
+        for _ in 0..200 {
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let mut u = Unstructured::new(&bytes);
+
+            let header = Header::arbitrary(&mut u).unwrap();
+            let expected_hash = header.hash_slow();
+
+            let mut encoded = Vec::new();
+            header.encode(&mut encoded);
+
+            let mut buf = encoded.as_slice();
+            let sealed = Header::decode_sealed(&mut buf).unwrap();
+
+            assert_eq!(sealed.hash(), expected_hash);
+            assert_eq!(*sealed.inner(), header);
+        }
     }
 }

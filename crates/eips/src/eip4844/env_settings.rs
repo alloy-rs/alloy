@@ -49,7 +49,7 @@ impl EnvKzgSettings {
     /// not already loaded, see also [`c_kzg::ethereum_kzg_settings`].
     ///
     /// To configure a different [precompute] value, [`c_kzg::ethereum_kzg_settings`] must be called
-    /// directly once. The default precompute value is `0`.
+    /// directly once. The default precompute value is `8`.
     ///
     /// [precompute]: https://github.com/ethereum/c-kzg-4844/blob/dffa18ee350aeef38f749ffad24a27c1645fb4f8/README.md?plain=1#L112
     #[inline]

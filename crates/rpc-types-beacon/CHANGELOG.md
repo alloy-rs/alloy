@@ -5,11 +5,164 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3](https://github.com/alloy-rs/alloy/releases/tag/v1.8.3) - 2026-03-27
+
+### Miscellaneous Tasks
+
+- Release 1.8.2
+
+## [1.8.1](https://github.com/alloy-rs/alloy/releases/tag/v1.8.1) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.1
+
+## [1.8.0](https://github.com/alloy-rs/alloy/releases/tag/v1.8.0) - 2026-03-25
+
+### Miscellaneous Tasks
+
+- Release 1.8.0
+
+## [1.7.4](https://github.com/alloy-rs/alloy/releases/tag/v1.7.4) - 2026-03-09
+
+### Miscellaneous Tasks
+
+- Release 1.7.4
+
+## [1.7.3](https://github.com/alloy-rs/alloy/releases/tag/v1.7.3) - 2026-02-18
+
+### Miscellaneous Tasks
+
+- Release 1.7.3
+- Release 1.7.2
+
+## [1.7.1](https://github.com/alloy-rs/alloy/releases/tag/v1.7.1) - 2026-02-17
+
+### Miscellaneous Tasks
+
+- Release 1.7.1
+
+## [1.7.0](https://github.com/alloy-rs/alloy/releases/tag/v1.7.0) - 2026-02-17
+
+### Features
+
+- [rpc-types-beacon] Add proposer duties, state validators, and fork types ([#3688](https://github.com/alloy-rs/alloy/issues/3688))
+
+### Miscellaneous Tasks
+
+- Release 1.7.0
+
+## [1.6.3](https://github.com/alloy-rs/alloy/releases/tag/v1.6.3) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.3
+
+## [1.6.2](https://github.com/alloy-rs/alloy/releases/tag/v1.6.2) - 2026-02-09
+
+### Miscellaneous Tasks
+
+- Release 1.6.2
+
+## [1.6.1](https://github.com/alloy-rs/alloy/releases/tag/v1.6.1) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.1
+
+## [1.6.0](https://github.com/alloy-rs/alloy/releases/tag/v1.6.0) - 2026-02-03
+
+### Miscellaneous Tasks
+
+- Release 1.6.0
+
+## [1.5.2](https://github.com/alloy-rs/alloy/releases/tag/v1.5.2) - 2026-01-22
+
+### Features
+
+- [rpc-types-beacon] Add SSZ support for beacon block types ([#3575](https://github.com/alloy-rs/alloy/issues/3575))
+
+### Miscellaneous Tasks
+
+- Release 1.5.2
+
+## [1.5.1](https://github.com/alloy-rs/alloy/releases/tag/v1.5.1) - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release 1.5.1 ([#3569](https://github.com/alloy-rs/alloy/issues/3569))
+
+### Other
+
+- Revert "chore: "reapply "chore: added slot num in payload attr"" ([#3567](https://github.com/alloy-rs/alloy/issues/3567))
+
+## [1.5.0](https://github.com/alloy-rs/alloy/releases/tag/v1.5.0) - 2026-01-21
+
+### Features
+
+- [rpc-types-beacon] Add SignedBeaconBlock and BeaconBlock types ([#3565](https://github.com/alloy-rs/alloy/issues/3565))
+- [rpc-types-beacon] Add BeaconExecutionPayloadV4 support ([#3562](https://github.com/alloy-rs/alloy/issues/3562))
+
+### Miscellaneous Tasks
+
+- Release 1.5.0
+- "reapply "chore: added slot num in payload attr" ([#3530](https://github.com/alloy-rs/alloy/issues/3530))
+- Added slot num in payload attr ([#3524](https://github.com/alloy-rs/alloy/issues/3524))
+
+### Other
+
+- Revert "chore: added slot num in payload attr" ([#3528](https://github.com/alloy-rs/alloy/issues/3528))
+
+## [1.4.3](https://github.com/alloy-rs/alloy/releases/tag/v1.4.3) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.3
+
+## [1.4.2](https://github.com/alloy-rs/alloy/releases/tag/v1.4.2) - 2026-01-14
+
+### Miscellaneous Tasks
+
+- Release 1.4.2
+
+## [1.4.1](https://github.com/alloy-rs/alloy/releases/tag/v1.4.1) - 2026-01-13
+
+### Miscellaneous Tasks
+
+- Release 1.4.1
+
+## [1.4.0](https://github.com/alloy-rs/alloy/releases/tag/v1.4.0) - 2026-01-09
+
+### Miscellaneous Tasks
+
+- Release 1.4.0
+
+## [1.3.0](https://github.com/alloy-rs/alloy/releases/tag/v1.3.0) - 2026-01-06
+
+### Miscellaneous Tasks
+
+- Release 1.3.0
+
+## [1.2.1](https://github.com/alloy-rs/alloy/releases/tag/v1.2.1) - 2025-12-23
+
+### Miscellaneous Tasks
+
+- Release 1.2.1
+- Rm all deprecations ([#3341](https://github.com/alloy-rs/alloy/issues/3341))
+
+### Refactor
+
+- Remove unnecessary Encode bound in parse_request_payload ([#3184](https://github.com/alloy-rs/alloy/issues/3184))
+
 ## [1.1.3](https://github.com/alloy-rs/alloy/releases/tag/v1.1.3) - 2025-12-06
 
 ### Features
 
 - Include DecodeError in SszDecodeError display ([#3232](https://github.com/alloy-rs/alloy/issues/3232))
+
+### Miscellaneous Tasks
+
+- Release 1.1.3
 
 ## [1.1.2](https://github.com/alloy-rs/alloy/releases/tag/v1.1.2) - 2025-11-20
 
@@ -546,11 +699,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Release 0.7.3
-
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.7.0...HEAD)
-
-### Miscellaneous Tasks
-
 - Release 0.7.2 ([#1729](https://github.com/alloy-rs/alloy/issues/1729))
 - Disable serde-with default features ([#1703](https://github.com/alloy-rs/alloy/issues/1703))
 
