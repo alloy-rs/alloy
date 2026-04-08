@@ -100,28 +100,6 @@ pub enum ForkchoiceUpdateError {
 
 impl core::error::Error for ForkchoiceUpdateError {}
 
-#[cfg(feature = "jsonrpsee-types")]
-impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static> {
-    fn from(value: ForkchoiceUpdateError) -> Self {
-        match value {
-            ForkchoiceUpdateError::UpdatedInvalidPayloadAttributes => {
-                jsonrpsee_types::error::ErrorObject::owned(
-                    INVALID_PAYLOAD_ATTRIBUTES_ERROR,
-                    INVALID_PAYLOAD_ATTRIBUTES_ERROR_MSG,
-                    None::<()>,
-                )
-            }
-            ForkchoiceUpdateError::InvalidState | ForkchoiceUpdateError::UnknownFinalBlock => {
-                jsonrpsee_types::error::ErrorObject::owned(
-                    INVALID_FORK_CHOICE_STATE_ERROR,
-                    INVALID_FORK_CHOICE_STATE_ERROR_MSG,
-                    None::<()>,
-                )
-            }
-        }
-    }
-}
-
 /// Represents a successfully _processed_ forkchoice state update.
 ///
 /// Note: this can still be INVALID if the provided payload was invalid.

@@ -525,7 +525,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -566,7 +566,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 
@@ -595,7 +595,7 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .with_simple_nonce_management()
-            .filler(GasFiller)
+            .filler(GasFiller::default())
             .filler(ChainIdFiller::default())
             .connect_anvil();
 

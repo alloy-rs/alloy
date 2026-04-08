@@ -1,7 +1,8 @@
 //! 'eth_simulateV1' Request / Response types: <https://github.com/ethereum/execution-apis/pull/484>
 
 use crate::{
-    alloc::string::ToString, state::StateOverride, Block, BlockOverrides, Log, TransactionRequest,
+    alloc::string::ToString, error::EthRpcErrorCode, state::StateOverride, Block, BlockOverrides,
+    Log, TransactionRequest,
 };
 use alloc::{string::String, vec::Vec};
 use alloy_primitives::{Bytes, U256};
@@ -87,7 +88,7 @@ pub struct SimulatedBlock<B = Block> {
 
 /// Captures the outcome of a transaction simulation.
 /// It includes the return value, logs produced, gas used, and the status of the transaction.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimCallResult {
@@ -186,9 +187,11 @@ impl<TxReq> SimulatePayload<TxReq> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulateError {
-    /// Code error
-    /// -3200: Execution reverted
-    /// -32015: VM execution error
+    /// Error code.
+    ///
+    /// Known values:
+    /// - [`Self::EXECUTION_REVERTED_CODE`] for `Execution reverted`
+    /// - [`Self::VM_EXECUTION_ERROR_CODE`] for `VM execution error`
     pub code: i32,
     /// Message error
     pub message: String,
@@ -198,9 +201,20 @@ pub struct SimulateError {
 }
 
 impl SimulateError {
+    /// `Execution reverted` error code.
+    pub const EXECUTION_REVERTED_CODE: i32 = EthRpcErrorCode::ExecutionError.code();
+    /// `VM execution error` error code.
+    pub const VM_EXECUTION_ERROR_CODE: i32 = -32015;
+    /// `Invalid params` error code.
+    pub const INVALID_PARAMS_ERROR_CODE: i32 = -32602;
+
     /// Creates a new invalid params error.
     pub fn invalid_params() -> Self {
-        Self { code: -32602, message: "invalid params".to_string(), data: None }
+        Self {
+            code: Self::INVALID_PARAMS_ERROR_CODE,
+            message: "invalid params".to_string(),
+            data: None,
+        }
     }
 }
 
@@ -313,5 +327,12 @@ mod tests {
         assert_eq!(block_state_call_2.calls[1].from.unwrap(), address_2);
         assert_eq!(block_state_call_2.calls[1].to.unwrap(), TxKind::Call(address_2));
         assert_eq!(block_state_call_2.calls[1].nonce.unwrap(), 5);
+    }
+
+    #[test]
+    fn test_simulate_error_codes() {
+        assert_eq!(SimulateError::EXECUTION_REVERTED_CODE, EthRpcErrorCode::ExecutionError.code());
+        assert_eq!(SimulateError::VM_EXECUTION_ERROR_CODE, -32015);
+        assert_eq!(SimulateError::invalid_params().code, SimulateError::INVALID_PARAMS_ERROR_CODE);
     }
 }
