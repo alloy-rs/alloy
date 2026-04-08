@@ -312,6 +312,7 @@ impl From<GenesisAccount> for TrieAccount {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 #[cfg_attr(feature = "borsh", derive(borsh::BorshSerialize, borsh::BorshDeserialize))]
+#[expect(clippy::manual_non_exhaustive)]
 pub struct ChainConfig {
     /// The network's chain ID.
     pub chain_id: u64,
@@ -453,6 +454,9 @@ pub struct ChainConfig {
     /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub blob_schedule: BTreeMap<String, BlobParams>,
+
+    /// Non-exhaustive field to allow adding new fields to the struct without breaking changes.
+    _non_exhaustive: (),
 }
 
 /// Bincode-compatible [`ChainConfig`] serde implementation.
@@ -654,6 +658,7 @@ pub mod serde_bincode_compat {
                 },
                 deposit_contract_address: value.deposit_contract_address,
                 blob_schedule: value.blob_schedule.into_owned(),
+                _non_exhaustive: (),
             }
         }
     }
@@ -756,6 +761,7 @@ pub mod serde_bincode_compat {
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
                 blob_schedule,
+                _non_exhaustive: (),
             };
 
             let data = Data { config };
@@ -813,6 +819,7 @@ pub mod serde_bincode_compat {
                 extra_fields: Default::default(),
                 deposit_contract_address: None,
                 blob_schedule: Default::default(),
+                _non_exhaustive: (),
             };
 
             // Add some extra fields with different serde_json::Value types
@@ -1100,6 +1107,7 @@ impl Default for ChainConfig {
             extra_fields: Default::default(),
             deposit_contract_address: None,
             blob_schedule: Default::default(),
+            _non_exhaustive: (),
         }
     }
 }
