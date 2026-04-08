@@ -9,7 +9,10 @@ use alloy_network::BlockResponse;
 use alloy_primitives::{B256, U128, U64};
 use alloy_rpc_client::WeakClient;
 use alloy_transport::{TransportError, TransportResult};
-use std::{fmt, fmt::Formatter};
+use std::{
+    fmt::{self, Formatter},
+    sync::Arc,
+};
 
 pub use alloy_eips::eip1559::Eip1559Estimation;
 
@@ -26,33 +29,33 @@ pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
 /// A trait responsible for estimating EIP-1559 values
-pub trait Eip1559EstimatorFn: Send + Unpin {
+pub trait Eip1559EstimatorFn: Send + Sync + Unpin {
     /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
     fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation;
 }
 
 /// EIP-1559 estimator variants
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum Eip1559Estimator {
     /// Uses the builtin estimator
     #[default]
     Default,
     /// Uses a custom estimator
-    Custom(Box<dyn Eip1559EstimatorFn>),
+    Custom(Arc<dyn Eip1559EstimatorFn>),
 }
 
 impl Eip1559Estimator {
     /// Creates a new estimator from a closure
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin + 'static,
+        F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Sync + Unpin + 'static,
     {
         Self::new_estimator(f)
     }
 
     /// Creates a new estimate fn
     pub fn new_estimator<F: Eip1559EstimatorFn + 'static>(f: F) -> Self {
-        Self::Custom(Box::new(f))
+        Self::Custom(Arc::new(f))
     }
 
     /// Estimates the EIP-1559 values given the latest basefee and the recent rewards.
@@ -66,7 +69,7 @@ impl Eip1559Estimator {
 
 impl<F> Eip1559EstimatorFn for F
 where
-    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Unpin,
+    F: Fn(u128, &[Vec<u128>]) -> Eip1559Estimation + Send + Sync + Unpin,
 {
     fn estimate(&self, base_fee: u128, rewards: &[Vec<u128>]) -> Eip1559Estimation {
         (self)(base_fee, rewards)
@@ -156,6 +159,23 @@ pub(crate) async fn hashes_to_blocks<BlockResp: BlockResponse + RpcRecv>(
     }))
     .await?;
     Ok(blocks)
+}
+
+/// Fetches headers for a list of block hashes.
+pub(crate) async fn hashes_to_headers<
+    HeaderResp: alloy_network_primitives::HeaderResponse + RpcRecv,
+>(
+    hashes: Vec<B256>,
+    client: WeakClient,
+) -> TransportResult<Vec<Option<HeaderResp>>> {
+    let client = client.upgrade().ok_or(TransportError::local_usage_str("client dropped"))?;
+    let headers = futures::future::try_join_all(
+        hashes
+            .into_iter()
+            .map(|hash| client.request::<_, Option<HeaderResp>>("eth_getHeaderByHash", (hash,))),
+    )
+    .await?;
+    Ok(headers)
 }
 
 /// Helper type representing the joined recommended fillers i.e [`GasFiller`],
