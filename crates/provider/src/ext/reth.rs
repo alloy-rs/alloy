@@ -3,7 +3,7 @@
 use crate::GetSubscription;
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{map::HashMap, Address, U256};
+use alloy_primitives::{map::HashMap, Address, U256, U64};
 use alloy_rpc_types_eth::BlockId;
 use alloy_transport::TransportResult;
 
@@ -16,6 +16,17 @@ pub trait RethProviderExt<N: Network>: Send + Sync {
         &self,
         block_id: BlockId,
     ) -> TransportResult<HashMap<Address, U256>>;
+
+    /// Re-executes a block (or a range of blocks) and returns the execution outcome including
+    /// receipts, state changes, and EIP-7685 requests.
+    ///
+    /// If `count` is provided, re-executes `count` consecutive blocks starting from `block_id`
+    /// and returns the merged execution outcome.
+    async fn reth_get_block_execution_outcome(
+        &self,
+        block_id: BlockId,
+        count: Option<U64>,
+    ) -> TransportResult<Option<serde_json::Value>>;
 
     /// Subscribe to json `ChainNotifications`
     #[cfg(feature = "pubsub")]
@@ -44,6 +55,14 @@ where
         block_id: BlockId,
     ) -> TransportResult<HashMap<Address, U256>> {
         self.client().request("reth_getBalanceChangesInBlock", (block_id,)).await
+    }
+
+    async fn reth_get_block_execution_outcome(
+        &self,
+        block_id: BlockId,
+        count: Option<U64>,
+    ) -> TransportResult<Option<serde_json::Value>> {
+        self.client().request("reth_getBlockExecutionOutcome", (block_id, count)).await
     }
 
     #[cfg(feature = "pubsub")]

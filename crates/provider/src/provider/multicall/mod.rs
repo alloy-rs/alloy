@@ -594,12 +594,7 @@ where
 
     /// Call the `blockAndAggregate` function
     pub async fn block_and_aggregate(&self) -> Result<(u64, B256, T::SuccessReturns)> {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        let call = blockAndAggregateCall { calls };
+        let call = self.to_block_and_aggregate_call();
         let output = self.build_and_call(call, None).await?;
         let blockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         let result = T::decode_return_results(&returnData)?;
@@ -616,12 +611,7 @@ where
         &self,
         require_success: bool,
     ) -> Result<(u64, B256, T::Returns)> {
-        let calls = self
-            .calls
-            .iter()
-            .map(|c| Call { target: c.target, callData: c.callData.clone() })
-            .collect::<Vec<_>>();
-        let call = tryBlockAndAggregateCall { requireSuccess: require_success, calls };
+        let call = self.to_try_block_and_aggregate_call(require_success);
         let output = self.build_and_call(call, None).await?;
         let tryBlockAndAggregateReturn { blockNumber, blockHash, returnData } = output;
         Ok((blockNumber.to::<u64>(), blockHash, T::decode_return_results(&returnData)?))

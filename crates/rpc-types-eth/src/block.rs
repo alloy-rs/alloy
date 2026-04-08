@@ -707,6 +707,14 @@ pub struct BlockOverrides {
     /// Overrides the blob base fee of the block.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub blob_base_fee: Option<U256>,
+    /// Overrides the parent beacon block root of the block.
+    ///
+    /// Only used by `eth_simulateV1` — not applicable to `eth_call` or `eth_estimateGas`.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "parentBeaconBlockRoot")
+    )]
+    pub beacon_root: Option<B256>,
     /// A dictionary that maps blockNumber to a user-defined hash. It can be queried from the
     /// EVM opcode BLOCKHASH.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -724,6 +732,7 @@ impl BlockOverrides {
             && self.random.is_none()
             && self.base_fee.is_none()
             && self.blob_base_fee.is_none()
+            && self.beacon_root.is_none()
             && self.block_hash.is_none()
     }
 
@@ -772,6 +781,12 @@ impl BlockOverrides {
     /// Sets the blob base fee override
     pub const fn with_blob_base_fee(mut self, blob_base_fee: U256) -> Self {
         self.blob_base_fee = Some(blob_base_fee);
+        self
+    }
+
+    /// Sets the parent beacon block root override
+    pub const fn with_beacon_root(mut self, beacon_root: B256) -> Self {
+        self.beacon_root = Some(beacon_root);
         self
     }
 
@@ -1043,6 +1058,10 @@ mod tests {
         let overrides_with_block_hash =
             BlockOverrides::default().append_block_hash(1, B256::with_last_byte(1));
         assert!(!overrides_with_block_hash.is_empty());
+
+        let overrides_with_beacon_root =
+            BlockOverrides::default().with_beacon_root(B256::with_last_byte(1));
+        assert!(!overrides_with_beacon_root.is_empty());
     }
 
     #[test]

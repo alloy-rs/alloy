@@ -32,7 +32,6 @@ alloy-eip7928 = { workspace = true, features = ["rlp"] }
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 either.workspace = true
-thiserror.workspace = true
 
 # serde
 alloy-serde = { workspace = true, optional = true }
@@ -91,7 +90,6 @@ std = [
 	"sha2?/std",
 	"either/std",
 	"serde_with?/std",
-	"thiserror/std",
 	"borsh?/std"
 ]
 serde = [

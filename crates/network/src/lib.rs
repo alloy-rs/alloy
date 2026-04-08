@@ -15,8 +15,8 @@ use core::fmt::{Debug, Display};
 mod transaction;
 pub use transaction::{
     BuildResult, FullSigner, FullSignerSync, NetworkWallet, TransactionBuilder,
-    TransactionBuilder4844, TransactionBuilder7594, TransactionBuilder7702,
-    TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
+    TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError, TxSigner,
+    TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
@@ -62,7 +62,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The network transaction envelope type.
     #[doc(alias = "TransactionEnvelope")]
-    type TxEnvelope: Eip2718Envelope + Transaction + Debug;
+    type TxEnvelope: Eip2718Envelope + Transaction + Debug + Clone;
 
     /// An enum over the various transaction types.
     #[doc(alias = "UnsignedTransaction")]
@@ -83,7 +83,8 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + TransactionBuilder<Self>
         + Debug
         + From<Self::TxEnvelope>
-        + From<Self::UnsignedTx>;
+        + From<Self::UnsignedTx>
+        + From<Self::TransactionResponse>;
 
     /// The JSON body of a transaction response.
     #[doc(alias = "TxResponse")]
