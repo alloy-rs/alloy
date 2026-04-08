@@ -94,10 +94,10 @@ alloy-eip7928 = { version = "0.3", default-features = false }
 alloy-hardforks = "0.2.0"
 
 # ethereum
-ethereum_ssz_derive = "0.9"
-ethereum_ssz = "0.9"
-tree_hash = "0.10.0"
-tree_hash_derive = "0.10.0"
+ethereum_ssz_derive = "0.10"
+ethereum_ssz = "0.10"
+tree_hash = "0.12"
+tree_hash_derive = "0.12"
 
 # crypto
 c-kzg = { version = "2.1.1", default-features = false }
